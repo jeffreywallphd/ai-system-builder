@@ -1,4 +1,4 @@
-const { existsSync, readFileSync } = require("node:fs");
+const { existsSync, readFileSync, readdirSync } = require("node:fs");
 const { resolve } = require("node:path");
 
 const REQUIRED_TOP_LEVEL_FOLDERS = [
@@ -51,6 +51,17 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/governance/context-system-rollout-boundaries.md",
   "docs/context/governance/context-system-rollout-boundaries.ai.md",
 ];
+
+const REQUIRED_ADR_FILES = [
+  "docs/adr/records/adr-registry.json",
+];
+
+const ADR_DECISION_STATUSES = new Set([
+  "proposed",
+  "accepted",
+  "superseded",
+  "deprecated",
+]);
 
 const REQUIRED_HEADER_FIELDS = [
   "title",
@@ -266,6 +277,16 @@ function validateDocsFoundation(repoRoot) {
     }
   }
 
+  for (const relativePath of REQUIRED_ADR_FILES) {
+    const absolutePath = resolve(repoRoot, relativePath);
+    if (!existsSync(absolutePath)) {
+      issues.push({
+        code: "ADR_FILE_MISSING",
+        message: `Missing required ADR foundation file: ${relativePath}`,
+      });
+    }
+  }
+
   const contextPackCatalogContractPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.contract.json");
   const contextPackCatalogSeedPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.seed.json");
   const contextPackContractPath = resolve(repoRoot, "docs/context/packs/context-pack.contract.json");
@@ -273,6 +294,7 @@ function validateDocsFoundation(repoRoot) {
   const contextAssetMetadataContractPath = resolve(repoRoot, "docs/context/context-asset-metadata.contract.json");
   const taskRoutingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
   const taskRoutingSeedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.seed.json");
+  const adrRegistryPath = resolve(repoRoot, "docs/adr/records/adr-registry.json");
 
   const expectedContextJsonArtifacts = [
     contextPackContractPath,
@@ -423,6 +445,302 @@ function validateDocsFoundation(repoRoot) {
   const contextMap = contextJsonArtifacts.get(contextMapPath);
   const catalogSeed = contextJsonArtifacts.get(contextPackCatalogSeedPath);
   const catalogContract = contextJsonArtifacts.get(contextPackCatalogContractPath);
+  let adrRegistry;
+  if (existsSync(adrRegistryPath)) {
+    try {
+      adrRegistry = readJson(adrRegistryPath);
+    } catch (error) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_INVALID",
+        "docs/adr/records/adr-registry.json is not valid JSON.",
+      );
+    }
+  }
+
+  if (adrRegistry) {
+    if (adrRegistry.schemaVersion !== "1.0.0" || adrRegistry.artifactType !== "adr-registry") {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_INVALID",
+        "docs/adr/records/adr-registry.json must declare schemaVersion 1.0.0 and artifactType adr-registry.",
+      );
+    }
+
+    if (!Array.isArray(adrRegistry.records) || adrRegistry.records.length === 0) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_INVALID",
+        "docs/adr/records/adr-registry.json must include non-empty records.",
+      );
+    }
+
+    if (
+      !adrRegistry.discoveryIndex
+      || typeof adrRegistry.discoveryIndex !== "object"
+      || !adrRegistry.discoveryIndex.byDecisionStatus
+      || typeof adrRegistry.discoveryIndex.byDecisionStatus !== "object"
+      || !adrRegistry.discoveryIndex.byDomain
+      || typeof adrRegistry.discoveryIndex.byDomain !== "object"
+    ) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_INVALID",
+        "docs/adr/records/adr-registry.json must include discoveryIndex.byDecisionStatus and discoveryIndex.byDomain objects.",
+      );
+    }
+
+    const registryIdentifiers = new Set();
+    const registryNumbers = [];
+    const seenHumanPaths = new Set();
+    const seenAiPaths = new Set();
+
+    for (const [index, entry] of (adrRegistry.records || []).entries()) {
+      const requiredFields = [
+        "identifier",
+        "adrNumber",
+        "title",
+        "decisionStatus",
+        "decisionDate",
+        "summary",
+        "humanDocPath",
+        "aiDocPath",
+      ];
+      for (const field of requiredFields) {
+        if (!isNonEmptyString(entry?.[field])) {
+          addIssue(
+            issues,
+            "ADR_REGISTRY_INVALID",
+            `docs/adr/records/adr-registry.json record index ${index} is missing required field '${field}'.`,
+          );
+        }
+      }
+
+      if (!Array.isArray(entry?.relatedDomains) || !isArrayOfNonEmptyStrings(entry.relatedDomains)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json record '${entry?.identifier || `index-${index}`}' must include non-empty relatedDomains.`,
+        );
+      }
+
+      if (isNonEmptyString(entry?.decisionStatus) && !ADR_DECISION_STATUSES.has(entry.decisionStatus)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json record '${entry.identifier}' has unsupported decisionStatus '${entry.decisionStatus}'.`,
+        );
+      }
+
+      if (isNonEmptyString(entry?.decisionDate) && !isValidIsoDate(entry.decisionDate)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json record '${entry.identifier}' has invalid decisionDate '${entry.decisionDate}'.`,
+        );
+      }
+
+      if (isNonEmptyString(entry?.summary) && entry.summary.length > 260) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json record '${entry.identifier}' summary exceeds 260 characters.`,
+        );
+      }
+
+      if (isNonEmptyString(entry?.identifier) && registryIdentifiers.has(entry.identifier)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json contains duplicate identifier '${entry.identifier}'.`,
+        );
+      }
+      registryIdentifiers.add(entry?.identifier);
+
+      if (!/^\d{3}$/.test(entry?.adrNumber || "")) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json record '${entry?.identifier || `index-${index}`}' must use a 3-digit adrNumber.`,
+        );
+      } else {
+        registryNumbers.push(Number(entry.adrNumber));
+      }
+
+      for (const pathField of ["humanDocPath", "aiDocPath"]) {
+        const pathValue = entry?.[pathField];
+        if (!isNonEmptyString(pathValue)) {
+          continue;
+        }
+        if (!pathExistsForReference(repoRoot, pathValue)) {
+          addIssue(
+            issues,
+            "ADR_REGISTRY_REFERENCE_INVALID",
+            `docs/adr/records/adr-registry.json record '${entry?.identifier || `index-${index}`}' references missing ${pathField} '${pathValue}'.`,
+          );
+        }
+      }
+
+      if (isNonEmptyString(entry?.humanDocPath) && seenHumanPaths.has(entry.humanDocPath)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json contains duplicate humanDocPath '${entry.humanDocPath}'.`,
+        );
+      }
+      seenHumanPaths.add(entry?.humanDocPath);
+
+      if (isNonEmptyString(entry?.aiDocPath) && seenAiPaths.has(entry.aiDocPath)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json contains duplicate aiDocPath '${entry.aiDocPath}'.`,
+        );
+      }
+      seenAiPaths.add(entry?.aiDocPath);
+
+      if (isNonEmptyString(entry?.identifier) && isNonEmptyString(entry?.adrNumber)) {
+        const expectedIdentifier = `ADR-${entry.adrNumber}`;
+        if (entry.identifier !== expectedIdentifier) {
+          addIssue(
+            issues,
+            "ADR_REGISTRY_INVALID",
+            `docs/adr/records/adr-registry.json record '${entry.identifier}' must use identifier '${expectedIdentifier}'.`,
+          );
+        }
+      }
+
+      if (pathExistsForReference(repoRoot, entry?.humanDocPath)) {
+        try {
+          const frontmatter = parseFrontmatter(readFileSync(resolve(repoRoot, entry.humanDocPath), "utf8"));
+          const expectedTitle = `ADR-${entry.adrNumber} ${entry.title}`;
+          if (frontmatter.title !== expectedTitle) {
+            addIssue(
+              issues,
+              "ADR_REGISTRY_REFERENCE_INVALID",
+              `docs/adr/records/adr-registry.json record '${entry.identifier}' title does not match human ADR frontmatter.`,
+            );
+          }
+          if (frontmatter.adr_number !== entry.adrNumber) {
+            addIssue(
+              issues,
+              "ADR_REGISTRY_REFERENCE_INVALID",
+              `docs/adr/records/adr-registry.json record '${entry.identifier}' adrNumber does not match human ADR frontmatter.`,
+            );
+          }
+          if (frontmatter.decision_status !== entry.decisionStatus) {
+            addIssue(
+              issues,
+              "ADR_REGISTRY_REFERENCE_INVALID",
+              `docs/adr/records/adr-registry.json record '${entry.identifier}' decisionStatus does not match human ADR frontmatter.`,
+            );
+          }
+          if (frontmatter.decision_date !== entry.decisionDate) {
+            addIssue(
+              issues,
+              "ADR_REGISTRY_REFERENCE_INVALID",
+              `docs/adr/records/adr-registry.json record '${entry.identifier}' decisionDate does not match human ADR frontmatter.`,
+            );
+          }
+        } catch (error) {
+          addIssue(
+            issues,
+            "ADR_REGISTRY_REFERENCE_INVALID",
+            `docs/adr/records/adr-registry.json record '${entry?.identifier || `index-${index}`}' has unreadable human ADR frontmatter: ${error.message}`,
+          );
+        }
+      }
+    }
+
+    const sortedRegistryNumbers = [...registryNumbers].sort((left, right) => left - right);
+    if (JSON.stringify(registryNumbers) !== JSON.stringify(sortedRegistryNumbers)) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_INVALID",
+        "docs/adr/records/adr-registry.json records must be sorted by adrNumber ascending.",
+      );
+    }
+
+    const expectedHumanAdrDocs = readdirSync(resolve(repoRoot, "docs/adr/records"))
+      .filter((name) => /^adr-\d{3}-.*\.md$/.test(name) && !name.endsWith(".ai.md"))
+      .map((name) => `docs/adr/records/${name}`)
+      .sort();
+    const registryHumanDocs = [...seenHumanPaths].filter((pathValue) => isNonEmptyString(pathValue)).sort();
+    if (JSON.stringify(expectedHumanAdrDocs) !== JSON.stringify(registryHumanDocs)) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_REFERENCE_INVALID",
+        "docs/adr/records/adr-registry.json humanDocPath entries must match all ADR record docs in docs/adr/records.",
+      );
+    }
+
+    const discoveryByStatus = adrRegistry.discoveryIndex?.byDecisionStatus || {};
+    for (const status of ADR_DECISION_STATUSES) {
+      if (!Array.isArray(discoveryByStatus[status])) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json discoveryIndex.byDecisionStatus must include array for '${status}'.`,
+        );
+      }
+    }
+
+    for (const [status, identifiers] of Object.entries(discoveryByStatus)) {
+      if (!ADR_DECISION_STATUSES.has(status)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json discoveryIndex.byDecisionStatus has unsupported key '${status}'.`,
+        );
+        continue;
+      }
+      if (!Array.isArray(identifiers) || !isArrayOfNonEmptyStrings(identifiers, { allowEmpty: true })) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json discoveryIndex.byDecisionStatus['${status}'] must be an array of strings.`,
+        );
+        continue;
+      }
+      const expectedIds = (adrRegistry.records || [])
+        .filter((record) => record.decisionStatus === status)
+        .map((record) => record.identifier);
+      if (JSON.stringify(identifiers) !== JSON.stringify(expectedIds)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_REFERENCE_INVALID",
+          `docs/adr/records/adr-registry.json discoveryIndex.byDecisionStatus['${status}'] must match record decisionStatus membership.`,
+        );
+      }
+    }
+
+    for (const [domain, identifiers] of Object.entries(adrRegistry.discoveryIndex?.byDomain || {})) {
+      if (!isNonEmptyString(domain)) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          "docs/adr/records/adr-registry.json discoveryIndex.byDomain keys must be non-empty strings.",
+        );
+      }
+      if (!Array.isArray(identifiers) || !isArrayOfNonEmptyStrings(identifiers, { allowEmpty: false })) {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_INVALID",
+          `docs/adr/records/adr-registry.json discoveryIndex.byDomain['${domain}'] must be a non-empty string array.`,
+        );
+        continue;
+      }
+      for (const identifier of identifiers) {
+        if (!registryIdentifiers.has(identifier)) {
+          addIssue(
+            issues,
+            "ADR_REGISTRY_REFERENCE_INVALID",
+            `docs/adr/records/adr-registry.json discoveryIndex.byDomain['${domain}'] references unknown identifier '${identifier}'.`,
+          );
+        }
+      }
+    }
+  }
 
   const routingContractTaskCategories = new Set(
     Array.isArray(routingContract?.supportedTaskCategories)
@@ -1103,8 +1421,10 @@ function main() {
     `Checked top-level folders: ${REQUIRED_TOP_LEVEL_FOLDERS.length}`,
     `Checked router files: ${2 + (REQUIRED_TOP_LEVEL_FOLDERS.length * 2)}`,
     `Checked context foundation assets: ${REQUIRED_CONTEXT_FILES.length}`,
+    `Checked ADR foundation assets: ${REQUIRED_ADR_FILES.length}`,
     "Checked context map and pack shape references.",
     "Checked pack/routing/source cross-reference integrity.",
+    "Checked ADR registry cross-reference integrity.",
     `Checked metadata seed docs: ${SEED_DOCUMENTS.length}`,
   ].join("\n") + "\n");
 }
