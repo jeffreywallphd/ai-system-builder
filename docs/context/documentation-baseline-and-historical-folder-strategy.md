@@ -35,6 +35,7 @@ Define explicit target destinations for baseline and historical documentation so
 | Historical context/taxonomy migration snapshots | `docs/baselines/context/` | Preserves historical context-engineering artifacts separately from active context contracts. |
 | Historical UI behavior or rollout snapshots | `docs/baselines/ui/` | Keeps prior UI state references away from active UI contracts. |
 | Cross-cutting historical bundles spanning multiple active areas | `docs/baselines/cross-cutting/` | Avoids scattering one historical bundle across many active namespaces. |
+| Transition-era migration notes and rollout completion logs | `docs/baselines/architecture/<domain>/` (or `docs/baselines/cross-cutting/` when multi-domain) | Isolates temporary migration detail from durable architecture and contributor guidance. |
 
 ## Narrowly Justified Non-Baseline Destinations
 
@@ -75,6 +76,13 @@ Use this rule:
 2. Keep `.md` and `.ai.md` companion pairs aligned for baseline artifacts.
 3. Update router links in the same change set when introducing a new baseline destination.
 4. Preserve active authority links from baselines back to canonical active docs.
+
+## Transitional and Rollout Note Handling Pattern
+
+1. Active rollout-scope declarations stay in explicit rollout-boundary files only.
+2. Story-by-story migration logs and completed rollout notes move to baseline destinations.
+3. Old active paths become superseded redirect stubs with canonical destination links.
+4. Contributor and architecture routers should link active authority first, then optional historical baseline references.
 
 ## Related Guidance
 

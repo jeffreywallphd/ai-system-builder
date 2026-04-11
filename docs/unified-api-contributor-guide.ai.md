@@ -47,6 +47,7 @@ related_code_paths:
 - `docs/unified-api-contributor-guide.md`
 - `docs/architecture/unified-api-authoritative-surface.md`
 - `docs/architecture/unified-api-endpoint-reference.md`
+- `docs/baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.ai.md`
 - `docs/architecture/shared-api-contract-package.md`
 - `docs/unified-api-observability-troubleshooting.md`
 

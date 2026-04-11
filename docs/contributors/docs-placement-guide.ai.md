@@ -84,7 +84,7 @@
 - Historical Notes: retained non-authoritative context for traceability.
 - Migration Guides and Records: sequencing, inventory, and migration safety docs.
 - Rollout-Boundary Notes: phase boundaries, non-goals, and deferred work declarations.
-- Temporary Transition Documents: short-lived stubs and pointer notes during migration.
+- Temporary Transition Documents: short-lived stubs and pointer notes during migration with explicit baseline destinations.
 - Superseded or Deprecated Documents: retired authority paths with replacement metadata.
 
 ## Historical Isolation Target Destinations
@@ -97,6 +97,12 @@
   - `docs/baselines/ui/`
   - `docs/baselines/cross-cutting/`
 - Keep old active paths only as short superseded pointer notes when link continuity is required.
+
+## Transitional and Rollout Isolation Pattern
+
+- Keep active rollout boundaries in explicit rollout-boundary docs only.
+- Move completed transition and rollout notes to `docs/baselines/architecture/<domain>/` (or `docs/baselines/cross-cutting/` when multi-domain).
+- Keep legacy active paths as short superseded redirect stubs with canonical destination links.
 
 ## Human Companion
 - `docs/contributors/docs-placement-guide.md`

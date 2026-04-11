@@ -42,4 +42,5 @@ related_code_paths:
 - [Image Run Feature 4 Final Baseline](./execution-control-plane-and-scheduling/image-run-feature-4-final-baseline.md)
 - [Image Workflow Feature 2 Final Baseline](./studio-and-system-composition/image-workflow-feature-2-final-baseline.md)
 - [Image Manipulation Feature 8 Final Vertical-Slice Completion](./studio-and-system-composition/image-manipulation-feature-8-final-vertical-slice-completion.md)
+- [Unified API Convergence Transition Baseline](./api-and-transport-surfaces/unified-api-convergence-plan.md)
 - [Architecture Router (Active Authority)](../../architecture/README.md)

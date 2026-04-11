@@ -84,6 +84,19 @@
         "docs/architecture/host-service-registration-composition-rules.md"
       ],
       "retention": "Keep as link stub while historical inbound references remain."
+    },
+    {
+      "sourcePath": "docs/architecture/unified-api-convergence-plan.md",
+      "legacyState": "migrated-link-stub",
+      "status": "superseded",
+      "supersededBy": "docs/baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.md",
+      "canonicalDestinations": [
+        "docs/baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.md",
+        "docs/architecture/unified-api-authoritative-surface.md",
+        "docs/architecture/unified-api-endpoint-reference.md",
+        "docs/architecture/domains/api-and-transport-surfaces/overview.md"
+      ],
+      "retention": "Keep as link stub while inbound links migrate to canonical active and baseline destinations."
     }
   ],
   "legacyAuthorityDocuments": [
