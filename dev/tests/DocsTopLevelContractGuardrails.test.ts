@@ -18,6 +18,14 @@ const requiredTopLevelFolders = [
 
 const folderContractReadmeRequirements = requiredTopLevelFolders;
 
+function countWords(content: string): number {
+  return content
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 0)
+    .length;
+}
+
 describe("docs top-level contract guardrails", () => {
   it("keeps required top-level docs folders present", () => {
     for (const folder of requiredTopLevelFolders) {
@@ -58,5 +66,42 @@ describe("docs top-level contract guardrails", () => {
       expect(readme).toContain(`docs/${folder}/`);
       expect(aiReadme).toContain(`docs/${folder}/`);
     }
+  });
+
+  it("enforces root router structure for role and task-based navigation", () => {
+    const readme = readFileSync(resolve(docsRoot, "README.md"), "utf8");
+    const aiReadme = readFileSync(resolve(docsRoot, "README.ai.md"), "utf8");
+
+    const requiredSections = [
+      "## Documentation Areas",
+      "## Route By Reader Type",
+      "## Route By Task",
+      "## Durability Rules",
+    ] as const;
+
+    for (const section of requiredSections) {
+      expect(readme).toContain(section);
+      expect(aiReadme).toContain(section);
+    }
+
+    expect(readme).not.toContain("## Folder responsibilities");
+    expect(aiReadme).not.toContain("## Required folder contract");
+
+    expect(readme).toContain("./contributors/docs-placement-guide.md");
+    expect(readme).toContain("./context/documentation-taxonomy.md");
+    expect(readme).toContain("./context/documentation-metadata-header.md");
+    expect(aiReadme).toContain("./contributors/docs-placement-guide.md");
+    expect(aiReadme).toContain("./context/documentation-taxonomy.ai.md");
+    expect(aiReadme).toContain("./context/documentation-metadata-header.ai.md");
+  });
+
+  it("keeps root router concise and navigation-first", () => {
+    const readme = readFileSync(resolve(docsRoot, "README.md"), "utf8");
+    const aiReadme = readFileSync(resolve(docsRoot, "README.ai.md"), "utf8");
+
+    expect(countWords(readme)).toBeLessThanOrEqual(500);
+    expect(countWords(aiReadme)).toBeLessThanOrEqual(500);
+    expect((readme.match(/\[[^\]]+\]\([^)]+\)/g) || []).length).toBeGreaterThanOrEqual(12);
+    expect((aiReadme.match(/\[[^\]]+\]\([^)]+\)/g) || []).length).toBeGreaterThanOrEqual(12);
   });
 });
