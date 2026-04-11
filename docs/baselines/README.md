@@ -33,6 +33,8 @@
 - [Feature 1 Documentation Foundation Completion Handoff](./feature-1-documentation-foundation-handoff.md)
 - [Documentation Migration Baseline](../documentation-migration-baseline.md)
 - [Documentation Migration Inventory](../documentation-migration-baseline.inventory.json)
+- [Documentation Segmentation Migration Inventory (Story 5.2.1)](../documentation-segmentation-migration-inventory.md)
+- [Documentation Segmentation Migration Inventory JSON](../documentation-segmentation-migration-inventory.inventory.json)
 - [Baseline and Historical Folder Strategy](../context/documentation-baseline-and-historical-folder-strategy.md)
 - [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.md)
 - [Docs Top-Level Contract](../README.md)
