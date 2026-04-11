@@ -24,6 +24,7 @@
 - [Documentation Foundation Validation Guide](./docs-foundation-validation.ai.md)
 - [Context Engineering System Contributor Guide](./context-engineering-system-guide.ai.md)
 - [Router and Overview Writing Standard](./router-overview-writing-standard.ai.md)
+- [Architecture Domain Overview and Reference Readability Guide](./architecture-domain-overview-reference-readability-guide.ai.md)
 - [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.ai.md)
 - [Documentation Templates](../context/templates/README.ai.md)
 - [Run Submission Contributor Guide](../run-submission-contributor-guide.md)
