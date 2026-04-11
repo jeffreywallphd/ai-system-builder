@@ -139,3 +139,7 @@ Classification is lifecycle-aware so unhealthy posture is distinguishable from i
 - unsupported backend operation handling
 - rejected provisioning failure handling without persisting unintended transitions
 - storage mutation audit event coverage, including policy-update event emission and high-value mutation metadata details
+
+## Related ADRs
+
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md`

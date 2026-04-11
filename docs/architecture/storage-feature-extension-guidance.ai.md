@@ -43,3 +43,7 @@ Story 9.4.5 baseline for Feature 9 / Epic 9.4: define extension-safe rules and o
 - `src/shared/schemas/storage/tests/StorageTransportSchemaContracts.test.ts`
 - `src/ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
 - `src/ui/pages/tests/StorageAdministrationPage.test.tsx`
+
+## Related ADRs
+
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md`

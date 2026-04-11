@@ -148,3 +148,4 @@ The model is intentionally suitable for later persistence and API projection whi
 ## Related ADRs
 
 - `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`

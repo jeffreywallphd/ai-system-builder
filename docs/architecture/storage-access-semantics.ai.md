@@ -51,3 +51,4 @@ Story 9.1.5 adds storage-specific permission/access summary contracts so managed
 ## Related ADRs
 
 - `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md`

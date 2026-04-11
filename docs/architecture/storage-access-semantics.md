@@ -62,3 +62,4 @@ These actions are represented in domain constants (`StorageManagedActions`), app
 ## Related ADRs
 
 - `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`

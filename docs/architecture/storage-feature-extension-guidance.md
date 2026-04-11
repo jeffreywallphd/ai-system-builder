@@ -196,3 +196,7 @@ Keep these suites green when extending storage backends or admin behavior:
 - `docs/architecture/storage-access-semantics.md`
 - `docs/architecture/storage-server-api.md`
 - `docs/storage-administration-operations.md`
+
+## Related ADRs
+
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`
