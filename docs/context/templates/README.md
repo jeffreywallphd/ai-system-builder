@@ -22,7 +22,7 @@ Provide lean, reusable starting points so document roles, metadata, and section 
 | `contributor-guide` | Contributor implementation workflow and guardrails. | `docs/contributors/` | [contributor-guide.template.md](./contributor-guide.template.md) |
 | `runbook` | Runtime/admin procedures and troubleshooting. | `docs/operations/` | [runbook.template.md](./runbook.template.md) |
 | `baseline` | Historical migration or completion snapshot. | `docs/baselines/` | [baseline.template.md](./baseline.template.md) |
-| `adr` | A specific architecture decision with alternatives and status. | `docs/adr/` | [adr.template.md](./adr.template.md) |
+| `adr` | A specific architecture decision with alternatives and status. | `docs/adr/records/` | [adr.template.md](./adr.template.md) |
 | `ai-context` | Shared taxonomy or context pack for AI/human routing. | `docs/context/` | [ai-context.template.md](./ai-context.template.md) |
 | `ai-context` (pack contract) | Context packs under `docs/context/packs/` with required contract sections. | `docs/context/packs/` | [context-pack.template.md](./context-pack.template.md) |
 

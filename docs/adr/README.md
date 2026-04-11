@@ -17,7 +17,14 @@
 - Operational runbooks and support procedures.
 - Contributor implementation tutorials.
 
+## ADR File Home
+- Store ADR files in `docs/adr/records/`.
+- Use filename format `adr-<NNN>-<kebab-case-title>.md` and pair AI companion files as `*.ai.md`.
+- Keep architecture overviews/references in `docs/architecture/`; use ADRs only for explicit choices and tradeoffs.
+
 ## Start Here
+- [ADR Records Home](./records/README.md)
+- [ADR Template](../context/templates/adr.template.md)
 - [Architecture Router](../architecture/README.md)
 - [Docs Top-Level Contract](../README.md)
 - [Baselines Router](../baselines/README.md)
