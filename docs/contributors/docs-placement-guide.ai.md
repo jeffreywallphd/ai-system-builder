@@ -8,13 +8,14 @@
 - `docs/contributors/`: contributor implementation workflows, extension guardrails, and coding process constraints.
 - `docs/operations/`: runbooks, diagnostics, troubleshooting, and admin/runtime procedures.
 - `docs/baselines/`: historical snapshots, migration inventories, and completion baselines.
-- `docs/adr/`: decision records with status, alternatives, and supersession history.
+- `docs/adr/`: ADR router/navigation and decision-system entrypoints.
+- `docs/adr/records/`: individual decision records with status, alternatives, and supersession history.
 - `docs/context/`: shared taxonomy/glossary and cross-domain context for human/AI reasoning.
 - `docs/prompts/`: prompt templates and prompt-engineering helpers.
 - `docs/ui/`: UI behavior/UX contracts and frontend interaction rules.
 
 ## Quick Decision Flow
-1. Formal decision record? -> `docs/adr/`.
+1. Formal decision record? -> `docs/adr/records/`.
 2. Architecture explanation/contract? -> `docs/architecture/`.
 3. Runtime operations/runbook? -> `docs/operations/`.
 4. Contributor implementation workflow? -> `docs/contributors/`.
@@ -28,7 +29,7 @@
 - Architecture explanation -> `docs/architecture/`.
 - Runbook -> `docs/operations/`.
 - Historical baseline -> `docs/baselines/`.
-- ADR -> `docs/adr/`.
+- ADR -> `docs/adr/records/`.
 - AI-context taxonomy/glossary -> `docs/context/`.
 
 ## Anti-Patterns

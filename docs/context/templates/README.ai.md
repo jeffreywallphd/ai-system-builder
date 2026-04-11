@@ -15,7 +15,7 @@ Use this folder as the canonical template pack for doc creation.
 - `contributor-guide` -> [contributor-guide.template.md](./contributor-guide.template.md)
 - `runbook` -> [runbook.template.md](./runbook.template.md)
 - `baseline` -> [baseline.template.md](./baseline.template.md)
-- `adr` -> [adr.template.md](./adr.template.md)
+- `adr` -> [adr.template.md](./adr.template.md) (place output in `docs/adr/records/`)
 - `ai-context` -> [ai-context.template.md](./ai-context.template.md)
 - `ai-context` pack contract -> [context-pack.template.md](./context-pack.template.md)
 - Routing entry JSON -> [task-to-context-routing-entry.template.json](./task-to-context-routing-entry.template.json)

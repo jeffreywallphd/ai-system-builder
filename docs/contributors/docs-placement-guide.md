@@ -12,7 +12,8 @@ Provide one consistent placement rule set so contributors and AI coding agents p
 | `docs/contributors/` | Explaining how contributors should safely implement, extend, or refactor code. | Recording formal architecture decisions or live operations runbooks. |
 | `docs/operations/` | Providing runbooks, diagnostics, incident handling, or admin operations. | Capturing architecture rationale or long-term design contracts. |
 | `docs/baselines/` | Capturing historical snapshots, migration inventories, and completion baselines. | Serving as the canonical source for current behavior. |
-| `docs/adr/` | Recording a decision, alternatives, status, and supersession history. | Providing broad architecture explanation without a specific decision record. |
+| `docs/adr/` | Routing, templates, and ADR system navigation. | Housing architecture references or runtime procedures. |
+| `docs/adr/records/` | Storing individual ADR decision files with status, alternatives, and supersession history. | Providing broad architecture explanation without a specific decision record. |
 | `docs/context/` | Providing shared taxonomy, glossary, and AI/human cross-domain context packs. | Publishing operational instructions or contributor coding workflows. |
 | `docs/prompts/` | Storing reusable prompt templates and prompt-engineering helpers. | Defining architecture or operational authority for the product itself. |
 | `docs/ui/` | Documenting UI behavior contracts, UX states, and frontend interaction rules. | Describing non-UI system architecture or backend operations. |
@@ -20,7 +21,7 @@ Provide one consistent placement rule set so contributors and AI coding agents p
 ## Simple Decision Flow
 
 1. Is this document a formal architecture decision with status and alternatives?
-   - Yes: place it in `docs/adr/`.
+   - Yes: place it in `docs/adr/records/`.
    - No: continue.
 2. Is this document mostly a system design contract or architecture explanation?
    - Yes: place it in `docs/architecture/`.
@@ -57,7 +58,7 @@ Provide one consistent placement rule set so contributors and AI coding agents p
   - Placement: `docs/baselines/`.
 - ADR example:
   - Topic: decide between event-sourcing and state-snapshot persistence with accepted outcome.
-  - Placement: `docs/adr/`.
+  - Placement: `docs/adr/records/`.
 - AI-context document example:
   - Topic: taxonomy/glossary that helps agents and humans navigate cross-domain terms consistently.
   - Placement: `docs/context/`.
