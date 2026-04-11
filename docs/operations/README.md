@@ -7,6 +7,10 @@
 ## Purpose
 - Operational procedures for administration, diagnostics, and troubleshooting.
 
+## Active Authority Scope
+- This router is for current operations/runbook authority.
+- Use [Baselines Router](../baselines/README.md) only for historical migration evidence or completion snapshots.
+
 ## Belongs Here
 - Runbooks for runtime administration and support workflows.
 - Diagnostics and troubleshooting procedures for operational incidents.

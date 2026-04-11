@@ -7,6 +7,10 @@
 ## Purpose
 - Entry point for contributor-facing extension and implementation workflow docs.
 
+## Active Authority Scope
+- This router is for current contributor workflows and active implementation guidance.
+- Use [Baselines Router](../baselines/README.ai.md) only for historical delivery records and migration snapshots.
+
 ## Belongs Here
 - Contributor guides for feature extensions and safe change workflows.
 - Guardrails/checklists that constrain implementation patterns.
