@@ -16,6 +16,7 @@ const requiredHeadings = [
   "## When To Use Context Packs",
   "## How To Avoid Over-Contexting",
   "## Task Playbooks",
+  "## Example Prompt Assembly Workflows",
   "## Extending the System Responsibly",
   "## Validation Checklist Before Merge",
 ] as const;
@@ -25,6 +26,20 @@ const requiredTaskPlaybookLabels = [
   "### Feature Decomposition",
   "### Implementation Tasks",
   "### Reviews (Code or Design)",
+] as const;
+
+const requiredExampleWorkflowLabels = [
+  "### Workflow 1: Feature Decomposition Prompt",
+  "### Workflow 2: Implementation Prompt",
+  "### Workflow 3: Architecture Review Prompt",
+  "### Workflow 4: Documentation Refactor Prompt",
+] as const;
+
+const requiredExampleWorkflowTaskIds = [
+  "feature-decomposition-epic-story-planning",
+  "runtime-host-coding-implementation",
+  "architecture-review-host-boundaries",
+  "documentation-refactor-context-and-architecture",
 ] as const;
 
 const requiredRoutingFields = [
@@ -85,6 +100,41 @@ describe("context engineering system contributor guide guardrails", () => {
     for (const label of requiredTaskPlaybookLabels) {
       expect(guide).toContain(label);
       expect(guideAi).toContain(label);
+    }
+
+    for (const label of requiredExampleWorkflowLabels) {
+      expect(guide).toContain(label);
+      expect(guideAi).toContain(label);
+    }
+  });
+
+  it("keeps example workflows aligned with routing IDs and context principles", () => {
+    const guide = readFileSync(guidePath, "utf8");
+    const guideAi = readFileSync(guideAiPath, "utf8");
+
+    for (const taskId of requiredExampleWorkflowTaskIds) {
+      expect(guide).toContain(`\`taskId\`: \`${taskId}\``);
+      expect(guideAi).toContain(`\`taskId\`: \`${taskId}\``);
+    }
+
+    for (const packId of [
+      "repository-overview",
+      "architecture-core",
+      "context-system-foundations",
+      "runtime-and-host",
+      "documentation-refactor",
+    ]) {
+      expect(guide).toContain(`\`${packId}\``);
+      expect(guideAi).toContain(`\`${packId}\``);
+    }
+
+    for (const phrase of [
+      "Minimum sufficient context",
+      "Authoritative docs",
+      "Prompt scaffold",
+    ]) {
+      expect(guide).toContain(phrase);
+      expect(guideAi).toContain(phrase);
     }
   });
 
