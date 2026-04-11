@@ -54,6 +54,14 @@ const expectedCoreWorkflowTaskIds = [
   "studio-system-design-and-ux-shaping",
 ] as const;
 
+const expectedWorkedExampleTaskIds = [
+  "example-feature-decomposition-context-engineering",
+  "example-documentation-routing-restructure",
+  "example-architecture-review-host-boundaries",
+  "example-diagnostics-host-startup-regression",
+  "example-ui-studio-system-handoff-update",
+] as const;
+
 const requiredMappingMetadataFields = [
   "id",
   "title",
@@ -110,7 +118,18 @@ type RoutingSeed = {
   routingExamples: Array<{
     taskId: string;
     taskCategory: string;
-    routingInputs: Record<string, unknown>;
+    routingInputs: {
+      taskSummary: string;
+      changedPaths: string[];
+      requestedOutcomes: string[];
+      constraints: string[];
+    };
+    expectedSelectionMode: string;
+    expectedPriorityTier: string;
+    expectedContextAssemblyProfileId: string;
+    expectedPackOrder: string[];
+    expectedRelatedDocOrder: string[];
+    expectedExclusions: string[];
   }>;
   mappings: Array<Record<string, unknown>>;
 };
@@ -168,7 +187,7 @@ describe("task-to-context routing contract guardrails", () => {
     expect(seed.artifactType).toBe("task-to-context-routing-map");
     expect(Array.isArray(seed.mappings)).toBe(true);
     expect(seed.taskCategoryMap.map((entry) => entry.taskCategory)).toEqual(expectedTaskCategories);
-    expect(seed.routingExamples.length).toBeGreaterThanOrEqual(2);
+    expect(seed.routingExamples.length).toBeGreaterThanOrEqual(expectedWorkedExampleTaskIds.length);
     expect(seed.mappings.length).toBeGreaterThanOrEqual(expectedCoreWorkflowTaskIds.length);
 
     for (const entry of seed.taskCategoryMap) {
@@ -181,6 +200,27 @@ describe("task-to-context routing contract guardrails", () => {
       expect(expectedTaskCategories).toContain(example.taskCategory as (typeof expectedTaskCategories)[number]);
       expect(typeof example.routingInputs.taskSummary).toBe("string");
       expect(Array.isArray(example.routingInputs.changedPaths)).toBe(true);
+      expect(Array.isArray(example.routingInputs.requestedOutcomes)).toBe(true);
+      expect(Array.isArray(example.routingInputs.constraints)).toBe(true);
+      expect(["ordered", "fallback", "single"]).toContain(example.expectedSelectionMode);
+      expect(expectedPriorityTiers).toContain(example.expectedPriorityTier as (typeof expectedPriorityTiers)[number]);
+      expect(example.expectedContextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
+      expect(example.expectedPackOrder).toEqual(["context-system-foundations"]);
+      expect(example.expectedRelatedDocOrder.length).toBeGreaterThanOrEqual(3);
+      expect(example.expectedExclusions.length).toBeGreaterThanOrEqual(2);
+
+      for (const changedPath of example.routingInputs.changedPaths) {
+        expect(existsSync(resolve(repoRoot, changedPath))).toBe(true);
+      }
+
+      for (const docPath of example.expectedRelatedDocOrder) {
+        expect(existsSync(resolve(repoRoot, docPath))).toBe(true);
+      }
+    }
+
+    const routingExampleTaskIds = seed.routingExamples.map((example) => example.taskId);
+    for (const expectedTaskId of expectedWorkedExampleTaskIds) {
+      expect(routingExampleTaskIds).toContain(expectedTaskId);
     }
 
     for (const mapping of seed.mappings) {
