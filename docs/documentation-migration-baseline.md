@@ -1,3 +1,14 @@
+---
+title: Documentation Migration Baseline
+doc_type: baseline
+status: archived
+authoritativeness: historical
+owned_by: team:developer-experience
+last_reviewed: 2026-04-11
+related_code_paths:
+  - docs/documentation-migration-baseline.inventory.json
+---
+
 # Documentation Migration Baseline (Story 1.1.1)
 
 This artifact captures the current-state documentation structure and taxonomy baseline before any migration work.

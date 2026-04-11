@@ -1,3 +1,15 @@
+---
+title: Canonical Documentation Taxonomy
+doc_type: ai-context
+status: active
+authoritativeness: canonical
+owned_by: team:developer-experience
+last_reviewed: 2026-04-11
+related_code_paths:
+  - docs/context/documentation-taxonomy.contract.json
+  - docs/context/documentation-metadata-header.contract.json
+---
+
 # Canonical Documentation Taxonomy (Story 1.2.1)
 
 This document defines the canonical documentation taxonomy for AI Loom Studio. It is implementation-ready and uses exact field values for validation and indexing.

@@ -1,3 +1,16 @@
+---
+title: Security and Policy Configuration Operations
+doc_type: runbook
+status: active
+authoritativeness: reference
+owned_by: team:operations-security
+last_reviewed: 2026-04-11
+related_code_paths:
+  - src/ui/pages/SecurityPolicyConfigurationPage.tsx
+  - src/ui/shared/admin/AdminSettingsFormPrimitives.tsx
+  - src/ui/routes
+---
+
 # Security and Policy Configuration Operations
 
 ## Scope

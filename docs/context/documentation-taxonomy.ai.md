@@ -1,3 +1,15 @@
+---
+title: "AI Companion: Canonical Documentation Taxonomy"
+doc_type: ai-context
+status: active
+authoritativeness: canonical
+owned_by: team:developer-experience
+last_reviewed: 2026-04-11
+related_code_paths:
+  - docs/context/documentation-taxonomy.contract.json
+  - docs/context/documentation-metadata-header.contract.json
+---
+
 # AI Companion: Canonical Documentation Taxonomy (Story 1.2.1)
 
 Use this file for exact docs-role classification and metadata tagging.

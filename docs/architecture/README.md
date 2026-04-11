@@ -1,3 +1,15 @@
+---
+title: Architecture Documentation Router
+doc_type: architecture-overview
+status: active
+authoritativeness: canonical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+related_code_paths:
+  - src/hosts
+  - src/composition
+---
+
 # Architecture Documentation Router
 
 ## Audience

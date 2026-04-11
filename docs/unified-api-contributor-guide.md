@@ -1,3 +1,17 @@
+---
+title: Unified API Contributor Guide
+doc_type: contributor-guide
+status: active
+authoritativeness: reference
+owned_by: team:developer-experience
+last_reviewed: 2026-04-11
+related_code_paths:
+  - src/shared/contracts
+  - src/shared/schemas
+  - src/infrastructure/api
+  - src/ui/shared
+---
+
 # Unified API Contributor Guide
 
 ## Who this is for

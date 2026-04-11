@@ -171,4 +171,16 @@ related_code_paths:
 ## Enforcement
 
 - Guardrail test: `dev/tests/DocumentationMetadataHeaderGuardrails.test.ts`
+- Seed backfill guardrail: `dev/tests/DocumentationMetadataSeedBackfillGuardrails.test.ts`
 - Keep field definitions synchronized with `documentation-metadata-header.contract.json`.
+
+## Seed Reference Implementations (Story 1.2.4)
+
+The following existing high-value docs are backfilled to serve as early reference implementations for future migration work:
+
+- `docs/architecture/README.md` (`architecture-overview`)
+- `docs/architecture/domain-and-application-core.md` (`architecture-reference`)
+- `docs/unified-api-contributor-guide.md` (`contributor-guide`)
+- `docs/security-policy-configuration-operations.md` (`runbook`)
+- `docs/documentation-migration-baseline.md` (`baseline`)
+- `docs/context/documentation-taxonomy.md` (`ai-context`)

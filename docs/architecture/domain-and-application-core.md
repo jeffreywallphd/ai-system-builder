@@ -1,3 +1,15 @@
+---
+title: Domain and Application Core
+doc_type: architecture-reference
+status: active
+authoritativeness: canonical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+related_code_paths:
+  - src/domain
+  - src/application
+---
+
 # Domain and Application Core
 
 This document goes deeper into the inner layers of the system: the domain model and the application orchestration built around it.
