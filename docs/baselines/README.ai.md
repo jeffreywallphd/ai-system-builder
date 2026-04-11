@@ -1,13 +1,24 @@
 # AI Companion: Baselines Documentation Router
 
+## Audience
+- AI assistants that need historical project context.
+- Engineers validating what changed across stories or epics.
+
 ## Purpose
-Home for historical documentation baselines and migration snapshots.
+- Entry point for documentation baseline and migration-history artifacts.
 
 ## Belongs Here
 - Baseline reports tied to stories/epics.
-- Migration inventory and snapshot artifacts.
+- Migration inventories and snapshot artifacts.
+- Historical completion records preserved for traceability.
 
 ## Does Not Belong Here
-- Current source-of-truth operational procedures.
-- Contributor extension workflow docs.
-- Ongoing architecture reference docs.
+- Active operational procedures.
+- Current contributor extension workflows.
+- Canonical architecture design references.
+
+## Start Here
+- [Documentation Migration Baseline](../documentation-migration-baseline.ai.md)
+- [Documentation Migration Inventory](../documentation-migration-baseline.inventory.json)
+- [Docs Top-Level Contract](../README.ai.md)
+- [Context Router](../context/README.ai.md)

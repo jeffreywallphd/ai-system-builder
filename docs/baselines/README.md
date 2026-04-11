@@ -1,14 +1,24 @@
 # Baselines Documentation Router
 
+## Audience
+- Engineers and reviewers validating historical delivery context.
+- Maintainers checking migration and completion snapshots.
+
 ## Purpose
-Historical and migration baseline artifacts used for traceability.
+- Historical baseline and migration artifacts used for traceability.
 
 ## Belongs Here
-- Story/epic baseline reports.
-- Migration inventories and point-in-time snapshots.
-- Completion handoff baselines.
+- Story or epic baseline snapshots and completion records.
+- Migration inventories and point-in-time documentation captures.
+- Historical handoff artifacts preserved for auditability.
 
 ## Does Not Belong Here
-- Active operational runbooks.
-- Day-to-day contributor implementation guides.
-- Canonical architecture reference docs.
+- Current operational runbooks.
+- Active contributor implementation workflows.
+- Canonical architecture references for current behavior.
+
+## Start Here
+- [Documentation Migration Baseline](../documentation-migration-baseline.md)
+- [Documentation Migration Inventory](../documentation-migration-baseline.inventory.json)
+- [Docs Top-Level Contract](../README.md)
+- [Context Router](../context/README.md)

@@ -1,34 +1,34 @@
 {
   "schemaVersion": "1.0.0",
-  "generatedAt": "2026-04-11T13:31:35.597Z",
+  "generatedAt": "2026-04-11T13:36:04.250Z",
   "auditScope": "docs/**/*.(md|ai.md)",
-  "branchContext": "codex-c64c54d044",
+  "branchContext": "codex-2be7374697",
   "summary": {
-    "totalMarkdownFiles": 534,
+    "totalMarkdownFiles": 538,
     "totalDirectories": 9,
     "roleCounts": {
       "architectural": 229,
-      "operational": 25,
+      "operational": 27,
       "contributor-facing": 15,
       "historical": 1,
-      "ai-context-oriented": 264
+      "ai-context-oriented": 266
     },
     "roleSignalCounts": {
       "architectural": 471,
-      "operational": 86,
+      "operational": 88,
       "contributor-facing": 29,
       "historical": 48,
-      "ai-context-oriented": 264
+      "ai-context-oriented": 266
     },
     "pairing": {
-      "pairedFiles": 528,
+      "pairedFiles": 532,
       "missingCompanionFiles": 6
     },
     "ownershipSignals": {
       "filesWithOwnershipSignals": 9,
-      "filesWithoutOwnershipSignals": 525
+      "filesWithoutOwnershipSignals": 529
     },
-    "likelyOverloadedFiles": 18
+    "likelyOverloadedFiles": 16
   },
   "directories": [
     {
@@ -55,6 +55,32 @@
         "contributor-facing": 8,
         "historical": 1,
         "ai-context-oriented": 24
+      }
+    },
+    {
+      "path": "docs/prompts",
+      "fileCount": 3,
+      "pairedCount": 2,
+      "missingCompanionCount": 1,
+      "roleCounts": {
+        "architectural": 0,
+        "operational": 2,
+        "contributor-facing": 0,
+        "historical": 0,
+        "ai-context-oriented": 1
+      }
+    },
+    {
+      "path": "docs/ui",
+      "fileCount": 3,
+      "pairedCount": 2,
+      "missingCompanionCount": 1,
+      "roleCounts": {
+        "architectural": 0,
+        "operational": 2,
+        "contributor-facing": 0,
+        "historical": 0,
+        "ai-context-oriented": 1
       }
     },
     {
@@ -121,55 +147,71 @@
         "historical": 0,
         "ai-context-oriented": 1
       }
-    },
-    {
-      "path": "docs/prompts",
-      "fileCount": 1,
-      "pairedCount": 0,
-      "missingCompanionCount": 1,
-      "roleCounts": {
-        "architectural": 0,
-        "operational": 1,
-        "contributor-facing": 0,
-        "historical": 0,
-        "ai-context-oriented": 0
-      }
-    },
-    {
-      "path": "docs/ui",
-      "fileCount": 1,
-      "pairedCount": 0,
-      "missingCompanionCount": 1,
-      "roleCounts": {
-        "architectural": 0,
-        "operational": 1,
-        "contributor-facing": 0,
-        "historical": 0,
-        "ai-context-oriented": 0
-      }
     }
   ],
   "highValueDocuments": [
     {
+      "path": "docs/architecture/README.ai.md",
+      "primaryRole": "ai-context-oriented",
+      "linkCount": 6,
+      "wordCount": 124,
+      "reason": "explicitly-curated-entry-point"
+    },
+    {
       "path": "docs/architecture/README.md",
       "primaryRole": "architectural",
-      "linkCount": 192,
-      "wordCount": 6058,
+      "linkCount": 6,
+      "wordCount": 119,
       "reason": "explicitly-curated-entry-point"
+    },
+    {
+      "path": "docs/contributors/README.md",
+      "primaryRole": "operational",
+      "linkCount": 6,
+      "wordCount": 122,
+      "reason": "readme-or-index"
+    },
+    {
+      "path": "docs/operations/README.md",
+      "primaryRole": "operational",
+      "linkCount": 6,
+      "wordCount": 113,
+      "reason": "readme-or-index"
+    },
+    {
+      "path": "docs/baselines/README.md",
+      "primaryRole": "operational",
+      "linkCount": 4,
+      "wordCount": 97,
+      "reason": "readme-or-index"
+    },
+    {
+      "path": "docs/context/README.md",
+      "primaryRole": "operational",
+      "linkCount": 4,
+      "wordCount": 103,
+      "reason": "readme-or-index"
     },
     {
       "path": "docs/adr/README.md",
       "primaryRole": "operational",
-      "linkCount": 0,
-      "wordCount": 51,
+      "linkCount": 3,
+      "wordCount": 92,
       "reason": "readme-or-index"
     },
     {
-      "path": "docs/architecture/README.ai.md",
-      "primaryRole": "ai-context-oriented",
-      "linkCount": 0,
-      "wordCount": 5175,
-      "reason": "explicitly-curated-entry-point"
+      "path": "docs/prompts/README.md",
+      "primaryRole": "operational",
+      "linkCount": 3,
+      "wordCount": 84,
+      "reason": "readme-or-index"
+    },
+    {
+      "path": "docs/ui/README.md",
+      "primaryRole": "operational",
+      "linkCount": 3,
+      "wordCount": 79,
+      "reason": "readme-or-index"
     },
     {
       "path": "docs/audit-governance-contributor-guide.md",
@@ -179,39 +221,11 @@
       "reason": "explicitly-curated-entry-point"
     },
     {
-      "path": "docs/baselines/README.md",
-      "primaryRole": "operational",
-      "linkCount": 0,
-      "wordCount": 50,
-      "reason": "readme-or-index"
-    },
-    {
-      "path": "docs/context/README.md",
-      "primaryRole": "operational",
-      "linkCount": 0,
-      "wordCount": 62,
-      "reason": "readme-or-index"
-    },
-    {
-      "path": "docs/contributors/README.md",
-      "primaryRole": "operational",
-      "linkCount": 0,
-      "wordCount": 51,
-      "reason": "readme-or-index"
-    },
-    {
       "path": "docs/general-prompt-guidance.md",
       "primaryRole": "contributor-facing",
       "linkCount": 0,
       "wordCount": 382,
       "reason": "explicitly-curated-entry-point"
-    },
-    {
-      "path": "docs/operations/README.md",
-      "primaryRole": "operational",
-      "linkCount": 0,
-      "wordCount": 49,
-      "reason": "readme-or-index"
     },
     {
       "path": "docs/README.md",
@@ -260,7 +274,11 @@
           "docs/contributors/README.ai.md",
           "docs/contributors/README.md",
           "docs/operations/README.ai.md",
-          "docs/operations/README.md"
+          "docs/operations/README.md",
+          "docs/prompts/README.ai.md",
+          "docs/prompts/README.md",
+          "docs/ui/README.ai.md",
+          "docs/ui/README.md"
         ]
       }
     ],
@@ -280,11 +298,6 @@
       "title": "A small number of hub documents are overloaded navigation bottlenecks",
       "evidence": [
         {
-          "path": "docs/architecture/README.md",
-          "wordCount": 6058,
-          "linkCount": 192
-        },
-        {
           "path": "docs/architecture/desktop-auth-first-startup-boundary.md",
           "wordCount": 3097,
           "linkCount": 0
@@ -303,6 +316,11 @@
           "path": "docs/architecture/domain-and-application-core.md",
           "wordCount": 20863,
           "linkCount": 0
+        },
+        {
+          "path": "docs/architecture/identity-foundation.md",
+          "wordCount": 3362,
+          "linkCount": 0
         }
       ],
       "impact": "Readers must parse very large documents to discover canonical docs, reducing findability and increasing onboarding cost."
@@ -312,8 +330,8 @@
       "severity": "high",
       "title": "Ownership and stewardship metadata is mostly absent",
       "evidence": {
-        "filesWithoutOwnershipSignals": 525,
-        "totalFiles": 534
+        "filesWithoutOwnershipSignals": 529,
+        "totalFiles": 538
       },
       "impact": "Future migrations and maintenance cannot be routed predictably to responsible owners."
     },
@@ -333,7 +351,7 @@
       "severity": "medium",
       "title": "Large `.md` / `.ai.md` companion surface increases drift risk",
       "evidence": {
-        "pairedFiles": 528,
+        "pairedFiles": 532,
         "missingCompanionFiles": 6
       },
       "impact": "Dual maintenance across human and AI companion docs creates synchronization risk without explicit parity checks."
@@ -369,10 +387,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 14,
-        "wordCount": 48,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 24,
+        "wordCount": 94,
+        "headingCount": 6,
+        "linkCount": 3
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "retain-current-location"
@@ -385,10 +403,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 14,
-        "wordCount": 51,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 24,
+        "wordCount": 92,
+        "headingCount": 6,
+        "linkCount": 3
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "docs/operations"
@@ -5592,12 +5610,12 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 371,
-        "wordCount": 5175,
-        "headingCount": 17,
-        "linkCount": 0
+        "lineCount": 27,
+        "wordCount": 124,
+        "headingCount": 6,
+        "linkCount": 6
       },
-      "likelyOverloaded": true,
+      "likelyOverloaded": false,
       "likelyTargetArea": "retain-current-location"
     },
     {
@@ -5608,12 +5626,12 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 447,
-        "wordCount": 6058,
-        "headingCount": 23,
-        "linkCount": 192
+        "lineCount": 27,
+        "wordCount": 119,
+        "headingCount": 6,
+        "linkCount": 6
       },
-      "likelyOverloaded": true,
+      "likelyOverloaded": false,
       "likelyTargetArea": "retain-current-location"
     },
     {
@@ -8630,10 +8648,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 14,
-        "wordCount": 51,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 25,
+        "wordCount": 95,
+        "headingCount": 6,
+        "linkCount": 4
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "retain-current-location"
@@ -8646,10 +8664,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 15,
-        "wordCount": 50,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 25,
+        "wordCount": 97,
+        "headingCount": 6,
+        "linkCount": 4
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "docs/operations"
@@ -8662,10 +8680,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 14,
-        "wordCount": 47,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 25,
+        "wordCount": 92,
+        "headingCount": 6,
+        "linkCount": 4
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "retain-current-location"
@@ -8678,10 +8696,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 15,
-        "wordCount": 62,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 25,
+        "wordCount": 103,
+        "headingCount": 6,
+        "linkCount": 4
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "docs/operations"
@@ -8694,10 +8712,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 14,
-        "wordCount": 45,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 27,
+        "wordCount": 123,
+        "headingCount": 6,
+        "linkCount": 6
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "retain-current-location"
@@ -8710,10 +8728,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 15,
-        "wordCount": 51,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 27,
+        "wordCount": 122,
+        "headingCount": 6,
+        "linkCount": 6
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "docs/operations"
@@ -9014,10 +9032,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 14,
-        "wordCount": 48,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 27,
+        "wordCount": 107,
+        "headingCount": 6,
+        "linkCount": 6
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "retain-current-location"
@@ -9030,10 +9048,10 @@
       "pairStatus": "paired",
       "hasOwnershipSignal": false,
       "metrics": {
-        "lineCount": 15,
-        "wordCount": 49,
-        "headingCount": 4,
-        "linkCount": 0
+        "lineCount": 27,
+        "wordCount": 113,
+        "headingCount": 6,
+        "linkCount": 6
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "retain-current-location"
@@ -9050,6 +9068,38 @@
         "wordCount": 556,
         "headingCount": 9,
         "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "docs/operations"
+    },
+    {
+      "path": "docs/prompts/README.ai.md",
+      "primaryRole": "ai-context-oriented",
+      "secondaryRoles": [],
+      "companionPath": "docs/prompts/README.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": false,
+      "metrics": {
+        "lineCount": 23,
+        "wordCount": 88,
+        "headingCount": 6,
+        "linkCount": 3
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "retain-current-location"
+    },
+    {
+      "path": "docs/prompts/README.md",
+      "primaryRole": "operational",
+      "secondaryRoles": [],
+      "companionPath": "docs/prompts/README.ai.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": false,
+      "metrics": {
+        "lineCount": 23,
+        "wordCount": 84,
+        "headingCount": 6,
+        "linkCount": 3
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "docs/operations"
@@ -9457,6 +9507,38 @@
         "wordCount": 732,
         "headingCount": 16,
         "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "docs/operations"
+    },
+    {
+      "path": "docs/ui/README.ai.md",
+      "primaryRole": "ai-context-oriented",
+      "secondaryRoles": [],
+      "companionPath": "docs/ui/README.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": false,
+      "metrics": {
+        "lineCount": 23,
+        "wordCount": 92,
+        "headingCount": 6,
+        "linkCount": 3
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "retain-current-location"
+    },
+    {
+      "path": "docs/ui/README.md",
+      "primaryRole": "operational",
+      "secondaryRoles": [],
+      "companionPath": "docs/ui/README.ai.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": false,
+      "metrics": {
+        "lineCount": 23,
+        "wordCount": 79,
+        "headingCount": 6,
+        "linkCount": 3
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "docs/operations"
