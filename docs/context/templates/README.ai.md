@@ -17,7 +17,9 @@ Use this folder as the canonical template pack for doc creation.
 - `baseline` -> [baseline.template.md](./baseline.template.md)
 - `adr` -> [adr.template.md](./adr.template.md)
 - `ai-context` -> [ai-context.template.md](./ai-context.template.md)
-- AI companions are colocated as `*.template.ai.md`.
+- `ai-context` pack contract -> [context-pack.template.md](./context-pack.template.md)
+- Routing entry JSON -> [task-to-context-routing-entry.template.json](./task-to-context-routing-entry.template.json)
+- AI companions are colocated as `*.template.ai.md` for markdown templates.
 
 For pack files in `docs/context/packs/`, also apply `docs/context/packs/README.ai.md#standard-context-pack-contract` for required section layout.
 
