@@ -75,6 +75,22 @@ The seed registry includes at least one entry for each major `docType` so findab
 - Use `docs/documentation-registry-population-inventory.ai.md` and
   `docs/documentation-registry-population-inventory.inventory.json` as the practical candidate set and phased ordering source for follow-on registry population work.
 
+## Active Architecture Population Status (Story 6.2.2)
+
+Registry seed coverage now includes:
+
+- `docs/architecture/architecture-domain-taxonomy.md`
+- Architecture routing/governance references:
+  `architecture-domain-migration-inventory.md`,
+  `architecture-migration-sequence-and-priority.md`,
+  `architecture-domainization-rollout-boundaries.md`,
+  `architecture-supersession-and-retirement-governance.md`,
+  `architecture-document-scope-boundaries.md`,
+  `architecture-domain-cross-linking-rules.md`
+- Domain overview anchors in `docs/architecture/domains/*/overview.md`
+
+These records are linked through registry `discoveryIndex` maps and architecture routing `relatedDocRecordIds` in `docs/context/routing/task-to-context-routing.seed.json`.
+
 ## Coverage Policy Contract
 
 - `coveragePolicy` carries machine-readable inclusion/exclusion boundaries.

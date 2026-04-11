@@ -115,6 +115,12 @@
         "docs/architecture/workflow-execution-and-tools.md",
         "docs/unified-api-observability-troubleshooting.md",
         "src/infrastructure/runtime"
+      ],
+      "relatedDocRecordIds": [
+        "doc-architecture-domain-taxonomy",
+        "doc-architecture-domain-core-platform-and-composition-overview",
+        "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
+        "doc-architecture-domain-and-application-core"
       ]
     },
     {
@@ -202,6 +208,12 @@
       "expectedExclusions": [
         "docs/baselines",
         "docs/ui/README.md"
+      ],
+      "relatedDocRecordIds": [
+        "doc-architecture-domain-taxonomy",
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-architecture-domain-core-platform-and-composition-overview",
+        "doc-architecture-domain-and-application-core"
       ]
     },
     {
@@ -459,7 +471,13 @@
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-architecture-domain-taxonomy",
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-architecture-domain-core-platform-and-composition-overview",
+        "doc-architecture-domain-and-application-core"
+      ]
     },
     {
       "taskId": "feature-decomposition-epic-story-planning",
@@ -551,7 +569,13 @@
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-architecture-domain-taxonomy",
+        "doc-architecture-domain-core-platform-and-composition-overview",
+        "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
+        "doc-architecture-domain-and-application-core"
+      ]
     },
     {
       "taskId": "repo-implementation-core-workflows",

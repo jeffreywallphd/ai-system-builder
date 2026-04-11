@@ -90,6 +90,22 @@ It should also include status and authoritativeness indexes, even when some cate
 Use `docs/documentation-registry-population-inventory.md` and
 `docs/documentation-registry-population-inventory.inventory.json` as the practical target set and ordering input for incremental registry-entry population work.
 
+## Active Architecture Population Status (Story 6.2.2)
+
+The registry seed now includes active architecture domain coverage for:
+
+- `docs/architecture/architecture-domain-taxonomy.md`
+- Architecture routing/governance references:
+  `architecture-domain-migration-inventory.md`,
+  `architecture-migration-sequence-and-priority.md`,
+  `architecture-domainization-rollout-boundaries.md`,
+  `architecture-supersession-and-retirement-governance.md`,
+  `architecture-document-scope-boundaries.md`,
+  `architecture-domain-cross-linking-rules.md`
+- Domain overviews under `docs/architecture/domains/*/overview.md`
+
+These entries are indexed in `discoveryIndex` and linked into task routing records through `relatedDocRecordIds` in `docs/context/routing/task-to-context-routing.seed.json` for architecture-oriented retrieval.
+
 ## Extensibility Boundaries
 
 - Keep structure explicit and readable; avoid introducing a large platform abstraction.

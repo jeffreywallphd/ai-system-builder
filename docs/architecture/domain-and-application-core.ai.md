@@ -1,4 +1,4 @@
-﻿---
+---
 title: Domain and Application Core
 doc_type: architecture-reference
 status: active
