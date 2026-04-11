@@ -1,4 +1,4 @@
-﻿---
+---
 title: Core Platform and Composition Domain References
 doc_type: architecture-reference
 status: active
@@ -23,14 +23,21 @@ Store canonical, durable architecture references for core-platform-and-compositi
 
 ## What Does Not Belong in Domain References
 
-- Repeated domain boundary summaries that already live in `../overview.md`.
+- Repeated domain boundary summaries that already live in ../overview.md.
 - Environment-specific runbook procedures and day-2 operations playbooks.
 - Sprint-level delivery plans, temporary migration notes, or ticket-specific checklists.
+
+## Seed Reference Placeholders
+
+Use this short list as migration scaffolding. Create each placeholder file when the first canonical contract lands, then replace placeholder language with authoritative content.
+
+- `layer-direction-and-dependency-rules.md` - Core layering and allowed dependency direction rules.
+- `application-composition-root-contracts.md` - Composition contracts for application-level orchestration seams.
+- `domain-model-shared-invariants.md` - Cross-cutting invariants that constrain domain model evolution.
 
 ## Reference Authoring Rules
 
 - Keep each reference focused on one contract surface and explicit invariants.
 - Link back to [Domain Overview](../overview.md) for boundary context.
-- Include `## Related ADRs` when a decision record constrains the reference.
-- Include `## Related Context Packs` when context routing depends on the contract.
-
+- Include ## Related ADRs when a decision record constrains the reference.
+- Include ## Related Context Packs when context routing depends on the contract.

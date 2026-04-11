@@ -1,4 +1,4 @@
-﻿---
+---
 title: "AI Companion: Identity Trust and Security Domain Overview"
 doc_type: architecture-overview
 status: active
@@ -13,18 +13,24 @@ related_code_paths:
 
 ## Purpose
 
-Define the architecture boundary for identity-trust-and-security and route domain-scoped architecture knowledge into predictable overview and reference documents.
+Own fail-closed architecture boundaries for identity proof, trust establishment, authorization enforcement, and secret handling.
 
 ## Boundary
 
-- Owns architecture contracts scoped to the identity-trust-and-security taxonomy boundary.
-- Links to adjacent domains for cross-boundary behavior instead of duplicating authority.
+- Defines authentication/session trust, authorization policy enforcement, and security-redaction guardrails.
+- Delegates tenancy/resource ownership policy to workspace-storage-and-assets unless the rule is primarily security logic.
+
+## Seed Scope Guidance
+
+- Seed references around trust proofs, authorization contracts, and secret lifecycle boundaries first.
+- Use reference docs to capture normative fail-closed behavior and policy decision seams.
+- Avoid duplicating transport payload catalogs or operations runbooks in this domain.
 
 ## What Belongs in the Overview
 
 - Domain boundary intent, ownership seams, and cross-domain dependency rules.
 - Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in `./references/`.
+- Concise routing links to the canonical reference documents in ./references/.
 
 ## What Does Not Belong in the Overview
 
@@ -44,4 +50,3 @@ Define the architecture boundary for identity-trust-and-security and route domai
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Identity And Security](../../../context/packs/identity-and-security.pack.md)
-

@@ -1,4 +1,4 @@
-﻿---
+---
 title: Deployment Policy and Audit Governance Domain Overview
 doc_type: architecture-overview
 status: active
@@ -14,18 +14,24 @@ related_code_paths:
 
 ## Purpose
 
-Define the architecture boundary for deployment-policy-and-audit-governance and route domain-scoped architecture knowledge into predictable overview and reference documents.
+Own governance architecture for deployment policy administration, policy explainability, and audit evidence recording.
 
 ## Boundary
 
-- Owns architecture contracts scoped to the deployment-policy-and-audit-governance taxonomy boundary.
-- Links to adjacent domains for cross-boundary behavior instead of duplicating authority.
+- Defines deployment policy resolution/override boundaries and audit recording authority contracts.
+- Delegates runtime dispatch mechanics to execution-control-plane-and-scheduling and identity proofing to identity-trust-and-security.
+
+## Seed Scope Guidance
+
+- Seed references for policy administration authority and audit ledger/event contracts first.
+- Keep governance architecture authoritative here while linking outward for runtime behavior details.
+- Avoid embedding implementation task plans; keep this domain focused on durable governance contracts.
 
 ## What Belongs in the Overview
 
 - Domain boundary intent, ownership seams, and cross-domain dependency rules.
 - Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in `./references/`.
+- Concise routing links to the canonical reference documents in ./references/.
 
 ## What Does Not Belong in the Overview
 
@@ -45,4 +51,3 @@ Define the architecture boundary for deployment-policy-and-audit-governance and 
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Repository Overview](../../../context/packs/repository-overview.pack.md)
-

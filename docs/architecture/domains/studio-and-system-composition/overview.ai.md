@@ -1,4 +1,4 @@
-﻿---
+---
 title: "AI Companion: Studio and System Composition Domain Overview"
 doc_type: architecture-overview
 status: active
@@ -14,18 +14,24 @@ related_code_paths:
 
 ## Purpose
 
-Define the architecture boundary for studio-and-system-composition and route domain-scoped architecture knowledge into predictable overview and reference documents.
+Own how studio surfaces compose and present shared system/workflow/asset contracts without becoming separate model authorities.
 
 ## Boundary
 
-- Owns architecture contracts scoped to the studio-and-system-composition taxonomy boundary.
-- Links to adjacent domains for cross-boundary behavior instead of duplicating authority.
+- Defines studio handoff seams, projection/read-model boundaries, and composition responsibilities across studio surfaces.
+- Delegates authoritative run/workspace/security policy to the domains that own those contracts.
+
+## Seed Scope Guidance
+
+- Seed references around studio handoff and projection boundaries that multiple UX surfaces reuse.
+- Keep this domain focused on composition contracts, not endpoint payload catalogs.
+- Route operational UX workflow procedures to docs/contributors or docs/operations as appropriate.
 
 ## What Belongs in the Overview
 
 - Domain boundary intent, ownership seams, and cross-domain dependency rules.
 - Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in `./references/`.
+- Concise routing links to the canonical reference documents in ./references/.
 
 ## What Does Not Belong in the Overview
 
@@ -45,4 +51,3 @@ Define the architecture boundary for studio-and-system-composition and route dom
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Studio And System Composition](../../../context/packs/studio-and-system-composition.pack.md)
-

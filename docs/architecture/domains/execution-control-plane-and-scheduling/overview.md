@@ -1,4 +1,4 @@
-﻿---
+---
 title: Execution Control Plane and Scheduling Domain Overview
 doc_type: architecture-overview
 status: active
@@ -13,18 +13,24 @@ related_code_paths:
 
 ## Purpose
 
-Define the architecture boundary for execution-control-plane-and-scheduling and route domain-scoped architecture knowledge into predictable overview and reference documents.
+Own control-plane authority for run lifecycle transitions, scheduling policy application, and execution readiness gating.
 
 ## Boundary
 
-- Owns architecture contracts scoped to the execution-control-plane-and-scheduling taxonomy boundary.
-- Links to adjacent domains for cross-boundary behavior instead of duplicating authority.
+- Defines run submission and orchestration authority, queueing/dispatch constraints, and scheduler decision boundaries.
+- Delegates workflow modeling to studio-and-system-composition and shared domain model policy to core-platform-and-composition.
+
+## Seed Scope Guidance
+
+- Seed references around run lifecycle state transitions and scheduling decision contracts.
+- Capture where policy-aware scheduling consumes governance constraints from deployment-policy-and-audit-governance.
+- Keep payload-level transport contracts outside this domain and link to api-and-transport-surfaces.
 
 ## What Belongs in the Overview
 
 - Domain boundary intent, ownership seams, and cross-domain dependency rules.
 - Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in `./references/`.
+- Concise routing links to the canonical reference documents in ./references/.
 
 ## What Does Not Belong in the Overview
 
@@ -44,4 +50,3 @@ Define the architecture boundary for execution-control-plane-and-scheduling and 
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Repository Overview](../../../context/packs/repository-overview.pack.md)
-
