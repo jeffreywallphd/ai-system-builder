@@ -350,3 +350,9 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
   - `desktop-startup.post-login-warmup`
   - `desktop-startup.deferred-feature-registration`
 - Startup phase events are logged on `[ai-loom][startup]` and memory snapshots are logged on `[ai-loom][startup-memory]`, so slow pre-login boot can be separated from slow post-login warmup.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md`

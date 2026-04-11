@@ -142,3 +142,9 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Registration now explicitly distinguishes application ports, infrastructure adapters, and platform services with boundary-layer alignment validation and dependency-cycle prevention.
 - Composition now enforces host capability/control-plane-role constraints and host-safe exposure boundaries (`ui`, `transport`, `execution`, `persistence`).
 - Authoritative host bootstrap now composes and validates required service coverage in `src/hosts/server/AuthoritativeServerCompositionRoot.ts` before runtime startup.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
+- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md`

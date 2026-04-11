@@ -1828,3 +1828,8 @@ Explicitly later than this scope:
   - `src/domain/platform/tests/OfflineLocalModeBoundaries.test.ts`
   - `src/application/common/tests/OfflineLocalModeResynchronization.test.ts`
   - `src/hosts/desktop/tests/DesktopOfflineLocalModeProfile.test.ts`
+
+## Related ADRs
+
+- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md`
+- `docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.ai.md`
