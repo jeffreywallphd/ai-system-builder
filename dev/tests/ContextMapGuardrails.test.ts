@@ -34,6 +34,12 @@ const studioSystemPackOrder = [
   "studio-and-system-composition",
   "context-system-foundations",
 ] as const;
+const documentationPackOrder = [
+  "repository-overview",
+  "architecture-core",
+  "documentation-refactor",
+  "context-system-foundations",
+] as const;
 
 type RoutingContract = {
   supportedTaskCategories: Array<{ id: string }>;
@@ -183,6 +189,8 @@ describe("context map guardrails", () => {
         ? identitySecurityPackOrder
         : mapping.taskCategoryId === "ui-studio"
         ? studioSystemPackOrder
+        : mapping.taskCategoryId === "documentation-change"
+        ? documentationPackOrder
         : defaultPackOrder;
       expect(mapping.packRefs.map((entry) => entry.packId)).toEqual(expectedPackOrder);
       expect(mapping.packRefs.map((entry) => entry.priorityOrder)).toEqual(

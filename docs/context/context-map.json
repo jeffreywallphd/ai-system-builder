@@ -552,8 +552,12 @@
           "priorityOrder": 2
         },
         {
-          "packId": "context-system-foundations",
+          "packId": "documentation-refactor",
           "priorityOrder": 3
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 4
         }
       ],
       "excludePackIds": [],
@@ -573,7 +577,7 @@
         "historical-reference",
         "summary-reference"
       ],
-      "notes": "Documentation changes keep deterministic pack ordering with core architecture context available when architecture docs are in scope.",
+      "notes": "Documentation-change routing keeps deterministic ordering with documentation-refactor inserted before context-system foundations for docs-system authority.",
       "status": "active",
       "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "contextAssemblyTierHints": {
