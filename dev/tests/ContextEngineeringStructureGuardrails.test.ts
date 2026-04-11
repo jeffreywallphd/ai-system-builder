@@ -26,6 +26,8 @@ const requiredContextFiles = [
   "docs/context/packs/context-pack.contract.json",
   "docs/context/packs/context-pack-catalog.contract.json",
   "docs/context/packs/context-pack-catalog.seed.json",
+  "docs/context/packs/architecture-core.pack.md",
+  "docs/context/packs/architecture-core.pack.ai.md",
   "docs/context/packs/context-system-foundations.pack.md",
   "docs/context/packs/context-system-foundations.pack.ai.md",
   "docs/context/packs/repository-overview.pack.md",

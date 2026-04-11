@@ -24,6 +24,7 @@
 - [Context Pack Catalog Seed](./context-pack-catalog.seed.json)
 - [Context Asset Metadata Standard](../context-asset-metadata.ai.md)
 - [Seed Pack: Repository Overview](./repository-overview.pack.ai.md)
+- [Seed Pack: Core Architecture](./architecture-core.pack.ai.md)
 - [Seed Pack: Context System Foundations](./context-system-foundations.pack.ai.md)
 - [Context Router](../README.ai.md)
 - [Context Pack Template](../templates/context-pack.template.ai.md)

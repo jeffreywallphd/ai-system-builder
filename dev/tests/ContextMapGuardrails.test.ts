@@ -155,8 +155,10 @@ describe("context map guardrails", () => {
       expect(mapping.packRefs.length).toBeGreaterThanOrEqual(1);
       expect(mapping.packRefs[0]?.packId).toBe("repository-overview");
       expect(mapping.packRefs[0]?.priorityOrder).toBe(1);
-      expect(mapping.packRefs[1]?.packId).toBe("context-system-foundations");
+      expect(mapping.packRefs[1]?.packId).toBe("architecture-core");
       expect(mapping.packRefs[1]?.priorityOrder).toBe(2);
+      expect(mapping.packRefs[2]?.packId).toBe("context-system-foundations");
+      expect(mapping.packRefs[2]?.priorityOrder).toBe(3);
 
       for (const exclusionTagId of mapping.exclusionTagIds) {
         expect(globalExclusionTagIds.has(exclusionTagId)).toBe(true);

@@ -55,7 +55,7 @@ Each mapping entry in `taskCategoryMappings` includes:
 This first version is intentionally scoped:
 
 - one deterministic mapping per supported task category;
-- one active pack reference (`context-system-foundations`) per mapping;
+- one deterministic three-pack core route per mapping (`repository-overview`, `architecture-core`, `context-system-foundations`);
 - one deterministic four-tier assembly profile shared across initial task categories;
 - explicit exclusion tags, authority tags, and notes for future extension;
 - no runtime resolver implementation in this story.

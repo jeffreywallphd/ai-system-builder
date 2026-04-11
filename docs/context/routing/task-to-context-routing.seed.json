@@ -102,6 +102,7 @@
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -138,6 +139,7 @@
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -177,6 +179,7 @@
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -214,6 +217,7 @@
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -252,6 +256,7 @@
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -327,6 +332,7 @@
       },
       "packIds": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
@@ -349,7 +355,7 @@
         "dev/tests/HostCompositionArchitectureGuardrails.test.ts"
       ],
       "excludePackIds": [],
-      "notes": "Primary ordering remains deterministic: foundations pack first until domain-specific packs exist.",
+      "notes": "Primary ordering remains deterministic: repository orientation first, then core architecture, then context foundations.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
@@ -417,6 +423,7 @@
       },
       "packIds": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
@@ -507,6 +514,7 @@
       },
       "packIds": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
@@ -530,7 +538,7 @@
         "dev/tests"
       ],
       "excludePackIds": [],
-      "notes": "Two-pack ordering keeps implementation context bounded until additional domain packs are published.",
+      "notes": "Three-pack ordering keeps implementation context bounded while adding architecture-specific grounding.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
@@ -598,6 +606,7 @@
       },
       "packIds": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "selectionMode": "single",
@@ -620,7 +629,7 @@
         "dev/tests/TaskToContextRoutingContractGuardrails.test.ts"
       ],
       "excludePackIds": [],
-      "notes": "Single selection mode intentionally avoids broad multi-pack documentation context.",
+      "notes": "Single selection mode keeps documentation routes deterministic while retaining architecture grounding.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
@@ -688,6 +697,7 @@
       },
       "packIds": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "selectionMode": "fallback",
@@ -709,7 +719,7 @@
         "dev/tests/HostDevelopmentStartupScripts.test.ts"
       ],
       "excludePackIds": [],
-      "notes": "Fallback mode keeps diagnostics resilient while preserving deterministic primary-pack ordering.",
+      "notes": "Fallback mode keeps diagnostics resilient while preserving deterministic architecture-first primary-pack ordering.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
@@ -777,6 +787,7 @@
       },
       "packIds": [
         "repository-overview",
+        "architecture-core",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",

@@ -37,6 +37,7 @@ Use this file with `docs/context/context-map.json` to keep deterministic task-to
 - Keep authoritative and related source tags distinct; related tags are context-only.
 - Keep mappings scoped and explicit; do not add speculative categories.
 - Keep notes short and focused on routing behavior.
+- Keep deterministic core-pack ordering explicit: `repository-overview`, then `architecture-core`, then `context-system-foundations` unless a documented exception is required.
 
 ## Guardrails
 
