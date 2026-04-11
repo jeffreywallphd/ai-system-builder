@@ -16,8 +16,10 @@ related_code_paths:
   - docs/context/templates/documentation-registry-entry.adr.template.json
   - docs/context/templates/documentation-registry-entry.context-pack.template.json
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/validate-documentation-registry.cjs
   - dev/scripts/generate-documentation-index-view.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
+  - dev/tests/DocumentationRegistryValidationScript.test.ts
   - dev/tests/DocumentationIndexViewStory631Guardrails.test.ts
   - dev/tests/DocumentationTaskDiscoveryPathsStory632Guardrails.test.ts
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
@@ -287,6 +289,8 @@ This keeps the registry/index useful as an active discovery-and-routing layer in
 - `dev/tests/DocumentationRegistryStructureGuardrails.test.ts`
 - `dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts`
 - `dev/scripts/validate-docs-foundation.cjs`
+- `dev/scripts/validate-documentation-registry.cjs`
+- `npm run docs:validate:registry`
 
 ## Authoring Starter Patterns (Story 6.1.6)
 
