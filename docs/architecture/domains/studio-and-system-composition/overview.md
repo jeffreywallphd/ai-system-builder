@@ -51,6 +51,8 @@ Out of scope:
 
 Contract-level details are canonical in `./references/`:
 - [Studio Handoff and Boundary Contracts](./references/studio-handoff-and-boundary-contracts.md)
+- [Studio UI Composition and State](./references/studio-ui-composition-and-state.md)
+- [Workflow and System Composition Contracts](./references/workflow-and-system-composition-contracts.md)
 
 ## Canonical Source Documents Migrated into This Domain
 
