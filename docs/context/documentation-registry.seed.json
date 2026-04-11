@@ -1387,6 +1387,45 @@
       "lastReviewed": "2026-04-11"
     },
     {
+      "recordId": "doc-contributors-documentation-index-assisted-discovery-worked-examples",
+      "path": "docs/contributors/documentation-index-assisted-discovery-worked-examples.md",
+      "aiPath": "docs/contributors/documentation-index-assisted-discovery-worked-examples.ai.md",
+      "title": "Documentation Index-Assisted Discovery Worked Examples",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Repository-specific worked examples that show index-first document discovery, routing linkage, and metadata authority checks for real tasks.",
+      "keywords": [
+        "documentation index",
+        "recordId discovery",
+        "task workflow routing",
+        "status and authoritativeness",
+        "security-sensitive change guidance"
+      ],
+      "relatedCodePaths": [
+        "docs/context/documentation-index.md",
+        "docs/context/routing/task-to-context-routing.seed.json",
+        "dev/tests/DocumentationIndexAssistedDiscoveryWorkedExamplesStory635Guardrails.test.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-context-engineering-system-guide",
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-operations-secret-health-diagnostics"
+      ],
+      "relatedDocs": [
+        "docs/contributors/documentation-index-daily-usage-guide.md",
+        "docs/context/documentation-registry.md",
+        "docs/context/documentation-taxonomy.md",
+        "docs/context/documentation-status-signals.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
       "recordId": "doc-contributors-docs-foundation-validation-guide",
       "path": "docs/contributors/docs-foundation-validation.md",
       "aiPath": "docs/contributors/docs-foundation-validation.ai.md",
@@ -1861,7 +1900,8 @@
         "doc-contributors-context-engineering-system-guide",
         "doc-contributors-docs-foundation-validation-guide",
         "doc-contributors-docs-migration-safety-guide",
-        "doc-contributors-docs-placement-guide"
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ],
       "runbook": [
         "doc-operations-node-bootstrap-identity",
@@ -1940,7 +1980,8 @@
         "doc-operations-secret-health-diagnostics",
         "doc-operations-workspace-administration",
         "doc-operations-storage-administration",
-        "doc-baseline-documentation-segmentation-migration-inventory"
+        "doc-baseline-documentation-segmentation-migration-inventory",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ],
       "deprecated": [],
       "superseded": [
@@ -1984,7 +2025,8 @@
         "doc-contributors-context-engineering-system-guide",
         "doc-contributors-docs-foundation-validation-guide",
         "doc-contributors-docs-migration-safety-guide",
-        "doc-contributors-docs-placement-guide"
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ],
       "operations": [
         "doc-context-pack-runtime-and-host",
@@ -2045,7 +2087,8 @@
         "doc-contributors-docs-foundation-validation-guide",
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
-        "doc-operations-node-bootstrap-identity"
+        "doc-operations-node-bootstrap-identity",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ],
       "reference": [
         "doc-architecture-document-scope-boundaries",
@@ -2083,14 +2126,16 @@
         "doc-architecture-domain-and-application-core",
         "doc-context-pack-architecture-core",
         "doc-adr-001-single-authoritative-control-plane",
-        "doc-architecture-domain-runtime-host-surfaces-overview"
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ],
       "feature-decomposition": [
         "doc-architecture-domain-and-application-core",
         "doc-architecture-domain-taxonomy",
         "doc-context-pack-repository-overview",
         "doc-context-pack-architecture-core",
-        "doc-contributors-context-engineering-system-guide"
+        "doc-contributors-context-engineering-system-guide",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ],
       "coding-implementation": [
         "doc-context-pack-repository-overview",
@@ -2111,7 +2156,8 @@
         "doc-operations-secret-health-diagnostics",
         "doc-operations-node-bootstrap-identity",
         "doc-architecture-domain-runtime-host-surfaces-overview",
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ],
       "ui-studio": [
         "doc-context-pack-studio-and-system-composition",
@@ -2125,14 +2171,16 @@
         "doc-adr-005-trust-identity-and-security-boundary-enforcement",
         "doc-architecture-domain-identity-trust-and-security-overview",
         "doc-operations-security-policy-configuration",
-        "doc-operations-secret-health-diagnostics"
+        "doc-operations-secret-health-diagnostics",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ],
       "documentation-change": [
         "doc-context-pack-documentation-refactor",
         "doc-contributors-docs-placement-guide",
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-foundation-validation-guide",
-        "doc-context-documentation-identity-and-reference-conventions"
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
       ]
     }
   },

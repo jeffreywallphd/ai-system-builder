@@ -25,8 +25,8 @@ This index is generated from the machine-readable documentation registry so cont
 
 ## At a Glance
 
-- Indexed records: **48**
-- Active records: **43**
+- Indexed records: **49**
+- Active records: **44**
 - Non-active records: **5**
 - Document types covered: **7**
 - Domains covered: **8**
@@ -59,10 +59,11 @@ This index is generated from the machine-readable documentation registry so cont
 - [Shared Asset Contracts (Legacy Link Stub)](../architecture/shared-asset-contracts.md) (`doc-architecture-superseded-shared-asset-contracts`)
 - [Workflow Execution and Tools (Legacy Link Stub)](../architecture/workflow-execution-and-tools.md) (`doc-architecture-superseded-workflow-execution-and-tools`)
 
-### `contributor-guide` (5)
+### `contributor-guide` (6)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.md) (`doc-contributors-adr-informed-implementation-and-review-examples`)
 - [Context Engineering System Contributor Guide](../contributors/context-engineering-system-guide.md) (`doc-contributors-context-engineering-system-guide`)
 - [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.md) (`doc-contributors-docs-foundation-validation-guide`)
+- [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
 
@@ -99,7 +100,7 @@ This index is generated from the machine-readable documentation registry so cont
 
 ## Browse by Task Workflow
 
-### `architecture-review` (5)
+### `architecture-review` (6)
 - Routing task IDs: `architecture-review-host-boundaries`
 - Context-map mapping IDs: `context-map-architecture-review-v1`
 - Selection mode / priority: `ordered` / `high`
@@ -107,6 +108,7 @@ This index is generated from the machine-readable documentation registry so cont
 - [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.md) (`doc-adr-001-single-authoritative-control-plane`)
 - [Architecture Domain Taxonomy](../architecture/architecture-domain-taxonomy.md) (`doc-architecture-domain-taxonomy`)
 - [Core Architecture Context Pack](./packs/architecture-core.pack.md) (`doc-context-pack-architecture-core`)
+- [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Domain and Application Core](../architecture/domain-and-application-core.md) (`doc-architecture-domain-and-application-core`)
 - [Runtime Host Surfaces Domain Overview](../architecture/domains/runtime-host-surfaces/overview.md) (`doc-architecture-domain-runtime-host-surfaces-overview`)
 
@@ -121,29 +123,31 @@ This index is generated from the machine-readable documentation registry so cont
 - [Repository Overview Context Pack](./packs/repository-overview.pack.md) (`doc-context-pack-repository-overview`)
 - [Runtime and Host Context Pack](./packs/runtime-and-host.pack.md) (`doc-context-pack-runtime-and-host`)
 
-### `diagnostics` (5)
+### `diagnostics` (6)
 - Routing task IDs: `runtime-host-diagnostics-triage`
 - Context-map mapping IDs: `context-map-diagnostics-v1`
 - Selection mode / priority: `fallback` / `high`
 - Context assembly profile: `foundation-domain-implementation-optional-v1`
 - [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.md) (`doc-adr-001-single-authoritative-control-plane`)
+- [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Node Bootstrap Identity Operations](../node-bootstrap-identity-operations.md) (`doc-operations-node-bootstrap-identity`)
 - [Runtime and Host Context Pack](./packs/runtime-and-host.pack.md) (`doc-context-pack-runtime-and-host`)
 - [Runtime Host Surfaces Domain Overview](../architecture/domains/runtime-host-surfaces/overview.md) (`doc-architecture-domain-runtime-host-surfaces-overview`)
 - [Secret Health and Operational Diagnostics](../secret-health-and-operational-diagnostics.md) (`doc-operations-secret-health-diagnostics`)
 
-### `documentation-change` (5)
+### `documentation-change` (6)
 - Routing task IDs: `documentation-refactor-context-and-architecture`
 - Context-map mapping IDs: `context-map-documentation-change-v1`
 - Selection mode / priority: `single` / `normal`
 - Context assembly profile: `foundation-domain-implementation-optional-v1`
 - [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.md) (`doc-contributors-docs-foundation-validation-guide`)
 - [Documentation Identity, Stable Keys, and Reference Conventions](./documentation-identity-and-reference-conventions.md) (`doc-context-documentation-identity-and-reference-conventions`)
+- [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
 - [Documentation Refactor Context Pack](./packs/documentation-refactor.pack.md) (`doc-context-pack-documentation-refactor`)
 
-### `feature-decomposition` (5)
+### `feature-decomposition` (6)
 - Routing task IDs: `feature-decomposition-epic-story-planning`
 - Context-map mapping IDs: `context-map-feature-decomposition-v1`
 - Selection mode / priority: `ordered` / `high`
@@ -151,6 +155,7 @@ This index is generated from the machine-readable documentation registry so cont
 - [Architecture Domain Taxonomy](../architecture/architecture-domain-taxonomy.md) (`doc-architecture-domain-taxonomy`)
 - [Context Engineering System Contributor Guide](../contributors/context-engineering-system-guide.md) (`doc-contributors-context-engineering-system-guide`)
 - [Core Architecture Context Pack](./packs/architecture-core.pack.md) (`doc-context-pack-architecture-core`)
+- [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Domain and Application Core](../architecture/domain-and-application-core.md) (`doc-architecture-domain-and-application-core`)
 - [Repository Overview Context Pack](./packs/repository-overview.pack.md) (`doc-context-pack-repository-overview`)
 
@@ -165,12 +170,13 @@ This index is generated from the machine-readable documentation registry so cont
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
 - [Documentation Refactor Context Pack](./packs/documentation-refactor.pack.md) (`doc-context-pack-documentation-refactor`)
 
-### `runtime-security` (5)
+### `runtime-security` (6)
 - Routing task IDs: `runtime-security-identity-and-policy-hardening`
 - Context-map mapping IDs: `context-map-runtime-security-v1`
 - Selection mode / priority: `ordered` / `critical`
 - Context assembly profile: `foundation-domain-implementation-optional-v1`
 - [ADR-005 Trust, Identity, and Security Boundary Enforcement](../adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md) (`doc-adr-005-trust-identity-and-security-boundary-enforcement`)
+- [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Identity and Security Context Pack](./packs/identity-and-security.pack.md) (`doc-context-pack-identity-and-security`)
 - [Identity Trust and Security Domain Overview](../architecture/domains/identity-trust-and-security/overview.md) (`doc-architecture-domain-identity-trust-and-security-overview`)
 - [Secret Health and Operational Diagnostics](../secret-health-and-operational-diagnostics.md) (`doc-operations-secret-health-diagnostics`)
@@ -215,10 +221,11 @@ This index is generated from the machine-readable documentation registry so cont
 - [Documentation Segmentation Migration Inventory](../documentation-segmentation-migration-inventory.md) (`doc-baseline-documentation-segmentation-migration-inventory`)
 - [Feature 1 Documentation Foundation Completion Handoff](../baselines/feature-1-documentation-foundation-handoff.md) (`doc-baseline-feature-1-documentation-foundation-handoff`)
 
-### `contributors` (5)
+### `contributors` (6)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.md) (`doc-contributors-adr-informed-implementation-and-review-examples`)
 - [Context Engineering System Contributor Guide](../contributors/context-engineering-system-guide.md) (`doc-contributors-context-engineering-system-guide`)
 - [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.md) (`doc-contributors-docs-foundation-validation-guide`)
+- [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
 
@@ -258,7 +265,7 @@ This index is generated from the machine-readable documentation registry so cont
 ### `draft` (0)
 - No indexed records.
 
-### `active` (43)
+### `active` (44)
 - [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.md) (`doc-adr-001-single-authoritative-control-plane`)
 - [ADR-002 Workspace-Centered Tenancy and Resource Ownership](../adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md) (`doc-adr-002-workspace-centered-tenancy-and-resource-ownership`)
 - [ADR-003 Storage as Managed Platform Resource](../adr/records/adr-003-storage-as-managed-platform-resource.md) (`doc-adr-003-storage-as-managed-platform-resource`)
@@ -282,6 +289,7 @@ This index is generated from the machine-readable documentation registry so cont
 - [Deployment Policy and Audit Governance Domain Overview](../architecture/domains/deployment-policy-and-audit-governance/overview.md) (`doc-architecture-domain-deployment-policy-and-audit-governance-overview`)
 - [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.md) (`doc-contributors-docs-foundation-validation-guide`)
 - [Documentation Identity, Stable Keys, and Reference Conventions](./documentation-identity-and-reference-conventions.md) (`doc-context-documentation-identity-and-reference-conventions`)
+- [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
 - [Documentation Refactor Context Pack](./packs/documentation-refactor.pack.md) (`doc-context-pack-documentation-refactor`)

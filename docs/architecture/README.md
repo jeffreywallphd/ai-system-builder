@@ -70,6 +70,8 @@ related_code_paths:
   [Active vs Historical Docs Worked Examples](../contributors/active-vs-historical-docs-worked-examples.md)
 - Need contributor workflow guidance for index-first discovery and metadata-based authority checks:
   [Documentation Index Daily Usage Guide](../contributors/documentation-index-daily-usage-guide.md)
+- Need repository task examples showing index-assisted discovery across routing, taxonomy, and status signals:
+  [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md)
 - Need full task-to-context-pack assembly rules instead of architecture-only routing:
   [Context Routing Router](../context/routing/README.md)
 
