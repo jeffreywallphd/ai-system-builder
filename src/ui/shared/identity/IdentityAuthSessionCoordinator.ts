@@ -67,6 +67,10 @@ export class IdentityAuthSessionCoordinator {
       readonly promise: Promise<IdentitySessionBootstrapResult>;
     }
     | undefined;
+  private static activeActorContextResolutions = new Map<
+    string,
+    Promise<Awaited<ReturnType<IdentityAuthService["resolveSessionActorContext"]>>>
+  >();
 
   private readonly now: () => Date;
 
@@ -80,6 +84,7 @@ export class IdentityAuthSessionCoordinator {
 
   public static resetInFlightBootstrapForTests(): void {
     IdentityAuthSessionCoordinator.activeBootstrap = undefined;
+    IdentityAuthSessionCoordinator.activeActorContextResolutions.clear();
   }
 
   public async bootstrap(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
@@ -263,6 +268,12 @@ export class IdentityAuthSessionCoordinator {
     },
     options?: IdentitySessionBootstrapOptions,
   ): Promise<Awaited<ReturnType<IdentityAuthService["resolveSessionActorContext"]>>> {
+    const requestKey = buildSessionActorContextRequestKey(request.sessionToken, request.workspaceId);
+    const inFlightResolution = IdentityAuthSessionCoordinator.activeActorContextResolutions.get(requestKey);
+    if (inFlightResolution) {
+      return await inFlightResolution;
+    }
+
     const startedAt = Date.now();
     const timeoutMs = normalizeTimeoutMs(options?.actorContextTimeoutMs, DefaultActorContextTimeoutMs);
     const cancelPendingProgressNotices = this.scheduleWorkspaceContextProgressNotices(
@@ -276,7 +287,7 @@ export class IdentityAuthSessionCoordinator {
       startedAt: new Date(startedAt).toISOString(),
       requestedWorkspaceId: request.workspaceId,
     }));
-    try {
+    const timedResolutionPromise = (async () => {
       const result = await this.authService.resolveSessionActorContext(request, {
         timeoutMs,
         retryPolicy: BootstrapRequestRetryPolicy,
@@ -290,7 +301,13 @@ export class IdentityAuthSessionCoordinator {
         durationMs: Date.now() - startedAt,
       }));
       return result;
+    })();
+
+    IdentityAuthSessionCoordinator.activeActorContextResolutions.set(requestKey, timedResolutionPromise);
+    try {
+      return await timedResolutionPromise;
     } finally {
+      IdentityAuthSessionCoordinator.activeActorContextResolutions.delete(requestKey);
       cancelPendingProgressNotices();
       logInitDiagnostic("resolveSessionActorContext:end", Object.freeze({
         durationMs: Date.now() - startedAt,
@@ -341,6 +358,10 @@ function logInitDiagnostic(event: string, details?: Readonly<Record<string, unkn
 function normalizeWorkspaceId(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function buildSessionActorContextRequestKey(sessionToken: string, workspaceId?: string): string {
+  return `${sessionToken}::${workspaceId ?? "*"}`;
 }
 
 function deriveInitialCapabilityState(

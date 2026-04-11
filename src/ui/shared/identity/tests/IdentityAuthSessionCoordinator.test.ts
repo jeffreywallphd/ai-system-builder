@@ -313,6 +313,59 @@ describe("IdentityAuthSessionCoordinator", () => {
     expect(resolveActorContextCalls).toBe(1);
   });
 
+  it("deduplicates in-flight actor-context requests across coordinator instances", async () => {
+    const storeA = createSessionStore();
+    const storeB = createSessionStore();
+    const session = createSession();
+    storeA.saveSession(session);
+    storeB.saveSession(session);
+
+    let resolveActorContext: ((value: IdentityAuthApiResponse<unknown>) => void) | undefined;
+    let resolveActorContextCalls = 0;
+    const actorContextPromise = new Promise<IdentityAuthApiResponse<unknown>>((resolve) => {
+      resolveActorContext = resolve;
+    });
+    const authService = {
+      resolveSessionActorContext: async () => {
+        resolveActorContextCalls += 1;
+        return await actorContextPromise as IdentityAuthApiResponse<never>;
+      },
+    };
+    const firstCoordinator = new IdentityAuthSessionCoordinator(storeA, authService);
+    const secondCoordinator = new IdentityAuthSessionCoordinator(storeB, authService);
+
+    const first = firstCoordinator.refreshIfAuthenticated();
+    const second = secondCoordinator.refreshIfAuthenticated();
+    resolveActorContext?.({
+      ok: true,
+      data: {
+        actor: {
+          userIdentityId: "user-1",
+          username: "alice",
+        },
+        session: {
+          sessionId: "identity-session:1",
+          providerId: "provider:local-password",
+          accessChannel: "desktop",
+          issuedAt: "2026-04-04T20:00:00.000Z",
+          expiresAt: "2026-04-05T20:00:00.000Z",
+          assuranceLevel: "authenticated-untrusted",
+          trustState: "untrusted",
+        },
+        workspaceContext: {
+          requestedWorkspaceId: undefined,
+          resolvedWorkspaceId: undefined,
+          workspaces: [],
+        },
+      },
+    });
+
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult.status).toBe(IdentitySessionBootstrapStatus.authenticated);
+    expect(secondResult.status).toBe(IdentitySessionBootstrapStatus.authenticated);
+    expect(resolveActorContextCalls).toBe(1);
+  });
+
   it("passes requested workspace context through bootstrap and refresh", async () => {
     const store = createSessionStore();
     store.saveSession(createSession());

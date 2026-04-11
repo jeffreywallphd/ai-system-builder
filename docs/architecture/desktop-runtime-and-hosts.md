@@ -340,6 +340,7 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
 - Session bootstrap in `src/ui/shared/identity/IdentityAuthSessionCoordinator.ts` is now explicitly timed/logged and bounded with timeout defaults for startup-critical identity calls:
   - `resolveAuthenticatedSession`
   - `resolveSessionActorContext`
+- Session actor-context hydration now coalesces identical in-flight requests (same session token + workspace id) across coordinator instances so startup/login routes do not fan out duplicate `/api/v1/identity/session/context` calls under concurrent React effects.
 - Shared API request timeout behavior now classifies timeout aborts as `domainCode: request-timeout` in `src/ui/shared/api/SharedApiClient.ts` so startup flows can distinguish timeout from user cancellation and route users to sign-in instead of leaving bootstrap pending.
 - Electron desktop startup now emits phased startup timing and memory checkpoints in `electron/main/main.ts` for:
   - `desktop-startup.host-bootstrap`
