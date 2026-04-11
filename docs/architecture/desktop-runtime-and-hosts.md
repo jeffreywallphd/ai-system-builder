@@ -29,6 +29,15 @@ Desktop startup orchestration is now explicit and stage-driven through the share
 
 ## Preload bridge responsibilities
 
+### Preload bridge module organization
+
+The preload bridge is now split into domain-focused factory modules under `electron/preload/bridge/`, with `electron/preload.ts` acting as a composition root.
+
+- `electron/preload.ts` remains responsible for sync bootstrap (`ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap)`), runtime-readiness helpers, auth/deferred surface composition, and `contextBridge.exposeInMainWorld("aiLoomDesktop", desktopBridge)`.
+- Domain bridge factories are isolated by contract area (`createStorageBridge`, `createSecretsBridge`, `createConnectivityBridge`, `createWorkflowsBridge`, `createExecutionRunsBridge`, `createWorkflowRunSummariesBridge`, `createModelFilesBridge`, `createCanonicalAssetsBridge`, `createStudioShellBridge`, `createRegistryBridge`, `createAgentsBridge`).
+- Shared deferred-feature guard behavior (`is ready` checks, on-demand warmup triggering, and unavailable error generation) is centralized in `electron/preload/bridge/deferredFeatureGuards.ts` and injected into guarded bridge groups from preload composition.
+- New preload bridge APIs should follow this pattern: add a domain factory module, accept dependencies explicitly via typed parameter objects, and compose it in `electron/preload.ts` without introducing mutable preload singletons.
+
 `electron/preload.ts` exposes a single `aiLoomDesktop` object into the renderer. The bridge includes:
 - bootstrap information
 - key/value storage access
