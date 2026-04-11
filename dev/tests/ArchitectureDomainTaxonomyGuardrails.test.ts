@@ -7,6 +7,8 @@ const humanTaxonomyPath = resolve(repoRoot, "docs/architecture/architecture-doma
 const aiTaxonomyPath = resolve(repoRoot, "docs/architecture/architecture-domain-taxonomy.ai.md");
 const architectureReadmePath = resolve(repoRoot, "docs/architecture/README.md");
 const architectureAiReadmePath = resolve(repoRoot, "docs/architecture/README.ai.md");
+const domainsRouterPath = resolve(repoRoot, "docs/architecture/domains/README.md");
+const domainsAiRouterPath = resolve(repoRoot, "docs/architecture/domains/README.ai.md");
 
 const requiredDomainIds = [
   "core-platform-and-composition",
@@ -23,12 +25,23 @@ describe("architecture domain taxonomy guardrails", () => {
   it("keeps architecture taxonomy documents present and linked from architecture routers", () => {
     expect(existsSync(humanTaxonomyPath)).toBe(true);
     expect(existsSync(aiTaxonomyPath)).toBe(true);
+    expect(existsSync(domainsRouterPath)).toBe(true);
+    expect(existsSync(domainsAiRouterPath)).toBe(true);
 
     const architectureReadme = readFileSync(architectureReadmePath, "utf8");
     const architectureAiReadme = readFileSync(architectureAiReadmePath, "utf8");
+    const domainsRouter = readFileSync(domainsRouterPath, "utf8");
+    const domainsAiRouter = readFileSync(domainsAiRouterPath, "utf8");
 
     expect(architectureReadme).toContain("./architecture-domain-taxonomy.md");
     expect(architectureAiReadme).toContain("./architecture-domain-taxonomy.md");
+    expect(architectureReadme).toContain("./domains/README.md");
+    expect(architectureAiReadme).toContain("./domains/README.md");
+
+    for (const domainId of requiredDomainIds) {
+      expect(domainsRouter).toContain(`./${domainId}/overview.md`);
+      expect(domainsAiRouter).toContain(`./${domainId}/overview.md`);
+    }
   });
 
   it("keeps the taxonomy scoped to grounded system boundaries with explicit migration rules", () => {
@@ -64,6 +77,18 @@ describe("architecture domain taxonomy guardrails", () => {
     ] as const) {
       expect(humanDoc).toContain(groundingSignal);
       expect(aiDoc).toContain(groundingSignal);
+    }
+  });
+
+  it("keeps the domain-oriented architecture folder contract in place", () => {
+    for (const domainId of requiredDomainIds) {
+      const domainRoot = resolve(repoRoot, `docs/architecture/domains/${domainId}`);
+      expect(existsSync(domainRoot)).toBe(true);
+      expect(existsSync(resolve(domainRoot, "overview.md"))).toBe(true);
+      expect(existsSync(resolve(domainRoot, "overview.ai.md"))).toBe(true);
+      expect(existsSync(resolve(domainRoot, "references"))).toBe(true);
+      expect(existsSync(resolve(domainRoot, "references/README.md"))).toBe(true);
+      expect(existsSync(resolve(domainRoot, "references/README.ai.md"))).toBe(true);
     }
   });
 });
