@@ -33,6 +33,11 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Routing worked examples keep valid `expectedPackOrder` IDs and resolvable `expectedRelatedDocOrder` paths.
 - Seed docs keep required metadata header fields with taxonomy-aligned enum values.
 - Seed `.md` and `.ai.md` pairs stay aligned on routing metadata.
+- ADR validators also enforce cross-reference integrity in high-value paths.
+- ADR `## Related Documentation` references resolve and linked ADR targets are present in `adr-registry.json`.
+- Architecture `## Related ADRs` references resolve and point to registered ADR records.
+- Context pack `## Authoritative Docs` ADR references resolve and point to registered ADR records.
+- ADR index files (`docs/adr/records/README.md` and `.ai.md`) stay synchronized with `adr-registry.json`.
 
 ## Run Command
 
@@ -62,6 +67,12 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 - `ADR_REQUIRED_SECTION_MISSING`
 - `ADR_IDENTIFIER_MISMATCH`
 - `ADR_SECTION_METADATA_MISMATCH`
+- `ADR_RELATED_DOC_REFERENCE_INVALID`
+- `ADR_RELATED_ADR_TARGET_MISSING`
+- `ARCHITECTURE_ADR_REFERENCE_INVALID`
+- `CONTEXT_PACK_ADR_REFERENCE_INVALID`
+- `ADR_INDEX_REFERENCE_INVALID`
+- `ADR_INDEX_REFERENCE_MISSING`
 
 ## Scope Notes
 

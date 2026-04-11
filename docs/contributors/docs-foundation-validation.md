@@ -33,6 +33,11 @@ Use this guide when you need a fast contract check for the documentation foundat
 - Routing worked examples keep valid `expectedPackOrder` IDs and resolvable `expectedRelatedDocOrder` paths.
 - Seed docs have a valid metadata header and stay aligned to taxonomy/metadata contracts.
 - Seed `.md` and `.ai.md` pairs stay aligned for routing metadata fields.
+- ADR validators also enforce cross-reference integrity in high-value paths.
+- ADR `## Related Documentation` references resolve and linked ADR targets are present in `adr-registry.json`.
+- Architecture `## Related ADRs` references resolve and point to registered ADR records.
+- Context pack `## Authoritative Docs` ADR references resolve and point to registered ADR records.
+- ADR index files (`docs/adr/records/README.md` and `.ai.md`) stay synchronized with `adr-registry.json`.
 
 ## Run Locally
 
@@ -69,6 +74,12 @@ Examples:
 - `ADR_REQUIRED_SECTION_MISSING`
 - `ADR_IDENTIFIER_MISMATCH`
 - `ADR_SECTION_METADATA_MISMATCH`
+- `ADR_RELATED_DOC_REFERENCE_INVALID`
+- `ADR_RELATED_ADR_TARGET_MISSING`
+- `ARCHITECTURE_ADR_REFERENCE_INVALID`
+- `CONTEXT_PACK_ADR_REFERENCE_INVALID`
+- `ADR_INDEX_REFERENCE_INVALID`
+- `ADR_INDEX_REFERENCE_MISSING`
 
 ## Scope Notes
 

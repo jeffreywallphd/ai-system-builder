@@ -70,4 +70,87 @@ describe("ADR validation script", () => {
     expect(combinedOutput).toContain("[ADR_IDENTIFIER_MISMATCH]");
     expect(combinedOutput).toContain("adr_number '099'");
   });
+
+  it("detects missing related documentation references in ADR records", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "adr-validator-related-doc-reference-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const humanAdrPath = join(
+      fixtureRoot,
+      "docs",
+      "adr",
+      "records",
+      "adr-001-single-authoritative-control-plane.md",
+    );
+    const updatedContent = readFileSync(humanAdrPath, "utf8").replace(
+      "docs/architecture/authoritative-server-host-assembly.md",
+      "docs/architecture/missing-related-doc-for-test.md",
+    );
+    writeFileSync(humanAdrPath, updatedContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ADR_RELATED_DOC_REFERENCE_INVALID]");
+    expect(combinedOutput).toContain("missing-related-doc-for-test.md");
+  });
+
+  it("detects architecture related-ADR references that are not registered targets", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "adr-validator-architecture-related-adr-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const architectureDocPath = join(
+      fixtureRoot,
+      "docs",
+      "architecture",
+      "domain-and-application-core.md",
+    );
+    const updatedContent = readFileSync(architectureDocPath, "utf8").replace(
+      "docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md",
+      "docs/adr/records/adr-099-missing-architecture-reference.md",
+    );
+    writeFileSync(architectureDocPath, updatedContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ARCHITECTURE_ADR_REFERENCE_INVALID]");
+    expect(combinedOutput).toContain("adr-099-missing-architecture-reference.md");
+  });
+
+  it("detects context-pack ADR references that are not registered targets", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "adr-validator-context-pack-related-adr-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const packDocPath = join(
+      fixtureRoot,
+      "docs",
+      "context",
+      "packs",
+      "architecture-core.pack.md",
+    );
+    const updatedContent = readFileSync(packDocPath, "utf8").replace(
+      "docs/adr/records/adr-003-storage-as-managed-platform-resource.md",
+      "docs/adr/records/adr-099-missing-context-pack-reference.md",
+    );
+    writeFileSync(packDocPath, updatedContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CONTEXT_PACK_ADR_REFERENCE_INVALID]");
+    expect(combinedOutput).toContain("adr-099-missing-context-pack-reference.md");
+  });
 });

@@ -1,5 +1,5 @@
 const { existsSync, readFileSync, readdirSync } = require("node:fs");
-const { resolve } = require("node:path");
+const { dirname, relative, resolve } = require("node:path");
 
 const REQUIRED_ADR_SECTIONS = [
   "Status",
@@ -134,16 +134,169 @@ function findHeadingLine(markdownContent, headingText) {
 
 function extractSectionBody(markdownContent, headingText) {
   const normalized = markdownContent.replace(/\r\n/g, "\n");
-  const escapedHeadingText = headingText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const sectionPattern = new RegExp(`^##\\s+${escapedHeadingText}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|\\n#\\s+|$)`, "m");
-  const match = normalized.match(sectionPattern);
-  return match ? match[1] : "";
+  const lines = normalized.split("\n");
+  const expectedHeading = `## ${headingText}`;
+  let sectionStartIndex = -1;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index].trim() === expectedHeading) {
+      sectionStartIndex = index + 1;
+      break;
+    }
+  }
+
+  if (sectionStartIndex === -1) {
+    return "";
+  }
+
+  const sectionLines = [];
+  for (let index = sectionStartIndex; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^##\s+/.test(line) || /^#\s+/.test(line)) {
+      break;
+    }
+    sectionLines.push(line);
+  }
+
+  return sectionLines.join("\n");
 }
 
 function extractH1(markdownContent) {
   const normalized = markdownContent.replace(/\r\n/g, "\n");
   const h1Match = normalized.match(/^#\s+(.+)$/m);
   return h1Match ? h1Match[1].trim() : "";
+}
+
+function extractInlineCodeReferences(text) {
+  const references = [];
+  const pattern = /`([^`]+)`/g;
+  let match = pattern.exec(text);
+  while (match) {
+    references.push(match[1].trim());
+    match = pattern.exec(text);
+  }
+  return references.filter((reference) => reference.length > 0);
+}
+
+function extractMarkdownLinkReferences(text) {
+  const references = [];
+  const pattern = /\[[^\]]+\]\(([^)]+)\)/g;
+  let match = pattern.exec(text);
+  while (match) {
+    references.push(match[1].trim());
+    match = pattern.exec(text);
+  }
+  return references.filter((reference) => reference.length > 0);
+}
+
+function normalizeReferencePath({ referencePath, sourceRelativePath, repoRoot }) {
+  if (!isNonEmptyString(referencePath)) {
+    return "";
+  }
+
+  const stripped = referencePath
+    .trim()
+    .replace(/^<|>$/g, "")
+    .split("#")[0]
+    .split("?")[0]
+    .trim();
+
+  if (!isNonEmptyString(stripped)) {
+    return "";
+  }
+
+  if (/^[a-z]+:/i.test(stripped)) {
+    return "";
+  }
+
+  const slashNormalized = stripped.replace(/\\/g, "/");
+
+  if (slashNormalized.startsWith("docs/")) {
+    return slashNormalized;
+  }
+
+  if (slashNormalized.startsWith("./") || slashNormalized.startsWith("../")) {
+    const sourceDirectory = dirname(resolve(repoRoot, sourceRelativePath));
+    const absoluteReferencePath = resolve(sourceDirectory, slashNormalized);
+    return normalizePath(relative(repoRoot, absoluteReferencePath));
+  }
+
+  return "";
+}
+
+function collectDocReferencesFromText({ text, sourceRelativePath, repoRoot }) {
+  const references = [
+    ...extractInlineCodeReferences(text),
+    ...extractMarkdownLinkReferences(text),
+  ];
+  const normalizedReferences = new Set();
+  for (const reference of references) {
+    const normalized = normalizeReferencePath({ referencePath: reference, sourceRelativePath, repoRoot });
+    if (normalized.startsWith("docs/")) {
+      normalizedReferences.add(normalized);
+    }
+  }
+  return [...normalizedReferences];
+}
+
+function collectDocReferencesFromSection({
+  markdownContent,
+  headingText,
+  sourceRelativePath,
+  repoRoot,
+}) {
+  const sectionBody = extractSectionBody(markdownContent, headingText);
+  return collectDocReferencesFromText({
+    text: sectionBody,
+    sourceRelativePath,
+    repoRoot,
+  });
+}
+
+function deriveVariantReference(referencePath, useAiVariant) {
+  if (referencePath.endsWith(".ai.md")) {
+    return useAiVariant
+      ? referencePath
+      : referencePath.replace(/\.ai\.md$/, ".md");
+  }
+
+  if (referencePath.endsWith(".md")) {
+    return useAiVariant
+      ? referencePath.replace(/\.md$/, ".ai.md")
+      : referencePath;
+  }
+
+  return referencePath;
+}
+
+function buildExpectedVariantReferenceSet({
+  references,
+  useAiVariant,
+  repoRoot,
+}) {
+  const expectedReferences = new Set();
+  for (const reference of references) {
+    const preferredVariant = deriveVariantReference(reference, useAiVariant);
+    if (preferredVariant !== reference && existsSync(resolve(repoRoot, preferredVariant))) {
+      expectedReferences.add(preferredVariant);
+      continue;
+    }
+    expectedReferences.add(reference);
+  }
+  return expectedReferences;
+}
+
+function findFirstMissingReference(expectedReferences, actualReferences) {
+  for (const expectedReference of expectedReferences) {
+    if (!actualReferences.has(expectedReference)) {
+      return expectedReference;
+    }
+  }
+  return "";
+}
+
+function isAdrRecordDocPath(referencePath) {
+  return /^docs\/adr\/records\/adr-\d{3}-.+\.(ai\.)?md$/.test(referencePath);
 }
 
 function validateAdrDocument({
@@ -289,7 +442,10 @@ function validateAdrDocument({
     );
   }
 
-  return frontmatter;
+  return {
+    frontmatter,
+    markdownContent,
+  };
 }
 
 function validateAdrRecords(repoRoot) {
@@ -345,6 +501,16 @@ function validateAdrRecords(repoRoot) {
     .map((entry) => entry?.humanDocPath)
     .filter((entry) => isNonEmptyString(entry))
     .sort();
+  const registryHumanDocPaths = new Set(
+    registry.records
+      .map((entry) => entry?.humanDocPath)
+      .filter((entry) => isNonEmptyString(entry)),
+  );
+  const registryAiDocPaths = new Set(
+    registry.records
+      .map((entry) => entry?.aiDocPath)
+      .filter((entry) => isNonEmptyString(entry)),
+  );
 
   if (JSON.stringify(docsInFolder) !== JSON.stringify(docsInRegistry)) {
     addIssue(
@@ -429,14 +595,14 @@ function validateAdrRecords(repoRoot) {
       continue;
     }
 
-    const humanFrontmatter = validateAdrDocument({
+    const humanValidationResult = validateAdrDocument({
       issues,
       absolutePath: absoluteHumanPath,
       relativePath: humanPath,
       expectedAdrNumber: entry.adrNumber,
       expectedDecisionTitle: entry.title,
     });
-    const aiFrontmatter = validateAdrDocument({
+    const aiValidationResult = validateAdrDocument({
       issues,
       absolutePath: absoluteAiPath,
       relativePath: aiPath,
@@ -444,9 +610,11 @@ function validateAdrRecords(repoRoot) {
       expectedDecisionTitle: entry.title,
     });
 
-    if (!humanFrontmatter || !aiFrontmatter) {
+    if (!humanValidationResult || !aiValidationResult) {
       continue;
     }
+    const humanFrontmatter = humanValidationResult.frontmatter;
+    const aiFrontmatter = aiValidationResult.frontmatter;
 
     for (const field of [
       "title",
@@ -461,6 +629,249 @@ function validateAdrRecords(repoRoot) {
           issues,
           "ADR_RECORD_PAIR_MISMATCH",
           `${humanPath} and ${aiPath} differ for metadata field '${field}'.`,
+        );
+      }
+    }
+
+    const humanRelatedDocReferences = collectDocReferencesFromSection({
+      markdownContent: humanValidationResult.markdownContent,
+      headingText: "Related Documentation",
+      sourceRelativePath: humanPath,
+      repoRoot,
+    });
+    const aiRelatedDocReferences = collectDocReferencesFromSection({
+      markdownContent: aiValidationResult.markdownContent,
+      headingText: "Related Documentation",
+      sourceRelativePath: aiPath,
+      repoRoot,
+    });
+
+    if (humanRelatedDocReferences.length === 0) {
+      addIssue(
+        issues,
+        "ADR_RELATED_DOC_REFERENCE_MISSING",
+        `${humanPath} must include at least one docs reference in '## Related Documentation'.`,
+      );
+    }
+
+    if (aiRelatedDocReferences.length === 0) {
+      addIssue(
+        issues,
+        "ADR_RELATED_DOC_REFERENCE_MISSING",
+        `${aiPath} must include at least one docs reference in '## Related Documentation'.`,
+      );
+    }
+
+    for (const referencePath of humanRelatedDocReferences) {
+      if (!existsSync(resolve(repoRoot, referencePath))) {
+        addIssue(
+          issues,
+          "ADR_RELATED_DOC_REFERENCE_INVALID",
+          `${humanPath} references missing related documentation path '${referencePath}'.`,
+        );
+      }
+
+      if (referencePath.endsWith(".ai.md")) {
+        addIssue(
+          issues,
+          "ADR_RELATED_DOC_VARIANT_INVALID",
+          `${humanPath} should reference human docs (.md) in '## Related Documentation': '${referencePath}'.`,
+        );
+      }
+
+      if (isAdrRecordDocPath(referencePath) && !registryHumanDocPaths.has(referencePath)) {
+        addIssue(
+          issues,
+          "ADR_RELATED_ADR_TARGET_MISSING",
+          `${humanPath} references ADR path '${referencePath}' that is not registered in adr-registry.json.`,
+        );
+      }
+    }
+
+    for (const referencePath of aiRelatedDocReferences) {
+      if (!existsSync(resolve(repoRoot, referencePath))) {
+        addIssue(
+          issues,
+          "ADR_RELATED_DOC_REFERENCE_INVALID",
+          `${aiPath} references missing related documentation path '${referencePath}'.`,
+        );
+      }
+
+      if (referencePath.endsWith(".md") && !referencePath.endsWith(".ai.md")) {
+        addIssue(
+          issues,
+          "ADR_RELATED_DOC_VARIANT_INVALID",
+          `${aiPath} should reference AI docs (.ai.md) in '## Related Documentation': '${referencePath}'.`,
+        );
+      }
+
+      if (isAdrRecordDocPath(referencePath) && !registryAiDocPaths.has(referencePath)) {
+        addIssue(
+          issues,
+          "ADR_RELATED_ADR_TARGET_MISSING",
+          `${aiPath} references ADR path '${referencePath}' that is not registered in adr-registry.json.`,
+        );
+      }
+    }
+
+    const expectedAiReferences = buildExpectedVariantReferenceSet({
+      references: humanRelatedDocReferences,
+      useAiVariant: true,
+      repoRoot,
+    });
+    const actualAiReferences = new Set(aiRelatedDocReferences);
+    const missingAiReference = findFirstMissingReference(expectedAiReferences, actualAiReferences);
+    if (missingAiReference) {
+      addIssue(
+        issues,
+        "ADR_RELATED_DOC_PAIR_MISMATCH",
+        `${aiPath} is missing related documentation reference '${missingAiReference}' expected from ${humanPath}.`,
+      );
+    }
+
+    const expectedHumanReferences = buildExpectedVariantReferenceSet({
+      references: aiRelatedDocReferences,
+      useAiVariant: false,
+      repoRoot,
+    });
+    const actualHumanReferences = new Set(humanRelatedDocReferences);
+    const missingHumanReference = findFirstMissingReference(expectedHumanReferences, actualHumanReferences);
+    if (missingHumanReference) {
+      addIssue(
+        issues,
+        "ADR_RELATED_DOC_PAIR_MISMATCH",
+        `${humanPath} is missing related documentation reference '${missingHumanReference}' expected from ${aiPath}.`,
+      );
+    }
+  }
+
+  const architectureDocsRoot = resolve(repoRoot, "docs/architecture");
+  if (existsSync(architectureDocsRoot)) {
+    const architectureDocNames = readdirSync(architectureDocsRoot)
+      .filter((name) => name.endsWith(".md"));
+    for (const docName of architectureDocNames) {
+      const relativeDocPath = `docs/architecture/${docName}`;
+      const absoluteDocPath = resolve(repoRoot, relativeDocPath);
+      const markdownContent = readFileSync(absoluteDocPath, "utf8");
+      if (!findHeadingLine(markdownContent, "Related ADRs")) {
+        continue;
+      }
+
+      const adrReferences = collectDocReferencesFromSection({
+        markdownContent,
+        headingText: "Related ADRs",
+        sourceRelativePath: relativeDocPath,
+        repoRoot,
+      }).filter((referencePath) => isAdrRecordDocPath(referencePath));
+
+      const expectedRegistrySet = relativeDocPath.endsWith(".ai.md")
+        ? registryAiDocPaths
+        : registryHumanDocPaths;
+
+      for (const referencePath of adrReferences) {
+        if (!existsSync(resolve(repoRoot, referencePath))) {
+          addIssue(
+            issues,
+            "ARCHITECTURE_ADR_REFERENCE_INVALID",
+            `${relativeDocPath} references missing ADR '${referencePath}' in '## Related ADRs'.`,
+          );
+          continue;
+        }
+
+        if (!expectedRegistrySet.has(referencePath)) {
+          addIssue(
+            issues,
+            "ARCHITECTURE_ADR_REFERENCE_INVALID",
+            `${relativeDocPath} references ADR '${referencePath}' that is not registered in adr-registry.json.`,
+          );
+        }
+      }
+    }
+  }
+
+  const contextPacksRoot = resolve(repoRoot, "docs/context/packs");
+  if (existsSync(contextPacksRoot)) {
+    const contextPackDocNames = readdirSync(contextPacksRoot)
+      .filter((name) => /\.pack(\.ai)?\.md$/.test(name));
+    for (const docName of contextPackDocNames) {
+      const relativeDocPath = `docs/context/packs/${docName}`;
+      const absoluteDocPath = resolve(repoRoot, relativeDocPath);
+      const markdownContent = readFileSync(absoluteDocPath, "utf8");
+      if (!findHeadingLine(markdownContent, "Authoritative Docs")) {
+        continue;
+      }
+
+      const adrReferences = collectDocReferencesFromSection({
+        markdownContent,
+        headingText: "Authoritative Docs",
+        sourceRelativePath: relativeDocPath,
+        repoRoot,
+      }).filter((referencePath) => isAdrRecordDocPath(referencePath));
+
+      const expectedRegistrySet = relativeDocPath.endsWith(".ai.md")
+        ? registryAiDocPaths
+        : registryHumanDocPaths;
+
+      for (const referencePath of adrReferences) {
+        if (!existsSync(resolve(repoRoot, referencePath))) {
+          addIssue(
+            issues,
+            "CONTEXT_PACK_ADR_REFERENCE_INVALID",
+            `${relativeDocPath} references missing ADR '${referencePath}' in '## Authoritative Docs'.`,
+          );
+          continue;
+        }
+
+        if (!expectedRegistrySet.has(referencePath)) {
+          addIssue(
+            issues,
+            "CONTEXT_PACK_ADR_REFERENCE_INVALID",
+            `${relativeDocPath} references ADR '${referencePath}' that is not registered in adr-registry.json.`,
+          );
+        }
+      }
+    }
+  }
+
+  for (const [indexPath, expectedRegistrySet] of [
+    ["docs/adr/records/README.md", registryHumanDocPaths],
+    ["docs/adr/records/README.ai.md", registryAiDocPaths],
+  ]) {
+    const absoluteIndexPath = resolve(repoRoot, indexPath);
+    if (!existsSync(absoluteIndexPath)) {
+      continue;
+    }
+
+    const markdownContent = readFileSync(absoluteIndexPath, "utf8");
+    const referencedAdrs = collectDocReferencesFromText({
+      text: markdownContent,
+      sourceRelativePath: indexPath,
+      repoRoot,
+    }).filter((referencePath) => isAdrRecordDocPath(referencePath));
+    const referencedAdrSet = new Set(referencedAdrs);
+
+    for (const referencePath of referencedAdrSet) {
+      if (!existsSync(resolve(repoRoot, referencePath))) {
+        addIssue(
+          issues,
+          "ADR_INDEX_REFERENCE_INVALID",
+          `${indexPath} references missing ADR path '${referencePath}'.`,
+        );
+      } else if (!expectedRegistrySet.has(referencePath)) {
+        addIssue(
+          issues,
+          "ADR_INDEX_REFERENCE_INVALID",
+          `${indexPath} references ADR path '${referencePath}' that is not registered in adr-registry.json.`,
+        );
+      }
+    }
+
+    for (const referencePath of expectedRegistrySet) {
+      if (!referencedAdrSet.has(referencePath)) {
+        addIssue(
+          issues,
+          "ADR_INDEX_REFERENCE_MISSING",
+          `${indexPath} is missing ADR path '${referencePath}' from adr-registry.json.`,
         );
       }
     }
@@ -495,6 +906,9 @@ function main() {
     `Checked metadata fields: ${REQUIRED_METADATA_FIELDS.length}`,
     "Checked identifier consistency across registry, filename, frontmatter, and H1.",
     "Checked markdown and AI companion ADR metadata alignment.",
+    "Checked ADR related-documentation cross-reference integrity and .md/.ai.md pairing.",
+    "Checked architecture and context-pack ADR references against ADR registry targets.",
+    "Checked ADR index files against registry records.",
   ].join("\n") + "\n");
 }
 
