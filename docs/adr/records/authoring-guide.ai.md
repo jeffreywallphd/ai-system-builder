@@ -21,6 +21,7 @@ Produce ADRs that are concise, decision-focused, and durable for human and AI re
 - `Considered Options`: real options, including rejected ones.
 - `Chosen Approach`: stable architecture boundaries and authority model.
 - `Consequences`: upside, downside, and residual risk.
+- `Related Documentation`: explicit repo-relative links to affected architecture docs, related ADR records, and context pack/routing assets that should preserve decision context.
 
 ## Good vs Bad (AI Loom Studio)
 
@@ -52,4 +53,5 @@ Produce ADRs that are concise, decision-focused, and durable for human and AI re
 - Can a reviewer name the top rejected alternative and reason?
 - Are non-trivial downsides explicit?
 - Is transient implementation detail excluded?
+- Does `Related Documentation` keep bi-directional navigation with architecture/context docs so ADR memory is connected?
 

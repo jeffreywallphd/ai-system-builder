@@ -29,6 +29,11 @@ related_code_paths:
 - Contributor workflow playbooks or implementation checklists.
 - Historical baseline snapshots kept for migration history only.
 
+## ADR Linking Expectations
+- Architecture docs and ADRs are connected decision memory.
+- If an architecture doc is constrained by a decision, add `## Related ADRs` with direct links to `docs/adr/records/adr-<NNN>-<decision-slug>.ai.md`.
+- Keep reverse links in ADR `## Related Documentation` so architecture contracts and decision rationale stay paired.
+
 ## Start Here
 - [Domain And Application Core](./domain-and-application-core.md)
 - [Layers And Boundaries](./layers-and-boundaries.md)

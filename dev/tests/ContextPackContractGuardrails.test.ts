@@ -179,6 +179,10 @@ describe("context pack contract guardrails", () => {
     expect(aiSpec).toContain("Brevity and Signal Rules");
     expect(humanSpec).toContain("Content That Must Not Appear in a Context Pack");
     expect(aiSpec).toContain("Do Not Include");
+    expect(humanSpec).toContain("## ADR Citation Conventions");
+    expect(aiSpec).toContain("## ADR Citation Conventions");
+    expect(humanSpec).toContain("docs/adr/records/adr-<NNN>-<decision-slug>.md");
+    expect(aiSpec).toContain("docs/adr/records/adr-<NNN>-<decision-slug>.ai.md");
   });
 
   it("keeps contract discoverable from context and pack routers", () => {

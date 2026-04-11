@@ -31,6 +31,12 @@ Describe expected failures, error handling, and recovery contracts.
 
 Describe safe extension points and prohibited changes.
 
+## Related ADRs
+
+Link ADR records that define invariants or tradeoffs for this reference:
+
+- `docs/adr/records/adr-<NNN>-<decision-slug>.ai.md`
+
 ## References
 
 Link to upstream architecture overviews, ADRs, and dependent references.

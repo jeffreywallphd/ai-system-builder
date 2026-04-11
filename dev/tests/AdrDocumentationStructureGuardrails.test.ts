@@ -24,6 +24,7 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRouter).toContain("## ADR Metadata and Lifecycle Rules");
     expect(humanRouter).toContain("## ADR Decision Thresholds");
     expect(humanRouter).toContain("## Standard ADR Sections");
+    expect(humanRouter).toContain("## ADR Cross-Linking Conventions");
     expect(humanRouter).toContain("docs/adr/records/");
     expect(humanRouter).toContain("3-digit, zero-padded identifiers");
     expect(humanRouter).toContain("ADR-<NNN> <Decision Title>");
@@ -46,12 +47,16 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRouter).toContain("../context/templates/adr.template.md");
     expect(humanRouter).toContain("Decision Statement");
     expect(humanRouter).toContain("Supersession");
+    expect(humanRouter).toContain("bi-directional");
+    expect(humanRouter).toContain("docs/context/packs/");
+    expect(humanRouter).toContain("## Related ADRs");
     expect(humanRouter).toContain("./records/authoring-guide.md");
 
     expect(aiRouter).toContain("## ADR File Home");
     expect(aiRouter).toContain("## ADR Metadata and Lifecycle Rules");
     expect(aiRouter).toContain("## ADR Decision Thresholds");
     expect(aiRouter).toContain("## Standard ADR Sections");
+    expect(aiRouter).toContain("## ADR Cross-Linking Conventions");
     expect(aiRouter).toContain("docs/adr/records/");
     expect(aiRouter).toContain("3-digit, zero-padded identifiers");
     expect(aiRouter).toContain("ADR-<NNN> <Decision Title>");
@@ -74,6 +79,9 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRouter).toContain("../context/templates/adr.template.ai.md");
     expect(aiRouter).toContain("Decision Statement");
     expect(aiRouter).toContain("Supersession");
+    expect(aiRouter).toContain("bi-directional");
+    expect(aiRouter).toContain("docs/context/packs/");
+    expect(aiRouter).toContain("## Related ADRs");
     expect(aiRouter).toContain("./records/authoring-guide.ai.md");
   });
 
@@ -168,9 +176,11 @@ describe("ADR documentation structure guardrails", () => {
       expect(guide).toContain("Decision Statement");
       expect(guide).toContain("Considered Options");
       expect(guide).toContain("Consequences");
+      expect(guide).toContain("Related Documentation");
       expect(normalizedGuide).toContain("tradeoff");
       expect(normalizedGuide).toContain("speculative");
       expect(normalizedGuide).toContain("implementation");
+      expect(normalizedGuide).toContain("bi-directional");
     }
   });
 });

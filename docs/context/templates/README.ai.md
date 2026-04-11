@@ -29,6 +29,12 @@ For pack files in `docs/context/packs/`, also apply `docs/context/packs/README.a
 - Optional sections: `Supersession` and `Follow-Up Actions` (`Supersession` is required when replacement links are present).
 - ADR metadata and lifecycle anchors: required `adr_number`, required `decision_status` (`proposed`, `accepted`, `superseded`, `deprecated`), required `decision_date`, and title format `ADR-<NNN> <Decision Title>`.
 - ADR writing quality guidance (problem framing, alternatives, tradeoff honesty): `docs/adr/records/authoring-guide.ai.md`.
+- ADR cross-linking expectations: use `Related Documentation` to link architecture docs, related ADRs, and context assets (packs/routing) that should carry decision context.
+
+## Architecture Template ADR Backlinks
+
+- `architecture-overview.template.md` and `architecture-reference.template.md` include `## Related ADRs`.
+- Use `## Related ADRs` to link back to ADR records that define the architecture constraints.
 
 ## Metadata Anchor
 

@@ -21,6 +21,7 @@ Write ADRs that capture one architectural decision clearly enough that future co
 - `Considered Options`: include at least one serious rejected option and why it lost.
 - `Chosen Approach`: describe architectural boundaries, not sprint tasks.
 - `Consequences`: include benefits, drawbacks, and residual risks.
+- `Related Documentation`: include explicit repo-relative links to impacted architecture docs, related ADRs, and any context packs/routing assets that should carry this decision into context assembly.
 
 ## Good vs Bad Examples (AI Loom Studio Context)
 
@@ -52,4 +53,5 @@ Write ADRs that capture one architectural decision clearly enough that future co
 - Can a reader explain why at least one alternative was rejected?
 - Are risks and drawbacks explicit instead of implied?
 - Does the ADR avoid implementation noise that will age quickly?
+- Does `Related Documentation` create bi-directional navigation with architecture/context docs instead of leaving the ADR isolated?
 

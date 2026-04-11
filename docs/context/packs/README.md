@@ -18,6 +18,15 @@
 - Feature-local implementation checklists.
 - Architecture decision records.
 
+## ADR Citation Conventions
+
+Context packs may cite ADRs when decision rationale is high-value for implementation safety:
+
+- Add ADR links in `## Authoritative Docs` using repo-relative paths (for example `docs/adr/records/adr-<NNN>-<decision-slug>.md`).
+- Prefer ADR citations when a pack invariant depends on a settled architecture tradeoff.
+- Keep ADR links paired with architecture references so pack consumers can read both the decision and the enduring contract.
+- If a cited ADR is superseded, update pack references to the replacement ADR promptly.
+
 ## Start Here
 - [Context Pack Contract (Machine-Readable)](./context-pack.contract.json)
 - [Context Pack Catalog Contract](./context-pack-catalog.contract.json)

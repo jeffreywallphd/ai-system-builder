@@ -91,7 +91,13 @@ Describe expected benefits, tradeoffs, and risks.
 
 ## Related Documentation
 
-Link architecture references, contributor guides, and baselines that provide broader context.
+Use repo-relative links and keep ADR memory connected to the rest of docs:
+
+- Architecture context: `docs/architecture/<related-doc>.md`
+- Related decisions: `docs/adr/records/adr-<NNN>-<related-decision>.md`
+- Context assets that should carry this decision: `docs/context/packs/<pack-id>.pack.md` and/or `docs/context/routing/<routing-doc>.md`
+
+When architecture docs are updated from this decision, add a backlink from that architecture doc under `## Related ADRs`.
 
 ## Related Code Paths
 
