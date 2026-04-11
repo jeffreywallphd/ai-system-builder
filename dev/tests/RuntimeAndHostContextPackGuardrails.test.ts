@@ -46,6 +46,7 @@ describe("runtime and host context pack guardrails", () => {
     }
 
     for (const authoritativePath of [
+      "docs/adr/records/adr-001-single-authoritative-control-plane.md",
       "docs/architecture/host-runtime-composition-boundaries.md",
       "docs/architecture/host-bootstrap-pipeline.md",
       "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
@@ -57,6 +58,7 @@ describe("runtime and host context pack guardrails", () => {
     }
 
     for (const authoritativePath of [
+      "docs/adr/records/adr-001-single-authoritative-control-plane.ai.md",
       "docs/architecture/host-runtime-composition-boundaries.ai.md",
       "docs/architecture/host-bootstrap-pipeline.ai.md",
       "docs/architecture/desktop-post-login-runtime-lifecycle-contract.ai.md",

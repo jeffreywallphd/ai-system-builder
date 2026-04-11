@@ -120,6 +120,41 @@ const studioSystemEnhancedCoreTaskIds = new Set([
 const documentationEnhancedCoreTaskIds = new Set([
   "documentation-refactor-context-and-architecture",
 ]);
+const expectedAdrDocsByExampleTaskId: Record<string, string[]> = {
+  "example-architecture-review-host-boundaries": [
+    "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+  ],
+  "example-diagnostics-host-startup-regression": [
+    "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+  ],
+  "example-coding-implementation-runtime-host-startup": [
+    "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+  ],
+  "example-runtime-security-identity-policy-hardening": [
+    "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
+  ],
+  "example-ui-studio-system-handoff-update": [
+    "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
+  ],
+};
+const expectedAdrDocsByCoreTaskId: Record<string, string[]> = {
+  "architecture-review-host-boundaries": [
+    "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+  ],
+  "runtime-host-diagnostics-triage": [
+    "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+  ],
+  "runtime-host-coding-implementation": [
+    "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+  ],
+  "runtime-security-identity-and-policy-hardening": [
+    "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+    "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
+  ],
+  "studio-system-design-and-ux-shaping": [
+    "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
+  ],
+};
 
 const requiredMappingMetadataFields = [
   "id",
@@ -276,6 +311,10 @@ describe("task-to-context routing contract guardrails", () => {
       expect(example.expectedPackOrder).toEqual(expectedPackOrder);
       expect(example.expectedRelatedDocOrder.length).toBeGreaterThanOrEqual(3);
       expect(example.expectedExclusions.length).toBeGreaterThanOrEqual(2);
+      const expectedAdrDocs = expectedAdrDocsByExampleTaskId[example.taskId] ?? [];
+      for (const adrDocPath of expectedAdrDocs) {
+        expect(example.expectedRelatedDocOrder).toContain(adrDocPath);
+      }
 
       for (const changedPath of example.routingInputs.changedPaths) {
         expect(existsSync(resolve(repoRoot, changedPath))).toBe(true);
@@ -357,6 +396,10 @@ describe("task-to-context routing contract guardrails", () => {
       const relatedCodePaths = mapping.relatedCodePaths as string[];
       expect(Array.isArray(relatedDocPaths)).toBe(true);
       expect(Array.isArray(relatedCodePaths)).toBe(true);
+      const expectedAdrDocs = expectedAdrDocsByCoreTaskId[taskId] ?? [];
+      for (const adrDocPath of expectedAdrDocs) {
+        expect(relatedDocPaths).toContain(adrDocPath);
+      }
       for (const relatedDocPath of relatedDocPaths) {
         expect(existsSync(resolve(repoRoot, relatedDocPath))).toBe(true);
       }
@@ -399,6 +442,9 @@ describe("task-to-context routing contract guardrails", () => {
       expect(humanSpec).toContain(field);
       expect(aiSpec).toContain(field);
     }
+
+    expect(humanSpec).toContain("Include ADR references in mapping `relatedDocPaths`");
+    expect(aiSpec).toContain("Include ADR references in mapping `relatedDocPaths`");
   });
 
   it("keeps human-readable prompt routing guidance aligned with routing assets", () => {

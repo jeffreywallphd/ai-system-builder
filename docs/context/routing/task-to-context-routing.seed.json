@@ -189,6 +189,7 @@
         "docs/architecture/authoritative-server-host-assembly.md",
         "docs/architecture/desktop-host-assembly.md",
         "docs/architecture/worker-host-assembly.md",
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
         "docs/architecture/studio-handoff-contract.md"
       ],
       "expectedExclusions": [
@@ -227,6 +228,7 @@
       "expectedRelatedDocOrder": [
         "docs/architecture/authoritative-server-host-assembly.md",
         "docs/architecture/desktop-host-assembly.md",
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
         "docs/unified-api-observability-troubleshooting.md"
       ],
       "expectedExclusions": [
@@ -268,6 +270,7 @@
         "docs/architecture/studio-handoff-contract.md",
         "docs/architecture/image-workflow-system-definition-layer.md",
         "docs/architecture/image-manipulation-studio-interaction-model.md",
+        "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
         "docs/ui/README.md"
       ],
       "expectedExclusions": [
@@ -308,7 +311,8 @@
       "expectedRelatedDocOrder": [
         "docs/architecture/host-bootstrap-pipeline.md",
         "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
-        "docs/architecture/desktop-auth-first-startup-boundary.md"
+        "docs/architecture/desktop-auth-first-startup-boundary.md",
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md"
       ],
       "expectedExclusions": [
         "docs/ui/README.md",
@@ -348,7 +352,8 @@
       "expectedRelatedDocOrder": [
         "docs/architecture/authorization-foundation.md",
         "docs/architecture/transport-security-foundation.md",
-        "docs/architecture/secrets-redaction-and-logging-safeguards.md"
+        "docs/architecture/secrets-redaction-and-logging-safeguards.md",
+        "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md"
       ],
       "expectedExclusions": [
         "docs/ui/README.md",
@@ -434,6 +439,7 @@
         "docs/architecture/authoritative-server-host-assembly.md",
         "docs/architecture/desktop-host-assembly.md",
         "docs/architecture/worker-host-assembly.md",
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
         "docs/architecture/studio-handoff-contract.md"
       ],
       "relatedCodePaths": [
@@ -806,6 +812,7 @@
         "docs/architecture/desktop-host-assembly.md",
         "docs/architecture/host-bootstrap-pipeline.md",
         "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
         "docs/unified-api-observability-troubleshooting.md"
       ],
       "relatedCodePaths": [
@@ -898,7 +905,8 @@
         "docs/architecture/host-bootstrap-pipeline.md",
         "docs/architecture/host-runtime-composition-boundaries.md",
         "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
-        "docs/architecture/desktop-auth-first-startup-boundary.md"
+        "docs/architecture/desktop-auth-first-startup-boundary.md",
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md"
       ],
       "relatedCodePaths": [
         "src/hosts",
@@ -992,6 +1000,8 @@
       "domain": "security-runtime",
       "owner": "team:security-platform",
       "relatedDocPaths": [
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+        "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
         "docs/architecture/authorization-foundation.md",
         "docs/architecture/authorization-enforcement-integration-patterns.md",
         "docs/architecture/transport-security-foundation.md",
@@ -1088,6 +1098,7 @@
       "domain": "studio-experience",
       "owner": "team:studio-experience",
       "relatedDocPaths": [
+        "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
         "docs/architecture/studio-handoff-contract.md",
         "docs/architecture/image-workflow-system-definition-layer.md",
         "docs/architecture/image-manipulation-studio-interaction-model.md",

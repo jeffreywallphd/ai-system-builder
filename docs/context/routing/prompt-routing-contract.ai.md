@@ -73,6 +73,7 @@ Exclusion: code-only work with no documentation contract impact.
 - Apply pack priority metadata when overlaps occur; lower numbers win.
 - Keep selected context minimal and outcome-focused.
 - Include governance/taxonomy packs when contract artifacts are changed.
+- Include ADR references in mapping `relatedDocPaths` only for foundational or high-risk decision constraints.
 - Apply `contextAssemblyProfileId` and `contextAssemblyTierHints` before loading lower-signal supporting sources.
 
 ## Context Assembly Priority and Ordering
