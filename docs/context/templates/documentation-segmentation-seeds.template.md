@@ -41,6 +41,18 @@ Current canonical guidance: `docs/<active-path>.md`
 Historical handling note: This file preserves historical evidence and is non-authoritative for new implementation work.
 ```
 
+## Documentation Status Template
+
+```markdown
+## Documentation Status
+
+- Segment: <Baselines|Historical Notes|Migration Guides and Records|Temporary Transition Documents|Superseded or Deprecated Documents>
+- Lifecycle status (`status`): <active|deprecated|superseded|archived>
+- Authority state (`authoritativeness`): <canonical|reference|supplemental|historical>
+- Current guidance stance: <state whether this doc is authoritative for current implementation behavior>
+- Canonical active path(s): `docs/<active-path>.md`
+```
+
 ## Migration Decision Checklist Template
 
 ```markdown
@@ -48,6 +60,7 @@ Historical handling note: This file preserves historical evidence and is non-aut
 
 - [ ] Segment category selected using `docs/context/documentation-segmentation-taxonomy.md`.
 - [ ] Metadata updated (`status`, `authoritativeness`, and `superseded_by` when applicable).
+- [ ] Non-active docs include a `## Documentation Status` block from `docs/context/documentation-status-signals.md`.
 - [ ] Baseline destination chosen using `docs/context/documentation-baseline-and-historical-folder-strategy.md` when history is retained.
 - [ ] Supersession marker follows `docs/context/documentation-supersession-and-redirect-conventions.md`.
 - [ ] Canonical destination links and router links updated in the same change.

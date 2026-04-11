@@ -68,10 +68,23 @@ Historical handling note: This file is historical evidence and non-authoritative
 
 - [ ] Segment classification selected from `documentation-segmentation-taxonomy.ai.md`.
 - [ ] Lifecycle metadata updated (`status`, `authoritativeness`, `superseded_by` when needed).
+- [ ] Non-active docs include a `## Documentation Status` block from `documentation-status-signals.ai.md`.
 - [ ] Baseline target chosen using `documentation-baseline-and-historical-folder-strategy.ai.md`.
 - [ ] Supersession block includes effective date, reason, canonical destination, and retention trigger.
 - [ ] Canonical destination links and routers updated in same change.
 - [ ] Human/AI companion docs kept aligned.
+
+## Seed Template: Documentation Status Block
+
+```markdown
+## Documentation Status
+
+- Segment: <Baselines|Historical Notes|Migration Guides and Records|Temporary Transition Documents|Superseded or Deprecated Documents>
+- Lifecycle status (`status`): <active|deprecated|superseded|archived>
+- Authority state (`authoritativeness`): <canonical|reference|supplemental|historical>
+- Current guidance stance: <state whether this doc is authoritative for current implementation behavior>
+- Canonical active path(s): `docs/<active-path>.md`
+```
 
 ## Fast Baseline Routing
 
@@ -86,5 +99,6 @@ Historical handling note: This file is historical evidence and non-authoritative
 
 - `docs/context/documentation-segmentation-taxonomy.ai.md`
 - `docs/context/documentation-baseline-and-historical-folder-strategy.ai.md`
+- `docs/context/documentation-status-signals.ai.md`
 - `docs/context/documentation-supersession-and-redirect-conventions.ai.md`
 - `docs/context/templates/documentation-segmentation-seeds.template.ai.md`

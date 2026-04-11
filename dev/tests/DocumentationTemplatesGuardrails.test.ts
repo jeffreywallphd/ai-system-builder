@@ -66,6 +66,7 @@ const requiredTemplates = [
     fileName: "baseline.template.md",
     docType: "baseline",
     requiredSections: [
+      "## Documentation Status",
       "## Snapshot Scope and Date",
       "## Included Artifacts",
       "## Successor or Follow-Up Links",

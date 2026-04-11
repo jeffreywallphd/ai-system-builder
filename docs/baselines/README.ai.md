@@ -7,6 +7,13 @@
 ## Purpose
 - Entry point for documentation baseline and migration-history artifacts.
 
+## Documentation Status
+- Segment: `Baselines`
+- Lifecycle status (`status`): `active` (router lifecycle only)
+- Authority state (`authoritativeness`): historical navigation for baseline evidence
+- Current guidance stance: not authoritative for current implementation behavior; use linked active routers for current decisions
+- Canonical active path(s): `docs/architecture/README.ai.md`, `docs/contributors/README.ai.md`, `docs/operations/README.ai.md`, and `docs/context/README.ai.md`
+
 ## Target Folder Strategy
 - Default baseline destination: `docs/baselines/`.
 - Preferred migration landing zones:

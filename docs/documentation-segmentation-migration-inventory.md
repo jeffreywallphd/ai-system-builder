@@ -15,6 +15,14 @@ related_code_paths:
 
 # Documentation Segmentation Migration Inventory (Story 5.2.1)
 
+## Documentation Status
+
+- Segment: `Migration Guides and Records`
+- Lifecycle status (`status`): `active`
+- Authority state (`authoritativeness`): `canonical` migration-planning reference
+- Current guidance stance: not authoritative for current implementation behavior; use active architecture/contributor/operations docs for implementation decisions
+- Canonical active path(s): `docs/architecture/README.md`, `docs/contributors/README.md`, `docs/operations/README.md`, and `docs/context/documentation-segmentation-taxonomy.md`
+
 ## Purpose
 
 Provide a practical, high-value inventory of mixed-purpose, historical, baseline-candidate, transitional, and superseded documentation so migration work can proceed deliberately rather than ad hoc.

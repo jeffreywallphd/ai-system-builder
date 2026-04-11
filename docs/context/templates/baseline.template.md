@@ -11,6 +11,14 @@ related_code_paths:
 
 # <Baseline Snapshot Title>
 
+## Documentation Status
+
+- Segment: `Baselines`
+- Lifecycle status (`status`): `archived` (or `active` for an in-progress migration baseline router)
+- Authority state (`authoritativeness`): `historical`
+- Current guidance stance: This file is non-authoritative for current implementation behavior.
+- Canonical active path(s): `docs/<active-router-or-reference>.md`
+
 ## Snapshot Scope and Date
 
 Describe the exact milestone/date range captured by this baseline.

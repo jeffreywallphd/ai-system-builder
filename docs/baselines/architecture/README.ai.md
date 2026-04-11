@@ -20,6 +20,13 @@ related_code_paths:
 ## Purpose
 - Route architecture baseline snapshots so they do not compete with active architecture authority.
 
+## Documentation Status
+- Segment: `Baselines`
+- Lifecycle status (`status`): `active` (router lifecycle only)
+- Authority state (`authoritativeness`): historical architecture snapshot routing
+- Current guidance stance: not authoritative for current architecture implementation behavior
+- Canonical active path(s): `docs/architecture/README.ai.md` and `docs/architecture/domains/*/overview.ai.md`
+
 ## Belongs Here
 - Baseline snapshots moved from active architecture paths.
 - Historical feature/story completion records.

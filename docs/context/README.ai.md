@@ -23,6 +23,7 @@
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.ai.md)
 - [Documentation Segmentation Taxonomy](./documentation-segmentation-taxonomy.ai.md)
 - [Documentation Segmentation Seed Guidance](./documentation-segmentation-seed-guidance.ai.md)
+- [Documentation Status Signals](./documentation-status-signals.ai.md)
 - [Baseline and Historical Folder Strategy](./documentation-baseline-and-historical-folder-strategy.ai.md)
 - [Supersession and Redirect Conventions](./documentation-supersession-and-redirect-conventions.ai.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.ai.md)
