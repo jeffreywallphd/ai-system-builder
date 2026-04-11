@@ -67,8 +67,8 @@ Allowed responsibilities:
 - workflow-run history infrastructure (`ensureWorkflowRunHistory`)
 - studio shell/system studio/system runtime backend graph creation (`ensureStudioShellBackendApi`, `ensureSystemStudioBackendApi`, `ensureSystemRuntimeBackendApi`)
 - image workflow/system persistence adapters used by studio/system paths
-- canonical registry runtime assembly (`ensureCanonicalRegistryRuntime` dynamic imports and graph)
-- agent runtime and agent repositories (`ensureAgentStudioBackendApi`)
+- canonical registry runtime assembly (`CanonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime` dynamic imports and graph)
+- agent runtime and agent repositories (`DesktopAgentRuntimeProvider.ensureAgentStudioBackendApi`)
 
 Failure behavior for this category:
 
@@ -90,8 +90,8 @@ Failure behavior for this category:
 | Studio shell/system runtime/image persistence infrastructure | `DeferredDesktopFeatureRuntime` ensure APIs | On-demand feature startup | Keep lazy; avoid eager warmup construction |
 | Model file operations | IPC handlers currently bound in `bootstrapPostLoginRuntime()` | Post-login immediate warmup now; on-demand feature startup target | Move handler registration behind dedicated model-files activation trigger |
 | Feature IPC registration (non-auth) | `registerDeferredFeatureIpc(...)` inside `bootstrapPostLoginRuntime()` | Post-login immediate warmup now; mixed long-term | Split into: post-login core IPC group vs per-feature on-demand registration groups |
-| Canonical registry runtime | `ensureCanonicalRegistryRuntime(...)` | On-demand feature startup | Keep lazy; preserve dynamic import posture |
-| Agent runtime and repos | `ensureAgentStudioBackendApi(...)` | On-demand feature startup | Keep lazy; preserve first-use initialization |
+| Canonical registry runtime | `CanonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime(...)` | On-demand feature startup | Keep lazy; preserve dynamic import posture |
+| Agent runtime and repos | `DesktopAgentRuntimeProvider.ensureAgentStudioBackendApi(...)` | On-demand feature startup | Keep lazy; preserve first-use initialization |
 
 ## Post-login/on-demand split for follow-on implementation stories
 

@@ -62,5 +62,7 @@ describe("electron main deferred runtime startup boundary", () => {
     expect(onDemandRuntimeSource).toContain("getStudioShellBackendApi: () => params.featureRuntime.ensureStudioShellBackendApi()");
     expect(onDemandRuntimeSource).toContain("getSystemStudioBackendApi: () => params.featureRuntime.ensureSystemStudioBackendApi()");
     expect(onDemandRuntimeSource).toContain("getSystemRuntimeBackendApi: () => params.featureRuntime.ensureSystemRuntimeBackendApi()");
+    expect(onDemandRuntimeSource).toContain("getCanonicalRegistryRuntime: () => params.canonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime()");
+    expect(onDemandRuntimeSource).toContain("getAgentStudioBackendApi: () => params.agentRuntimeProvider.ensureAgentStudioBackendApi()");
   });
 });

@@ -2,32 +2,7 @@ import type { IpcMain } from "electron";
 import type { AgentStudioBackendApi } from "../../../src/infrastructure/api/agents/AgentStudioBackendApi";
 import type { DeferredDesktopFeatureRuntime } from "../DeferredDesktopFeatureRuntime";
 import type { resolveDesktopStoragePaths } from "../../../src/infrastructure/desktop/DesktopAppPaths";
-
-export type CanonicalRegistryRuntime = {
-  readonly repository: { readonly isAvailable: boolean };
-  readonly listCanonicalAssetsUseCase: { execute(criteria?: unknown): Promise<Array<{ id: string }>> };
-  readonly loadCanonicalAssetDetailUseCase: { execute(assetId: string): Promise<any> };
-  readonly getVersionHistoryUseCase: { execute(assetId: string): Promise<Array<any>> };
-  readonly dependencyStateUseCase: { execute(input: unknown): Promise<any> };
-  readonly replayScopedProjectionUseCase: { execute(input: unknown): Promise<any> };
-  readonly verifyProjectionUseCase: { execute(input: unknown): Promise<any> };
-  readonly projectionTrustReadModelService: { summarize(input: unknown): unknown };
-  readonly rebuildProjectionOrchestrationUseCase: { execute(input: unknown): Promise<any> };
-  readonly loadManagementSnapshotUseCase: { execute(input: unknown): Promise<any> };
-  readonly reconcileIdentityUseCase: { execute(input: unknown): Promise<any> };
-  readonly registryBackendApi: {
-    listAssets(limit?: number): Promise<unknown>;
-    filterAssets(filters: unknown): Promise<unknown>;
-    searchAssets(query: unknown): Promise<unknown>;
-    listExploreAssets(limit?: number): Promise<unknown>;
-    searchExploreAssets(query: unknown): Promise<unknown>;
-    getAssetDetail(query: unknown): Promise<unknown>;
-    getDependencies(query: unknown): Promise<unknown>;
-    getDependents(query: unknown): Promise<unknown>;
-    traverseDependencies(query: unknown): Promise<unknown>;
-    traverseDependents(query: unknown): Promise<unknown>;
-  };
-};
+import type { CanonicalRegistryRuntime } from "../runtime/CanonicalRegistryRuntimeProvider";
 
 export type OnDemandFeatureCompositionPaths = {
   readonly getWorkflowPersistence: () => ReturnType<DeferredDesktopFeatureRuntime["ensureWorkflowPersistence"]>;
