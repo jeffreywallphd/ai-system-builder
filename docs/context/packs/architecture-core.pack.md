@@ -28,6 +28,7 @@
 ## Authoritative Docs
 
 - `docs/architecture/README.md`
+- `docs/architecture/architecture-document-scope-boundaries.md`
 - `docs/adr/records/adr-001-single-authoritative-control-plane.md`
 - `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`
 - `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md`
@@ -54,6 +55,7 @@
 - Moving domain/application policy into UI services, host entrypoints, or transport handlers.
 - Bypassing application ports/use cases with direct infrastructure calls from outer layers.
 - Treating long historical "Direction" update sections as current source-of-truth contracts when canonical architecture docs disagree.
+- Allowing architecture docs to become catch-all files for contributor workflow, runbook procedures, and ADR rationale history.
 - Adding new runtime/persistence paths that duplicate existing host composition seams.
 
 ## Related Packs

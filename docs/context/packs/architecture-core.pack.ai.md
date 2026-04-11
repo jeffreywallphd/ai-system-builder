@@ -28,6 +28,7 @@
 ## Authoritative Docs
 
 - `docs/architecture/README.ai.md`
+- `docs/architecture/architecture-document-scope-boundaries.ai.md`
 - `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
 - `docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md`
 - `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md`
@@ -54,6 +55,7 @@
 - Putting domain/application policy in UI services, entrypoints, or transport handlers.
 - Bypassing application ports with direct infrastructure calls from outer layers.
 - Treating historical direction notes as canonical architecture contracts when router docs differ.
+- Letting architecture docs become catch-all files for contributor workflow, runbook procedures, and ADR rationale history.
 - Adding duplicate runtime/persistence pathways outside host composition seams.
 
 ## Related Packs

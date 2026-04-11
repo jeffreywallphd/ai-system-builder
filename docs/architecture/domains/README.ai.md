@@ -80,6 +80,8 @@ When domain docs need content outside architecture scope, link instead of copyin
 - decision rationale history -> `docs/adr/records/`
 - retrieval assembly guidance -> `docs/context/packs/`
 
+For cross-domain scope rules and anti-pattern handling, use [Architecture Document Scope Boundaries](../architecture-document-scope-boundaries.md).
+
 ## Domain Folders
 
 - [core-platform-and-composition](./core-platform-and-composition/overview.md)

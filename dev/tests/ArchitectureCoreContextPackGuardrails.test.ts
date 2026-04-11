@@ -46,6 +46,7 @@ describe("architecture core context pack guardrails", () => {
 
     for (const authoritativePath of [
       "docs/architecture/README.md",
+      "docs/architecture/architecture-document-scope-boundaries.md",
       "docs/adr/records/adr-001-single-authoritative-control-plane.md",
       "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
       "docs/architecture/layers-and-boundaries.md",
@@ -59,6 +60,7 @@ describe("architecture core context pack guardrails", () => {
 
     for (const authoritativePath of [
       "docs/architecture/README.ai.md",
+      "docs/architecture/architecture-document-scope-boundaries.ai.md",
       "docs/adr/records/adr-001-single-authoritative-control-plane.ai.md",
       "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md",
       "docs/architecture/layers-and-boundaries.ai.md",
