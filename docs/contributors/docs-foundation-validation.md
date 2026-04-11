@@ -7,7 +7,9 @@ owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/validate-adr-records.cjs
   - dev/tests/DocsFoundationValidationScript.test.ts
+  - dev/tests/AdrValidationScript.test.ts
 ---
 
 # Documentation Foundation Validation Guide
@@ -36,6 +38,7 @@ Use this guide when you need a fast contract check for the documentation foundat
 
 ```bash
 npm run docs:validate:foundation
+npm run docs:validate:adr
 ```
 
 ## CI Usage
@@ -44,6 +47,7 @@ Run the same command in CI to block changes that erode the baseline docs structu
 
 ```bash
 npm run docs:validate:foundation
+npm run docs:validate:adr
 ```
 
 ## Failure Output
@@ -62,6 +66,9 @@ Examples:
 - `ROUTING_REFERENCE_INVALID`
 - `HEADER_FIELD_MISSING`
 - `SEED_PAIR_MISMATCH`
+- `ADR_REQUIRED_SECTION_MISSING`
+- `ADR_IDENTIFIER_MISMATCH`
+- `ADR_SECTION_METADATA_MISMATCH`
 
 ## Scope Notes
 

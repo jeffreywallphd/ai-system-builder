@@ -7,7 +7,9 @@ owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/validate-adr-records.cjs
   - dev/tests/DocsFoundationValidationScript.test.ts
+  - dev/tests/AdrValidationScript.test.ts
 ---
 
 # AI Companion: Documentation Foundation Validation Guide
@@ -36,6 +38,7 @@ Use this guide to run the baseline docs foundation validator before or during do
 
 ```bash
 npm run docs:validate:foundation
+npm run docs:validate:adr
 ```
 
 ## CI Contract
@@ -56,6 +59,9 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 - `FRONTMATTER_INVALID`
 - `HEADER_ENUM_INVALID`
 - `SEED_PAIR_MISMATCH`
+- `ADR_REQUIRED_SECTION_MISSING`
+- `ADR_IDENTIFIER_MISMATCH`
+- `ADR_SECTION_METADATA_MISMATCH`
 
 ## Scope Notes
 

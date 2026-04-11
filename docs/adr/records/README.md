@@ -40,6 +40,11 @@
 - Keep registry entries current when status changes (especially `superseded` and `deprecated`).
 - Keep `discoveryIndex` entries synchronized with the registry `records` list.
 
+## ADR Validation
+- Run `npm run docs:validate:adr` before merging ADR changes.
+- The validator checks required ADR sections, required metadata, and identifier consistency across filename, registry, frontmatter, and H1.
+- It also checks `.md` and `.ai.md` ADR pairs for metadata alignment to reduce silent drift.
+
 ## Current Index
 Canonical source: `docs/adr/records/adr-registry.json`
 
