@@ -71,6 +71,7 @@ Provide one safe, repeatable migration workflow for moving, splitting, or reclas
 - Prefer explicit supersession over silent removal.
 - Keep deprecation notes at the old path whenever practical.
 - Follow the canonical supersession/redirect pattern in `docs/context/documentation-supersession-and-redirect-conventions.md`.
+- Use `docs/context/documentation-segmentation-seed-guidance.md` when you need a quick copy/paste classification note, supersession marker, baseline introduction, or migration decision checklist.
 - Pointer notes should include:
   - Non-authoritative supersession/deprecation statement.
   - Replacement document link.

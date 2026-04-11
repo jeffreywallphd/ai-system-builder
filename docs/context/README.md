@@ -22,6 +22,7 @@
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.md)
 - [Documentation Segmentation Taxonomy](./documentation-segmentation-taxonomy.md)
+- [Documentation Segmentation Seed Guidance](./documentation-segmentation-seed-guidance.md)
 - [Baseline and Historical Folder Strategy](./documentation-baseline-and-historical-folder-strategy.md)
 - [Supersession and Redirect Conventions](./documentation-supersession-and-redirect-conventions.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.md)

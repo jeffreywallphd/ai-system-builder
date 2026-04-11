@@ -28,6 +28,15 @@ Provide lean, reusable starting points so document roles, metadata, and section 
 
 For context packs under `docs/context/packs/`, follow the standard contract in `docs/context/packs/README.md#standard-context-pack-contract` in addition to the `ai-context` template.
 
+## Segmentation Seed Templates
+
+Use [documentation-segmentation-seeds.template.md](./documentation-segmentation-seeds.template.md) for lightweight migration/classification snippets:
+
+- Classification note seed.
+- Supersession marker seed.
+- Baseline introduction seed.
+- Migration decision checklist seed.
+
 ## ADR Template Contract
 
 The ADR template distinguishes required vs optional sections explicitly:
