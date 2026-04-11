@@ -68,6 +68,9 @@ Reference docs should not contain:
 - operational playbooks better owned by `docs/operations/`
 - contributor process guidance better owned by `docs/contributors/`
 
+Use [Architecture Domain Overview and Reference Readability Guide](../../contributors/architecture-domain-overview-reference-readability-guide.md)
+for section ordering, brevity, concept-first explanation, boundary clarity, and de-duplication expectations.
+
 ## ADR and Context Pack Linking Rules
 
 - Domain overviews must include `## Related ADRs` when ADRs constrain the domain boundary.
