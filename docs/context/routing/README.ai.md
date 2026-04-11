@@ -9,7 +9,7 @@
 
 ## Belongs Here
 - Task-to-context mapping contracts.
-- Seed map artifacts for future routing expansion.
+- Seed map artifacts with practical workflow routing entries.
 - Prompt routing contracts with category-specific inclusion, exclusion, and fallback behavior.
 
 ## Does Not Belong Here
@@ -25,3 +25,11 @@
 - [Routing Entry Template](../templates/task-to-context-routing-entry.template.json)
 - [Context Asset Metadata Standard](../context-asset-metadata.ai.md)
 - [Context Packs Directory](../packs/README.ai.md)
+
+## Initial Workflow Coverage
+- Architecture review work for host and system boundaries.
+- Feature decomposition work for story slicing and sequencing.
+- Core implementation work across `src/` application, domain, infrastructure, and hosts.
+- Documentation refactor work for context and architecture routers/contracts.
+- Runtime and host diagnostics triage workflows.
+- Studio and system design workflows spanning UI and handoff contracts.

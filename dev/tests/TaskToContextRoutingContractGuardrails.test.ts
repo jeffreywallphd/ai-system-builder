@@ -37,6 +37,15 @@ const expectedPriorityTiers = [
   "low",
 ] as const;
 
+const expectedCoreWorkflowTaskIds = [
+  "architecture-review-host-boundaries",
+  "feature-decomposition-epic-story-planning",
+  "repo-implementation-core-workflows",
+  "documentation-refactor-context-and-architecture",
+  "runtime-host-diagnostics-triage",
+  "studio-system-design-and-ux-shaping",
+] as const;
+
 const requiredMappingMetadataFields = [
   "id",
   "title",
@@ -82,7 +91,7 @@ type RoutingSeed = {
     taskCategory: string;
     routingInputs: Record<string, unknown>;
   }>;
-  mappings: unknown[];
+  mappings: Array<Record<string, unknown>>;
 };
 
 describe("task-to-context routing contract guardrails", () => {
@@ -123,7 +132,7 @@ describe("task-to-context routing contract guardrails", () => {
     expect(Array.isArray(seed.mappings)).toBe(true);
     expect(seed.taskCategoryMap.map((entry) => entry.taskCategory)).toEqual(expectedTaskCategories);
     expect(seed.routingExamples.length).toBeGreaterThanOrEqual(2);
-    expect(seed.mappings.length).toBeGreaterThanOrEqual(1);
+    expect(seed.mappings.length).toBeGreaterThanOrEqual(expectedCoreWorkflowTaskIds.length);
 
     for (const entry of seed.taskCategoryMap) {
       expect(entry.defaultIntent.trim().length).toBeGreaterThan(0);
@@ -136,9 +145,54 @@ describe("task-to-context routing contract guardrails", () => {
       expect(Array.isArray(example.routingInputs.changedPaths)).toBe(true);
     }
 
-    for (const mapping of seed.mappings as Array<Record<string, unknown>>) {
+    for (const mapping of seed.mappings) {
       for (const field of requiredMappingMetadataFields) {
         expect(mapping[field]).toBeDefined();
+      }
+    }
+  });
+
+  it("keeps core workflow routes explicit and grounded in repository paths", () => {
+    const seed = JSON.parse(readFileSync(seedPath, "utf8")) as RoutingSeed;
+    const mappingByTaskId = new Map(
+      seed.mappings.map((mapping) => [mapping.taskId as string, mapping]),
+    );
+
+    for (const taskId of expectedCoreWorkflowTaskIds) {
+      const mapping = mappingByTaskId.get(taskId);
+      expect(mapping).toBeDefined();
+      if (!mapping) {
+        continue;
+      }
+
+      expect(mapping.status).toBe("active");
+      expect(mapping.packIds).toEqual(["context-system-foundations"]);
+      expect(Array.isArray(mapping.excludePackIds)).toBe(true);
+      expect(typeof mapping.notes).toBe("string");
+      expect((mapping.notes as string).trim().length).toBeGreaterThan(0);
+
+      const routingInputs = mapping.routingInputs as Record<string, unknown>;
+      expect(routingInputs).toBeDefined();
+      expect(routingInputs.taskCategory).toBe(mapping.taskCategory);
+      expect(Array.isArray(routingInputs.exclusions)).toBe(true);
+      expect((routingInputs.exclusions as unknown[]).length).toBeGreaterThanOrEqual(1);
+
+      const changedPaths = routingInputs.changedPaths as string[];
+      expect(Array.isArray(changedPaths)).toBe(true);
+      expect(changedPaths.length).toBeGreaterThanOrEqual(1);
+      for (const changedPath of changedPaths) {
+        expect(existsSync(resolve(repoRoot, changedPath))).toBe(true);
+      }
+
+      const relatedDocPaths = mapping.relatedDocPaths as string[];
+      const relatedCodePaths = mapping.relatedCodePaths as string[];
+      expect(Array.isArray(relatedDocPaths)).toBe(true);
+      expect(Array.isArray(relatedCodePaths)).toBe(true);
+      for (const relatedDocPath of relatedDocPaths) {
+        expect(existsSync(resolve(repoRoot, relatedDocPath))).toBe(true);
+      }
+      for (const relatedCodePath of relatedCodePaths) {
+        expect(existsSync(resolve(repoRoot, relatedCodePath))).toBe(true);
       }
     }
   });
