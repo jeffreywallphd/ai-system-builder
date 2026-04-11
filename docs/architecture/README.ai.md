@@ -35,6 +35,7 @@ related_code_paths:
 - Keep reverse links in ADR `## Related Documentation` so architecture contracts and decision rationale stay paired.
 
 ## Start Here
+- [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
 - [Domain And Application Core](./domain-and-application-core.md)
 - [Layers And Boundaries](./layers-and-boundaries.md)
 - [Workflow Execution And Tools](./workflow-execution-and-tools.md)
