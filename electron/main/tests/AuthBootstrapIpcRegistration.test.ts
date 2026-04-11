@@ -1,3 +1,6 @@
+/**
+ * Unit tests covering authentication bootstrap IPC registration, argument validation, and safe error handling semantics.
+ */
 import { describe, expect, it } from "bun:test";
 import type { IpcMain } from "electron";
 import {

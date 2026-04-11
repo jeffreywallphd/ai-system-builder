@@ -1,3 +1,6 @@
+/**
+ * Renderer preload entrypoint that composes and exposes the typed desktop bridges on window.desktop while preserving least-privilege boundaries.
+ */
 import { contextBridge, ipcRenderer } from "electron";
 import {
   DesktopPostLoginWarmupTriggerSources,
@@ -24,6 +27,9 @@ import {
 const bootstrap = ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap);
 let deferredFeatureDemandWarmupRequest: Promise<void> | undefined;
 
+/**
+ * Reports whether post-login deferred feature IPC endpoints are currently registered in the main process.
+ */
 function isDeferredFeatureApiReady(): boolean {
   try {
     return ipcRenderer.sendSync(DesktopBootstrapIpcChannels.deferredFeatureApiReady) === true;
@@ -32,6 +38,9 @@ function isDeferredFeatureApiReady(): boolean {
   }
 }
 
+/**
+ * Fetches the current post-login runtime status from the main process, with a safe fallback when sync IPC is unavailable.
+ */
 function getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus {
   try {
     return ipcRenderer.sendSync(DesktopBootstrapIpcChannels.postLoginRuntimeStatus) as DesktopPostLoginRuntimeStatus;
@@ -40,6 +49,9 @@ function getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus {
   }
 }
 
+/**
+ * Starts a one-at-a-time on-demand warmup for deferred feature runtime services so feature requests can unblock safely.
+ */
 function startDeferredFeatureWarmupOnDemand(): void {
   if (deferredFeatureDemandWarmupRequest) {
     return;
@@ -50,12 +62,16 @@ function startDeferredFeatureWarmupOnDemand(): void {
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: new Date().toISOString(),
     }),
-  ).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[ai-loom][desktop-runtime] deferred feature warmup request failed: ${message}`);
-  }).finally(() => {
-    deferredFeatureDemandWarmupRequest = undefined;
-  });
+  )
+    // Convert warmup failures into diagnostics so renderer feature guards can continue presenting fallback states.
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[ai-loom][desktop-runtime] deferred feature warmup request failed: ${message}`);
+    })
+    // Always clear the in-flight marker to allow retries after completion or failure.
+    .finally(() => {
+      deferredFeatureDemandWarmupRequest = undefined;
+    });
 }
 
 const { guardDeferredSyncGroup, guardDeferredAsyncGroup } = createDeferredBridgeGuards({
@@ -88,6 +104,7 @@ const authBootstrapSurface = Object.freeze({
   runtime: Object.freeze({
     isDeferredFeatureApiReady,
     getPostLoginRuntimeStatus,
+    // Allows renderer-auth surfaces to explicitly trigger post-login warmup with optional caller metadata.
     startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest) {
       return ipcRenderer.invoke(DesktopBootstrapIpcChannels.startPostLoginWarmup, request) as Promise<void>;
     },

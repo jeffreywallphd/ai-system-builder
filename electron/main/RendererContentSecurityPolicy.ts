@@ -1,3 +1,6 @@
+/**
+ * Generates renderer content security policy directives from desktop runtime configuration and hardening defaults.
+ */
 import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 
 const SELF_SOURCE = "'self'";

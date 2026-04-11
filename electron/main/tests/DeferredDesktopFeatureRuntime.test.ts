@@ -1,3 +1,6 @@
+/**
+ * Integration-style tests for deferred desktop runtime feature composition and lifecycle orchestration behavior.
+ */
 import { describe, expect, it } from "bun:test";
 import type { AppRuntimeConfigValues } from "../../../src/infrastructure/config/AppRuntimeConfig";
 import type { resolveDesktopStoragePaths } from "../../../src/infrastructure/desktop/DesktopAppPaths";

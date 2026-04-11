@@ -1,3 +1,6 @@
+/**
+ * Deferred runtime composition layer that lazily instantiates optional desktop features and binds them to IPC registrations.
+ */
 import path from "node:path";
 import { GetExecutionRunUseCase } from "../../src/application/execution/GetExecutionRunUseCase";
 import type { IWorkflowRunSummaryRepository } from "../../src/application/ports/interfaces/IWorkflowRunSummaryRepository";
