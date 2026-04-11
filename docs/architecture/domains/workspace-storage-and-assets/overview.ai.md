@@ -51,6 +51,7 @@ Out of scope:
 
 Contract-level details are canonical in `./references/`:
 - [Workspace Tenancy and Ownership Contracts](./references/workspace-tenancy-and-ownership-contracts.md)
+- [Asset Models and Selection](./references/asset-models-and-selection.md)
 
 ## Canonical Source Documents Migrated into This Domain
 

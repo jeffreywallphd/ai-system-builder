@@ -50,6 +50,7 @@ Out of scope:
 
 Contract-level details are canonical in `./references/`:
 - [Run Lifecycle State Authority](./references/run-lifecycle-state-authority.md)
+- [Workflow Execution Runtime Handoff](./references/workflow-execution-runtime-handoff.md)
 
 ## Canonical Source Documents Migrated into This Domain
 

@@ -19,16 +19,17 @@ Index durable contract-level architecture references for `studio-and-system-comp
 ## Reference Scope
 
 - Studio handoff boundary contracts.
-- Projection/read-model composition contracts.
-- Shared system composition seams used across studio surfaces.
+- Studio UI composition and presentation-state contracts.
+- Workflow/system composition contracts consumed by studio surfaces.
 
 ## Canonical Reference Documents
 
 - [Studio Handoff and Boundary Contracts](./studio-handoff-and-boundary-contracts.md)
+- [Studio UI Composition and State](./studio-ui-composition-and-state.md)
+- [Workflow and System Composition Contracts](./workflow-and-system-composition-contracts.md)
 
 ## Migration Backlog (Not Yet Canonical)
 
-- `projection-and-read-model-composition.md`
 - `shared-system-composition-seams.md`
 
 ## Reference Authoring Guardrails

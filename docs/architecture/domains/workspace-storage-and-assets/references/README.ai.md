@@ -25,6 +25,7 @@ Index durable contract-level architecture references for `workspace-storage-and-
 ## Canonical Reference Documents
 
 - [Workspace Tenancy and Ownership Contracts](./workspace-tenancy-and-ownership-contracts.md)
+- [Asset Models and Selection](./asset-models-and-selection.md)
 
 ## Migration Backlog (Not Yet Canonical)
 

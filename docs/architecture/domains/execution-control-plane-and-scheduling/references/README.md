@@ -24,6 +24,7 @@ Index durable contract-level architecture references for `execution-control-plan
 ## Canonical Reference Documents
 
 - [Run Lifecycle State Authority](./run-lifecycle-state-authority.md)
+- [Workflow Execution Runtime Handoff](./workflow-execution-runtime-handoff.md)
 
 ## Migration Backlog (Not Yet Canonical)
 
