@@ -61,6 +61,10 @@ const expectedWorkedExampleTaskIds = [
   "example-diagnostics-host-startup-regression",
   "example-ui-studio-system-handoff-update",
 ] as const;
+const expectedPackOrder = [
+  "repository-overview",
+  "context-system-foundations",
+] as const;
 
 const requiredMappingMetadataFields = [
   "id",
@@ -205,7 +209,7 @@ describe("task-to-context routing contract guardrails", () => {
       expect(["ordered", "fallback", "single"]).toContain(example.expectedSelectionMode);
       expect(expectedPriorityTiers).toContain(example.expectedPriorityTier as (typeof expectedPriorityTiers)[number]);
       expect(example.expectedContextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
-      expect(example.expectedPackOrder).toEqual(["context-system-foundations"]);
+      expect(example.expectedPackOrder).toEqual(expectedPackOrder);
       expect(example.expectedRelatedDocOrder.length).toBeGreaterThanOrEqual(3);
       expect(example.expectedExclusions.length).toBeGreaterThanOrEqual(2);
 
@@ -258,7 +262,7 @@ describe("task-to-context routing contract guardrails", () => {
       }
 
       expect(mapping.status).toBe("active");
-      expect(mapping.packIds).toEqual(["context-system-foundations"]);
+      expect(mapping.packIds).toEqual(expectedPackOrder);
       expect(Array.isArray(mapping.excludePackIds)).toBe(true);
       expect(typeof mapping.notes).toBe("string");
       expect((mapping.notes as string).trim().length).toBeGreaterThan(0);

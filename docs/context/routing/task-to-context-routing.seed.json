@@ -101,6 +101,7 @@
       "expectedPriorityTier": "high",
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -136,6 +137,7 @@
       "expectedPriorityTier": "normal",
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -174,6 +176,7 @@
       "expectedPriorityTier": "high",
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -210,6 +213,7 @@
       "expectedPriorityTier": "high",
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -247,6 +251,7 @@
       "expectedPriorityTier": "normal",
       "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "expectedPackOrder": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -321,6 +326,7 @@
         }
       },
       "packIds": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
@@ -410,6 +416,7 @@
         }
       },
       "packIds": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
@@ -499,6 +506,7 @@
         }
       },
       "packIds": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
@@ -522,7 +530,7 @@
         "dev/tests"
       ],
       "excludePackIds": [],
-      "notes": "Single-pack ordering keeps implementation context bounded until additional domain packs are published.",
+      "notes": "Two-pack ordering keeps implementation context bounded until additional domain packs are published.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
@@ -589,6 +597,7 @@
         }
       },
       "packIds": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "selectionMode": "single",
@@ -678,6 +687,7 @@
         }
       },
       "packIds": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "selectionMode": "fallback",
@@ -766,6 +776,7 @@
         }
       },
       "packIds": [
+        "repository-overview",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
