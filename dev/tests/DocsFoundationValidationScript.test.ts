@@ -254,6 +254,32 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("doc-missing-record-for-validator-test");
   });
 
+  it("detects invalid task-discovery routing hints in documentation registry", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-doc-registry-task-routing-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const registryPath = join(fixtureRoot, "docs", "context", "documentation-registry.seed.json");
+    const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
+      taskRoutingIndex: {
+        routeHintsByTaskCategory: Record<string, { routeTaskIds: string[] }>;
+      };
+    };
+    registry.taskRoutingIndex.routeHintsByTaskCategory["architecture-review"].routeTaskIds = [
+      "missing-routing-task-id-for-validator-test",
+    ];
+    writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CONTEXT_REGISTRY_INVALID]");
+    expect(combinedOutput).toContain("missing-routing-task-id-for-validator-test");
+  });
+
   it("detects missing ADR registry record references", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-adr-registry-ref-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });

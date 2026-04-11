@@ -47,6 +47,7 @@ Use this file for the canonical intent of documentation indexing and findability
 - Taxonomy defines doc role and authority semantics.
 - Metadata header fields serialize taxonomy for tooling.
 - Registry entries provide discoverability records.
+- Registry task-discovery paths map workflow categories to authoritative records and routing hints.
 - Routing maps select minimal context paths using indexed authority signals.
 - Context packs remain curated reuse units for task classes.
 

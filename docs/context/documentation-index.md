@@ -9,6 +9,7 @@ related_code_paths:
   - docs/context/documentation-registry.seed.json
   - dev/scripts/generate-documentation-index-view.cjs
   - dev/tests/DocumentationIndexViewStory631Guardrails.test.ts
+  - dev/tests/DocumentationTaskDiscoveryPathsStory632Guardrails.test.ts
   - dev/scripts/validate-docs-foundation.cjs
 ---
 
@@ -30,6 +31,7 @@ This index is generated from the machine-readable documentation registry so cont
 - Document types covered: **7**
 - Domains covered: **8**
 - Status values covered: **5**
+- Task workflows covered: **8**
 
 ## Browse by Document Type
 
@@ -94,6 +96,96 @@ This index is generated from the machine-readable documentation registry so cont
 - [Repository Overview Context Pack](./packs/repository-overview.pack.md) (`doc-context-pack-repository-overview`)
 - [Runtime and Host Context Pack](./packs/runtime-and-host.pack.md) (`doc-context-pack-runtime-and-host`)
 - [Studio and System Composition Context Pack](./packs/studio-and-system-composition.pack.md) (`doc-context-pack-studio-and-system-composition`)
+
+## Browse by Task Workflow
+
+### `architecture-review` (5)
+- Routing task IDs: `architecture-review-host-boundaries`
+- Context-map mapping IDs: `context-map-architecture-review-v1`
+- Selection mode / priority: `ordered` / `high`
+- Context assembly profile: `foundation-domain-implementation-optional-v1`
+- [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.md) (`doc-adr-001-single-authoritative-control-plane`)
+- [Architecture Domain Taxonomy](../architecture/architecture-domain-taxonomy.md) (`doc-architecture-domain-taxonomy`)
+- [Core Architecture Context Pack](./packs/architecture-core.pack.md) (`doc-context-pack-architecture-core`)
+- [Domain and Application Core](../architecture/domain-and-application-core.md) (`doc-architecture-domain-and-application-core`)
+- [Runtime Host Surfaces Domain Overview](../architecture/domains/runtime-host-surfaces/overview.md) (`doc-architecture-domain-runtime-host-surfaces-overview`)
+
+### `coding-implementation` (5)
+- Routing task IDs: `repo-implementation-core-workflows`, `runtime-host-coding-implementation`
+- Context-map mapping IDs: `context-map-coding-implementation-v1`
+- Selection mode / priority: `ordered` / `normal`
+- Context assembly profile: `foundation-domain-implementation-optional-v1`
+- [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.md) (`doc-adr-001-single-authoritative-control-plane`)
+- [Domain and Application Core](../architecture/domain-and-application-core.md) (`doc-architecture-domain-and-application-core`)
+- [Layers and Boundaries](../architecture/layers-and-boundaries.md) (`doc-architecture-layers-and-boundaries`)
+- [Repository Overview Context Pack](./packs/repository-overview.pack.md) (`doc-context-pack-repository-overview`)
+- [Runtime and Host Context Pack](./packs/runtime-and-host.pack.md) (`doc-context-pack-runtime-and-host`)
+
+### `diagnostics` (5)
+- Routing task IDs: `runtime-host-diagnostics-triage`
+- Context-map mapping IDs: `context-map-diagnostics-v1`
+- Selection mode / priority: `fallback` / `high`
+- Context assembly profile: `foundation-domain-implementation-optional-v1`
+- [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.md) (`doc-adr-001-single-authoritative-control-plane`)
+- [Node Bootstrap Identity Operations](../node-bootstrap-identity-operations.md) (`doc-operations-node-bootstrap-identity`)
+- [Runtime and Host Context Pack](./packs/runtime-and-host.pack.md) (`doc-context-pack-runtime-and-host`)
+- [Runtime Host Surfaces Domain Overview](../architecture/domains/runtime-host-surfaces/overview.md) (`doc-architecture-domain-runtime-host-surfaces-overview`)
+- [Secret Health and Operational Diagnostics](../secret-health-and-operational-diagnostics.md) (`doc-operations-secret-health-diagnostics`)
+
+### `documentation-change` (5)
+- Routing task IDs: `documentation-refactor-context-and-architecture`
+- Context-map mapping IDs: `context-map-documentation-change-v1`
+- Selection mode / priority: `single` / `normal`
+- Context assembly profile: `foundation-domain-implementation-optional-v1`
+- [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.md) (`doc-contributors-docs-foundation-validation-guide`)
+- [Documentation Identity, Stable Keys, and Reference Conventions](./documentation-identity-and-reference-conventions.md) (`doc-context-documentation-identity-and-reference-conventions`)
+- [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
+- [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
+- [Documentation Refactor Context Pack](./packs/documentation-refactor.pack.md) (`doc-context-pack-documentation-refactor`)
+
+### `feature-decomposition` (5)
+- Routing task IDs: `feature-decomposition-epic-story-planning`
+- Context-map mapping IDs: `context-map-feature-decomposition-v1`
+- Selection mode / priority: `ordered` / `high`
+- Context assembly profile: `foundation-domain-implementation-optional-v1`
+- [Architecture Domain Taxonomy](../architecture/architecture-domain-taxonomy.md) (`doc-architecture-domain-taxonomy`)
+- [Context Engineering System Contributor Guide](../contributors/context-engineering-system-guide.md) (`doc-contributors-context-engineering-system-guide`)
+- [Core Architecture Context Pack](./packs/architecture-core.pack.md) (`doc-context-pack-architecture-core`)
+- [Domain and Application Core](../architecture/domain-and-application-core.md) (`doc-architecture-domain-and-application-core`)
+- [Repository Overview Context Pack](./packs/repository-overview.pack.md) (`doc-context-pack-repository-overview`)
+
+### `migration-refactor` (5)
+- Routing task IDs: _No direct route task IDs registered; use context-map defaults._
+- Context-map mapping IDs: `context-map-migration-refactor-v1`
+- Selection mode / priority: `fallback` / `high`
+- Context assembly profile: `foundation-domain-implementation-optional-v1`
+- [Canonical Documentation Taxonomy](./documentation-taxonomy.md) (`doc-context-documentation-taxonomy`)
+- [Documentation Identity, Stable Keys, and Reference Conventions](./documentation-identity-and-reference-conventions.md) (`doc-context-documentation-identity-and-reference-conventions`)
+- [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
+- [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
+- [Documentation Refactor Context Pack](./packs/documentation-refactor.pack.md) (`doc-context-pack-documentation-refactor`)
+
+### `runtime-security` (5)
+- Routing task IDs: `runtime-security-identity-and-policy-hardening`
+- Context-map mapping IDs: `context-map-runtime-security-v1`
+- Selection mode / priority: `ordered` / `critical`
+- Context assembly profile: `foundation-domain-implementation-optional-v1`
+- [ADR-005 Trust, Identity, and Security Boundary Enforcement](../adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md) (`doc-adr-005-trust-identity-and-security-boundary-enforcement`)
+- [Identity and Security Context Pack](./packs/identity-and-security.pack.md) (`doc-context-pack-identity-and-security`)
+- [Identity Trust and Security Domain Overview](../architecture/domains/identity-trust-and-security/overview.md) (`doc-architecture-domain-identity-trust-and-security-overview`)
+- [Secret Health and Operational Diagnostics](../secret-health-and-operational-diagnostics.md) (`doc-operations-secret-health-diagnostics`)
+- [Security and Policy Configuration Operations](../security-policy-configuration-operations.md) (`doc-operations-security-policy-configuration`)
+
+### `ui-studio` (5)
+- Routing task IDs: `studio-system-design-and-ux-shaping`
+- Context-map mapping IDs: `context-map-ui-studio-v1`
+- Selection mode / priority: `ordered` / `normal`
+- Context assembly profile: `foundation-domain-implementation-optional-v1`
+- [ADR-004 Studios as Views Over Shared System and Asset Model](../adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md) (`doc-adr-004-studios-as-views-over-shared-system-and-asset-model`)
+- [Core Architecture Context Pack](./packs/architecture-core.pack.md) (`doc-context-pack-architecture-core`)
+- [Repository Overview Context Pack](./packs/repository-overview.pack.md) (`doc-context-pack-repository-overview`)
+- [Studio and System Composition Context Pack](./packs/studio-and-system-composition.pack.md) (`doc-context-pack-studio-and-system-composition`)
+- [Studio and System Composition Domain Overview](../architecture/domains/studio-and-system-composition/overview.md) (`doc-architecture-domain-studio-and-system-composition-overview`)
 
 ## Browse by Domain
 

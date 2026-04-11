@@ -14,6 +14,7 @@ const requiredDiscoveryIndexes = [
   "byStatus",
   "byDomain",
   "byAuthoritativeness",
+  "byTaskCategory",
 ] as const;
 
 type RegistryEntry = {
@@ -54,6 +55,18 @@ type DocumentationRegistry = {
   };
   entries: RegistryEntry[];
   discoveryIndex: Record<string, Record<string, string[]>>;
+  taskRoutingIndex: {
+    schemaVersion: string;
+    routingSeedPath: string;
+    contextMapPath: string;
+    routeHintsByTaskCategory: Record<string, {
+      routeTaskIds: string[];
+      contextMapMappingIds: string[];
+      defaultSelectionMode: string;
+      defaultPriorityTier: string;
+      contextAssemblyProfileId: string;
+    }>;
+  };
 };
 
 type IndexedMetadataContract = {
@@ -178,6 +191,39 @@ describe("story 6.1.3 documentation registry structure guardrails", () => {
           expect(recordIds.has(recordId)).toBe(true);
         }
       }
+    }
+  });
+
+  it("keeps task-oriented discovery hints aligned with routing/context assets", () => {
+    const registry = readJson<DocumentationRegistry>(registryPath);
+    const byTaskCategory = registry.discoveryIndex.byTaskCategory;
+
+    expect(registry.taskRoutingIndex.schemaVersion).toBe("1.0.0");
+    expect(registry.taskRoutingIndex.routingSeedPath).toBe("docs/context/routing/task-to-context-routing.seed.json");
+    expect(registry.taskRoutingIndex.contextMapPath).toBe("docs/context/context-map.json");
+
+    const requiredTaskCategories = [
+      "architecture-review",
+      "feature-decomposition",
+      "coding-implementation",
+      "migration-refactor",
+      "diagnostics",
+      "ui-studio",
+      "runtime-security",
+      "documentation-change",
+    ] as const;
+
+    for (const taskCategory of requiredTaskCategories) {
+      expect(Array.isArray(byTaskCategory[taskCategory])).toBe(true);
+      expect((byTaskCategory[taskCategory] || []).length).toBeGreaterThan(0);
+
+      const hint = registry.taskRoutingIndex.routeHintsByTaskCategory[taskCategory];
+      expect(hint).toBeDefined();
+      expect(Array.isArray(hint.contextMapMappingIds)).toBe(true);
+      expect(hint.contextMapMappingIds.length).toBeGreaterThan(0);
+      expect(typeof hint.defaultSelectionMode).toBe("string");
+      expect(typeof hint.defaultPriorityTier).toBe("string");
+      expect(hint.contextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
     }
   });
 

@@ -2076,6 +2076,158 @@
         "doc-architecture-superseded-shared-asset-contracts",
         "doc-architecture-superseded-workflow-execution-and-tools"
       ]
+    },
+    "byTaskCategory": {
+      "architecture-review": [
+        "doc-architecture-domain-taxonomy",
+        "doc-architecture-domain-and-application-core",
+        "doc-context-pack-architecture-core",
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-architecture-domain-runtime-host-surfaces-overview"
+      ],
+      "feature-decomposition": [
+        "doc-architecture-domain-and-application-core",
+        "doc-architecture-domain-taxonomy",
+        "doc-context-pack-repository-overview",
+        "doc-context-pack-architecture-core",
+        "doc-contributors-context-engineering-system-guide"
+      ],
+      "coding-implementation": [
+        "doc-context-pack-repository-overview",
+        "doc-architecture-domain-and-application-core",
+        "doc-architecture-layers-and-boundaries",
+        "doc-context-pack-runtime-and-host",
+        "doc-adr-001-single-authoritative-control-plane"
+      ],
+      "migration-refactor": [
+        "doc-context-pack-documentation-refactor",
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-context-documentation-taxonomy"
+      ],
+      "diagnostics": [
+        "doc-context-pack-runtime-and-host",
+        "doc-operations-secret-health-diagnostics",
+        "doc-operations-node-bootstrap-identity",
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-adr-001-single-authoritative-control-plane"
+      ],
+      "ui-studio": [
+        "doc-context-pack-studio-and-system-composition",
+        "doc-architecture-domain-studio-and-system-composition-overview",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
+        "doc-context-pack-architecture-core",
+        "doc-context-pack-repository-overview"
+      ],
+      "runtime-security": [
+        "doc-context-pack-identity-and-security",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-architecture-domain-identity-trust-and-security-overview",
+        "doc-operations-security-policy-configuration",
+        "doc-operations-secret-health-diagnostics"
+      ],
+      "documentation-change": [
+        "doc-context-pack-documentation-refactor",
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-context-documentation-identity-and-reference-conventions"
+      ]
+    }
+  },
+  "taskRoutingIndex": {
+    "schemaVersion": "1.0.0",
+    "routingSeedPath": "docs/context/routing/task-to-context-routing.seed.json",
+    "contextMapPath": "docs/context/context-map.json",
+    "routeHintsByTaskCategory": {
+      "architecture-review": {
+        "routeTaskIds": [
+          "architecture-review-host-boundaries"
+        ],
+        "contextMapMappingIds": [
+          "context-map-architecture-review-v1"
+        ],
+        "defaultSelectionMode": "ordered",
+        "defaultPriorityTier": "high",
+        "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      },
+      "feature-decomposition": {
+        "routeTaskIds": [
+          "feature-decomposition-epic-story-planning"
+        ],
+        "contextMapMappingIds": [
+          "context-map-feature-decomposition-v1"
+        ],
+        "defaultSelectionMode": "ordered",
+        "defaultPriorityTier": "high",
+        "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      },
+      "coding-implementation": {
+        "routeTaskIds": [
+          "repo-implementation-core-workflows",
+          "runtime-host-coding-implementation"
+        ],
+        "contextMapMappingIds": [
+          "context-map-coding-implementation-v1"
+        ],
+        "defaultSelectionMode": "ordered",
+        "defaultPriorityTier": "normal",
+        "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      },
+      "migration-refactor": {
+        "routeTaskIds": [],
+        "contextMapMappingIds": [
+          "context-map-migration-refactor-v1"
+        ],
+        "defaultSelectionMode": "fallback",
+        "defaultPriorityTier": "high",
+        "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      },
+      "diagnostics": {
+        "routeTaskIds": [
+          "runtime-host-diagnostics-triage"
+        ],
+        "contextMapMappingIds": [
+          "context-map-diagnostics-v1"
+        ],
+        "defaultSelectionMode": "fallback",
+        "defaultPriorityTier": "high",
+        "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      },
+      "ui-studio": {
+        "routeTaskIds": [
+          "studio-system-design-and-ux-shaping"
+        ],
+        "contextMapMappingIds": [
+          "context-map-ui-studio-v1"
+        ],
+        "defaultSelectionMode": "ordered",
+        "defaultPriorityTier": "normal",
+        "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      },
+      "runtime-security": {
+        "routeTaskIds": [
+          "runtime-security-identity-and-policy-hardening"
+        ],
+        "contextMapMappingIds": [
+          "context-map-runtime-security-v1"
+        ],
+        "defaultSelectionMode": "ordered",
+        "defaultPriorityTier": "critical",
+        "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      },
+      "documentation-change": {
+        "routeTaskIds": [
+          "documentation-refactor-context-and-architecture"
+        ],
+        "contextMapMappingIds": [
+          "context-map-documentation-change-v1"
+        ],
+        "defaultSelectionMode": "single",
+        "defaultPriorityTier": "normal",
+        "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      }
     }
   }
 }

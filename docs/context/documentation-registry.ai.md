@@ -19,6 +19,7 @@ related_code_paths:
   - dev/scripts/generate-documentation-index-view.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
   - dev/tests/DocumentationIndexViewStory631Guardrails.test.ts
+  - dev/tests/DocumentationTaskDiscoveryPathsStory632Guardrails.test.ts
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
   - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
   - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
@@ -192,6 +193,23 @@ The view is intentionally grouped around practical discovery dimensions only:
 - `status` for lifecycle routing
 
 Alignment is enforced by generation + validation guardrails so the index does not diverge into a separate manually maintained source.
+
+## Task-Oriented Discovery Paths Status (Story 6.3.2)
+
+The registry now includes task-oriented discovery paths that reuse the existing routing/context task model rather than creating a competing classification layer.
+
+Task discovery is represented by:
+
+- `discoveryIndex.byTaskCategory`: curated registry record sets by routing task category.
+- `taskRoutingIndex`: route hints that link task categories to canonical routing/context assets.
+
+`taskRoutingIndex` stays explicit and validator-friendly:
+
+- `routingSeedPath`: `docs/context/routing/task-to-context-routing.seed.json`
+- `contextMapPath`: `docs/context/context-map.json`
+- `routeHintsByTaskCategory`: per-category route task IDs, context-map mapping IDs, and default selection/priority/profile hints.
+
+The generated documentation index now exposes a task-workflow section for architecture review, feature decomposition, coding implementation, runtime diagnostics, runtime security changes, and documentation refactor work.
 
 ## Coverage Policy Contract
 

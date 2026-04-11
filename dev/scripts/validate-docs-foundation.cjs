@@ -782,7 +782,7 @@ function validateDocsFoundation(repoRoot) {
         message: "docs/context/documentation-registry.seed.json must include discoveryIndex object.",
       });
     } else {
-      for (const indexName of ["byDocType", "byStatus", "byDomain", "byAuthoritativeness"]) {
+      for (const indexName of ["byDocType", "byStatus", "byDomain", "byAuthoritativeness", "byTaskCategory"]) {
         const indexValue = documentationRegistry.discoveryIndex[indexName];
         if (!indexValue || typeof indexValue !== "object" || Array.isArray(indexValue)) {
           addIssue(
@@ -2328,6 +2328,178 @@ function validateDocsFoundation(repoRoot) {
             "CONTEXT_REGISTRY_INVALID",
             `docs/context/documentation-registry.seed.json discoveryIndex.${indexName}.${key} must include '${entry.recordId}'.`,
           );
+        }
+      }
+    }
+
+    const byTaskCategory = discoveryIndex.byTaskCategory;
+    if (!byTaskCategory || typeof byTaskCategory !== "object" || Array.isArray(byTaskCategory)) {
+      addIssue(
+        issues,
+        "CONTEXT_REGISTRY_INVALID",
+        "docs/context/documentation-registry.seed.json discoveryIndex.byTaskCategory must be an object map.",
+      );
+    } else {
+      const requiredTaskCategories = routingContractTaskCategories.size > 0
+        ? [...routingContractTaskCategories]
+        : [];
+      for (const taskCategory of requiredTaskCategories) {
+        if (!Array.isArray(byTaskCategory[taskCategory]) || byTaskCategory[taskCategory].length === 0) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json discoveryIndex.byTaskCategory must include non-empty array for '${taskCategory}'.`,
+          );
+        }
+      }
+
+      for (const [taskCategory, recordIds] of Object.entries(byTaskCategory)) {
+        if (routingContractTaskCategories.size > 0 && !routingContractTaskCategories.has(taskCategory)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json discoveryIndex.byTaskCategory has unsupported key '${taskCategory}'.`,
+          );
+        }
+
+        if (!Array.isArray(recordIds)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json discoveryIndex.byTaskCategory.${taskCategory} must be an array.`,
+          );
+          continue;
+        }
+
+        for (const recordId of recordIds) {
+          if (!isNonEmptyString(recordId) || !entryIds.has(recordId)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json discoveryIndex.byTaskCategory.${taskCategory} references unknown recordId '${recordId}'.`,
+            );
+          }
+        }
+      }
+    }
+
+    const taskRoutingIndex = documentationRegistry.taskRoutingIndex;
+    if (!taskRoutingIndex || typeof taskRoutingIndex !== "object" || Array.isArray(taskRoutingIndex)) {
+      addIssue(
+        issues,
+        "CONTEXT_REGISTRY_INVALID",
+        "docs/context/documentation-registry.seed.json must include taskRoutingIndex object.",
+      );
+    } else {
+      if (taskRoutingIndex.schemaVersion !== "1.0.0") {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          "docs/context/documentation-registry.seed.json taskRoutingIndex.schemaVersion must be '1.0.0'.",
+        );
+      }
+
+      if (taskRoutingIndex.routingSeedPath !== "docs/context/routing/task-to-context-routing.seed.json") {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          "docs/context/documentation-registry.seed.json taskRoutingIndex.routingSeedPath must be 'docs/context/routing/task-to-context-routing.seed.json'.",
+        );
+      }
+      if (taskRoutingIndex.contextMapPath !== "docs/context/context-map.json") {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          "docs/context/documentation-registry.seed.json taskRoutingIndex.contextMapPath must be 'docs/context/context-map.json'.",
+        );
+      }
+
+      const routeHintsByTaskCategory = taskRoutingIndex.routeHintsByTaskCategory;
+      if (!routeHintsByTaskCategory || typeof routeHintsByTaskCategory !== "object" || Array.isArray(routeHintsByTaskCategory)) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          "docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory must be an object map.",
+        );
+      } else {
+        const routingTaskIds = new Set(Array.isArray(routingSeed?.mappings) ? routingSeed.mappings.map((mapping) => mapping?.taskId).filter((value) => isNonEmptyString(value)) : []);
+        const contextMapDefaults = new Map(Array.isArray(contextMap?.taskCategoryDefaults) ? contextMap.taskCategoryDefaults.map((entry) => [entry?.taskCategoryId, entry]) : []);
+        const contextMapMappingIds = new Set(Array.isArray(contextMap?.taskCategoryMappings) ? contextMap.taskCategoryMappings.map((mapping) => mapping?.mappingId).filter((value) => isNonEmptyString(value)) : []);
+        const requiredTaskCategories = routingContractTaskCategories.size > 0
+          ? [...routingContractTaskCategories]
+          : Object.keys(routeHintsByTaskCategory);
+
+        for (const taskCategory of requiredTaskCategories) {
+          const hint = routeHintsByTaskCategory[taskCategory];
+          if (!hint || typeof hint !== "object" || Array.isArray(hint)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory must include object for '${taskCategory}'.`,
+            );
+            continue;
+          }
+
+          if (!Array.isArray(hint.routeTaskIds)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory.${taskCategory}.routeTaskIds must be an array.`,
+            );
+          } else {
+            for (const routeTaskId of hint.routeTaskIds) {
+              if (!isNonEmptyString(routeTaskId) || (routingTaskIds.size > 0 && !routingTaskIds.has(routeTaskId))) {
+                addIssue(
+                  issues,
+                  "CONTEXT_REGISTRY_INVALID",
+                  `docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory.${taskCategory}.routeTaskIds references unknown taskId '${routeTaskId}'.`,
+                );
+              }
+            }
+          }
+
+          if (!isArrayOfNonEmptyStrings(hint.contextMapMappingIds)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory.${taskCategory}.contextMapMappingIds must be a non-empty string array.`,
+            );
+          } else {
+            for (const mappingId of hint.contextMapMappingIds) {
+              if (contextMapMappingIds.size > 0 && !contextMapMappingIds.has(mappingId)) {
+                addIssue(
+                  issues,
+                  "CONTEXT_REGISTRY_INVALID",
+                  `docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory.${taskCategory}.contextMapMappingIds references unknown mappingId '${mappingId}'.`,
+                );
+              }
+            }
+          }
+
+          const contextDefault = contextMapDefaults.get(taskCategory);
+          if (contextDefault) {
+            if (hint.defaultSelectionMode !== contextDefault.selectionMode) {
+              addIssue(
+                issues,
+                "CONTEXT_REGISTRY_INVALID",
+                `docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory.${taskCategory}.defaultSelectionMode must match context-map default '${contextDefault.selectionMode}'.`,
+              );
+            }
+            if (hint.defaultPriorityTier !== contextDefault.priorityTier) {
+              addIssue(
+                issues,
+                "CONTEXT_REGISTRY_INVALID",
+                `docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory.${taskCategory}.defaultPriorityTier must match context-map default '${contextDefault.priorityTier}'.`,
+              );
+            }
+            if (hint.contextAssemblyProfileId !== contextDefault.contextAssemblyProfileId) {
+              addIssue(
+                issues,
+                "CONTEXT_REGISTRY_INVALID",
+                `docs/context/documentation-registry.seed.json taskRoutingIndex.routeHintsByTaskCategory.${taskCategory}.contextAssemblyProfileId must match context-map default '${contextDefault.contextAssemblyProfileId}'.`,
+              );
+            }
+          }
         }
       }
     }
