@@ -20,6 +20,8 @@ const requiredContextFiles = [
   "docs/context/packs/context-pack-catalog.seed.json",
   "docs/context/routing/README.md",
   "docs/context/routing/README.ai.md",
+  "docs/context/routing/prompt-routing-contract.md",
+  "docs/context/routing/prompt-routing-contract.ai.md",
   "docs/context/routing/task-to-context-routing.contract.json",
   "docs/context/routing/task-to-context-routing.seed.json",
   "docs/context/governance/README.md",
@@ -88,6 +90,7 @@ describe("context engineering structure guardrails", () => {
     expect(routingContract.schemaVersion).toBe("1.0.0");
     expect(routingContract.artifactType).toBe("task-to-context-routing-map");
     expect(Array.isArray(routingContract.mappingRequiredFields)).toBe(true);
+    expect(Array.isArray(routingContract.supportedTaskCategories)).toBe(true);
 
     expect(routingSeed.schemaVersion).toBe("1.0.0");
     expect(routingSeed.artifactType).toBe("task-to-context-routing-map");

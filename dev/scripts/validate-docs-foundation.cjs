@@ -27,6 +27,8 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/packs/context-pack-catalog.seed.json",
   "docs/context/routing/README.md",
   "docs/context/routing/README.ai.md",
+  "docs/context/routing/prompt-routing-contract.md",
+  "docs/context/routing/prompt-routing-contract.ai.md",
   "docs/context/routing/task-to-context-routing.contract.json",
   "docs/context/routing/task-to-context-routing.seed.json",
   "docs/context/governance/README.md",
@@ -290,6 +292,20 @@ function validateDocsFoundation(repoRoot) {
         message: "docs/context/routing/task-to-context-routing.contract.json must declare schemaVersion 1.0.0 and artifactType task-to-context-routing-map.",
       });
     }
+
+    if (!Array.isArray(routingContract.routingRequestRequiredFields) || routingContract.routingRequestRequiredFields.length === 0) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/routing/task-to-context-routing.contract.json must include routingRequestRequiredFields.",
+      });
+    }
+
+    if (!Array.isArray(routingContract.supportedTaskCategories) || routingContract.supportedTaskCategories.length < 8) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/routing/task-to-context-routing.contract.json must include supportedTaskCategories with at least 8 categories.",
+      });
+    }
   }
 
   const routingSeed = contextJsonArtifacts.get(taskRoutingSeedPath);
@@ -298,6 +314,20 @@ function validateDocsFoundation(repoRoot) {
       issues.push({
         code: "CONTEXT_CONTRACT_INVALID",
         message: "docs/context/routing/task-to-context-routing.seed.json must include schemaVersion 1.0.0, artifactType task-to-context-routing-map, and mappings array.",
+      });
+    }
+
+    if (!Array.isArray(routingSeed.taskCategoryMap) || routingSeed.taskCategoryMap.length < 8) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/routing/task-to-context-routing.seed.json must include taskCategoryMap with at least 8 task categories.",
+      });
+    }
+
+    if (!Array.isArray(routingSeed.routingExamples) || routingSeed.routingExamples.length === 0) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/routing/task-to-context-routing.seed.json must include routingExamples.",
       });
     }
   }
