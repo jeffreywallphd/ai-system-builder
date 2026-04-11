@@ -7,6 +7,7 @@ owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
   - docs/context/documentation-registry.seed.json
+  - docs/context/documentation-index-coverage-rules.md
   - docs/context/documentation-indexed-document-metadata.contract.json
   - docs/context/documentation-identity-and-reference.contract.json
   - dev/scripts/validate-docs-foundation.cjs
@@ -42,6 +43,7 @@ The registry includes:
 - `domainRelationships` for cross-domain navigation hints.
 - `entries` as stable indexed records with `recordId` and metadata-contract fields.
 - `discoveryIndex` maps for practical retrieval (`byDocType`, `byStatus`, `byDomain`, `byAuthoritativeness`).
+- `coveragePolicy` for machine-readable inclusion, selective indexing, and exclusion boundaries.
 
 ## Entry Model
 
@@ -52,6 +54,17 @@ Each entry must include:
 
 Optional fields such as `keywords`, `relatedDocs`, `relatedCodePaths`, `owner`, `lastReviewed`, and `aiPath` are used for findability and routing precision.
 For durable cross-artifact linking, entries may use `relatedRecordIds` in addition to path-based relationships.
+
+## Coverage Policy
+
+Coverage boundaries are intentionally explicit so the registry stays high-signal:
+
+- `requiredCategories`: categories that must be represented with index records when active docs exist.
+- `selectiveCategories`: categories indexed only by curated anchor records.
+- `excludedCategories`: categories that should not be represented as standalone registry entries.
+- `categoryRules`: per-category treatment including expected status/authoritativeness and representation notes.
+
+Canonical rule semantics live in `docs/context/documentation-index-coverage-rules.md`.
 
 ## Seed Coverage Expectations
 

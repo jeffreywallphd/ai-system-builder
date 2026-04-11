@@ -7,6 +7,7 @@ owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
   - docs/context/documentation-registry.seed.json
+  - docs/context/documentation-index-coverage-rules.ai.md
   - docs/context/documentation-indexed-document-metadata.contract.json
   - docs/context/documentation-identity-and-reference.contract.json
   - dev/scripts/validate-docs-foundation.cjs
@@ -42,6 +43,7 @@ Use this file for the canonical machine-readable documentation registry shape an
 - `domainRelationships`
 - `entries`
 - `discoveryIndex`
+- `coveragePolicy`
 
 ## Entry Shape
 
@@ -62,6 +64,13 @@ Use `relatedRecordIds` for durable stable-key links between registry entries.
 ## Seed Coverage Rule
 
 The seed registry includes at least one entry for each major `docType` so findability and routing can validate cross-category behavior from day one.
+
+## Coverage Policy Contract
+
+- `coveragePolicy` carries machine-readable inclusion/exclusion boundaries.
+- Keep `requiredCategories`, `selectiveCategories`, and `excludedCategories` explicit.
+- Use `categoryRules` to capture per-category representation and status/authority treatment.
+- Human-readable rule semantics are defined in `documentation-index-coverage-rules.ai.md`.
 
 ## Non-Goals
 
