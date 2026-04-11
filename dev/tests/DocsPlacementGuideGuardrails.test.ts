@@ -24,10 +24,33 @@ describe("docs placement guide guardrails", () => {
 
   it("enforces routing examples, anti-patterns, and decision flow anchors", () => {
     const humanGuide = readFileSync(humanGuidePath, "utf8");
+    const aiGuide = readFileSync(aiGuidePath, "utf8");
 
     expect(humanGuide).toContain("## Simple Decision Flow");
+    expect(humanGuide).toContain("## ADR Thresholds For Planned Changes");
     expect(humanGuide).toContain("## Placement Examples");
     expect(humanGuide).toContain("## Anti-Patterns to Avoid");
+    expect(humanGuide).toContain("### ADR Required");
+    expect(humanGuide).toContain("### ADR Recommended");
+    expect(humanGuide).toContain("### ADR Unnecessary");
+    expect(humanGuide).toContain("architectural invariant");
+    expect(humanGuide).toContain("control-plane");
+    expect(humanGuide).toContain("workspace model");
+    expect(humanGuide).toContain("security trust boundaries");
+    expect(humanGuide).toContain("storage policy");
+    expect(humanGuide).toContain("studio/system modeling");
+    expect(humanGuide).toContain("## Placement For Non-ADR Changes");
+    expect(aiGuide).toContain("## ADR Thresholds For Planned Changes");
+    expect(aiGuide).toContain("### ADR Required");
+    expect(aiGuide).toContain("### ADR Recommended");
+    expect(aiGuide).toContain("### ADR Unnecessary");
+    expect(aiGuide).toContain("architectural invariant");
+    expect(aiGuide).toContain("control-plane");
+    expect(aiGuide).toContain("workspace model");
+    expect(aiGuide).toContain("security trust boundaries");
+    expect(aiGuide).toContain("storage policy");
+    expect(aiGuide).toContain("studio/system modeling");
+    expect(aiGuide).toContain("### Placement For Non-ADR Changes");
 
     const requiredAreas = [
       "docs/architecture/",
