@@ -14,16 +14,22 @@ related_code_paths:
 
 Use this router to pick the correct documentation entry point by reader role or task. Keep deeper content in destination docs.
 
+## Active Documentation Quick Start
+
+- Architecture authority: [Architecture Router](./architecture/README.ai.md)
+- Contributor implementation workflows: [Contributors Router](./contributors/README.ai.md)
+- Runtime/admin runbooks: [Operations Router](./operations/README.ai.md)
+- Context taxonomy and routing rules: [Context Router](./context/README.ai.md)
+- UI behavior contracts: [UI Router](./ui/README.ai.md)
+- Prompt helpers: [Prompts Router](./prompts/README.ai.md)
+- Decision lineage: [ADR Router](./adr/README.ai.md)
+
 ## Documentation Areas
 
-- `docs/architecture/`: [Architecture Router](./architecture/README.ai.md) for canonical architecture contracts.
-- `docs/contributors/`: [Contributors Router](./contributors/README.ai.md) for contributor implementation workflows.
-- `docs/operations/`: [Operations Router](./operations/README.ai.md) for runtime/admin runbooks and diagnostics.
-- `docs/baselines/`: [Baselines Router](./baselines/README.ai.md) for historical baselines and migration snapshots.
-- `docs/adr/`: [ADR Router](./adr/README.ai.md) for decision records and supersession history.
-- `docs/context/`: [Context Router](./context/README.ai.md) for taxonomy and metadata contract anchors.
-- `docs/prompts/`: [Prompts Router](./prompts/README.ai.md) for reusable prompt helpers.
-- `docs/ui/`: [UI Router](./ui/README.ai.md) for UI behavior and UX contract docs.
+- Active current-guidance routers:
+  `docs/architecture/` [Architecture](./architecture/README.ai.md), `docs/contributors/` [Contributors](./contributors/README.ai.md), `docs/operations/` [Operations](./operations/README.ai.md), `docs/context/` [Context](./context/README.ai.md), `docs/ui/` [UI](./ui/README.ai.md), `docs/prompts/` [Prompts](./prompts/README.ai.md), `docs/adr/` [ADR](./adr/README.ai.md).
+- Historical and migration routers:
+  `docs/baselines/` [Baselines](./baselines/README.ai.md).
 
 ## Route By Reader Type
 
@@ -36,6 +42,7 @@ Use this router to pick the correct documentation entry point by reader role or 
 
 - Decide placement for a new doc: [Docs Placement Guide](./contributors/docs-placement-guide.md).
 - Apply canonical metadata fields: [Documentation Taxonomy](./context/documentation-taxonomy.ai.md), [Documentation Segmentation Taxonomy](./context/documentation-segmentation-taxonomy.ai.md), [Documentation Segmentation Seed Guidance](./context/documentation-segmentation-seed-guidance.ai.md), [Supersession and Redirect Conventions](./context/documentation-supersession-and-redirect-conventions.ai.md), and [Metadata Header Contract](./context/documentation-metadata-header.ai.md).
+- Start with current authoritative guidance (default path): [Architecture Router](./architecture/README.ai.md), [Contributors Router](./contributors/README.ai.md), [Operations Router](./operations/README.ai.md), and [Context Router](./context/README.ai.md).
 - Plan historical-isolation migration work: [Documentation Segmentation Migration Inventory](./documentation-segmentation-migration-inventory.ai.md).
 - Find current design authority: [Architecture Router](./architecture/README.ai.md).
 - Find historical baselines and Feature 1 handoff context: [Baselines Router](./baselines/README.ai.md).
@@ -53,4 +60,5 @@ Use this router to pick the correct documentation entry point by reader role or 
 
 - Keep this root README thin and routing-only.
 - Link to authoritative docs rather than restating detailed guidance.
+- Keep the default path active-first; route to baselines only when historical evidence is needed.
 - Update only when top-level docs navigation changes.

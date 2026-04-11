@@ -19,6 +19,10 @@ related_code_paths:
 ## Purpose
 - Route quickly into domain overviews, domain reference indexes, ADRs, and migration anchors without restating contract detail.
 
+## Active Authority Scope
+- This router is for current architecture authority and active implementation boundaries.
+- Use [Architecture Baselines Router](../baselines/architecture/README.ai.md) only for historical snapshots and prior-state migration context.
+
 ## Belongs Here
 - Navigation into `docs/architecture/domains/*/overview.md` and `references/README.md`.
 - Cross-cutting architecture navigation contracts and ADR backlink expectations.

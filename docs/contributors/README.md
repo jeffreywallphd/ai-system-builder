@@ -7,6 +7,10 @@
 ## Purpose
 - Contributor-facing implementation and extension guidance.
 
+## Active Authority Scope
+- This router is for current contributor workflows and active implementation guidance.
+- Use [Baselines Router](../baselines/README.md) only for historical delivery records and migration snapshots.
+
 ## Belongs Here
 - Contributor guides for adding or modifying feature behavior safely.
 - Extension guardrails, checklists, and implementation workflow conventions.

@@ -7,6 +7,10 @@
 ## Purpose
 - Entry point for runtime/admin operations guidance.
 
+## Active Authority Scope
+- This router is for current operations/runbook authority.
+- Use [Baselines Router](../baselines/README.ai.md) only for historical migration evidence or completion snapshots.
+
 ## Belongs Here
 - Runtime operations runbooks and admin procedures.
 - Troubleshooting and diagnostics workflows.
