@@ -29,6 +29,7 @@ Baseline context for changing context-engineering contracts, routing maps, and g
 - `docs/context/packs/README.ai.md`
 - `docs/context/routing/prompt-routing-contract.ai.md`
 - `docs/context/governance/context-governance-policy.ai.md`
+- `docs/context/governance/context-asset-lifecycle.ai.md`
 
 ## Authoritative Code Paths
 

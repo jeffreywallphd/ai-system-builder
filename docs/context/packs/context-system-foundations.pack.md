@@ -29,6 +29,7 @@ Provide baseline context for evolving `docs/context` contracts, routing guidance
 - `docs/context/packs/README.md`
 - `docs/context/routing/prompt-routing-contract.md`
 - `docs/context/governance/context-governance-policy.md`
+- `docs/context/governance/context-asset-lifecycle.md`
 
 ## Authoritative Code Paths
 

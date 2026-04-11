@@ -24,6 +24,7 @@ This policy defines how context-pack and routing artifacts are maintained so con
 - Keep pack and routing seed files valid JSON even when empty.
 - Keep router pages concise and navigation-first; avoid duplicating full pack content.
 - Keep context-pack entries and routing mappings aligned to `docs/context/context-asset-metadata.contract.json`.
+- Apply lifecycle state transitions and conflict-resolution rules from `docs/context/governance/context-asset-lifecycle.md`.
 
 ## Review Cadence
 

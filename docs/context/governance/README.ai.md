@@ -19,5 +19,6 @@
 
 ## Start Here
 - [Context Governance Policy](./context-governance-policy.ai.md)
+- [Context Asset Lifecycle Guidance](./context-asset-lifecycle.ai.md)
 - [Context Routing Directory](../routing/README.ai.md)
 - [Context Packs Directory](../packs/README.ai.md)
