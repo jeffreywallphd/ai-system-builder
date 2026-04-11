@@ -127,6 +127,7 @@ const REQUIRED_DOCUMENTATION_INDEX_VIEW_HEADINGS = [
 const REQUIRED_DOCUMENTATION_QUALITY_STANDARD_HEADINGS = [
   "## Scope and Enforcement Boundary",
   "## Required Rules (Normative, Enforceable)",
+  "## Rule Severity Levels and Failure Policy",
   "## Documentation Category Rule Scope Matrix",
   "## Category-Specific Enforcement Boundaries",
   "## Recommended Guidance (Non-Blocking)",

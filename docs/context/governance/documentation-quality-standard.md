@@ -22,7 +22,7 @@ related_code_paths:
 
 This standard defines the minimum documentation quality rules AI Loom Studio enforces to keep architecture, context-engineering, ADR, indexing, and segmented guidance trustworthy over time.
 
-This is not a broad prose style manifesto. It is intentionally narrow and enforceable. Required rules are blocking guardrails. Recommended guidance is non-blocking.
+This is not a broad prose style manifesto. It is intentionally narrow and enforceable. Required rules are lintable constraints, but not every lintable issue should block merges.
 
 ## Required Rules (Normative, Enforceable)
 
@@ -56,26 +56,44 @@ This is not a broad prose style manifesto. It is intentionally narrow and enforc
 - Governance and contributor docs must keep "required versus non-required" distinctions explicit where policy language is used.
 - Documents should remain single-purpose by authority role; mixed-purpose authority/history content is not allowed in active canonical guidance.
 
+## Rule Severity Levels and Failure Policy
+
+Use these severity levels for all required rules so linting and CI can report outcomes consistently without over-policing documentation work.
+
+| Severity level | Priority class | Definition | Default CI behavior | Lint output expectation |
+| --- | --- | --- | --- | --- |
+| `critical` | Critical structural failures | Contract, routing, or authority failures that can misroute readers, break discovery/indexing, or invalidate canonical references. | Blocking. Non-zero exit when one or more `critical` findings exist. | Emit as errors with stable rule IDs and path context. |
+| `important` | Important maintainability problems | High-value quality issues that increase drift risk or maintenance cost but do not immediately break core retrieval contracts. | Warning. Zero exit by default, with optional strict mode escalation in dedicated quality campaigns. | Emit as warnings with stable rule IDs and remediation hints. |
+| `advisory` | Lower-severity advisory issues | Readability and consistency guidance that improves contributor experience but is not suitable for deterministic merge blocking. | Non-blocking informational output only. | Emit as advisory/info entries and aggregate in quality summaries. |
+
+Severity assignment contract for future tooling:
+
+- Every enforceable rule must have a stable rule ID and default severity (`critical` or `important`).
+- Recommended guidance maps to `advisory` unless explicitly promoted through governance review.
+- CI exit behavior is severity-driven: fail on `critical`, warn on `important`, report-only on `advisory`.
+- Rule severity can be profile-adjusted for targeted cleanup efforts, but the default repository profile remains pragmatic and warning-first outside structural breakages.
+
 ## Documentation Category Rule Scope Matrix
 
 Use this matrix to determine which required rule groups are enforced per documentation category. This scope mapping is normative for linting and validation implementation.
 
-| Documentation category | Rule groups enforced as blocking | Category-specific scope notes |
-| --- | --- | --- |
-| Architecture docs (`docs/architecture/**/*.md`) | 1, 2, 3, 4, 5 | Full enforcement. Active architecture authority docs must keep metadata integrity, status clarity, routing/index discoverability, and link hygiene. |
-| ADR records (`docs/adr/records/*.md`) | 1, 2, 3, 4 | Full metadata and supersession integrity. ADR decision status and replacement/backlink integrity remain blocking. Readability-shape checks are minimal and template-driven. |
-| Context packs (`docs/context/packs/*.pack.md`) | 1, 2, 3, 4, 5 | Strictest enforcement. Required heading shape, metadata alignment, catalog/contract ID integrity, and authoritative reference resolvability are all blocking. |
-| Routing artifacts (`docs/context/routing/*.md`, `docs/context/routing/*.json`, `docs/context/context-map.json`) | 1, 2, 3, 4, 5 | Strictest enforcement. Task/category IDs, mapping references, route hints, and canonical path targets are blocking because these files drive retrieval behavior. |
-| Contributor docs (`docs/contributors/**/*.md`) | 1, 2, 4, 5 | Metadata and status clarity are blocking. Routing/index cross-reference rules apply only when contributor docs are referenced by registry/routing artifacts. |
-| Operations docs (`docs/operations/**/*.md`) | 1, 2, 4 | Metadata and status clarity are blocking. Routing discipline checks apply only when docs are explicitly indexed/routed. Heading-shape checks are advisory unless contract-critical. |
-| Baselines (`docs/baselines/**/*.md`) | 1, 2, 4 | Must keep explicit baseline/historical status signaling and resolvable references. Routing/index placement is selective and non-universal by design. |
-| Historical or superseded materials (any `status: superseded` or under historical/baseline legacy paths) | 1, 2, 4 | Reduced enforcement to avoid false positives. Require valid metadata, explicit supersession/redirect signals, and resolvable replacement pointers; do not require active-router placement or modern readability shape. |
+| Documentation category | Rule groups in scope | Default severity profile | Category-specific scope notes |
+| --- | --- | --- | --- |
+| Architecture docs (`docs/architecture/**/*.md`) | 1, 2, 3, 4, 5 | `critical` for Groups 1-4; `important` for Group 5 | Active architecture authority docs must keep metadata integrity, status clarity, routing/index discoverability, and link hygiene. |
+| ADR records (`docs/adr/records/*.md`) | 1, 2, 3, 4 | `critical` for Groups 1-4 | Full metadata and supersession integrity. ADR decision status and replacement/backlink integrity remain blocking. Readability-shape checks are minimal and template-driven. |
+| Context packs (`docs/context/packs/*.pack.md`) | 1, 2, 3, 4, 5 | `critical` for Groups 1-5 | Strictest enforcement. Required heading shape, metadata alignment, catalog/contract ID integrity, and authoritative reference resolvability are all blocking. |
+| Routing artifacts (`docs/context/routing/*.md`, `docs/context/routing/*.json`, `docs/context/context-map.json`) | 1, 2, 3, 4, 5 | `critical` for Groups 1-5 | Strictest enforcement. Task/category IDs, mapping references, route hints, and canonical path targets are blocking because these files drive retrieval behavior. |
+| Contributor docs (`docs/contributors/**/*.md`) | 1, 2, 4, 5 | `critical` for Groups 1-2; `important` for Groups 4-5 | Metadata and status clarity are blocking. Routing/index cross-reference rules apply only when contributor docs are referenced by registry/routing artifacts. |
+| Operations docs (`docs/operations/**/*.md`) | 1, 2, 4 | `critical` for Groups 1-2; `important` for Group 4 | Metadata and status clarity are blocking. Routing discipline checks apply only when docs are explicitly indexed/routed. Heading-shape checks are advisory unless contract-critical. |
+| Baselines (`docs/baselines/**/*.md`) | 1, 2, 4 | `critical` for Groups 1-2; `important` for Group 4 | Must keep explicit baseline/historical status signaling and resolvable references. Routing/index placement is selective and non-universal by design. |
+| Historical or superseded materials (any `status: superseded` or under historical/baseline legacy paths) | 1, 2, 4 | `critical` for metadata and redirect integrity; `important` for non-blocking hygiene checks | Reduced enforcement to avoid false positives. Require valid metadata, explicit supersession/redirect signals, and resolvable replacement pointers; do not require active-router placement or modern readability shape. |
 
 ## Category-Specific Enforcement Boundaries
 
 - Keep enforcement profile selection path-first and status-aware: select category by repository path, then apply status (`active`, `superseded`, `archived`) narrowing rules.
 - Treat context packs and routing artifacts as high-risk retrieval assets; apply strict metadata, contract, and heading checks by default.
 - Treat archival and superseded material as reference history, not active authority: validate identity and redirect integrity without requiring active discoverability placement.
+- Default to warning-level enforcement (`important`) for maintainability issues in contributor and operations docs unless the issue breaks a contract.
 - Avoid category drift in future linting work by encoding this matrix directly in validator configuration, not ad hoc file-by-file exceptions.
 
 ## Recommended Guidance (Non-Blocking)
@@ -89,23 +107,23 @@ Use this matrix to determine which required rule groups are enforced per documen
 
 Use the following translation model when adding linting and validation:
 
-- Enforce now with blocking checks:
+- Enforce now with `critical` blocking checks:
   - File presence and pairing contracts.
   - Frontmatter shape and taxonomy enums.
   - Required heading anchors for core policy/contract docs.
   - Path/reference resolvability in high-value routing and registry artifacts.
   - Supersession redirect integrity and active-router hygiene.
-- Enforce with low-cost incremental checks next:
+- Enforce with low-cost incremental `important` warning checks next:
   - Additional heading/anchor checks for newly introduced governance standards.
   - Companion metadata consistency across newly scoped doc families.
   - Focused anti-mixed-authority detection in explicitly scoped active docs.
-- Keep manual review only (non-blocking):
+- Keep manual review only (`advisory`, non-blocking):
   - Writing tone, pedagogy depth, and narrative flow.
   - Domain-specific examples that are useful but not contract-critical.
 
 ## Governance and Change Control
 
-- Treat this document as the canonical quality baseline for Story 7.1.1, Story 7.1.2, and downstream enforcement stories.
+- Treat this document as the canonical quality baseline for Story 7.1.1, Story 7.1.2, Story 7.1.3, and downstream enforcement stories.
 - Any change to required rules must be accompanied by corresponding validator or guardrail test updates in the same pull request.
 - If a proposed requirement cannot be translated into a lightweight deterministic check, place it under recommended guidance instead of required rules.
 - Keep `.md` and `.ai.md` versions aligned whenever this standard changes.
