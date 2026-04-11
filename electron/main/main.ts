@@ -1,3 +1,6 @@
+/**
+ * Electron main-process entrypoint that initializes startup contracts, registers IPC surfaces, and composes deferred desktop runtimes.
+ */
 import started from "electron-squirrel-startup";
 import fs from "node:fs";
 import path from "node:path";
@@ -84,6 +87,9 @@ const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:51
 const preloadScriptPath = resolvePreloadScriptPath();
 validateDesktopStartupContract();
 
+/**
+ * Resolves the preload bundle path by probing packaged and development output locations in priority order.
+ */
 function resolvePreloadScriptPath(): string {
   const preloadCandidates = [
     path.join(__dirname, "preload.cjs"),
@@ -98,11 +104,15 @@ function resolvePreloadScriptPath(): string {
   return resolvedPath;
 }
 
+/**
+ * Installs response-header middleware that injects the renderer Content Security Policy for every main-session response.
+ */
 function installRendererContentSecurityPolicy(): void {
   const resolvePolicy = createRendererContentSecurityPolicyResolver({
     rendererDevUrl,
     getRuntimeConfig: () => rendererContentSecurityPolicyRuntimeConfig,
   });
+  // Intercepts renderer responses to attach the latest CSP header resolved from current runtime config.
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = details.responseHeaders ? { ...details.responseHeaders } : {};
     responseHeaders["Content-Security-Policy"] = [resolvePolicy()];
@@ -165,6 +175,9 @@ type AuthShellBootstrapResult = {
   readonly identityApiBaseUrl: string;
 };
 
+/**
+ * Lazily imports and memoizes the deferred feature runtime factory so startup can defer heavy module loading until needed.
+ */
 async function ensureDeferredDesktopFeatureRuntimeFactory(): Promise<(
   options: {
     readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
@@ -180,6 +193,9 @@ async function ensureDeferredDesktopFeatureRuntimeFactory(): Promise<(
   return deferredDesktopFeatureRuntimeFactory;
 }
 
+/**
+ * Marks post-login runtime status as unavailable with the supplied reason for renderer-visible diagnostics.
+ */
 function markPostLoginRuntimeUnavailable(reason: DesktopPostLoginRuntimeUnavailableReason): void {
   postLoginRuntimeStatus = Object.freeze({
     state: DesktopPostLoginRuntimeStates.unavailable,
@@ -188,6 +204,9 @@ function markPostLoginRuntimeUnavailable(reason: DesktopPostLoginRuntimeUnavaila
   });
 }
 
+/**
+ * Marks post-login runtime status as warming and records activation metadata from the triggering request.
+ */
 function markPostLoginRuntimeWarming(request: DesktopPostLoginWarmupRequest): void {
   postLoginRuntimeStatus = Object.freeze({
     state: DesktopPostLoginRuntimeStates.warming,
@@ -200,6 +219,9 @@ function markPostLoginRuntimeWarming(request: DesktopPostLoginWarmupRequest): vo
   });
 }
 
+/**
+ * Marks post-login runtime status as ready after deferred feature services and IPC registrations complete.
+ */
 function markPostLoginRuntimeReady(): void {
   postLoginRuntimeStatus = Object.freeze({
     ...postLoginRuntimeStatus,
@@ -209,6 +231,9 @@ function markPostLoginRuntimeReady(): void {
   });
 }
 
+/**
+ * Marks post-login runtime status as failed and captures retryable failure context for renderer recovery UX.
+ */
 function markPostLoginRuntimeFailed(request: DesktopPostLoginWarmupRequest, error: unknown): void {
   const message = error instanceof Error ? error.message : "Post-login runtime warmup failed.";
   postLoginRuntimeStatus = Object.freeze({
@@ -227,6 +252,9 @@ function markPostLoginRuntimeFailed(request: DesktopPostLoginWarmupRequest, erro
   });
 }
 
+/**
+ * Builds a synthetic connectivity payload used before live monitoring starts so auth bootstrap can expose stable state.
+ */
 function createDeferredConnectivityState(detail?: string): {
   readonly state: "connecting";
   readonly stale: false;
@@ -247,6 +275,9 @@ function createDeferredConnectivityState(detail?: string): {
   });
 }
 
+/**
+ * Returns connectivity state serialized for auth IPC callers, including deferred placeholders before monitoring is active.
+ */
 function getConnectivityStateForAuthBootstrapIpc(): string {
   if (!desktopConnectivityMonitoringStarted) {
     return JSON.stringify(createDeferredConnectivityState(DeferredConnectivityStateDetail));
@@ -255,6 +286,9 @@ function getConnectivityStateForAuthBootstrapIpc(): string {
   return JSON.stringify(state);
 }
 
+/**
+ * Applies deliberate offline-mode toggles from auth IPC and returns the resulting serialized connectivity state.
+ */
 function setConnectivityOfflineModeForAuthBootstrapIpc(requestJson: string): string {
   const request = JSON.parse(requestJson) as { readonly active?: boolean; readonly detail?: string };
   if (!desktopConnectivityMonitoringStarted || !desktopConnectivityStateService) {
@@ -264,6 +298,9 @@ function setConnectivityOfflineModeForAuthBootstrapIpc(requestJson: string): str
   return JSON.stringify(state);
 }
 
+/**
+ * Starts background connectivity probes against identity services once post-login warmup is underway.
+ */
 function startDesktopConnectivityMonitoring(identityApiBaseUrl: string): void {
   if (desktopConnectivityMonitoringStarted) {
     return;
@@ -271,18 +308,25 @@ function startDesktopConnectivityMonitoring(identityApiBaseUrl: string): void {
   if (!desktopConnectivityStateService) {
     desktopConnectivityStateService = new DesktopConnectivityStateService();
   }
+  // Supplies token lookup backing for probe requests so monitoring can observe authenticated connectivity state.
   desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl, (key) => storageDatabase?.getItem(key) ?? null), {
     intervalMs: 3_000,
   });
   desktopConnectivityMonitoringStarted = true;
 }
 
+/**
+ * Stops and disposes connectivity monitoring resources during shutdown or runtime reset.
+ */
 function stopDesktopConnectivityMonitoring(): void {
   desktopConnectivityStateService?.stopMonitoring();
   desktopConnectivityMonitoringStarted = false;
   desktopConnectivityStateService = undefined;
 }
 
+/**
+ * Builds a renderer query-string fragment from optional parameters while omitting undefined values.
+ */
 function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -295,6 +339,9 @@ function createRendererSearch(params: Record<string, string | undefined>): strin
   return serialized ? `?${serialized}` : undefined;
 }
 
+/**
+ * Composes the desktop agent runner with tool catalogs, executors, and memory services backed by local storage.
+ */
 function createDesktopAgentRunner(params: {
   readonly assetSystemRepository: SqliteAssetSystemRepository;
   readonly sessionRepository: SqliteAgentExecutionSessionRepository;
@@ -332,6 +379,9 @@ function createDesktopAgentRunner(params: {
   );
 }
 
+/**
+ * Lazily creates and caches the Agent Studio backend API dependencies for deferred feature IPC domains.
+ */
 function ensureAgentStudioBackendApi(
   storagePaths: ReturnType<typeof resolveDesktopStoragePaths>,
 ): AgentStudioBackendApi {
@@ -350,6 +400,9 @@ function ensureAgentStudioBackendApi(
   return agentStudioBackendApi;
 }
 
+/**
+ * Creates the primary desktop BrowserWindow, loads renderer content, and reveals the window when ready.
+ */
 async function createMainWindow(): Promise<void> {
   const mainWindowCreateStartedAt = logInitializationStart(DesktopStartupPhases.mainWindowCreation);
   const window = new BrowserWindow({
@@ -365,6 +418,7 @@ async function createMainWindow(): Promise<void> {
   });
 
   mainWindow = window;
+  // Waits for first paint milestone before maximizing/showing the main window to avoid visual flash.
   window.once("ready-to-show", () => {
     logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show", mainWindowCreateStartedAt);
     logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show");
@@ -382,6 +436,9 @@ async function createMainWindow(): Promise<void> {
   }
 }
 
+/**
+ * Loads the renderer root page from packaged assets or dev server, applying optional launch search params.
+ */
 async function loadRendererRoot(window: BrowserWindow, search?: string): Promise<void> {
   const runtimeConfig = bootstrapContext?.runtimeConfig;
   if (runtimeConfig?.rendererDeliveryMode === RendererDeliveryModes.packagedAssets) {
@@ -401,6 +458,9 @@ async function loadRendererRoot(window: BrowserWindow, search?: string): Promise
   }
 }
 
+/**
+ * Launches or reuses a runtime window described by the serialized system-runtime launch contract.
+ */
 async function launchRuntimeWindowFromContract(
   launchContractJson: string,
 ): Promise<LaunchSystemRuntimeWindowReadModel> {
@@ -444,6 +504,7 @@ async function launchRuntimeWindowFromContract(
     },
   });
 
+  // Reveals the runtime window only after content is ready to avoid partially rendered first paint.
   runtimeWindow.once("ready-to-show", () => runtimeWindow.show());
   const search = createRendererSearch({
     [SystemRuntimeWindowLaunchQueryParam]: launchContractJson,
@@ -456,6 +517,7 @@ async function launchRuntimeWindowFromContract(
 
   if (reuseWindowKey) {
     runtimeWindowByReuseKey.set(reuseWindowKey, runtimeWindow);
+    // Ensures reuse-key mapping is cleaned up when a reused runtime window is closed.
     runtimeWindow.on("closed", () => {
       runtimeWindowByReuseKey.delete(reuseWindowKey);
     });
@@ -471,6 +533,9 @@ async function launchRuntimeWindowFromContract(
   });
 }
 
+/**
+ * Creates and memoizes canonical registry runtime services used by deferred registry and inspection surfaces.
+ */
 async function ensureCanonicalRegistryRuntime(
   storagePaths: ReturnType<typeof resolveDesktopStoragePaths>,
 ): Promise<CanonicalRegistryRuntime> {
@@ -595,6 +660,9 @@ async function ensureCanonicalRegistryRuntime(
   return canonicalRegistryRuntime;
 }
 
+/**
+ * Builds immutable auth bootstrap context shared with renderer preload surfaces and auth IPC handlers.
+ */
 function buildBootstrapContext(params: {
   readonly runtimeConfig: AppRuntimeConfig;
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
@@ -613,6 +681,9 @@ function buildBootstrapContext(params: {
   });
 }
 
+/**
+ * Projects full runtime config values to the reduced auth-bootstrap runtime contract exposed before post-login warmup.
+ */
 function projectDesktopAuthBootstrapRuntimeConfig(values: AppRuntimeConfigValues): DesktopAuthBootstrapRuntimeConfig {
   return Object.freeze({
     runtimeMode: values.runtimeMode,
@@ -634,6 +705,9 @@ function projectDesktopAuthBootstrapRuntimeConfig(values: AppRuntimeConfigValues
   });
 }
 
+/**
+ * Registers pre-login auth bootstrap IPC channels once and wires storage, secrets, connectivity, and warmup hooks.
+ */
 function registerAuthIpc(): void {
   if (authIpcRegistered) {
     return;
@@ -641,27 +715,38 @@ function registerAuthIpc(): void {
   authIpcRegistered = true;
   registerAuthBootstrapIpc({
     ipcMain,
+    // Supplies immutable bootstrap context required by auth preload APIs.
     getBootstrapContext: () => bootstrapContext,
     storage: {
+      // Reads persisted bootstrap storage values used by auth-shell workflows.
       getItem: (key: string) => storageDatabase?.getItem(key) ?? null,
+      // Persists bootstrap storage values from renderer auth operations.
       setItem: (key: string, value: string) => {
         storageDatabase?.setItem(key, value);
       },
+      // Removes bootstrap storage keys requested by renderer auth operations.
       removeItem: (key: string) => {
         storageDatabase?.removeItem(key);
       },
     },
+    // Reports deferred-feature IPC readiness to control renderer feature gating.
     isDeferredFeatureIpcReady: () => deferredFeatureIpcReady,
+    // Returns lifecycle status of post-login runtime warmup.
     getPostLoginRuntimeStatus: () => postLoginRuntimeStatus,
+    // Handles explicit renderer requests to start post-login warmup.
     startPostLoginWarmup: async (request: DesktopPostLoginWarmupRequest) => {
       await ensurePostLoginWarmupStarted(request);
     },
     connectivity: {
+      // Returns current serialized connectivity state for auth surfaces.
       getState: () => getConnectivityStateForAuthBootstrapIpc(),
+      // Applies deliberate offline-mode transitions for auth surfaces.
       setOfflineMode: (requestJson: string) => setConnectivityOfflineModeForAuthBootstrapIpc(requestJson),
     },
     secrets: {
+      // Indicates whether OS-backed encryption services are currently available.
       isAvailable: () => safeStorage.isEncryptionAvailable(),
+      // Decrypts and returns a secret value from storage if available.
       getSecret: (key: string) => {
         const encoded = storageDatabase?.getItem(`secure:${key}`) ?? null;
         if (!encoded) {
@@ -673,6 +758,7 @@ function registerAuthIpc(): void {
           return null;
         }
       },
+      // Encrypts and stores a secret value when platform encryption is available.
       setSecret: (key: string, value: string) => {
         if (!safeStorage.isEncryptionAvailable()) {
           return;
@@ -680,6 +766,7 @@ function registerAuthIpc(): void {
         const encrypted = safeStorage.encryptString(value).toString("base64");
         storageDatabase?.setItem(`secure:${key}`, encrypted);
       },
+      // Removes a previously stored encrypted secret value.
       removeSecret: (key: string) => {
         storageDatabase?.removeItem(`secure:${key}`);
       },
@@ -687,6 +774,9 @@ function registerAuthIpc(): void {
   });
 }
 
+/**
+ * Bootstraps pre-login runtime infrastructure, including storage, identity host, runtime config, and auth IPC.
+ */
 async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
   const authShellStartedAt = logInitializationStart(DesktopStartupPhases.preLoginAuthShellBootstrap);
   logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "start");
@@ -761,6 +851,9 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
   }
 }
 
+/**
+ * Registers deferred feature IPC domains a single time and updates lifecycle status when registration succeeds.
+ */
 function registerDeferredFeatureIpc(register: () => void): void {
   if (deferredFeatureIpcRegistered) {
     return;
@@ -777,10 +870,16 @@ function registerDeferredFeatureIpc(register: () => void): void {
   }
 }
 
+/**
+ * Formats a compact post-login warmup request string for startup diagnostics logging.
+ */
 function formatPostLoginWarmupRequestLog(request: DesktopPostLoginWarmupRequest): string {
   return `source=${request.triggerSource}${request.requestedAt ? ` requestedAt=${request.requestedAt}` : ""}`;
 }
 
+/**
+ * Starts post-login warmup once, deduplicates concurrent requests, and handles failure shutdown semantics.
+ */
 async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupRequest): Promise<void> {
   console.info(`[ai-loom] Post-login warmup requested (${formatPostLoginWarmupRequestLog(request)}).`);
   if (postLoginBootstrapPromise) {
@@ -826,6 +925,9 @@ type PostLoginRuntimeComposition = {
   readonly featureRuntime: DeferredDesktopFeatureRuntime;
 };
 
+/**
+ * Composes post-login runtime dependencies (python, service supervisor, config, deferred runtime container).
+ */
 async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, bootstrapStartedAt: number): Promise<PostLoginRuntimeComposition> {
   const { storagePaths, identityApiBaseUrl } = authShell;
   if (!storageDatabase) {
@@ -915,10 +1017,14 @@ async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, boot
   });
 }
 
+/**
+ * Exposes lazy feature-resolver functions used by deferred IPC domains to load expensive services on demand.
+ */
 function createOnDemandFeatureCompositionPaths(params: {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
   readonly featureRuntime: DeferredDesktopFeatureRuntime;
 }): OnDemandFeatureCompositionPaths {
+  // Each resolver lazily constructs/accesses a deferred feature service only when its IPC domain is exercised.
   return Object.freeze({
     getWorkflowPersistence: () => params.featureRuntime.ensureWorkflowPersistence(),
     getExecutionHistory: () => params.featureRuntime.ensureExecutionHistory(),
@@ -931,12 +1037,16 @@ function createOnDemandFeatureCompositionPaths(params: {
   });
 }
 
+/**
+ * Completes post-login bootstrap by composing runtime dependencies and registering deferred IPC domains.
+ */
 async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
   const bootstrapStartedAt = logInitializationStart(DesktopStartupPhases.postLoginWarmup);
   try {
     logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "start");
     const runtimeComposition = await composePostLoginRuntime(authShell, bootstrapStartedAt);
     const { storagePaths, runtimeConfig, pythonRuntime, featureRuntime } = runtimeComposition;
+    // Registers deferred IPC only after core post-login services are composed and ready.
     registerDeferredFeatureIpc(() => {
       const onDemand = createOnDemandFeatureCompositionPaths({ storagePaths, featureRuntime });
       registerDeferredFeatureIpcDomains({
@@ -960,6 +1070,9 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
   }
 }
 
+/**
+ * Stops hosts/services and clears cached runtime resources so shutdown and fatal-error recovery are clean.
+ */
 async function disposeDesktopRuntimeResources(): Promise<void> {
   isDesktopRuntimeDisposing = true;
   markPostLoginRuntimeUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
@@ -993,10 +1106,12 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   isDesktopRuntimeDisposing = false;
 }
 
+// Bootstraps desktop host lifecycle after Electron app readiness and manages first-window activation behavior.
 app.whenReady().then(async () => {
   const desktopHostStartupAt = logInitializationStart(DesktopStartupPhases.hostBootstrap);
   try {
     desktopHostRuntime = await startDesktopHostAssembly({
+      // Starts pre-login auth shell first, then opens the renderer window with bootstrap IPC available.
       startHost: async () => {
         try {
           logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-start", desktopHostStartupAt);
@@ -1029,22 +1144,27 @@ app.whenReady().then(async () => {
     logInitializationEnd(DesktopStartupPhases.hostBootstrap, desktopHostStartupAt);
   }
 
+  // Recreates the main window when the dock icon is activated and no windows are currently open.
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       await createMainWindow();
     }
   });
-}).catch((error) => {
-  console.error("Failed to bootstrap desktop host", error);
-  app.exit(1);
-});
+})
+  // Fails fast when desktop host bootstrap cannot complete.
+  .catch((error) => {
+    console.error("Failed to bootstrap desktop host", error);
+    app.exit(1);
+  });
 
+// Quits the app when all windows close on non-macOS platforms.
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
+// Ensures host runtime stop hooks complete before process quit finalizes.
 app.on("before-quit", async () => {
   await desktopHostRuntime?.stop();
 });

@@ -1,3 +1,6 @@
+/**
+ * Registers IPC handlers for studio shell lifecycle operations and validates payloads before forwarding to shell/runtime services.
+ */
 import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../../src/application/studio-shell/contracts";
 import type { StudioShellBackendApi } from "../../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { StudioShellIpcRegistrationParams } from "./IpcRegistrationTypes";

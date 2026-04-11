@@ -1,3 +1,6 @@
+/**
+ * Desktop trust bootstrap coordinator for loading trust material, persisting consent state, and exposing trust-aware startup primitives.
+ */
 import process from "node:process";
 import { safeStorage } from "electron";
 import type { DesktopIdentityTransportTrustBootstrap } from "../shared/DesktopContracts";

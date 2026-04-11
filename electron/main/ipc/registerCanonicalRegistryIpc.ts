@@ -1,3 +1,6 @@
+/**
+ * Registers canonical registry IPC handlers used by the renderer to browse, create, and manage local registry-backed assets.
+ */
 import type { CanonicalRegistryIpcRegistrationParams } from "./IpcRegistrationTypes";
 
 export function registerCanonicalRegistryIpc(params: CanonicalRegistryIpcRegistrationParams): void {

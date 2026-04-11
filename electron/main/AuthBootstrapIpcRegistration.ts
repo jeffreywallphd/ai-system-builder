@@ -1,3 +1,6 @@
+/**
+ * Registers authentication bootstrap IPC channels required to initialize renderer auth state and session metadata.
+ */
 import type { IpcMain } from "electron";
 import {
   DesktopPostLoginWarmupTriggerSources,

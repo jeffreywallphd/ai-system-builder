@@ -1,3 +1,6 @@
+/**
+ * Shared desktop contract types and runtime validators used across main, preload, and renderer boundaries.
+ */
 import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 import type { CanonicalEntityType } from "../../src/application/ports/interfaces/ICanonicalAssetIdentityRepository";
 

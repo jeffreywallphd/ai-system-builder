@@ -1,3 +1,6 @@
+/**
+ * Factory helpers for the studio shell preload bridge, including launch, process, and stream APIs that proxy renderer requests to IPC.
+ */
 import type { DesktopIpcRendererLike } from "./types";
 
 export function createStudioShellBridge({ ipcRenderer }: { ipcRenderer: DesktopIpcRendererLike }) {

@@ -1,3 +1,6 @@
+/**
+ * Security-focused tests that verify renderer CSP generation rules and expected directive hardening defaults.
+ */
 import { describe, expect, it } from "bun:test";
 import type { AppRuntimeConfigValues } from "../../../src/infrastructure/config/AppRuntimeConfig";
 import {

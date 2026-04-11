@@ -1,3 +1,6 @@
+/**
+ * Defines and validates the startup contract used to safely exchange initialization context between desktop process boundaries.
+ */
 import { DesktopBootstrapIpcChannels } from "../shared/DesktopBootstrapIpcChannels";
 
 export const DesktopStartupPhases = Object.freeze({
