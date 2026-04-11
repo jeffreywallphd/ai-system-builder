@@ -25,6 +25,8 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/context-asset-metadata.contract.json",
   "docs/context/documentation-indexing-model.md",
   "docs/context/documentation-indexing-model.ai.md",
+  "docs/context/documentation-index-coverage-rules.md",
+  "docs/context/documentation-index-coverage-rules.ai.md",
   "docs/context/documentation-indexed-document-metadata.md",
   "docs/context/documentation-indexed-document-metadata.ai.md",
   "docs/context/documentation-indexed-document-metadata.contract.json",
@@ -78,6 +80,25 @@ const REQUIRED_DOCUMENTATION_INDEXING_MODEL_AI_HEADINGS = [
   "## Relationship Contract",
   "## Non-Goals",
   "## Complexity Target",
+];
+
+const REQUIRED_DOCUMENTATION_INDEX_COVERAGE_RULES_HEADINGS = [
+  "## Coverage Modes",
+  "## Coverage Policy By Category",
+  "## Inclusion Rules",
+  "## Selective Indexing Rules",
+  "## Exclusion Rules",
+  "## Status and Authoritativeness Expectations",
+  "## Registry Representation Rules",
+];
+
+const REQUIRED_DOCUMENTATION_INDEX_COVERAGE_RULES_AI_HEADINGS = [
+  "## Coverage Modes",
+  "## Required Categories",
+  "## Selective Categories",
+  "## Excluded Categories",
+  "## Status and Authority Rules",
+  "## Registry Contract",
 ];
 
 const REQUIRED_ADR_FILES = [
@@ -367,6 +388,34 @@ function validateDocsFoundation(repoRoot) {
           issues,
           "DOCUMENTATION_INDEX_MODEL_INVALID",
           `docs/context/documentation-indexing-model.ai.md is missing required heading '${heading}'.`,
+        );
+      }
+    }
+  }
+
+  const documentationIndexCoverageRulesPath = resolve(repoRoot, "docs/context/documentation-index-coverage-rules.md");
+  if (existsSync(documentationIndexCoverageRulesPath)) {
+    const content = readFileSync(documentationIndexCoverageRulesPath, "utf8");
+    for (const heading of REQUIRED_DOCUMENTATION_INDEX_COVERAGE_RULES_HEADINGS) {
+      if (!content.includes(heading)) {
+        addIssue(
+          issues,
+          "DOCUMENTATION_INDEX_COVERAGE_RULES_INVALID",
+          `docs/context/documentation-index-coverage-rules.md is missing required heading '${heading}'.`,
+        );
+      }
+    }
+  }
+
+  const documentationIndexCoverageRulesAiPath = resolve(repoRoot, "docs/context/documentation-index-coverage-rules.ai.md");
+  if (existsSync(documentationIndexCoverageRulesAiPath)) {
+    const content = readFileSync(documentationIndexCoverageRulesAiPath, "utf8");
+    for (const heading of REQUIRED_DOCUMENTATION_INDEX_COVERAGE_RULES_AI_HEADINGS) {
+      if (!content.includes(heading)) {
+        addIssue(
+          issues,
+          "DOCUMENTATION_INDEX_COVERAGE_RULES_INVALID",
+          `docs/context/documentation-index-coverage-rules.ai.md is missing required heading '${heading}'.`,
         );
       }
     }
@@ -677,6 +726,130 @@ function validateDocsFoundation(repoRoot) {
             "CONTEXT_REGISTRY_INVALID",
             `docs/context/documentation-registry.seed.json discoveryIndex.${indexName} must be an object map.`,
           );
+        }
+      }
+    }
+
+    const coveragePolicy = documentationRegistry.coveragePolicy;
+    if (
+      !coveragePolicy
+      || typeof coveragePolicy !== "object"
+      || Array.isArray(coveragePolicy)
+    ) {
+      issues.push({
+        code: "CONTEXT_REGISTRY_INVALID",
+        message: "docs/context/documentation-registry.seed.json must include coveragePolicy object.",
+      });
+    } else {
+      if (coveragePolicy.schemaVersion !== "1.0.0") {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          "docs/context/documentation-registry.seed.json coveragePolicy.schemaVersion must be '1.0.0'.",
+        );
+      }
+
+      for (const [fieldName, expectedPath] of [
+        ["canonicalHumanSpecPath", "docs/context/documentation-index-coverage-rules.md"],
+        ["canonicalAiSpecPath", "docs/context/documentation-index-coverage-rules.ai.md"],
+      ]) {
+        if (coveragePolicy[fieldName] !== expectedPath) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json coveragePolicy.${fieldName} must equal '${expectedPath}'.`,
+          );
+        } else if (!pathExistsForReference(repoRoot, expectedPath)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json coveragePolicy.${fieldName} references missing path '${expectedPath}'.`,
+          );
+        }
+      }
+
+      const requiredCategories = coveragePolicy.requiredCategories;
+      const selectiveCategories = coveragePolicy.selectiveCategories;
+      const excludedCategories = coveragePolicy.excludedCategories;
+      const categoryRules = coveragePolicy.categoryRules;
+
+      for (const [fieldName, allowEmpty] of [
+        ["requiredCategories", false],
+        ["selectiveCategories", false],
+        ["excludedCategories", false],
+      ]) {
+        const categories = coveragePolicy[fieldName];
+        if (!isArrayOfNonEmptyStrings(categories, { allowEmpty })) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json coveragePolicy.${fieldName} must be a non-empty string array.`,
+          );
+        }
+      }
+
+      if (
+        !categoryRules
+        || typeof categoryRules !== "object"
+        || Array.isArray(categoryRules)
+      ) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          "docs/context/documentation-registry.seed.json coveragePolicy.categoryRules must be an object map.",
+        );
+      } else {
+        const allCategoryIds = new Set([
+          ...(Array.isArray(requiredCategories) ? requiredCategories : []),
+          ...(Array.isArray(selectiveCategories) ? selectiveCategories : []),
+          ...(Array.isArray(excludedCategories) ? excludedCategories : []),
+        ]);
+
+        for (const categoryId of allCategoryIds) {
+          const rule = categoryRules[categoryId];
+          if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json coveragePolicy.categoryRules must include object for '${categoryId}'.`,
+            );
+            continue;
+          }
+
+          if (!isNonEmptyString(rule.coverageMode) || !new Set(["required", "selective", "excluded"]).has(rule.coverageMode)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json coveragePolicy.categoryRules['${categoryId}'].coverageMode must be required|selective|excluded.`,
+            );
+          }
+
+          if (!isArrayOfNonEmptyStrings(rule.includePaths)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json coveragePolicy.categoryRules['${categoryId}'].includePaths must be a non-empty string array.`,
+            );
+          }
+
+          if (!isNonEmptyString(rule.representation)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json coveragePolicy.categoryRules['${categoryId}'].representation must be a non-empty string.`,
+            );
+          }
+
+          for (const fieldName of ["expectedStatus", "expectedAuthoritativeness"]) {
+            const expectedValues = rule[fieldName];
+            if (!Array.isArray(expectedValues) || !expectedValues.every((value) => isNonEmptyString(value))) {
+              addIssue(
+                issues,
+                "CONTEXT_REGISTRY_INVALID",
+                `docs/context/documentation-registry.seed.json coveragePolicy.categoryRules['${categoryId}'].${fieldName} must be a string array.`,
+              );
+            }
+          }
         }
       }
     }

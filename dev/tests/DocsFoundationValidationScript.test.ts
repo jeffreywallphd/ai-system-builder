@@ -144,6 +144,28 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("documentation-indexing-model.md is missing required heading '## Goals'.");
   });
 
+  it("detects missing required headings in documentation index coverage rules", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-index-coverage-rules-shape-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const coverageRulesPath = join(fixtureRoot, "docs", "context", "documentation-index-coverage-rules.md");
+    const coverageRulesContent = readFileSync(coverageRulesPath, "utf8").replace(
+      "## Inclusion Rules",
+      "## Inclusion Guidance",
+    );
+    writeFileSync(coverageRulesPath, coverageRulesContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[DOCUMENTATION_INDEX_COVERAGE_RULES_INVALID]");
+    expect(combinedOutput).toContain("documentation-index-coverage-rules.md is missing required heading '## Inclusion Rules'.");
+  });
+
   it("detects invalid indexed document metadata contract shape", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-indexed-metadata-contract-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });

@@ -22,6 +22,7 @@
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.md)
 - [Documentation Indexing Model and Goals](./documentation-indexing-model.md)
+- [Documentation Index Coverage Rules](./documentation-index-coverage-rules.md)
 - [Standard Indexed Document Metadata Contract](./documentation-indexed-document-metadata.md)
 - [Documentation Registry Structure](./documentation-registry.md)
 - [Documentation Identity, Stable Keys, and Reference Conventions](./documentation-identity-and-reference-conventions.md)

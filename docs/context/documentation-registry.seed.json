@@ -69,6 +69,173 @@
       "decision-records"
     ]
   },
+  "coveragePolicy": {
+    "schemaVersion": "1.0.0",
+    "canonicalHumanSpecPath": "docs/context/documentation-index-coverage-rules.md",
+    "canonicalAiSpecPath": "docs/context/documentation-index-coverage-rules.ai.md",
+    "requiredCategories": [
+      "active-architecture",
+      "active-contributors",
+      "active-operations",
+      "context-packs",
+      "adr-records"
+    ],
+    "selectiveCategories": [
+      "baselines",
+      "superseded-and-historical"
+    ],
+    "excludedCategories": [
+      "router-readmes",
+      "templates",
+      "prompt-helpers",
+      "ai-companion-duplicates"
+    ],
+    "categoryRules": {
+      "active-architecture": {
+        "coverageMode": "required",
+        "includePaths": [
+          "docs/architecture"
+        ],
+        "representation": "Index canonical architecture-overview and architecture-reference docs that define active system boundaries.",
+        "expectedStatus": [
+          "active"
+        ],
+        "expectedAuthoritativeness": [
+          "canonical",
+          "reference"
+        ]
+      },
+      "active-contributors": {
+        "coverageMode": "required",
+        "includePaths": [
+          "docs/contributors"
+        ],
+        "representation": "Index contributor-guide docs that govern active implementation workflows and review guardrails.",
+        "expectedStatus": [
+          "active"
+        ],
+        "expectedAuthoritativeness": [
+          "canonical",
+          "reference"
+        ]
+      },
+      "active-operations": {
+        "coverageMode": "required",
+        "includePaths": [
+          "docs/operations",
+          "docs"
+        ],
+        "representation": "Index operational runbooks and diagnostics guidance used for current runtime operation.",
+        "expectedStatus": [
+          "active"
+        ],
+        "expectedAuthoritativeness": [
+          "canonical",
+          "reference"
+        ]
+      },
+      "context-packs": {
+        "coverageMode": "required",
+        "includePaths": [
+          "docs/context/packs"
+        ],
+        "representation": "Index curated context packs as reusable routing anchors instead of indexing every supporting context artifact.",
+        "expectedStatus": [
+          "active"
+        ],
+        "expectedAuthoritativeness": [
+          "canonical",
+          "supplemental"
+        ]
+      },
+      "adr-records": {
+        "coverageMode": "required",
+        "includePaths": [
+          "docs/adr/records"
+        ],
+        "representation": "Index ADR entries for active and superseded decision lineage, with status and linkage preserved.",
+        "expectedStatus": [
+          "active",
+          "superseded",
+          "deprecated"
+        ],
+        "expectedAuthoritativeness": [
+          "canonical",
+          "historical"
+        ]
+      },
+      "baselines": {
+        "coverageMode": "selective",
+        "includePaths": [
+          "docs/baselines",
+          "docs/documentation-migration-baseline.md",
+          "docs/documentation-segmentation-migration-inventory.md"
+        ],
+        "representation": "Index only durable baseline anchors and migration references; avoid exhaustive snapshot-by-snapshot indexing.",
+        "expectedStatus": [
+          "active",
+          "archived"
+        ],
+        "expectedAuthoritativeness": [
+          "historical"
+        ]
+      },
+      "superseded-and-historical": {
+        "coverageMode": "selective",
+        "includePaths": [
+          "docs/architecture",
+          "docs/contributors",
+          "docs/operations",
+          "docs/ui"
+        ],
+        "representation": "Index only curated superseded pointers or historical stubs when needed for redirects, traceability, or compliance.",
+        "expectedStatus": [
+          "superseded",
+          "deprecated",
+          "archived"
+        ],
+        "expectedAuthoritativeness": [
+          "historical"
+        ]
+      },
+      "router-readmes": {
+        "coverageMode": "excluded",
+        "includePaths": [
+          "docs/**/README.md"
+        ],
+        "representation": "Router files remain navigation wrappers and should not be indexed as authority records.",
+        "expectedStatus": [],
+        "expectedAuthoritativeness": []
+      },
+      "templates": {
+        "coverageMode": "excluded",
+        "includePaths": [
+          "docs/context/templates"
+        ],
+        "representation": "Authoring templates are scaffolds and are excluded from registry entries.",
+        "expectedStatus": [],
+        "expectedAuthoritativeness": []
+      },
+      "prompt-helpers": {
+        "coverageMode": "excluded",
+        "includePaths": [
+          "docs/prompts"
+        ],
+        "representation": "Prompt helper snippets are excluded unless promoted into canonical guidance docs.",
+        "expectedStatus": [],
+        "expectedAuthoritativeness": []
+      },
+      "ai-companion-duplicates": {
+        "coverageMode": "excluded",
+        "includePaths": [
+          "docs/**/*.ai.md"
+        ],
+        "representation": "AI companion paths should be represented through aiPath on indexed human entries, not duplicate records.",
+        "expectedStatus": [],
+        "expectedAuthoritativeness": []
+      }
+    }
+  },
   "entries": [
     {
       "recordId": "doc-architecture-domain-and-application-core",

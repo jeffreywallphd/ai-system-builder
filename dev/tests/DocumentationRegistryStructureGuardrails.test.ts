@@ -37,6 +37,21 @@ type DocumentationRegistry = {
   statusCatalog: string[];
   authoritativenessCatalog: string[];
   domainRelationships: Record<string, string[]>;
+  coveragePolicy: {
+    schemaVersion: string;
+    canonicalHumanSpecPath: string;
+    canonicalAiSpecPath: string;
+    requiredCategories: string[];
+    selectiveCategories: string[];
+    excludedCategories: string[];
+    categoryRules: Record<string, {
+      coverageMode: "required" | "selective" | "excluded";
+      includePaths: string[];
+      representation: string;
+      expectedStatus: string[];
+      expectedAuthoritativeness: string[];
+    }>;
+  };
   entries: RegistryEntry[];
   discoveryIndex: Record<string, Record<string, string[]>>;
 };
@@ -76,6 +91,29 @@ describe("story 6.1.3 documentation registry structure guardrails", () => {
     expect(registry.statusCatalog).toEqual(taxonomy.metadataFields.status.allowedValues);
     expect(registry.authoritativenessCatalog).toEqual(taxonomy.metadataFields.authoritativeness.allowedValues);
     expect(Object.keys(registry.domainRelationships).length).toBeGreaterThanOrEqual(5);
+    expect(registry.coveragePolicy.schemaVersion).toBe("1.0.0");
+    expect(registry.coveragePolicy.canonicalHumanSpecPath).toBe("docs/context/documentation-index-coverage-rules.md");
+    expect(registry.coveragePolicy.canonicalAiSpecPath).toBe("docs/context/documentation-index-coverage-rules.ai.md");
+    expect(registry.coveragePolicy.requiredCategories.length).toBeGreaterThan(0);
+    expect(registry.coveragePolicy.selectiveCategories.length).toBeGreaterThan(0);
+    expect(registry.coveragePolicy.excludedCategories.length).toBeGreaterThan(0);
+
+    for (const categoryId of [
+      ...registry.coveragePolicy.requiredCategories,
+      ...registry.coveragePolicy.selectiveCategories,
+      ...registry.coveragePolicy.excludedCategories,
+    ]) {
+      const categoryRule = registry.coveragePolicy.categoryRules[categoryId];
+      expect(categoryRule).toBeDefined();
+      if (!categoryRule) {
+        continue;
+      }
+      expect(["required", "selective", "excluded"]).toContain(categoryRule.coverageMode);
+      expect(categoryRule.includePaths.length).toBeGreaterThan(0);
+      expect(categoryRule.representation.length).toBeGreaterThan(0);
+      expect(Array.isArray(categoryRule.expectedStatus)).toBe(true);
+      expect(Array.isArray(categoryRule.expectedAuthoritativeness)).toBe(true);
+    }
   });
 
   it("keeps entry shape aligned with metadata contract and existing docs", () => {
