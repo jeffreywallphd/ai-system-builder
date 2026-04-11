@@ -76,6 +76,7 @@ describe("docs top-level contract guardrails", () => {
       "## Documentation Areas",
       "## Route By Reader Type",
       "## Route By Task",
+      "## Common Reader Journeys",
       "## Durability Rules",
     ] as const;
 
@@ -93,6 +94,36 @@ describe("docs top-level contract guardrails", () => {
     expect(aiReadme).toContain("./contributors/docs-placement-guide.md");
     expect(aiReadme).toContain("./context/documentation-taxonomy.ai.md");
     expect(aiReadme).toContain("./context/documentation-metadata-header.ai.md");
+  });
+
+  it("keeps explicit high-value reader journeys in the root routers", () => {
+    const readme = readFileSync(resolve(docsRoot, "README.md"), "utf8");
+    const aiReadme = readFileSync(resolve(docsRoot, "README.ai.md"), "utf8");
+
+    const requiredJourneyLabels = [
+      "Understand architecture boundaries and decisions",
+      "Contribute a code change safely",
+      "Operate or troubleshoot the system locally",
+      "Review historical baselines and migration context",
+      "Prepare AI context for implementation or analysis",
+    ] as const;
+
+    for (const label of requiredJourneyLabels) {
+      expect(readme).toContain(label);
+      expect(aiReadme).toContain(label);
+    }
+
+    expect(readme).toContain("./architecture/README.md");
+    expect(readme).toContain("./contributors/README.md");
+    expect(readme).toContain("./operations/README.md");
+    expect(readme).toContain("./baselines/README.md");
+    expect(readme).toContain("./context/README.md");
+
+    expect(aiReadme).toContain("./architecture/README.ai.md");
+    expect(aiReadme).toContain("./contributors/README.ai.md");
+    expect(aiReadme).toContain("./operations/README.ai.md");
+    expect(aiReadme).toContain("./baselines/README.ai.md");
+    expect(aiReadme).toContain("./context/README.ai.md");
   });
 
   it("keeps root router concise and navigation-first", () => {

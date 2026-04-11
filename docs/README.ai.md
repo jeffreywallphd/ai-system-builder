@@ -39,6 +39,14 @@ Use this router to pick the correct documentation entry point by reader role or 
 - Find current design authority: [Architecture Router](./architecture/README.ai.md).
 - Find historical baselines: [Baselines Router](./baselines/README.ai.md).
 
+## Common Reader Journeys
+
+- Understand architecture boundaries and decisions: [Architecture Router](./architecture/README.ai.md) -> [Domain And Application Core](./architecture/domain-and-application-core.ai.md) -> [ADR Router](./adr/README.ai.md).
+- Contribute a code change safely: [Contributors Router](./contributors/README.ai.md) -> [Docs Placement Guide](./contributors/docs-placement-guide.ai.md) -> [Architecture Router](./architecture/README.ai.md).
+- Operate or troubleshoot the system locally: [Operations Router](./operations/README.ai.md) -> [Node Bootstrap Identity Operations](./node-bootstrap-identity-operations.ai.md) -> [Secret Health And Operational Diagnostics](./secret-health-and-operational-diagnostics.ai.md).
+- Review historical baselines and migration context: [Baselines Router](./baselines/README.ai.md) -> [Documentation Migration Baseline](./documentation-migration-baseline.ai.md) -> [Documentation Migration Inventory](./documentation-migration-baseline.inventory.json).
+- Prepare AI context for implementation or analysis: [Context Router](./context/README.ai.md) -> [Documentation Taxonomy](./context/documentation-taxonomy.ai.md) -> [Metadata Header Contract](./context/documentation-metadata-header.ai.md).
+
 ## Durability Rules
 
 - Keep this root README thin and routing-only.
