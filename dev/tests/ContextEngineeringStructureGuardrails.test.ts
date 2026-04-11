@@ -19,6 +19,8 @@ const requiredContextFiles = [
   "docs/context/context-map.md",
   "docs/context/context-map.ai.md",
   "docs/context/context-map.json",
+  "docs/context/prompt-routing.md",
+  "docs/context/prompt-routing.ai.md",
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
   "docs/context/packs/context-pack.contract.json",
@@ -62,6 +64,7 @@ describe("context engineering structure guardrails", () => {
     expect(contextReadme).toContain("./governance/README.md");
     expect(contextReadme).toContain("./templates/README.md");
     expect(contextReadme).toContain("./context-map.md");
+    expect(contextReadme).toContain("./prompt-routing.md");
     expect(contextReadme).toContain("./context-map.json");
 
     expect(contextAiReadme).toContain("./packs/README.ai.md");
@@ -69,6 +72,7 @@ describe("context engineering structure guardrails", () => {
     expect(contextAiReadme).toContain("./governance/README.ai.md");
     expect(contextAiReadme).toContain("./templates/README.ai.md");
     expect(contextAiReadme).toContain("./context-map.ai.md");
+    expect(contextAiReadme).toContain("./prompt-routing.ai.md");
     expect(contextAiReadme).toContain("./context-map.json");
   });
 

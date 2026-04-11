@@ -18,6 +18,7 @@
 - Operations runbooks.
 
 ## Start Here
+- [Human-Readable Prompt Routing Guidance](../prompt-routing.ai.md)
 - [Prompt Routing Contract and Task Categories](./prompt-routing-contract.ai.md)
 - [Task-to-Context Routing Contract](./task-to-context-routing.contract.json)
 - [Task-to-Context Routing Seed](./task-to-context-routing.seed.json)

@@ -25,6 +25,7 @@
 - [Context Asset Metadata Standard](./context-asset-metadata.md)
 - [Context Map](./context-map.md)
 - [Context Map JSON](./context-map.json)
+- [Human-Readable Prompt Routing Guidance](./prompt-routing.md)
 - [Context Pack Directory](./packs/README.md)
 - [Standard Context Pack Contract](./packs/README.md#standard-context-pack-contract)
 - [Routing Assets Directory](./routing/README.md)
