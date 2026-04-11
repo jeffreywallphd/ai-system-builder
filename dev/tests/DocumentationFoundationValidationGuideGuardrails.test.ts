@@ -30,12 +30,17 @@ describe("documentation foundation validation guide guardrails", () => {
       scripts?: Record<string, string>;
     };
 
+    expect(guide).toContain("npm run docs:lint");
+    expect(guideAi).toContain("npm run docs:lint");
     expect(guide).toContain("npm run docs:validate:foundation");
     expect(guideAi).toContain("npm run docs:validate:foundation");
     expect(guide).toContain("npm run docs:validate:segmentation");
     expect(guideAi).toContain("npm run docs:validate:segmentation");
     expect(guide).toContain("## CI Usage");
     expect(guideAi).toContain("## CI Contract");
+    expect(packageJson.scripts?.["docs:lint"]).toBe(
+      "node dev/scripts/lint-docs.cjs",
+    );
     expect(packageJson.scripts?.["docs:validate:foundation"]).toBe(
       "node dev/scripts/validate-docs-foundation.cjs",
     );

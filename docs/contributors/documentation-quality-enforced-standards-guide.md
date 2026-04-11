@@ -12,10 +12,12 @@ related_code_paths:
   - docs/contributors/router-overview-writing-standard.md
   - docs/context/templates/README.md
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/lint-docs.cjs
   - dev/scripts/validate-documentation-registry.cjs
   - dev/scripts/validate-adr-records.cjs
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/tests/DocsLintEntrypointScript.test.ts
   - dev/tests/DocumentationQualityContributorStandardsStory716Guardrails.test.ts
 ---
 
@@ -50,6 +52,12 @@ Translate enforced documentation quality rules into a practical pre-PR checklist
 4. Keep contract-critical headings intact.
    - Do not rename required headings in governance, routing, pack, or validation-contract docs without matching validator/test updates.
 5. Run docs checks before review.
+
+```bash
+npm run docs:lint
+```
+
+Run individual validators when you need targeted debugging:
 
 ```bash
 npm run docs:validate:foundation

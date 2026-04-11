@@ -7,10 +7,12 @@ owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/lint-docs.cjs
   - dev/scripts/validate-documentation-registry.cjs
   - dev/scripts/validate-adr-records.cjs
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/tests/DocsLintEntrypointScript.test.ts
   - dev/tests/DocsFoundationValidationScript.test.ts
   - dev/tests/DocumentationRegistryValidationScript.test.ts
   - dev/tests/DocumentationRegistryCrossReferenceValidationStory642Guardrails.test.ts
@@ -62,6 +64,12 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Registry validation also enforces cross-reference integrity for indexed `relatedDocs` to `relatedRecordIds` alignment.
 
 ## Run Command
+
+```bash
+npm run docs:lint
+```
+
+Run individual validators directly when narrowing to one rule family:
 
 ```bash
 npm run docs:validate:foundation

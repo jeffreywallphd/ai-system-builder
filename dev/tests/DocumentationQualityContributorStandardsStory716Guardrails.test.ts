@@ -71,6 +71,7 @@ describe("story 7.1.6 contributor-facing standards guidance guardrails", () => {
 
     for (const content of [human, ai]) {
       for (const command of [
+        "npm run docs:lint",
         "npm run docs:validate:foundation",
         "npm run docs:validate:registry",
         "npm run docs:validate:adr",
