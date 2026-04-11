@@ -258,6 +258,13 @@
       "expectedExclusions": [
         "docs/baselines/README.md",
         "docs/ui/README.md"
+      ],
+      "relatedDocRecordIds": [
+        "doc-operations-node-bootstrap-identity",
+        "doc-operations-secret-health-diagnostics",
+        "doc-operations-security-policy-configuration",
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-adr-001-single-authoritative-control-plane"
       ]
     },
     {
@@ -382,6 +389,13 @@
       "expectedExclusions": [
         "docs/ui/README.md",
         "docs/architecture/image-manipulation-studio-interaction-model.md"
+      ],
+      "relatedDocRecordIds": [
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-architecture-domain-identity-trust-and-security-overview",
+        "doc-context-pack-identity-and-security",
+        "doc-operations-security-policy-configuration",
+        "doc-operations-secret-health-diagnostics"
       ]
     }
   ],
@@ -874,7 +888,14 @@
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-operations-node-bootstrap-identity",
+        "doc-operations-secret-health-diagnostics",
+        "doc-operations-security-policy-configuration",
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-adr-001-single-authoritative-control-plane"
+      ]
     },
     {
       "taskId": "runtime-host-coding-implementation",
@@ -1070,7 +1091,14 @@
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-architecture-domain-identity-trust-and-security-overview",
+        "doc-context-pack-identity-and-security",
+        "doc-operations-security-policy-configuration",
+        "doc-operations-secret-health-diagnostics"
+      ]
     },
     {
       "taskId": "studio-system-design-and-ux-shaping",
