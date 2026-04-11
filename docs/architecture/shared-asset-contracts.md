@@ -1569,3 +1569,7 @@ Not implemented in this slice:
   - runtime materialization/storage-reference shape regressions,
   - required model/runtime readiness regressions,
   - seeded default template contract regressions.
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`

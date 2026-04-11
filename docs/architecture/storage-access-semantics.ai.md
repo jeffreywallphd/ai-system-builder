@@ -47,3 +47,7 @@ Story 9.1.5 adds storage-specific permission/access summary contracts so managed
 
 - Provides an authoritative access representation that API/admin screens can trust.
 - Gives later stories a stable seam for integrating full authorization engines and policy explainability.
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`

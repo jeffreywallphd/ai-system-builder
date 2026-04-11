@@ -510,3 +510,7 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - `workspace_records` includes `encryption_mode`, `content_encryption_required`, `key_scope`, `allow_preview_decryption`, `allow_worker_decryption`
   - schema migration version is incremented with additive column migration for existing databases.
 
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`
+

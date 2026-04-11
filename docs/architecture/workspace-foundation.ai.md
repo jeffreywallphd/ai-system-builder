@@ -435,3 +435,7 @@ Protected-resource composition pattern is canonical:
   - `workspace_records` includes `encryption_mode`, `content_encryption_required`, `key_scope`, `allow_preview_decryption`, `allow_worker_decryption`
   - migration version is bumped to include additive schema evolution for existing databases.
 
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`
+
