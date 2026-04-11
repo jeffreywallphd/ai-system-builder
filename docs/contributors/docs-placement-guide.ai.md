@@ -70,7 +70,17 @@
 ## Metadata Contract
 - Use the header structure from `docs/context/documentation-metadata-header.contract.json`.
 - Use exact `doc_type`, `status`, and `authoritativeness` values from `docs/context/documentation-taxonomy.contract.json`.
+- Use segmentation categories from `docs/context/documentation-segmentation-taxonomy.ai.md` to separate active vs historical/transition material.
 - Start new docs from templates in `docs/context/templates/README.md`.
+
+## Segmentation Taxonomy Mapping
+- Active Guidance: current architecture/contributor/operations/UI authority docs.
+- Baselines: point-in-time snapshots and completion records.
+- Historical Notes: retained non-authoritative context for traceability.
+- Migration Guides and Records: sequencing, inventory, and migration safety docs.
+- Rollout-Boundary Notes: phase boundaries, non-goals, and deferred work declarations.
+- Temporary Transition Documents: short-lived stubs and pointer notes during migration.
+- Superseded or Deprecated Documents: retired authority paths with replacement metadata.
 
 ## Human Companion
 - `docs/contributors/docs-placement-guide.md`

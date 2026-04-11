@@ -77,6 +77,30 @@ Provide one consistent placement rule set so contributors and AI coding agents p
 - Historical baseline or migration snapshots -> `docs/baselines/`.
 - Shared taxonomy/context for humans and AI -> `docs/context/`.
 
+## Documentation Segmentation Taxonomy Mapping
+
+Use `docs/context/documentation-segmentation-taxonomy.md` when classifying docs by authority state and migration posture.
+
+Primary segment categories:
+
+- Active Guidance.
+- Baselines.
+- Historical Notes.
+- Migration Guides and Records.
+- Rollout-Boundary Notes.
+- Temporary Transition Documents.
+- Superseded or Deprecated Documents.
+
+Placement guidance by segment:
+
+- Active Guidance: keep canonical architecture, contributor, operations, and UI guidance in active routers and topic docs.
+- Baselines: store historical snapshots and completion baselines in `docs/baselines/`.
+- Historical Notes: keep non-authoritative historical material in baseline or retired/superseded records.
+- Migration Guides and Records: keep migration sequence, inventory, and safety procedures in architecture/contributor/context governance areas.
+- Rollout-Boundary Notes: keep bounded scope and deferred-work notes in explicit rollout-boundary documents.
+- Temporary Transition Documents: keep short stubs/pointer notes only while links are migrating; require canonical destination links.
+- Superseded or Deprecated Documents: preserve old paths with clear retirement metadata and replacement links; do not use as active authority.
+
 ## Placement Examples
 
 - Architecture explanation example:
