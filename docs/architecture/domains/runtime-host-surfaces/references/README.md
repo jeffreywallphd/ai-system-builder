@@ -40,3 +40,14 @@ Index durable contract-level architecture references for `runtime-host-surfaces`
 
 - [Domain Overview](../overview.md)
 - [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)
+
+## Related Contributor and Operations Guidance
+
+- [Node Bootstrap Identity Operations](../../../../node-bootstrap-identity-operations.md)
+- [Operations Router](../../../../operations/README.md)
+
+## Related Code Paths
+
+- [src/hosts](../../../../../src/hosts)
+- [src/infrastructure/runtime](../../../../../src/infrastructure/runtime)
+- [electron/main](../../../../../electron/main)

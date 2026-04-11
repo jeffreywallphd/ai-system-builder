@@ -66,3 +66,15 @@ Contract-level details are canonical in `./references/`:
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Repository Overview](../../../context/packs/repository-overview.pack.md)
+
+## Related Contributor and Operations Guidance
+
+- [Unified API Contributor Guide](../../../unified-api-contributor-guide.md)
+- [Unified API Observability Troubleshooting](../../../unified-api-observability-troubleshooting.md)
+- [Authorization Sharing Management And Access Review](../../../authorization-sharing-management-and-access-review.md)
+
+## Related Code Paths
+
+- [src/infrastructure/api](../../../../src/infrastructure/api)
+- [src/infrastructure/transport](../../../../src/infrastructure/transport)
+- [src/application/contracts](../../../../src/application/contracts)

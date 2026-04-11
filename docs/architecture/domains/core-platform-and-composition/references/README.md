@@ -40,3 +40,14 @@ Index durable contract-level architecture references for `core-platform-and-comp
 
 - [Domain Overview](../overview.md)
 - [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)
+
+## Related Contributor and Operations Guidance
+
+- [Contributors Router](../../../../contributors/README.md)
+- [Operations Router](../../../../operations/README.md)
+
+## Related Code Paths
+
+- [src/domain](../../../../../src/domain)
+- [src/application](../../../../../src/application)
+- [src/infrastructure/composition](../../../../../src/infrastructure/composition)

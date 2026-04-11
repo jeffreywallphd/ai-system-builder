@@ -69,3 +69,16 @@ Contract-level details are canonical in `./references/`:
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Repository Overview](../../../context/packs/repository-overview.pack.md)
+
+## Related Contributor and Operations Guidance
+
+- [Workspace Administration Operations](../../../workspace-administration-operations.md)
+- [Storage Administration Operations](../../../storage-administration-operations.md)
+- [Authorization Sharing Management And Access Review](../../../authorization-sharing-management-and-access-review.md)
+
+## Related Code Paths
+
+- [src/domain/workspaces](../../../../src/domain/workspaces)
+- [src/domain/storage](../../../../src/domain/storage)
+- [src/domain/assets](../../../../src/domain/assets)
+- [src/infrastructure/storage](../../../../src/infrastructure/storage)

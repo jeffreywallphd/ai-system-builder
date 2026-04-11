@@ -68,3 +68,16 @@ Contract-level details are canonical in `./references/`:
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Repository Overview](../../../context/packs/repository-overview.pack.md)
+
+## Related Contributor and Operations Guidance
+
+- [Deployment Profile Policy Contributor Guide](../../../deployment-profile-policy-contributor-guide.md)
+- [Audit Governance Contributor Guide](../../../audit-governance-contributor-guide.md)
+- [Governance Audit Review Workflows](../../../governance-audit-review-workflows.md)
+
+## Related Code Paths
+
+- [src/domain/deployment](../../../../src/domain/deployment)
+- [src/domain/audit](../../../../src/domain/audit)
+- [src/application/policy-administration](../../../../src/application/policy-administration)
+- [src/infrastructure/audit](../../../../src/infrastructure/audit)

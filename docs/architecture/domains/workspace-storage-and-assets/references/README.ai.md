@@ -42,3 +42,14 @@ Index durable contract-level architecture references for `workspace-storage-and-
 
 - [Domain Overview](../overview.md)
 - [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)
+
+## Related Contributor and Operations Guidance
+
+- [Workspace Administration Operations](../../../../workspace-administration-operations.md)
+- [Storage Administration Operations](../../../../storage-administration-operations.md)
+
+## Related Code Paths
+
+- [src/domain/workspaces](../../../../../src/domain/workspaces)
+- [src/domain/storage](../../../../../src/domain/storage)
+- [src/domain/assets](../../../../../src/domain/assets)
