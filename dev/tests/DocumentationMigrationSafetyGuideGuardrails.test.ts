@@ -50,6 +50,7 @@ describe("documentation migration safety guide guardrails", () => {
       "Deprecation and Pointer Note Rules",
       "Handling Mixed Historical and Active Content",
       "superseded_by",
+      "documentation-supersession-and-redirect-conventions",
       "npm run docs:validate:foundation",
     ];
 

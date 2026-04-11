@@ -146,6 +146,7 @@ When a document combines active guidance with history, migration notes, or super
 
 - Keep using `doc_type`, `status`, and `authoritativeness` from `docs/context/documentation-taxonomy.md`.
 - Use this segmentation taxonomy to decide placement and cleanup behavior during migration and retirement work.
+- Use `docs/context/documentation-supersession-and-redirect-conventions.md` for concrete supersession note, redirect, pointer, and deprecation marker format.
 - Where classifications conflict, prioritize current authoritative guidance and move historical detail to baseline or retired paths.
 
 ## Validation

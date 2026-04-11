@@ -79,6 +79,7 @@ Use this rule:
 ## Related Guidance
 
 - `docs/context/documentation-segmentation-taxonomy.md`
+- `docs/context/documentation-supersession-and-redirect-conventions.md`
 - `docs/contributors/docs-placement-guide.md`
 - `docs/contributors/docs-migration-safety-guide.md`
 - `docs/baselines/README.md`

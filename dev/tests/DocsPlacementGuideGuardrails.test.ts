@@ -40,6 +40,7 @@ describe("docs placement guide guardrails", () => {
     expect(humanGuide).toContain("storage policy");
     expect(humanGuide).toContain("studio/system modeling");
     expect(humanGuide).toContain("## Placement For Non-ADR Changes");
+    expect(humanGuide).toContain("documentation-supersession-and-redirect-conventions.md");
     expect(aiGuide).toContain("## ADR Thresholds For Planned Changes");
     expect(aiGuide).toContain("### ADR Required");
     expect(aiGuide).toContain("### ADR Recommended");
@@ -51,6 +52,7 @@ describe("docs placement guide guardrails", () => {
     expect(aiGuide).toContain("storage policy");
     expect(aiGuide).toContain("studio/system modeling");
     expect(aiGuide).toContain("### Placement For Non-ADR Changes");
+    expect(aiGuide).toContain("documentation-supersession-and-redirect-conventions.ai.md");
 
     const requiredAreas = [
       "docs/architecture/",

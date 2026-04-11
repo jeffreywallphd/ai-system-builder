@@ -76,6 +76,7 @@
 ## Segmentation Taxonomy Mapping
 - Segmentation model source: `docs/context/documentation-segmentation-taxonomy.ai.md`.
 - Historical landing-zone strategy: `docs/context/documentation-baseline-and-historical-folder-strategy.ai.md`.
+- Supersession/redirect pattern source: `docs/context/documentation-supersession-and-redirect-conventions.ai.md`.
 - Active Guidance: current architecture/contributor/operations/UI authority docs.
 - Baselines: point-in-time snapshots and completion records.
 - Historical Notes: retained non-authoritative context for traceability.

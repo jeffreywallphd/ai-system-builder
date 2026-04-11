@@ -66,6 +66,7 @@ Allowed only as short non-authoritative context with links to the full baseline 
 ## Related Guidance
 
 - `docs/context/documentation-segmentation-taxonomy.ai.md`
+- `docs/context/documentation-supersession-and-redirect-conventions.ai.md`
 - `docs/contributors/docs-placement-guide.ai.md`
 - `docs/contributors/docs-migration-safety-guide.ai.md`
 - `docs/baselines/README.ai.md`

@@ -47,8 +47,21 @@ describe("documentation baseline and historical folder strategy guardrails", () 
       expect(strategyAi).toContain(destination);
     }
 
-    for (const anchor of ["docs/adr/records/", "superseded_by", "short superseded pointer"]) {
+    for (const anchor of [
+      "docs/adr/records/",
+      "superseded_by",
+      "short superseded pointer",
+      "documentation-supersession-and-redirect-conventions.md",
+    ]) {
       expect(strategy).toContain(anchor);
+    }
+
+    for (const anchor of [
+      "docs/adr/records/",
+      "superseded_by",
+      "short superseded pointer",
+      "documentation-supersession-and-redirect-conventions.ai.md",
+    ]) {
       expect(strategyAi).toContain(anchor);
     }
   });
