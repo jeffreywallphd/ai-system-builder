@@ -48,6 +48,8 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/governance/context-governance-policy.ai.md",
   "docs/context/governance/context-asset-lifecycle.md",
   "docs/context/governance/context-asset-lifecycle.ai.md",
+  "docs/context/governance/context-system-rollout-boundaries.md",
+  "docs/context/governance/context-system-rollout-boundaries.ai.md",
 ];
 
 const REQUIRED_HEADER_FIELDS = [

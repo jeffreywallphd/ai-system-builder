@@ -14,6 +14,7 @@ Use these as source of truth:
 4. `docs/context/packs/context-pack-catalog.seed.json`
 5. `docs/context/packs/context-pack.contract.json`
 6. `docs/context/prompt-routing.md`
+7. `docs/context/governance/context-system-rollout-boundaries.md`
 
 ## Routing Workflow
 
@@ -241,6 +242,8 @@ Return:
 ```
 
 ## Extending the System Responsibly
+
+Before extending routing or packs, confirm the requested change is outside initial-release boundaries documented in `docs/context/governance/context-system-rollout-boundaries.md`.
 
 When adding or changing routing mappings:
 

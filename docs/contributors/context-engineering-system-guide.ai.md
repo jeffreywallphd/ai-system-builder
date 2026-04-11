@@ -14,6 +14,7 @@ Treat these as authoritative:
 4. `docs/context/packs/context-pack-catalog.seed.json`
 5. `docs/context/packs/context-pack.contract.json`
 6. `docs/context/prompt-routing.ai.md`
+7. `docs/context/governance/context-system-rollout-boundaries.ai.md`
 
 ## Routing Workflow
 
@@ -238,6 +239,8 @@ Return:
 ```
 
 ## Extending the System Responsibly
+
+Before adding packs or routing entries, confirm the request is outside initial-release boundaries in `docs/context/governance/context-system-rollout-boundaries.ai.md`.
 
 Routing mapping changes:
 

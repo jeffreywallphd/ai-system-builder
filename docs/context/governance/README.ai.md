@@ -21,5 +21,6 @@
 - [Context Governance Policy](./context-governance-policy.ai.md)
 - [Context Asset Lifecycle Guidance](./context-asset-lifecycle.ai.md)
 - [High-Risk Context Pack Guidance](./high-risk-context-pack-guidance.ai.md)
+- [Context System Rollout Boundaries and Follow-On Work](./context-system-rollout-boundaries.ai.md)
 - [Context Routing Directory](../routing/README.ai.md)
 - [Context Packs Directory](../packs/README.ai.md)
