@@ -422,8 +422,12 @@
           "priorityOrder": 2
         },
         {
-          "packId": "context-system-foundations",
+          "packId": "studio-and-system-composition",
           "priorityOrder": 3
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 4
         }
       ],
       "excludePackIds": [],
@@ -443,7 +447,7 @@
         "historical-reference",
         "summary-reference"
       ],
-      "notes": "UI mapping stays explicit and now includes architecture-core for cross-layer handoff boundaries.",
+      "notes": "UI-studio routing remains deterministic with studio/system composition context inserted before context foundations.",
       "status": "active",
       "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "contextAssemblyTierHints": {

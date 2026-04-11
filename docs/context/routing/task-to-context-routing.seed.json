@@ -259,12 +259,14 @@
       "expectedPackOrder": [
         "repository-overview",
         "architecture-core",
+        "studio-and-system-composition",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
-        "docs/ui/README.md",
         "docs/architecture/studio-handoff-contract.md",
-        "docs/architecture/image-manipulation-studio-interaction-model.md"
+        "docs/architecture/image-workflow-system-definition-layer.md",
+        "docs/architecture/image-manipulation-studio-interaction-model.md",
+        "docs/ui/README.md"
       ],
       "expectedExclusions": [
         "docs/architecture/secrets-foundation.md",
@@ -927,6 +929,7 @@
       "packIds": [
         "repository-overview",
         "architecture-core",
+        "studio-and-system-composition",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
@@ -938,9 +941,11 @@
       "domain": "studio-experience",
       "owner": "team:studio-experience",
       "relatedDocPaths": [
-        "docs/ui/README.md",
         "docs/architecture/studio-handoff-contract.md",
-        "docs/architecture/image-manipulation-studio-interaction-model.md"
+        "docs/architecture/image-workflow-system-definition-layer.md",
+        "docs/architecture/image-manipulation-studio-interaction-model.md",
+        "docs/ui/README.md",
+        "docs/architecture/asset-selector-framework.md"
       ],
       "relatedCodePaths": [
         "src/ui",
@@ -948,7 +953,7 @@
         "dev/tests/MultiSurfaceUiArchitectureDocumentationGuardrails.test.ts"
       ],
       "excludePackIds": [],
-      "notes": "Ordered mode keeps studio context sequencing deterministic: UI contracts first, then implementation paths.",
+      "notes": "Ordered mode keeps studio/system routes deterministic: repository orientation, architecture constraints, studio-system composition contracts, then context foundations.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
