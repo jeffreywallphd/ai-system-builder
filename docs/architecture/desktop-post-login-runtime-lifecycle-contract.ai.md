@@ -20,6 +20,9 @@ Story: C.1.3
   - owns lifecycle transitions and authoritative status payload.
   - owns warmup orchestration (`ensurePostLoginWarmupStarted` -> `bootstrapPostLoginRuntime`).
   - owns deferred feature IPC readiness gate and runtime disposal/reset transitions.
+  - composes focused runtime-control modules for stateful lifecycle concerns:
+    - `electron/main/DesktopPostLoginRuntimeStatusStore.ts`
+    - `electron/main/DesktopConnectivityRuntimeController.ts`
 - preload (`electron/preload.ts`):
   - exposes runtime status/readiness probes and warmup trigger bridge.
   - enforces deferred API guards until runtime is ready.
@@ -157,6 +160,15 @@ The deferred runtime lifecycle contract now includes explicit regression guardra
   - Python runtime resolution and service-supervisor startup remain in post-login composition,
   - workflow/studio/system backends remain lazy through deferred runtime `ensure*` paths.
 
+## Story C.3.5 runtime-control extraction boundary
+
+- Post-login runtime lifecycle state transitions now flow through `createDesktopPostLoginRuntimeStatusStore(...)` instead of ad hoc mutable status variables in `main.ts`.
+- Deferred connectivity lifecycle behavior (placeholder state creation, auth IPC serialization, offline-mode fallback/write handling, monitoring start/stop ownership) now flows through `createDesktopConnectivityRuntimeController(...)`.
+- Contract semantics remain unchanged:
+  - deferred placeholder detail text remains stable,
+  - monitoring starts only after warmup acceptance,
+  - probe token lookup still resolves through persisted bootstrap storage.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,
@@ -189,4 +201,3 @@ The deferred runtime lifecycle contract now includes explicit regression guardra
 - `electron/shared/DesktopContracts.ts`
 - `src/ui/runtime/DesktopPostLoginWarmup.ts`
 - `src/ui/App.tsx`
-

@@ -22,13 +22,9 @@ import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type {
   DesktopAuthBootstrapContext,
   DesktopAuthBootstrapRuntimeConfig,
-  DesktopPostLoginRuntimeStatus,
-  DesktopPostLoginRuntimeUnavailableReason,
   DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
 import {
-  DesktopPostLoginRuntimeActivationModes,
-  DesktopPostLoginRuntimeStates,
   DesktopPostLoginRuntimeUnavailableReasons,
 } from "../shared/DesktopContracts";
 import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
@@ -64,6 +60,8 @@ import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../s
 import {
   DesktopConnectivityStateService,
 } from "../../src/hosts/desktop/DesktopConnectivityStateService";
+import { createDesktopPostLoginRuntimeStatusStore } from "./DesktopPostLoginRuntimeStatusStore";
+import { createDesktopConnectivityRuntimeController } from "./DesktopConnectivityRuntimeController";
 import type { DeferredDesktopFeatureRuntime } from "./DeferredDesktopFeatureRuntime";
 import {
   startAuthMinimalServerHostAssembly,
@@ -127,8 +125,6 @@ let authMinimalServerRuntime: AuthMinimalServerHostRuntimeHandle | undefined;
 let bootstrapContext: DesktopAuthBootstrapContext | undefined;
 let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
-let desktopConnectivityStateService: DesktopConnectivityStateService | undefined;
-let desktopConnectivityMonitoringStarted = false;
 let deferredFeatureRuntime: DeferredDesktopFeatureRuntime | undefined;
 let deferredDesktopFeatureRuntimeFactory: ((options: {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
@@ -158,12 +154,12 @@ let postLoginBootstrapPromise: Promise<void> | undefined;
 let postLoginWarmupStarted = false;
 let isDesktopRuntimeDisposing = false;
 let authShellBootstrapResult: AuthShellBootstrapResult | undefined;
-let postLoginRuntimeStatus: DesktopPostLoginRuntimeStatus = Object.freeze({
-  state: DesktopPostLoginRuntimeStates.unavailable,
-  unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
-  updatedAt: new Date().toISOString(),
+const postLoginRuntimeStatusStore = createDesktopPostLoginRuntimeStatusStore();
+const connectivityRuntimeController = createDesktopConnectivityRuntimeController({
+  createConnectivityStateService: () => new DesktopConnectivityStateService(),
+  createConnectivityProbePort: createDesktopConnectivityProbePort,
+  lookupToken: (key) => storageDatabase?.getItem(key) ?? null,
 });
-const DeferredConnectivityStateDetail = "Connectivity monitoring is deferred until post-login runtime warmup starts.";
 
 const windowManager = createDesktopWindowManager({
   BrowserWindow,
@@ -195,137 +191,6 @@ async function ensureDeferredDesktopFeatureRuntimeFactory(): Promise<(
   const runtimeModule = await import("./DeferredDesktopFeatureRuntime");
   deferredDesktopFeatureRuntimeFactory = runtimeModule.createDeferredDesktopFeatureRuntime;
   return deferredDesktopFeatureRuntimeFactory;
-}
-
-/**
- * Marks post-login runtime status as unavailable with the supplied reason for renderer-visible diagnostics.
- */
-function markPostLoginRuntimeUnavailable(reason: DesktopPostLoginRuntimeUnavailableReason): void {
-  postLoginRuntimeStatus = Object.freeze({
-    state: DesktopPostLoginRuntimeStates.unavailable,
-    unavailableReason: reason,
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-/**
- * Marks post-login runtime status as warming and records activation metadata from the triggering request.
- */
-function markPostLoginRuntimeWarming(request: DesktopPostLoginWarmupRequest): void {
-  postLoginRuntimeStatus = Object.freeze({
-    state: DesktopPostLoginRuntimeStates.warming,
-    activationMode: request.triggerSource === "feature-demand"
-      ? DesktopPostLoginRuntimeActivationModes.lazyFeatureDemand
-      : DesktopPostLoginRuntimeActivationModes.authSuccessWarmup,
-    triggerSource: request.triggerSource,
-    requestedAt: request.requestedAt,
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-/**
- * Marks post-login runtime status as ready after deferred feature services and IPC registrations complete.
- */
-function markPostLoginRuntimeReady(): void {
-  postLoginRuntimeStatus = Object.freeze({
-    ...postLoginRuntimeStatus,
-    state: DesktopPostLoginRuntimeStates.ready,
-    failure: undefined,
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-/**
- * Marks post-login runtime status as failed and captures retryable failure context for renderer recovery UX.
- */
-function markPostLoginRuntimeFailed(request: DesktopPostLoginWarmupRequest, error: unknown): void {
-  const message = error instanceof Error ? error.message : "Post-login runtime warmup failed.";
-  postLoginRuntimeStatus = Object.freeze({
-    state: DesktopPostLoginRuntimeStates.failed,
-    activationMode: request.triggerSource === "feature-demand"
-      ? DesktopPostLoginRuntimeActivationModes.lazyFeatureDemand
-      : DesktopPostLoginRuntimeActivationModes.authSuccessWarmup,
-    triggerSource: request.triggerSource,
-    requestedAt: request.requestedAt,
-    updatedAt: new Date().toISOString(),
-    failure: Object.freeze({
-      message,
-      failedAt: new Date().toISOString(),
-      retryable: true,
-    }),
-  });
-}
-
-/**
- * Builds a synthetic connectivity payload used before live monitoring starts so auth bootstrap can expose stable state.
- */
-function createDeferredConnectivityState(detail?: string): {
-  readonly state: "connecting";
-  readonly stale: false;
-  readonly localModeActive: false;
-  readonly detail?: string;
-  readonly lastChangedAt: string;
-  readonly canQueueOperations: true;
-  readonly canResynchronize: false;
-} {
-  return Object.freeze({
-    state: "connecting",
-    stale: false,
-    localModeActive: false,
-    detail,
-    lastChangedAt: new Date().toISOString(),
-    canQueueOperations: true,
-    canResynchronize: false,
-  });
-}
-
-/**
- * Returns connectivity state serialized for auth IPC callers, including deferred placeholders before monitoring is active.
- */
-function getConnectivityStateForAuthBootstrapIpc(): string {
-  if (!desktopConnectivityMonitoringStarted) {
-    return JSON.stringify(createDeferredConnectivityState(DeferredConnectivityStateDetail));
-  }
-  const state = desktopConnectivityStateService?.getState() ?? createDeferredConnectivityState();
-  return JSON.stringify(state);
-}
-
-/**
- * Applies deliberate offline-mode toggles from auth IPC and returns the resulting serialized connectivity state.
- */
-function setConnectivityOfflineModeForAuthBootstrapIpc(requestJson: string): string {
-  const request = JSON.parse(requestJson) as { readonly active?: boolean; readonly detail?: string };
-  if (!desktopConnectivityMonitoringStarted || !desktopConnectivityStateService) {
-    return JSON.stringify(createDeferredConnectivityState(DeferredConnectivityStateDetail));
-  }
-  const state = desktopConnectivityStateService.setDeliberateOfflineMode(request.active === true, request.detail);
-  return JSON.stringify(state);
-}
-
-/**
- * Starts background connectivity probes against identity services once post-login warmup is underway.
- */
-function startDesktopConnectivityMonitoring(identityApiBaseUrl: string): void {
-  if (desktopConnectivityMonitoringStarted) {
-    return;
-  }
-  if (!desktopConnectivityStateService) {
-    desktopConnectivityStateService = new DesktopConnectivityStateService();
-  }
-  // Supplies token lookup backing for probe requests so monitoring can observe authenticated connectivity state.
-  desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl, (key) => storageDatabase?.getItem(key) ?? null), {
-    intervalMs: 3_000,
-  });
-  desktopConnectivityMonitoringStarted = true;
-}
-
-/**
- * Stops and disposes connectivity monitoring resources during shutdown or runtime reset.
- */
-function stopDesktopConnectivityMonitoring(): void {
-  desktopConnectivityStateService?.stopMonitoring();
-  desktopConnectivityMonitoringStarted = false;
-  desktopConnectivityStateService = undefined;
 }
 
 /**
@@ -606,16 +471,16 @@ function registerAuthIpc(): void {
     // Reports deferred-feature IPC readiness to control renderer feature gating.
     isDeferredFeatureIpcReady: () => deferredFeatureIpcReady,
     // Returns lifecycle status of post-login runtime warmup.
-    getPostLoginRuntimeStatus: () => postLoginRuntimeStatus,
+    getPostLoginRuntimeStatus: () => postLoginRuntimeStatusStore.getStatus(),
     // Handles explicit renderer requests to start post-login warmup.
     startPostLoginWarmup: async (request: DesktopPostLoginWarmupRequest) => {
       await ensurePostLoginWarmupStarted(request);
     },
     connectivity: {
       // Returns current serialized connectivity state for auth surfaces.
-      getState: () => getConnectivityStateForAuthBootstrapIpc(),
+      getState: () => connectivityRuntimeController.getConnectivityStateForAuthBootstrapIpc(),
       // Applies deliberate offline-mode transitions for auth surfaces.
-      setOfflineMode: (requestJson: string) => setConnectivityOfflineModeForAuthBootstrapIpc(requestJson),
+      setOfflineMode: (requestJson: string) => connectivityRuntimeController.setConnectivityOfflineModeForAuthBootstrapIpc(requestJson),
     },
     secrets: {
       // Indicates whether OS-backed encryption services are currently available.
@@ -737,7 +602,7 @@ function registerDeferredFeatureIpc(register: () => void): void {
     deferredFeatureIpcRegistered = true;
     register();
     deferredFeatureIpcReady = true;
-    markPostLoginRuntimeReady();
+    postLoginRuntimeStatusStore.markReady();
     logInitializationMemory(DesktopStartupPhases.deferredFeatureRegistration, "ready");
   } finally {
     logInitializationEnd(DesktopStartupPhases.deferredFeatureRegistration, deferredFeatureRegistrationStartedAt);
@@ -771,8 +636,8 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
   }
 
   postLoginWarmupStarted = true;
-  markPostLoginRuntimeWarming(request);
-  startDesktopConnectivityMonitoring(authShell.identityApiBaseUrl);
+  postLoginRuntimeStatusStore.markWarming(request);
+  connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
   postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
@@ -781,7 +646,7 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     console.info("[ai-loom] Post-login desktop runtime warmup completed.");
   } catch (error) {
     postLoginBootstrapPromise = undefined;
-    markPostLoginRuntimeFailed(request, error);
+    postLoginRuntimeStatusStore.markFailed(request, error);
     if (!isDesktopRuntimeDisposing) {
       console.error("Post-login desktop runtime bootstrap failed", error);
       await disposeDesktopRuntimeResources();
@@ -951,11 +816,11 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
  */
 async function disposeDesktopRuntimeResources(): Promise<void> {
   isDesktopRuntimeDisposing = true;
-  markPostLoginRuntimeUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
+  postLoginRuntimeStatusStore.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
   const pendingPostLoginBootstrap = postLoginBootstrapPromise;
   postLoginBootstrapPromise = undefined;
   await pendingPostLoginBootstrap?.catch(() => undefined);
-  stopDesktopConnectivityMonitoring();
+  connectivityRuntimeController.stopMonitoring();
   await authMinimalServerRuntime?.stop();
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
@@ -978,7 +843,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   deferredFeatureIpcReady = false;
   postLoginWarmupStarted = false;
   authShellBootstrapResult = undefined;
-  markPostLoginRuntimeUnavailable(DesktopPostLoginRuntimeUnavailableReasons.preLogin);
+  postLoginRuntimeStatusStore.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.preLogin);
   isDesktopRuntimeDisposing = false;
 }
 

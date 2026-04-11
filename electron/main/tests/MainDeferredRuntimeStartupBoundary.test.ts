@@ -45,7 +45,7 @@ describe("electron main deferred runtime startup boundary", () => {
   });
 
   it("starts connectivity monitoring only when post-login warmup is accepted", () => {
-    expect(warmupEntrySource).toContain("startDesktopConnectivityMonitoring(authShell.identityApiBaseUrl)");
+    expect(warmupEntrySource).toContain("connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl)");
     expect(warmupEntrySource).not.toContain("bootstrapAuthShell");
   });
 
