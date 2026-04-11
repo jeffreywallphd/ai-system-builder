@@ -57,6 +57,8 @@ related_code_paths:
   [Studio and System Composition](./domains/studio-and-system-composition/overview.md)
 - Examine security-sensitive trust, authz, and secret-handling boundaries:
   [Identity Trust and Security](./domains/identity-trust-and-security/overview.md)
+- Need worked navigation examples for architecture review, decomposition, runtime diagnostics, security-sensitive changes, and doc refactors:
+  [Architecture Domain Navigation Worked Examples](../contributors/architecture-domain-navigation-worked-examples.md)
 - Need full task-to-context-pack assembly rules instead of architecture-only routing:
   [Context Routing Router](../context/routing/README.md)
 
