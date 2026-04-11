@@ -25,6 +25,13 @@
 - `superseded`: replaced by a newer accepted ADR.
 - `deprecated`: retained for legacy compatibility but not for new decisions.
 
+## ADR Lifecycle Handling
+- Amend existing ADRs only when the decision itself is unchanged.
+- Publish a new ADR when architectural intent changes in a way future work must follow.
+- For full replacement: set old ADR `decision_status: superseded`, set old `superseded_by`, and set new `supersedes`.
+- For partial revision: create a focused ADR for the changed scope and keep old ADR `accepted` or `deprecated` with explicit scope notes.
+- Keep old/new links bi-directional so maintainers can find the currently authoritative decision quickly.
+
 ## ADR Index and Sorting Rules
 - Keep `docs/adr/records/adr-registry.json` as the canonical ADR discovery registry.
 - Keep `records` entries sorted by `adrNumber` ascending.

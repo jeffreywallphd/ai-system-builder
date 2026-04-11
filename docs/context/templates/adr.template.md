@@ -30,6 +30,14 @@ superseded_by: <optional repo-relative doc path>
 - `decision_date`: required acceptance date in `YYYY-MM-DD`.
 - Keep the `Status` section value aligned with `decision_status` metadata.
 
+## ADR Lifecycle Rules
+
+- Amend an existing ADR only when decision intent is unchanged (clarifications, typo fixes, link/metadata cleanup).
+- Create a new ADR when architecture direction changes in durable ways future implementation must follow.
+- For full replacement, mark the old ADR `decision_status: superseded`, set old `superseded_by`, and set new ADR `supersedes`.
+- For partial revision, create a focused ADR for changed scope and keep the old ADR `accepted` or `deprecated` based on remaining validity.
+- Whenever `supersedes` or `superseded_by` is present, include `## Supersession` and explain scope boundaries of the replacement.
+
 ## Required Sections
 
 - `Status`

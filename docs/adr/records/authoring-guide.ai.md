@@ -14,6 +14,14 @@ Produce ADRs that are concise, decision-focused, and durable for human and AI re
 - State the final decision directly with architectural scope boundaries.
 - Record tradeoffs and risks, not only benefits.
 
+## Lifecycle Decision Rules
+
+- Amend an ADR in place only when the decision remains unchanged.
+- Publish a new ADR when durable architecture direction changes.
+- Full replacement pattern: old ADR `superseded` + old `superseded_by` + new ADR `supersedes`.
+- Partial revision pattern: create a focused ADR for changed scope and keep prior ADR `accepted` or `deprecated` depending on remaining authority.
+- Require bi-directional supersession links so current authoritative ADRs are discoverable from older records.
+
 ## Section Expectations
 
 - `Decision Statement`: clear final choice, not intent language.

@@ -78,6 +78,21 @@ Use ADR lifecycle status values in `decision_status` frontmatter and mirror the 
 - `superseded`: replaced by a newer accepted ADR; `superseded_by` must point to the replacement path.
 - `deprecated`: still valid for legacy contexts but should not guide new architecture work.
 
+### Amendment vs New ADR Rules
+- Amend an existing ADR in place only for non-decisional edits: clarification, wording quality, typo fixes, broken links, or metadata cleanup.
+- Create a new ADR whenever architectural intent changes in a durable way: authority boundaries, invariants, trust model, storage direction, tenancy guarantees, or extension constraints.
+- For partial revisions, create a new ADR for the changed slice and keep the older ADR `accepted` or mark it `deprecated` depending on how much of its guidance remains valid.
+- Never overwrite decision history by editing an old `Decision Statement` to represent a newly chosen direction.
+
+### Supersession Representation Rules
+- Use frontmatter `superseded_by` only on ADRs that are no longer current authority.
+- Use frontmatter `supersedes` on the newer ADR that becomes decision authority for replaced scope.
+- Keep links bi-directional:
+  - Older ADR: `superseded_by: docs/adr/records/adr-<new>.ai.md`
+  - Newer ADR: `supersedes: docs/adr/records/adr-<old>.ai.md`
+- For full replacement, mark older ADR `decision_status: superseded`.
+- For partial replacement, keep older ADR `accepted` or `deprecated` and explain narrowed scope in `## Supersession`.
+
 ### ADR-Specific Metadata Fields
 Each ADR must include these lightweight metadata fields in frontmatter:
 

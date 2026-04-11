@@ -14,6 +14,14 @@ Write ADRs that capture one architectural decision clearly enough that future co
 - Document tradeoffs honestly, including costs and risks.
 - Keep implementation details limited to durable boundaries and invariants.
 
+## Lifecycle Decision Rules
+
+- Use amendment-in-place only when architecture direction does not change.
+- Create a new ADR when the decision boundary changes and future work must behave differently.
+- Full replacement: mark the old ADR as `superseded`, set old `superseded_by`, and set new `supersedes`.
+- Partial replacement: publish a narrowly scoped ADR for the revised area and keep the old ADR as `accepted` or `deprecated` based on remaining authority.
+- Keep supersession links bi-directional so readers can navigate from historical decision to current authority and back.
+
 ## Section Quality Rules
 
 - `Decision Statement`: 2-4 sentences with the final outcome, scope, and any non-negotiable constraints.

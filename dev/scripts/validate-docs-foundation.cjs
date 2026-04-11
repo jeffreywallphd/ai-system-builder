@@ -494,6 +494,9 @@ function validateDocsFoundation(repoRoot) {
     const registryNumbers = [];
     const seenHumanPaths = new Set();
     const seenAiPaths = new Set();
+    const adrFrontmatterByHumanPath = new Map();
+    const adrAiFrontmatterByHumanPath = new Map();
+    const adrContentByHumanPath = new Map();
 
     for (const [index, entry] of (adrRegistry.records || []).entries()) {
       const requiredFields = [
@@ -612,8 +615,11 @@ function validateDocsFoundation(repoRoot) {
 
       if (pathExistsForReference(repoRoot, entry?.humanDocPath)) {
         try {
-          const frontmatter = parseFrontmatter(readFileSync(resolve(repoRoot, entry.humanDocPath), "utf8"));
+          const humanContent = readFileSync(resolve(repoRoot, entry.humanDocPath), "utf8");
+          const frontmatter = parseFrontmatter(humanContent);
           const expectedTitle = `ADR-${entry.adrNumber} ${entry.title}`;
+          adrFrontmatterByHumanPath.set(entry.humanDocPath, frontmatter);
+          adrContentByHumanPath.set(entry.humanDocPath, humanContent);
           if (frontmatter.title !== expectedTitle) {
             addIssue(
               issues,
@@ -650,6 +656,19 @@ function validateDocsFoundation(repoRoot) {
           );
         }
       }
+
+      if (pathExistsForReference(repoRoot, entry?.aiDocPath)) {
+        try {
+          const aiFrontmatter = parseFrontmatter(readFileSync(resolve(repoRoot, entry.aiDocPath), "utf8"));
+          adrAiFrontmatterByHumanPath.set(entry.humanDocPath, aiFrontmatter);
+        } catch (error) {
+          addIssue(
+            issues,
+            "ADR_REGISTRY_REFERENCE_INVALID",
+            `docs/adr/records/adr-registry.json record '${entry?.identifier || `index-${index}`}' has unreadable AI ADR frontmatter: ${error.message}`,
+          );
+        }
+      }
     }
 
     const sortedRegistryNumbers = [...registryNumbers].sort((left, right) => left - right);
@@ -665,6 +684,7 @@ function validateDocsFoundation(repoRoot) {
       .filter((name) => /^adr-\d{3}-.*\.md$/.test(name) && !name.endsWith(".ai.md"))
       .map((name) => `docs/adr/records/${name}`)
       .sort();
+    const expectedHumanAdrDocSet = new Set(expectedHumanAdrDocs);
     const registryHumanDocs = [...seenHumanPaths].filter((pathValue) => isNonEmptyString(pathValue)).sort();
     if (JSON.stringify(expectedHumanAdrDocs) !== JSON.stringify(registryHumanDocs)) {
       addIssue(
@@ -736,6 +756,97 @@ function validateDocsFoundation(repoRoot) {
             issues,
             "ADR_REGISTRY_REFERENCE_INVALID",
             `docs/adr/records/adr-registry.json discoveryIndex.byDomain['${domain}'] references unknown identifier '${identifier}'.`,
+          );
+        }
+      }
+    }
+
+    for (const [humanDocPath, frontmatter] of adrFrontmatterByHumanPath.entries()) {
+      const aiFrontmatter = adrAiFrontmatterByHumanPath.get(humanDocPath);
+      const humanContent = adrContentByHumanPath.get(humanDocPath) || "";
+      const supersedes = typeof frontmatter.supersedes === "string" ? frontmatter.supersedes : "";
+      const supersededBy = typeof frontmatter.superseded_by === "string" ? frontmatter.superseded_by : "";
+      const hasSupersessionSection = /^##\s+Supersession\s*$/m.test(humanContent);
+
+      if (aiFrontmatter) {
+        for (const field of ["supersedes", "superseded_by"]) {
+          if (frontmatter[field] !== aiFrontmatter[field]) {
+            addIssue(
+              issues,
+              "ADR_SUPERSESSION_MISMATCH",
+              `${humanDocPath} and AI companion differ for '${field}'.`,
+            );
+          }
+        }
+      }
+
+      if (isNonEmptyString(supersedes) && isNonEmptyString(supersededBy)) {
+        addIssue(
+          issues,
+          "ADR_SUPERSESSION_CONFLICT",
+          `${humanDocPath} cannot set both supersedes and superseded_by.`,
+        );
+      }
+
+      if ((isNonEmptyString(supersedes) || isNonEmptyString(supersededBy)) && !hasSupersessionSection) {
+        addIssue(
+          issues,
+          "ADR_SUPERSESSION_SECTION_MISSING",
+          `${humanDocPath} must include '## Supersession' when supersedes or superseded_by is set.`,
+        );
+      }
+
+      if (frontmatter.decision_status === "superseded" && !isNonEmptyString(supersededBy)) {
+        addIssue(
+          issues,
+          "ADR_SUPERSESSION_LINK_MISSING",
+          `${humanDocPath} has decision_status 'superseded' but is missing superseded_by.`,
+        );
+      }
+
+      if (isNonEmptyString(supersedes)) {
+        if (!expectedHumanAdrDocSet.has(supersedes)) {
+          addIssue(
+            issues,
+            "ADR_SUPERSESSION_REFERENCE_INVALID",
+            `${humanDocPath} supersedes references unknown ADR path '${supersedes}'.`,
+          );
+        }
+      }
+
+      if (isNonEmptyString(supersededBy)) {
+        if (!expectedHumanAdrDocSet.has(supersededBy)) {
+          addIssue(
+            issues,
+            "ADR_SUPERSESSION_REFERENCE_INVALID",
+            `${humanDocPath} superseded_by references unknown ADR path '${supersededBy}'.`,
+          );
+          continue;
+        }
+
+        const replacementFrontmatter = adrFrontmatterByHumanPath.get(supersededBy);
+        if (!replacementFrontmatter) {
+          addIssue(
+            issues,
+            "ADR_SUPERSESSION_REFERENCE_INVALID",
+            `${humanDocPath} superseded_by target '${supersededBy}' is missing readable frontmatter.`,
+          );
+          continue;
+        }
+
+        if (replacementFrontmatter.decision_status !== "accepted") {
+          addIssue(
+            issues,
+            "ADR_SUPERSESSION_TARGET_INVALID",
+            `${humanDocPath} superseded_by target '${supersededBy}' must be decision_status 'accepted'.`,
+          );
+        }
+
+        if (replacementFrontmatter.supersedes !== humanDocPath) {
+          addIssue(
+            issues,
+            "ADR_SUPERSESSION_BACKLINK_MISSING",
+            `${humanDocPath} superseded_by target '${supersededBy}' must set supersedes: ${humanDocPath}.`,
           );
         }
       }
