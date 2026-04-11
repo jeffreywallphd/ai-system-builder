@@ -66,6 +66,27 @@ Decision shortcut:
 4. Update metadata and inbound links in the same commit.
 5. Add guardrail checks for headings, links, and metadata expectations.
 
+## Anti-Patterns for Mixed-Purpose and Low-Signal Docs
+
+- `Architecture + change-log blend`: active `docs/architecture/` files mix canonical contracts with dated implementation chronology.
+  - Corrective action: keep current contracts in architecture docs; move timeline history to `docs/baselines/architecture/` or historical notes.
+- `History-heavy active docs`: active contributor/architecture docs embed long story-by-story completion history.
+  - Corrective action: keep only short rationale in active docs and relocate full chronology/evidence to baselines.
+- `Stale plan as active authority`: planning/migration residue remains `status: active` and appears as current guidance.
+  - Corrective action: reclassify to migration or superseded segments, update metadata, and link canonical current docs.
+- `Overloaded README`: a single `README.md` carries routing, architecture authority, runbook steps, and historical notes.
+  - Corrective action: keep README as orientation/router only; split authority content into architecture/contributor/operations/baseline docs.
+- `Superseded doc with executable steps`: deprecated pointer docs still include run procedures or implementation instructions.
+  - Corrective action: convert to redirect-style stub content with destination links only.
+
+## Anti-Pattern Decision Triggers
+
+1. Split immediately when one file mixes canonical current rules with timeline/change-log prose.
+2. Move chronology/planning residue when it exceeds one-third of active document content.
+3. Replace overloaded README authority with linked specialized docs.
+4. Mark retained stale planning records as historical, never canonical.
+5. Keep superseded continuity paths non-normative and redirect-only.
+
 ## Expected Metadata Signals
 
 - Active guidance: commonly `status: active`, `authoritativeness: canonical|reference`.

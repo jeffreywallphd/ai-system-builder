@@ -66,6 +66,7 @@
 - Historical snapshots mixed into active canonical docs.
 - Duplicated authority across folders instead of linking.
 - Shared AI-context notes embedded directly in feature runbooks.
+- Mixed-purpose docs that combine architecture authority, stale plans, runbook steps, and long implementation chronology.
 
 ## Metadata Contract
 - Use the header structure from `docs/context/documentation-metadata-header.contract.json`.

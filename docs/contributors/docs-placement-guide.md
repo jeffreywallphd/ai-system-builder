@@ -145,6 +145,8 @@ Placement guidance by segment:
   - Correct action: keep one authoritative source and link from related areas.
 - Anti-pattern: placing AI-context taxonomy notes directly in feature runbooks.
   - Correct action: place shared context in `docs/context/` and reference it from runbooks or contributor guides.
+- Anti-pattern: mixing architecture authority, implementation history, stale planning notes, and runbook steps in one document.
+  - Correct action: apply the anti-pattern split rules in `docs/context/documentation-segmentation-taxonomy.md` and reclassify each content block to its correct segment.
 
 ## Consistency Rules for Humans and AI Agents
 
