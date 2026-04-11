@@ -9,8 +9,16 @@ Python runtime resolution and local service-supervisor startup now occur in post
 - Desktop host assembly entrypoint/composition root: `src/hosts/desktop/DesktopHostEntrypoint.ts`, `src/hosts/desktop/DesktopHostCompositionRoot.ts`
 - Main process bootstrap: `electron/main/main.ts`
 - Preload bridge: `electron/preload.ts`
+- Preload bridge modules: `electron/preload/bridge/*` (domain bridge factories + deferred guard utilities)
 - Preload build artifact: `.vite/build/preload.cjs` (CommonJS for Electron preload execution)
 - Bridge contracts: `electron/src/shared/DesktopContracts.ts`
+
+## Preload bridge organization
+- `electron/preload.ts` is now a preload composition root: it keeps bootstrap sync semantics, runtime-readiness probing, auth/deferred surface composition, and `contextBridge.exposeInMainWorld("aiLoomDesktop", desktopBridge)`.
+- IPC-backed bridge operations are split into domain factories under `electron/preload/bridge/` (`createStorageBridge`, `createSecretsBridge`, `createConnectivityBridge`, `createWorkflowsBridge`, `createExecutionRunsBridge`, `createWorkflowRunSummariesBridge`, `createModelFilesBridge`, `createCanonicalAssetsBridge`, `createStudioShellBridge`, `createRegistryBridge`, `createAgentsBridge`).
+- Deferred feature guard behavior (`guardDeferredSyncGroup`, `guardDeferredAsyncGroup`, unavailable error construction, and fallback runtime status) is centralized in `electron/preload/bridge/deferredFeatureGuards.ts` and composed via explicit dependencies.
+- New preload bridge API additions should follow the same pattern: create a focused bridge factory with injected dependencies, then compose it in `electron/preload.ts` without mutable shared module state.
+
 - Desktop workflow persistence: `src/infrastructure/desktop/DesktopWorkflowPersistence.ts`
 - Desktop execution-run persistence: `src/infrastructure/filesystem/execution/SqliteExecutionRunRepository.ts`
 - Desktop agent-authoring backend API: `src/infrastructure/api/agents/AgentAuthoringBackendApi.ts`
