@@ -1,5 +1,5 @@
 ---
-title: "AI Companion: API and Transport Surfaces Domain References"
+title: API and Transport Surfaces Domain References
 doc_type: architecture-reference
 status: active
 authoritativeness: canonical
@@ -9,35 +9,34 @@ related_code_paths:
   - src/infrastructure/api
   - src/infrastructure/transport
 ---
-# AI Companion: API and Transport Surfaces Domain References
+# API and Transport Surfaces Domain References
 
 ## Purpose
 
-Store canonical, durable architecture references for api-and-transport-surfaces that implement or constrain the domain overview.
+Index durable contract-level architecture references for `api-and-transport-surfaces` while keeping domain-boundary narrative in [Domain Overview](../overview.md).
 
-## What Belongs in Domain References
+## Reference Scope
 
-- One reference file per durable contract, interface family, or boundary rule.
-- Normative constraints that directly guide implementation and review outcomes.
-- Stable links to governing ADRs and relevant context packs when decision rationale matters.
+- Unified API authority and route-family contracts.
+- Request/response validation and compatibility contracts.
+- Event publication/subscription contract boundaries.
 
-## What Does Not Belong in Domain References
+## Canonical Reference Documents
 
-- Repeated domain boundary summaries that already live in ../overview.md.
-- Environment-specific runbook procedures and day-2 operations playbooks.
-- Sprint-level delivery plans, temporary migration notes, or ticket-specific checklists.
+- [Unified API Surface Contracts](./unified-api-surface-contracts.md)
 
-## Seed Reference Placeholders
+## Migration Backlog (Not Yet Canonical)
 
-Use this short list as migration scaffolding. Create each placeholder file when the first canonical contract lands, then replace placeholder language with authoritative content.
+- `transport-request-response-contracts.md`
+- `event-publication-and-subscription-contracts.md`
 
-- `unified-api-surface-contracts.md` - Canonical unified API surface and route-family boundaries.
-- `transport-request-response-contracts.md` - Shared request/response transport contract rules.
-- `event-publication-and-subscription-contracts.md` - Cross-surface event contract boundaries.
+## Reference Authoring Guardrails
 
-## Reference Authoring Rules
-
-- Keep each reference focused on one contract surface and explicit invariants.
+- Keep one durable contract surface per reference file.
 - Link back to [Domain Overview](../overview.md) for boundary context.
-- Include ## Related ADRs when a decision record constrains the reference.
-- Include ## Related Context Packs when context routing depends on that contract for retrieval quality.
+- Keep runbooks in `docs/operations/` and workflow guidance in `docs/contributors/`.
+
+## Related Documentation
+
+- [Domain Overview](../overview.md)
+- [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)

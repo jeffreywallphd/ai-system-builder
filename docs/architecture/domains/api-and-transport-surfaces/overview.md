@@ -13,63 +13,50 @@ related_code_paths:
 
 ## Purpose
 
-Own transport-facing route, endpoint, and event contracts that expose domain/application capabilities without redefining business policy.
+Define transport-facing contracts that expose authoritative capabilities while preserving business-policy ownership in domain/application layers.
 
-## Boundary
+## Scope and System Boundary
 
-- Defines unified API surface boundaries, transport semantics, and request/response or event contract expectations.
-- Delegates policy source-of-truth to domains that own business logic and governance authority.
+In scope:
+- Unified API route-family authority boundaries.
+- Request/response validation and envelope conventions.
+- Event publication/subscription contract boundaries.
 
-## Foundational Concepts
+Out of scope:
+- Domain policy semantics and lifecycle rules.
+- Runtime host startup sequencing and capability wiring.
+- Operations troubleshooting playbooks.
 
-- Protected client operations must converge on one authoritative server API surface with shared DTO and schema contracts.
-- Contract ownership is explicit: shared contracts/schemas define stable wire semantics; backend APIs orchestrate use cases; transport adapters enforce boundary validation.
-- Desktop preload and host IPC remain adapter seams, not authoritative protected-resource APIs.
-- Migration posture is explicit: legacy bypass paths may exist temporarily but must converge to shared API clients and authoritative transport.
-- Error envelopes and compatibility behavior are shared-contract concerns, preventing UI-specific transport drift.
+## Canonical Responsibilities
 
-## Domain-Wide Invariants
+- Keep protected operations on one authoritative server-facing API surface.
+- Enforce shared contract/schema validation before business-policy invocation.
+- Maintain stable transport/event semantics across host/client modes.
 
-- New protected operations must define shared contracts and schemas before transport/UI integration.
-- UI-only DTO forks, direct protected local storage authority, and auth-bypass shortcuts are non-compliant.
-- Transport handlers validate and normalize requests; business-policy decisions stay in domain/application layers.
-- Realtime and event semantics should use shared contracts, not client-local protocol variants.
+## Cross-Cutting Invariants
 
-## Cross-Domain Dependency Rules
+- New protected operations require shared contracts and schemas before integration.
+- Transport adapters normalize wire input but do not mint policy decisions.
+- Client-local protocol forks are non-compliant for protected behavior.
 
-- `identity-trust-and-security` governs auth/session/authorization checks consumed at authoritative transport boundaries.
-- `core-platform-and-composition` and feature domains own business semantics that API surfaces expose.
-- `runtime-host-surfaces` may provide desktop adapter channels, but protected behavior converges through authoritative API paths.
-- `deployment-policy-and-audit-governance` may require explainability/audit metadata exposed by API contracts.
+## Integration and Dependency Boundaries
 
-## Seed Scope Guidance
+- `identity-trust-and-security` governs auth/session/authorization checks at transport boundaries.
+- `core-platform-and-composition` and feature domains own semantics exposed by route handlers.
+- `runtime-host-surfaces` provides adapter channels while authoritative behavior converges to unified APIs.
+- `deployment-policy-and-audit-governance` may constrain explainability/audit metadata requirements.
 
-- Seed references around canonical endpoint families and shared transport contract conventions.
-- Document transport durability and compatibility expectations in focused reference files.
-- Keep business policy rationale in owning domains and link instead of duplicating.
+## Reference Map
 
-## Canonical Source Documents Migrated into This Overview
+Contract-level details are canonical in `./references/`:
+- [Unified API Surface Contracts](./references/unified-api-surface-contracts.md)
+
+## Canonical Source Documents Migrated into This Domain
 
 - [Unified API Authoritative Surface](../../unified-api-authoritative-surface.md)
 - [Unified API Endpoint Reference](../../unified-api-endpoint-reference.md)
 - [Unified API Convergence Plan](../../unified-api-convergence-plan.md)
 - [Shared API Contract Package](../../shared-api-contract-package.md)
-
-## What Belongs in the Overview
-
-- Domain boundary intent, ownership seams, and cross-domain dependency rules.
-- Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in ./references/.
-
-## What Does Not Belong in the Overview
-
-- Endpoint-level schemas, API payload matrices, and low-level interface catalogs.
-- Step-by-step operational runbooks and troubleshooting procedures.
-- Contributor process checklists, implementation task plans, or release notes.
-
-## Related Domain References
-
-- [Domain References Index](./references/README.md)
 
 ## Related ADRs
 
