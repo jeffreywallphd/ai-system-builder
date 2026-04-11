@@ -1,25 +1,46 @@
-# Documentation Top-Level Contract (Story 1.1.2)
+---
+title: Documentation Router
+doc_type: ai-context
+status: active
+authoritativeness: canonical
+owned_by: team:developer-experience
+last_reviewed: 2026-04-11
+related_code_paths:
+  - docs
+  - dev/tests/DocsTopLevelContractGuardrails.test.ts
+---
 
-This file defines the durable top-level documentation information architecture for AI Loom Studio.
+# Documentation Router
 
-## Folder responsibilities
+Use this page to pick the right documentation path quickly. It routes by reader intent and points to authoritative docs without repeating long-form content.
 
-| Folder | Purpose | Belongs here | Does not belong here |
-| --- | --- | --- | --- |
-| `docs/architecture/` | Canonical architecture baselines and system design contracts. | Layer boundaries, cross-feature architecture decisions, architecture reference docs. | Step-by-step operations, contributor process checklists, temporary migration notes. |
-| `docs/contributors/` | Contributor-facing extension and implementation workflow guides. | How-to guides for extending features safely, contributor guardrails, coding workflow docs. | Operational runbooks, ADR decisions, architecture internals as primary content. |
-| `docs/operations/` | Runtime operations and support procedures. | Runbooks, troubleshooting, operational diagnostics, admin workflows. | Architecture contracts, feature design rationale, ADR decision records. |
-| `docs/baselines/` | Historical milestone snapshots and migration baselines. | Story/epic baselines, migration inventories, completion snapshots. | Current canonical operational or contributor instructions. |
-| `docs/adr/` | Architecture Decision Records and supersession history. | ADRs with status and rationale, decision alternatives, superseded decisions. | General architecture reference docs without a decision record. |
-| `docs/context/` | Shared domain context that supports both humans and AI assistants. | Taxonomy overviews, glossary/context packs, cross-domain navigation context. | Operational runbooks or implementation-only contributor workflows. |
-| `docs/prompts/` | Prompt templates and prompt-facing operational helpers. | Prompt docs used during engineering workflows. | Product architecture decisions and runtime operations guidance. |
-| `docs/ui/` | UI-specific behavior and UX implementation notes. | UI contracts, frontend behavior guides, UX state conventions. | Non-UI architecture baselines and system operations runbooks. |
+## Documentation Areas
 
-## Routing rule
+- `docs/architecture/`: [Architecture Router](./architecture/README.md) for system boundaries and canonical design contracts.
+- `docs/contributors/`: [Contributors Router](./contributors/README.md) for implementation workflows and extension guardrails.
+- `docs/operations/`: [Operations Router](./operations/README.md) for runbooks, diagnostics, and support procedures.
+- `docs/baselines/`: [Baselines Router](./baselines/README.md) for historical snapshots and migration artifacts.
+- `docs/adr/`: [ADR Router](./adr/README.md) for architecture decisions and supersession history.
+- `docs/context/`: [Context Router](./context/README.md) for taxonomy, metadata contract, and shared context packs.
+- `docs/prompts/`: [Prompts Router](./prompts/README.md) for reusable prompt templates and helpers.
+- `docs/ui/`: [UI Router](./ui/README.md) for UI behavior and UX implementation contracts.
 
-When adding a new document, choose the folder whose purpose is the document's primary role. If a doc spans roles, prefer the strictest authoritative home and link to it from related folders.
+## Route By Reader Type
 
-## Guardrails
+- Architecture reviewer: start in [docs/architecture/](./architecture/README.md), then open relevant ADRs in [docs/adr/](./adr/README.md).
+- Contributor implementing changes: start in [docs/contributors/](./contributors/README.md), then follow links to architecture or UI contracts.
+- Operator/support maintainer: start in [docs/operations/](./operations/README.md) for runtime and troubleshooting guidance.
+- AI assistant or cross-domain reader: start in [docs/context/](./context/README.md) for taxonomy and metadata conventions.
 
-- `dev/tests/DocsTopLevelContractGuardrails.test.ts` enforces required folders and router contract sections.
-- `dev/tests/DocumentationMigrationBaselineGuardrails.test.ts` enforces inventory synchronization for all docs markdown files.
+## Route By Task
+
+- Place a new document: use [Docs Placement Guide](./contributors/docs-placement-guide.md).
+- Apply taxonomy and metadata correctly: use [Documentation Taxonomy](./context/documentation-taxonomy.md) and [Metadata Header Contract](./context/documentation-metadata-header.md).
+- Locate current system design authority: use [Architecture Router](./architecture/README.md).
+- Find historical delivery/migration records: use [Baselines Router](./baselines/README.md).
+
+## Durability Rules
+
+- Keep this root README navigation-first and concise.
+- Keep authoritative detail in linked destination docs.
+- Update this router only when top-level structure or primary entry paths change.
