@@ -16,6 +16,9 @@ const requiredContextFiles = [
   "docs/context/context-asset-metadata.md",
   "docs/context/context-asset-metadata.ai.md",
   "docs/context/context-asset-metadata.contract.json",
+  "docs/context/context-map.md",
+  "docs/context/context-map.ai.md",
+  "docs/context/context-map.json",
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
   "docs/context/packs/context-pack.contract.json",
@@ -58,11 +61,15 @@ describe("context engineering structure guardrails", () => {
     expect(contextReadme).toContain("./routing/README.md");
     expect(contextReadme).toContain("./governance/README.md");
     expect(contextReadme).toContain("./templates/README.md");
+    expect(contextReadme).toContain("./context-map.md");
+    expect(contextReadme).toContain("./context-map.json");
 
     expect(contextAiReadme).toContain("./packs/README.ai.md");
     expect(contextAiReadme).toContain("./routing/README.ai.md");
     expect(contextAiReadme).toContain("./governance/README.ai.md");
     expect(contextAiReadme).toContain("./templates/README.ai.md");
+    expect(contextAiReadme).toContain("./context-map.ai.md");
+    expect(contextAiReadme).toContain("./context-map.json");
   });
 
   it("keeps routing and pack contracts parseable and structurally seeded", () => {
