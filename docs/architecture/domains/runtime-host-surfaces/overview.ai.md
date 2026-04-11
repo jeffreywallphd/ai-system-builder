@@ -53,6 +53,12 @@ Out of scope:
 - `execution-control-plane-and-scheduling` owns run lifecycle transitions; hosts transport commands.
 - `core-platform-and-composition` owns business semantics and inner service contracts.
 
+## Domain Boundary Notes for Common Confusion
+
+- `runtime-host-surfaces` vs `execution-control-plane-and-scheduling`: this domain owns startup/readiness assembly and host capability gates; control-plane scheduling and lifecycle authority stays in `execution-control-plane-and-scheduling`.
+- `runtime-host-surfaces` vs `api-and-transport-surfaces`: this domain composes host adapters and startup wiring; API domain owns authoritative route and payload contracts.
+- `runtime-host-surfaces` vs operations docs: this overview defines runtime architecture boundaries, while host runbooks and incident response belong in `docs/operations/`.
+
 ## Reference Map
 
 Contract-level details are canonical in `./references/`:

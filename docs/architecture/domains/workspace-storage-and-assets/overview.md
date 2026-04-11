@@ -54,6 +54,12 @@ Out of scope:
 - `execution-control-plane-and-scheduling` consumes workspace and asset references for execution lineage.
 - `studio-and-system-composition` composes read models without redefining tenancy truth.
 
+## Domain Boundary Notes for Common Confusion
+
+- `workspace-storage-and-assets` vs `studio-and-system-composition`: this domain owns workspace and asset source-of-truth contracts; studios consume projections and selection flows without redefining tenancy or lineage truth.
+- `workspace-storage-and-assets` vs runtime-local files: managed storage and asset identity are architecture-level authorities; host-local caches and temporary artifacts are implementation details in `runtime-host-surfaces`.
+- `workspace-storage-and-assets` vs operations docs: this overview defines storage and asset boundary contracts; backup, migration, and operational remediation procedures belong in `docs/operations/`.
+
 ## Reference Map
 
 Contract-level details are canonical in `./references/`:

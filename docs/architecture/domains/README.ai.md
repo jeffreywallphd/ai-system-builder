@@ -47,6 +47,7 @@ No extra domain-level file types are required right now. Add new top-level file 
 - Add `## Domain Summary for Fast Context Selection` near the top with quick purpose, boundary, and importance signals.
 - Include concise domain-specific role language so migration starts with clear system intent.
 - State domain-wide invariants and concise migration direction.
+- Add `## Domain Boundary Notes for Common Confusion` when adjacent domains have subtle or frequently conflated ownership seams.
 - Route readers to canonical references in `./references/`.
 - Keep summary language architecture-facing and avoid duplicating context-pack assembly content.
 

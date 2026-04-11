@@ -53,6 +53,12 @@ Out of scope:
 - `api-and-transport-surfaces` exposes commands/queries without redefining policy.
 - `runtime-host-surfaces` executes transport/runtime mechanics under control-plane decisions.
 
+## Domain Boundary Notes for Common Confusion
+
+- `execution-control-plane-and-scheduling` vs `runtime-host-surfaces`: this domain decides lifecycle transitions, scheduling posture, and dispatch eligibility; runtime hosts execute those approved decisions without becoming lifecycle authority.
+- `execution-control-plane-and-scheduling` vs `studio-and-system-composition`: this domain owns submission-to-dispatch state authority; studios own authoring and handoff UX contracts before authoritative run control begins.
+- `execution-control-plane-and-scheduling` vs operations docs: this overview defines architecture authority boundaries; procedure and troubleshooting guidance belongs in `docs/operations/` and contributor guides.
+
 ## Reference Map
 
 Contract-level details are canonical in `./references/`:
