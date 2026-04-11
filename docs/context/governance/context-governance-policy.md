@@ -28,6 +28,7 @@ This policy defines how context-pack and routing artifacts are maintained so con
 - Apply high-risk review controls from `docs/context/governance/high-risk-context-pack-guidance.md` when changing security, runtime/host, or architecture-invariant packs.
 - Apply rollout boundary assumptions from `docs/context/governance/context-system-rollout-boundaries.md` so initial-release scope remains explicit.
 - Apply documentation segmentation completion boundaries from `docs/context/governance/documentation-segmentation-rollout-boundaries.md` so segmentation follow-on work stays explicit and non-ambiguous.
+- Apply indexing and findability completion boundaries from `docs/context/governance/documentation-indexing-rollout-boundaries.md` so Feature 6 scope and remaining follow-on work stay explicit.
 
 ## Review Cadence
 

@@ -22,6 +22,7 @@
 - [Context Asset Lifecycle Guidance](./context-asset-lifecycle.ai.md)
 - [High-Risk Context Pack Guidance](./high-risk-context-pack-guidance.ai.md)
 - [Documentation Segmentation Rollout Boundaries and Follow-On Work](./documentation-segmentation-rollout-boundaries.ai.md)
+- [Documentation Indexing Rollout Boundaries and Future Expansion Points](./documentation-indexing-rollout-boundaries.ai.md)
 - [Context System Rollout Boundaries and Follow-On Work](./context-system-rollout-boundaries.ai.md)
 - [Context Routing Directory](../routing/README.ai.md)
 - [Context Packs Directory](../packs/README.ai.md)
