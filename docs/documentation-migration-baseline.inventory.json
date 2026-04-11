@@ -4,28 +4,28 @@
   "auditScope": "docs/**/*.(md|ai.md)",
   "branchContext": "codex-f2b6d46d4e",
   "summary": {
-    "totalMarkdownFiles": 560,
+    "totalMarkdownFiles": 568,
     "totalDirectories": 10,
     "roleCounts": {
       "architectural": 229,
       "operational": 36,
-      "contributor-facing": 16,
-      "historical": 2,
-      "ai-context-oriented": 277
+      "contributor-facing": 19,
+      "historical": 4,
+      "ai-context-oriented": 280
     },
     "roleSignalCounts": {
       "architectural": 471,
       "operational": 97,
-      "contributor-facing": 31,
+      "contributor-facing": 37,
       "historical": 50,
-      "ai-context-oriented": 277
+      "ai-context-oriented": 280
     },
     "pairing": {
-      "pairedFiles": 554,
+      "pairedFiles": 562,
       "missingCompanionFiles": 6
     },
     "ownershipSignals": {
-      "filesWithOwnershipSignals": 9,
+      "filesWithOwnershipSignals": 17,
       "filesWithoutOwnershipSignals": 551
     },
     "likelyOverloadedFiles": 16
@@ -85,15 +85,15 @@
     },
     {
       "path": "docs/contributors",
-      "fileCount": 4,
-      "pairedCount": 4,
+      "fileCount": 10,
+      "pairedCount": 10,
       "missingCompanionCount": 0,
       "roleCounts": {
         "architectural": 0,
         "operational": 2,
-        "contributor-facing": 0,
+        "contributor-facing": 3,
         "historical": 0,
-        "ai-context-oriented": 2
+        "ai-context-oriented": 5
       }
     },
     {
@@ -124,14 +124,14 @@
     },
     {
       "path": "docs/adr",
-      "fileCount": 2,
-      "pairedCount": 2,
+      "fileCount": 4,
+      "pairedCount": 4,
       "missingCompanionCount": 0,
       "roleCounts": {
         "architectural": 0,
         "operational": 1,
         "contributor-facing": 0,
-        "historical": 0,
+        "historical": 2,
         "ai-context-oriented": 1
       }
     },
@@ -8695,6 +8695,38 @@
       "likelyTargetArea": "docs/operations"
     },
     {
+      "path": "docs/baselines/feature-1-documentation-foundation-handoff.ai.md",
+      "primaryRole": "historical",
+      "secondaryRoles": [],
+      "companionPath": "docs/baselines/feature-1-documentation-foundation-handoff.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": true,
+      "metrics": {
+        "lineCount": 61,
+        "wordCount": 227,
+        "headingCount": 6,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "docs/baselines"
+    },
+    {
+      "path": "docs/baselines/feature-1-documentation-foundation-handoff.md",
+      "primaryRole": "historical",
+      "secondaryRoles": [],
+      "companionPath": "docs/baselines/feature-1-documentation-foundation-handoff.ai.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": true,
+      "metrics": {
+        "lineCount": 90,
+        "wordCount": 460,
+        "headingCount": 7,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "docs/baselines"
+    },
+    {
       "path": "docs/context/documentation-metadata-header.ai.md",
       "primaryRole": "ai-context-oriented",
       "secondaryRoles": [],
@@ -9113,6 +9145,108 @@
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "docs/operations"
+    },
+    {
+      "path": "docs/contributors/docs-foundation-validation.ai.md",
+      "primaryRole": "ai-context-oriented",
+      "secondaryRoles": [
+        "contributor-facing"
+      ],
+      "companionPath": "docs/contributors/docs-foundation-validation.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": true,
+      "metrics": {
+        "lineCount": 46,
+        "wordCount": 156,
+        "headingCount": 7,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "retain-current-location"
+    },
+    {
+      "path": "docs/contributors/docs-foundation-validation.md",
+      "primaryRole": "contributor-facing",
+      "secondaryRoles": [],
+      "companionPath": "docs/contributors/docs-foundation-validation.ai.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": true,
+      "metrics": {
+        "lineCount": 52,
+        "wordCount": 183,
+        "headingCount": 7,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "docs/contributors"
+    },
+    {
+      "path": "docs/contributors/docs-migration-safety-guide.ai.md",
+      "primaryRole": "ai-context-oriented",
+      "secondaryRoles": [
+        "contributor-facing"
+      ],
+      "companionPath": "docs/contributors/docs-migration-safety-guide.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": true,
+      "metrics": {
+        "lineCount": 82,
+        "wordCount": 289,
+        "headingCount": 9,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "retain-current-location"
+    },
+    {
+      "path": "docs/contributors/docs-migration-safety-guide.md",
+      "primaryRole": "contributor-facing",
+      "secondaryRoles": [],
+      "companionPath": "docs/contributors/docs-migration-safety-guide.ai.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": true,
+      "metrics": {
+        "lineCount": 107,
+        "wordCount": 582,
+        "headingCount": 10,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "docs/contributors"
+    },
+    {
+      "path": "docs/contributors/router-overview-writing-standard.ai.md",
+      "primaryRole": "ai-context-oriented",
+      "secondaryRoles": [
+        "contributor-facing"
+      ],
+      "companionPath": "docs/contributors/router-overview-writing-standard.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": true,
+      "metrics": {
+        "lineCount": 67,
+        "wordCount": 314,
+        "headingCount": 7,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "retain-current-location"
+    },
+    {
+      "path": "docs/contributors/router-overview-writing-standard.md",
+      "primaryRole": "contributor-facing",
+      "secondaryRoles": [],
+      "companionPath": "docs/contributors/router-overview-writing-standard.ai.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": true,
+      "metrics": {
+        "lineCount": 67,
+        "wordCount": 368,
+        "headingCount": 7,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "docs/contributors"
     },
     {
       "path": "docs/deployment-profile-policy-contributor-guide.ai.md",

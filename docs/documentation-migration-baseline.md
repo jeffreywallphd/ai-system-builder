@@ -16,7 +16,7 @@ This artifact captures the current-state documentation structure and taxonomy ba
 ## Scope
 - Branch context: `codex-f2b6d46d4e`
 - Audited path: `docs/**/*.(md|ai.md)`
-- Audited files: 560
+- Audited files: 568
 - Audited directories: 10
 - Machine-readable inventory: `docs/documentation-migration-baseline.inventory.json`
 
@@ -27,9 +27,9 @@ This artifact captures the current-state documentation structure and taxonomy ba
 | `docs/architecture` | 471 | ai-context-oriented | 1 |
 | `docs` | 51 | ai-context-oriented | 3 |
 | `docs/context/templates` | 16 | ai-context-oriented | 0 |
+| `docs/contributors` | 10 | ai-context-oriented | 0 |
 | `docs/context` | 6 | operational | 0 |
-| `docs/contributors` | 4 | operational | 0 |
-| `docs/prompts` | 3 | operational | 1 |
+| `docs/baselines` | 4 | mixed | 0 |
 
 ## Role Category Breakdown (Primary Role)
 
@@ -37,9 +37,9 @@ This artifact captures the current-state documentation structure and taxonomy ba
 | --- | ---: |
 | architectural | 229 |
 | operational | 36 |
-| contributor-facing | 16 |
-| historical | 2 |
-| ai-context-oriented | 277 |
+| contributor-facing | 19 |
+| historical | 4 |
+| ai-context-oriented | 280 |
 
 ## Role Category Breakdown (Any Role Signal)
 
@@ -47,14 +47,14 @@ This artifact captures the current-state documentation structure and taxonomy ba
 | --- | ---: |
 | architectural | 471 |
 | operational | 97 |
-| contributor-facing | 31 |
+| contributor-facing | 37 |
 | historical | 50 |
-| ai-context-oriented | 277 |
+| ai-context-oriented | 280 |
 
 ## Major Observations
 - The `docs/architecture/` subtree dominates the doc set with 471 files and mixes current architecture guidance with historical baselines.
 - The docs root currently holds 51 markdown files, creating role ambiguity between contributor guides, operational runbooks, and AI companion content.
-- Companion duplication is extensive: 554 files are in `.md`/`.ai.md` pairs and 6 files do not have a companion.
+- Companion duplication is extensive: 562 files are in `.md`/`.ai.md` pairs and 6 files do not have a companion.
 - Ownership signals are missing in 551 files, which limits migration accountability.
 
 ## Highest-Risk Structural Problems
