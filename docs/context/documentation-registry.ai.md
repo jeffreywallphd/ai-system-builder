@@ -28,6 +28,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryDiscoverySummariesKeywordsStory625Guardrails.test.ts
   - dev/tests/DocumentationRegistryRelationshipsStory626Guardrails.test.ts
   - dev/tests/DocumentationRegistryCrossReferenceValidationStory642Guardrails.test.ts
+  - dev/tests/DocumentationRegistryMaintenanceReviewStory643Guardrails.test.ts
   - dev/tests/DocumentationRegistryContextRoutingIntegrationStory633Guardrails.test.ts
   - dev/tests/DocumentationIndexContributorDailyUsageStory634Guardrails.test.ts
   - dev/tests/DocumentationIndexAssistedDiscoveryWorkedExamplesStory635Guardrails.test.ts
@@ -288,6 +289,54 @@ Run:
 Cross-reference mismatches emit:
 
 - `REGISTRY_CROSS_REFERENCE_INVALID`
+
+## Registry Maintenance and Review Expectations Status (Story 6.4.3)
+
+Story 6.4.3 defines lightweight registry-maintenance expectations so discovery metadata stays trustworthy without adding high-overhead governance.
+
+### When Registry Entries Must Be Updated
+
+Update the affected registry records in the same change set when any of these occur:
+
+- Indexed document path moves (`path` and `aiPath`), split/merge outcomes, or redirect-stub introductions.
+- Lifecycle/authority transitions (`status`, `authoritativeness`, `supersededBy`, `supersedes`).
+- Discovery metadata changes with retrieval impact (`title`, `summary`, `keywords`, `relatedDocs`, `relatedRecordIds`, `relatedCodePaths`).
+- Routing/context-pack linkage changes where indexed docs are added or removed from `relatedDocRecordIds`.
+
+For wording-only edits that do not affect retrieval, lifecycle, or routing, registry edits are optional.
+
+### How New Documentation Should Be Added to the Registry
+
+Use this bounded add flow:
+
+1. Confirm coverage eligibility using `coveragePolicy` and `documentation-index-coverage-rules.ai.md`.
+2. Start from `docs/context/templates/documentation-registry-entry*.json`.
+3. Add one stable `entries` record with `recordId` (`doc-...`, lowercase kebab-case) and required metadata-contract fields.
+4. Update `discoveryIndex` membership (`byDocType`, `byStatus`, `byDomain`, `byAuthoritativeness`, and `byTaskCategory` when applicable).
+5. Update routing/pack assets with `relatedDocRecordIds` when the new doc is part of documented workflows.
+6. Run `npm run docs:validate:registry`; if discovery groupings changed, run `npm run docs:generate:index-view` and `npm run docs:validate:foundation`.
+
+### Who Should Care About Stale Entries
+
+`team:developer-experience` remains the registry owner, but stale-entry prevention is shared:
+
+- Authors/story implementers update registry metadata when changing indexed docs.
+- Reviewers treat stale or missing registry updates as blocking for changes that affect discovery, routing, or lifecycle state.
+- Routing/context-pack maintainers keep `relatedDocRecordIds` aligned when mappings or pack associations change.
+
+This keeps registry hygiene embedded in normal pull-request review instead of creating a separate maintenance workflow.
+
+### Handling Superseded, Deprecated, and Historical Transitions
+
+When a document is no longer current authority:
+
+1. Preserve existing `recordId`; do not rotate IDs for the same lineage.
+2. Move lifecycle state to `superseded`, `deprecated`, or `archived` and set `authoritativeness: historical` when implementation authority is retired.
+3. Maintain `supersededBy`/`supersedes` links and resolvable redirect targets.
+4. Keep `discoveryIndex.byStatus` and `byAuthoritativeness` aligned to non-active buckets while canonical replacements remain indexed as `active`.
+5. Preserve historical discoverability for traceability while routing implementation decisions to active canonical records.
+
+Use `documentation-status-signals.ai.md` and `documentation-supersession-and-redirect-conventions.ai.md` for content-level status markers while the registry carries machine-readable lifecycle state.
 
 ## Coverage Policy Contract
 
