@@ -111,27 +111,239 @@
   ],
   "mappings": [
     {
-      "taskId": "context-asset-metadata-standardization",
-      "taskCategory": "documentation-change",
-      "intent": "define-and-maintain-context-asset-metadata-standards",
+      "taskId": "architecture-review-host-boundaries",
+      "taskCategory": "architecture-review",
+      "intent": "validate-host-composition-boundaries-and-contract-seams",
       "routingInputs": {
-        "taskSummary": "Define metadata standards for context-pack and routing assets.",
+        "taskSummary": "Review host composition and architecture boundary changes before implementation.",
+        "taskCategory": "architecture-review",
         "changedPaths": [
-          "docs/context/packs",
-          "docs/context/routing",
-          "docs/context/context-asset-metadata.contract.json",
+          "docs/architecture",
+          "src/hosts",
+          "src/application"
+        ],
+        "requestedOutcomes": [
+          "boundary-review",
+          "contract-impact-summary",
+          "recommended-change-plan"
+        ],
+        "constraints": [
+          "preserve-layered-architecture-direction",
+          "avoid-cross-layer-shortcuts"
+        ],
+        "primarySurfaces": [
+          "desktop-host",
+          "authoritative-server-host",
+          "worker-host"
+        ],
+        "qualityGates": [
+          "architecture-docs-updated-with-boundary-changes",
+          "host-composition-tests-stay-green"
+        ],
+        "exclusions": [
+          "ui-cosmetic-only-changes",
+          "runtime-security-incident-response"
+        ],
+        "notes": "Read host assembly docs before implementation details to keep routing deterministic."
+      },
+      "packIds": [
+        "context-system-foundations"
+      ],
+      "selectionMode": "ordered",
+      "priorityTier": "high",
+      "status": "active",
+      "id": "route-architecture-review-host-boundaries",
+      "title": "Route Architecture Review for Host Boundaries",
+      "purpose": "Route architecture review tasks to context contracts and host boundary references with minimal context noise.",
+      "domain": "platform-architecture",
+      "owner": "team:platform-architecture",
+      "relatedDocPaths": [
+        "docs/architecture/authoritative-server-host-assembly.md",
+        "docs/architecture/desktop-host-assembly.md",
+        "docs/architecture/worker-host-assembly.md",
+        "docs/architecture/studio-handoff-contract.md"
+      ],
+      "relatedCodePaths": [
+        "src/hosts",
+        "src/application",
+        "dev/tests/HostCompositionArchitectureGuardrails.test.ts"
+      ],
+      "excludePackIds": [],
+      "notes": "Primary ordering remains deterministic: foundations pack first until domain-specific packs exist.",
+      "reviewExpectations": {
+        "cadence": "per-story",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
+      "taskId": "feature-decomposition-epic-story-planning",
+      "taskCategory": "feature-decomposition",
+      "intent": "break-features-into-sequenced-implementation-slices",
+      "routingInputs": {
+        "taskSummary": "Decompose feature or epic requests into implementation slices and dependency order.",
+        "taskCategory": "feature-decomposition",
+        "changedPaths": [
+          "docs/architecture",
+          "docs/baselines",
+          "src/application",
+          "src/domain"
+        ],
+        "requestedOutcomes": [
+          "slice-plan",
+          "dependency-order",
+          "test-and-docs-plan"
+        ],
+        "constraints": [
+          "respect-existing-host-and-layer-boundaries",
+          "avoid-speculative-abstractions"
+        ],
+        "primarySurfaces": [
+          "application-layer",
+          "domain-layer",
+          "architecture-docs"
+        ],
+        "qualityGates": [
+          "decomposition-maps-to-existing-doc-domains",
+          "stories-include-test-and-doc-updates"
+        ],
+        "exclusions": [
+          "incident-hotfix-triage",
+          "ui-polish-only-work"
+        ],
+        "notes": "Prioritize architecture overviews and existing contributor guides before producing slices."
+      },
+      "packIds": [
+        "context-system-foundations"
+      ],
+      "selectionMode": "ordered",
+      "priorityTier": "high",
+      "status": "active",
+      "id": "route-feature-decomposition-epic-story-planning",
+      "title": "Route Feature Decomposition and Planning",
+      "purpose": "Route decomposition tasks to context assets that preserve deterministic planning and documentation coverage.",
+      "domain": "delivery-planning",
+      "owner": "team:developer-experience",
+      "relatedDocPaths": [
+        "docs/architecture/README.md",
+        "docs/baselines/README.md",
+        "docs/context/routing/prompt-routing-contract.md"
+      ],
+      "relatedCodePaths": [
+        "src/application",
+        "src/domain",
+        "dev/tests/TaskToContextRoutingContractGuardrails.test.ts"
+      ],
+      "excludePackIds": [],
+      "notes": "Use deterministic ordering to keep decomposition prompts compact and architecture-first.",
+      "reviewExpectations": {
+        "cadence": "per-story",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
+      "taskId": "repo-implementation-core-workflows",
+      "taskCategory": "coding-implementation",
+      "intent": "implement-or-modify-repository-runtime-behavior",
+      "routingInputs": {
+        "taskSummary": "Implement code changes in repository runtime or host surfaces with aligned tests and docs.",
+        "taskCategory": "coding-implementation",
+        "changedPaths": [
+          "src/application",
+          "src/domain",
+          "src/infrastructure",
+          "src/hosts",
           "dev/tests"
         ],
         "requestedOutcomes": [
-          "contract-update",
-          "seed-update",
-          "guardrail-tests",
-          "docs-update"
+          "code-change",
+          "targeted-tests",
+          "documentation-alignment"
         ],
         "constraints": [
-          "keep-metadata-standard-lightweight",
-          "keep-deterministic-routing"
-        ]
+          "reuse-existing-architecture-seams",
+          "avoid-unrelated-refactors"
+        ],
+        "primarySurfaces": [
+          "application-services",
+          "runtime-hosts",
+          "infrastructure-adapters"
+        ],
+        "qualityGates": [
+          "targeted-automated-tests-pass",
+          "public-behavior-changes-documented"
+        ],
+        "exclusions": [
+          "docs-only-edits",
+          "security-policy-only-work-without-runtime-change"
+        ],
+        "notes": "Start from nearest architecture and contributor docs, then load only paths in changedPaths."
+      },
+      "packIds": [
+        "context-system-foundations"
+      ],
+      "selectionMode": "ordered",
+      "priorityTier": "normal",
+      "status": "active",
+      "id": "route-repo-implementation-core-workflows",
+      "title": "Route Core Repository Implementation Work",
+      "purpose": "Route implementation work to deterministic context assets that favor architecture-preserving code changes.",
+      "domain": "implementation",
+      "owner": "team:platform-engineering",
+      "relatedDocPaths": [
+        "docs/architecture/workflow-execution-and-tools.md",
+        "docs/architecture/authoritative-server-host-assembly.md",
+        "docs/contributors/docs-foundation-validation.md"
+      ],
+      "relatedCodePaths": [
+        "src/application",
+        "src/domain",
+        "src/infrastructure",
+        "src/hosts",
+        "dev/tests"
+      ],
+      "excludePackIds": [],
+      "notes": "Single-pack ordering keeps implementation context bounded until additional domain packs are published.",
+      "reviewExpectations": {
+        "cadence": "per-story",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
+      "taskId": "documentation-refactor-context-and-architecture",
+      "taskCategory": "documentation-change",
+      "intent": "refactor-or-update-documentation-contracts-and-routing-assets",
+      "routingInputs": {
+        "taskSummary": "Refactor documentation contracts and routers while keeping human and AI docs aligned.",
+        "taskCategory": "documentation-change",
+        "changedPaths": [
+          "docs/context",
+          "docs/architecture",
+          "docs/contributors",
+          "dev/tests"
+        ],
+        "requestedOutcomes": [
+          "docs-update",
+          "metadata-alignment",
+          "guardrail-test-updates"
+        ],
+        "constraints": [
+          "keep-md-and-ai-doc-pairs-aligned",
+          "preserve-canonical-router-links"
+        ],
+        "primarySurfaces": [
+          "context-routing-docs",
+          "architecture-router-docs",
+          "contributor-guides"
+        ],
+        "qualityGates": [
+          "docs-foundation-validation-passes",
+          "routing-and-metadata-guardrails-pass"
+        ],
+        "exclusions": [
+          "runtime-implementation-only-work",
+          "ui-interaction-only-updates"
+        ],
+        "notes": "Prefer router and contract docs first, then update deep references only where linked."
       },
       "packIds": [
         "context-system-foundations"
@@ -139,23 +351,156 @@
       "selectionMode": "single",
       "priorityTier": "normal",
       "status": "active",
-      "id": "route-context-asset-metadata-standardization",
-      "title": "Route Context Asset Metadata Standardization",
-      "purpose": "Deterministically route metadata-contract and governance work to the context-system foundations pack.",
-      "domain": "context-engineering",
+      "id": "route-documentation-refactor-context-and-architecture",
+      "title": "Route Documentation Refactor Work",
+      "purpose": "Route documentation refactor tasks to context assets that enforce deterministic docs governance.",
+      "domain": "documentation-system",
       "owner": "team:developer-experience",
       "relatedDocPaths": [
+        "docs/context/routing/README.md",
         "docs/context/context-asset-metadata.md",
-        "docs/context/packs/context-pack-catalog.contract.json",
-        "docs/context/routing/task-to-context-routing.contract.json"
+        "docs/contributors/router-overview-writing-standard.md",
+        "docs/contributors/docs-placement-guide.md"
       ],
       "relatedCodePaths": [
-        "dev/tests/ContextAssetMetadataStandardsGuardrails.test.ts",
-        "dev/tests/ContextPackContractGuardrails.test.ts",
+        "dev/tests/DocsFoundationValidationScript.test.ts",
+        "dev/tests/DocumentationRouterOverviewWritingStandardGuardrails.test.ts",
         "dev/tests/TaskToContextRoutingContractGuardrails.test.ts"
       ],
+      "excludePackIds": [],
+      "notes": "Single selection mode intentionally avoids broad multi-pack documentation context.",
       "reviewExpectations": {
-        "cadence": "per-epic-milestone",
+        "cadence": "per-story",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
+      "taskId": "runtime-host-diagnostics-triage",
+      "taskCategory": "diagnostics",
+      "intent": "triage-runtime-or-host-failures-and-regressions",
+      "routingInputs": {
+        "taskSummary": "Diagnose runtime or host startup/execution failures and converge on a minimal safe fix.",
+        "taskCategory": "diagnostics",
+        "changedPaths": [
+          "src/hosts",
+          "src/infrastructure/runtime",
+          "docs/architecture",
+          "dev/tests"
+        ],
+        "requestedOutcomes": [
+          "root-cause",
+          "minimal-fix",
+          "regression-test"
+        ],
+        "constraints": [
+          "preserve-host-composition-boundaries",
+          "avoid-adding-new-runtime-surfaces-during-triage"
+        ],
+        "primarySurfaces": [
+          "host-startup",
+          "runtime-services",
+          "health-diagnostics"
+        ],
+        "qualityGates": [
+          "diagnostic-reproduction-documented",
+          "fix-validated-by-targeted-tests"
+        ],
+        "exclusions": [
+          "feature-decomposition-planning",
+          "broad-refactor-without-reproduction"
+        ],
+        "notes": "Load host assembly docs first, then narrow to runtime paths touched by reproduction."
+      },
+      "packIds": [
+        "context-system-foundations"
+      ],
+      "selectionMode": "fallback",
+      "priorityTier": "high",
+      "status": "active",
+      "id": "route-runtime-host-diagnostics-triage",
+      "title": "Route Runtime and Host Diagnostics",
+      "purpose": "Route diagnostics to deterministic context that supports fast, low-noise root-cause analysis.",
+      "domain": "runtime-operations",
+      "owner": "team:runtime-platform",
+      "relatedDocPaths": [
+        "docs/architecture/authoritative-server-host-assembly.md",
+        "docs/architecture/desktop-host-assembly.md",
+        "docs/unified-api-observability-troubleshooting.md"
+      ],
+      "relatedCodePaths": [
+        "src/hosts",
+        "src/infrastructure/runtime",
+        "dev/tests/HostDevelopmentStartupScripts.test.ts"
+      ],
+      "excludePackIds": [],
+      "notes": "Fallback mode keeps diagnostics resilient while preserving deterministic primary-pack ordering.",
+      "reviewExpectations": {
+        "cadence": "per-story",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
+      "taskId": "studio-system-design-and-ux-shaping",
+      "taskCategory": "ui-studio",
+      "intent": "design-or-adjust-studio-and-system-user-experience-contracts",
+      "routingInputs": {
+        "taskSummary": "Design or evolve Studio and System UX flows while preserving backend contract alignment.",
+        "taskCategory": "ui-studio",
+        "changedPaths": [
+          "src/ui",
+          "src/application/workflow-studio",
+          "docs/ui",
+          "docs/architecture"
+        ],
+        "requestedOutcomes": [
+          "ux-design-update",
+          "state-flow-alignment",
+          "validation-or-test-coverage"
+        ],
+        "constraints": [
+          "preserve-backend-authoritative-boundaries",
+          "keep-studio-handoff-contract-consistent"
+        ],
+        "primarySurfaces": [
+          "studio-shell",
+          "system-studio",
+          "workflow-studio"
+        ],
+        "qualityGates": [
+          "ui-contract-docs-stay-aligned",
+          "multi-surface-guardrail-tests-pass"
+        ],
+        "exclusions": [
+          "server-runtime-only-changes",
+          "security-policy-hardening-without-ui-impact"
+        ],
+        "notes": "Prefer studio handoff and UI router docs before component-level changes."
+      },
+      "packIds": [
+        "context-system-foundations"
+      ],
+      "selectionMode": "ordered",
+      "priorityTier": "normal",
+      "status": "active",
+      "id": "route-studio-system-design-and-ux-shaping",
+      "title": "Route Studio and System Design Tasks",
+      "purpose": "Route studio/system design work to deterministic context assets that balance UX and architecture constraints.",
+      "domain": "studio-experience",
+      "owner": "team:studio-experience",
+      "relatedDocPaths": [
+        "docs/ui/README.md",
+        "docs/architecture/studio-handoff-contract.md",
+        "docs/architecture/image-manipulation-studio-interaction-model.md"
+      ],
+      "relatedCodePaths": [
+        "src/ui",
+        "src/application/workflow-studio",
+        "dev/tests/MultiSurfaceUiArchitectureDocumentationGuardrails.test.ts"
+      ],
+      "excludePackIds": [],
+      "notes": "Ordered mode keeps studio context sequencing deterministic: UI contracts first, then implementation paths.",
+      "reviewExpectations": {
+        "cadence": "per-story",
         "lastReviewed": "2026-04-11"
       }
     }
