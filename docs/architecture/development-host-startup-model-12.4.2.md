@@ -1,71 +1,33 @@
+---
+title: Development and Test Startup Host Migration (Legacy Path Stub)
+doc_type: architecture-reference
+status: superseded
+authoritativeness: historical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+superseded_by: docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.md
+related_code_paths:
+  - docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.md
+  - docs/architecture/domains/runtime-host-surfaces/overview.md
+---
+
 # Development and Test Startup Host Migration (Story 12.4.2)
 
-Story 12.4.2 moves developer startup and harness execution paths onto the host composition framework so local workflows match production composition boundaries.
+## Supersession Notice
 
-## What changed
+This document is a `migrated-link-stub` and is not authoritative for active startup architecture decisions.
 
-### Local development scripts now expose host-first startup modes
+Effective date: 2026-04-11.
+Reason: migration-era startup notes were moved into architecture baselines to prevent stale guidance from appearing as current authority.
+Canonical source: `docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.md`.
 
-`package.json` now includes host-oriented local development aliases:
+## Redirect
 
-- `dev:host:authoritative-server`
-- `dev:host:hybrid`
-- `dev:host:web`
-- `dev:host:worker`
-- `dev:host:control-plane-worker`
+- Historical baseline snapshot:
+  `docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.md`
+- Current startup/runtime-host authority:
+  - `docs/architecture/domains/runtime-host-surfaces/overview.md`
+  - `docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md`
+  - `docs/architecture/host-bootstrap-pipeline.md`
 
-Each alias runs through one of the executable host entrypoints already defined in the host framework:
-
-- `start:authoritative-server` -> `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
-- `start:hybrid-host` -> `src/hosts/hybrid/HybridHostEntrypoint.ts`
-- `start:web-host` -> `src/hosts/web/WebHostEntrypoint.ts`
-- `start:worker-host` -> `src/hosts/worker/WorkerHostEntrypoint.ts`
-
-The new combined mode (`dev:host:control-plane-worker`) uses `concurrently` to run the authoritative server and worker host assemblies together for local control-plane plus execution testing.
-
-Desktop development startup also separates Electron Forge launch into `dev:desktop:start` and runs both desktop preflight and Forge CLI through Node symlink-preservation flags:
-
-- `dev:desktop:prepare` -> `node --preserve-symlinks-main dev/prepare-electron-forge-dev.cjs`
-- `dev:desktop:start` -> `node --preserve-symlinks --preserve-symlinks-main node_modules/@electron-forge/cli/dist/electron-forge.js start`
-
-This keeps the default `npm run dev` workflow stable on Windows hosts where parent-directory realpath resolution can fail under restricted ACLs.
-
-Desktop preflight native module repair now resolves the `electron-rebuild` package CLI entrypoint and executes it through the active Node runtime (`process.execPath`) instead of invoking platform wrapper binaries directly. This keeps `better-sqlite3` rebuild behavior consistent across environments (including Windows shells where `.cmd` spawn semantics can fail with `EINVAL`).
-Desktop preflight compatibility probing now runs in a short-lived Electron subprocess instead of loading `better-sqlite3` in the long-lived preflight process, preventing Windows native-module file locks (`EPERM` on `better_sqlite3.node` unlink) during `electron-rebuild` while validating the runtime that actually boots in desktop mode.
-
-Electron main-process bundling now also preserves native dependency runtime loading by externalizing `sharp` and `@img/sharp-*` modules in `vite.main.config.ts`, including resolved `node_modules` path variants and CommonJS virtual module IDs (`commonjs-external:*`, `/@id/*`) used by Rollup on Windows builds, so native binaries are resolved from installed `node_modules` packages at runtime instead of being inlined into the Vite bundle.
-
-Preview-derivative image processing now resolves the `sharp` factory at runtime via dynamic import (`src/infrastructure/media/generated-results/SharpGeneratedResultPreviewImageProcessor.ts`) to avoid direct static import bundling in Electron main while keeping the same processing behavior.
-
-### Server integration harness startup now runs through host assembly entrypoint
-
-`src/hosts/server/tests/IdentityServerHost.test.ts` now starts runtime hosts via a dedicated helper that composes startup through `startAuthoritativeServerHostAssembly(...)`.
-
-The helper preserves existing test ergonomics (`address`, `secretService`, and `close`) while routing startup and shutdown through host lifecycle coordination. This keeps the test harness aligned with production host composition without rewriting integration assertions.
-
-### Guardrail test coverage for startup scripts
-
-Added `dev/tests/HostDevelopmentStartupScripts.test.ts` to validate startup workflow contracts:
-
-- default development command remains `npm run dev:desktop`
-- desktop startup scripts use symlink-preservation Node flags for preflight and Electron Forge entrypoint invocation
-- host startup scripts resolve to host entrypoint assemblies
-- host-based aliases and combined local mode remain defined
-- package scripts do not use direct legacy `IdentityServerHost.ts` startup as a default path
-
-### Browser development runtime bootstrap path correction
-
-Browser-mode Vite runtime bootstrap now resolves the repository root through a shared browser-development path module (`src/infrastructure/runtime/browser-development/BrowserDevelopmentPaths.ts`).
-
-This removes duplicate path math and prevents accidental `src/src/...` entrypoint resolution when auto-starting managed runtime infrastructure (for example `service-supervisor.js` and authoritative server startup).
-
-A regression test (`src/infrastructure/runtime/tests/BrowserDevelopmentPaths.test.ts`) now verifies browser-development bootstrap paths resolve to the actual repository root and expected supervisor entrypoint.
-
-## Developer-facing startup model
-
-- Standard local app development remains: `npm run dev` (desktop host path).
-- Host-specific local startup can be run directly through `npm run dev:host:*` commands.
-- Combined local control-plane + worker mode is available with:
-  - `npm run dev:host:control-plane-worker`
-
-This keeps local startup behavior composition-root-first while preserving fast feedback loops.
+Retention/removal trigger: keep this stub only while inbound references still rely on this legacy path.
