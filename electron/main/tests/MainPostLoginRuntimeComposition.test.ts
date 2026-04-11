@@ -17,7 +17,7 @@ describe("electron main post-login runtime composition", () => {
     expect(mainSource).toContain("const pythonRuntime = resolveDesktopPythonRuntime(");
     expect(mainSource).toContain("serviceSupervisor = new DesktopServiceSupervisor(");
     expect(mainSource).toContain("await serviceSupervisor.start()");
-    expect(mainSource).toContain("startDesktopConnectivityMonitoring(authShell.identityApiBaseUrl)");
+    expect(mainSource).toContain("connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl)");
   });
 
   it("keeps legacy eager bootstrap entrypoint removed", () => {

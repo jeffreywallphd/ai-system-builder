@@ -44,6 +44,9 @@ Main process (`electron/main`):
 - owns warmup orchestration (`ensurePostLoginWarmupStarted` -> `bootstrapPostLoginRuntime`).
 - owns deferred feature IPC readiness gate (`deferredFeatureIpcReady`).
 - owns teardown/reset transitions during desktop runtime disposal.
+- composes focused runtime-control modules for lifecycle and connectivity:
+  - `electron/main/DesktopPostLoginRuntimeStatusStore.ts`
+  - `electron/main/DesktopConnectivityRuntimeController.ts`
 
 Preload (`electron/preload.ts`):
 
@@ -193,6 +196,15 @@ Deferred runtime lifecycle protection now includes explicit startup guardrails t
   - Python runtime resolution and service-supervisor startup remain post-login composition work,
   - workflow/studio/system backends remain on-demand via deferred runtime `ensure*` activators.
 
+## Story C.3.5 runtime-control extraction seam
+
+To reduce scattered mutable state in `electron/main/main.ts` while preserving behavior:
+
+- post-login lifecycle status transitions are hosted by `createDesktopPostLoginRuntimeStatusStore(...)`.
+- auth IPC status reads (`getPostLoginRuntimeStatus`) delegate to this store.
+- deferred connectivity placeholder generation, auth IPC serialization, offline-mode write handling, and monitoring start/stop lifecycle are hosted by `createDesktopConnectivityRuntimeController(...)`.
+- monitoring still starts only when post-login warmup is accepted, and still provisions probe token lookup from persisted storage before starting monitor probes.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)
@@ -269,4 +281,3 @@ Contract target for authenticated logout:
 4. next authenticated session may re-trigger warmup through auth-success or lazy feature demand.
 
 This story defines the logout reset contract boundary and status semantics so follow-on stories can implement logout-triggered runtime reset without re-deciding lifecycle behavior.
-
