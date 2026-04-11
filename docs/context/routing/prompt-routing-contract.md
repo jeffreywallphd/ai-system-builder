@@ -102,6 +102,8 @@ Ordering and token-efficiency rules:
 - Exclude deprecated packs unless the request explicitly asks for historical behavior.
 - Exclude packs outside declared path/surface scope.
 - Respect explicit `excludePackIds` from task mappings.
+- Exclude baseline or historical docs by default unless `routingInputs` or `requestedOutcomes` explicitly require historical evidence.
+- Exclude superseded pointer docs by default unless the task is supersession maintenance, redirect validation, or migration traceability.
 - If exclusions remove all primary packs, route via fallback behavior rather than guessing.
 
 ## Priority and Fallback Behavior
@@ -130,6 +132,7 @@ Fallback behavior:
 - `selectionMode` must be `ordered`, `fallback`, or `single`.
 - `priorityTier` must be `critical`, `high`, `normal`, or `low`.
 - `status` must be `draft`, `active`, or `deprecated`.
+- Keep active-authoritative docs in `relatedDocPaths` by default; add baseline/superseded links only when the mapping intent explicitly depends on historical evidence or supersession maintenance.
 - Every mapping must include metadata fields:
 `id`, `title`, `purpose`, `domain`, `owner`, `status`, `relatedDocPaths`, `relatedCodePaths`.
 - Keep `id` equal to or deterministically derived from `taskId`.

@@ -107,10 +107,12 @@
       ],
       "expectedRelatedDocOrder": [
         "docs/architecture/README.md",
-        "docs/baselines/README.md",
+        "docs/context/documentation-segmentation-taxonomy.md",
         "docs/context/routing/prompt-routing-contract.md"
       ],
       "expectedExclusions": [
+        "docs/baselines/README.md",
+        "docs/architecture/workflow-execution-and-tools.md",
         "docs/unified-api-observability-troubleshooting.md",
         "src/infrastructure/runtime"
       ]
@@ -151,6 +153,7 @@
         "docs/contributors/docs-placement-guide.md"
       ],
       "expectedExclusions": [
+        "docs/baselines/README.md",
         "docs/architecture/workflow-execution-and-tools.md",
         "docs/unified-api-observability-troubleshooting.md"
       ]
@@ -463,7 +466,7 @@
         "taskCategory": "feature-decomposition",
         "changedPaths": [
           "docs/architecture",
-          "docs/baselines",
+          "docs/context",
           "src/application",
           "src/domain"
         ],
@@ -486,6 +489,8 @@
           "stories-include-test-and-doc-updates"
         ],
         "exclusions": [
+          "baseline-and-historical-docs-unless-explicitly-requested",
+          "superseded-pointer-docs-unless-target-of-task",
           "incident-hotfix-triage",
           "ui-polish-only-work"
         ],
@@ -529,7 +534,7 @@
       "owner": "team:developer-experience",
       "relatedDocPaths": [
         "docs/architecture/README.md",
-        "docs/baselines/README.md",
+        "docs/context/documentation-segmentation-taxonomy.md",
         "docs/context/routing/prompt-routing-contract.md"
       ],
       "relatedCodePaths": [
@@ -669,6 +674,8 @@
           "routing-and-metadata-guardrails-pass"
         ],
         "exclusions": [
+          "baseline-and-historical-docs-unless-explicitly-requested",
+          "superseded-pointer-docs-unless-target-of-task",
           "runtime-implementation-only-work",
           "ui-interaction-only-updates"
         ],

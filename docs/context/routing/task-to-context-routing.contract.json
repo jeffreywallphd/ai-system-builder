@@ -177,7 +177,9 @@
   "exclusionRules": [
     "exclude packs marked deprecated unless explicitly requested.",
     "exclude packs whose declared scope does not match changedPaths.",
-    "exclude packs explicitly listed in mapping.excludePackIds."
+    "exclude packs explicitly listed in mapping.excludePackIds.",
+    "exclude baseline or historical docs by default unless routingInputs or requestedOutcomes explicitly require historical evidence.",
+    "exclude superseded pointer docs by default unless the task explicitly targets supersession or redirect maintenance."
   ],
   "allowedStatusValues": [
     "draft",

@@ -118,13 +118,15 @@
       "aiDocPath": "docs/context/packs/documentation-refactor.pack.ai.md",
       "relatedDocPaths": [
         "docs/architecture/README.md",
-        "docs/documentation-migration-baseline.md",
         "docs/contributors/docs-placement-guide.md",
         "docs/contributors/docs-migration-safety-guide.md",
         "docs/contributors/docs-foundation-validation.md",
         "docs/contributors/router-overview-writing-standard.md",
         "docs/context/documentation-taxonomy.md",
-        "docs/context/documentation-metadata-header.md"
+        "docs/context/documentation-metadata-header.md",
+        "docs/context/documentation-status-signals.md",
+        "docs/context/documentation-baseline-and-historical-folder-strategy.md",
+        "docs/context/documentation-supersession-and-redirect-conventions.md"
       ],
       "relatedCodePaths": [
         "dev/scripts/validate-docs-foundation.cjs",

@@ -76,6 +76,8 @@ Apply these exclusions even when files look adjacent or partially relevant:
 For all categories, explicitly exclude:
 
 - stale historical material when a newer canonical source exists;
+- baseline snapshots unless requested outcomes explicitly require historical evidence;
+- superseded pointer docs unless the task is pointer maintenance, redirect validation, or migration traceability;
 - unrelated architecture domains not present in `changedPaths` or `primarySurfaces`;
 - overlapping but non-authoritative files when authoritative contracts/docs are available;
 - context packs intended only for adjacent workflows.
@@ -113,7 +115,7 @@ Use when converting epics or stories into sequenced implementation slices.
 
 Primary docs:
 - `docs/architecture/README.md`
-- `docs/baselines/README.md`
+- `docs/context/documentation-segmentation-taxonomy.md`
 - `docs/context/routing/prompt-routing-contract.md`
 
 Typical code surfaces:
@@ -233,10 +235,11 @@ Expected context assembly:
 - Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/README.md`
-2. `docs/baselines/README.md`
+2. `docs/context/documentation-segmentation-taxonomy.md`
 3. `docs/context/routing/prompt-routing-contract.md`
 
 Explicit exclusions:
+- `docs/baselines/README.md` (historical baseline routing is opt-in, not default decomposition context)
 - `docs/unified-api-observability-troubleshooting.md` (diagnostics-only depth not required for planning)
 - runtime incident triage artifacts in `src/infrastructure/runtime/`
 
@@ -254,7 +257,7 @@ Routing inputs:
 - `requestedOutcomes`: `authoritative-doc-update`, `metadata-alignment`, `guardrail-test-update`
 
 Expected context assembly:
-- Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `documentation-refactor`, `context-system-foundations`
 - Ordered docs:
 1. `docs/context/routing/README.md`
 2. `docs/context/context-asset-metadata.md`
@@ -262,6 +265,7 @@ Expected context assembly:
 4. `docs/contributors/docs-placement-guide.md`
 
 Explicit exclusions:
+- `docs/baselines/README.md` (historical baseline references are loaded only when explicitly requested)
 - `docs/architecture/workflow-execution-and-tools.md` (implementation-centric, not docs-router authority)
 - host runtime diagnostics docs unless a docs claim depends on runtime behavior evidence
 

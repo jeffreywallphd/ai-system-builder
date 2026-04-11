@@ -102,6 +102,8 @@ Deterministic ordering and token guardrails:
 - Exclude deprecated packs unless explicitly requested.
 - Exclude packs outside task scope.
 - Apply explicit `excludePackIds` before fallback evaluation.
+- Exclude baseline or historical docs by default unless `routingInputs` or `requestedOutcomes` explicitly require historical evidence.
+- Exclude superseded pointer docs by default unless the task is supersession maintenance, redirect validation, or migration traceability.
 - Do not infer random replacements when all primary packs are excluded.
 
 ## Priority and Fallback Behavior
@@ -128,6 +130,7 @@ Fallback behavior:
 - `contextAssemblyProfileId` must resolve to a defined contract profile.
 - `contextAssemblyTierHints` must include every tier from `contextAssemblyTierOrder` with descending weights.
 - Do not redefine category semantics per mapping entry.
+- Keep active-authoritative docs in `relatedDocPaths` by default; add baseline/superseded links only when mapping intent explicitly requires historical evidence or supersession maintenance.
 - Always include mapping metadata fields:
 `id`, `title`, `purpose`, `domain`, `owner`, `status`, `relatedDocPaths`, `relatedCodePaths`.
 - Keep `id` equal to or deterministically derived from `taskId`.

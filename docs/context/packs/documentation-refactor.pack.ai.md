@@ -23,19 +23,22 @@
 - Keep `.md` and `.ai.md` companion docs synchronized.
 - Maintain one authoritative owner per responsibility; link secondary references instead of duplicating authority.
 - Keep metadata fields and taxonomy enum values contract-aligned.
-- Use migration baseline assets as historical context, not current authority.
+- Treat baseline, transitional, and superseded docs as opt-in historical context only.
+- Prefer active canonical routers/contracts by default; include historical evidence only when an outcome explicitly requires it.
 - Keep routers/overviews concise and link-first.
 
 ## Authoritative Docs
 
 - `docs/architecture/README.ai.md`
-- `docs/documentation-migration-baseline.ai.md`
 - `docs/contributors/docs-placement-guide.ai.md`
 - `docs/contributors/docs-migration-safety-guide.ai.md`
 - `docs/contributors/docs-foundation-validation.ai.md`
 - `docs/contributors/router-overview-writing-standard.ai.md`
 - `docs/context/documentation-taxonomy.ai.md`
 - `docs/context/documentation-metadata-header.ai.md`
+- `docs/context/documentation-status-signals.ai.md`
+- `docs/context/documentation-baseline-and-historical-folder-strategy.ai.md`
+- `docs/context/documentation-supersession-and-redirect-conventions.ai.md`
 - `docs/context/prompt-routing.ai.md`
 
 ## Authoritative Code Paths
@@ -55,6 +58,7 @@
 - Refactoring docs without updating metadata lifecycle and pointer notes.
 - Leaving parallel canonical docs after split/move operations.
 - Using archived migration baseline content as active canonical guidance.
+- Pulling in `docs/baselines/` or superseded pointer stubs by default when active canonical sources already cover the task.
 - Turning routers into procedural implementation guides.
 
 ## Related Packs

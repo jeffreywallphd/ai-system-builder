@@ -47,9 +47,11 @@ describe("documentation refactor context pack guardrails", () => {
 
     for (const authoritativePath of [
       "docs/architecture/README.md",
-      "docs/documentation-migration-baseline.md",
       "docs/contributors/docs-placement-guide.md",
       "docs/contributors/docs-migration-safety-guide.md",
+      "docs/context/documentation-status-signals.md",
+      "docs/context/documentation-baseline-and-historical-folder-strategy.md",
+      "docs/context/documentation-supersession-and-redirect-conventions.md",
       "dev/scripts/validate-docs-foundation.cjs",
       "dev/tests/DocsFoundationValidationScript.test.ts",
     ]) {
@@ -58,9 +60,11 @@ describe("documentation refactor context pack guardrails", () => {
 
     for (const authoritativePath of [
       "docs/architecture/README.ai.md",
-      "docs/documentation-migration-baseline.ai.md",
       "docs/contributors/docs-placement-guide.ai.md",
       "docs/contributors/docs-migration-safety-guide.ai.md",
+      "docs/context/documentation-status-signals.ai.md",
+      "docs/context/documentation-baseline-and-historical-folder-strategy.ai.md",
+      "docs/context/documentation-supersession-and-redirect-conventions.ai.md",
       "dev/scripts/validate-docs-foundation.cjs",
       "dev/tests/DocsFoundationValidationScript.test.ts",
     ]) {
