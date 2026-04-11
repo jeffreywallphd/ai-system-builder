@@ -22,6 +22,19 @@ const requiredSegments = [
   "Superseded or Deprecated Documents",
 ] as const;
 
+const requiredHumanFrameworkHeadings = [
+  "## Active Versus Historical Decision Framework",
+  "## Segment Selection Signals",
+  "## Borderline Case Rules",
+  "## Mixed-Content Split and Redirect Procedure",
+] as const;
+
+const requiredAiFrameworkHeadings = [
+  "## Active Versus Historical Decision Rubric",
+  "## Borderline and Mixed-Content Rules",
+  "## Mixed-Content Split Workflow",
+] as const;
+
 describe("documentation segmentation taxonomy guardrails", () => {
   it("keeps human and AI taxonomy artifacts present", () => {
     expect(existsSync(humanTaxonomyPath)).toBe(true);
@@ -42,6 +55,43 @@ describe("documentation segmentation taxonomy guardrails", () => {
     expect(humanTaxonomy).toContain("`doc_type`");
     expect(humanTaxonomy).toContain("`status`");
     expect(humanTaxonomy).toContain("`authoritativeness`");
+
+    for (const heading of requiredHumanFrameworkHeadings) {
+      expect(humanTaxonomy).toContain(heading);
+    }
+
+    for (const heading of requiredAiFrameworkHeadings) {
+      expect(aiTaxonomy).toContain(heading);
+    }
+  });
+
+  it("keeps active-vs-historical and mixed-content decisions explicit", () => {
+    const humanTaxonomy = readFileSync(humanTaxonomyPath, "utf8");
+    const aiTaxonomy = readFileSync(aiTaxonomyPath, "utf8");
+
+    for (const phrase of [
+      "Current-action test",
+      "Temporal-state test",
+      "Authority-source test",
+      "Purpose test",
+      "Replacement test",
+      "If a document has current instructions plus retrospective rationale",
+      "If one file would require conflicting authority signals",
+      "Extract current authoritative guidance into the destination active doc",
+      "Convert the source path into either",
+    ]) {
+      expect(humanTaxonomy).toContain(phrase);
+    }
+
+    for (const phrase of [
+      "Current-action + canonical authority -> `Active Guidance`.",
+      "Prior-state + traceability value -> `Historical Notes` or `Baselines`.",
+      "Movement coordination -> `Migration Guides and Records` or `Temporary Transition Documents`.",
+      "If classification is ambiguous, default to non-authoritative placement",
+      "Keep the old path as either router index or superseded transition stub with destination links.",
+    ]) {
+      expect(aiTaxonomy).toContain(phrase);
+    }
   });
 
   it("keeps context and root routers linked to segmentation taxonomy", () => {
