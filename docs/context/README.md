@@ -23,6 +23,7 @@
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.md)
 - [Context Pack Directory](./packs/README.md)
+- [Standard Context Pack Contract](./packs/README.md#standard-context-pack-contract)
 - [Routing Assets Directory](./routing/README.md)
 - [Context Governance Directory](./governance/README.md)
 - [Documentation Templates](./templates/README.md)

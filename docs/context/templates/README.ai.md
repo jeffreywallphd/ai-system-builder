@@ -19,6 +19,8 @@ Use this folder as the canonical template pack for doc creation.
 - `ai-context` -> [ai-context.template.md](./ai-context.template.md)
 - AI companions are colocated as `*.template.ai.md`.
 
+For pack files in `docs/context/packs/`, also apply `docs/context/packs/README.ai.md#standard-context-pack-contract` for required section layout.
+
 ## Metadata Anchor
 
 Required header keys are defined in `docs/context/documentation-metadata-header.contract.json`.

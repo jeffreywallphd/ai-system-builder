@@ -25,6 +25,8 @@ Provide lean, reusable starting points so document roles, metadata, and section 
 | `adr` | A specific architecture decision with alternatives and status. | `docs/adr/` | [adr.template.md](./adr.template.md) |
 | `ai-context` | Shared taxonomy or context pack for AI/human routing. | `docs/context/` | [ai-context.template.md](./ai-context.template.md) |
 
+For context packs under `docs/context/packs/`, follow the standard contract in `docs/context/packs/README.md#standard-context-pack-contract` in addition to the `ai-context` template.
+
 ## Metadata Contract Reminder
 
 Every template uses the required metadata header keys from `docs/context/documentation-metadata-header.md`:
