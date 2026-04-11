@@ -148,4 +148,47 @@ describe("documentation router and overview writing standard guardrails", () => 
       expect(h2Count).toBeGreaterThanOrEqual(3);
     }
   });
+
+  it("keeps the architecture router domain-first and non-exhaustive", () => {
+    const architectureRouterPath = resolve(docsRoot, "architecture/README.md");
+    const architectureRouterAiPath = resolve(docsRoot, "architecture/README.ai.md");
+    const architectureRouter = readFileSync(architectureRouterPath, "utf8");
+    const architectureRouterAi = readFileSync(architectureRouterAiPath, "utf8");
+
+    for (const section of [
+      "## Route By Domain",
+      "## Route By Document Type",
+      "## Active Flat References Pending Domain Migration",
+    ] as const) {
+      expect(architectureRouter).toContain(section);
+      expect(architectureRouterAi).toContain(section);
+    }
+
+    const directDomainLinksHuman = (architectureRouter.match(/\.\/domains\/[^)\s]+\/overview\.md/g) || []).length;
+    const directDomainLinksAi = (architectureRouterAi.match(/\.\/domains\/[^)\s]+\/overview\.md/g) || []).length;
+    expect(directDomainLinksHuman).toBe(8);
+    expect(directDomainLinksAi).toBe(8);
+
+    const humanPendingSection = architectureRouter.match(
+      /## Active Flat References Pending Domain Migration([\s\S]*?)(?:\n## |\n?$)/,
+    )?.[1] || "";
+    const aiPendingSection = architectureRouterAi.match(
+      /## Active Flat References Pending Domain Migration([\s\S]*?)(?:\n## |\n?$)/,
+    )?.[1] || "";
+    const legacyLinkCountHuman = (humanPendingSection.match(/\[[^\]]+\]\(\.\/[^)]+\.md\)/g) || []).length;
+    const legacyLinkCountAi = (aiPendingSection.match(/\[[^\]]+\]\(\.\/[^)]+\.md\)/g) || []).length;
+
+    // Keep direct flat links intentionally small while migration is in progress.
+    expect(architectureRouter).not.toContain("./domain-and-application-core.md");
+    expect(architectureRouter).not.toContain("./layers-and-boundaries.md");
+    expect(architectureRouter).not.toContain("./workflow-execution-and-tools.md");
+    expect(architectureRouter).not.toContain("./desktop-runtime-and-hosts.md");
+    expect(architectureRouterAi).not.toContain("./domain-and-application-core.md");
+    expect(architectureRouterAi).not.toContain("./layers-and-boundaries.md");
+    expect(architectureRouterAi).not.toContain("./workflow-execution-and-tools.md");
+    expect(architectureRouterAi).not.toContain("./desktop-runtime-and-hosts.md");
+
+    expect(legacyLinkCountHuman).toBeLessThanOrEqual(3);
+    expect(legacyLinkCountAi).toBeLessThanOrEqual(3);
+  });
 });

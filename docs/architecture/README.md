@@ -13,45 +13,48 @@ related_code_paths:
 # Architecture Documentation Router
 
 ## Audience
-- Engineers defining or reviewing system design contracts.
-- Contributors mapping feature work to architectural boundaries.
+- Engineers reviewing or changing architecture boundaries.
+- Contributors mapping work to the correct architecture domain.
 
 ## Purpose
-- Canonical architecture baselines and design contracts for AI Loom Studio.
+- Route readers to canonical architecture domains, references, ADRs, and migration inventories without duplicating detailed content.
 
 ## Belongs Here
-- Layer boundaries, domain/application/infrastructure contracts, and host composition rules.
-- Feature architecture baselines that define durable implementation direction.
-- Cross-cutting architecture references used by contributors and operators.
+- Quick routing into domain overviews and domain reference indexes.
+- Cross-cutting architecture navigation docs and ADR linking expectations.
 
 ## Does Not Belong Here
-- Step-by-step operational runbooks.
-- Contributor workflow checklists and coding process guides.
-- Historical snapshots that exist only for migration traceability.
+- Long implementation walkthroughs or endpoint-level reference detail.
+- Runbooks, contributor process checklists, and historical narrative content.
 
 ## ADR Linking Expectations
-- Architecture docs and ADRs are bi-directional companions, not separate archives.
-- When a domain/reference doc is shaped by a decision record, include a `## Related ADRs` section with direct links to `docs/adr/records/adr-<NNN>-<decision-slug>.md`.
-- When authoring new decisions, ensure the matching ADR `## Related Documentation` links back to the impacted architecture docs.
+- Architecture docs should include `## Related ADRs` when decisions shape scope or constraints.
+- Link ADRs with `docs/adr/records/adr-<NNN>-<decision-slug>.md` and maintain reverse links from ADR `## Related Documentation`.
 
 ## Start Here
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
+- [Domain Folder Contract](./domains/README.md)
 - [Architecture Domain Migration Inventory](./architecture-domain-migration-inventory.md)
-- [Architecture Domain Folders](./domains/README.md)
 - [Architecture Document Scope Boundaries](./architecture-document-scope-boundaries.md)
 - [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
-- [Domain Document Pattern](./domains/README.md#standard-domain-document-pattern)
-- [Core Platform and Composition Overview](./domains/core-platform-and-composition/overview.md)
-- [Runtime Host Surfaces Overview](./domains/runtime-host-surfaces/overview.md)
-- [Identity Trust and Security Overview](./domains/identity-trust-and-security/overview.md)
-- [Workspace Storage and Assets Overview](./domains/workspace-storage-and-assets/overview.md)
-- [Execution Control Plane and Scheduling Overview](./domains/execution-control-plane-and-scheduling/overview.md)
-- [Studio and System Composition Overview](./domains/studio-and-system-composition/overview.md)
-- [API and Transport Surfaces Overview](./domains/api-and-transport-surfaces/overview.md)
-- [Deployment Policy and Audit Governance Overview](./domains/deployment-policy-and-audit-governance/overview.md)
-- [Domain And Application Core](./domain-and-application-core.md)
-- [Layers And Boundaries](./layers-and-boundaries.md)
-- [Workflow Execution And Tools](./workflow-execution-and-tools.md)
-- [Desktop Runtime And Hosts](./desktop-runtime-and-hosts.md)
-- [Contributors Router](../contributors/README.md)
-- [Operations Router](../operations/README.md)
+
+## Route By Domain
+- [Core Platform and Composition](./domains/core-platform-and-composition/overview.md)
+- [Runtime Host Surfaces](./domains/runtime-host-surfaces/overview.md)
+- [Identity Trust and Security](./domains/identity-trust-and-security/overview.md)
+- [Workspace Storage and Assets](./domains/workspace-storage-and-assets/overview.md)
+- [Execution Control Plane and Scheduling](./domains/execution-control-plane-and-scheduling/overview.md)
+- [Studio and System Composition](./domains/studio-and-system-composition/overview.md)
+- [API and Transport Surfaces](./domains/api-and-transport-surfaces/overview.md)
+- [Deployment Policy and Audit Governance](./domains/deployment-policy-and-audit-governance/overview.md)
+
+## Route By Document Type
+- Domain boundaries and invariants: start in the relevant `overview.md` above.
+- Contract detail: open each domain `references/README.md` from [Domain Folder Contract](./domains/README.md).
+- Decision rationale: [ADR Router](../adr/README.md).
+- Cross-domain authoring and placement standards: [Contributors Router](../contributors/README.md).
+
+## Active Flat References Pending Domain Migration
+- [Multi-Surface UI Composition Foundation](./multi-surface-ui-composition-foundation.md)
+- [Run Orchestration Scheduling Authoritative Queue Selection and Assignment Integration](./run-orchestration-scheduling-authoritative-queue-selection-and-assignment-integration.md)
+- [Unified API Endpoint Reference](./unified-api-endpoint-reference.md)
