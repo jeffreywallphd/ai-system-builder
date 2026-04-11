@@ -79,6 +79,7 @@ Provide one consistent placement rule set so contributors and AI coding agents p
 
 - Choose folder placement by the document's primary role, not by where related docs already exist.
 - If a document spans multiple roles, keep a single authoritative copy and add links for discoverability.
-- Apply canonical docs metadata values exactly as defined in `docs/context/documentation-taxonomy.md`.
+- Apply the standard metadata header contract defined in `docs/context/documentation-metadata-header.md`.
+- Use `doc_type`, `status`, and `authoritativeness` values exactly as defined in `docs/context/documentation-taxonomy.md`.
 - Maintain `.md` and `.ai.md` companions together when both are required by local conventions.
 - Keep top-level router READMEs (`Purpose`, `Belongs Here`, `Does Not Belong Here`, `Start Here`) aligned as docs evolve.
