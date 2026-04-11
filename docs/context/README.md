@@ -31,6 +31,7 @@
 - [Routing Assets Directory](./routing/README.md)
 - [Context Governance Directory](./governance/README.md)
 - [Context Asset Lifecycle Guidance](./governance/context-asset-lifecycle.md)
+- [Context System Rollout Boundaries and Follow-On Work](./governance/context-system-rollout-boundaries.md)
 - [Documentation Templates](./templates/README.md)
 - [Shared Composition Taxonomy](../architecture/shared-composition-taxonomy.md)
 - [Architecture Router](../architecture/README.md)

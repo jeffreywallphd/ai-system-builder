@@ -52,6 +52,8 @@ const requiredContextFiles = [
   "docs/context/governance/context-governance-policy.ai.md",
   "docs/context/governance/context-asset-lifecycle.md",
   "docs/context/governance/context-asset-lifecycle.ai.md",
+  "docs/context/governance/context-system-rollout-boundaries.md",
+  "docs/context/governance/context-system-rollout-boundaries.ai.md",
 ] as const;
 
 describe("context engineering structure guardrails", () => {
