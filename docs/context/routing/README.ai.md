@@ -34,4 +34,5 @@
 - Core implementation work across `src/` application, domain, infrastructure, and hosts.
 - Documentation refactor work for context and architecture routers/contracts.
 - Runtime and host diagnostics triage workflows.
+- Runtime security workflows for identity, policy enforcement, trust, and secrets-sensitive updates.
 - Studio and system design workflows spanning UI and handoff contracts.

@@ -44,6 +44,7 @@ Use the smallest context set that can still produce a correct answer:
 
 - Start with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then category-specific domain packs, then `context-system-foundations`) and the mapping's `relatedDocPaths`.
 - For runtime/host/desktop/startup tasks, insert `runtime-and-host` after `architecture-core` and before `context-system-foundations`.
+- For identity/authentication/authorization/trust/secrets-sensitive tasks, insert `identity-and-security` after `architecture-core` and before `context-system-foundations`.
 - For Studio Shell and System Studio composition tasks, insert `studio-and-system-composition` after `architecture-core` and before `context-system-foundations`.
 - Add path-specific architecture or contributor docs only when they directly match `changedPaths` or `primarySurfaces`.
 - Prefer one canonical source over multiple overlapping summaries.
@@ -179,6 +180,7 @@ Typical code surfaces:
 Use for policy, authorization, and runtime safety boundaries.
 
 Primary docs:
+- `docs/context/packs/identity-and-security.pack.md`
 - `docs/architecture/authorization-foundation.md`
 - `docs/architecture/transport-security-foundation.md`
 - `docs/architecture/secrets-foundation.md`

@@ -174,8 +174,12 @@
           "priorityOrder": 2
         },
         {
-          "packId": "context-system-foundations",
+          "packId": "identity-and-security",
           "priorityOrder": 3
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 4
         }
       ],
       "excludePackIds": [],
@@ -508,7 +512,7 @@
         "historical-reference",
         "summary-reference"
       ],
-      "notes": "Security routing keeps deterministic ordering and includes architecture-core for host/layer boundary context.",
+      "notes": "Security routing keeps deterministic ordering by inserting identity-and-security after architecture-core before context-system foundations.",
       "status": "active",
       "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "contextAssemblyTierHints": {

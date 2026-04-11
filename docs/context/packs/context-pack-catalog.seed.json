@@ -139,6 +139,48 @@
       }
     },
     {
+      "id": "identity-and-security",
+      "title": "Identity and Security Pack",
+      "purpose": "Focused context for identity, authentication, authorization, trust, and security-sensitive implementation or review work.",
+      "domain": "identity-security",
+      "owner": "team:security-platform",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/identity-and-security.pack.md",
+      "aiDocPath": "docs/context/packs/identity-and-security.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/architecture/authorization-foundation.md",
+        "docs/architecture/authorization-enforcement-integration-patterns.md",
+        "docs/architecture/trusted-device-foundation.md",
+        "docs/architecture/transport-security-foundation.md",
+        "docs/architecture/secrets-foundation.md",
+        "docs/architecture/secrets-redaction-and-logging-safeguards.md",
+        "docs/architecture/node-trust-foundation.md",
+        "docs/architecture/auth-only-server-startup-contract.md"
+      ],
+      "relatedCodePaths": [
+        "src/application/identity",
+        "src/application/authorization",
+        "src/infrastructure/security",
+        "src/infrastructure/transport/http-server/identity",
+        "src/infrastructure/persistence/identity",
+        "src/infrastructure/persistence/authorization",
+        "src/infrastructure/persistence/security",
+        "dev/tests/IdentityAndSecurityContextPackGuardrails.test.ts"
+      ],
+      "tags": [
+        "identity",
+        "authentication",
+        "authorization",
+        "trust",
+        "transport-security",
+        "secrets"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
       "id": "studio-and-system-composition",
       "title": "Studio and System Composition Pack",
       "purpose": "Focused context for studio/system composition tasks spanning Studio Shell UX, system definitions, handoff contracts, and cross-studio asset flows.",
