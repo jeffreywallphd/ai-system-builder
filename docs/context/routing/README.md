@@ -27,6 +27,7 @@
 - [Routing Entry Template](../templates/task-to-context-routing-entry.template.json)
 - [Context Asset Metadata Standard](../context-asset-metadata.md)
 - [Context Packs Directory](../packs/README.md)
+- [Context Engineering System Contributor Guide](../../contributors/context-engineering-system-guide.md)
 
 ## Initial Workflow Coverage
 - Architecture review for host and system boundary decisions.
