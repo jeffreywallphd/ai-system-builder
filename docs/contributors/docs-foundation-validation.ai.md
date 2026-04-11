@@ -24,7 +24,11 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Context foundation contract/seed JSON artifacts keep expected schema markers.
 - Context map shape remains valid and references stay resolvable (task categories, profile IDs, exclusion tags, pack IDs).
 - Context pack catalog entries keep required metadata shape and valid `primaryDocPath` / `aiDocPath` links.
+- Context pack catalog `relatedDocPaths` and `relatedCodePaths` resolve to real files or directories.
 - Context pack markdown files keep required headings from `docs/context/packs/context-pack.contract.json`.
+- Context pack `## Authoritative Docs`, `## Authoritative Code Paths`, and `## Related Packs` references remain resolvable.
+- Routing mapping `relatedDocPaths` and `relatedCodePaths` references resolve to real repository paths.
+- Routing worked examples keep valid `expectedPackOrder` IDs and resolvable `expectedRelatedDocOrder` paths.
 - Seed docs keep required metadata header fields with taxonomy-aligned enum values.
 - Seed `.md` and `.ai.md` pairs stay aligned on routing metadata.
 

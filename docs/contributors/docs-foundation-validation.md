@@ -24,7 +24,11 @@ Use this guide when you need a fast contract check for the documentation foundat
 - Context foundation contracts/seeds are valid JSON and keep expected schema markers.
 - Context map shape stays valid and cross-references remain resolvable (routing categories, profile IDs, exclusion tags, and pack IDs).
 - Context pack catalog entries keep required metadata shape and valid `primaryDocPath` / `aiDocPath` references.
+- Context pack catalog `relatedDocPaths` and `relatedCodePaths` resolve to real files or directories.
 - Context pack markdown files keep required section headings from `docs/context/packs/context-pack.contract.json`.
+- Context pack `## Authoritative Docs`, `## Authoritative Code Paths`, and `## Related Packs` references remain resolvable.
+- Routing mapping `relatedDocPaths` and `relatedCodePaths` references resolve to real repository paths.
+- Routing worked examples keep valid `expectedPackOrder` IDs and resolvable `expectedRelatedDocOrder` paths.
 - Seed docs have a valid metadata header and stay aligned to taxonomy/metadata contracts.
 - Seed `.md` and `.ai.md` pairs stay aligned for routing metadata fields.
 

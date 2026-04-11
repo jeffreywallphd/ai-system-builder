@@ -77,4 +77,48 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("[CONTEXT_PACK_SHAPE_INVALID]");
     expect(combinedOutput).toContain("repository-overview.pack.md is missing required heading '## Anti-Patterns'.");
   });
+
+  it("detects missing authoritative references inside context packs", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-pack-authority-ref-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const packPath = join(fixtureRoot, "docs", "context", "packs", "repository-overview.pack.md");
+    const packContent = readFileSync(packPath, "utf8").replace(
+      "- `docs/architecture/layers-and-boundaries.md`",
+      "- `docs/architecture/missing-authoritative-doc.md`",
+    );
+    writeFileSync(packPath, packContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CONTEXT_PACK_REFERENCE_INVALID]");
+    expect(combinedOutput).toContain("missing-authoritative-doc.md");
+  });
+
+  it("detects missing routing mapping core reference paths", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-routing-core-ref-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const routingSeedPath = join(fixtureRoot, "docs", "context", "routing", "task-to-context-routing.seed.json");
+    const routingSeed = JSON.parse(readFileSync(routingSeedPath, "utf8")) as {
+      mappings: Array<{ relatedDocPaths: string[] }>;
+    };
+    routingSeed.mappings[0].relatedDocPaths[0] = "docs/architecture/missing-routing-reference.md";
+    writeFileSync(routingSeedPath, `${JSON.stringify(routingSeed, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ROUTING_REFERENCE_INVALID]");
+    expect(combinedOutput).toContain("missing-routing-reference.md");
+  });
 });
