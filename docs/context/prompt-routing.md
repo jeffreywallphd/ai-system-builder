@@ -43,6 +43,7 @@ Rationale:
 Use the smallest context set that can still produce a correct answer:
 
 - Start with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then `context-system-foundations`) and the mapping's `relatedDocPaths`.
+- For runtime/host/desktop/startup tasks, insert `runtime-and-host` after `architecture-core` and before `context-system-foundations`.
 - Add path-specific architecture or contributor docs only when they directly match `changedPaths` or `primarySurfaces`.
 - Prefer one canonical source over multiple overlapping summaries.
 - Stop adding documents once requested outcomes can be satisfied with confidence.
@@ -93,6 +94,7 @@ Use this deterministic source precedence:
 Use when reviewing boundaries, host composition seams, or contract implications.
 
 Primary docs:
+- `docs/context/packs/runtime-and-host.pack.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/architecture/worker-host-assembly.md`
@@ -120,6 +122,7 @@ Typical code surfaces:
 Use for behavior-changing code work with tests and docs alignment.
 
 Primary docs:
+- `docs/context/packs/runtime-and-host.pack.md`
 - `docs/architecture/workflow-execution-and-tools.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/contributors/docs-foundation-validation.md`
@@ -146,6 +149,7 @@ Typical code surfaces:
 Use for regressions, startup failures, and root-cause work.
 
 Primary docs:
+- `docs/context/packs/runtime-and-host.pack.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/unified-api-observability-troubleshooting.md`
@@ -269,7 +273,7 @@ Routing inputs:
 - `requestedOutcomes`: `boundary-review`, `contract-impact-summary`, `recommended-change-plan`
 
 Expected context assembly:
-- Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/authoritative-server-host-assembly.md`
 2. `docs/architecture/desktop-host-assembly.md`
@@ -294,7 +298,7 @@ Routing inputs:
 - `requestedOutcomes`: `root-cause`, `minimal-fix`, `regression-test`
 
 Expected context assembly:
-- Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/authoritative-server-host-assembly.md`
 2. `docs/architecture/desktop-host-assembly.md`
@@ -306,6 +310,30 @@ Explicit exclusions:
 
 Why this route:
 - Keeps diagnostics focused on reproducibility and host/runtime evidence before unrelated planning context.
+
+### Example F: Runtime-host implementation fix for startup readiness
+
+Task request:
+- "Implement a host-startup readiness fix for desktop post-login runtime initialization and add targeted regression coverage."
+
+Routing inputs:
+- `taskCategory`: `coding-implementation`
+- `changedPaths`: `src/hosts/desktop`, `src/hosts/bootstrap`, `electron/main/runtime`, `dev/tests/HostDevelopmentStartupScripts.test.ts`
+- `requestedOutcomes`: `minimal-safe-runtime-fix`, `targeted-regression-tests`, `contract-aligned-doc-update`
+
+Expected context assembly:
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Ordered docs:
+1. `docs/architecture/host-bootstrap-pipeline.md`
+2. `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
+3. `docs/architecture/desktop-auth-first-startup-boundary.md`
+
+Explicit exclusions:
+- `docs/ui/README.md` (UI guidance is not primary authority for startup runtime composition)
+- `docs/architecture/secrets-foundation.md` (security foundation context is out of scope unless runtime evidence points there)
+
+Why this route:
+- Keeps implementation prompts bounded to host/runtime startup authority and avoids broad repository context noise.
 
 ### Example E: Studio/System workflow interaction change
 

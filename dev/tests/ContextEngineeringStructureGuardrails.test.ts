@@ -32,6 +32,8 @@ const requiredContextFiles = [
   "docs/context/packs/context-system-foundations.pack.ai.md",
   "docs/context/packs/repository-overview.pack.md",
   "docs/context/packs/repository-overview.pack.ai.md",
+  "docs/context/packs/runtime-and-host.pack.md",
+  "docs/context/packs/runtime-and-host.pack.ai.md",
   "docs/context/routing/README.md",
   "docs/context/routing/README.ai.md",
   "docs/context/routing/prompt-routing-contract.md",

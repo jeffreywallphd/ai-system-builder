@@ -101,6 +101,42 @@
         "cadence": "per-epic-milestone",
         "lastReviewed": "2026-04-11"
       }
+    },
+    {
+      "id": "runtime-and-host",
+      "title": "Runtime and Host Pack",
+      "purpose": "Focused runtime/host/desktop/startup guidance for implementation and diagnostics work across host bootstrap and runtime lifecycle boundaries.",
+      "domain": "runtime-host-composition",
+      "owner": "team:runtime-platform",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/runtime-and-host.pack.md",
+      "aiDocPath": "docs/context/packs/runtime-and-host.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/architecture/host-runtime-composition-boundaries.md",
+        "docs/architecture/host-bootstrap-pipeline.md",
+        "docs/architecture/desktop-host-assembly.md",
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
+        "docs/architecture/auth-only-server-startup-contract.md"
+      ],
+      "relatedCodePaths": [
+        "src/hosts/bootstrap",
+        "src/hosts/desktop",
+        "src/hosts/server",
+        "src/hosts/lifecycle",
+        "electron/main",
+        "src/infrastructure/config/HostStartupConfiguration.ts"
+      ],
+      "tags": [
+        "runtime",
+        "hosts",
+        "desktop",
+        "startup",
+        "diagnostics"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-11"
+      }
     }
   ]
 }

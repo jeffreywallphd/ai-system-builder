@@ -41,6 +41,7 @@ Rationale:
 ## Minimum Sufficient Context Rules
 
 - Begin with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then `context-system-foundations`) and mapping `relatedDocPaths`.
+- For runtime/host/desktop/startup tasks, insert `runtime-and-host` after `architecture-core` and before `context-system-foundations`.
 - Add docs only when tied to `changedPaths`, `primarySurfaces`, or required quality gates.
 - Prefer canonical contracts over secondary summaries.
 - Stop when outcomes are satisfiable with high confidence.
@@ -88,6 +89,7 @@ Use this order:
 
 ### `architecture-review`
 Primary docs:
+- `docs/context/packs/runtime-and-host.pack.ai.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/architecture/worker-host-assembly.md`
@@ -105,6 +107,7 @@ Primary surfaces:
 
 ### `coding-implementation`
 Primary docs:
+- `docs/context/packs/runtime-and-host.pack.ai.md`
 - `docs/architecture/workflow-execution-and-tools.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/contributors/docs-foundation-validation.md`
@@ -120,6 +123,7 @@ Primary surfaces:
 
 ### `diagnostics`
 Primary docs:
+- `docs/context/packs/runtime-and-host.pack.ai.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/unified-api-observability-troubleshooting.md`
@@ -190,7 +194,7 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Review server/desktop/worker host boundary changes before implementation."
 - Category: `architecture-review`
 - Inputs: `src/hosts`, `src/application`, `docs/architecture`, `dev/tests/HostCompositionArchitectureGuardrails.test.ts`
-- Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/authoritative-server-host-assembly.md`
 2. `docs/architecture/desktop-host-assembly.md`
@@ -202,12 +206,23 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Investigate authoritative host startup regression and produce a minimal safe fix."
 - Category: `diagnostics`
 - Inputs: `src/hosts`, `src/infrastructure/runtime`, `dev/tests/HostDevelopmentStartupScripts.test.ts`
-- Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/authoritative-server-host-assembly.md`
 2. `docs/architecture/desktop-host-assembly.md`
 3. `docs/unified-api-observability-troubleshooting.md`
 - Exclude feature-planning docs and broad refactor narratives unless reproduction evidence requires them.
+
+### Example F: Runtime-host implementation for startup readiness
+- Task request: "Implement a host-startup readiness fix for desktop post-login runtime initialization with targeted regression coverage."
+- Category: `coding-implementation`
+- Inputs: `src/hosts/desktop`, `src/hosts/bootstrap`, `electron/main/runtime`, `dev/tests/HostDevelopmentStartupScripts.test.ts`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Ordered docs:
+1. `docs/architecture/host-bootstrap-pipeline.md`
+2. `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
+3. `docs/architecture/desktop-auth-first-startup-boundary.md`
+- Exclude UI-only docs and unrelated security-foundation docs unless runtime-host evidence requires them.
 
 ### Example E: Studio/System interaction-flow update
 - Task request: "Adjust Studio/System handoff behavior and workflow-studio interaction sequencing."

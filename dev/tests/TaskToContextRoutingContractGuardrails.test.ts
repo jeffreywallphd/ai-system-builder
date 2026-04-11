@@ -60,12 +60,28 @@ const expectedWorkedExampleTaskIds = [
   "example-architecture-review-host-boundaries",
   "example-diagnostics-host-startup-regression",
   "example-ui-studio-system-handoff-update",
+  "example-coding-implementation-runtime-host-startup",
 ] as const;
-const expectedPackOrder = [
+const expectedDefaultPackOrder = [
   "repository-overview",
   "architecture-core",
   "context-system-foundations",
 ] as const;
+const expectedRuntimeHostPackOrder = [
+  "repository-overview",
+  "architecture-core",
+  "runtime-and-host",
+  "context-system-foundations",
+] as const;
+const runtimeHostEnhancedExampleTaskIds = new Set([
+  "example-architecture-review-host-boundaries",
+  "example-diagnostics-host-startup-regression",
+  "example-coding-implementation-runtime-host-startup",
+]);
+const runtimeHostEnhancedCoreTaskIds = new Set([
+  "architecture-review-host-boundaries",
+  "runtime-host-diagnostics-triage",
+]);
 
 const requiredMappingMetadataFields = [
   "id",
@@ -210,6 +226,9 @@ describe("task-to-context routing contract guardrails", () => {
       expect(["ordered", "fallback", "single"]).toContain(example.expectedSelectionMode);
       expect(expectedPriorityTiers).toContain(example.expectedPriorityTier as (typeof expectedPriorityTiers)[number]);
       expect(example.expectedContextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
+      const expectedPackOrder = runtimeHostEnhancedExampleTaskIds.has(example.taskId)
+        ? expectedRuntimeHostPackOrder
+        : expectedDefaultPackOrder;
       expect(example.expectedPackOrder).toEqual(expectedPackOrder);
       expect(example.expectedRelatedDocOrder.length).toBeGreaterThanOrEqual(3);
       expect(example.expectedExclusions.length).toBeGreaterThanOrEqual(2);
@@ -263,6 +282,9 @@ describe("task-to-context routing contract guardrails", () => {
       }
 
       expect(mapping.status).toBe("active");
+      const expectedPackOrder = runtimeHostEnhancedCoreTaskIds.has(taskId)
+        ? expectedRuntimeHostPackOrder
+        : expectedDefaultPackOrder;
       expect(mapping.packIds).toEqual(expectedPackOrder);
       expect(Array.isArray(mapping.excludePackIds)).toBe(true);
       expect(typeof mapping.notes).toBe("string");

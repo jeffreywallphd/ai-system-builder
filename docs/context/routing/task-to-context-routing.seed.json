@@ -180,6 +180,7 @@
       "expectedPackOrder": [
         "repository-overview",
         "architecture-core",
+        "runtime-and-host",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -218,6 +219,7 @@
       "expectedPackOrder": [
         "repository-overview",
         "architecture-core",
+        "runtime-and-host",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -267,6 +269,46 @@
       "expectedExclusions": [
         "docs/architecture/secrets-foundation.md",
         "src/hosts/server"
+      ]
+    },
+    {
+      "taskId": "example-coding-implementation-runtime-host-startup",
+      "taskCategory": "coding-implementation",
+      "routingInputs": {
+        "taskSummary": "Implement a host-startup readiness fix for desktop post-login runtime initialization with targeted regression coverage.",
+        "changedPaths": [
+          "src/hosts/desktop",
+          "src/hosts/bootstrap",
+          "electron/main/runtime",
+          "dev/tests/HostDevelopmentStartupScripts.test.ts"
+        ],
+        "requestedOutcomes": [
+          "minimal-safe-runtime-fix",
+          "targeted-regression-tests",
+          "contract-aligned-doc-update"
+        ],
+        "constraints": [
+          "preserve-auth-first-startup-boundary",
+          "avoid-cross-layer-shortcuts"
+        ]
+      },
+      "expectedSelectionMode": "ordered",
+      "expectedPriorityTier": "high",
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "expectedPackOrder": [
+        "repository-overview",
+        "architecture-core",
+        "runtime-and-host",
+        "context-system-foundations"
+      ],
+      "expectedRelatedDocOrder": [
+        "docs/architecture/host-bootstrap-pipeline.md",
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
+        "docs/architecture/desktop-auth-first-startup-boundary.md"
+      ],
+      "expectedExclusions": [
+        "docs/ui/README.md",
+        "docs/architecture/secrets-foundation.md"
       ]
     }
   ],
@@ -333,6 +375,7 @@
       "packIds": [
         "repository-overview",
         "architecture-core",
+        "runtime-and-host",
         "context-system-foundations"
       ],
       "selectionMode": "ordered",
@@ -355,7 +398,7 @@
         "dev/tests/HostCompositionArchitectureGuardrails.test.ts"
       ],
       "excludePackIds": [],
-      "notes": "Primary ordering remains deterministic: repository orientation first, then core architecture, then context foundations.",
+      "notes": "Primary ordering remains deterministic: repository orientation first, then core architecture, then runtime-host context, then context foundations.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
@@ -698,6 +741,7 @@
       "packIds": [
         "repository-overview",
         "architecture-core",
+        "runtime-and-host",
         "context-system-foundations"
       ],
       "selectionMode": "fallback",
@@ -711,6 +755,8 @@
       "relatedDocPaths": [
         "docs/architecture/authoritative-server-host-assembly.md",
         "docs/architecture/desktop-host-assembly.md",
+        "docs/architecture/host-bootstrap-pipeline.md",
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
         "docs/unified-api-observability-troubleshooting.md"
       ],
       "relatedCodePaths": [
@@ -719,7 +765,100 @@
         "dev/tests/HostDevelopmentStartupScripts.test.ts"
       ],
       "excludePackIds": [],
-      "notes": "Fallback mode keeps diagnostics resilient while preserving deterministic architecture-first primary-pack ordering.",
+      "notes": "Fallback mode keeps diagnostics resilient while preserving deterministic architecture-first ordering with runtime-host context before context foundations.",
+      "reviewExpectations": {
+        "cadence": "per-story",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
+      "taskId": "runtime-host-coding-implementation",
+      "taskCategory": "coding-implementation",
+      "intent": "implement-runtime-and-host-startup-or-lifecycle-behavior",
+      "routingInputs": {
+        "taskSummary": "Implement host/runtime startup or lifecycle behavior changes with bounded regression impact.",
+        "taskCategory": "coding-implementation",
+        "changedPaths": [
+          "src/hosts",
+          "electron/main",
+          "src/infrastructure/runtime",
+          "dev/tests"
+        ],
+        "requestedOutcomes": [
+          "code-change",
+          "targeted-regression-tests",
+          "docs-update-where-contracts-changed"
+        ],
+        "constraints": [
+          "preserve-host-authority-boundaries",
+          "keep-auth-first-and-post-login-startup-boundaries-explicit"
+        ],
+        "primarySurfaces": [
+          "host-bootstrap",
+          "desktop-startup",
+          "runtime-lifecycle"
+        ],
+        "qualityGates": [
+          "startup-and-runtime-tests-pass",
+          "host-runtime-doc-contracts-remain-aligned"
+        ],
+        "exclusions": [
+          "ui-only-behavior-updates",
+          "broad-non-runtime-refactors"
+        ],
+        "notes": "Prefer host bootstrap/lifecycle contracts and runtime-host context pack before touching implementation details."
+      },
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always load routing contracts and foundational context first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Load mapped task-category domain docs before implementation details."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Add implementation references only when changed paths or quality gates require them."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Reserve optional supporting material for explicit unresolved gaps."
+        }
+      },
+      "packIds": [
+        "repository-overview",
+        "architecture-core",
+        "runtime-and-host",
+        "context-system-foundations"
+      ],
+      "selectionMode": "ordered",
+      "priorityTier": "high",
+      "status": "active",
+      "id": "route-runtime-host-coding-implementation",
+      "title": "Route Runtime and Host Implementation Work",
+      "purpose": "Route runtime/host coding tasks to startup and lifecycle authority with minimal context noise.",
+      "domain": "runtime-host-composition",
+      "owner": "team:runtime-platform",
+      "relatedDocPaths": [
+        "docs/architecture/host-bootstrap-pipeline.md",
+        "docs/architecture/host-runtime-composition-boundaries.md",
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
+        "docs/architecture/desktop-auth-first-startup-boundary.md"
+      ],
+      "relatedCodePaths": [
+        "src/hosts",
+        "electron/main",
+        "src/infrastructure/runtime",
+        "dev/tests/HostDevelopmentStartupScripts.test.ts"
+      ],
+      "excludePackIds": [],
+      "notes": "Ordered mode keeps runtime-host implementation deterministic: repository, architecture, runtime-host pack, then context-system foundations.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
