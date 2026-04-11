@@ -16,8 +16,10 @@ related_code_paths:
   - docs/context/templates/documentation-registry-entry.adr.template.json
   - docs/context/templates/documentation-registry-entry.context-pack.template.json
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/validate-documentation-registry.cjs
   - dev/scripts/generate-documentation-index-view.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
+  - dev/tests/DocumentationRegistryValidationScript.test.ts
   - dev/tests/DocumentationIndexViewStory631Guardrails.test.ts
   - dev/tests/DocumentationTaskDiscoveryPathsStory632Guardrails.test.ts
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
@@ -297,6 +299,8 @@ This keeps the registry and index practical for day-to-day contributor and AI re
 - Guardrail test: `dev/tests/DocumentationRegistryStructureGuardrails.test.ts`
 - Guardrail test: `dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts`
 - Foundation validator: `dev/scripts/validate-docs-foundation.cjs`
+- Lightweight registry validator: `dev/scripts/validate-documentation-registry.cjs`
+- Run command: `npm run docs:validate:registry`
 
 ## Registry Entry Authoring Starters (Story 6.1.6)
 

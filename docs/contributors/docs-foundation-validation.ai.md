@@ -7,10 +7,12 @@ owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/validate-documentation-registry.cjs
   - dev/scripts/validate-adr-records.cjs
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/tests/DocsFoundationValidationScript.test.ts
+  - dev/tests/DocumentationRegistryValidationScript.test.ts
   - dev/tests/AdrValidationScript.test.ts
   - dev/tests/ArchitectureDomainValidationScript.test.ts
   - dev/tests/DocsSegmentationValidationScript.test.ts
@@ -54,11 +56,13 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Supersession registry canonical destination lists stay resolvable.
 - Superseded stub `## Redirect` sections keep resolvable local destination paths and required canonical targets.
 - Active top-level routers avoid linking to superseded paths.
+- Registry validation enforces lightweight shape and metadata invariants for `docs/context/documentation-registry.seed.json`.
 
 ## Run Command
 
 ```bash
 npm run docs:validate:foundation
+npm run docs:validate:registry
 npm run docs:validate:adr
 npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
@@ -115,6 +119,11 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 - `SUPERSESSION_COMPANION_MISSING`
 - `ACTIVE_PATH_REFERENCE_INVALID`
 - `DOCUMENTATION_INDEX_MODEL_INVALID`
+- `REGISTRY_FILE_MISSING`
+- `REGISTRY_SHAPE_INVALID`
+- `REGISTRY_ENTRY_INVALID`
+- `REGISTRY_REFERENCE_INVALID`
+- `REGISTRY_TAXONOMY_MISMATCH`
 
 ## Scope Notes
 
