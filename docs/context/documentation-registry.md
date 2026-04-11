@@ -354,6 +354,16 @@ When a doc stops being current authority:
 
 Use `documentation-status-signals.md` and `documentation-supersession-and-redirect-conventions.md` for content-level status blocks while the registry provides the machine-readable lifecycle signal.
 
+## Indexing Rollout Boundaries and Expansion Guidance Status (Story 6.4.4)
+
+Story 6.4.4 closes Feature 6 by documenting explicit first-rollout boundaries for indexing and findability, including what is materially complete now, what remains intentionally out of scope, and which follow-on extensions are expected later.
+
+Canonical rollout-boundary guidance lives in:
+
+- `docs/context/governance/documentation-indexing-rollout-boundaries.md`
+
+Use this guidance when evaluating completion claims, prioritizing backlog follow-on work, and deciding whether a proposed enhancement belongs in this lightweight indexing system or in a future deeper-search initiative.
+
 ## Extensibility Boundaries
 
 - Keep structure explicit and readable; avoid introducing a large platform abstraction.

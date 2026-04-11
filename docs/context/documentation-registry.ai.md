@@ -338,6 +338,16 @@ When a document is no longer current authority:
 
 Use `documentation-status-signals.ai.md` and `documentation-supersession-and-redirect-conventions.ai.md` for content-level status markers while the registry carries machine-readable lifecycle state.
 
+## Indexing Rollout Boundaries and Expansion Guidance Status (Story 6.4.4)
+
+Story 6.4.4 closes Feature 6 with explicit rollout boundaries for indexing/findability so completion can be claimed without implying exhaustive day-one coverage.
+
+Canonical guidance:
+
+- `docs/context/governance/documentation-indexing-rollout-boundaries.ai.md`
+
+Use this boundary note when triaging enhancement requests, separating current-scope fixes from follow-on deeper-search work, and keeping governance expectations explicit for contributors and AI assistants.
+
 ## Coverage Policy Contract
 
 - `coveragePolicy` carries machine-readable inclusion/exclusion boundaries.
