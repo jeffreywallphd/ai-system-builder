@@ -27,6 +27,7 @@
 - [Seed Pack: Core Architecture](./architecture-core.pack.ai.md)
 - [Seed Pack: Context System Foundations](./context-system-foundations.pack.ai.md)
 - [Seed Pack: Runtime and Host](./runtime-and-host.pack.ai.md)
+- [Seed Pack: Identity and Security](./identity-and-security.pack.ai.md)
 - [Seed Pack: Studio and System Composition](./studio-and-system-composition.pack.ai.md)
 - [Context Router](../README.ai.md)
 - [Context Pack Template](../templates/context-pack.template.ai.md)

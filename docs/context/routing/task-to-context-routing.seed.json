@@ -312,6 +312,46 @@
         "docs/ui/README.md",
         "docs/architecture/secrets-foundation.md"
       ]
+    },
+    {
+      "taskId": "example-runtime-security-identity-policy-hardening",
+      "taskCategory": "runtime-security",
+      "routingInputs": {
+        "taskSummary": "Harden identity session validation and authorization policy enforcement for security-sensitive runtime routes.",
+        "changedPaths": [
+          "src/application/identity",
+          "src/application/authorization",
+          "src/infrastructure/security",
+          "src/infrastructure/transport/http-server/identity"
+        ],
+        "requestedOutcomes": [
+          "security-hardening-change",
+          "targeted-regression-tests",
+          "contract-aligned-doc-update"
+        ],
+        "constraints": [
+          "preserve-least-privilege-boundaries",
+          "deny-by-default-when-policy-context-missing"
+        ]
+      },
+      "expectedSelectionMode": "ordered",
+      "expectedPriorityTier": "critical",
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "expectedPackOrder": [
+        "repository-overview",
+        "architecture-core",
+        "identity-and-security",
+        "context-system-foundations"
+      ],
+      "expectedRelatedDocOrder": [
+        "docs/architecture/authorization-foundation.md",
+        "docs/architecture/transport-security-foundation.md",
+        "docs/architecture/secrets-redaction-and-logging-safeguards.md"
+      ],
+      "expectedExclusions": [
+        "docs/ui/README.md",
+        "docs/architecture/image-manipulation-studio-interaction-model.md"
+      ]
     }
   ],
   "mappings": [
@@ -861,6 +901,106 @@
       ],
       "excludePackIds": [],
       "notes": "Ordered mode keeps runtime-host implementation deterministic: repository, architecture, runtime-host pack, then context-system foundations.",
+      "reviewExpectations": {
+        "cadence": "per-story",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
+      "taskId": "runtime-security-identity-and-policy-hardening",
+      "taskCategory": "runtime-security",
+      "intent": "harden-identity-authorization-and-trust-boundaries",
+      "routingInputs": {
+        "taskSummary": "Implement security-sensitive identity/authz/trust changes with strict policy and redaction posture.",
+        "taskCategory": "runtime-security",
+        "changedPaths": [
+          "src/application/identity",
+          "src/application/authorization",
+          "src/infrastructure/security",
+          "src/infrastructure/transport/http-server/identity",
+          "docs/architecture"
+        ],
+        "requestedOutcomes": [
+          "security-hardening-change",
+          "targeted-regression-tests",
+          "contract-aligned-doc-update"
+        ],
+        "constraints": [
+          "preserve-least-privilege-boundaries",
+          "deny-by-default-when-policy-context-missing",
+          "maintain-secret-redaction-and-trust-material-handling"
+        ],
+        "primarySurfaces": [
+          "identity-session-and-authentication",
+          "authorization-policy-enforcement",
+          "transport-and-runtime-trust",
+          "secrets-handling"
+        ],
+        "qualityGates": [
+          "security-sensitive-tests-pass",
+          "authorization-and-trust-contracts-remain-aligned",
+          "redaction-behavior-preserved"
+        ],
+        "exclusions": [
+          "ui-only-polish-work",
+          "non-security-adjacent-domain-expansion"
+        ],
+        "notes": "Load identity/security pack before implementation details to keep security invariants explicit."
+      },
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always load routing contracts and foundational context first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Load mapped task-category domain docs before implementation details."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Add implementation references only when changed paths or quality gates require them."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Reserve optional supporting material for explicit unresolved gaps."
+        }
+      },
+      "packIds": [
+        "repository-overview",
+        "architecture-core",
+        "identity-and-security",
+        "context-system-foundations"
+      ],
+      "selectionMode": "ordered",
+      "priorityTier": "critical",
+      "status": "active",
+      "id": "route-runtime-security-identity-and-policy-hardening",
+      "title": "Route Runtime Security Hardening Tasks",
+      "purpose": "Route identity/authz/trust/security-sensitive work to deterministic security authority with minimal context noise.",
+      "domain": "security-runtime",
+      "owner": "team:security-platform",
+      "relatedDocPaths": [
+        "docs/architecture/authorization-foundation.md",
+        "docs/architecture/authorization-enforcement-integration-patterns.md",
+        "docs/architecture/transport-security-foundation.md",
+        "docs/architecture/secrets-foundation.md",
+        "docs/architecture/secrets-redaction-and-logging-safeguards.md",
+        "docs/architecture/trusted-device-foundation.md"
+      ],
+      "relatedCodePaths": [
+        "src/application/identity",
+        "src/application/authorization",
+        "src/infrastructure/security",
+        "src/infrastructure/transport/http-server/identity",
+        "dev/tests/IdentityAndSecurityContextPackGuardrails.test.ts"
+      ],
+      "excludePackIds": [],
+      "notes": "Ordered mode keeps runtime-security routing deterministic: repository orientation, architecture constraints, identity-security pack, then context foundations.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"

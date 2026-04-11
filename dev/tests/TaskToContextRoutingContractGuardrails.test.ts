@@ -51,6 +51,7 @@ const expectedCoreWorkflowTaskIds = [
   "repo-implementation-core-workflows",
   "documentation-refactor-context-and-architecture",
   "runtime-host-diagnostics-triage",
+  "runtime-security-identity-and-policy-hardening",
   "studio-system-design-and-ux-shaping",
 ] as const;
 
@@ -61,6 +62,7 @@ const expectedWorkedExampleTaskIds = [
   "example-diagnostics-host-startup-regression",
   "example-ui-studio-system-handoff-update",
   "example-coding-implementation-runtime-host-startup",
+  "example-runtime-security-identity-policy-hardening",
 ] as const;
 const expectedDefaultPackOrder = [
   "repository-overview",
@@ -71,6 +73,12 @@ const expectedRuntimeHostPackOrder = [
   "repository-overview",
   "architecture-core",
   "runtime-and-host",
+  "context-system-foundations",
+] as const;
+const expectedIdentitySecurityPackOrder = [
+  "repository-overview",
+  "architecture-core",
+  "identity-and-security",
   "context-system-foundations",
 ] as const;
 const expectedStudioSystemPackOrder = [
@@ -87,9 +95,15 @@ const runtimeHostEnhancedExampleTaskIds = new Set([
 const studioSystemEnhancedExampleTaskIds = new Set([
   "example-ui-studio-system-handoff-update",
 ]);
+const identitySecurityEnhancedExampleTaskIds = new Set([
+  "example-runtime-security-identity-policy-hardening",
+]);
 const runtimeHostEnhancedCoreTaskIds = new Set([
   "architecture-review-host-boundaries",
   "runtime-host-diagnostics-triage",
+]);
+const identitySecurityEnhancedCoreTaskIds = new Set([
+  "runtime-security-identity-and-policy-hardening",
 ]);
 const studioSystemEnhancedCoreTaskIds = new Set([
   "studio-system-design-and-ux-shaping",
@@ -240,6 +254,8 @@ describe("task-to-context routing contract guardrails", () => {
       expect(example.expectedContextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
       const expectedPackOrder = runtimeHostEnhancedExampleTaskIds.has(example.taskId)
         ? expectedRuntimeHostPackOrder
+        : identitySecurityEnhancedExampleTaskIds.has(example.taskId)
+        ? expectedIdentitySecurityPackOrder
         : studioSystemEnhancedExampleTaskIds.has(example.taskId)
         ? expectedStudioSystemPackOrder
         : expectedDefaultPackOrder;
@@ -298,6 +314,8 @@ describe("task-to-context routing contract guardrails", () => {
       expect(mapping.status).toBe("active");
       const expectedPackOrder = runtimeHostEnhancedCoreTaskIds.has(taskId)
         ? expectedRuntimeHostPackOrder
+        : identitySecurityEnhancedCoreTaskIds.has(taskId)
+        ? expectedIdentitySecurityPackOrder
         : studioSystemEnhancedCoreTaskIds.has(taskId)
         ? expectedStudioSystemPackOrder
         : expectedDefaultPackOrder;

@@ -34,4 +34,5 @@
 - Core repository implementation work across `src/` runtime and host surfaces.
 - Documentation refactor work for context, architecture, and contributor routers.
 - Runtime and host diagnostics triage for startup and regression investigation.
+- Runtime security workflows for identity, policy enforcement, trust, and secrets-sensitive changes.
 - Studio and system design tasks for UI/UX and handoff contract alignment.

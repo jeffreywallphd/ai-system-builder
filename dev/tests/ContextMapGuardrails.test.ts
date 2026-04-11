@@ -22,6 +22,12 @@ const runtimeHostPackOrder = [
   "runtime-and-host",
   "context-system-foundations",
 ] as const;
+const identitySecurityPackOrder = [
+  "repository-overview",
+  "architecture-core",
+  "identity-and-security",
+  "context-system-foundations",
+] as const;
 const studioSystemPackOrder = [
   "repository-overview",
   "architecture-core",
@@ -173,6 +179,8 @@ describe("context map guardrails", () => {
       expect(mapping.packRefs.length).toBeGreaterThanOrEqual(1);
       const expectedPackOrder = mapping.taskCategoryId === "architecture-review" || mapping.taskCategoryId === "diagnostics"
         ? runtimeHostPackOrder
+        : mapping.taskCategoryId === "runtime-security"
+        ? identitySecurityPackOrder
         : mapping.taskCategoryId === "ui-studio"
         ? studioSystemPackOrder
         : defaultPackOrder;
