@@ -19,6 +19,7 @@
 
 ## Start Here
 - [Documentation Placement Guide](./docs-placement-guide.md)
+- [Documentation Migration Safety Guide](./docs-migration-safety-guide.ai.md)
 - [Documentation Foundation Validation Guide](./docs-foundation-validation.ai.md)
 - [Router and Overview Writing Standard](./router-overview-writing-standard.ai.md)
 - [Documentation Templates](../context/templates/README.ai.md)

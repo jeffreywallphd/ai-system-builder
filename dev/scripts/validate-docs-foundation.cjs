@@ -25,6 +25,7 @@ const SEED_DOCUMENTS = [
   "docs/architecture/README.md",
   "docs/architecture/domain-and-application-core.md",
   "docs/unified-api-contributor-guide.md",
+  "docs/contributors/docs-migration-safety-guide.md",
   "docs/security-policy-configuration-operations.md",
   "docs/documentation-migration-baseline.md",
   "docs/context/documentation-taxonomy.md",
