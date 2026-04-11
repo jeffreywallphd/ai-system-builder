@@ -218,6 +218,29 @@ Desktop runtime startup composition now splits post-login shared bootstrap from 
   - canonical registry runtime composition,
   - agent runtime composition.
 
+## Story C.2.2 implementation update
+
+Deferred feature IPC registration is now split into domain registration modules under `electron/main/ipc/` and orchestrated from `electron/main/main.ts`:
+
+- `registerWorkflowPersistenceIpc`
+- `registerExecutionRunIpc`
+- `registerWorkflowRunHistoryIpc`
+- `registerAgentStudioIpc`
+- `registerStudioShellIpc`
+- `registerSystemStudioIpc`
+- `registerSystemRuntimeIpc`
+- `registerModelFileIpc`
+- `registerCanonicalRegistryIpc`
+
+`registerDeferredFeatureIpc(...)` remains the idempotent gate in main-process bootstrap, but the large inline `ipcMain.on` / `ipcMain.handle` block has been replaced by `registerDeferredFeatureIpcDomains(...)` composition wiring.
+
+Guidance for future additions:
+
+- Add new non-auth channels in the appropriate domain module under `electron/main/ipc/`.
+- Keep dependencies explicit via typed registration parameter objects.
+- Keep `main.ts` focused on lifecycle/orchestration and registration composition only.
+- Preserve existing renderer IPC channel names/contracts unless a coordinated surface change is planned.
+
 Result: `bootstrapPostLoginRuntime(...)` is now orchestration glue for post-login and on-demand paths instead of a single broad runtime bootstrap block.
 
 ## Story C.2.2 implementation update

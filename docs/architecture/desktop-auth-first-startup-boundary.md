@@ -451,3 +451,26 @@ This document sets the concrete target architecture for startup splitting so lat
 - on-demand responsibilities,
 - minimal bootstrap data required for auth/session restoration,
 - major startup work to move off first-render critical path.
+
+## Story C.2.2 deferred feature IPC domain registration extraction
+
+Deferred feature IPC binding is now organized into focused domain registration modules under `electron/main/ipc/`, with `electron/main/main.ts` retaining only high-level composition/orchestration:
+
+- `registerWorkflowPersistenceIpc`
+- `registerExecutionRunIpc`
+- `registerWorkflowRunHistoryIpc`
+- `registerAgentStudioIpc`
+- `registerStudioShellIpc`
+- `registerSystemStudioIpc`
+- `registerSystemRuntimeIpc`
+- `registerModelFileIpc`
+- `registerCanonicalRegistryIpc`
+
+`registerDeferredFeatureIpc(...)` remains the idempotent post-login gate and now delegates to `registerDeferredFeatureIpcDomains(...)`.
+
+Guidance for future additions:
+
+- add new non-auth channels to the relevant domain module in `electron/main/ipc/`;
+- keep module dependencies explicit through typed parameter objects;
+- keep `main.ts` focused on lifecycle/startup orchestration and dependency composition;
+- preserve existing renderer IPC channel names and sync/async behavior unless a coordinated API migration is planned.
