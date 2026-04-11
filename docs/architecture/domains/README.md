@@ -7,6 +7,8 @@ owned_by: team:platform-architecture
 last_reviewed: 2026-04-11
 related_code_paths:
   - docs/architecture/architecture-domain-taxonomy.md
+  - dev/scripts/validate-architecture-domains.cjs
+  - dev/tests/ArchitectureDomainValidationScript.test.ts
 ---
 
 # Architecture Domain Folders
@@ -107,3 +109,11 @@ For cross-domain scope rules and anti-pattern handling, use [Architecture Docume
 
 - These folders are the target migration shape for later stories.
 - Existing flat architecture docs remain authoritative until explicitly migrated.
+
+## Validation
+
+Run the domain structure guardrail validator before or after migration edits:
+
+```bash
+npm run docs:validate:architecture-domains
+```

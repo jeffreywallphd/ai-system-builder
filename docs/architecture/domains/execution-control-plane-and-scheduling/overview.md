@@ -70,7 +70,7 @@ Contract-level details are canonical in `./references/`:
 - [Run Orchestration Domain Foundation](../../run-orchestration-domain-foundation.md)
 - [Run Orchestration Queue Assignment Dispatch Control Plane](../../run-orchestration-queue-assignment-dispatch-control-plane.md)
 - [Run Orchestration Scheduling Policy Framework and Rule Pipeline](../../run-orchestration-scheduling-policy-framework-and-rule-pipeline.md)
-- [Run Submission Domain Foundation](../../run-submission-domain-foundation.md)
+- [Run Submission Validation Policy Eligibility](../../run-submission-validation-policy-eligibility.md)
 
 ## Related ADRs
 
