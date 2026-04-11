@@ -34,7 +34,8 @@
     "docs:migration-baseline": "node dev/scripts/generate-docs-migration-baseline.cjs",
     "docs:validate:foundation": "node dev/scripts/validate-docs-foundation.cjs",
     "docs:validate:adr": "node dev/scripts/validate-adr-records.cjs",
-    "docs:validate:architecture-domains": "node dev/scripts/validate-architecture-domains.cjs"
+    "docs:validate:architecture-domains": "node dev/scripts/validate-architecture-domains.cjs",
+    "docs:validate:segmentation": "node dev/scripts/validate-docs-segmentation.cjs"
   },
   "dependencies": {
     "@huggingface/hub": "^2.6.1",

@@ -9,9 +9,11 @@ related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-adr-records.cjs
   - dev/scripts/validate-architecture-domains.cjs
+  - dev/scripts/validate-docs-segmentation.cjs
   - dev/tests/DocsFoundationValidationScript.test.ts
   - dev/tests/AdrValidationScript.test.ts
   - dev/tests/ArchitectureDomainValidationScript.test.ts
+  - dev/tests/DocsSegmentationValidationScript.test.ts
 ---
 
 # AI Companion: Documentation Foundation Validation Guide
@@ -45,6 +47,10 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Domain overviews and reference indexes keep required routing links (`./references/README.md` and `../overview.md`).
 - Core markdown links in domain routers, domain overviews, and reference indexes resolve to real repository paths.
 - Domain reference docs maintain `.md` and `.ai.md` companion pairing.
+- Segmentation status-signal anchor docs keep required `## Documentation Status` markers.
+- Segmentation inventory candidates keep baseline destination guidance for non-superseded historical material.
+- Supersession registry entries keep frontmatter and destination alignment.
+- Active top-level routers avoid linking to superseded paths.
 
 ## Run Command
 
@@ -52,6 +58,7 @@ Use this guide to run the baseline docs foundation validator before or during do
 npm run docs:validate:foundation
 npm run docs:validate:adr
 npm run docs:validate:architecture-domains
+npm run docs:validate:segmentation
 ```
 
 ## CI Contract
@@ -87,6 +94,17 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 - `DOMAIN_REQUIRED_LINK_MISSING`
 - `DOMAIN_CORE_LINK_MISSING`
 - `DOMAIN_REFERENCE_PAIR_MISSING`
+- `STATUS_SIGNAL_DOC_MISSING`
+- `STATUS_SIGNAL_MARKER_MISSING`
+- `SEGMENTATION_INVENTORY_INVALID`
+- `BASELINE_DESTINATION_INVALID`
+- `SEGMENTATION_SUPERSESSION_LINK_MISSING`
+- `SEGMENTATION_SUPERSESSION_LINK_INVALID`
+- `SUPERSESSION_REGISTRY_INVALID`
+- `SUPERSESSION_DESTINATION_INVALID`
+- `SUPERSESSION_METADATA_MISMATCH`
+- `SUPERSESSION_SECTION_MISSING`
+- `ACTIVE_PATH_REFERENCE_INVALID`
 
 ## Scope Notes
 
