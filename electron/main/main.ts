@@ -27,27 +27,6 @@ import type {
 import {
   DesktopPostLoginRuntimeUnavailableReasons,
 } from "../shared/DesktopContracts";
-import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
-import { SqliteAgentRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentRepository";
-import { SqliteAgentExecutionSessionRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentExecutionSessionRepository";
-import { AgentStudioBackendApi } from "../../src/infrastructure/api/agents/AgentStudioBackendApi";
-import { AgentRunnerService } from "../../src/application/agents/services/AgentRunnerService";
-import { DeterministicAgentPlanningService } from "../../src/application/agents/services/AgentPlanningInterface";
-import { ExecuteAgentToolsUseCase } from "../../src/application/agents/ExecuteAgentToolsUseCase";
-import { DefaultAgentMemoryRetrievalService } from "../../src/application/agents/services/AgentMemoryRetrievalService";
-import { AgentMemoryWriteService } from "../../src/application/agents/services/AgentMemoryWriteService";
-import { AssetBackedAgentMemoryStore } from "../../src/application/agents/services/AssetBackedAgentMemoryStore";
-import { CompositeToolCapabilityCatalog } from "../../src/infrastructure/tools/CompositeToolCapabilityCatalog";
-import { StaticLocalToolCapabilityCatalog } from "../../src/infrastructure/tools/StaticLocalToolCapabilityCatalog";
-import { McpToolCapabilityCatalog } from "../../src/infrastructure/tools/McpToolCapabilityCatalog";
-import { CompositeToolCapabilityExecutor } from "../../src/infrastructure/tools/CompositeToolCapabilityExecutor";
-import { StaticLocalToolCapabilityExecutor } from "../../src/infrastructure/tools/StaticLocalToolCapabilityExecutor";
-import { McpToolCapabilityExecutor } from "../../src/infrastructure/tools/McpToolCapabilityExecutor";
-import { DeterministicToolCapabilityAgentOrchestrator } from "../../src/infrastructure/agents/DeterministicToolCapabilityAgentOrchestrator";
-import { PythonRuntimeConfig } from "../../src/infrastructure/config/PythonRuntimeConfig";
-import { createMcpRuntimeIntegration } from "../../src/infrastructure/python/mcp/createMcpRuntimeIntegration";
-import { SqliteAssetSystemAgentMemoryCatalog } from "../../src/infrastructure/filesystem/agents/SqliteAssetSystemAgentMemoryCatalog";
-import { ListPersistedWorkflowsUseCase } from "../../src/application/workflow-persistence/ListPersistedWorkflowsUseCase";
 import { type LaunchSystemRuntimeWindowReadModel } from "../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { createRendererContentSecurityPolicyResolver } from "./RendererContentSecurityPolicy";
 import { logInitializationCheckpoint, logInitializationEnd, logInitializationMemory, logInitializationStart } from "./InitializationLogging";
@@ -69,6 +48,8 @@ import {
 } from "../../src/hosts/server/AuthMinimalServerHostEntrypoint";
 import { createDesktopWindowManager } from "./DesktopWindowManager";
 import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
+import { createDesktopAgentRuntimeProvider, type DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
+import { createCanonicalRegistryRuntimeProvider, type CanonicalRegistryRuntimeProvider } from "./runtime/CanonicalRegistryRuntimeProvider";
 
 // Provide ESM-safe CommonJS path globals for runtime compatibility with CJS dependencies.
 const __filename = fileURLToPath(import.meta.url);
@@ -116,10 +97,6 @@ function installRendererContentSecurityPolicy(): void {
 }
 
 let storageDatabase: DesktopStorageDatabase | undefined;
-let agentRepository: SqliteAgentRepository | undefined;
-let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
-let agentRunnerAssetSystemRepository: SqliteAssetSystemRepository | undefined;
-let agentStudioBackendApi: AgentStudioBackendApi | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let authMinimalServerRuntime: AuthMinimalServerHostRuntimeHandle | undefined;
 let bootstrapContext: DesktopAuthBootstrapContext | undefined;
@@ -131,21 +108,8 @@ let deferredDesktopFeatureRuntimeFactory: ((options: {
   readonly runtimeConfigValues: AppRuntimeConfigValues;
   readonly repoRoot: string;
 }) => DeferredDesktopFeatureRuntime) | undefined;
-type CanonicalRegistryRuntime = {
-  readonly repository: SqliteAssetSystemRepository;
-  readonly listCanonicalAssetsUseCase: any;
-  readonly loadCanonicalAssetDetailUseCase: any;
-  readonly getVersionHistoryUseCase: any;
-  readonly dependencyStateUseCase: any;
-  readonly replayScopedProjectionUseCase: any;
-  readonly verifyProjectionUseCase: any;
-  readonly projectionTrustReadModelService: any;
-  readonly rebuildProjectionOrchestrationUseCase: any;
-  readonly loadManagementSnapshotUseCase: any;
-  readonly reconcileIdentityUseCase: any;
-  readonly registryBackendApi: any;
-};
-let canonicalRegistryRuntime: CanonicalRegistryRuntime | undefined;
+let agentRuntimeProvider: DesktopAgentRuntimeProvider | undefined;
+let canonicalRegistryRuntimeProvider: CanonicalRegistryRuntimeProvider | undefined;
 const DesktopServiceSupervisorPort = 8790;
 let authIpcRegistered = false;
 let deferredFeatureIpcRegistered = false;
@@ -193,67 +157,6 @@ async function ensureDeferredDesktopFeatureRuntimeFactory(): Promise<(
   return deferredDesktopFeatureRuntimeFactory;
 }
 
-/**
- * Composes the desktop agent runner with tool catalogs, executors, and memory services backed by local storage.
- */
-function createDesktopAgentRunner(params: {
-  readonly assetSystemRepository: SqliteAssetSystemRepository;
-  readonly sessionRepository: SqliteAgentExecutionSessionRepository;
-}): AgentRunnerService {
-  const pythonConfig = PythonRuntimeConfig.fromEnv(process.env);
-  const mcpIntegration = createMcpRuntimeIntegration(pythonConfig);
-  const toolCatalog = new CompositeToolCapabilityCatalog([
-    new StaticLocalToolCapabilityCatalog([]),
-    new McpToolCapabilityCatalog(mcpIntegration.toolCatalog),
-  ]);
-  const toolExecutor = new CompositeToolCapabilityExecutor([
-    {
-      providerKind: "local",
-      providerId: "local-runtime",
-      executor: new StaticLocalToolCapabilityExecutor({}),
-    },
-    {
-      providerKind: "mcp",
-      providerId: "python-mcp-runtime",
-      executor: new McpToolCapabilityExecutor(mcpIntegration.toolExecutor),
-    },
-  ]);
-  const memoryStore = new AssetBackedAgentMemoryStore(
-    new SqliteAssetSystemAgentMemoryCatalog(params.assetSystemRepository),
-    params.assetSystemRepository,
-  );
-  return new AgentRunnerService(
-    new DeterministicAgentPlanningService(toolCatalog, memoryStore),
-    new ExecuteAgentToolsUseCase(toolCatalog, new DeterministicToolCapabilityAgentOrchestrator(toolExecutor)),
-    new DefaultAgentMemoryRetrievalService(memoryStore),
-    new AgentMemoryWriteService(memoryStore),
-    undefined,
-    undefined,
-    params.sessionRepository,
-  );
-}
-
-/**
- * Lazily creates and caches the Agent Studio backend API dependencies for deferred feature IPC domains.
- */
-function ensureAgentStudioBackendApi(
-  storagePaths: ReturnType<typeof resolveDesktopStoragePaths>,
-): AgentStudioBackendApi {
-  if (agentStudioBackendApi) {
-    return agentStudioBackendApi;
-  }
-  agentRepository = new SqliteAgentRepository(path.join(storagePaths.storageDirectory, "agents", "agents.sqlite"));
-  agentSessionRepository = new SqliteAgentExecutionSessionRepository(path.join(storagePaths.storageDirectory, "agents", "agent-sessions.sqlite"));
-  agentRunnerAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
-  const agentRunner = createDesktopAgentRunner({
-    assetSystemRepository: agentRunnerAssetSystemRepository,
-    sessionRepository: agentSessionRepository,
-  });
-  agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
-  logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "agent-runtime-ready");
-  return agentStudioBackendApi;
-}
-
 async function openMainDesktopWindow(): Promise<void> {
   const mainWindowCreateStartedAt = logInitializationStart(DesktopStartupPhases.mainWindowCreation);
   await windowManager.createMainWindow({
@@ -270,133 +173,6 @@ async function openMainDesktopWindow(): Promise<void> {
       logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "ready");
     },
   });
-}
-
-/**
- * Creates and memoizes canonical registry runtime services used by deferred registry and inspection surfaces.
- */
-async function ensureCanonicalRegistryRuntime(
-  storagePaths: ReturnType<typeof resolveDesktopStoragePaths>,
-): Promise<CanonicalRegistryRuntime> {
-  if (canonicalRegistryRuntime) {
-    return canonicalRegistryRuntime;
-  }
-  const runtime = deferredFeatureRuntime;
-  if (!runtime) {
-    throw new Error("Deferred desktop feature runtime is unavailable.");
-  }
-  const systemRuntimeBackendApi = runtime.ensureSystemRuntimeBackendApi();
-  const [
-    { InMemoryAssetLineageGraphProjectionSink },
-    { ExplainCanonicalVersionExistenceUseCase, GetCanonicalProvenanceSummaryUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase },
-    { GetAssetVersionHistoryUseCase },
-    { GetCanonicalDependencyStateUseCase },
-    { GetAssetDependencyHealthUseCase },
-    { GetAssetImpactAnalysisUseCase },
-    { ReconcileCanonicalIdentityMappingsUseCase, ReplayScopedAssetGraphProjectionUseCase },
-    { ReplayAssetGraphProjectionUseCase },
-    { VerifyAssetGraphProjectionUseCase },
-    { ProjectionRebuildOrchestrationUseCase },
-    { LoadCanonicalAssetManagementSnapshotUseCase },
-    { ProjectionTrustReadModelService },
-    { RegistryBackendApi },
-    { RegistryQueryService },
-    { CrossStudioRegistryQueryService },
-    { RegistryDependencyGraphService },
-    { RegistryCacheLayer },
-    { CompositionAssetContractResolver },
-  ] = await Promise.all([
-    import("../../src/infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink"),
-    import("../../src/application/assets-system/CanonicalAssetReadUseCases"),
-    import("../../src/application/assets-system/GetAssetVersionHistoryUseCase"),
-    import("../../src/application/assets-system/CanonicalDependencyStateUseCase"),
-    import("../../src/application/assets-system/GetAssetDependencyHealthUseCase"),
-    import("../../src/application/assets-system/GetAssetImpactAnalysisUseCase"),
-    import("../../src/application/assets-system/ReconciliationUseCases"),
-    import("../../src/application/assets-system/ReplayAssetGraphProjectionUseCase"),
-    import("../../src/application/assets-system/VerifyAssetGraphProjectionUseCase"),
-    import("../../src/application/assets-system/ProjectionRebuildOrchestrationUseCase"),
-    import("../../src/application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase"),
-    import("../../src/application/assets-system/ProjectionTrustReadModelService"),
-    import("../../src/infrastructure/api/registry/RegistryBackendApi"),
-    import("../../src/application/asset-registry/RegistryQueryService"),
-    import("../../src/application/asset-registry/CrossStudioRegistryQueryService"),
-    import("../../src/application/asset-registry/RegistryDependencyGraphService"),
-    import("../../src/application/asset-registry/RegistryCacheLayer"),
-    import("../../src/application/contracts/CompositionAssetContractResolver"),
-  ]);
-
-  const repository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
-  const projectionSink = new InMemoryAssetLineageGraphProjectionSink();
-  const listCanonicalAssetsUseCase = new ListCanonicalAssetsUseCase(repository, repository);
-  const loadCanonicalAssetDetailUseCase = new LoadCanonicalAssetDetailUseCase(repository, repository, repository, repository, repository);
-  const getVersionHistoryUseCase = new GetAssetVersionHistoryUseCase(repository);
-  const explainVersionExistenceUseCase = new ExplainCanonicalVersionExistenceUseCase(
-    new GetCanonicalProvenanceSummaryUseCase(repository, repository, repository),
-    repository,
-  );
-  const dependencyStateUseCase = new GetCanonicalDependencyStateUseCase(
-    repository,
-    repository,
-    new GetAssetDependencyHealthUseCase(repository, repository, repository),
-    new GetAssetImpactAnalysisUseCase(repository, repository, repository),
-    new GetCanonicalProvenanceSummaryUseCase(repository, repository, repository),
-    repository,
-  );
-  const replayProjectionUseCase = new ReplayAssetGraphProjectionUseCase(repository, projectionSink);
-  const replayScopedProjectionUseCase = new ReplayScopedAssetGraphProjectionUseCase(repository, replayProjectionUseCase);
-  const verifyProjectionUseCase = new VerifyAssetGraphProjectionUseCase(repository, projectionSink);
-  const projectionTrustReadModelService = new ProjectionTrustReadModelService();
-  const rebuildProjectionOrchestrationUseCase = new ProjectionRebuildOrchestrationUseCase(
-    replayScopedProjectionUseCase,
-    replayProjectionUseCase,
-    verifyProjectionUseCase,
-  );
-  const loadManagementSnapshotUseCase = new LoadCanonicalAssetManagementSnapshotUseCase(
-    loadCanonicalAssetDetailUseCase,
-    getVersionHistoryUseCase,
-    dependencyStateUseCase,
-    explainVersionExistenceUseCase,
-    verifyProjectionUseCase,
-  );
-  const registryCacheLayer = new RegistryCacheLayer({ maxEntriesPerNamespace: 300 });
-  const registryQueryService = new RegistryQueryService(
-    repository,
-    repository,
-    repository,
-    new CompositionAssetContractResolver(),
-    repository,
-    undefined,
-    registryCacheLayer,
-    repository,
-    {
-      async listRecentExecutionsForSystem(input) {
-        const response = await systemRuntimeBackendApi.listRecentExecutionsForSystem(input);
-        return response.ok && response.data ? response.data : [];
-      },
-    },
-  );
-  const registryBackendApi = new RegistryBackendApi(
-    new CrossStudioRegistryQueryService(registryQueryService),
-    new RegistryDependencyGraphService(registryQueryService, repository, repository, registryCacheLayer),
-    new ListPersistedWorkflowsUseCase(runtime.ensureWorkflowPersistenceRepository()),
-  );
-  canonicalRegistryRuntime = {
-    repository,
-    listCanonicalAssetsUseCase,
-    loadCanonicalAssetDetailUseCase,
-    getVersionHistoryUseCase,
-    dependencyStateUseCase,
-    replayScopedProjectionUseCase,
-    verifyProjectionUseCase,
-    projectionTrustReadModelService,
-    rebuildProjectionOrchestrationUseCase,
-    loadManagementSnapshotUseCase,
-    reconcileIdentityUseCase: new ReconcileCanonicalIdentityMappingsUseCase(repository, repository),
-    registryBackendApi,
-  };
-  logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "canonical-registry-runtime-ready");
-  return canonicalRegistryRuntime;
 }
 
 /**
@@ -762,6 +538,8 @@ async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, boot
 function createOnDemandFeatureCompositionPaths(params: {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
   readonly featureRuntime: DeferredDesktopFeatureRuntime;
+  readonly agentRuntimeProvider: DesktopAgentRuntimeProvider;
+  readonly canonicalRegistryRuntimeProvider: CanonicalRegistryRuntimeProvider;
 }): OnDemandFeatureCompositionPaths {
   // Each resolver lazily constructs/accesses a deferred feature service only when its IPC domain is exercised.
   return Object.freeze({
@@ -771,8 +549,8 @@ function createOnDemandFeatureCompositionPaths(params: {
     getStudioShellBackendApi: () => params.featureRuntime.ensureStudioShellBackendApi(),
     getSystemStudioBackendApi: () => params.featureRuntime.ensureSystemStudioBackendApi(),
     getSystemRuntimeBackendApi: () => params.featureRuntime.ensureSystemRuntimeBackendApi(),
-    getCanonicalRegistryRuntime: () => ensureCanonicalRegistryRuntime(params.storagePaths),
-    getAgentStudioBackendApi: () => ensureAgentStudioBackendApi(params.storagePaths),
+    getCanonicalRegistryRuntime: () => params.canonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime(),
+    getAgentStudioBackendApi: () => params.agentRuntimeProvider.ensureAgentStudioBackendApi(),
   });
 }
 
@@ -785,9 +563,23 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "start");
     const runtimeComposition = await composePostLoginRuntime(authShell, bootstrapStartedAt);
     const { storagePaths, runtimeConfig, pythonRuntime, featureRuntime } = runtimeComposition;
+    agentRuntimeProvider = createDesktopAgentRuntimeProvider({
+      storagePaths,
+      onRuntimeReady: () => logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "agent-runtime-ready"),
+    });
+    canonicalRegistryRuntimeProvider = createCanonicalRegistryRuntimeProvider({
+      storagePaths,
+      getDeferredFeatureRuntime: () => deferredFeatureRuntime,
+      onRuntimeReady: () => logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "canonical-registry-runtime-ready"),
+    });
     // Registers deferred IPC only after core post-login services are composed and ready.
     registerDeferredFeatureIpc(() => {
-      const onDemand = createOnDemandFeatureCompositionPaths({ storagePaths, featureRuntime });
+      const onDemand = createOnDemandFeatureCompositionPaths({
+        storagePaths,
+        featureRuntime,
+        agentRuntimeProvider: agentRuntimeProvider!,
+        canonicalRegistryRuntimeProvider: canonicalRegistryRuntimeProvider!,
+      });
       registerDeferredFeatureIpcDomains({
         ipcMain,
         onDemand,
@@ -825,16 +617,11 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
   deferredFeatureRuntime?.dispose();
-  agentRepository?.dispose();
-  agentSessionRepository?.dispose();
-  agentRunnerAssetSystemRepository?.dispose();
-  canonicalRegistryRuntime?.repository.dispose();
-  agentStudioBackendApi = undefined;
-  agentRepository = undefined;
-  agentSessionRepository = undefined;
-  agentRunnerAssetSystemRepository = undefined;
-  canonicalRegistryRuntime = undefined;
+  agentRuntimeProvider?.dispose();
+  canonicalRegistryRuntimeProvider?.dispose();
   deferredFeatureRuntime = undefined;
+  agentRuntimeProvider = undefined;
+  canonicalRegistryRuntimeProvider = undefined;
   deferredDesktopFeatureRuntimeFactory = undefined;
   serviceSupervisor = undefined;
   authMinimalServerRuntime = undefined;

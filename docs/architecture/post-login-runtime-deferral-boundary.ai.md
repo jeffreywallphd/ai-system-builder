@@ -61,8 +61,8 @@ Initialize only on first feature use:
 - execution history runtime (`ensureExecutionHistory`)
 - workflow-run history runtime (`ensureWorkflowRunHistory`)
 - studio shell/system studio/system runtime backends and image persistence adapters
-- canonical registry runtime dynamic-import graph (`ensureCanonicalRegistryRuntime`)
-- agent runtime/repositories (`ensureAgentStudioBackendApi`)
+- canonical registry runtime dynamic-import graph (`CanonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime`)
+- agent runtime/repositories (`DesktopAgentRuntimeProvider.ensureAgentStudioBackendApi`)
 
 Failure posture:
 
@@ -82,8 +82,8 @@ The legacy eager startup responsibilities map to this contract as follows:
 | Studio shell/system runtime/image persistence infra | `DeferredDesktopFeatureRuntime` ensure methods | On-demand | Keep lazy |
 | Model file operations | IPC registration in `bootstrapPostLoginRuntime` | Post-login now; on-demand target | Move to feature activation boundary |
 | Feature IPC registration | `registerDeferredFeatureIpc(...)` | Post-login now; split target | Segment into core warmup IPC + on-demand feature IPC groups |
-| Canonical registry runtime | `ensureCanonicalRegistryRuntime` | On-demand | Keep lazy |
-| Agent runtime | `ensureAgentStudioBackendApi` | On-demand | Keep lazy |
+| Canonical registry runtime | `CanonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime` | On-demand | Keep lazy |
+| Agent runtime | `DesktopAgentRuntimeProvider.ensureAgentStudioBackendApi` | On-demand | Keep lazy |
 
 ## Follow-on story implementation target
 

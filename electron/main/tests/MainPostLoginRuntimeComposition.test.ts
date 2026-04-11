@@ -11,6 +11,8 @@ describe("electron main post-login runtime composition", () => {
     expect(mainSource).toContain("async function ensureDeferredDesktopFeatureRuntimeFactory()");
     expect(mainSource).toContain("const runtimeComposition = await composePostLoginRuntime(");
     expect(mainSource).toContain("const onDemand = createOnDemandFeatureCompositionPaths(");
+    expect(mainSource).toContain("agentRuntimeProvider = createDesktopAgentRuntimeProvider(");
+    expect(mainSource).toContain("canonicalRegistryRuntimeProvider = createCanonicalRegistryRuntimeProvider(");
     expect(mainSource).toContain("const createDeferredDesktopFeatureRuntime = await ensureDeferredDesktopFeatureRuntimeFactory()");
     expect(mainSource).toContain("await import(\"./DeferredDesktopFeatureRuntime\")");
     expect(mainSource).not.toContain("import {\n  createDeferredDesktopFeatureRuntime,");
