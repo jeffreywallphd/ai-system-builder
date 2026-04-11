@@ -15,24 +15,17 @@ related_code_paths:
 
 ## Supersession Notice
 
-This document is a `migrated-link-stub` and is not authoritative for architecture decisions. Route to the canonical domain references below.
+This document is a `migrated-link-stub` and is not authoritative for architecture decisions.
 
-## Split Routing for Previously Mixed Content
+Effective date: 2026-04-11.
+Reason: This mixed legacy path was split into domain-specific canonical references.
+Retention/removal trigger: Remove this stub after inbound links are migrated and supersession guardrails pass without this path.
 
-The prior version mixed multiple architecture domains. Canonical authority now routes as follows:
+## Redirect
 
-- Studio and composition contracts:
-  - `docs/architecture/domains/studio-and-system-composition/references/studio-ui-composition-and-state.md`
-  - `docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.md`
-- Execution control-plane and workflow handoff contracts:
-  - `docs/architecture/domains/execution-control-plane-and-scheduling/references/workflow-execution-runtime-handoff.md`
-- Runtime host assembly/startup contracts:
-  - `docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md`
-- Multi-surface UI layering reference still active pending migration:
-  - `docs/architecture/multi-surface-ui-composition-foundation.md`
-
-## Related ADRs
-
-- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md`
-- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
-- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`
+Use these canonical sources instead:
+- Primary replacement: `docs/architecture/domains/studio-and-system-composition/references/studio-ui-composition-and-state.ai.md`
+- Related workflow composition: `docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.ai.md`
+- Related execution handoff: `docs/architecture/domains/execution-control-plane-and-scheduling/references/workflow-execution-runtime-handoff.ai.md`
+- Related runtime host contracts: `docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.ai.md`
+- Pending flat reference still active: `docs/architecture/multi-surface-ui-composition-foundation.md`
