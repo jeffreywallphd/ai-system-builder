@@ -91,4 +91,59 @@ describe("architecture domain taxonomy guardrails", () => {
       expect(existsSync(resolve(domainRoot, "references/README.ai.md"))).toBe(true);
     }
   });
+
+  it("keeps the standard domain document pattern explicit and consistent across domains", () => {
+    const domainsRouter = readFileSync(domainsRouterPath, "utf8");
+    const domainsAiRouter = readFileSync(domainsAiRouterPath, "utf8");
+
+    for (const requiredAnchor of [
+      "## Standard Domain Document Pattern",
+      "## Overview Responsibilities",
+      "## Reference Responsibilities",
+      "## ADR and Context Pack Linking Rules",
+      "## Content Placement Rules",
+      "overview.md",
+      "references/README.md",
+    ] as const) {
+      expect(domainsRouter).toContain(requiredAnchor);
+      expect(domainsAiRouter).toContain(requiredAnchor);
+    }
+
+    for (const domainId of requiredDomainIds) {
+      const overviewPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/overview.md`);
+      const overviewAiPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/overview.ai.md`);
+      const referenceReadmePath = resolve(repoRoot, `docs/architecture/domains/${domainId}/references/README.md`);
+      const referenceReadmeAiPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/references/README.ai.md`);
+
+      const overview = readFileSync(overviewPath, "utf8");
+      const overviewAi = readFileSync(overviewAiPath, "utf8");
+      const references = readFileSync(referenceReadmePath, "utf8");
+      const referencesAi = readFileSync(referenceReadmeAiPath, "utf8");
+
+      for (const heading of [
+        "## What Belongs in the Overview",
+        "## What Does Not Belong in the Overview",
+        "## Related Domain References",
+        "## Related ADRs",
+        "## Related Context Packs",
+      ] as const) {
+        expect(overview).toContain(heading);
+        expect(overviewAi).toContain(heading);
+      }
+
+      for (const heading of [
+        "## What Belongs in Domain References",
+        "## What Does Not Belong in Domain References",
+        "## Reference Authoring Rules",
+      ] as const) {
+        expect(references).toContain(heading);
+        expect(referencesAi).toContain(heading);
+      }
+
+      expect(overview).toContain("./references/README.md");
+      expect(overviewAi).toContain("./references/README.md");
+      expect(references).toContain("../overview.md");
+      expect(referencesAi).toContain("../overview.md");
+    }
+  });
 });

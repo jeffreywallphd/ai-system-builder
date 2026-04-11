@@ -13,14 +13,72 @@ related_code_paths:
 
 ## Purpose
 
-Define the canonical folder structure under docs/architecture/domains/ for domain-oriented architecture documentation migration.
+Define the canonical folder structure and document pattern under docs/architecture/domains/ so each domain has predictable overview and reference responsibilities.
 
 ## Folder Contract
 
 - Use one folder per domain ID from docs/architecture/architecture-domain-taxonomy.md.
 - Keep one overview.md per domain as the boundary and routing contract.
+- Keep one references/README.md per domain as the reference-index and authoring contract.
 - Keep detailed contracts in the domain references/ folder.
 - Keep markdown and AI companion files aligned during migrations.
+
+## Standard Domain Document Pattern
+
+Each domain uses this minimum file shape:
+
+```text
+docs/architecture/domains/<domain-id>/
+  overview.md
+  overview.ai.md
+  references/
+    README.md
+    README.ai.md
+    <contract-reference>.md
+    <contract-reference>.ai.md
+```
+
+No extra domain-level file types are required right now. Add new top-level file types only when architecture complexity cannot be expressed cleanly with overview plus references.
+
+## Overview Responsibilities
+
+`overview.md` is the domain boundary contract:
+- Define scope, ownership seams, and cross-domain dependency rules.
+- State domain-wide invariants and concise migration direction.
+- Route readers to canonical references in `./references/`.
+
+`overview.md` should not contain:
+- endpoint payload catalogs, schema tables, or low-level API matrices
+- runbook procedures or troubleshooting workflows
+- ticket-level delivery plans or contributor process checklists
+
+## Reference Responsibilities
+
+`references/README.md` is the domain reference-index contract:
+- Define what reference docs in the folder are allowed to cover.
+- Require one durable contract surface per reference doc.
+- Require references to link back to `../overview.md` for boundary context.
+
+Reference docs should not contain:
+- duplicated domain boundary summaries from `overview.md`
+- operational playbooks better owned by `docs/operations/`
+- contributor process guidance better owned by `docs/contributors/`
+
+## ADR and Context Pack Linking Rules
+
+- Domain overviews must include `## Related ADRs` when ADRs constrain the domain boundary.
+- Domain reference docs must include `## Related ADRs` when the specific contract is ADR-constrained.
+- Domain overviews should include `## Related Context Packs` with links to relevant `docs/context/packs/*.pack.md` assets.
+- Domain references should include `## Related Context Packs` when routing quality depends on that contract for AI retrieval.
+
+## Content Placement Rules
+
+When domain docs need content outside architecture scope, link instead of copying:
+
+- operations procedures -> `docs/operations/`
+- contributor workflows and authoring standards -> `docs/contributors/`
+- decision rationale history -> `docs/adr/records/`
+- retrieval assembly guidance -> `docs/context/packs/`
 
 ## Domain Folders
 
