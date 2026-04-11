@@ -48,6 +48,8 @@ describe("identity and security context pack guardrails", () => {
     }
 
     for (const authoritativePath of [
+      "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+      "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
       "docs/architecture/authorization-foundation.md",
       "docs/architecture/transport-security-foundation.md",
       "docs/architecture/secrets-foundation.md",
@@ -60,6 +62,8 @@ describe("identity and security context pack guardrails", () => {
     }
 
     for (const authoritativePath of [
+      "docs/adr/records/adr-001-single-authoritative-control-plane.ai.md",
+      "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md",
       "docs/architecture/authorization-foundation.ai.md",
       "docs/architecture/transport-security-foundation.ai.md",
       "docs/architecture/secrets-foundation.ai.md",

@@ -46,6 +46,7 @@ Use the smallest context set that can still produce a correct answer:
 - For runtime/host/desktop/startup tasks, insert `runtime-and-host` after `architecture-core` and before `context-system-foundations`.
 - For identity/authentication/authorization/trust/secrets-sensitive tasks, insert `identity-and-security` after `architecture-core` and before `context-system-foundations`.
 - For Studio Shell and System Studio composition tasks, insert `studio-and-system-composition` after `architecture-core` and before `context-system-foundations`.
+- Add ADR references only when decisions materially constrain implementation outcomes (for example control-plane authority, trust boundary enforcement, or studio/system authority).
 - Add path-specific architecture or contributor docs only when they directly match `changedPaths` or `primarySurfaces`.
 - Prefer one canonical source over multiple overlapping summaries.
 - Stop adding documents once requested outcomes can be satisfied with confidence.

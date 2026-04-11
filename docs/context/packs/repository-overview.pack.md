@@ -27,6 +27,8 @@
 ## Authoritative Docs
 
 - `README.md`
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`
 - `docs/architecture/README.md`
 - `docs/architecture/domain-and-application-core.md`
 - `docs/architecture/layers-and-boundaries.md`

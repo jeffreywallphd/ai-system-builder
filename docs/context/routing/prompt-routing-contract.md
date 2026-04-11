@@ -73,6 +73,7 @@ Exclusion: code-only changes with no doc contract impact.
 - Lower numeric priority values win when two candidate packs overlap.
 - Keep selected packs minimal: include the smallest set needed to satisfy `requestedOutcomes`.
 - Always include cross-cutting governance/taxonomy packs when contract files are in scope.
+- Include ADR references in mapping `relatedDocPaths` only when decision history is a foundational or high-risk constraint for the task.
 - Use `contextAssemblyProfileId` and `contextAssemblyTierHints` to order source material by tier before adding optional support.
 
 ## Context Assembly Priority and Ordering

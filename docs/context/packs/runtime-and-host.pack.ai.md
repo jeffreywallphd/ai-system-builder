@@ -29,6 +29,8 @@
 
 ## Authoritative Docs
 
+- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md`
 - `docs/architecture/host-runtime-composition-boundaries.ai.md`
 - `docs/architecture/host-bootstrap-pipeline.ai.md`
 - `docs/architecture/authoritative-server-host-assembly.ai.md`

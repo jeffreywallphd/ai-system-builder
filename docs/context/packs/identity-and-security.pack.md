@@ -27,6 +27,7 @@
 
 ## Authoritative Docs
 
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
 - `docs/architecture/authorization-foundation.md`
 - `docs/architecture/authorization-enforcement-integration-patterns.md`
 - `docs/architecture/trusted-device-foundation.md`

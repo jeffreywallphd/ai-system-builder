@@ -44,6 +44,8 @@
       "aiDocPath": "docs/context/packs/repository-overview.pack.ai.md",
       "relatedDocPaths": [
         "README.md",
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+        "docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md",
         "docs/architecture/README.md",
         "docs/architecture/domain-and-application-core.md",
         "docs/architecture/layers-and-boundaries.md",
@@ -77,6 +79,8 @@
       "primaryDocPath": "docs/context/packs/architecture-core.pack.md",
       "aiDocPath": "docs/context/packs/architecture-core.pack.ai.md",
       "relatedDocPaths": [
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+        "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
         "docs/architecture/README.md",
         "docs/architecture/domain-and-application-core.md",
         "docs/architecture/layers-and-boundaries.md",
@@ -152,6 +156,8 @@
       "primaryDocPath": "docs/context/packs/runtime-and-host.pack.md",
       "aiDocPath": "docs/context/packs/runtime-and-host.pack.ai.md",
       "relatedDocPaths": [
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+        "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
         "docs/architecture/host-runtime-composition-boundaries.md",
         "docs/architecture/host-bootstrap-pipeline.md",
         "docs/architecture/desktop-host-assembly.md",
@@ -189,6 +195,8 @@
       "primaryDocPath": "docs/context/packs/identity-and-security.pack.md",
       "aiDocPath": "docs/context/packs/identity-and-security.pack.ai.md",
       "relatedDocPaths": [
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+        "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
         "docs/architecture/authorization-foundation.md",
         "docs/architecture/authorization-enforcement-integration-patterns.md",
         "docs/architecture/trusted-device-foundation.md",
@@ -232,6 +240,7 @@
       "primaryDocPath": "docs/context/packs/studio-and-system-composition.pack.md",
       "aiDocPath": "docs/context/packs/studio-and-system-composition.pack.ai.md",
       "relatedDocPaths": [
+        "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
         "docs/architecture/studio-handoff-contract.md",
         "docs/architecture/image-workflow-system-definition-layer.md",
         "docs/architecture/image-system-domain-foundation.md",

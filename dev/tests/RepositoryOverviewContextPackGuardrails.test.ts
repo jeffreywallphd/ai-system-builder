@@ -45,6 +45,7 @@ describe("repository overview context pack guardrails", () => {
 
     for (const authoritativePath of [
       "README.md",
+      "docs/adr/records/adr-001-single-authoritative-control-plane.md",
       "docs/architecture/README.md",
       "docs/context/prompt-routing.md",
       "src/domain",
@@ -56,6 +57,7 @@ describe("repository overview context pack guardrails", () => {
 
     for (const authoritativePath of [
       "README.md",
+      "docs/adr/records/adr-001-single-authoritative-control-plane.ai.md",
       "docs/architecture/README.ai.md",
       "docs/context/prompt-routing.ai.md",
       "src/domain",

@@ -155,9 +155,32 @@ describe("context pack contract guardrails", () => {
     expect(catalogPackIds).toContain("identity-and-security");
     expect(catalogPackIds).toContain("studio-and-system-composition");
 
+    const expectedAdrDocsByPackId: Record<string, string[]> = {
+      "repository-overview": [
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+      ],
+      "architecture-core": [
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+      ],
+      "runtime-and-host": [
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+      ],
+      "identity-and-security": [
+        "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
+      ],
+      "studio-and-system-composition": [
+        "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
+      ],
+    };
+
     for (const entry of catalogSeed.packs) {
       for (const requiredField of requiredCatalogFields) {
         expect(entry[requiredField]).toBeDefined();
+      }
+      const expectedAdrDocs = expectedAdrDocsByPackId[String(entry.id)] ?? [];
+      const relatedDocPaths = entry.relatedDocPaths as string[];
+      for (const adrDocPath of expectedAdrDocs) {
+        expect(relatedDocPaths).toContain(adrDocPath);
       }
     }
   });

@@ -24,6 +24,8 @@ Context packs can cite ADRs when decision history materially improves implementa
 
 - Add ADR links in `## Authoritative Docs` with repo-relative paths (for example `docs/adr/records/adr-<NNN>-<decision-slug>.ai.md`).
 - Cite ADRs when pack invariants depend on accepted architecture tradeoffs.
+- Prioritize ADR citations in foundational/high-risk packs where decisions materially constrain outputs.
+- Keep ADR references selective (typically one to three links) to prevent context noise.
 - Keep ADR references paired with architecture docs so assistants can traverse rationale and current contract together.
 - Update pack ADR references when an ADR becomes superseded.
 

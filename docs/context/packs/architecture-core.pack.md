@@ -28,7 +28,9 @@
 ## Authoritative Docs
 
 - `docs/architecture/README.md`
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
 - `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`
+- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md`
 - `docs/architecture/domain-and-application-core.md`
 - `docs/architecture/layers-and-boundaries.md`
 - `docs/architecture/workflow-execution-and-tools.md`
