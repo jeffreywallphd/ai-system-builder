@@ -30,7 +30,13 @@
 - Canonical architecture references for current behavior.
 
 ## Start Here
+- [Architecture Baselines Router](./architecture/README.md)
 - [Feature 1 Documentation Foundation Completion Handoff](./feature-1-documentation-foundation-handoff.md)
+- [Feature 4 Final Baseline: Authorization](./architecture/authorization/authorization-feature-4-final-baseline.md)
+- [Deployment Policy Persistence/API Integration Baseline](./architecture/deployment-policy-and-audit-governance/deployment-profile-policy-persistence-api-integration-baseline.md)
+- [Image Run Feature 4 Final Baseline](./architecture/execution-control-plane-and-scheduling/image-run-feature-4-final-baseline.md)
+- [Image Workflow Feature 2 Final Baseline](./architecture/studio-and-system-composition/image-workflow-feature-2-final-baseline.md)
+- [Image Manipulation Feature 8 Final Vertical-Slice Completion](./architecture/studio-and-system-composition/image-manipulation-feature-8-final-vertical-slice-completion.md)
 - [Documentation Migration Baseline](../documentation-migration-baseline.md)
 - [Documentation Migration Inventory](../documentation-migration-baseline.inventory.json)
 - [Documentation Segmentation Migration Inventory (Story 5.2.1)](../documentation-segmentation-migration-inventory.md)
