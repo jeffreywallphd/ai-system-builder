@@ -15,6 +15,13 @@ related_code_paths:
 
 Define transport-facing contracts that expose authoritative capabilities while preserving business-policy ownership in domain/application layers.
 
+## Domain Summary for Fast Context Selection
+
+- Primary focus: Transport-facing route, endpoint, validation, and event contract boundaries for authoritative capabilities.
+- Boundary line: Owns transport contract surfaces and validation seams; does not own business-policy decisions from domain/application layers.
+- Why it matters: This domain controls how authoritative behavior is exposed externally without leaking or rewriting policy authority.
+- Context-pack relationship: This overview defines architecture boundaries. Context packs in `docs/context/packs/` assemble task-specific retrieval and should reference this domain instead of duplicating it.
+
 ## Scope and System Boundary
 
 In scope:

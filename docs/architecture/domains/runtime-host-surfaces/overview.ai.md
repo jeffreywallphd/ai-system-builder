@@ -15,6 +15,13 @@ related_code_paths:
 
 Define host assembly, startup lifecycle, and runtime-capability boundaries for desktop, web, server, and worker hosts.
 
+## Domain Summary for Fast Context Selection
+
+- Primary focus: Host composition, startup lifecycle, and runtime capability gating across desktop, web, server, and worker modes.
+- Boundary line: Owns host assembly and readiness semantics; does not own inner business-policy decisions or transport contract catalogs.
+- Why it matters: Incorrect host boundaries can bypass trust gates or create inconsistent startup/readiness behavior across runtimes.
+- Context-pack relationship: This overview defines architecture boundaries. Context packs in `docs/context/packs/` assemble task-specific retrieval and should reference this domain instead of duplicating it.
+
 ## Scope and System Boundary
 
 In scope:

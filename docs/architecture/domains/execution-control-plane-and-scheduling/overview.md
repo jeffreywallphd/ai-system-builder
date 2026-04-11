@@ -15,6 +15,13 @@ related_code_paths:
 
 Define control-plane authority for run lifecycle, scheduling policy application, and dispatch/readiness gating.
 
+## Domain Summary for Fast Context Selection
+
+- Primary focus: Authoritative run lifecycle transitions, scheduling policy decisions, and dispatch-readiness gating.
+- Boundary line: Owns control-plane lifecycle and scheduling authority; does not own studio authoring semantics or transport protocol details.
+- Why it matters: This domain determines whether and when workloads execute, so boundary errors can cause incorrect or unsafe execution behavior.
+- Context-pack relationship: This overview defines architecture boundaries. Context packs in `docs/context/packs/` assemble task-specific retrieval and should reference this domain instead of duplicating it.
+
 ## Scope and System Boundary
 
 In scope:
