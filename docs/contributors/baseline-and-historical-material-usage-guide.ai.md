@@ -110,6 +110,7 @@ Prompt rules:
 1. Runtime host refactor: active host docs are authoritative; baseline snapshots are parity evidence only.
 2. Docs migration review: active placement/taxonomy docs are authoritative; baselines confirm traceability.
 3. AI implementation prompt: load mapped active docs first, then add historical sources only when explicitly required.
+4. For scenario-driven walkthroughs across decomposition, architecture review, migration planning, and troubleshooting, use `docs/contributors/active-vs-historical-docs-worked-examples.ai.md`.
 
 ## Validation Hooks
 
@@ -117,6 +118,7 @@ Prompt rules:
 - `docs/context/documentation-baseline-and-historical-folder-strategy.ai.md`
 - `docs/context/documentation-supersession-and-redirect-conventions.ai.md`
 - `docs/context/documentation-status-signals.ai.md`
+- `docs/contributors/active-vs-historical-docs-worked-examples.ai.md`
 - `dev/tests/DocumentationBaselineHistoricalUsageStory534Guardrails.test.ts`
 
 Run:

@@ -110,6 +110,7 @@ Prompt construction rules:
 1. Runtime host refactor: use active host assembly docs as authority; use baseline host snapshots only to verify parity claims.
 2. Documentation migration review: use active docs placement and taxonomy guides as authority; use migration inventory/baselines only to check traceability completeness.
 3. AI implementation prompt: include mapped active architecture + contributor docs first; include baseline docs only when requested outcomes explicitly ask for historical evidence.
+4. For expanded scenario walkthroughs across decomposition, architecture review, migration planning, and troubleshooting, use `docs/contributors/active-vs-historical-docs-worked-examples.md`.
 
 ## Validation and Governance Hooks
 
@@ -117,6 +118,7 @@ Prompt construction rules:
 - `docs/context/documentation-baseline-and-historical-folder-strategy.md`
 - `docs/context/documentation-supersession-and-redirect-conventions.md`
 - `docs/context/documentation-status-signals.md`
+- `docs/contributors/active-vs-historical-docs-worked-examples.md`
 - `dev/tests/DocumentationBaselineHistoricalUsageStory534Guardrails.test.ts`
 
 Run:
