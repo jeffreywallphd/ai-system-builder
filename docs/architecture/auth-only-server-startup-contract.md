@@ -120,3 +120,8 @@ An auth-minimal server startup mode should:
 3. defer non-auth control-plane routes/services/persistence until post-login or first feature use.
 
 This note is the contract baseline for follow-on implementation stories in Epic B.1.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md`

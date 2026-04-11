@@ -462,3 +462,8 @@ Story 7.2.4 formalizes thin-client browser/mobile channel behavior so thin-clien
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
   - covers thin-client websocket origin rejection and accepted thin-client websocket routing with valid origin.
 
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md`
+

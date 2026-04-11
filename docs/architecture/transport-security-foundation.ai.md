@@ -406,3 +406,8 @@ Story 7.2.4 makes thin-client browser/mobile session channels explicit and secur
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
   - validates thin-client websocket origin rejection and thin-client accepted upgrade routing when origin policy passes.
 
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md`
+
