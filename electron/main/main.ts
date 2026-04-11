@@ -11,7 +11,6 @@ import { InitializeProductionStorageUseCase } from "../../src/application/runtim
 import { ProductionStorageInitializationScopes } from "../../src/application/runtime/interfaces/IProductionStorageInitializer";
 import { resolveDesktopStoragePaths } from "../../src/infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../src/infrastructure/desktop/DesktopStorageDatabase";
-import { resolveDesktopPythonRuntime } from "../../src/infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig, type AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 import {
   HostSecureTransportKinds,
@@ -24,17 +23,11 @@ import type {
   DesktopAuthBootstrapRuntimeConfig,
   DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
-import {
-  DesktopPostLoginRuntimeUnavailableReasons,
-} from "../shared/DesktopContracts";
-import { type LaunchSystemRuntimeWindowReadModel } from "../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { createRendererContentSecurityPolicyResolver } from "./RendererContentSecurityPolicy";
 import { logInitializationCheckpoint, logInitializationEnd, logInitializationMemory, logInitializationStart } from "./InitializationLogging";
 import { createDesktopConnectivityProbePort, normalizeHttpOrigin, resolveDesktopIdentityTransportTrustBootstrap } from "./DesktopTrustBootstrap";
 import { registerAuthBootstrapIpc } from "./AuthBootstrapIpcRegistration";
 import { DesktopStartupPhases, validateDesktopStartupContract } from "./DesktopStartupContract";
-import { registerDeferredFeatureIpcDomains } from "./ipc/registerDeferredFeatureIpcDomains";
-import type { OnDemandFeatureCompositionPaths } from "./ipc/IpcRegistrationTypes";
 import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../src/hosts/desktop/DesktopHostEntrypoint";
 import {
   DesktopConnectivityStateService,
@@ -48,8 +41,10 @@ import {
 } from "../../src/hosts/server/AuthMinimalServerHostEntrypoint";
 import { createDesktopWindowManager } from "./DesktopWindowManager";
 import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
-import { createDesktopAgentRuntimeProvider, type DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
-import { createCanonicalRegistryRuntimeProvider, type CanonicalRegistryRuntimeProvider } from "./runtime/CanonicalRegistryRuntimeProvider";
+import type { DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
+import type { CanonicalRegistryRuntimeProvider } from "./runtime/CanonicalRegistryRuntimeProvider";
+import { createPostLoginRuntimeBootstrapper, type AuthShellBootstrapResult } from "./runtime/PostLoginRuntimeBootstrapper";
+import { createDesktopRuntimeDisposalCoordinator } from "./runtime/DesktopRuntimeDisposalCoordinator";
 
 // Provide ESM-safe CommonJS path globals for runtime compatibility with CJS dependencies.
 const __filename = fileURLToPath(import.meta.url);
@@ -103,14 +98,8 @@ let bootstrapContext: DesktopAuthBootstrapContext | undefined;
 let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 let deferredFeatureRuntime: DeferredDesktopFeatureRuntime | undefined;
-let deferredDesktopFeatureRuntimeFactory: ((options: {
-  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
-  readonly runtimeConfigValues: AppRuntimeConfigValues;
-  readonly repoRoot: string;
-}) => DeferredDesktopFeatureRuntime) | undefined;
 let agentRuntimeProvider: DesktopAgentRuntimeProvider | undefined;
 let canonicalRegistryRuntimeProvider: CanonicalRegistryRuntimeProvider | undefined;
-const DesktopServiceSupervisorPort = 8790;
 let authIpcRegistered = false;
 let deferredFeatureIpcRegistered = false;
 let deferredFeatureIpcReady = false;
@@ -133,29 +122,6 @@ const windowManager = createDesktopWindowManager({
   mainProcessDir: __dirname,
   getRuntimeConfig: () => bootstrapContext?.runtimeConfig,
 });
-
-type AuthShellBootstrapResult = {
-  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
-  readonly identityApiBaseUrl: string;
-};
-
-/**
- * Lazily imports and memoizes the deferred feature runtime factory so startup can defer heavy module loading until needed.
- */
-async function ensureDeferredDesktopFeatureRuntimeFactory(): Promise<(
-  options: {
-    readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
-    readonly runtimeConfigValues: AppRuntimeConfigValues;
-    readonly repoRoot: string;
-  },
-) => DeferredDesktopFeatureRuntime> {
-  if (deferredDesktopFeatureRuntimeFactory) {
-    return deferredDesktopFeatureRuntimeFactory;
-  }
-  const runtimeModule = await import("./DeferredDesktopFeatureRuntime");
-  deferredDesktopFeatureRuntimeFactory = runtimeModule.createDeferredDesktopFeatureRuntime;
-  return deferredDesktopFeatureRuntimeFactory;
-}
 
 async function openMainDesktopWindow(): Promise<void> {
   const mainWindowCreateStartedAt = logInitializationStart(DesktopStartupPhases.mainWindowCreation);
@@ -366,24 +332,84 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
   }
 }
 
-/**
- * Registers deferred feature IPC domains a single time and updates lifecycle status when registration succeeds.
- */
-function registerDeferredFeatureIpc(register: () => void): void {
-  if (deferredFeatureIpcRegistered) {
-    return;
-  }
-  const deferredFeatureRegistrationStartedAt = logInitializationStart(DesktopStartupPhases.deferredFeatureRegistration);
-  try {
-    deferredFeatureIpcRegistered = true;
-    register();
+const postLoginRuntimeBootstrapper = createPostLoginRuntimeBootstrapper({
+  ipcMain,
+  isPackaged,
+  repoRoot,
+  getStorageDatabase: () => storageDatabase,
+  setServiceSupervisor: (supervisor) => {
+    serviceSupervisor = supervisor;
+  },
+  setDeferredFeatureRuntime: (runtime) => {
+    deferredFeatureRuntime = runtime;
+  },
+  getDeferredFeatureRuntime: () => deferredFeatureRuntime,
+  setAgentRuntimeProvider: (provider) => {
+    agentRuntimeProvider = provider;
+  },
+  setCanonicalRegistryRuntimeProvider: (provider) => {
+    canonicalRegistryRuntimeProvider = provider;
+  },
+  markDeferredFeatureIpcReady: () => {
     deferredFeatureIpcReady = true;
-    postLoginRuntimeStatusStore.markReady();
-    logInitializationMemory(DesktopStartupPhases.deferredFeatureRegistration, "ready");
-  } finally {
-    logInitializationEnd(DesktopStartupPhases.deferredFeatureRegistration, deferredFeatureRegistrationStartedAt);
-  }
-}
+  },
+  isDeferredFeatureIpcRegistered: () => deferredFeatureIpcRegistered,
+  markDeferredFeatureIpcRegistered: () => {
+    deferredFeatureIpcRegistered = true;
+  },
+  postLoginRuntimeStatusStore,
+  buildBootstrapContext,
+  launchRuntimeWindowFromContract: (launchContractJson) => windowManager.launchRuntimeWindowFromContract(launchContractJson),
+});
+
+const runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({
+  getPostLoginBootstrapPromise: () => postLoginBootstrapPromise,
+  setPostLoginBootstrapPromise: (promise) => {
+    postLoginBootstrapPromise = promise;
+  },
+  getAuthMinimalServerRuntime: () => authMinimalServerRuntime,
+  setAuthMinimalServerRuntime: (runtime) => {
+    authMinimalServerRuntime = runtime;
+  },
+  getServiceSupervisor: () => serviceSupervisor,
+  setServiceSupervisor: (supervisor) => {
+    serviceSupervisor = supervisor;
+  },
+  getStorageDatabase: () => storageDatabase,
+  getDeferredFeatureRuntime: () => deferredFeatureRuntime,
+  setDeferredFeatureRuntime: (runtime) => {
+    deferredFeatureRuntime = runtime;
+  },
+  getAgentRuntimeProvider: () => agentRuntimeProvider,
+  setAgentRuntimeProvider: (provider) => {
+    agentRuntimeProvider = provider;
+  },
+  getCanonicalRegistryRuntimeProvider: () => canonicalRegistryRuntimeProvider,
+  setCanonicalRegistryRuntimeProvider: (provider) => {
+    canonicalRegistryRuntimeProvider = provider;
+  },
+  clearBootstrapContext: () => {
+    bootstrapContext = undefined;
+    rendererContentSecurityPolicyRuntimeConfig = undefined;
+  },
+  resetDeferredFeatureIpcReadiness: () => {
+    deferredFeatureIpcReady = false;
+  },
+  resetWarmupStarted: () => {
+    postLoginWarmupStarted = false;
+  },
+  clearAuthShellBootstrapResult: () => {
+    authShellBootstrapResult = undefined;
+  },
+  clearDeferredRuntimeFactoryCache: () => {
+    postLoginRuntimeBootstrapper.clearCachedFactory();
+  },
+  connectivityRuntimeController,
+  postLoginRuntimeStatusStore,
+  setIsDisposing: (value) => {
+    isDesktopRuntimeDisposing = value;
+  },
+});
 
 /**
  * Formats a compact post-login warmup request string for startup diagnostics logging.
@@ -416,7 +442,7 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
   connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
-  postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
+  postLoginBootstrapPromise = postLoginRuntimeBootstrapper.bootstrap(authShell);
   try {
     await postLoginBootstrapPromise;
     console.info("[ai-loom] Post-login desktop runtime warmup completed.");
@@ -425,213 +451,12 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     postLoginRuntimeStatusStore.markFailed(request, error);
     if (!isDesktopRuntimeDisposing) {
       console.error("Post-login desktop runtime bootstrap failed", error);
-      await disposeDesktopRuntimeResources();
+      await runtimeDisposalCoordinator.disposeDesktopRuntimeResources();
       app.exit(1);
     }
     postLoginWarmupStarted = false;
     throw error;
   }
-}
-
-type PostLoginRuntimeComposition = {
-  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
-  readonly runtimeConfig: AppRuntimeConfig;
-  readonly pythonRuntime: ReturnType<typeof resolveDesktopPythonRuntime>;
-  readonly featureRuntime: DeferredDesktopFeatureRuntime;
-};
-
-/**
- * Composes post-login runtime dependencies (python, service supervisor, config, deferred runtime container).
- */
-async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, bootstrapStartedAt: number): Promise<PostLoginRuntimeComposition> {
-  const { storagePaths, identityApiBaseUrl } = authShell;
-  if (!storageDatabase) {
-    throw new Error("Desktop storage database is unavailable for post-login runtime bootstrap.");
-  }
-
-  const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-startup.post-login-python-runtime-resolve");
-  console.info("[ai-loom][startup] Resolving desktop Python runtime for post-login warmup.");
-  const pythonRuntime = resolveDesktopPythonRuntime({
-    isPackaged,
-    repoRoot,
-    resourcesPath: process.resourcesPath,
-    storagePaths,
-  });
-  logInitializationEnd("desktop-startup.post-login-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
-  console.info(
-    `[ai-loom][startup] Desktop Python runtime resolved (mode=${pythonRuntime.mode}, available=${pythonRuntime.isAvailable}).`,
-  );
-  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved", bootstrapStartedAt);
-  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved");
-
-  await new InitializeProductionStorageUseCase(storageDatabase).execute({
-    scope: ProductionStorageInitializationScopes.fullRuntime,
-  });
-  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "full-storage-provisioning-ready", bootstrapStartedAt);
-  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "full-storage-provisioning-ready");
-
-  serviceSupervisor = new DesktopServiceSupervisor({
-    repoRoot,
-    isPackaged,
-    resourcesPath: process.resourcesPath,
-    storagePaths,
-    pythonRuntime,
-    pythonRuntimeBaseUrl: process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100",
-  });
-  const supervisorStartAt = logInitializationStart("desktop-startup.post-login-service-supervisor-start");
-  console.info("[ai-loom][startup] Starting desktop local service supervisor for post-login runtime.");
-  await serviceSupervisor.start();
-  logInitializationEnd("desktop-startup.post-login-service-supervisor-start", supervisorStartAt);
-  console.info(
-    `[ai-loom][startup] Desktop local service supervisor ready (baseUrl=${serviceSupervisor.baseUrl}, runtimeBaseUrl=${serviceSupervisor.runtimeBaseUrl}).`,
-  );
-  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "local-service-supervisor-ready", bootstrapStartedAt);
-  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "local-service-supervisor-ready");
-
-  const baseRuntimeConfig = isPackaged
-    ? AppRuntimeConfig.forDesktopProduction({
-      storage: storagePaths,
-      pythonRuntime,
-      serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
-      serviceSupervisorPort: DesktopServiceSupervisorPort,
-      pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
-    })
-    : AppRuntimeConfig.forDesktopDevelopment({
-      storage: storagePaths,
-      pythonRuntime,
-      serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
-      serviceSupervisorPort: DesktopServiceSupervisorPort,
-      pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
-    });
-  const runtimeConfig = AppRuntimeConfig.fromValues({
-    ...baseRuntimeConfig.toValues(),
-    identityApiBaseUrl,
-  });
-  buildBootstrapContext({
-    runtimeConfig,
-    storagePaths,
-  });
-  const createDeferredDesktopFeatureRuntime = await ensureDeferredDesktopFeatureRuntimeFactory();
-  deferredFeatureRuntime = createDeferredDesktopFeatureRuntime({
-    storagePaths,
-    runtimeConfigValues: runtimeConfig.toValues(),
-    repoRoot,
-  });
-  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready", bootstrapStartedAt);
-  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready");
-  const featureRuntime = deferredFeatureRuntime;
-  if (!featureRuntime) {
-    throw new Error("Deferred desktop feature runtime is unavailable for post-login bootstrap.");
-  }
-
-  return Object.freeze({
-    storagePaths,
-    runtimeConfig,
-    pythonRuntime,
-    featureRuntime,
-  });
-}
-
-/**
- * Exposes lazy feature-resolver functions used by deferred IPC domains to load expensive services on demand.
- */
-function createOnDemandFeatureCompositionPaths(params: {
-  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
-  readonly featureRuntime: DeferredDesktopFeatureRuntime;
-  readonly agentRuntimeProvider: DesktopAgentRuntimeProvider;
-  readonly canonicalRegistryRuntimeProvider: CanonicalRegistryRuntimeProvider;
-}): OnDemandFeatureCompositionPaths {
-  // Each resolver lazily constructs/accesses a deferred feature service only when its IPC domain is exercised.
-  return Object.freeze({
-    getWorkflowPersistence: () => params.featureRuntime.ensureWorkflowPersistence(),
-    getExecutionHistory: () => params.featureRuntime.ensureExecutionHistory(),
-    getWorkflowRunHistory: () => params.featureRuntime.ensureWorkflowRunHistory(),
-    getStudioShellBackendApi: () => params.featureRuntime.ensureStudioShellBackendApi(),
-    getSystemStudioBackendApi: () => params.featureRuntime.ensureSystemStudioBackendApi(),
-    getSystemRuntimeBackendApi: () => params.featureRuntime.ensureSystemRuntimeBackendApi(),
-    getCanonicalRegistryRuntime: () => params.canonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime(),
-    getAgentStudioBackendApi: () => params.agentRuntimeProvider.ensureAgentStudioBackendApi(),
-  });
-}
-
-/**
- * Completes post-login bootstrap by composing runtime dependencies and registering deferred IPC domains.
- */
-async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
-  const bootstrapStartedAt = logInitializationStart(DesktopStartupPhases.postLoginWarmup);
-  try {
-    logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "start");
-    const runtimeComposition = await composePostLoginRuntime(authShell, bootstrapStartedAt);
-    const { storagePaths, runtimeConfig, pythonRuntime, featureRuntime } = runtimeComposition;
-    agentRuntimeProvider = createDesktopAgentRuntimeProvider({
-      storagePaths,
-      onRuntimeReady: () => logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "agent-runtime-ready"),
-    });
-    canonicalRegistryRuntimeProvider = createCanonicalRegistryRuntimeProvider({
-      storagePaths,
-      getDeferredFeatureRuntime: () => deferredFeatureRuntime,
-      onRuntimeReady: () => logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "canonical-registry-runtime-ready"),
-    });
-    // Registers deferred IPC only after core post-login services are composed and ready.
-    registerDeferredFeatureIpc(() => {
-      const onDemand = createOnDemandFeatureCompositionPaths({
-        storagePaths,
-        featureRuntime,
-        agentRuntimeProvider: agentRuntimeProvider!,
-        canonicalRegistryRuntimeProvider: canonicalRegistryRuntimeProvider!,
-      });
-      registerDeferredFeatureIpcDomains({
-        ipcMain,
-        onDemand,
-        storagePaths,
-        launchRuntimeWindowFromContract: async (launchContractJson): Promise<LaunchSystemRuntimeWindowReadModel> => {
-          return windowManager.launchRuntimeWindowFromContract(launchContractJson);
-        },
-      });
-    });
-    logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "deferred-feature-registration-ready", bootstrapStartedAt);
-    logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "deferred-feature-registration-ready");
-
-    if (runtimeConfig.isPackagedDesktopHost && !pythonRuntime.isAvailable) {
-      console.warn(
-        `[ai-loom] Packaged private Python runtime was not found at '${pythonRuntime.executablePath ?? pythonRuntime.runtimeRoot}'.`,
-      );
-    }
-  } finally {
-    logInitializationEnd(DesktopStartupPhases.postLoginWarmup, bootstrapStartedAt);
-    logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "complete");
-  }
-}
-
-/**
- * Stops hosts/services and clears cached runtime resources so shutdown and fatal-error recovery are clean.
- */
-async function disposeDesktopRuntimeResources(): Promise<void> {
-  isDesktopRuntimeDisposing = true;
-  postLoginRuntimeStatusStore.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
-  const pendingPostLoginBootstrap = postLoginBootstrapPromise;
-  postLoginBootstrapPromise = undefined;
-  await pendingPostLoginBootstrap?.catch(() => undefined);
-  connectivityRuntimeController.stopMonitoring();
-  await authMinimalServerRuntime?.stop();
-  await serviceSupervisor?.stop();
-  storageDatabase?.dispose();
-  deferredFeatureRuntime?.dispose();
-  agentRuntimeProvider?.dispose();
-  canonicalRegistryRuntimeProvider?.dispose();
-  deferredFeatureRuntime = undefined;
-  agentRuntimeProvider = undefined;
-  canonicalRegistryRuntimeProvider = undefined;
-  deferredDesktopFeatureRuntimeFactory = undefined;
-  serviceSupervisor = undefined;
-  authMinimalServerRuntime = undefined;
-  bootstrapContext = undefined;
-  rendererContentSecurityPolicyRuntimeConfig = undefined;
-  deferredFeatureIpcReady = false;
-  postLoginWarmupStarted = false;
-  authShellBootstrapResult = undefined;
-  postLoginRuntimeStatusStore.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.preLogin);
-  isDesktopRuntimeDisposing = false;
 }
 
 registerDesktopAppLifecycle({
@@ -658,10 +483,10 @@ registerDesktopAppLifecycle({
             logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "main-window-ready", desktopHostStartupAt);
             logInitializationMemory(DesktopStartupPhases.hostBootstrap, "main-window-ready");
             return Object.freeze({
-              close: disposeDesktopRuntimeResources,
+              close: runtimeDisposalCoordinator.disposeDesktopRuntimeResources,
             });
           } catch (error) {
-            await disposeDesktopRuntimeResources();
+            await runtimeDisposalCoordinator.disposeDesktopRuntimeResources();
             throw error;
           }
         },

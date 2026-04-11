@@ -41,12 +41,14 @@ Contract surfaces:
 Main process (`electron/main`):
 
 - owns lifecycle state transitions and authoritative status.
-- owns warmup orchestration (`ensurePostLoginWarmupStarted` -> `bootstrapPostLoginRuntime`).
+- owns warmup orchestration (`ensurePostLoginWarmupStarted` -> `createPostLoginRuntimeBootstrapper(...).bootstrap(...)`).
 - owns deferred feature IPC readiness gate (`deferredFeatureIpcReady`).
-- owns teardown/reset transitions during desktop runtime disposal.
+- owns teardown/reset transitions during desktop runtime disposal through `createDesktopRuntimeDisposalCoordinator(...)`.
 - composes focused runtime-control modules for lifecycle and connectivity:
   - `electron/main/DesktopPostLoginRuntimeStatusStore.ts`
   - `electron/main/DesktopConnectivityRuntimeController.ts`
+  - `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`
+  - `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`
 
 Preload (`electron/preload.ts`):
 
@@ -204,6 +206,12 @@ To reduce scattered mutable state in `electron/main/main.ts` while preserving be
 - auth IPC status reads (`getPostLoginRuntimeStatus`) delegate to this store.
 - deferred connectivity placeholder generation, auth IPC serialization, offline-mode write handling, and monitoring start/stop lifecycle are hosted by `createDesktopConnectivityRuntimeController(...)`.
 - monitoring still starts only when post-login warmup is accepted, and still provisions probe token lookup from persisted storage before starting monitor probes.
+
+Story C.3.6 further extracts runtime lifecycle machinery from the Electron composition root:
+
+- post-login runtime composition/bootstrap details now live in `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`.
+- shutdown/disposal sequencing and state reset details now live in `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`.
+- `electron/main/main.ts` now primarily composes dependencies and delegates warmup/disposal orchestration to those modules.
 
 ## Status Contract
 
