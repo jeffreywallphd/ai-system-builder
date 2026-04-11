@@ -41,6 +41,7 @@
 ## Metadata Contract
 - Use the header structure from `docs/context/documentation-metadata-header.contract.json`.
 - Use exact `doc_type`, `status`, and `authoritativeness` values from `docs/context/documentation-taxonomy.contract.json`.
+- Start new docs from templates in `docs/context/templates/README.md`.
 
 ## Human Companion
 - `docs/contributors/docs-placement-guide.md`

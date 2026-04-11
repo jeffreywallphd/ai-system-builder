@@ -20,6 +20,7 @@
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.ai.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.ai.md)
+- [Documentation Templates](./templates/README.ai.md)
 - [Shared Composition Taxonomy](../architecture/shared-composition-taxonomy.ai.md)
 - [Architecture Router](../architecture/README.ai.md)
 - [Contributors Router](../contributors/README.ai.md)
