@@ -22,6 +22,17 @@ Write ADRs that capture one architectural decision clearly enough that future co
 - Partial replacement: publish a narrowly scoped ADR for the revised area and keep the old ADR as `accepted` or `deprecated` based on remaining authority.
 - Keep supersession links bi-directional so readers can navigate from historical decision to current authority and back.
 
+## High-Risk Review Rules
+
+- Set `review_tier: heightened` when the decision changes security/trust boundaries, runtime control authority, tenancy/isolation guarantees, or supersedes those decisions.
+- Keep `review_tier: routine` for ADRs that are still architectural but do not alter high-risk boundaries.
+- For `review_tier: heightened`, include `## Review Expectations` with:
+  - `Risk Class`
+  - `Required Reviewers`
+  - `Broader Architecture Review Trigger`
+  - `Recertification Cadence`
+- Keep this section concise: enough to prove governance rigor without turning ADRs into process-heavy checklists.
+
 ## Section Quality Rules
 
 - `Decision Statement`: 2-4 sentences with the final outcome, scope, and any non-negotiable constraints.
@@ -62,4 +73,5 @@ Write ADRs that capture one architectural decision clearly enough that future co
 - Are risks and drawbacks explicit instead of implied?
 - Does the ADR avoid implementation noise that will age quickly?
 - Does `Related Documentation` create bi-directional navigation with architecture/context docs instead of leaving the ADR isolated?
+- Is `review_tier` correct for the risk class and does `## Review Expectations` exist when `review_tier: heightened`?
 

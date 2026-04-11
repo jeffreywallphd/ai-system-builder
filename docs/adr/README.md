@@ -99,10 +99,46 @@ Each ADR must include these lightweight metadata fields in frontmatter:
 - `adr_number`: 3-digit ADR identifier matching filename/title.
 - `decision_status`: one of `proposed`, `accepted`, `superseded`, `deprecated`.
 - `decision_date`: `YYYY-MM-DD` date when decision status became `accepted` (or date accepted before later lifecycle changes).
+- `review_tier`: one of `routine` or `heightened` to classify review depth expectations.
+
+## High-Risk ADR Review Expectations
+
+Use `review_tier` to distinguish routine ADR governance from ADRs needing heightened care:
+
+- `routine`: normal architecture review path for ADRs that do not change sensitive boundaries.
+- `heightened`: stronger review path for ADRs that change high-risk architecture boundaries.
+
+### High-Risk ADR Classes
+- Security and trust boundaries: authentication, authorization, trusted-device/node trust, transport trust, secret handling, or audit redaction boundaries.
+- Runtime control authority: control-plane ownership, orchestration mutation authority, or host role inversion that can bypass centralized governance.
+- Tenancy and isolation semantics: workspace ownership boundaries, cross-workspace access/data-flow rules, and isolation guarantees.
+- Supersession of high-risk authority: replacing or narrowing an accepted high-risk ADR where downstream teams rely on existing guarantees.
+
+### Heightened Review Minimums
+- Keep review practical: require explicit evidence only for decisions that cross high-risk classes, not for routine implementation-local ADRs.
+- Require at least two reviewers before moving `decision_status` to `accepted` or `superseded`:
+  - one platform architecture owner, and
+  - one domain owner from the highest-impact area (security, runtime, or tenancy depending on scope).
+- Include a concise `## Review Expectations` section in the ADR capturing:
+  - `Risk Class`
+  - `Required Reviewers`
+  - `Broader Architecture Review Trigger`
+  - `Recertification Cadence`
+- Keep cadence lightweight but explicit: high-risk accepted ADRs should define recertification timing in terms of architecture risk (for example every 6-12 months or on trigger events).
+
+### Broader Architecture Review Triggers
+Run broader architecture review before accepting or superseding an ADR when any of these are true:
+
+- The ADR changes trust boundaries or privileged-operation pathways spanning more than one runtime surface.
+- The ADR changes control-plane authority ownership or introduces alternate mutation channels.
+- The ADR changes tenancy/isolation rules, especially cross-workspace visibility or ownership behavior.
+- The ADR supersedes (full or partial) an accepted high-risk ADR and can change existing safety guarantees.
+
+Broader review can stay lightweight (async design review thread or one focused review meeting) as long as decisions and dissent are captured in the ADR PR trail.
 
 ## Standard ADR Sections
 - Required: `Status`, `Decision Date`, `Decision Statement`, `Context and Problem Statement`, `Decision Drivers`, `Considered Options`, `Chosen Approach`, `Consequences`, `Related Documentation`, and `Related Code Paths`.
-- Optional: `Supersession` (required whenever the ADR supersedes another ADR or is superseded) and `Follow-Up Actions`.
+- Optional: `Review Expectations` (required for `review_tier: heightened`), `Supersession` (required whenever the ADR supersedes another ADR or is superseded), and `Follow-Up Actions`.
 - Use the template directly so decision records remain concise and consistent: `docs/context/templates/adr.template.md`.
 - Use ADR authoring guidance to keep decisions concise and high-signal: `docs/adr/records/authoring-guide.md`.
 

@@ -119,6 +119,15 @@ Discussion outcome template:
   - No new ADR if work remains implementation-local.
   - New ADR if durable model-authority rules change.
 
+## Routine vs Heightened ADR Review Lanes
+
+Use ADR `review_tier` to keep governance strong without forcing process-heavy review for every ADR:
+
+| Review Tier | Typical ADR Scope | Minimum Review Expectation | Broader Architecture Review Before Acceptance/Supersession |
+| --- | --- | --- | --- |
+| `routine` | Architectural direction that does not alter high-risk boundaries. | One architecture maintainer review plus normal ADR PR discussion. | Optional; use only when cross-domain impact is unclear. |
+| `heightened` | Security/trust boundaries, runtime control authority, tenancy/isolation semantics, or supersession of those decisions. | Platform architecture owner + impacted domain owner, plus explicit `## Review Expectations` in ADR body. | Required when boundaries, authority, or isolation guarantees change. |
+
 ## Quick ADR Gate Before Merge
 
 1. Relevant accepted ADR constraints were preserved.

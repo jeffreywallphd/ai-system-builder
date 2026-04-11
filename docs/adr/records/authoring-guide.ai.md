@@ -22,6 +22,17 @@ Produce ADRs that are concise, decision-focused, and durable for human and AI re
 - Partial revision pattern: create a focused ADR for changed scope and keep prior ADR `accepted` or `deprecated` depending on remaining authority.
 - Require bi-directional supersession links so current authoritative ADRs are discoverable from older records.
 
+## High-Risk Review Rules
+
+- Set `review_tier: heightened` when the decision changes security/trust boundaries, runtime control authority, tenancy/isolation guarantees, or supersedes those decisions.
+- Keep `review_tier: routine` for ADRs that are architectural but do not alter high-risk boundaries.
+- For `review_tier: heightened`, include `## Review Expectations` with:
+  - `Risk Class`
+  - `Required Reviewers`
+  - `Broader Architecture Review Trigger`
+  - `Recertification Cadence`
+- Keep this section concise: enough governance signal to protect high-risk decisions without adding unnecessary bureaucracy.
+
 ## Section Expectations
 
 - `Decision Statement`: clear final choice, not intent language.
@@ -62,4 +73,5 @@ Produce ADRs that are concise, decision-focused, and durable for human and AI re
 - Are non-trivial downsides explicit?
 - Is transient implementation detail excluded?
 - Does `Related Documentation` keep bi-directional navigation with architecture/context docs so ADR memory is connected?
+- Is `review_tier` correct for the risk class and does `## Review Expectations` exist when `review_tier: heightened`?
 

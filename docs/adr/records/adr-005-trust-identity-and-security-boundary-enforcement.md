@@ -7,6 +7,7 @@ owned_by: team:platform-architecture
 adr_number: 005
 decision_status: accepted
 decision_date: 2026-04-11
+review_tier: heightened
 last_reviewed: 2026-04-11
 related_code_paths:
   - src/application/identity/services/IdentityAuthenticatedSessionService.ts
@@ -75,6 +76,15 @@ Authoritative route handlers and runtime adapters must compose these gates in or
 - High-risk implication: any bypass that merges authentication, trust, and authorization into one step can create silent privilege escalation across desktop, thin-client, and node channels.
 - High-risk implication: stale trust on long-lived channels (for example websocket sessions after revocation) must trigger invalidation/revalidation to avoid unauthorized continuity.
 - Tradeoff: stricter separation increases integration effort for new routes and runtime features because each gate must be wired explicitly.
+
+## Review Expectations
+
+- Risk Class: security and trust boundaries (authentication, trust evaluation, authorization, and transport trust sequencing).
+- Required Reviewers:
+  - Platform architecture owner.
+  - Security/trust domain owner.
+- Broader Architecture Review Trigger: required before acceptance or supersession if trust-gate ordering changes, transport trust assumptions are relaxed, or privileged internal/runtime bypass paths are introduced.
+- Recertification Cadence: re-review this ADR every 6 months or whenever security boundary contracts are materially changed.
 
 ## Related Documentation
 

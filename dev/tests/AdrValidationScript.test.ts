@@ -153,4 +153,31 @@ describe("ADR validation script", () => {
     expect(combinedOutput).toContain("[CONTEXT_PACK_ADR_REFERENCE_INVALID]");
     expect(combinedOutput).toContain("adr-099-missing-context-pack-reference.md");
   });
+
+  it("detects missing review expectations for heightened ADRs", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "adr-validator-heightened-review-expectations-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    for (const variant of [
+      "adr-005-trust-identity-and-security-boundary-enforcement.md",
+      "adr-005-trust-identity-and-security-boundary-enforcement.ai.md",
+    ]) {
+      const adrPath = join(fixtureRoot, "docs", "adr", "records", variant);
+      const content = readFileSync(adrPath, "utf8").replace(
+        /\n## Review Expectations[\s\S]*?(?=\n## Related Documentation)/m,
+        "\n",
+      );
+      writeFileSync(adrPath, content, "utf8");
+    }
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ADR_REVIEW_EXPECTATIONS_SECTION_MISSING]");
+    expect(combinedOutput).toContain("review_tier is 'heightened'");
+  });
 });

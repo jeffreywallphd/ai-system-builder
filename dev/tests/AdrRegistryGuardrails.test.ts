@@ -10,6 +10,7 @@ const adrRouterPath = resolve(repoRoot, "docs/adr/README.md");
 const adrRouterAiPath = resolve(repoRoot, "docs/adr/README.ai.md");
 
 type DecisionStatus = "proposed" | "accepted" | "superseded" | "deprecated";
+type ReviewTier = "routine" | "heightened";
 
 type AdrRegistryRecord = {
   identifier: string;
@@ -17,6 +18,7 @@ type AdrRegistryRecord = {
   title: string;
   decisionStatus: DecisionStatus;
   decisionDate: string;
+  reviewTier: ReviewTier;
   summary: string;
   relatedDomains: string[];
   humanDocPath: string;
@@ -31,6 +33,7 @@ type AdrRegistry = {
   records: AdrRegistryRecord[];
   discoveryIndex: {
     byDecisionStatus: Record<DecisionStatus, string[]>;
+    byReviewTier: Record<ReviewTier, string[]>;
     byDomain: Record<string, string[]>;
   };
 };
@@ -40,6 +43,7 @@ type Frontmatter = {
   adr_number: string;
   decision_status: DecisionStatus;
   decision_date: string;
+  review_tier: ReviewTier;
 };
 
 const allowedDecisionStatuses: DecisionStatus[] = [
@@ -48,6 +52,18 @@ const allowedDecisionStatuses: DecisionStatus[] = [
   "superseded",
   "deprecated",
 ];
+const allowedReviewTiers: ReviewTier[] = ["routine", "heightened"];
+const highRiskDomains = new Set([
+  "control-plane",
+  "runtime-host-composition",
+  "workspace-tenancy",
+  "ownership",
+  "authorization",
+  "identity-security",
+  "transport-trust",
+  "execution",
+  "policy-enforcement",
+]);
 
 function read(relativePath: string): string {
   return readFileSync(resolve(repoRoot, relativePath), "utf8");
@@ -72,6 +88,7 @@ function parseFrontmatter(markdownContent: string): Frontmatter {
     adr_number: result.adr_number,
     decision_status: result.decision_status as DecisionStatus,
     decision_date: result.decision_date,
+    review_tier: result.review_tier as ReviewTier,
   };
 }
 
@@ -95,6 +112,9 @@ describe("ADR registry guardrails", () => {
 
     for (const status of allowedDecisionStatuses) {
       expect(Array.isArray(registry.discoveryIndex.byDecisionStatus[status])).toBe(true);
+    }
+    for (const tier of allowedReviewTiers) {
+      expect(Array.isArray(registry.discoveryIndex.byReviewTier[tier])).toBe(true);
     }
   });
 
@@ -127,6 +147,7 @@ describe("ADR registry guardrails", () => {
       expect(record.summary.length).toBeLessThanOrEqual(260);
       expect(record.relatedDomains.length).toBeGreaterThan(0);
       expect(allowedDecisionStatuses).toContain(record.decisionStatus);
+      expect(allowedReviewTiers).toContain(record.reviewTier);
       expect(record.decisionDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(record.humanDocPath.endsWith(".md")).toBe(true);
       expect(record.aiDocPath.endsWith(".ai.md")).toBe(true);
@@ -150,6 +171,15 @@ describe("ADR registry guardrails", () => {
       expect(aiFrontmatter.decision_status).toBe(record.decisionStatus);
       expect(humanFrontmatter.decision_date).toBe(record.decisionDate);
       expect(aiFrontmatter.decision_date).toBe(record.decisionDate);
+      expect(humanFrontmatter.review_tier).toBe(record.reviewTier);
+      expect(aiFrontmatter.review_tier).toBe(record.reviewTier);
+
+      const hasHighRiskDomain = record.relatedDomains.some((domain) =>
+        highRiskDomains.has(domain),
+      );
+      if (hasHighRiskDomain) {
+        expect(record.reviewTier).toBe("heightened");
+      }
       expect(allDiscoveryIdentifiers.has(record.identifier)).toBe(true);
     }
   });
@@ -181,6 +211,24 @@ describe("ADR registry guardrails", () => {
       for (const id of ids) {
         expect(validIds.has(id)).toBe(true);
       }
+    }
+
+    const expectedByReviewTier = new Map<ReviewTier, string[]>();
+    for (const tier of allowedReviewTiers) {
+      expectedByReviewTier.set(
+        tier,
+        registry.records
+          .filter((record) => record.reviewTier === tier)
+          .map((record) => record.identifier),
+      );
+    }
+
+    for (const [tier, ids] of Object.entries(registry.discoveryIndex.byReviewTier)) {
+      expect(allowedReviewTiers).toContain(tier as ReviewTier);
+      for (const id of ids) {
+        expect(validIds.has(id)).toBe(true);
+      }
+      expect(ids).toEqual(expectedByReviewTier.get(tier as ReviewTier));
     }
   });
 });

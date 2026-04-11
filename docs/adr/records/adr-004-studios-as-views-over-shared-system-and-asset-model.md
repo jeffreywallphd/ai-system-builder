@@ -7,6 +7,7 @@ owned_by: team:platform-architecture
 adr_number: 004
 decision_status: accepted
 decision_date: 2026-04-11
+review_tier: routine
 last_reviewed: 2026-04-11
 related_code_paths:
   - src/domain/studio-shell/StudioShellDomain.ts

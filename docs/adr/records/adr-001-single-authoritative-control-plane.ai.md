@@ -7,6 +7,7 @@ owned_by: team:platform-architecture
 adr_number: 001
 decision_status: accepted
 decision_date: 2026-04-11
+review_tier: heightened
 last_reviewed: 2026-04-11
 related_code_paths:
   - src/hosts/HostRuntimeCatalog.ts
@@ -63,6 +64,15 @@ Auth-minimal pre-login startup remains a narrowed startup mode of the same autho
 - Trust: identity/session/authorization/audit-sensitive control operations stay centralized at authoritative boundaries.
 - Host/client interaction: preload/IPC and local adapters remain bridges and helpers, not alternate authoritative mutation channels.
 - Tradeoff: authoritative runtime reliability is critical; degraded paths must preserve non-authoritative posture.
+
+## Review Expectations
+
+- Risk Class: runtime control authority (control-plane ownership and orchestration mutation boundaries).
+- Required Reviewers:
+  - Platform architecture owner.
+  - Runtime/orchestration domain owner.
+- Broader Architecture Review Trigger: required before acceptance or supersession if the change introduces non-authoritative mutation channels, host-role inversion, or new protected control-plane write paths.
+- Recertification Cadence: re-review this ADR every 6 months or before any host-runtime authority model change is accepted.
 
 ## Related Documentation
 
