@@ -39,6 +39,14 @@ Use this page to pick the right documentation path quickly. It routes by reader 
 - Locate current system design authority: use [Architecture Router](./architecture/README.md).
 - Find historical delivery/migration records: use [Baselines Router](./baselines/README.md).
 
+## Common Reader Journeys
+
+- Understand architecture boundaries and decisions: [Architecture Router](./architecture/README.md) -> [Domain And Application Core](./architecture/domain-and-application-core.md) -> [ADR Router](./adr/README.md).
+- Contribute a code change safely: [Contributors Router](./contributors/README.md) -> [Documentation Placement Guide](./contributors/docs-placement-guide.md) -> [Architecture Router](./architecture/README.md).
+- Operate or troubleshoot the system locally: [Operations Router](./operations/README.md) -> [Node Bootstrap Identity Operations](./node-bootstrap-identity-operations.md) -> [Secret Health And Operational Diagnostics](./secret-health-and-operational-diagnostics.md).
+- Review historical baselines and migration context: [Baselines Router](./baselines/README.md) -> [Documentation Migration Baseline](./documentation-migration-baseline.md) -> [Documentation Migration Inventory](./documentation-migration-baseline.inventory.json).
+- Prepare AI context for implementation or analysis: [Context Router](./context/README.md) -> [Documentation Taxonomy](./context/documentation-taxonomy.md) -> [Metadata Header Contract](./context/documentation-metadata-header.md).
+
 ## Durability Rules
 
 - Keep this root README navigation-first and concise.
