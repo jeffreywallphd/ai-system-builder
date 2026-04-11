@@ -19,6 +19,8 @@ const requiredContextFiles = [
   "docs/context/context-map.md",
   "docs/context/context-map.ai.md",
   "docs/context/context-map.json",
+  "docs/context/documentation-supersession-and-redirect-conventions.md",
+  "docs/context/documentation-supersession-and-redirect-conventions.ai.md",
   "docs/context/prompt-routing.md",
   "docs/context/prompt-routing.ai.md",
   "docs/context/packs/README.md",
@@ -80,6 +82,7 @@ describe("context engineering structure guardrails", () => {
     expect(contextReadme).toContain("./context-map.md");
     expect(contextReadme).toContain("./prompt-routing.md");
     expect(contextReadme).toContain("./context-map.json");
+    expect(contextReadme).toContain("./documentation-supersession-and-redirect-conventions.md");
 
     expect(contextAiReadme).toContain("./packs/README.ai.md");
     expect(contextAiReadme).toContain("./routing/README.ai.md");
@@ -88,6 +91,7 @@ describe("context engineering structure guardrails", () => {
     expect(contextAiReadme).toContain("./context-map.ai.md");
     expect(contextAiReadme).toContain("./prompt-routing.ai.md");
     expect(contextAiReadme).toContain("./context-map.json");
+    expect(contextAiReadme).toContain("./documentation-supersession-and-redirect-conventions.ai.md");
   });
 
   it("keeps routing and pack contracts parseable and structurally seeded", () => {

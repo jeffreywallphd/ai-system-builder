@@ -55,6 +55,7 @@ describe("documentation segmentation taxonomy guardrails", () => {
     expect(humanTaxonomy).toContain("`doc_type`");
     expect(humanTaxonomy).toContain("`status`");
     expect(humanTaxonomy).toContain("`authoritativeness`");
+    expect(humanTaxonomy).toContain("documentation-supersession-and-redirect-conventions.md");
 
     for (const heading of requiredHumanFrameworkHeadings) {
       expect(humanTaxonomy).toContain(heading);
@@ -63,6 +64,7 @@ describe("documentation segmentation taxonomy guardrails", () => {
     for (const heading of requiredAiFrameworkHeadings) {
       expect(aiTaxonomy).toContain(heading);
     }
+    expect(aiTaxonomy).toContain("documentation-supersession-and-redirect-conventions.ai.md");
   });
 
   it("keeps active-vs-historical and mixed-content decisions explicit", () => {

@@ -66,6 +66,7 @@ Temporary bridge (only if needed):
 ## Pointer Note Expectations
 
 Pointer notes should state replacement path, effective date, and canonical authority.
+Use `docs/context/documentation-supersession-and-redirect-conventions.ai.md` as the canonical supersession/redirect format source.
 
 Example:
 

@@ -76,5 +76,6 @@ Decision shortcut:
 
 - Canonical taxonomy contract: `docs/context/documentation-taxonomy.md`
 - Placement decisions: `docs/contributors/docs-placement-guide.md`
+- Supersession/redirect convention source: `docs/context/documentation-supersession-and-redirect-conventions.ai.md`
 - Guardrail test: `dev/tests/DocumentationSegmentationTaxonomyGuardrails.test.ts`
 
