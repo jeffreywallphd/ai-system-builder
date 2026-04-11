@@ -77,7 +77,8 @@ Folder naming rule:
 1. Move documents into domain folders by authoritative source boundary, not by feature ticket number.
 2. Prefer one canonical home per document and use links for cross-domain relationships.
 3. Add `## Related ADRs` to domain overviews/references where ADR constraints apply.
-4. Update context packs and routing seeds after each migration batch so retrieval remains accurate.
+4. Add `## Related Context Packs` to domain overviews and to references that materially affect routing quality.
+5. Update context packs and routing seeds after each migration batch so retrieval remains accurate.
 
 ## Related ADRs
 

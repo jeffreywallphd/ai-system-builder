@@ -9,15 +9,28 @@ related_code_paths:
   - src/domain/runs
   - src/domain/scheduling
 ---
-
 # Execution Control Plane and Scheduling Domain References
 
 ## Purpose
 
-Store detailed architecture reference contracts for execution-control-plane-and-scheduling.
+Store canonical, durable architecture references for execution-control-plane-and-scheduling that implement or constrain the domain overview.
 
-## Authoring Rules
+## What Belongs in Domain References
 
-- Keep each reference focused on one durable contract or interface boundary.
-- Link back to ../overview.md for domain boundary context.
-- Add a Related ADRs section when a reference is constrained by an ADR.
+- One reference file per durable contract, interface family, or boundary rule.
+- Normative constraints that directly guide implementation and review outcomes.
+- Stable links to governing ADRs and relevant context packs when decision rationale matters.
+
+## What Does Not Belong in Domain References
+
+- Repeated domain boundary summaries that already live in `../overview.md`.
+- Environment-specific runbook procedures and day-2 operations playbooks.
+- Sprint-level delivery plans, temporary migration notes, or ticket-specific checklists.
+
+## Reference Authoring Rules
+
+- Keep each reference focused on one contract surface and explicit invariants.
+- Link back to [Domain Overview](../overview.md) for boundary context.
+- Include `## Related ADRs` when a decision record constrains the reference.
+- Include `## Related Context Packs` when context routing depends on the contract.
+

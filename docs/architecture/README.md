@@ -37,6 +37,7 @@ related_code_paths:
 ## Start Here
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
 - [Architecture Domain Folders](./domains/README.md)
+- [Domain Document Pattern](./domains/README.md#standard-domain-document-pattern)
 - [Domain And Application Core](./domain-and-application-core.md)
 - [Layers And Boundaries](./layers-and-boundaries.md)
 - [Workflow Execution And Tools](./workflow-execution-and-tools.md)
