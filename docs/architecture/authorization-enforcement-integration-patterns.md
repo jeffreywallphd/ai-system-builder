@@ -225,3 +225,8 @@ Reference docs:
 
 - `docs/architecture/authorization-feature-4-final-baseline.md`
 - `docs/authorization-sharing-management-and-access-review.md`
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md`

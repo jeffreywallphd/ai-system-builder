@@ -38,6 +38,7 @@
 | 002 | accepted | 2026-04-11 | Workspace-Centered Tenancy and Resource Ownership | `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md` |
 | 003 | accepted | 2026-04-11 | Storage as Managed Platform Resource | `docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md` |
 | 004 | accepted | 2026-04-11 | Studios as Views Over Shared System and Asset Model | `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md` |
+| 005 | accepted | 2026-04-11 | Trust, Identity, and Security Boundary Enforcement | `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md` |
 
 ## Start Here
 - [ADR Router](../README.ai.md)

@@ -35,6 +35,7 @@
 - `docs/architecture/secrets-redaction-and-logging-safeguards.ai.md`
 - `docs/architecture/node-trust-foundation.ai.md`
 - `docs/architecture/auth-only-server-startup-contract.ai.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md`
 
 ## Authoritative Code Paths
 

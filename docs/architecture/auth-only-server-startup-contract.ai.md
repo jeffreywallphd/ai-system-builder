@@ -60,3 +60,8 @@ Story: B.1.1
 ## Boundary target
 - Pre-login: identity-auth + trusted-device/session-context only.
 - Post-login or on-demand: non-auth control-plane routes, services, persistence, and execution infrastructure.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md`
