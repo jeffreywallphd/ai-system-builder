@@ -77,7 +77,10 @@
       "relatedDocRecordIds": [
         "doc-context-pack-repository-overview",
         "doc-architecture-domain-taxonomy",
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-architecture-domain-and-application-core",
+        "doc-architecture-layers-and-boundaries"
       ]
     },
     {
@@ -121,7 +124,8 @@
         "doc-context-pack-architecture-core",
         "doc-architecture-domain-and-application-core",
         "doc-architecture-layers-and-boundaries",
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model"
       ]
     },
     {
@@ -265,7 +269,8 @@
       "relatedDocRecordIds": [
         "doc-context-pack-identity-and-security",
         "doc-architecture-domain-identity-trust-and-security-overview",
-        "doc-adr-005-trust-identity-and-security-boundary-enforcement"
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-adr-001-single-authoritative-control-plane"
       ]
     },
     {

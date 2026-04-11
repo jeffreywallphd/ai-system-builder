@@ -1414,6 +1414,13 @@ function validateDocsFoundation(repoRoot) {
           .filter((value) => isNonEmptyString(value))
         : [],
     );
+    const registryRecordIdByPath = new Map(
+      Array.isArray(documentationRegistry?.entries)
+        ? documentationRegistry.entries
+          .filter((entry) => isNonEmptyString(entry?.path) && isNonEmptyString(entry?.recordId))
+          .map((entry) => [entry.path, entry.recordId])
+        : [],
+    );
 
     for (const [index, packEntry] of (catalogSeed.packs || []).entries()) {
       if (!packEntry || typeof packEntry !== "object") {
@@ -1493,22 +1500,37 @@ function validateDocsFoundation(repoRoot) {
         }
       }
 
-      if (packEntry.relatedDocRecordIds !== undefined) {
-        if (!isArrayOfNonEmptyStrings(packEntry.relatedDocRecordIds)) {
-          addIssue(
-            issues,
-            "CONTEXT_PACK_REFERENCE_INVALID",
-            `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' field 'relatedDocRecordIds' must be a non-empty string array when set.`,
-          );
-        } else {
-          for (const recordId of packEntry.relatedDocRecordIds) {
-            if (!registryRecordIds.has(recordId)) {
-              addIssue(
-                issues,
-                "CONTEXT_PACK_REFERENCE_INVALID",
-                `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' references unknown relatedDocRecordId '${recordId}'.`,
-              );
-            }
+      if (!isArrayOfNonEmptyStrings(packEntry.relatedDocRecordIds)) {
+        addIssue(
+          issues,
+          "CONTEXT_PACK_REFERENCE_INVALID",
+          `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' must include non-empty relatedDocRecordIds for stable registry linking.`,
+        );
+      } else {
+        const packRecordIds = new Set(packEntry.relatedDocRecordIds);
+        for (const recordId of packEntry.relatedDocRecordIds) {
+          if (!registryRecordIds.has(recordId)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_REFERENCE_INVALID",
+              `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' references unknown relatedDocRecordId '${recordId}'.`,
+            );
+          }
+        }
+
+        const indexedDocPaths = [
+          packEntry.primaryDocPath,
+          ...(Array.isArray(packEntry.relatedDocPaths) ? packEntry.relatedDocPaths : []),
+        ].filter((value) => isNonEmptyString(value) && registryRecordIdByPath.has(value));
+
+        for (const indexedDocPath of indexedDocPaths) {
+          const expectedRecordId = registryRecordIdByPath.get(indexedDocPath);
+          if (isNonEmptyString(expectedRecordId) && !packRecordIds.has(expectedRecordId)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_REFERENCE_INVALID",
+              `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' references indexed doc path '${indexedDocPath}' but is missing relatedDocRecordId '${expectedRecordId}'.`,
+            );
           }
         }
       }
@@ -1813,6 +1835,13 @@ function validateDocsFoundation(repoRoot) {
           .filter((value) => isNonEmptyString(value))
         : [],
     );
+    const registryRecordIdByPath = new Map(
+      Array.isArray(documentationRegistry?.entries)
+        ? documentationRegistry.entries
+          .filter((entry) => isNonEmptyString(entry?.path) && isNonEmptyString(entry?.recordId))
+          .map((entry) => [entry.path, entry.recordId])
+        : [],
+    );
 
     for (const mapping of routingSeed.mappings || []) {
       if (routingContractTaskCategories.size > 0 && !routingContractTaskCategories.has(mapping.taskCategory)) {
@@ -1876,22 +1905,36 @@ function validateDocsFoundation(repoRoot) {
         }
       }
 
-      if (mapping.relatedDocRecordIds !== undefined) {
-        if (!isArrayOfNonEmptyStrings(mapping.relatedDocRecordIds)) {
-          addIssue(
-            issues,
-            "ROUTING_REFERENCE_INVALID",
-            `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' field 'relatedDocRecordIds' must be a non-empty string array when set.`,
-          );
-        } else {
-          for (const recordId of mapping.relatedDocRecordIds) {
-            if (!registryRecordIds.has(recordId)) {
-              addIssue(
-                issues,
-                "ROUTING_REFERENCE_INVALID",
-                `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' references unknown relatedDocRecordId '${recordId}'.`,
-              );
-            }
+      if (!isArrayOfNonEmptyStrings(mapping.relatedDocRecordIds)) {
+        addIssue(
+          issues,
+          "ROUTING_REFERENCE_INVALID",
+          `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' must include non-empty relatedDocRecordIds for stable registry linking.`,
+        );
+      } else {
+        const mappingRecordIds = new Set(mapping.relatedDocRecordIds);
+        for (const recordId of mapping.relatedDocRecordIds) {
+          if (!registryRecordIds.has(recordId)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' references unknown relatedDocRecordId '${recordId}'.`,
+            );
+          }
+        }
+
+        const indexedDocPaths = Array.isArray(mapping.relatedDocPaths)
+          ? mapping.relatedDocPaths
+            .filter((value) => isNonEmptyString(value) && registryRecordIdByPath.has(value))
+          : [];
+        for (const indexedDocPath of indexedDocPaths) {
+          const expectedRecordId = registryRecordIdByPath.get(indexedDocPath);
+          if (isNonEmptyString(expectedRecordId) && !mappingRecordIds.has(expectedRecordId)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' references indexed relatedDocPath '${indexedDocPath}' but is missing relatedDocRecordId '${expectedRecordId}'.`,
+            );
           }
         }
       }
@@ -1936,22 +1979,36 @@ function validateDocsFoundation(repoRoot) {
         }
       }
 
-      if (example.relatedDocRecordIds !== undefined) {
-        if (!isArrayOfNonEmptyStrings(example.relatedDocRecordIds)) {
-          addIssue(
-            issues,
-            "ROUTING_REFERENCE_INVALID",
-            `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' field 'relatedDocRecordIds' must be a non-empty string array when set.`,
-          );
-        } else {
-          for (const recordId of example.relatedDocRecordIds) {
-            if (!registryRecordIds.has(recordId)) {
-              addIssue(
-                issues,
-                "ROUTING_REFERENCE_INVALID",
-                `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' references unknown relatedDocRecordId '${recordId}'.`,
-              );
-            }
+      const indexedDocPaths = Array.isArray(example.expectedRelatedDocOrder)
+        ? example.expectedRelatedDocOrder
+          .filter((value) => isNonEmptyString(value) && registryRecordIdByPath.has(value))
+        : [];
+      if (indexedDocPaths.length > 0 && !isArrayOfNonEmptyStrings(example.relatedDocRecordIds)) {
+        addIssue(
+          issues,
+          "ROUTING_REFERENCE_INVALID",
+          `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' must include non-empty relatedDocRecordIds when expectedRelatedDocOrder includes indexed docs.`,
+        );
+      } else if (example.relatedDocRecordIds !== undefined) {
+        const exampleRecordIds = new Set(example.relatedDocRecordIds);
+        for (const recordId of example.relatedDocRecordIds) {
+          if (!registryRecordIds.has(recordId)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' references unknown relatedDocRecordId '${recordId}'.`,
+            );
+          }
+        }
+
+        for (const indexedDocPath of indexedDocPaths) {
+          const expectedRecordId = registryRecordIdByPath.get(indexedDocPath);
+          if (isNonEmptyString(expectedRecordId) && !exampleRecordIds.has(expectedRecordId)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' references indexed expectedRelatedDocOrder path '${indexedDocPath}' but is missing relatedDocRecordId '${expectedRecordId}'.`,
+            );
           }
         }
       }

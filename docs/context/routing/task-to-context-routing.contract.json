@@ -132,12 +132,12 @@
     "domain",
     "owner",
     "relatedDocPaths",
-    "relatedCodePaths"
+    "relatedCodePaths",
+    "relatedDocRecordIds"
   ],
   "mappingOptionalFields": [
     "excludePackIds",
     "fallbackPackIds",
-    "relatedDocRecordIds",
     "notes",
     "reviewExpectations"
   ],
