@@ -80,6 +80,7 @@ Provide one consistent placement rule set so contributors and AI coding agents p
 ## Documentation Segmentation Taxonomy Mapping
 
 Use `docs/context/documentation-segmentation-taxonomy.md` when classifying docs by authority state and migration posture.
+Use `docs/context/documentation-baseline-and-historical-folder-strategy.md` to choose concrete baseline landing zones versus superseded pointer-note retention.
 
 Primary segment categories:
 
@@ -100,6 +101,18 @@ Placement guidance by segment:
 - Rollout-Boundary Notes: keep bounded scope and deferred-work notes in explicit rollout-boundary documents.
 - Temporary Transition Documents: keep short stubs/pointer notes only while links are migrating; require canonical destination links.
 - Superseded or Deprecated Documents: preserve old paths with clear retirement metadata and replacement links; do not use as active authority.
+
+### Historical Isolation Target Destinations
+
+- Default historical destination: `docs/baselines/`.
+- Preferred baseline landing zones by source area:
+  - `docs/baselines/architecture/`
+  - `docs/baselines/contributors/`
+  - `docs/baselines/operations/`
+  - `docs/baselines/context/`
+  - `docs/baselines/ui/`
+  - `docs/baselines/cross-cutting/`
+- Keep old active paths only as short superseded pointer notes when inbound-link continuity is required.
 
 ## Placement Examples
 

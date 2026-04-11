@@ -22,6 +22,7 @@
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.md)
 - [Documentation Segmentation Taxonomy](./documentation-segmentation-taxonomy.md)
+- [Baseline and Historical Folder Strategy](./documentation-baseline-and-historical-folder-strategy.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.md)
 - [Context Asset Metadata Standard](./context-asset-metadata.md)
 - [Context Map](./context-map.md)
