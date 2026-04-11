@@ -248,6 +248,36 @@ describe("docs foundation validation script", () => {
     );
   });
 
+  it("detects missing readability boundary heading in documentation quality standard", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-quality-standard-readability-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const qualityStandardPath = join(
+      fixtureRoot,
+      "docs",
+      "context",
+      "governance",
+      "documentation-quality-standard.md",
+    );
+    const qualityStandardContent = readFileSync(qualityStandardPath, "utf8").replace(
+      "## Readability and Signal-to-Noise Enforcement Boundaries",
+      "## Readability Boundaries",
+    );
+    writeFileSync(qualityStandardPath, qualityStandardContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[DOCUMENTATION_QUALITY_STANDARD_INVALID]");
+    expect(combinedOutput).toContain(
+      "documentation-quality-standard.md is missing required heading '## Readability and Signal-to-Noise Enforcement Boundaries'.",
+    );
+  });
+
   it("detects invalid indexed document metadata contract shape", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-indexed-metadata-contract-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
