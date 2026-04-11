@@ -10,8 +10,13 @@ related_code_paths:
   - docs/context/documentation-index-coverage-rules.md
   - docs/context/documentation-indexed-document-metadata.contract.json
   - docs/context/documentation-identity-and-reference.contract.json
+  - docs/context/templates/documentation-registry-entry.template.json
+  - docs/context/templates/documentation-registry-entry.architecture.template.json
+  - docs/context/templates/documentation-registry-entry.adr.template.json
+  - docs/context/templates/documentation-registry-entry.context-pack.template.json
   - dev/scripts/validate-docs-foundation.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
+  - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
 ---
 
 # Documentation Registry Structure (Story 6.1.3)
@@ -91,4 +96,20 @@ It should also include status and authoritativeness indexes, even when some cate
 ## Validation
 
 - Guardrail test: `dev/tests/DocumentationRegistryStructureGuardrails.test.ts`
+- Guardrail test: `dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts`
 - Foundation validator: `dev/scripts/validate-docs-foundation.cjs`
+
+## Registry Entry Authoring Starters (Story 6.1.6)
+
+To reduce index-maintenance friction, use the starter patterns in `docs/context/templates/` when adding or updating `entries` in `documentation-registry.seed.json`.
+
+- Generic scaffold: `documentation-registry-entry.template.json`
+- Architecture doc example: `documentation-registry-entry.architecture.template.json`
+- ADR example: `documentation-registry-entry.adr.template.json`
+- Context pack example: `documentation-registry-entry.context-pack.template.json`
+
+Starter patterns are examples, not source-of-truth entries. Replace all values before merge and keep:
+
+- `recordId` stable, lowercase kebab-case, and prefixed with `doc-`.
+- Required metadata fields aligned with `documentation-indexed-document-metadata.contract.json`.
+- Category-specific `docType`, `domain`, and authority/status values aligned with coverage policy intent.

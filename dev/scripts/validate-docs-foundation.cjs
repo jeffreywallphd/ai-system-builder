@@ -63,6 +63,13 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/governance/context-asset-lifecycle.ai.md",
   "docs/context/governance/context-system-rollout-boundaries.md",
   "docs/context/governance/context-system-rollout-boundaries.ai.md",
+  "docs/context/templates/README.md",
+  "docs/context/templates/README.ai.md",
+  "docs/context/templates/task-to-context-routing-entry.template.json",
+  "docs/context/templates/documentation-registry-entry.template.json",
+  "docs/context/templates/documentation-registry-entry.architecture.template.json",
+  "docs/context/templates/documentation-registry-entry.adr.template.json",
+  "docs/context/templates/documentation-registry-entry.context-pack.template.json",
 ];
 
 const REQUIRED_DOCUMENTATION_INDEXING_MODEL_HEADINGS = [

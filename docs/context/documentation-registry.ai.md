@@ -10,8 +10,13 @@ related_code_paths:
   - docs/context/documentation-index-coverage-rules.ai.md
   - docs/context/documentation-indexed-document-metadata.contract.json
   - docs/context/documentation-identity-and-reference.contract.json
+  - docs/context/templates/documentation-registry-entry.template.json
+  - docs/context/templates/documentation-registry-entry.architecture.template.json
+  - docs/context/templates/documentation-registry-entry.adr.template.json
+  - docs/context/templates/documentation-registry-entry.context-pack.template.json
   - dev/scripts/validate-docs-foundation.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
+  - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Registry Structure (Story 6.1.3)
@@ -82,4 +87,20 @@ The seed registry includes at least one entry for each major `docType` so findab
 ## Guardrails
 
 - `dev/tests/DocumentationRegistryStructureGuardrails.test.ts`
+- `dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts`
 - `dev/scripts/validate-docs-foundation.cjs`
+
+## Authoring Starter Patterns (Story 6.1.6)
+
+Use starter JSON patterns in `docs/context/templates/` when creating/updating registry `entries`:
+
+- `documentation-registry-entry.template.json` (generic scaffold)
+- `documentation-registry-entry.architecture.template.json`
+- `documentation-registry-entry.adr.template.json`
+- `documentation-registry-entry.context-pack.template.json`
+
+Starters are examples only. Replace values before merge and preserve:
+
+- Stable `recordId` format (`doc-...`, lowercase kebab-case)
+- Required metadata fields from `documentation-indexed-document-metadata.contract.json`
+- Coverage-aware `docType`, `domain`, `status`, and `authoritativeness`
