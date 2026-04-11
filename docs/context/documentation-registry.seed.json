@@ -1,0 +1,330 @@
+﻿{
+  "schemaVersion": "1.0.0",
+  "artifactType": "documentation-registry",
+  "status": "seed",
+  "description": "Initial machine-readable documentation registry seed for discoverability and routing metadata.",
+  "entryContractPath": "docs/context/documentation-indexed-document-metadata.contract.json",
+  "taxonomyContractPath": "docs/context/documentation-taxonomy.contract.json",
+  "docTypeCatalog": [
+    "architecture-overview",
+    "architecture-reference",
+    "contributor-guide",
+    "runbook",
+    "adr",
+    "baseline",
+    "ai-context"
+  ],
+  "statusCatalog": [
+    "draft",
+    "active",
+    "deprecated",
+    "superseded",
+    "archived"
+  ],
+  "authoritativenessCatalog": [
+    "canonical",
+    "reference",
+    "supplemental",
+    "historical"
+  ],
+  "domainRelationships": {
+    "documentation": [
+      "architecture",
+      "contributors",
+      "operations",
+      "governance"
+    ],
+    "architecture": [
+      "documentation",
+      "contributors",
+      "identity-and-security"
+    ],
+    "contributors": [
+      "architecture",
+      "documentation",
+      "operations"
+    ],
+    "operations": [
+      "contributors",
+      "architecture",
+      "identity-and-security"
+    ],
+    "decision-records": [
+      "architecture",
+      "governance",
+      "documentation"
+    ],
+    "baselines": [
+      "documentation",
+      "governance"
+    ],
+    "governance": [
+      "documentation",
+      "decision-records",
+      "baselines"
+    ],
+    "identity-and-security": [
+      "architecture",
+      "operations",
+      "decision-records"
+    ]
+  },
+  "entries": [
+    {
+      "recordId": "doc-architecture-domain-and-application-core",
+      "path": "docs/architecture/domain-and-application-core.md",
+      "aiPath": "docs/architecture/domain-and-application-core.ai.md",
+      "title": "Domain And Application Core",
+      "docType": "architecture-overview",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines durable boundaries and responsibilities for domain and application layers.",
+      "keywords": [
+        "architecture",
+        "domain layer",
+        "application layer",
+        "boundaries"
+      ],
+      "relatedCodePaths": [
+        "src/application",
+        "src/domain"
+      ],
+      "relatedDocs": [
+        "docs/architecture/layers-and-boundaries.md",
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-layers-and-boundaries",
+      "path": "docs/architecture/layers-and-boundaries.md",
+      "aiPath": "docs/architecture/layers-and-boundaries.ai.md",
+      "title": "Layers And Boundaries",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Documents detailed layer contracts and interaction boundaries across system components.",
+      "keywords": [
+        "layers",
+        "boundaries",
+        "contracts"
+      ],
+      "relatedCodePaths": [
+        "src"
+      ],
+      "relatedDocs": [
+        "docs/architecture/domain-and-application-core.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-docs-placement-guide",
+      "path": "docs/contributors/docs-placement-guide.md",
+      "aiPath": "docs/contributors/docs-placement-guide.ai.md",
+      "title": "Documentation Placement Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Guides contributors on correct documentation placement and routing boundaries.",
+      "keywords": [
+        "documentation",
+        "placement",
+        "contributor workflow"
+      ],
+      "relatedCodePaths": [
+        "docs"
+      ],
+      "relatedDocs": [
+        "docs/README.md",
+        "docs/context/documentation-taxonomy.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-operations-node-bootstrap-identity",
+      "path": "docs/node-bootstrap-identity-operations.md",
+      "aiPath": "docs/node-bootstrap-identity-operations.ai.md",
+      "title": "Node Bootstrap Identity Operations",
+      "docType": "runbook",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Operational runbook for node identity bootstrap, registration, and supporting workflows.",
+      "keywords": [
+        "operations",
+        "bootstrap",
+        "identity",
+        "runbook"
+      ],
+      "relatedCodePaths": [
+        "src/hosts",
+        "src/infrastructure"
+      ],
+      "relatedDocs": [
+        "docs/operations/README.md",
+        "docs/trusted-device-workflows.md"
+      ],
+      "owner": "team:operations",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-adr-001-single-authoritative-control-plane",
+      "path": "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+      "aiPath": "docs/adr/records/adr-001-single-authoritative-control-plane.ai.md",
+      "title": "ADR-001 Single Authoritative Control Plane",
+      "docType": "adr",
+      "domain": "decision-records",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Architecture decision record establishing a single authoritative control-plane boundary.",
+      "keywords": [
+        "adr",
+        "control plane",
+        "decision record"
+      ],
+      "relatedCodePaths": [
+        "src/hosts/server",
+        "src/application"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-registry.json",
+        "docs/architecture/domain-and-application-core.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-baseline-documentation-migration-baseline",
+      "path": "docs/documentation-migration-baseline.md",
+      "aiPath": "docs/documentation-migration-baseline.ai.md",
+      "title": "Documentation Migration Baseline",
+      "docType": "baseline",
+      "domain": "baselines",
+      "status": "active",
+      "authoritativeness": "historical",
+      "summary": "Historical baseline inventory for documentation migration and sequencing decisions.",
+      "keywords": [
+        "baseline",
+        "migration",
+        "historical"
+      ],
+      "relatedCodePaths": [
+        "docs"
+      ],
+      "relatedDocs": [
+        "docs/baselines/README.md",
+        "docs/documentation-segmentation-migration-inventory.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-context-documentation-taxonomy",
+      "path": "docs/context/documentation-taxonomy.md",
+      "aiPath": "docs/context/documentation-taxonomy.ai.md",
+      "title": "Canonical Documentation Taxonomy",
+      "docType": "ai-context",
+      "domain": "governance",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines canonical document classification and lifecycle semantics for routing and validation.",
+      "keywords": [
+        "taxonomy",
+        "metadata",
+        "routing"
+      ],
+      "relatedCodePaths": [
+        "docs/context",
+        "dev/scripts/validate-docs-foundation.cjs"
+      ],
+      "relatedDocs": [
+        "docs/context/documentation-indexed-document-metadata.md",
+        "docs/context/documentation-registry.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    }
+  ],
+  "discoveryIndex": {
+    "byDocType": {
+      "architecture-overview": [
+        "doc-architecture-domain-and-application-core"
+      ],
+      "architecture-reference": [
+        "doc-architecture-layers-and-boundaries"
+      ],
+      "contributor-guide": [
+        "doc-contributors-docs-placement-guide"
+      ],
+      "runbook": [
+        "doc-operations-node-bootstrap-identity"
+      ],
+      "adr": [
+        "doc-adr-001-single-authoritative-control-plane"
+      ],
+      "baseline": [
+        "doc-baseline-documentation-migration-baseline"
+      ],
+      "ai-context": [
+        "doc-context-documentation-taxonomy"
+      ]
+    },
+    "byStatus": {
+      "draft": [],
+      "active": [
+        "doc-architecture-domain-and-application-core",
+        "doc-architecture-layers-and-boundaries",
+        "doc-contributors-docs-placement-guide",
+        "doc-operations-node-bootstrap-identity",
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-baseline-documentation-migration-baseline",
+        "doc-context-documentation-taxonomy"
+      ],
+      "deprecated": [],
+      "superseded": [],
+      "archived": []
+    },
+    "byDomain": {
+      "architecture": [
+        "doc-architecture-domain-and-application-core",
+        "doc-architecture-layers-and-boundaries"
+      ],
+      "contributors": [
+        "doc-contributors-docs-placement-guide"
+      ],
+      "operations": [
+        "doc-operations-node-bootstrap-identity"
+      ],
+      "decision-records": [
+        "doc-adr-001-single-authoritative-control-plane"
+      ],
+      "baselines": [
+        "doc-baseline-documentation-migration-baseline"
+      ],
+      "governance": [
+        "doc-context-documentation-taxonomy"
+      ]
+    },
+    "byAuthoritativeness": {
+      "canonical": [
+        "doc-architecture-domain-and-application-core",
+        "doc-architecture-layers-and-boundaries",
+        "doc-contributors-docs-placement-guide",
+        "doc-operations-node-bootstrap-identity",
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-context-documentation-taxonomy"
+      ],
+      "reference": [],
+      "supplemental": [],
+      "historical": [
+        "doc-baseline-documentation-migration-baseline"
+      ]
+    }
+  }
+}

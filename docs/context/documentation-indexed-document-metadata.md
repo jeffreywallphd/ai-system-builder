@@ -11,6 +11,7 @@ Provide a lightweight, stable record shape for documentation indexing so humans 
 - Human-readable: `docs/context/documentation-indexed-document-metadata.md`
 - AI-readable: `docs/context/documentation-indexed-document-metadata.ai.md`
 - Machine-readable: `docs/context/documentation-indexed-document-metadata.contract.json`
+- Registry seed consumer: `docs/context/documentation-registry.seed.json`
 
 ## Scope
 

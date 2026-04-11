@@ -28,6 +28,9 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/documentation-indexed-document-metadata.md",
   "docs/context/documentation-indexed-document-metadata.ai.md",
   "docs/context/documentation-indexed-document-metadata.contract.json",
+  "docs/context/documentation-registry.md",
+  "docs/context/documentation-registry.ai.md",
+  "docs/context/documentation-registry.seed.json",
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
   "docs/context/packs/context-pack.contract.json",
@@ -113,6 +116,11 @@ const OPTIONAL_INDEXED_DOCUMENT_METADATA_FIELDS = [
   "aiPath",
   "supersedes",
   "supersededBy",
+];
+
+const REQUIRED_DOCUMENTATION_REGISTRY_ENTRY_FIELDS = [
+  "recordId",
+  ...REQUIRED_INDEXED_DOCUMENT_METADATA_FIELDS,
 ];
 
 const SEED_DOCUMENTS = [
@@ -364,6 +372,7 @@ function validateDocsFoundation(repoRoot) {
   const contextMapPath = resolve(repoRoot, "docs/context/context-map.json");
   const contextAssetMetadataContractPath = resolve(repoRoot, "docs/context/context-asset-metadata.contract.json");
   const indexedDocumentMetadataContractPath = resolve(repoRoot, "docs/context/documentation-indexed-document-metadata.contract.json");
+  const documentationRegistrySeedPath = resolve(repoRoot, "docs/context/documentation-registry.seed.json");
   const taskRoutingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
   const taskRoutingSeedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.seed.json");
   const adrRegistryPath = resolve(repoRoot, "docs/adr/records/adr-registry.json");
@@ -373,6 +382,7 @@ function validateDocsFoundation(repoRoot) {
     contextMapPath,
     contextAssetMetadataContractPath,
     indexedDocumentMetadataContractPath,
+    documentationRegistrySeedPath,
     contextPackCatalogContractPath,
     contextPackCatalogSeedPath,
     taskRoutingContractPath,
@@ -517,6 +527,102 @@ function validateDocsFoundation(repoRoot) {
             code: "CONTEXT_CONTRACT_INVALID",
             message: `docs/context/documentation-indexed-document-metadata.contract.json missing fieldDefinitions.${fieldName}.`,
           });
+        }
+      }
+    }
+  }
+
+  const documentationRegistry = contextJsonArtifacts.get(documentationRegistrySeedPath);
+  if (documentationRegistry) {
+    if (
+      documentationRegistry.schemaVersion !== "1.0.0"
+      || documentationRegistry.artifactType !== "documentation-registry"
+    ) {
+      issues.push({
+        code: "CONTEXT_REGISTRY_INVALID",
+        message: "docs/context/documentation-registry.seed.json must declare schemaVersion 1.0.0 and artifactType documentation-registry.",
+      });
+    }
+
+    if (
+      documentationRegistry.entryContractPath !== "docs/context/documentation-indexed-document-metadata.contract.json"
+      || documentationRegistry.taxonomyContractPath !== "docs/context/documentation-taxonomy.contract.json"
+    ) {
+      issues.push({
+        code: "CONTEXT_REGISTRY_INVALID",
+        message: "docs/context/documentation-registry.seed.json must reference indexed-document metadata and taxonomy contracts.",
+      });
+    }
+
+    for (const [fieldName, label] of [
+      ["docTypeCatalog", "docTypeCatalog"],
+      ["statusCatalog", "statusCatalog"],
+      ["authoritativenessCatalog", "authoritativenessCatalog"],
+    ]) {
+      const fieldValue = documentationRegistry[fieldName];
+      if (!isArrayOfNonEmptyStrings(fieldValue)) {
+        issues.push({
+          code: "CONTEXT_REGISTRY_INVALID",
+          message: `docs/context/documentation-registry.seed.json must include non-empty ${label}.`,
+        });
+      }
+    }
+
+    if (
+      !documentationRegistry.domainRelationships
+      || typeof documentationRegistry.domainRelationships !== "object"
+      || Array.isArray(documentationRegistry.domainRelationships)
+    ) {
+      issues.push({
+        code: "CONTEXT_REGISTRY_INVALID",
+        message: "docs/context/documentation-registry.seed.json must include domainRelationships object.",
+      });
+    } else {
+      for (const [domainId, relatedDomains] of Object.entries(documentationRegistry.domainRelationships)) {
+        if (!isNonEmptyString(domainId)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            "docs/context/documentation-registry.seed.json domainRelationships keys must be non-empty strings.",
+          );
+          continue;
+        }
+
+        if (!isArrayOfNonEmptyStrings(relatedDomains)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json domainRelationships.${domainId} must be a non-empty string array.`,
+          );
+        }
+      }
+    }
+
+    if (!Array.isArray(documentationRegistry.entries) || documentationRegistry.entries.length === 0) {
+      issues.push({
+        code: "CONTEXT_REGISTRY_INVALID",
+        message: "docs/context/documentation-registry.seed.json must include non-empty entries array.",
+      });
+    }
+
+    if (
+      !documentationRegistry.discoveryIndex
+      || typeof documentationRegistry.discoveryIndex !== "object"
+      || Array.isArray(documentationRegistry.discoveryIndex)
+    ) {
+      issues.push({
+        code: "CONTEXT_REGISTRY_INVALID",
+        message: "docs/context/documentation-registry.seed.json must include discoveryIndex object.",
+      });
+    } else {
+      for (const indexName of ["byDocType", "byStatus", "byDomain", "byAuthoritativeness"]) {
+        const indexValue = documentationRegistry.discoveryIndex[indexName];
+        if (!indexValue || typeof indexValue !== "object" || Array.isArray(indexValue)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json discoveryIndex.${indexName} must be an object map.`,
+          );
         }
       }
     }
@@ -1567,6 +1673,264 @@ function validateDocsFoundation(repoRoot) {
     }
   }
 
+  if (documentationRegistry) {
+    const requiredEntryFields = new Set(REQUIRED_DOCUMENTATION_REGISTRY_ENTRY_FIELDS);
+    const optionalEntryFields = new Set(OPTIONAL_INDEXED_DOCUMENT_METADATA_FIELDS);
+
+    if (
+      JSON.stringify(documentationRegistry.docTypeCatalog || []) !== JSON.stringify([...allowedDocTypes])
+    ) {
+      addIssue(
+        issues,
+        "CONTEXT_REGISTRY_INVALID",
+        "docs/context/documentation-registry.seed.json docTypeCatalog must align with taxonomy document_type allowed values.",
+      );
+    }
+    if (
+      JSON.stringify(documentationRegistry.statusCatalog || []) !== JSON.stringify([...allowedStatuses])
+    ) {
+      addIssue(
+        issues,
+        "CONTEXT_REGISTRY_INVALID",
+        "docs/context/documentation-registry.seed.json statusCatalog must align with taxonomy status allowed values.",
+      );
+    }
+    if (
+      JSON.stringify(documentationRegistry.authoritativenessCatalog || []) !== JSON.stringify([...allowedAuthoritativeness])
+    ) {
+      addIssue(
+        issues,
+        "CONTEXT_REGISTRY_INVALID",
+        "docs/context/documentation-registry.seed.json authoritativenessCatalog must align with taxonomy authoritativeness allowed values.",
+      );
+    }
+
+    const entryIds = new Set();
+    for (const entry of documentationRegistry.entries || []) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          "docs/context/documentation-registry.seed.json entries must contain objects only.",
+        );
+        continue;
+      }
+
+      for (const fieldName of requiredEntryFields) {
+        if (!isNonEmptyString(entry[fieldName])) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry is missing required non-empty field '${fieldName}'.`,
+          );
+        }
+      }
+
+      const recordId = entry.recordId;
+      if (isNonEmptyString(recordId)) {
+        if (entryIds.has(recordId)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json has duplicate recordId '${recordId}'.`,
+          );
+        }
+        entryIds.add(recordId);
+      }
+
+      for (const fieldName of Object.keys(entry)) {
+        if (!requiredEntryFields.has(fieldName) && !optionalEntryFields.has(fieldName)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' uses unsupported field '${fieldName}'.`,
+          );
+        }
+      }
+
+      if (isNonEmptyString(entry.path)) {
+        if (!entry.path.startsWith("docs/") || !entry.path.endsWith(".md") || entry.path.endsWith(".ai.md")) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' has invalid path '${entry.path}'.`,
+          );
+        } else if (!pathExistsForReference(repoRoot, entry.path)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' references missing path '${entry.path}'.`,
+          );
+        }
+      }
+
+      if (entry.aiPath !== undefined) {
+        if (!isNonEmptyString(entry.aiPath) || !entry.aiPath.endsWith(".ai.md")) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' has invalid aiPath '${entry.aiPath}'.`,
+          );
+        } else if (!pathExistsForReference(repoRoot, entry.aiPath)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' references missing aiPath '${entry.aiPath}'.`,
+          );
+        }
+      }
+
+      if (isNonEmptyString(entry.docType) && !allowedDocTypes.has(entry.docType)) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' uses unsupported docType '${entry.docType}'.`,
+        );
+      }
+      if (isNonEmptyString(entry.status) && !allowedStatuses.has(entry.status)) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' uses unsupported status '${entry.status}'.`,
+        );
+      }
+      if (isNonEmptyString(entry.authoritativeness) && !allowedAuthoritativeness.has(entry.authoritativeness)) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' uses unsupported authoritativeness '${entry.authoritativeness}'.`,
+        );
+      }
+
+      for (const listField of ["keywords", "relatedCodePaths", "relatedDocs"]) {
+        if (entry[listField] !== undefined && !isArrayOfNonEmptyStrings(entry[listField])) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' field '${listField}' must be a non-empty string array when set.`,
+          );
+        }
+      }
+
+      for (const referenceField of ["relatedCodePaths", "relatedDocs", "supersedes", "supersededBy"]) {
+        const value = entry[referenceField];
+        if (Array.isArray(value)) {
+          for (const pathValue of value) {
+            if (!pathExistsForReference(repoRoot, pathValue)) {
+              addIssue(
+                issues,
+                "CONTEXT_REGISTRY_INVALID",
+                `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' references missing ${referenceField} path '${pathValue}'.`,
+              );
+            }
+          }
+        } else if (isNonEmptyString(value) && !pathExistsForReference(repoRoot, value)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' references missing ${referenceField} path '${value}'.`,
+          );
+        }
+      }
+
+      if (entry.supersedes && entry.supersededBy) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' cannot set both supersedes and supersededBy.`,
+        );
+      }
+      if (entry.status === "superseded" && !isNonEmptyString(entry.supersededBy)) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' with status superseded must set supersededBy.`,
+        );
+      }
+
+      if (entry.lastReviewed !== undefined) {
+        if (!isNonEmptyString(entry.lastReviewed) || !isValidIsoDate(entry.lastReviewed)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' has invalid lastReviewed '${entry.lastReviewed}'.`,
+          );
+        } else {
+          const reviewedDate = new Date(`${entry.lastReviewed}T00:00:00.000Z`);
+          if (reviewedDate.getTime() > todayUtc.getTime()) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' has future lastReviewed '${entry.lastReviewed}'.`,
+            );
+          }
+        }
+      }
+    }
+
+    const discoveryIndex = documentationRegistry.discoveryIndex || {};
+    const indexChecks = [
+      { indexName: "byDocType", requiredKeys: documentationRegistry.docTypeCatalog || [], entryField: "docType" },
+      { indexName: "byStatus", requiredKeys: documentationRegistry.statusCatalog || [], entryField: "status" },
+      { indexName: "byAuthoritativeness", requiredKeys: documentationRegistry.authoritativenessCatalog || [], entryField: "authoritativeness" },
+      { indexName: "byDomain", requiredKeys: Object.keys(documentationRegistry.domainRelationships || {}), entryField: "domain" },
+    ];
+
+    for (const { indexName, requiredKeys, entryField } of indexChecks) {
+      const indexMap = discoveryIndex[indexName];
+      if (!indexMap || typeof indexMap !== "object" || Array.isArray(indexMap)) {
+        continue;
+      }
+
+      for (const requiredKey of requiredKeys) {
+        if (!Array.isArray(indexMap[requiredKey])) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json discoveryIndex.${indexName} must include key '${requiredKey}' with an array value.`,
+          );
+        }
+      }
+
+      for (const [key, recordIds] of Object.entries(indexMap)) {
+        if (!Array.isArray(recordIds)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json discoveryIndex.${indexName}.${key} must be an array.`,
+          );
+          continue;
+        }
+
+        for (const recordId of recordIds) {
+          if (!isNonEmptyString(recordId) || !entryIds.has(recordId)) {
+            addIssue(
+              issues,
+              "CONTEXT_REGISTRY_INVALID",
+              `docs/context/documentation-registry.seed.json discoveryIndex.${indexName}.${key} references unknown recordId '${recordId}'.`,
+            );
+          }
+        }
+      }
+
+      for (const entry of documentationRegistry.entries || []) {
+        const key = entry?.[entryField];
+        if (!isNonEmptyString(entry?.recordId) || !isNonEmptyString(key)) {
+          continue;
+        }
+
+        const keyList = Array.isArray(indexMap[key]) ? indexMap[key] : [];
+        if (!keyList.includes(entry.recordId)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json discoveryIndex.${indexName}.${key} must include '${entry.recordId}'.`,
+          );
+        }
+      }
+    }
+  }
+
   for (const seedPath of SEED_DOCUMENTS) {
     const absoluteSeedPath = resolve(repoRoot, seedPath);
     if (!existsSync(absoluteSeedPath)) {
@@ -1721,6 +2085,7 @@ function main() {
     `Checked ADR foundation assets: ${REQUIRED_ADR_FILES.length}`,
     "Checked context map and pack shape references.",
     "Checked pack/routing/source cross-reference integrity.",
+    "Checked documentation registry cross-reference integrity.",
     "Checked ADR registry cross-reference integrity.",
     `Checked metadata seed docs: ${SEED_DOCUMENTS.length}`,
   ].join("\n") + "\n");
