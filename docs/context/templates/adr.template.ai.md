@@ -7,6 +7,7 @@ owned_by: <team-or-maintainer>
 adr_number: <NNN>
 decision_status: proposed
 decision_date: <YYYY-MM-DD>
+review_tier: routine
 last_reviewed: <YYYY-MM-DD>
 related_code_paths:
   - <optional repo-relative path>
@@ -28,7 +29,9 @@ superseded_by: <optional repo-relative doc path>
 - `adr_number`: required 3-digit identifier for sorting and indexing.
 - `decision_status`: required ADR lifecycle value (`proposed`, `accepted`, `superseded`, `deprecated`).
 - `decision_date`: required acceptance date in `YYYY-MM-DD`.
+- `review_tier`: required review expectation tier (`routine`, `heightened`).
 - Keep the `Status` section value aligned with `decision_status` metadata.
+- Keep `review_tier` aligned with the review guidance in `## Review Expectations`.
 
 ## ADR Lifecycle Rules
 
@@ -53,6 +56,7 @@ superseded_by: <optional repo-relative doc path>
 
 ## Optional Sections
 
+- `Review Expectations` (required when `review_tier: heightened`)
 - `Supersession` (required when replacing an ADR or marking this ADR as superseded)
 - `Follow-Up Actions`
 
@@ -96,6 +100,20 @@ Describe the selected option and key implementation boundaries.
 ## Consequences
 
 Describe expected benefits, tradeoffs, and risks.
+
+## Review Expectations
+
+Document review depth proportional to risk:
+
+- `routine`: normal ADR review path (one architecture maintainer review and standard async comments in the ADR PR).
+- `heightened`: high-risk ADR path requiring stronger review evidence before `accepted` or `superseded`.
+
+For `heightened` ADRs, include:
+
+- `Risk Class`: why this ADR is high-risk (for example security, trust boundary, runtime control authority, or tenancy/isolation).
+- `Required Reviewers`: cross-domain reviewers needed before status changes.
+- `Broader Architecture Review Trigger`: whether broader architecture review is required and why.
+- `Recertification Cadence`: expected review cadence to keep the ADR current.
 
 ## Related Documentation
 

@@ -19,6 +19,7 @@ const REQUIRED_METADATA_FIELDS = [
   "adr_number",
   "decision_status",
   "decision_date",
+  "review_tier",
 ];
 
 const ADR_DECISION_STATUSES = new Set([
@@ -26,6 +27,23 @@ const ADR_DECISION_STATUSES = new Set([
   "accepted",
   "superseded",
   "deprecated",
+]);
+
+const ADR_REVIEW_TIERS = new Set([
+  "routine",
+  "heightened",
+]);
+
+const HIGH_RISK_ADR_DOMAINS = new Set([
+  "control-plane",
+  "runtime-host-composition",
+  "workspace-tenancy",
+  "ownership",
+  "authorization",
+  "identity-security",
+  "transport-trust",
+  "execution",
+  "policy-enforcement",
 ]);
 
 function normalizePath(pathValue) {
@@ -372,6 +390,14 @@ function validateAdrDocument({
     );
   }
 
+  if (!ADR_REVIEW_TIERS.has(frontmatter.review_tier)) {
+    addIssue(
+      issues,
+      "ADR_METADATA_INVALID",
+      `${relativePath} has unsupported review_tier '${frontmatter.review_tier}'.`,
+    );
+  }
+
   const expectedFrontmatterTitle = `ADR-${expectedAdrNumber} ${expectedDecisionTitle}`;
   if (frontmatter.title !== expectedFrontmatterTitle) {
     addIssue(
@@ -433,6 +459,33 @@ function validateAdrDocument({
 
   const supersedes = typeof frontmatter.supersedes === "string" ? frontmatter.supersedes : "";
   const supersededBy = typeof frontmatter.superseded_by === "string" ? frontmatter.superseded_by : "";
+  const hasReviewExpectationsSection = Boolean(findHeadingLine(markdownContent, "Review Expectations"));
+  if (frontmatter.review_tier === "heightened" && !hasReviewExpectationsSection) {
+    addIssue(
+      issues,
+      "ADR_REVIEW_EXPECTATIONS_SECTION_MISSING",
+      `${relativePath} must include '## Review Expectations' when review_tier is 'heightened'.`,
+    );
+  }
+
+  if (frontmatter.review_tier === "heightened") {
+    const reviewExpectationsBody = extractSectionBody(markdownContent, "Review Expectations").toLowerCase();
+    for (const requiredToken of [
+      "risk class",
+      "required reviewers",
+      "broader architecture review trigger",
+      "recertification cadence",
+    ]) {
+      if (!reviewExpectationsBody.includes(requiredToken)) {
+        addIssue(
+          issues,
+          "ADR_REVIEW_EXPECTATIONS_CONTENT_MISSING",
+          `${relativePath} review expectations must include '${requiredToken}'.`,
+        );
+      }
+    }
+  }
+
   const hasSupersessionSection = Boolean(findHeadingLine(markdownContent, "Supersession"));
   if ((isNonEmptyString(supersedes) || isNonEmptyString(supersededBy)) && !hasSupersessionSection) {
     addIssue(
@@ -492,6 +545,20 @@ function validateAdrRecords(repoRoot) {
     return issues;
   }
 
+  if (
+    !registry.discoveryIndex ||
+    typeof registry.discoveryIndex !== "object" ||
+    !registry.discoveryIndex.byReviewTier ||
+    !Array.isArray(registry.discoveryIndex.byReviewTier.routine) ||
+    !Array.isArray(registry.discoveryIndex.byReviewTier.heightened)
+  ) {
+    addIssue(
+      issues,
+      "ADR_REGISTRY_INVALID",
+      "docs/adr/records/adr-registry.json must include discoveryIndex.byReviewTier with routine and heightened arrays.",
+    );
+  }
+
   const docsInFolder = readdirSync(adrRecordsRoot)
     .filter((name) => /^adr-\d{3}-.*\.md$/.test(name) && !name.endsWith(".ai.md"))
     .map((name) => `docs/adr/records/${name}`)
@@ -527,6 +594,7 @@ function validateAdrRecords(repoRoot) {
       "title",
       "decisionStatus",
       "decisionDate",
+      "reviewTier",
       "humanDocPath",
       "aiDocPath",
     ];
@@ -575,6 +643,31 @@ function validateAdrRecords(repoRoot) {
       );
     }
 
+    if (!ADR_REVIEW_TIERS.has(entry.reviewTier)) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_RECORD_INVALID",
+        `adr-registry record '${entry.identifier}' has unsupported reviewTier '${entry.reviewTier}'.`,
+      );
+    }
+
+    if (!Array.isArray(entry.relatedDomains) || entry.relatedDomains.length === 0) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_RECORD_INVALID",
+        `adr-registry record '${entry.identifier}' must include at least one relatedDomains value.`,
+      );
+    } else {
+      const isHighRiskByDomain = entry.relatedDomains.some((domain) => HIGH_RISK_ADR_DOMAINS.has(domain));
+      if (isHighRiskByDomain && entry.reviewTier !== "heightened") {
+        addIssue(
+          issues,
+          "ADR_REGISTRY_REVIEW_TIER_INVALID",
+          `adr-registry record '${entry.identifier}' must use reviewTier 'heightened' for high-risk relatedDomains.`,
+        );
+      }
+    }
+
     for (const docPath of [entry.humanDocPath, entry.aiDocPath]) {
       const absoluteDocPath = resolve(repoRoot, docPath || "");
       if (!existsSync(absoluteDocPath)) {
@@ -621,6 +714,7 @@ function validateAdrRecords(repoRoot) {
       "adr_number",
       "decision_status",
       "decision_date",
+      "review_tier",
       "supersedes",
       "superseded_by",
     ]) {
@@ -631,6 +725,22 @@ function validateAdrRecords(repoRoot) {
           `${humanPath} and ${aiPath} differ for metadata field '${field}'.`,
         );
       }
+    }
+
+    if (humanFrontmatter.review_tier !== entry.reviewTier) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_RECORD_INVALID",
+        `${humanPath} review_tier '${humanFrontmatter.review_tier}' does not match registry reviewTier '${entry.reviewTier}'.`,
+      );
+    }
+
+    if (aiFrontmatter.review_tier !== entry.reviewTier) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_RECORD_INVALID",
+        `${aiPath} review_tier '${aiFrontmatter.review_tier}' does not match registry reviewTier '${entry.reviewTier}'.`,
+      );
     }
 
     const humanRelatedDocReferences = collectDocReferencesFromSection({
@@ -741,6 +851,31 @@ function validateAdrRecords(repoRoot) {
         issues,
         "ADR_RELATED_DOC_PAIR_MISMATCH",
         `${humanPath} is missing related documentation reference '${missingHumanReference}' expected from ${aiPath}.`,
+      );
+    }
+  }
+
+  if (registry.discoveryIndex?.byReviewTier) {
+    const expectedRoutineIds = registry.records
+      .filter((entry) => entry.reviewTier === "routine")
+      .map((entry) => entry.identifier);
+    const expectedHeightenedIds = registry.records
+      .filter((entry) => entry.reviewTier === "heightened")
+      .map((entry) => entry.identifier);
+
+    if (JSON.stringify(registry.discoveryIndex.byReviewTier.routine || []) !== JSON.stringify(expectedRoutineIds)) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_REVIEW_TIER_INDEX_INVALID",
+        "adr-registry discoveryIndex.byReviewTier.routine must match records tagged as reviewTier 'routine'.",
+      );
+    }
+
+    if (JSON.stringify(registry.discoveryIndex.byReviewTier.heightened || []) !== JSON.stringify(expectedHeightenedIds)) {
+      addIssue(
+        issues,
+        "ADR_REGISTRY_REVIEW_TIER_INDEX_INVALID",
+        "adr-registry discoveryIndex.byReviewTier.heightened must match records tagged as reviewTier 'heightened'.",
       );
     }
   }
@@ -905,6 +1040,7 @@ function main() {
     `Checked required sections: ${REQUIRED_ADR_SECTIONS.length}`,
     `Checked metadata fields: ${REQUIRED_METADATA_FIELDS.length}`,
     "Checked identifier consistency across registry, filename, frontmatter, and H1.",
+    "Checked ADR review tiers and heightened review-expectation guardrails for high-risk domains.",
     "Checked markdown and AI companion ADR metadata alignment.",
     "Checked ADR related-documentation cross-reference integrity and .md/.ai.md pairing.",
     "Checked architecture and context-pack ADR references against ADR registry targets.",

@@ -23,6 +23,7 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRouter).toContain("## ADR File Home");
     expect(humanRouter).toContain("## ADR Metadata and Lifecycle Rules");
     expect(humanRouter).toContain("## ADR Decision Thresholds");
+    expect(humanRouter).toContain("## High-Risk ADR Review Expectations");
     expect(humanRouter).toContain("## Standard ADR Sections");
     expect(humanRouter).toContain("## ADR Cross-Linking Conventions");
     expect(humanRouter).toContain("### Amendment vs New ADR Rules");
@@ -40,6 +41,8 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRouter).toContain("storage policy");
     expect(humanRouter).toContain("studio and system modeling");
     expect(humanRouter).toContain("decision_status");
+    expect(humanRouter).toContain("review_tier");
+    expect(humanRouter).toContain("heightened");
     expect(humanRouter).toContain("accepted");
     expect(humanRouter).toContain("deprecated");
     expect(humanRouter).toContain("Do not silently rewrite history");
@@ -54,11 +57,14 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRouter).toContain("bi-directional");
     expect(humanRouter).toContain("docs/context/packs/");
     expect(humanRouter).toContain("## Related ADRs");
+    expect(humanRouter).toContain("### High-Risk ADR Classes");
+    expect(humanRouter).toContain("### Broader Architecture Review Triggers");
     expect(humanRouter).toContain("./records/authoring-guide.md");
 
     expect(aiRouter).toContain("## ADR File Home");
     expect(aiRouter).toContain("## ADR Metadata and Lifecycle Rules");
     expect(aiRouter).toContain("## ADR Decision Thresholds");
+    expect(aiRouter).toContain("## High-Risk ADR Review Expectations");
     expect(aiRouter).toContain("## Standard ADR Sections");
     expect(aiRouter).toContain("## ADR Cross-Linking Conventions");
     expect(aiRouter).toContain("### Amendment vs New ADR Rules");
@@ -76,6 +82,8 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRouter).toContain("storage policy");
     expect(aiRouter).toContain("studio/system modeling");
     expect(aiRouter).toContain("decision_status");
+    expect(aiRouter).toContain("review_tier");
+    expect(aiRouter).toContain("heightened");
     expect(aiRouter).toContain("accepted");
     expect(aiRouter).toContain("deprecated");
     expect(aiRouter).toContain("Never overwrite decision history");
@@ -90,6 +98,8 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRouter).toContain("bi-directional");
     expect(aiRouter).toContain("docs/context/packs/");
     expect(aiRouter).toContain("## Related ADRs");
+    expect(aiRouter).toContain("### High-Risk ADR Classes");
+    expect(aiRouter).toContain("### Broader Architecture Review Triggers");
     expect(aiRouter).toContain("./records/authoring-guide.ai.md");
   });
 
@@ -104,12 +114,17 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRecords).toContain("superseded");
     expect(humanRecords).toContain("deprecated");
     expect(humanRecords).toContain("## ADR Lifecycle Handling");
+    expect(humanRecords).toContain("## ADR Review Tier Taxonomy");
+    expect(humanRecords).toContain("review_tier");
+    expect(humanRecords).toContain("heightened");
+    expect(humanRecords).toContain("routine");
     expect(humanRecords).toContain("Full replacement");
     expect(humanRecords).toContain("Partial revision");
     expect(humanRecords).toContain("## ADR Index and Sorting Rules");
     expect(humanRecords).toContain("adr_number");
     expect(humanRecords).toContain("adr-registry.json");
     expect(humanRecords).toContain("## Current Index");
+    expect(humanRecords).toContain("Review Tier");
     expect(humanRecords).toContain("Related Domains");
     expect(humanRecords).toContain("Summary");
     expect(humanRecords).toContain("required section");
@@ -121,12 +136,17 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRecords).toContain("superseded");
     expect(aiRecords).toContain("deprecated");
     expect(aiRecords).toContain("## ADR Lifecycle Handling");
+    expect(aiRecords).toContain("## ADR Review Tier Taxonomy");
+    expect(aiRecords).toContain("review_tier");
+    expect(aiRecords).toContain("heightened");
+    expect(aiRecords).toContain("routine");
     expect(aiRecords).toContain("Full replacement");
     expect(aiRecords).toContain("Partial revision");
     expect(aiRecords).toContain("## ADR Index and Sorting Rules");
     expect(aiRecords).toContain("adr_number");
     expect(aiRecords).toContain("adr-registry.json");
     expect(aiRecords).toContain("## Current Index");
+    expect(aiRecords).toContain("Review Tier");
     expect(aiRecords).toContain("Related Domains");
     expect(aiRecords).toContain("Summary");
     expect(aiRecords).toContain("required sections");
@@ -198,6 +218,9 @@ describe("ADR documentation structure guardrails", () => {
       expect(guide).toContain("Consequences");
       expect(guide).toContain("Related Documentation");
       expect(guide).toContain("Lifecycle Decision Rules");
+      expect(guide).toContain("High-Risk Review Rules");
+      expect(guide).toContain("review_tier");
+      expect(guide).toContain("Review Expectations");
       expect(normalizedGuide).toContain("partial");
       expect(normalizedGuide).toContain("superseded");
       expect(normalizedGuide).toContain("tradeoff");

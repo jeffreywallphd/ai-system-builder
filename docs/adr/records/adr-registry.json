@@ -10,6 +10,7 @@
       "title": "Single Authoritative Control Plane",
       "decisionStatus": "accepted",
       "decisionDate": "2026-04-11",
+      "reviewTier": "heightened",
       "summary": "Defines a single authoritative server-host control plane for lifecycle mutations, orchestration transitions, and protected host/client interactions.",
       "relatedDomains": [
         "control-plane",
@@ -25,6 +26,7 @@
       "title": "Workspace-Centered Tenancy and Resource Ownership",
       "decisionStatus": "accepted",
       "decisionDate": "2026-04-11",
+      "reviewTier": "heightened",
       "summary": "Establishes workspace identity as the primary tenancy and ownership boundary, including private resources as workspace-scoped policy posture.",
       "relatedDomains": [
         "workspace-tenancy",
@@ -40,6 +42,7 @@
       "title": "Storage as Managed Platform Resource",
       "decisionStatus": "accepted",
       "decisionDate": "2026-04-11",
+      "reviewTier": "routine",
       "summary": "Treats storage as a managed platform capability with lifecycle, policy, and access semantics handled through storage domain/application contracts.",
       "relatedDomains": [
         "storage",
@@ -55,6 +58,7 @@
       "title": "Studios as Views Over Shared System and Asset Model",
       "decisionStatus": "accepted",
       "decisionDate": "2026-04-11",
+      "reviewTier": "routine",
       "summary": "Defines studios as bounded interaction views over shared system/asset contracts rather than independent tools with separate model authority.",
       "relatedDomains": [
         "studio-composition",
@@ -70,6 +74,7 @@
       "title": "Trust, Identity, and Security Boundary Enforcement",
       "decisionStatus": "accepted",
       "decisionDate": "2026-04-11",
+      "reviewTier": "heightened",
       "summary": "Enforces layered fail-closed security gates for authentication, trust, authorization, and auditability at authoritative runtime boundaries.",
       "relatedDomains": [
         "identity-security",
@@ -85,6 +90,7 @@
       "title": "Policy-Aware Scheduling and Controlled Execution",
       "decisionStatus": "accepted",
       "decisionDate": "2026-04-11",
+      "reviewTier": "heightened",
       "summary": "Keeps scheduling, dispatch, and retry behavior under centralized policy-aware orchestration with controlled state transitions and explainable outcomes.",
       "relatedDomains": [
         "scheduling",
@@ -108,6 +114,18 @@
       ],
       "superseded": [],
       "deprecated": []
+    },
+    "byReviewTier": {
+      "routine": [
+        "ADR-003",
+        "ADR-004"
+      ],
+      "heightened": [
+        "ADR-001",
+        "ADR-002",
+        "ADR-005",
+        "ADR-006"
+      ]
     },
     "byDomain": {
       "control-plane": [

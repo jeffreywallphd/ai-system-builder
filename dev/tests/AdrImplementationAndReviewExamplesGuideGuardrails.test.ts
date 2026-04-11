@@ -22,6 +22,7 @@ const requiredHeadings = [
   "## Example 2: Review Checklist (Storage Shortcut Proposal)",
   "## Example 3: Refactor Plan (Host Startup Simplification)",
   "## Example 4: Design Discussion (Studio-Specific Data Model Request)",
+  "## Routine vs Heightened ADR Review Lanes",
   "## Quick ADR Gate Before Merge",
 ] as const;
 
@@ -64,6 +65,9 @@ describe("ADR-informed implementation and review examples guardrails", () => {
       "Do Not Re-Decide In Story Work",
       "unless proposing a new ADR",
       "review comments distinguish settled decisions from open implementation details",
+      "review_tier",
+      "heightened",
+      "broader architecture review",
     ]) {
       expect(guide.toLowerCase()).toContain(phrase.toLowerCase());
       expect(guideAi.toLowerCase()).toContain(phrase.toLowerCase());

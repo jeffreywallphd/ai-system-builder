@@ -7,6 +7,7 @@ owned_by: team:platform-architecture
 adr_number: 006
 decision_status: accepted
 decision_date: 2026-04-11
+review_tier: heightened
 last_reviewed: 2026-04-11
 related_code_paths:
   - src/application/scheduling/use-cases/EvaluateAuthoritativeSchedulingDecisionPipelineUseCase.ts
@@ -76,6 +77,15 @@ Retry and requeue behavior is governed by explicit orchestration rules: retryabl
 - Tradeoff: orchestration use cases carry more explicit state-management complexity than adapter-local shortcuts.
 - Tradeoff: new policy dimensions must be added through rule/provider seams instead of transport-layer patches.
 - Residual risk: long-lived orchestration flows still require careful stale-state handling when runtime topology changes quickly.
+
+## Review Expectations
+
+- Risk Class: runtime control authority (scheduling/dispatch/retry authority and policy-enforcement boundaries).
+- Required Reviewers:
+  - Platform architecture owner.
+  - Runtime/orchestration domain owner.
+- Broader Architecture Review Trigger: required before acceptance or supersession if policy evaluation is moved out of authoritative orchestration or adapter-local execution paths gain authority over retry/finalization decisions.
+- Recertification Cadence: re-review this ADR every 6 months or on major scheduling policy model changes.
 
 ## Related Documentation
 

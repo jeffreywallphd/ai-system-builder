@@ -7,6 +7,7 @@ owned_by: team:platform-architecture
 adr_number: 003
 decision_status: accepted
 decision_date: 2026-04-11
+review_tier: routine
 last_reviewed: 2026-04-11
 related_code_paths:
   - src/domain/storage/StorageDomain.ts

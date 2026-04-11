@@ -7,6 +7,7 @@ owned_by: team:platform-architecture
 adr_number: 002
 decision_status: accepted
 decision_date: 2026-04-11
+review_tier: heightened
 last_reviewed: 2026-04-11
 related_code_paths:
   - src/shared/workspaces/WorkspaceOwnership.ts
@@ -68,6 +69,15 @@ Storage provisioning, asset contracts, run execution orchestration, and authoriz
 - Policy: authorization and visibility-sharing contracts must evaluate permissions against workspace ownership context before resource-family rules.
 - User-private resources: private resources remain first-class but cannot escape workspace tenancy; private means restricted access within workspace-scoped ownership, not separate tenancy authority.
 - Tradeoff: cross-workspace collaboration and personal/private convenience flows require explicit policy and projection steps, increasing orchestration rigor but preserving consistency and auditability.
+
+## Review Expectations
+
+- Risk Class: tenancy and isolation semantics (workspace ownership boundaries and cross-workspace access rules).
+- Required Reviewers:
+  - Platform architecture owner.
+  - Tenancy/authorization domain owner.
+- Broader Architecture Review Trigger: required before acceptance or supersession if cross-workspace ownership transfer rules, visibility defaults, or isolation guarantees change.
+- Recertification Cadence: re-review this ADR every 6 months or when tenancy policy semantics are revised.
 
 ## Related Documentation
 
