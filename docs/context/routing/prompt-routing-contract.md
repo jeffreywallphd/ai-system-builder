@@ -6,9 +6,11 @@ authoritativeness: canonical
 owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
+  - docs/context/context-asset-metadata.contract.json
   - docs/context/routing/task-to-context-routing.contract.json
   - docs/context/routing/task-to-context-routing.seed.json
   - docs/context/packs/context-pack-catalog.seed.json
+  - dev/tests/ContextAssetMetadataStandardsGuardrails.test.ts
   - dev/tests/TaskToContextRoutingContractGuardrails.test.ts
 ---
 
@@ -103,5 +105,9 @@ Fallback behavior:
 - `selectionMode` must be `ordered`, `fallback`, or `single`.
 - `priorityTier` must be `critical`, `high`, `normal`, or `low`.
 - `status` must be `draft`, `active`, or `deprecated`.
+- Every mapping must include metadata fields:
+`id`, `title`, `purpose`, `domain`, `owner`, `status`, `relatedDocPaths`, `relatedCodePaths`.
+- Keep `id` equal to or deterministically derived from `taskId`.
+- `reviewExpectations` is optional, but when set it must include `cadence`.
 
 When adding new entries to `task-to-context-routing.seed.json`, follow this contract instead of redefining category or fallback semantics inside each mapping.

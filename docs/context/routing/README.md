@@ -21,4 +21,5 @@
 - [Prompt Routing Contract and Task Categories](./prompt-routing-contract.md)
 - [Task-to-Context Routing Contract](./task-to-context-routing.contract.json)
 - [Task-to-Context Routing Seed](./task-to-context-routing.seed.json)
+- [Context Asset Metadata Standard](../context-asset-metadata.md)
 - [Context Packs Directory](../packs/README.md)

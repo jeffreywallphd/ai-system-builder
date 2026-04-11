@@ -20,11 +20,16 @@ const REQUIRED_CONTEXT_SUBFOLDERS = [
 ];
 
 const REQUIRED_CONTEXT_FILES = [
+  "docs/context/context-asset-metadata.md",
+  "docs/context/context-asset-metadata.ai.md",
+  "docs/context/context-asset-metadata.contract.json",
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
   "docs/context/packs/context-pack.contract.json",
   "docs/context/packs/context-pack-catalog.contract.json",
   "docs/context/packs/context-pack-catalog.seed.json",
+  "docs/context/packs/context-system-foundations.pack.md",
+  "docs/context/packs/context-system-foundations.pack.ai.md",
   "docs/context/routing/README.md",
   "docs/context/routing/README.ai.md",
   "docs/context/routing/prompt-routing-contract.md",
@@ -212,11 +217,13 @@ function validateDocsFoundation(repoRoot) {
   const contextPackCatalogContractPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.contract.json");
   const contextPackCatalogSeedPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.seed.json");
   const contextPackContractPath = resolve(repoRoot, "docs/context/packs/context-pack.contract.json");
+  const contextAssetMetadataContractPath = resolve(repoRoot, "docs/context/context-asset-metadata.contract.json");
   const taskRoutingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
   const taskRoutingSeedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.seed.json");
 
   const expectedContextJsonArtifacts = [
     contextPackContractPath,
+    contextAssetMetadataContractPath,
     contextPackCatalogContractPath,
     contextPackCatalogSeedPath,
     taskRoutingContractPath,
@@ -272,6 +279,13 @@ function validateDocsFoundation(repoRoot) {
         message: "docs/context/packs/context-pack-catalog.contract.json must declare schemaVersion 1.0.0 and artifactType context-pack-catalog.",
       });
     }
+
+    if (packContract.contextAssetMetadataContractPath !== "docs/context/context-asset-metadata.contract.json") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/packs/context-pack-catalog.contract.json must reference docs/context/context-asset-metadata.contract.json.",
+      });
+    }
   }
 
   const packSeed = contextJsonArtifacts.get(contextPackCatalogSeedPath);
@@ -280,6 +294,19 @@ function validateDocsFoundation(repoRoot) {
       issues.push({
         code: "CONTEXT_CONTRACT_INVALID",
         message: "docs/context/packs/context-pack-catalog.seed.json must include schemaVersion 1.0.0, artifactType context-pack-catalog, and packs array.",
+      });
+    }
+  }
+
+  const contextAssetMetadataContract = contextJsonArtifacts.get(contextAssetMetadataContractPath);
+  if (contextAssetMetadataContract) {
+    if (
+      contextAssetMetadataContract.schemaVersion !== "1.0.0"
+      || contextAssetMetadataContract.artifactType !== "context-asset-metadata-standard"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/context-asset-metadata.contract.json must declare schemaVersion 1.0.0 and artifactType context-asset-metadata-standard.",
       });
     }
   }
@@ -304,6 +331,13 @@ function validateDocsFoundation(repoRoot) {
       issues.push({
         code: "CONTEXT_CONTRACT_INVALID",
         message: "docs/context/routing/task-to-context-routing.contract.json must include supportedTaskCategories with at least 8 categories.",
+      });
+    }
+
+    if (routingContract.contextAssetMetadataContractPath !== "docs/context/context-asset-metadata.contract.json") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/routing/task-to-context-routing.contract.json must reference docs/context/context-asset-metadata.contract.json.",
       });
     }
   }

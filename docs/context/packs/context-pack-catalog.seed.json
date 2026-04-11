@@ -1,5 +1,37 @@
 {
   "schemaVersion": "1.0.0",
   "artifactType": "context-pack-catalog",
-  "packs": []
+  "packs": [
+    {
+      "id": "context-system-foundations",
+      "title": "Context System Foundations Pack",
+      "purpose": "Baseline context for context-engineering contracts, metadata standards, routing rules, and governance.",
+      "domain": "context-engineering",
+      "owner": "team:developer-experience",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/context-system-foundations.pack.md",
+      "aiDocPath": "docs/context/packs/context-system-foundations.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/context/context-asset-metadata.md",
+        "docs/context/packs/README.md",
+        "docs/context/routing/prompt-routing-contract.md",
+        "docs/context/governance/context-governance-policy.md"
+      ],
+      "relatedCodePaths": [
+        "dev/tests/ContextEngineeringStructureGuardrails.test.ts",
+        "dev/tests/ContextPackContractGuardrails.test.ts",
+        "dev/tests/TaskToContextRoutingContractGuardrails.test.ts"
+      ],
+      "tags": [
+        "context-engineering",
+        "governance",
+        "routing",
+        "metadata"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-11"
+      }
+    }
+  ]
 }
