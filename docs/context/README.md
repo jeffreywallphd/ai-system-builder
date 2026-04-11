@@ -18,6 +18,7 @@
 - Architecture decision history better captured as ADRs.
 
 ## Start Here
+- [Canonical Documentation Taxonomy](./documentation-taxonomy.md)
 - [Shared Composition Taxonomy](../architecture/shared-composition-taxonomy.md)
 - [Architecture Router](../architecture/README.md)
 - [Contributors Router](../contributors/README.md)

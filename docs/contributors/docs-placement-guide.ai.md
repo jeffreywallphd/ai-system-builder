@@ -38,5 +38,8 @@
 - Duplicated authority across folders instead of linking.
 - Shared AI-context notes embedded directly in feature runbooks.
 
+## Metadata Contract
+- Use exact field/value sets from `docs/context/documentation-taxonomy.contract.json`.
+
 ## Human Companion
 - `docs/contributors/docs-placement-guide.md`
