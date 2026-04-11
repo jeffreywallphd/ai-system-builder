@@ -68,3 +68,16 @@ Contract-level details are canonical in `./references/`:
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Repository Overview](../../../context/packs/repository-overview.pack.md)
+
+## Related Contributor and Operations Guidance
+
+- [Run Orchestration Contributor Guide](../../../run-orchestration-contributor-guide.md)
+- [Run Submission Contributor Guide](../../../run-submission-contributor-guide.md)
+- [Governance Audit Review Workflows](../../../governance-audit-review-workflows.md)
+
+## Related Code Paths
+
+- [src/domain/runs](../../../../src/domain/runs)
+- [src/domain/scheduling](../../../../src/domain/scheduling)
+- [src/application/runs](../../../../src/application/runs)
+- [src/application/scheduling](../../../../src/application/scheduling)

@@ -67,3 +67,15 @@ Contract-level details are canonical in `./references/`:
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Context System Foundations](../../../context/packs/context-system-foundations.pack.md)
+
+## Related Contributor and Operations Guidance
+
+- [ADR-Informed Implementation and Review Examples](../../../contributors/adr-informed-implementation-and-review-examples.md)
+- [Documentation Placement Guide](../../../contributors/docs-placement-guide.md)
+- [Operations Router](../../../operations/README.md)
+
+## Related Code Paths
+
+- [src/domain](../../../../src/domain)
+- [src/application](../../../../src/application)
+- [src/infrastructure/composition](../../../../src/infrastructure/composition)

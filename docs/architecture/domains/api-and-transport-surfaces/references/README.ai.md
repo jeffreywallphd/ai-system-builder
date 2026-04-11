@@ -40,3 +40,14 @@ Index durable contract-level architecture references for `api-and-transport-surf
 
 - [Domain Overview](../overview.md)
 - [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)
+
+## Related Contributor and Operations Guidance
+
+- [Unified API Contributor Guide](../../../../unified-api-contributor-guide.md)
+- [Unified API Observability Troubleshooting](../../../../unified-api-observability-troubleshooting.md)
+
+## Related Code Paths
+
+- [src/infrastructure/api](../../../../../src/infrastructure/api)
+- [src/infrastructure/transport](../../../../../src/infrastructure/transport)
+- [src/application/contracts](../../../../../src/application/contracts)

@@ -40,3 +40,14 @@ Index durable contract-level architecture references for `identity-trust-and-sec
 
 - [Domain Overview](../overview.md)
 - [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)
+
+## Related Contributor and Operations Guidance
+
+- [Authorization Sharing Management And Access Review](../../../../authorization-sharing-management-and-access-review.md)
+- [Security Policy Configuration Operations](../../../../security-policy-configuration-operations.md)
+
+## Related Code Paths
+
+- [src/application/identity](../../../../../src/application/identity)
+- [src/application/authorization](../../../../../src/application/authorization)
+- [src/infrastructure/security](../../../../../src/infrastructure/security)

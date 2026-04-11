@@ -67,3 +67,15 @@ Contract-level details are canonical in `./references/`:
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Runtime And Host](../../../context/packs/runtime-and-host.pack.md)
+
+## Related Contributor and Operations Guidance
+
+- [Node Bootstrap Identity Operations](../../../node-bootstrap-identity-operations.md)
+- [Unified API Observability Troubleshooting](../../../unified-api-observability-troubleshooting.md)
+- [Operations Router](../../../operations/README.md)
+
+## Related Code Paths
+
+- [src/hosts](../../../../src/hosts)
+- [src/infrastructure/runtime](../../../../src/infrastructure/runtime)
+- [electron/main](../../../../electron/main)

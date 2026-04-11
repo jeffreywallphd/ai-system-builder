@@ -69,3 +69,16 @@ Contract-level details are canonical in `./references/`:
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Studio And System Composition](../../../context/packs/studio-and-system-composition.pack.md)
+
+## Related Contributor and Operations Guidance
+
+- [Image Manipulation Loading Status Conventions](../../../image-manipulation-loading-status-conventions.md)
+- [Tuning Dataset Studio](../../../tuning-dataset-studio.md)
+- [Workspace Administration Operations](../../../workspace-administration-operations.md)
+
+## Related Code Paths
+
+- [src/ui/studio-shell](../../../../src/ui/studio-shell)
+- [src/application/system-studio](../../../../src/application/system-studio)
+- [src/application/workflow-studio](../../../../src/application/workflow-studio)
+- [src/ui/features](../../../../src/ui/features)

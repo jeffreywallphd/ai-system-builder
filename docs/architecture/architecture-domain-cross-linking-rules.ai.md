@@ -37,8 +37,9 @@ Architecture domain docs point outward only when another doc type is the canonic
   - `## Related ADRs` for decision constraints in `docs/adr/records/`.
   - `## Related Context Packs` for retrieval assets in `docs/context/packs/`.
   - `## Related Contributor and Operations Guidance` for implementation/runbook docs in `docs/contributors/` and `docs/operations/`.
+  - `## Related Code Paths` for curated implementation surfaces in `src/` or host/runtime folders that embody the boundary contract.
   - `## Related Baselines` for historical snapshots in `docs/baselines/` when active architecture text references prior-state history.
-- Link only canonical routers or high-value canonical docs, not broad file indexes.
+- Link only canonical routers or high-value canonical docs, not every neighboring file.
 
 ### Domain References (`references/README.ai.md` and reference docs)
 
@@ -47,7 +48,8 @@ Architecture domain docs point outward only when another doc type is the canonic
   - ADR decisions (`docs/adr/records/`),
   - context retrieval routing quality (`docs/context/packs/`),
   - implementation workflow guardrails (`docs/contributors/`),
-  - operational authority boundaries (`docs/operations/`).
+  - operational authority boundaries (`docs/operations/`),
+  - concrete implementation boundaries where a small curated code-path list improves maintainability.
 - Do not add baseline links unless historical posture is required to interpret active contracts.
 
 ## Inbound Links From Neighbor Documentation Types
@@ -68,7 +70,8 @@ Use these rules to keep cross-linking high-signal:
 2. Prefer router/canonical reference links over long sibling-file lists.
 3. Use one link per external authority topic in overviews; move deeper lists to reference docs when necessary.
 4. Group links by purpose (`ADRs`, `Context Packs`, `Contributor/Operations`, `Baselines`) instead of one mixed "Related Docs" section.
-5. Replace repeated links with one canonical pointer when multiple docs in the same domain need the same external target.
+5. Keep code-path sections short (typically three to five links) and focused on authority-bearing surfaces.
+6. Replace repeated links with one canonical pointer when multiple docs in the same domain need the same external target.
 
 ## Migration Application Rules for Later Stories
 

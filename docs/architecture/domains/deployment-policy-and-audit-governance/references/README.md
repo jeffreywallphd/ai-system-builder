@@ -41,3 +41,14 @@ Index durable contract-level architecture references for `deployment-policy-and-
 
 - [Domain Overview](../overview.md)
 - [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)
+
+## Related Contributor and Operations Guidance
+
+- [Deployment Profile Policy Contributor Guide](../../../../deployment-profile-policy-contributor-guide.md)
+- [Governance Audit Review Workflows](../../../../governance-audit-review-workflows.md)
+
+## Related Code Paths
+
+- [src/domain/deployment](../../../../../src/domain/deployment)
+- [src/domain/audit](../../../../../src/domain/audit)
+- [src/application/policy-administration](../../../../../src/application/policy-administration)

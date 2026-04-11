@@ -66,3 +66,16 @@ Contract-level details are canonical in `./references/`:
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Identity And Security](../../../context/packs/identity-and-security.pack.md)
+
+## Related Contributor and Operations Guidance
+
+- [Authorization Sharing Management And Access Review](../../../authorization-sharing-management-and-access-review.md)
+- [Security Policy Configuration Operations](../../../security-policy-configuration-operations.md)
+- [Secret Health And Operational Diagnostics](../../../secret-health-and-operational-diagnostics.md)
+
+## Related Code Paths
+
+- [src/application/identity](../../../../src/application/identity)
+- [src/application/authorization](../../../../src/application/authorization)
+- [src/infrastructure/security](../../../../src/infrastructure/security)
+- [src/domain/security](../../../../src/domain/security)

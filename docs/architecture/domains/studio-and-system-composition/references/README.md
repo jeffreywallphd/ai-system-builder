@@ -42,3 +42,14 @@ Index durable contract-level architecture references for `studio-and-system-comp
 
 - [Domain Overview](../overview.md)
 - [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)
+
+## Related Contributor and Operations Guidance
+
+- [Image Manipulation Loading Status Conventions](../../../../image-manipulation-loading-status-conventions.md)
+- [Tuning Dataset Studio](../../../../tuning-dataset-studio.md)
+
+## Related Code Paths
+
+- [src/ui/studio-shell](../../../../../src/ui/studio-shell)
+- [src/application/system-studio](../../../../../src/application/system-studio)
+- [src/application/workflow-studio](../../../../../src/application/workflow-studio)
