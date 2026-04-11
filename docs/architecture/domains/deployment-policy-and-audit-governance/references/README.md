@@ -14,31 +14,30 @@ related_code_paths:
 
 ## Purpose
 
-Store canonical, durable architecture references for deployment-policy-and-audit-governance that implement or constrain the domain overview.
+Index durable contract-level architecture references for `deployment-policy-and-audit-governance` while keeping domain-boundary narrative in [Domain Overview](../overview.md).
 
-## What Belongs in Domain References
+## Reference Scope
 
-- One reference file per durable contract, interface family, or boundary rule.
-- Normative constraints that directly guide implementation and review outcomes.
-- Stable links to governing ADRs and relevant context packs when decision rationale matters.
+- Deployment policy resolution and override contracts.
+- Audit ledger persistence and event governance contracts.
+- Authoritative policy-administration command/query contracts.
 
-## What Does Not Belong in Domain References
+## Canonical Reference Documents
 
-- Repeated domain boundary summaries that already live in ../overview.md.
-- Environment-specific runbook procedures and day-2 operations playbooks.
-- Sprint-level delivery plans, temporary migration notes, or ticket-specific checklists.
+- [Deployment Policy Resolution and Overrides](./deployment-policy-resolution-and-overrides.md)
 
-## Seed Reference Placeholders
+## Migration Backlog (Not Yet Canonical)
 
-Use this short list as migration scaffolding. Create each placeholder file when the first canonical contract lands, then replace placeholder language with authoritative content.
+- `audit-ledger-and-event-governance-contracts.md`
+- `policy-administration-authority-surfaces.md`
 
-- `deployment-policy-resolution-and-overrides.md` - Policy resolution, override, and explainability boundaries.
-- `audit-ledger-and-event-governance-contracts.md` - Audit ledger persistence and event governance contracts.
-- `policy-administration-authority-surfaces.md` - Authoritative policy administration API and command surfaces.
+## Reference Authoring Guardrails
 
-## Reference Authoring Rules
-
-- Keep each reference focused on one contract surface and explicit invariants.
+- Keep one durable contract surface per reference file.
 - Link back to [Domain Overview](../overview.md) for boundary context.
-- Include ## Related ADRs when a decision record constrains the reference.
-- Include ## Related Context Packs when context routing depends on the contract.
+- Keep runbooks in `docs/operations/` and workflow guidance in `docs/contributors/`.
+
+## Related Documentation
+
+- [Domain Overview](../overview.md)
+- [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)

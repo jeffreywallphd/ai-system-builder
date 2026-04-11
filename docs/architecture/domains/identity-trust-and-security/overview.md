@@ -13,63 +13,50 @@ related_code_paths:
 
 ## Purpose
 
-Own fail-closed architecture boundaries for identity proof, trust establishment, authorization enforcement, and secret handling.
+Define fail-closed boundaries for identity proof, trust posture, authorization enforcement, and secret-safe observability.
 
-## Boundary
+## Scope and System Boundary
 
-- Defines authentication/session trust, authorization policy enforcement, and security-redaction guardrails.
-- Delegates tenancy/resource ownership policy to workspace-storage-and-assets unless the rule is primarily security logic.
+In scope:
+- Identity and session lifecycle trust contracts.
+- Authorization evaluation and enforcement boundaries.
+- Secret handling and redaction-safe diagnostics guardrails.
 
-## Foundational Concepts
+Out of scope:
+- Workspace tenancy ownership semantics.
+- Transport protocol catalogs and endpoint payload tables.
+- Runtime host startup orchestration mechanics.
 
-- Identity is provider-oriented (`local` now, external providers later) but platform-owned: user identity remains the stable authorization subject.
-- Session lifecycle and token material are separated: session state persists independently from token secret/hash storage.
-- Authentication, account lifecycle, credential policy, and session validation use typed operation results with deterministic error taxonomy.
-- Trusted-device and trust-marker seams are explicit extension points, not embedded assumptions in core identity entities.
-- Authorization and secret-management contracts are fail-closed by default and rely on explicit policy checks plus redaction-safe observability.
+## Canonical Responsibilities
 
-## Domain-Wide Invariants
+- Keep protected access decisions fail-closed on missing or invalid trust context.
+- Maintain explicit boundaries between identity/session, authorization, and secret handling surfaces.
+- Provide durable policy seams consumed by other domains without reimplementation.
 
-- Protected access decisions must fail closed on missing credentials, invalid session state, unsupported provider paths, or policy violations.
-- Credential and token secrets never appear in read models or logs; redaction/allowlist serializers are mandatory boundaries.
-- Identity lifecycle and credential/session transitions are explicit and guard-validated.
-- Security policy evaluation belongs in domain/application seams, not in UI or transport shortcuts.
+## Cross-Cutting Invariants
 
-## Cross-Domain Dependency Rules
+- Secret-bearing values never appear in read models or unredacted logs.
+- Credential/session transitions are explicit and guard-validated.
+- Policy evaluation remains in domain/application seams, not UI or transport shortcuts.
 
-- `workspace-storage-and-assets` owns workspace/resource ownership; this domain enforces identity/trust and authorization gates over those resources.
-- `api-and-transport-surfaces` publishes authentication/session endpoints but must not redefine identity policy.
-- `runtime-host-surfaces` may expose trust posture and secure-storage adapters, but trust decisions remain governed here.
-- `deployment-policy-and-audit-governance` consumes security events and policy outcomes for governance evidence.
+## Integration and Dependency Boundaries
 
-## Seed Scope Guidance
+- `workspace-storage-and-assets` owns tenancy/resource contracts that this domain gates.
+- `api-and-transport-surfaces` publishes security endpoints without redefining security policy.
+- `runtime-host-surfaces` may expose secure-storage/trust adapters but not trust decisions.
+- `deployment-policy-and-audit-governance` consumes security events for governance evidence.
 
-- Seed references around trust proofs, authorization contracts, and secret lifecycle boundaries first.
-- Use reference docs to capture normative fail-closed behavior and policy decision seams.
-- Avoid duplicating transport payload catalogs or operations runbooks in this domain.
+## Reference Map
 
-## Canonical Source Documents Migrated into This Overview
+Contract-level details are canonical in `./references/`:
+- [Identity Proof and Session Trust Contracts](./references/identity-proof-and-session-trust-contracts.md)
+
+## Canonical Source Documents Migrated into This Domain
 
 - [Identity Foundation](../../identity-foundation.md)
 - [Identity Session Architecture](../../identity-session-architecture.md)
 - [Authorization Foundation](../../authorization-foundation.md)
 - [Transport Security Foundation](../../transport-security-foundation.md)
-
-## What Belongs in the Overview
-
-- Domain boundary intent, ownership seams, and cross-domain dependency rules.
-- Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in ./references/.
-
-## What Does Not Belong in the Overview
-
-- Endpoint-level schemas, API payload matrices, and low-level interface catalogs.
-- Step-by-step operational runbooks and troubleshooting procedures.
-- Contributor process checklists, implementation task plans, or release notes.
-
-## Related Domain References
-
-- [Domain References Index](./references/README.md)
 
 ## Related ADRs
 

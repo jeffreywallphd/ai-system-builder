@@ -8,14 +8,14 @@ const architectureAiReadmePath = resolve(repoRoot, "docs/architecture/README.ai.
 
 type OverviewExpectation = {
   domainId: string;
-  roleSignal: string;
+  canonicalReference: string;
   migratedSourceSignals: string[];
 };
 
 const overviewExpectations: OverviewExpectation[] = [
   {
     domainId: "core-platform-and-composition",
-    roleSignal: "inner system model and composition contracts",
+    canonicalReference: "layer-direction-and-dependency-rules.md",
     migratedSourceSignals: [
       "domain-and-application-core.md",
       "layers-and-boundaries.md",
@@ -24,7 +24,7 @@ const overviewExpectations: OverviewExpectation[] = [
   },
   {
     domainId: "runtime-host-surfaces",
-    roleSignal: "runtime-specific host assembly and startup lifecycle",
+    canonicalReference: "host-composition-root-contracts.md",
     migratedSourceSignals: [
       "desktop-runtime-and-hosts.md",
       "authoritative-server-host-assembly.md",
@@ -33,7 +33,7 @@ const overviewExpectations: OverviewExpectation[] = [
   },
   {
     domainId: "identity-trust-and-security",
-    roleSignal: "fail-closed architecture boundaries for identity proof",
+    canonicalReference: "identity-proof-and-session-trust-contracts.md",
     migratedSourceSignals: [
       "identity-foundation.md",
       "identity-session-architecture.md",
@@ -42,7 +42,7 @@ const overviewExpectations: OverviewExpectation[] = [
   },
   {
     domainId: "workspace-storage-and-assets",
-    roleSignal: "workspace tenancy, storage provisioning, and asset lifecycle boundaries",
+    canonicalReference: "workspace-tenancy-and-ownership-contracts.md",
     migratedSourceSignals: [
       "workspace-foundation.md",
       "storage-foundation.md",
@@ -51,7 +51,7 @@ const overviewExpectations: OverviewExpectation[] = [
   },
   {
     domainId: "execution-control-plane-and-scheduling",
-    roleSignal: "control-plane authority for run lifecycle transitions",
+    canonicalReference: "run-lifecycle-state-authority.md",
     migratedSourceSignals: [
       "run-orchestration-domain-foundation.md",
       "run-submission-domain-foundation.md",
@@ -60,7 +60,7 @@ const overviewExpectations: OverviewExpectation[] = [
   },
   {
     domainId: "studio-and-system-composition",
-    roleSignal: "studio surfaces compose and present shared system/workflow/asset contracts",
+    canonicalReference: "studio-handoff-and-boundary-contracts.md",
     migratedSourceSignals: [
       "studio-handoff-contract.md",
       "presentation-and-state.md",
@@ -69,7 +69,7 @@ const overviewExpectations: OverviewExpectation[] = [
   },
   {
     domainId: "api-and-transport-surfaces",
-    roleSignal: "transport-facing route, endpoint, and event contracts",
+    canonicalReference: "unified-api-surface-contracts.md",
     migratedSourceSignals: [
       "unified-api-authoritative-surface.md",
       "unified-api-endpoint-reference.md",
@@ -78,7 +78,7 @@ const overviewExpectations: OverviewExpectation[] = [
   },
   {
     domainId: "deployment-policy-and-audit-governance",
-    roleSignal: "governance architecture for deployment policy administration",
+    canonicalReference: "deployment-policy-resolution-and-overrides.md",
     migratedSourceSignals: [
       "deployment-profile-policy-administration-foundation.md",
       "audit-domain-foundation.md",
@@ -86,13 +86,6 @@ const overviewExpectations: OverviewExpectation[] = [
     ],
   },
 ];
-
-function countWords(content: string): number {
-  return content
-    .trim()
-    .split(/\s+/)
-    .filter((token) => token.length > 0).length;
-}
 
 describe("architecture domain overview foundation guardrails", () => {
   it("keeps foundational domain overviews discoverable from architecture routers", () => {
@@ -106,8 +99,8 @@ describe("architecture domain overview foundation guardrails", () => {
     }
   });
 
-  it("keeps migrated foundational content sections in human and AI overviews", () => {
-    for (const { domainId } of overviewExpectations) {
+  it("keeps overviews conceptual and routes contract detail into references", () => {
+    for (const { domainId, canonicalReference, migratedSourceSignals } of overviewExpectations) {
       const overviewPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/overview.md`);
       const overviewAiPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/overview.ai.md`);
 
@@ -118,36 +111,71 @@ describe("architecture domain overview foundation guardrails", () => {
       const overviewAi = readFileSync(overviewAiPath, "utf8");
 
       for (const sectionHeading of [
-        "## Foundational Concepts",
-        "## Domain-Wide Invariants",
-        "## Cross-Domain Dependency Rules",
-        "## Canonical Source Documents Migrated into This Overview",
+        "## Scope and System Boundary",
+        "## Canonical Responsibilities",
+        "## Cross-Cutting Invariants",
+        "## Integration and Dependency Boundaries",
+        "## Reference Map",
+        "## Canonical Source Documents Migrated into This Domain",
       ] as const) {
         expect(overview).toContain(sectionHeading);
         expect(overviewAi).toContain(sectionHeading);
       }
 
-      expect(countWords(overview)).toBeGreaterThanOrEqual(280);
-      expect(countWords(overviewAi)).toBeGreaterThanOrEqual(280);
-    }
-  });
-
-  it("keeps each domain overview grounded to migration anchors and stable role intent", () => {
-    for (const { domainId, roleSignal, migratedSourceSignals } of overviewExpectations) {
-      const overviewPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/overview.md`);
-      const overviewAiPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/overview.ai.md`);
-      const overview = readFileSync(overviewPath, "utf8");
-      const overviewAi = readFileSync(overviewAiPath, "utf8");
-
-      expect(overview).toContain(roleSignal);
-      expect(overviewAi).toContain(roleSignal);
-      expect(overview).toContain("./references/README.md");
-      expect(overviewAi).toContain("./references/README.md");
+      expect(overview).toContain(`./references/${canonicalReference}`);
+      expect(overviewAi).toContain(`./references/${canonicalReference}`);
+      expect(overview).not.toContain("## Contracts and Interfaces");
+      expect(overviewAi).not.toContain("## Contracts and Interfaces");
+      expect(overview).not.toContain("## Failure and Recovery Semantics");
+      expect(overviewAi).not.toContain("## Failure and Recovery Semantics");
 
       for (const signal of migratedSourceSignals) {
         expect(overview).toContain(signal);
         expect(overviewAi).toContain(signal);
       }
+    }
+  });
+
+  it("keeps canonical reference docs discoverable and contract-focused in both variants", () => {
+    for (const { domainId, canonicalReference } of overviewExpectations) {
+      const indexPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/references/README.md`);
+      const indexAiPath = resolve(repoRoot, `docs/architecture/domains/${domainId}/references/README.ai.md`);
+      const referencePath = resolve(repoRoot, `docs/architecture/domains/${domainId}/references/${canonicalReference}`);
+      const referenceAiPath = resolve(
+        repoRoot,
+        `docs/architecture/domains/${domainId}/references/${canonicalReference.replace(".md", ".ai.md")}`,
+      );
+
+      expect(existsSync(indexPath)).toBe(true);
+      expect(existsSync(indexAiPath)).toBe(true);
+      expect(existsSync(referencePath)).toBe(true);
+      expect(existsSync(referenceAiPath)).toBe(true);
+
+      const index = readFileSync(indexPath, "utf8");
+      const indexAi = readFileSync(indexAiPath, "utf8");
+      expect(index).toContain("## Canonical Reference Documents");
+      expect(indexAi).toContain("## Canonical Reference Documents");
+      expect(index).toContain(`./${canonicalReference}`);
+      expect(indexAi).toContain(`./${canonicalReference}`);
+      expect(index).toContain("../overview.md");
+      expect(indexAi).toContain("../overview.md");
+
+      const reference = readFileSync(referencePath, "utf8");
+      const referenceAi = readFileSync(referenceAiPath, "utf8");
+      for (const heading of [
+        "## Context and Scope",
+        "## Contracts and Interfaces",
+        "## Data and State Invariants",
+        "## Failure and Recovery Semantics",
+        "## Extension Guardrails",
+        "## References",
+      ] as const) {
+        expect(reference).toContain(heading);
+        expect(referenceAi).toContain(heading);
+      }
+
+      expect(reference).toContain("[Domain Overview](../overview.md)");
+      expect(referenceAi).toContain("[Domain Overview](../overview.md)");
     }
   });
 });

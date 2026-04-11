@@ -1,5 +1,5 @@
 ---
-title: "AI Companion: Studio and System Composition Domain Overview"
+title: Studio and System Composition Domain Overview
 doc_type: architecture-overview
 status: active
 authoritativeness: canonical
@@ -10,67 +10,54 @@ related_code_paths:
   - src/application/system-studio
   - src/application/workflow-studio
 ---
-# AI Companion: Studio and System Composition Domain Overview
+# Studio and System Composition Domain Overview
 
 ## Purpose
 
-Own how studio surfaces compose and present shared system/workflow/asset contracts without becoming separate model authorities.
+Define studio composition boundaries for projecting shared system/workflow/asset models without becoming model authority.
 
-## Boundary
+## Scope and System Boundary
 
-- Defines studio handoff seams, projection/read-model boundaries, and composition responsibilities across studio surfaces.
-- Delegates authoritative run/workspace/security policy to the domains that own those contracts.
+In scope:
+- Studio handoff contracts across create/select/return/resume flows.
+- Projection/read-model composition seams used by studio surfaces.
+- Shared composition seams needed for cross-studio interoperability.
 
-## Foundational Concepts
+Out of scope:
+- Authoritative lifecycle policy for run execution.
+- Workspace/resource ownership semantics.
+- Transport API schema and protocol ownership.
 
-- Studios are views over shared platform models; studio-specific workflows cannot fork authoritative resource semantics.
-- Cross-studio handoff contracts are canonical for create/select/return/resume flows, with explicit origin, target, and outcome metadata.
-- Workflow Studio, Data Studio, and system runtime windows compose shared contracts through typed adapters and restoration services.
-- Selector and handoff lifecycle states are explicit (`created`, `cancelled`, `no-selection`, `abandoned`) and correlation-safe for multi-session behavior.
-- Runtime and asset-authoring projections are composition seams; authoritative persistence and lifecycle policy remain in owning domains.
+## Canonical Responsibilities
 
-## Domain-Wide Invariants
+- Keep studio handoff behavior contract-validated and correlation-safe.
+- Maintain projection boundaries so composition logic does not mutate canonical truth.
+- Preserve reusable seams that keep studio-specific flows aligned with shared contracts.
 
-- Studio state restoration and handoff application must be contract-validated before mutating draft/session state.
-- Projection services may transform views but cannot redefine workflow, run, workspace, or identity truth.
-- Cross-studio launch/return paths must remain resilient to stale or mismatched handoff context.
-- UI composition behavior must stay layered: presentation concerns in studio surfaces, policy in shared application/domain seams.
+## Cross-Cutting Invariants
 
-## Cross-Domain Dependency Rules
+- Projection services transform representation but do not redefine model truth.
+- Handoff outcomes are explicit (`created`, `cancelled`, `no-selection`, `abandoned`).
+- Restore/apply flows validate incoming contracts before session/draft mutation.
 
-- `core-platform-and-composition` owns canonical workflow/system semantics consumed by studio composition.
-- `workspace-storage-and-assets` owns asset identity/version/workspace ownership semantics used in selectors and authoring.
-- `execution-control-plane-and-scheduling` owns run execution lifecycle once studio flows submit executable work.
-- `api-and-transport-surfaces` owns authoritative route/event contracts used by studio clients.
+## Integration and Dependency Boundaries
 
-## Seed Scope Guidance
+- `core-platform-and-composition` owns shared model semantics consumed by studios.
+- `workspace-storage-and-assets` owns asset/workspace authority consumed by selectors.
+- `execution-control-plane-and-scheduling` owns run lifecycle once work is submitted.
+- `api-and-transport-surfaces` owns authoritative route/event contracts consumed by studio clients.
 
-- Seed references around studio handoff and projection boundaries that multiple UX surfaces reuse.
-- Keep this domain focused on composition contracts, not endpoint payload catalogs.
-- Route operational UX workflow procedures to docs/contributors or docs/operations as appropriate.
+## Reference Map
 
-## Canonical Source Documents Migrated into This Overview
+Contract-level details are canonical in `./references/`:
+- [Studio Handoff and Boundary Contracts](./references/studio-handoff-and-boundary-contracts.md)
+
+## Canonical Source Documents Migrated into This Domain
 
 - [Studio Handoff Contract](../../studio-handoff-contract.md)
 - [Presentation and State](../../presentation-and-state.md)
 - [Image System Domain Foundation](../../image-system-domain-foundation.md)
 - [Workflow Execution and Tools](../../workflow-execution-and-tools.md)
-
-## What Belongs in the Overview
-
-- Domain boundary intent, ownership seams, and cross-domain dependency rules.
-- Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in ./references/.
-
-## What Does Not Belong in the Overview
-
-- Endpoint-level schemas, API payload matrices, and low-level interface catalogs.
-- Step-by-step operational runbooks and troubleshooting procedures.
-- Contributor process checklists, implementation task plans, or release notes.
-
-## Related Domain References
-
-- [Domain References Index](./references/README.md)
 
 ## Related ADRs
 
@@ -80,4 +67,3 @@ Own how studio surfaces compose and present shared system/workflow/asset contrac
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Studio And System Composition](../../../context/packs/studio-and-system-composition.pack.md)
-

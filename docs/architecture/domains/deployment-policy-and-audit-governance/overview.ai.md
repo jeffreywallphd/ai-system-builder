@@ -1,5 +1,5 @@
 ---
-title: "AI Companion: Deployment Policy and Audit Governance Domain Overview"
+title: Deployment Policy and Audit Governance Domain Overview
 doc_type: architecture-overview
 status: active
 authoritativeness: canonical
@@ -10,67 +10,54 @@ related_code_paths:
   - src/domain/audit
   - src/application/policy-administration
 ---
-# AI Companion: Deployment Policy and Audit Governance Domain Overview
+# Deployment Policy and Audit Governance Domain Overview
 
 ## Purpose
 
-Own governance architecture for deployment policy administration, policy explainability, and audit evidence recording.
+Define governance boundaries for deployment policy posture, policy explainability, and durable audit evidence.
 
-## Boundary
+## Scope and System Boundary
 
-- Defines deployment policy resolution/override boundaries and audit recording authority contracts.
-- Delegates runtime dispatch mechanics to execution-control-plane-and-scheduling and identity proofing to identity-trust-and-security.
+In scope:
+- Policy profile resolution and override authority contracts.
+- Audit ledger persistence, query, and event governance boundaries.
+- Authoritative policy-administration command/query surfaces.
 
-## Foundational Concepts
+Out of scope:
+- Run dispatch mechanics and execution node internals.
+- Identity/session proof mechanics.
+- Feature-local logging that is not governance evidence.
 
-- Deployment profiles (`home`, `classroom`, `organization`) define baseline posture through explicit inheritance and typed policy-family settings.
-- Policy control modes (`profile-fixed`, `profile-default-admin-overridable`, `runtime-admin`) separate immutable profile intent from mutable runtime administration.
-- Effective policy snapshots are source-attributed (`profile-preset`, `policy-default`, `admin-state`) for explainability and auditability.
-- Policy evaluation is restricted to domain/application seams; UI/transport/infrastructure shortcut evaluation is prohibited.
-- Audit governance captures durable evidence of policy and administration actions without coupling to feature-local logging patterns.
+## Canonical Responsibilities
 
-## Domain-Wide Invariants
+- Keep policy posture deterministic across profile presets and runtime-admin controls.
+- Preserve source-attributed explainability for effective policy outcomes.
+- Ensure governance evidence is durable and reviewable across policy mutations.
 
-- Runtime admin overrides must respect control-mode boundaries and cannot bypass `profile-fixed` settings.
-- Policy catalogs and presets require typed validation, inheritance safety, and cycle prevention.
-- Governance events must be attributable and durable enough for operational review.
-- Audit recording and policy explainability are platform-level concerns, not endpoint-by-endpoint ad hoc behavior.
+## Cross-Cutting Invariants
 
-## Cross-Domain Dependency Rules
+- Runtime overrides cannot bypass `profile-fixed` controls.
+- Policy resolution output remains source-attributed and validation-safe.
+- Governance evidence capture is mandatory for policy-admin mutations.
 
-- `execution-control-plane-and-scheduling` consumes resolved policy posture for placement, dispatch, and lifecycle gating.
-- `identity-trust-and-security` supplies actor/session trust context for policy-admin authorization.
-- `workspace-storage-and-assets` and other resource domains consume governance policy outcomes for operational behavior.
-- `api-and-transport-surfaces` exposes policy-admin and audit query/mutation routes with shared contracts.
+## Integration and Dependency Boundaries
 
-## Seed Scope Guidance
+- `execution-control-plane-and-scheduling` consumes resolved policy posture for placement and lifecycle gates.
+- `identity-trust-and-security` provides trusted actor/session context for policy-admin authorization.
+- `workspace-storage-and-assets` and other domains consume governance outcomes.
+- `api-and-transport-surfaces` exposes policy-admin and audit APIs via shared contracts.
 
-- Seed references for policy administration authority and audit ledger/event contracts first.
-- Keep governance architecture authoritative here while linking outward for runtime behavior details.
-- Avoid embedding implementation task plans; keep this domain focused on durable governance contracts.
+## Reference Map
 
-## Canonical Source Documents Migrated into This Overview
+Contract-level details are canonical in `./references/`:
+- [Deployment Policy Resolution and Overrides](./references/deployment-policy-resolution-and-overrides.md)
+
+## Canonical Source Documents Migrated into This Domain
 
 - [Deployment Profile Policy Administration Foundation](../../deployment-profile-policy-administration-foundation.md)
 - [Deployment Profile Policy Effective Resolution and Overrides](../../deployment-profile-policy-effective-resolution-and-overrides.md)
 - [Audit Domain Foundation](../../audit-domain-foundation.md)
 - [Audit Ledger Persistence Query and Access Control Architecture](../../audit-ledger-persistence-query-and-access-control-architecture.md)
-
-## What Belongs in the Overview
-
-- Domain boundary intent, ownership seams, and cross-domain dependency rules.
-- Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in ./references/.
-
-## What Does Not Belong in the Overview
-
-- Endpoint-level schemas, API payload matrices, and low-level interface catalogs.
-- Step-by-step operational runbooks and troubleshooting procedures.
-- Contributor process checklists, implementation task plans, or release notes.
-
-## Related Domain References
-
-- [Domain References Index](./references/README.md)
 
 ## Related ADRs
 
@@ -81,4 +68,3 @@ Own governance architecture for deployment policy administration, policy explain
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Repository Overview](../../../context/packs/repository-overview.pack.md)
-

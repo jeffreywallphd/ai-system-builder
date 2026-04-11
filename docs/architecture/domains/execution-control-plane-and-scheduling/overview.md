@@ -13,63 +13,50 @@ related_code_paths:
 
 ## Purpose
 
-Own control-plane authority for run lifecycle transitions, scheduling policy application, and execution readiness gating.
+Define control-plane authority for run lifecycle, scheduling policy application, and dispatch/readiness gating.
 
-## Boundary
+## Scope and System Boundary
 
-- Defines run submission and orchestration authority, queueing/dispatch constraints, and scheduler decision boundaries.
-- Delegates workflow modeling to studio-and-system-composition and shared domain model policy to core-platform-and-composition.
+In scope:
+- Run state-machine and transition authority boundaries.
+- Scheduling policy evaluation and placement contracts.
+- Dispatch readiness gates and execution handoff constraints.
 
-## Foundational Concepts
+Out of scope:
+- Workflow authoring semantics and studio composition concerns.
+- Endpoint payload formats and transport protocol details.
+- Runtime host bootstrap/service-supervision mechanics.
 
-- Run records are authoritative lifecycle entities with explicit state transitions, timestamps, status history, and actor attribution.
-- Queue assignment and dispatch are control-plane concerns; adapters and execution nodes receive commands but do not redefine lifecycle truth.
-- Scheduling decisions are policy-aware and consume governance constraints while remaining separate from transport mechanics.
-- Image-run and generic-run models share one orchestration posture: explicit ownership scope, logical asset references, and deterministic transition guards.
-- Failure, degraded, and partial outcomes are first-class lifecycle states with required failure summary semantics.
+## Canonical Responsibilities
 
-## Domain-Wide Invariants
+- Preserve explicit lifecycle transition authority for run records.
+- Apply policy-aware scheduling decisions with deterministic outcomes.
+- Enforce readiness gating before dispatch handoff to execution infrastructure.
 
-- Run lifecycle transitions are explicit and must pass transition guards before persistence.
-- Dispatch/linkage metadata cannot appear before the lifecycle reaches appropriate states.
-- Status history is chronological and must terminate at the current status.
-- Scheduling and orchestration policy belongs in domain/application seams, not in UI or adapter-local branches.
+## Cross-Cutting Invariants
 
-## Cross-Domain Dependency Rules
+- Lifecycle transitions require valid current state plus guard-validated transition intent.
+- Dispatch metadata appears only in dispatch-eligible states.
+- Status history remains chronological and consistent with current status.
 
-- `deployment-policy-and-audit-governance` constrains scheduling and execution posture through policy families and governance hooks.
-- `studio-and-system-composition` and `workspace-storage-and-assets` provide workflow/asset/resource references consumed during submission and execution.
-- `api-and-transport-surfaces` exposes command/query endpoints and events without redefining lifecycle policy.
-- `runtime-host-surfaces` and adapter infrastructure execute transport/runtime mechanics under control-plane authority.
+## Integration and Dependency Boundaries
 
-## Seed Scope Guidance
+- `deployment-policy-and-audit-governance` constrains policy posture for scheduling and lifecycle gates.
+- `workspace-storage-and-assets` provides authoritative asset/workspace references.
+- `api-and-transport-surfaces` exposes commands/queries without redefining policy.
+- `runtime-host-surfaces` executes transport/runtime mechanics under control-plane decisions.
 
-- Seed references around run lifecycle state transitions and scheduling decision contracts.
-- Capture where policy-aware scheduling consumes governance constraints from deployment-policy-and-audit-governance.
-- Keep payload-level transport contracts outside this domain and link to api-and-transport-surfaces.
+## Reference Map
 
-## Canonical Source Documents Migrated into This Overview
+Contract-level details are canonical in `./references/`:
+- [Run Lifecycle State Authority](./references/run-lifecycle-state-authority.md)
+
+## Canonical Source Documents Migrated into This Domain
 
 - [Run Orchestration Domain Foundation](../../run-orchestration-domain-foundation.md)
 - [Run Orchestration Queue Assignment Dispatch Control Plane](../../run-orchestration-queue-assignment-dispatch-control-plane.md)
 - [Run Orchestration Scheduling Policy Framework and Rule Pipeline](../../run-orchestration-scheduling-policy-framework-and-rule-pipeline.md)
 - [Run Submission Domain Foundation](../../run-submission-domain-foundation.md)
-
-## What Belongs in the Overview
-
-- Domain boundary intent, ownership seams, and cross-domain dependency rules.
-- Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in ./references/.
-
-## What Does Not Belong in the Overview
-
-- Endpoint-level schemas, API payload matrices, and low-level interface catalogs.
-- Step-by-step operational runbooks and troubleshooting procedures.
-- Contributor process checklists, implementation task plans, or release notes.
-
-## Related Domain References
-
-- [Domain References Index](./references/README.md)
 
 ## Related ADRs
 

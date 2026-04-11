@@ -1,5 +1,5 @@
 ---
-title: "AI Companion: Workspace Storage and Assets Domain References"
+title: Workspace Storage and Assets Domain References
 doc_type: architecture-reference
 status: active
 authoritativeness: canonical
@@ -10,35 +10,34 @@ related_code_paths:
   - src/domain/storage
   - src/domain/assets
 ---
-# AI Companion: Workspace Storage and Assets Domain References
+# Workspace Storage and Assets Domain References
 
 ## Purpose
 
-Store canonical, durable architecture references for workspace-storage-and-assets that implement or constrain the domain overview.
+Index durable contract-level architecture references for `workspace-storage-and-assets` while keeping domain-boundary narrative in [Domain Overview](../overview.md).
 
-## What Belongs in Domain References
+## Reference Scope
 
-- One reference file per durable contract, interface family, or boundary rule.
-- Normative constraints that directly guide implementation and review outcomes.
-- Stable links to governing ADRs and relevant context packs when decision rationale matters.
+- Workspace tenancy and ownership contracts.
+- Storage provisioning and access semantics contracts.
+- Asset lifecycle and metadata authority contracts.
 
-## What Does Not Belong in Domain References
+## Canonical Reference Documents
 
-- Repeated domain boundary summaries that already live in ../overview.md.
-- Environment-specific runbook procedures and day-2 operations playbooks.
-- Sprint-level delivery plans, temporary migration notes, or ticket-specific checklists.
+- [Workspace Tenancy and Ownership Contracts](./workspace-tenancy-and-ownership-contracts.md)
 
-## Seed Reference Placeholders
+## Migration Backlog (Not Yet Canonical)
 
-Use this short list as migration scaffolding. Create each placeholder file when the first canonical contract lands, then replace placeholder language with authoritative content.
+- `storage-provisioning-and-access-semantics.md`
+- `asset-lifecycle-and-metadata-boundaries.md`
 
-- `workspace-tenancy-and-ownership-contracts.md` - Workspace identity, tenancy, and ownership boundaries.
-- `storage-provisioning-and-access-semantics.md` - Storage provisioning and access control contract surfaces.
-- `asset-lifecycle-and-metadata-boundaries.md` - Asset lifecycle states and metadata authority boundaries.
+## Reference Authoring Guardrails
 
-## Reference Authoring Rules
-
-- Keep each reference focused on one contract surface and explicit invariants.
+- Keep one durable contract surface per reference file.
 - Link back to [Domain Overview](../overview.md) for boundary context.
-- Include ## Related ADRs when a decision record constrains the reference.
-- Include ## Related Context Packs when context routing depends on that contract for retrieval quality.
+- Keep runbooks in `docs/operations/` and workflow guidance in `docs/contributors/`.
+
+## Related Documentation
+
+- [Domain Overview](../overview.md)
+- [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)

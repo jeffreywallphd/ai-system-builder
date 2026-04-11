@@ -1,5 +1,5 @@
 ---
-title: "AI Companion: Execution Control Plane and Scheduling Domain References"
+title: Execution Control Plane and Scheduling Domain References
 doc_type: architecture-reference
 status: active
 authoritativeness: canonical
@@ -9,35 +9,34 @@ related_code_paths:
   - src/domain/runs
   - src/domain/scheduling
 ---
-# AI Companion: Execution Control Plane and Scheduling Domain References
+# Execution Control Plane and Scheduling Domain References
 
 ## Purpose
 
-Store canonical, durable architecture references for execution-control-plane-and-scheduling that implement or constrain the domain overview.
+Index durable contract-level architecture references for `execution-control-plane-and-scheduling` while keeping domain-boundary narrative in [Domain Overview](../overview.md).
 
-## What Belongs in Domain References
+## Reference Scope
 
-- One reference file per durable contract, interface family, or boundary rule.
-- Normative constraints that directly guide implementation and review outcomes.
-- Stable links to governing ADRs and relevant context packs when decision rationale matters.
+- Run lifecycle state authority contracts.
+- Scheduling policy evaluation and placement contracts.
+- Dispatch readiness and execution handoff contracts.
 
-## What Does Not Belong in Domain References
+## Canonical Reference Documents
 
-- Repeated domain boundary summaries that already live in ../overview.md.
-- Environment-specific runbook procedures and day-2 operations playbooks.
-- Sprint-level delivery plans, temporary migration notes, or ticket-specific checklists.
+- [Run Lifecycle State Authority](./run-lifecycle-state-authority.md)
 
-## Seed Reference Placeholders
+## Migration Backlog (Not Yet Canonical)
 
-Use this short list as migration scaffolding. Create each placeholder file when the first canonical contract lands, then replace placeholder language with authoritative content.
+- `scheduling-policy-application-contracts.md`
+- `execution-readiness-and-dispatch-gates.md`
 
-- `run-lifecycle-state-authority.md` - Authoritative run lifecycle state transition rules.
-- `scheduling-policy-application-contracts.md` - Scheduling policy evaluation and application boundaries.
-- `execution-readiness-and-dispatch-gates.md` - Execution readiness checks and dispatch gating contracts.
+## Reference Authoring Guardrails
 
-## Reference Authoring Rules
-
-- Keep each reference focused on one contract surface and explicit invariants.
+- Keep one durable contract surface per reference file.
 - Link back to [Domain Overview](../overview.md) for boundary context.
-- Include ## Related ADRs when a decision record constrains the reference.
-- Include ## Related Context Packs when context routing depends on that contract for retrieval quality.
+- Keep runbooks in `docs/operations/` and workflow guidance in `docs/contributors/`.
+
+## Related Documentation
+
+- [Domain Overview](../overview.md)
+- [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)

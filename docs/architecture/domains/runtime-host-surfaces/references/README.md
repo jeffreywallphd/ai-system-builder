@@ -13,31 +13,30 @@ related_code_paths:
 
 ## Purpose
 
-Store canonical, durable architecture references for runtime-host-surfaces that implement or constrain the domain overview.
+Index durable contract-level architecture references for `runtime-host-surfaces` while keeping domain-boundary narrative in [Domain Overview](../overview.md).
 
-## What Belongs in Domain References
+## Reference Scope
 
-- One reference file per durable contract, interface family, or boundary rule.
-- Normative constraints that directly guide implementation and review outcomes.
-- Stable links to governing ADRs and relevant context packs when decision rationale matters.
+- Host composition-root authority contracts.
+- Startup lifecycle and gating contracts.
+- Pre-login vs post-login runtime capability boundaries.
 
-## What Does Not Belong in Domain References
+## Canonical Reference Documents
 
-- Repeated domain boundary summaries that already live in ../overview.md.
-- Environment-specific runbook procedures and day-2 operations playbooks.
-- Sprint-level delivery plans, temporary migration notes, or ticket-specific checklists.
+- [Host Composition Root Contracts](./host-composition-root-contracts.md)
 
-## Seed Reference Placeholders
+## Migration Backlog (Not Yet Canonical)
 
-Use this short list as migration scaffolding. Create each placeholder file when the first canonical contract lands, then replace placeholder language with authoritative content.
+- `startup-lifecycle-and-gating.md`
+- `pre-login-runtime-surface-boundaries.md`
 
-- `host-composition-root-contracts.md` - Contract boundaries for host-specific composition roots.
-- `startup-lifecycle-and-gating.md` - Startup phase sequencing and readiness gating rules.
-- `pre-login-runtime-surface-boundaries.md` - Pre-auth runtime boundary and capability constraints.
+## Reference Authoring Guardrails
 
-## Reference Authoring Rules
-
-- Keep each reference focused on one contract surface and explicit invariants.
+- Keep one durable contract surface per reference file.
 - Link back to [Domain Overview](../overview.md) for boundary context.
-- Include ## Related ADRs when a decision record constrains the reference.
-- Include ## Related Context Packs when context routing depends on the contract.
+- Keep runbooks in `docs/operations/` and workflow guidance in `docs/contributors/`.
+
+## Related Documentation
+
+- [Domain Overview](../overview.md)
+- [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)

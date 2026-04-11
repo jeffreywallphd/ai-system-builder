@@ -1,5 +1,5 @@
 ---
-title: "AI Companion: Studio and System Composition Domain References"
+title: Studio and System Composition Domain References
 doc_type: architecture-reference
 status: active
 authoritativeness: canonical
@@ -10,35 +10,34 @@ related_code_paths:
   - src/application/system-studio
   - src/application/workflow-studio
 ---
-# AI Companion: Studio and System Composition Domain References
+# Studio and System Composition Domain References
 
 ## Purpose
 
-Store canonical, durable architecture references for studio-and-system-composition that implement or constrain the domain overview.
+Index durable contract-level architecture references for `studio-and-system-composition` while keeping domain-boundary narrative in [Domain Overview](../overview.md).
 
-## What Belongs in Domain References
+## Reference Scope
 
-- One reference file per durable contract, interface family, or boundary rule.
-- Normative constraints that directly guide implementation and review outcomes.
-- Stable links to governing ADRs and relevant context packs when decision rationale matters.
+- Studio handoff boundary contracts.
+- Projection/read-model composition contracts.
+- Shared system composition seams used across studio surfaces.
 
-## What Does Not Belong in Domain References
+## Canonical Reference Documents
 
-- Repeated domain boundary summaries that already live in ../overview.md.
-- Environment-specific runbook procedures and day-2 operations playbooks.
-- Sprint-level delivery plans, temporary migration notes, or ticket-specific checklists.
+- [Studio Handoff and Boundary Contracts](./studio-handoff-and-boundary-contracts.md)
 
-## Seed Reference Placeholders
+## Migration Backlog (Not Yet Canonical)
 
-Use this short list as migration scaffolding. Create each placeholder file when the first canonical contract lands, then replace placeholder language with authoritative content.
+- `projection-and-read-model-composition.md`
+- `shared-system-composition-seams.md`
 
-- `studio-handoff-and-boundary-contracts.md` - Studio handoff and boundary ownership contracts.
-- `projection-and-read-model-composition.md` - Projection/read-model composition constraints across studios.
-- `shared-system-composition-seams.md` - Shared system composition seams used across studio surfaces.
+## Reference Authoring Guardrails
 
-## Reference Authoring Rules
-
-- Keep each reference focused on one contract surface and explicit invariants.
+- Keep one durable contract surface per reference file.
 - Link back to [Domain Overview](../overview.md) for boundary context.
-- Include ## Related ADRs when a decision record constrains the reference.
-- Include ## Related Context Packs when context routing depends on that contract for retrieval quality.
+- Keep runbooks in `docs/operations/` and workflow guidance in `docs/contributors/`.
+
+## Related Documentation
+
+- [Domain Overview](../overview.md)
+- [Architecture Domain Cross-Linking Rules](../../../architecture-domain-cross-linking-rules.md)
