@@ -27,6 +27,7 @@
 - [Documentation Migration Safety Guide](./docs-migration-safety-guide.md)
 - [Baseline and Historical Material Usage Guide](./baseline-and-historical-material-usage-guide.md)
 - [Documentation Foundation Validation Guide](./docs-foundation-validation.md)
+- [Documentation Quality Enforced Standards Guide](./documentation-quality-enforced-standards-guide.md)
 - [Context Engineering System Contributor Guide](./context-engineering-system-guide.md)
 - [Router and Overview Writing Standard](./router-overview-writing-standard.md)
 - [Architecture Domain Overview and Reference Readability Guide](./architecture-domain-overview-reference-readability-guide.md)
