@@ -86,6 +86,20 @@ Each ADR must include these lightweight metadata fields in frontmatter:
 - Use the template directly so decision records remain concise and consistent: `docs/context/templates/adr.template.md`.
 - Use ADR authoring guidance to keep decisions concise and high-signal: `docs/adr/records/authoring-guide.md`.
 
+## ADR Cross-Linking Conventions
+
+ADRs are part of the documentation system, not a standalone archive. Keep relationship paths explicit and durable:
+
+- In `## Related Documentation`, include repo-relative links for:
+  - Core architecture context (`docs/architecture/<...>.md`) that explains system boundaries touched by the decision.
+  - Prior/adjacent decisions (`docs/adr/records/adr-<NNN>-<...>.md`) when supersession or dependency exists.
+  - High-value context assets (`docs/context/packs/<...>.pack.md`, `docs/context/routing/<...>.md`, or `docs/context/context-map.md`) when routing or AI context should carry this decision.
+- Prefer stable path references over prose-only mentions so maintainers can update links mechanically.
+- Keep links bi-directional:
+  - ADRs point to architecture/context docs in `Related Documentation`.
+  - Architecture overviews/references should include `## Related ADRs` with direct links back to relevant ADR records.
+  - Context packs may cite ADRs in `## Authoritative Docs` when the pack must preserve decision intent for implementation tasks.
+
 ## Start Here
 - [ADR Records Home](./records/README.md)
 - [ADR Authoring Guide](./records/authoring-guide.md)

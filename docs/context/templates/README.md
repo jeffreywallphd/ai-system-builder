@@ -36,6 +36,12 @@ The ADR template distinguishes required vs optional sections explicitly:
 - Optional: `Supersession` and `Follow-Up Actions` (`Supersession` is required when a supersession relationship exists).
 - ADR metadata and lifecycle anchors: required `adr_number`, required `decision_status` (`proposed`, `accepted`, `superseded`, `deprecated`), required `decision_date`, and title format `ADR-<NNN> <Decision Title>`.
 - ADR writing quality guidance (problem framing, options, decision clarity, and tradeoff honesty): `docs/adr/records/authoring-guide.md`.
+- ADR cross-linking expectations: use `Related Documentation` to link architecture docs, related ADRs, and context assets (for example context packs or routing docs).
+
+## Architecture Template ADR Backlinks
+
+- `architecture-overview.template.md` and `architecture-reference.template.md` include `## Related ADRs`.
+- Use this section to point back to the ADR records that set invariants for the architecture doc.
 
 ## Routing Entry Template
 

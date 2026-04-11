@@ -29,6 +29,11 @@ related_code_paths:
 - Contributor workflow checklists and coding process guides.
 - Historical snapshots that exist only for migration traceability.
 
+## ADR Linking Expectations
+- Architecture docs and ADRs are bi-directional companions, not separate archives.
+- When a domain/reference doc is shaped by a decision record, include a `## Related ADRs` section with direct links to `docs/adr/records/adr-<NNN>-<decision-slug>.md`.
+- When authoring new decisions, ensure the matching ADR `## Related Documentation` links back to the impacted architecture docs.
+
 ## Start Here
 - [Domain And Application Core](./domain-and-application-core.md)
 - [Layers And Boundaries](./layers-and-boundaries.md)

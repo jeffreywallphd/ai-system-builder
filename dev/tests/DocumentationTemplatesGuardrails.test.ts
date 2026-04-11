@@ -31,6 +31,7 @@ const requiredTemplates = [
       "## Scope and System Boundary",
       "## Canonical Components and Responsibilities",
       "## Cross-Cutting Invariants",
+      "## Related ADRs",
     ],
   },
   {
@@ -40,6 +41,7 @@ const requiredTemplates = [
       "## Context and Scope",
       "## Contracts and Interfaces",
       "## Extension Guardrails",
+      "## Related ADRs",
     ],
   },
   {
@@ -164,6 +166,11 @@ describe("documentation templates guardrails", () => {
       expect(content).toContain("## Supersession");
       expect(content).toContain("Superseded By");
       expect(content).toContain("## Follow-Up Actions");
+      expect(content).toContain("docs/architecture/<related-doc>");
+      expect(content).toContain("docs/adr/records/adr-<NNN>-<related-decision>");
+      expect(content).toContain("docs/context/packs/<pack-id>.pack");
+      expect(content).toContain("architecture doc");
+      expect(content).toContain("## Related ADRs");
     }
   });
 
@@ -190,9 +197,13 @@ describe("documentation templates guardrails", () => {
     expect(templatesReadme).toContain("adr_number");
     expect(templatesReadme).toContain("decision_status");
     expect(templatesReadme).toContain("ADR-<NNN> <Decision Title>");
+    expect(templatesReadme).toContain("Architecture Template ADR Backlinks");
+    expect(templatesReadme).toContain("Related Documentation");
     expect(templatesAiReadme).toContain("adr_number");
     expect(templatesAiReadme).toContain("decision_status");
     expect(templatesAiReadme).toContain("ADR-<NNN> <Decision Title>");
+    expect(templatesAiReadme).toContain("Architecture Template ADR Backlinks");
+    expect(templatesAiReadme).toContain("Related Documentation");
     expect(templatesReadme).toContain("task-to-context-routing-entry.template.json");
     expect(templatesAiReadme).toContain("task-to-context-routing-entry.template.json");
   });

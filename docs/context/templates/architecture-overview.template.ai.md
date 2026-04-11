@@ -31,6 +31,12 @@ Summarize allowed dependencies and key upstream/downstream integration contracts
 
 Record what this architecture document does not define.
 
+## Related ADRs
+
+Link to ADR records that define or constrain this architecture scope:
+
+- `docs/adr/records/adr-<NNN>-<decision-slug>.ai.md`
+
 ## References
 
 Link to architecture references, ADRs, or related runbooks.

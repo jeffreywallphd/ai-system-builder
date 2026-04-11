@@ -18,6 +18,15 @@
 - Feature-specific coding workflows.
 - ADR decision history.
 
+## ADR Citation Conventions
+
+Context packs can cite ADRs when decision history materially improves implementation context:
+
+- Add ADR links in `## Authoritative Docs` with repo-relative paths (for example `docs/adr/records/adr-<NNN>-<decision-slug>.ai.md`).
+- Cite ADRs when pack invariants depend on accepted architecture tradeoffs.
+- Keep ADR references paired with architecture docs so assistants can traverse rationale and current contract together.
+- Update pack ADR references when an ADR becomes superseded.
+
 ## Start Here
 - [Context Pack Contract (Machine-Readable)](./context-pack.contract.json)
 - [Context Pack Catalog Contract](./context-pack-catalog.contract.json)

@@ -30,6 +30,7 @@ related_code_paths:
 ## Authoritative Docs
 
 - `docs/<path-to-canonical-doc>.md`
+- `docs/adr/records/adr-<NNN>-<decision-slug>.md` (optional: include when ADR rationale is required for safe implementation context)
 
 ## Authoritative Code Paths
 
