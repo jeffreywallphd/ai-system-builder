@@ -57,6 +57,10 @@
   - `## Authoritative Docs` ADR links inside context packs.
   - ADR references in `docs/adr/records/README.md` and `docs/adr/records/README.ai.md` against `adr-registry.json`.
 
+## ADR Rollout Boundaries
+- Initial ADR system scope is intentionally bounded and not exhaustive.
+- Use [ADR System Rollout Boundaries and Future Expansion Areas](./rollout-boundaries.ai.md) for current coverage, known gaps, and extension guidance.
+
 ## Current Index
 Canonical source: `docs/adr/records/adr-registry.json`
 
@@ -72,6 +76,7 @@ Canonical source: `docs/adr/records/adr-registry.json`
 ## Start Here
 - [ADR Router](../README.ai.md)
 - [ADR Discovery Registry](./adr-registry.json)
+- [ADR System Rollout Boundaries and Future Expansion Areas](./rollout-boundaries.ai.md)
 - [ADR Authoring Guide](./authoring-guide.ai.md)
 - [ADR Template](../../context/templates/adr.template.ai.md)
 - [Architecture Router](../../architecture/README.ai.md)
