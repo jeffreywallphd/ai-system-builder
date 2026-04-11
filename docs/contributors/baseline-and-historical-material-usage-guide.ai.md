@@ -14,6 +14,7 @@ related_code_paths:
   - docs/architecture/README.ai.md
   - docs/contributors/context-engineering-system-guide.ai.md
   - dev/tests/DocumentationBaselineHistoricalUsageStory534Guardrails.test.ts
+  - dev/tests/DocumentationBaselineHistoricalReviewExpectationsStory543Guardrails.test.ts
 ---
 
 # AI Companion: Baseline and Historical Material Usage Guide
@@ -105,6 +106,41 @@ Prompt rules:
 | Transitional notes | Exclude unless migration continuity is requested | Redirect continuity and rollout handoff context | Durable executable guidance |
 | Superseded/deprecated docs | Redirect to replacement | Locate replacement path and retirement rationale | Primary authority for current behavior |
 
+## Ongoing Review Expectations for Baseline/Historical Areas (Story 5.4.3)
+
+### Stability-First Rules
+
+- Keep baseline and historical artifacts as point-in-time records, not active living guides.
+- Preserve chronology and completion evidence unless factual corrections are required.
+- Keep archived content explicitly non-authoritative for current implementation contracts.
+
+### Allowed vs Disallowed Updates
+
+Allowed:
+- Fix broken canonical links, metadata drift, and navigation blockers.
+- Correct factual errors, retirement dates, or status classification metadata.
+- Apply required redaction/compliance updates.
+- Add clearer cross-links to canonical active destinations.
+
+Disallowed:
+- Routine refreshes that make archived docs appear active.
+- Rewriting old baselines to mirror current implementation state.
+- Adding new executable guidance to historical/superseded paths.
+
+### Newly Superseded Material Workflow
+
+1. Move meaningful prior-state evidence into the correct `docs/baselines/` destination.
+2. Keep only short superseded pointer notes at old active paths when continuity is required.
+3. Apply `status: superseded|deprecated` and `superseded_by` metadata as applicable.
+4. Link archived records back to canonical active docs for fast authority re-entry.
+
+### Anti-Dumping Controls
+
+- Each new archived artifact must state a retention reason: traceability, parity, audit, or retirement lineage.
+- Do not use `docs/baselines/` for draft plans, parking-lot notes, or unresolved design proposals.
+- Content that remains actionable today belongs in active routers.
+- Reviewers should reject archival additions without canonical active cross-links or with duplicated active guidance.
+
 ## Practical Examples
 
 1. Runtime host refactor: active host docs are authoritative; baseline snapshots are parity evidence only.
@@ -120,10 +156,12 @@ Prompt rules:
 - `docs/context/documentation-status-signals.ai.md`
 - `docs/contributors/active-vs-historical-docs-worked-examples.ai.md`
 - `dev/tests/DocumentationBaselineHistoricalUsageStory534Guardrails.test.ts`
+- `dev/tests/DocumentationBaselineHistoricalReviewExpectationsStory543Guardrails.test.ts`
 
 Run:
 
 ```bash
 npm run docs:validate:foundation
 bun test dev/tests/DocumentationBaselineHistoricalUsageStory534Guardrails.test.ts
+bun test dev/tests/DocumentationBaselineHistoricalReviewExpectationsStory543Guardrails.test.ts
 ```
