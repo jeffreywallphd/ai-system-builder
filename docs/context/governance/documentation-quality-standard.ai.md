@@ -96,6 +96,25 @@ Use this matrix when implementing linting/validation. It defines rule groups in 
 - Default maintainability checks in contributor and operations docs to `important` warnings unless contract integrity is affected.
 - Encode this matrix in validator configuration so linting scope stays deterministic and avoids ad hoc exceptions.
 
+## Readability and Signal-to-Noise Enforcement Boundaries
+
+Story 7.1.4 scope: enforce readability with measurable structure/signal checks, not subjective prose scoring.
+
+| Boundary ID | Applies to | Enforcement mode | Measurable/reviewable boundary | Default severity |
+| --- | --- | --- | --- | --- |
+| `READ-001` | Contract-critical governance/context docs (including this standard) | Automated | Required heading anchors must exist exactly per validator/test contracts. | `critical` |
+| `READ-002` | Router docs (`docs/README*` plus top-level area `README*`) | Automated | Router docs stay at or below 500 words, include at least 3 markdown links, and keep words-per-link ratio at or below 35. | `important` |
+| `READ-003` | Architecture overview docs (`doc_type: architecture-overview`) | Automated | Overview body stays at or below 900 words and includes at least 3 H2 sections. | `important` |
+| `READ-004` | Baseline/transitional/superseded status anchor docs | Automated | Required status labeling markers from segmentation validation remain present. | `critical` |
+| `READ-005` | Active canonical docs (`status: active`, `authoritativeness: canonical`) | Reviewable now, lintable later | Disallow mixed authority/history: active canonical docs cannot be supersession notices or redirect stubs. | `important` |
+| `READ-006` | Router and overview docs | Reviewable now, lintable later | Disallow catch-all sink sections such as generic miscellaneous/other-notes buckets that reduce routing clarity. | `important` |
+
+Readability checks intentionally out of automated scope:
+
+- Tone and pedagogy style preferences.
+- Grammar-polish-only issues when semantics are still clear.
+- Subjective prose-quality judgments that lack deterministic signals.
+
 ## Recommended Guidance (Non-Blocking)
 
 - Prefer concise, decision-oriented sections in active authority docs.
@@ -121,7 +140,7 @@ Use this matrix when implementing linting/validation. It defines rule groups in 
 
 ## Governance and Change Control
 
-- Treat this doc as canonical quality baseline for Story 7.1.1, Story 7.1.2, and Story 7.1.3.
+- Treat this doc as canonical quality baseline for Story 7.1.1, Story 7.1.2, Story 7.1.3, and Story 7.1.4.
 - When required rules change, update validator/tests in same pull request.
 - If a proposed rule cannot be checked deterministically with lightweight tooling, keep it non-blocking guidance.
 - Keep `.md` and `.ai.md` versions aligned.

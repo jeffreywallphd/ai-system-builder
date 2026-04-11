@@ -96,6 +96,25 @@ Use this matrix to determine which required rule groups are enforced per documen
 - Default to warning-level enforcement (`important`) for maintainability issues in contributor and operations docs unless the issue breaks a contract.
 - Avoid category drift in future linting work by encoding this matrix directly in validator configuration, not ad hoc file-by-file exceptions.
 
+## Readability and Signal-to-Noise Enforcement Boundaries
+
+Story 7.1.4 boundary: enforce readability through structural and measurable signals only. Do not gate merges on subjective prose quality judgments.
+
+| Boundary ID | Applies to | Enforcement mode | Measurable or reviewable boundary | Default severity |
+| --- | --- | --- | --- | --- |
+| `READ-001` | Contract-critical governance and context docs (including this standard) | Automated | Required heading anchors must exist exactly as defined by validator/test contracts. | `critical` |
+| `READ-002` | Router docs (`docs/README*` and top-level area `README*`) | Automated | Router word count must stay at or below 500, include at least 3 markdown links, and keep words-per-link ratio at or below 35. | `important` |
+| `READ-003` | Architecture overview docs (`doc_type: architecture-overview`) | Automated | Body word count should stay at or below 900 and include at least 3 H2 sections. | `important` |
+| `READ-004` | Baseline, transitional, and superseded status anchor docs | Automated | Required status labeling markers from segmentation validation must remain present to preserve clear state signaling. | `critical` |
+| `READ-005` | Active canonical docs (`status: active`, `authoritativeness: canonical`) | Reviewable now, lintable later | Mixed authority/history anti-pattern is prohibited: active canonical docs must not be used as supersession notices or historical redirect stubs. | `important` |
+| `READ-006` | Router and overview docs | Reviewable now, lintable later | Catch-all structure anti-pattern is prohibited: avoid generic "miscellaneous"/"other notes" sink sections that dilute routing signal. | `important` |
+
+Readability checks that remain out of scope for automated enforcement:
+
+- Writing voice, tone, and pedagogy style.
+- Grammar polish when meaning is already unambiguous.
+- Subjective "good prose" assessments without deterministic structural indicators.
+
 ## Recommended Guidance (Non-Blocking)
 
 - Prefer concise sections and decision-oriented phrasing over narrative history in active authority docs.
@@ -123,7 +142,7 @@ Use the following translation model when adding linting and validation:
 
 ## Governance and Change Control
 
-- Treat this document as the canonical quality baseline for Story 7.1.1, Story 7.1.2, Story 7.1.3, and downstream enforcement stories.
+- Treat this document as the canonical quality baseline for Story 7.1.1, Story 7.1.2, Story 7.1.3, Story 7.1.4, and downstream enforcement stories.
 - Any change to required rules must be accompanied by corresponding validator or guardrail test updates in the same pull request.
 - If a proposed requirement cannot be translated into a lightweight deterministic check, place it under recommended guidance instead of required rules.
 - Keep `.md` and `.ai.md` versions aligned whenever this standard changes.
