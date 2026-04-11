@@ -13,11 +13,16 @@ const requiredContextSubfolders = [
 ] as const;
 
 const requiredContextFiles = [
+  "docs/context/context-asset-metadata.md",
+  "docs/context/context-asset-metadata.ai.md",
+  "docs/context/context-asset-metadata.contract.json",
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
   "docs/context/packs/context-pack.contract.json",
   "docs/context/packs/context-pack-catalog.contract.json",
   "docs/context/packs/context-pack-catalog.seed.json",
+  "docs/context/packs/context-system-foundations.pack.md",
+  "docs/context/packs/context-system-foundations.pack.ai.md",
   "docs/context/routing/README.md",
   "docs/context/routing/README.ai.md",
   "docs/context/routing/prompt-routing-contract.md",
@@ -68,6 +73,9 @@ describe("context engineering structure guardrails", () => {
     const packSeed = JSON.parse(
       readFileSync(resolve(contextRoot, "packs/context-pack-catalog.seed.json"), "utf8"),
     ) as Record<string, unknown>;
+    const metadataContract = JSON.parse(
+      readFileSync(resolve(contextRoot, "context-asset-metadata.contract.json"), "utf8"),
+    ) as Record<string, unknown>;
     const routingContract = JSON.parse(
       readFileSync(resolve(contextRoot, "routing/task-to-context-routing.contract.json"), "utf8"),
     ) as Record<string, unknown>;
@@ -86,6 +94,11 @@ describe("context engineering structure guardrails", () => {
     expect(packSeed.schemaVersion).toBe("1.0.0");
     expect(packSeed.artifactType).toBe("context-pack-catalog");
     expect(Array.isArray(packSeed.packs)).toBe(true);
+    expect((packSeed.packs as unknown[]).length).toBeGreaterThanOrEqual(1);
+
+    expect(metadataContract.schemaVersion).toBe("1.0.0");
+    expect(metadataContract.artifactType).toBe("context-asset-metadata-standard");
+    expect(Array.isArray(metadataContract.requiredFields)).toBe(true);
 
     expect(routingContract.schemaVersion).toBe("1.0.0");
     expect(routingContract.artifactType).toBe("task-to-context-routing-map");

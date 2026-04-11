@@ -23,11 +23,13 @@ This policy defines how context-pack and routing artifacts are maintained so con
 - Treat contract files as compatibility surfaces; update versions intentionally.
 - Keep pack and routing seed files valid JSON even when empty.
 - Keep router pages concise and navigation-first; avoid duplicating full pack content.
+- Keep context-pack entries and routing mappings aligned to `docs/context/context-asset-metadata.contract.json`.
 
 ## Review Cadence
 
 - Review governance, pack catalog, and routing map artifacts at least once per feature epic milestone.
 - Update `last_reviewed` when governance changes are merged.
+- For assets using `reviewExpectations`, keep cadence and review dates current.
 
 ## Change Management
 

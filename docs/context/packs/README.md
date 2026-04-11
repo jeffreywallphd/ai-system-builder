@@ -22,6 +22,8 @@
 - [Context Pack Contract (Machine-Readable)](./context-pack.contract.json)
 - [Context Pack Catalog Contract](./context-pack-catalog.contract.json)
 - [Context Pack Catalog Seed](./context-pack-catalog.seed.json)
+- [Context Asset Metadata Standard](../context-asset-metadata.md)
+- [Seed Pack: Context System Foundations](./context-system-foundations.pack.md)
 - [Context Taxonomy Router](../README.md)
 - [AI Context Template](../templates/ai-context.template.md)
 
@@ -50,6 +52,31 @@ Every context pack file in `docs/context/packs/` must include:
 
 - `## Retrieval Order`
 - `## Change Triggers`
+
+## Context Pack Catalog Metadata Contract
+
+Catalog entries in `context-pack-catalog.seed.json` must follow the metadata baseline in `docs/context/context-asset-metadata.contract.json`.
+
+### Required Catalog Entry Fields
+
+- `id`
+- `title`
+- `purpose`
+- `domain`
+- `owner`
+- `status`
+- `primaryDocPath`
+- `aiDocPath`
+- `relatedDocPaths`
+- `relatedCodePaths`
+
+### Optional Catalog Entry Fields
+
+- `tags`
+- `notes`
+- `reviewExpectations`
+
+`reviewExpectations` is optional, but when present it must include `cadence`.
 
 ### Brevity and Signal-To-Noise Rules
 

@@ -109,5 +109,55 @@
       "expectedPriorityTier": "normal"
     }
   ],
-  "mappings": []
+  "mappings": [
+    {
+      "taskId": "context-asset-metadata-standardization",
+      "taskCategory": "documentation-change",
+      "intent": "define-and-maintain-context-asset-metadata-standards",
+      "routingInputs": {
+        "taskSummary": "Define metadata standards for context-pack and routing assets.",
+        "changedPaths": [
+          "docs/context/packs",
+          "docs/context/routing",
+          "docs/context/context-asset-metadata.contract.json",
+          "dev/tests"
+        ],
+        "requestedOutcomes": [
+          "contract-update",
+          "seed-update",
+          "guardrail-tests",
+          "docs-update"
+        ],
+        "constraints": [
+          "keep-metadata-standard-lightweight",
+          "keep-deterministic-routing"
+        ]
+      },
+      "packIds": [
+        "context-system-foundations"
+      ],
+      "selectionMode": "single",
+      "priorityTier": "normal",
+      "status": "active",
+      "id": "route-context-asset-metadata-standardization",
+      "title": "Route Context Asset Metadata Standardization",
+      "purpose": "Deterministically route metadata-contract and governance work to the context-system foundations pack.",
+      "domain": "context-engineering",
+      "owner": "team:developer-experience",
+      "relatedDocPaths": [
+        "docs/context/context-asset-metadata.md",
+        "docs/context/packs/context-pack-catalog.contract.json",
+        "docs/context/routing/task-to-context-routing.contract.json"
+      ],
+      "relatedCodePaths": [
+        "dev/tests/ContextAssetMetadataStandardsGuardrails.test.ts",
+        "dev/tests/ContextPackContractGuardrails.test.ts",
+        "dev/tests/TaskToContextRoutingContractGuardrails.test.ts"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-11"
+      }
+    }
+  ]
 }

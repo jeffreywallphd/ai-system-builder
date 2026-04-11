@@ -4,6 +4,7 @@
   "description": "Contract for deterministic routing between task categories and context pack identifiers.",
   "canonicalHumanSpecPath": "docs/context/routing/prompt-routing-contract.md",
   "canonicalAiSpecPath": "docs/context/routing/prompt-routing-contract.ai.md",
+  "contextAssetMetadataContractPath": "docs/context/context-asset-metadata.contract.json",
   "routingRequestRequiredFields": [
     "taskSummary",
     "taskCategory",
@@ -75,11 +76,27 @@
     "packIds",
     "selectionMode",
     "priorityTier",
-    "status"
+    "status",
+    "id",
+    "title",
+    "purpose",
+    "domain",
+    "owner",
+    "relatedDocPaths",
+    "relatedCodePaths"
   ],
   "mappingOptionalFields": [
     "excludePackIds",
     "fallbackPackIds",
+    "notes",
+    "reviewExpectations"
+  ],
+  "reviewExpectationsRequiredFieldsWhenPresent": [
+    "cadence"
+  ],
+  "reviewExpectationsOptionalFields": [
+    "lastReviewed",
+    "nextReviewBy",
     "notes"
   ],
   "allowedSelectionModes": [

@@ -4,6 +4,9 @@ import { resolve } from "node:path";
 
 const repoRoot = process.cwd();
 const contractJsonPath = resolve(repoRoot, "docs/context/packs/context-pack.contract.json");
+const catalogContractPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.contract.json");
+const catalogSeedPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.seed.json");
+const metadataContractPath = resolve(repoRoot, "docs/context/context-asset-metadata.contract.json");
 const humanSpecPath = resolve(repoRoot, "docs/context/packs/README.md");
 const aiSpecPath = resolve(repoRoot, "docs/context/packs/README.ai.md");
 const packsReadmePath = resolve(repoRoot, "docs/context/packs/README.md");
@@ -25,6 +28,25 @@ const requiredHeadings = [
 const optionalHeadings = [
   "## Retrieval Order",
   "## Change Triggers",
+] as const;
+
+const requiredCatalogFields = [
+  "id",
+  "title",
+  "purpose",
+  "domain",
+  "owner",
+  "status",
+  "primaryDocPath",
+  "aiDocPath",
+  "relatedDocPaths",
+  "relatedCodePaths",
+] as const;
+
+const optionalCatalogFields = [
+  "tags",
+  "notes",
+  "reviewExpectations",
 ] as const;
 
 type ContextPackContract = {
@@ -59,6 +81,9 @@ function readContract(): ContextPackContract {
 describe("context pack contract guardrails", () => {
   it("keeps context pack contract artifacts present", () => {
     expect(existsSync(contractJsonPath)).toBe(true);
+    expect(existsSync(catalogContractPath)).toBe(true);
+    expect(existsSync(catalogSeedPath)).toBe(true);
+    expect(existsSync(metadataContractPath)).toBe(true);
     expect(existsSync(humanSpecPath)).toBe(true);
     expect(existsSync(aiSpecPath)).toBe(true);
   });
@@ -91,6 +116,44 @@ describe("context pack contract guardrails", () => {
     expect(contract.qualityRules.prohibitedContent).toContain("feature delivery checklists");
   });
 
+  it("keeps catalog metadata requirements explicit and aligned to the shared metadata contract", () => {
+    const catalogContract = JSON.parse(readFileSync(catalogContractPath, "utf8")) as {
+      schemaVersion: string;
+      artifactType: string;
+      contextAssetMetadataContractPath: string;
+      entryRequiredFields: string[];
+      entryOptionalFields: string[];
+      reviewExpectationsRequiredFieldsWhenPresent: string[];
+    };
+    const sharedMetadataContract = JSON.parse(readFileSync(metadataContractPath, "utf8")) as {
+      requiredFields: string[];
+      optionalFields: string[];
+      reviewExpectations: { requiredFieldsWhenPresent: string[] };
+    };
+    const catalogSeed = JSON.parse(readFileSync(catalogSeedPath, "utf8")) as {
+      packs: Array<Record<string, unknown>>;
+    };
+
+    expect(catalogContract.schemaVersion).toBe("1.0.0");
+    expect(catalogContract.artifactType).toBe("context-pack-catalog");
+    expect(catalogContract.contextAssetMetadataContractPath).toBe("docs/context/context-asset-metadata.contract.json");
+    expect(catalogContract.entryRequiredFields).toEqual(requiredCatalogFields);
+    expect(catalogContract.entryOptionalFields).toEqual(optionalCatalogFields);
+    expect(catalogContract.reviewExpectationsRequiredFieldsWhenPresent).toEqual(["cadence"]);
+
+    expect(sharedMetadataContract.requiredFields).toContain("id");
+    expect(sharedMetadataContract.requiredFields).toContain("relatedCodePaths");
+    expect(sharedMetadataContract.optionalFields).toContain("reviewExpectations");
+    expect(sharedMetadataContract.reviewExpectations.requiredFieldsWhenPresent).toEqual(["cadence"]);
+    expect(catalogSeed.packs.length).toBeGreaterThanOrEqual(1);
+
+    for (const entry of catalogSeed.packs) {
+      for (const requiredField of requiredCatalogFields) {
+        expect(entry[requiredField]).toBeDefined();
+      }
+    }
+  });
+
   it("keeps human and AI pack specs aligned to required section anchors", () => {
     const humanSpec = readFileSync(humanSpecPath, "utf8");
     const aiSpec = readFileSync(aiSpecPath, "utf8");
@@ -118,6 +181,8 @@ describe("context pack contract guardrails", () => {
 
     expect(packsReadme).toContain("./context-pack.contract.json");
     expect(packsAiReadme).toContain("./context-pack.contract.json");
+    expect(packsReadme).toContain("../context-asset-metadata.md");
+    expect(packsAiReadme).toContain("../context-asset-metadata.ai.md");
     expect(contextReadme).toContain("./packs/README.md#standard-context-pack-contract");
     expect(contextAiReadme).toContain("./packs/README.ai.md#standard-context-pack-contract");
   });
