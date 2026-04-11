@@ -381,6 +381,7 @@ async function createMainWindow(): Promise<void> {
   window.once("ready-to-show", () => {
     logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show", mainWindowCreateStartedAt);
     logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show");
+    window.maximize();
     window.show();
   });
 
@@ -1628,8 +1629,11 @@ app.whenReady().then(async () => {
     desktopHostRuntime = await startDesktopHostAssembly({
       startHost: async () => {
         try {
+          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-start", desktopHostStartupAt);
           const authShell = await bootstrapAuthShell();
+          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-starting", desktopHostStartupAt);
           authShellBootstrapResult = authShell;
+          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-csp-install-start", desktopHostStartupAt);
           installRendererContentSecurityPolicy();
           logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready", desktopHostStartupAt);
           logInitializationMemory(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready");
