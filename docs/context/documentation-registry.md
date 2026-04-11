@@ -25,6 +25,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
   - dev/tests/DocumentationRegistryDiscoverySummariesKeywordsStory625Guardrails.test.ts
   - dev/tests/DocumentationRegistryRelationshipsStory626Guardrails.test.ts
+  - dev/tests/DocumentationRegistryContextRoutingIntegrationStory633Guardrails.test.ts
 ---
 
 # Documentation Registry Structure (Story 6.1.3)
@@ -226,6 +227,19 @@ Task discoverability is now modeled with:
 - `routeHintsByTaskCategory`: per-category route task IDs, context-map mapping IDs, and default selection/priority/profile hints.
 
 The generated index view now renders a task-workflow browsing section from these fields, covering architecture review, feature decomposition, implementation work, runtime diagnostics, runtime security hardening, and documentation refactor workflows.
+
+## Context Routing and Pack Selection Integration Status (Story 6.3.3)
+
+Registry identifiers are now a required integration surface for routing and pack-selection assets so task guidance can resolve authoritative docs through stable keys instead of path-only references.
+
+Integration points in this story:
+
+- Active routing mappings in `docs/context/routing/task-to-context-routing.seed.json` now carry `relatedDocRecordIds` as required stable references.
+- Routing worked examples include `relatedDocRecordIds` whenever `expectedRelatedDocOrder` includes registry-indexed docs.
+- Context pack catalog entries in `docs/context/packs/context-pack-catalog.seed.json` now maintain `relatedDocRecordIds` coverage for indexed `primaryDocPath` and indexed `relatedDocPaths`.
+- Foundation validation (`dev/scripts/validate-docs-foundation.cjs`) now enforces path-to-recordId alignment for indexed docs across routing and pack assets.
+
+This keeps the registry as the single durable identity layer while allowing routing and pack selection to remain practical, explicit, and low-complexity.
 
 ## Extensibility Boundaries
 

@@ -218,7 +218,8 @@
         "doc-architecture-domain-taxonomy",
         "doc-architecture-domain-runtime-host-surfaces-overview",
         "doc-architecture-domain-core-platform-and-composition-overview",
-        "doc-architecture-domain-and-application-core"
+        "doc-architecture-domain-and-application-core",
+        "doc-adr-001-single-authoritative-control-plane"
       ]
     },
     {
@@ -307,6 +308,9 @@
       "expectedExclusions": [
         "docs/architecture/secrets-foundation.md",
         "src/hosts/server"
+      ],
+      "relatedDocRecordIds": [
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model"
       ]
     },
     {
@@ -348,6 +352,9 @@
       "expectedExclusions": [
         "docs/ui/README.md",
         "docs/architecture/secrets-foundation.md"
+      ],
+      "relatedDocRecordIds": [
+        "doc-adr-001-single-authoritative-control-plane"
       ]
     },
     {
@@ -495,7 +502,8 @@
         "doc-architecture-domain-taxonomy",
         "doc-architecture-domain-runtime-host-surfaces-overview",
         "doc-architecture-domain-core-platform-and-composition-overview",
-        "doc-architecture-domain-and-application-core"
+        "doc-architecture-domain-and-application-core",
+        "doc-adr-001-single-authoritative-control-plane"
       ]
     },
     {
@@ -687,7 +695,11 @@
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-architecture-superseded-workflow-execution-and-tools",
+        "doc-contributors-docs-foundation-validation-guide"
+      ]
     },
     {
       "taskId": "documentation-refactor-context-and-architecture",
@@ -989,7 +1001,10 @@
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-adr-001-single-authoritative-control-plane"
+      ]
     },
     {
       "taskId": "runtime-security-identity-and-policy-hardening",
@@ -1097,7 +1112,8 @@
         "doc-architecture-domain-identity-trust-and-security-overview",
         "doc-context-pack-identity-and-security",
         "doc-operations-security-policy-configuration",
-        "doc-operations-secret-health-diagnostics"
+        "doc-operations-secret-health-diagnostics",
+        "doc-adr-001-single-authoritative-control-plane"
       ]
     },
     {
@@ -1192,7 +1208,10 @@
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model"
+      ]
     }
   ]
 }

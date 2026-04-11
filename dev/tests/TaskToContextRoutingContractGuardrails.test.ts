@@ -265,7 +265,7 @@ describe("task-to-context routing contract guardrails", () => {
     expect(contract.mappingRequiredFields).toContain("contextAssemblyProfileId");
     expect(contract.mappingRequiredFields).toContain("contextAssemblyTierHints");
     expect(contract.mappingRequiredFields).toContain("priorityTier");
-    expect(contract.mappingOptionalFields).toContain("relatedDocRecordIds");
+    expect(contract.mappingRequiredFields).toContain("relatedDocRecordIds");
     expect(contract.mappingOptionalFields).toContain("reviewExpectations");
     expect(contract.contextAssetMetadataContractPath).toBe("docs/context/context-asset-metadata.contract.json");
     expect(contract.reviewExpectationsRequiredFieldsWhenPresent).toEqual(["cadence"]);
@@ -341,6 +341,8 @@ describe("task-to-context routing contract guardrails", () => {
       for (const field of requiredMappingMetadataFields) {
         expect(mapping[field]).toBeDefined();
       }
+      expect(Array.isArray(mapping.relatedDocRecordIds)).toBe(true);
+      expect((mapping.relatedDocRecordIds as unknown[]).length).toBeGreaterThanOrEqual(1);
       expect(mapping.contextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
       const tierHints = mapping.contextAssemblyTierHints as Record<
         string,
