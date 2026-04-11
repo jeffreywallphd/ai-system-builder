@@ -12,10 +12,12 @@ related_code_paths:
   - docs/contributors/router-overview-writing-standard.ai.md
   - docs/context/templates/README.ai.md
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/lint-docs.cjs
   - dev/scripts/validate-documentation-registry.cjs
   - dev/scripts/validate-adr-records.cjs
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/tests/DocsLintEntrypointScript.test.ts
   - dev/tests/DocumentationQualityContributorStandardsStory716Guardrails.test.ts
 ---
 
@@ -50,6 +52,12 @@ Map enforced documentation quality rules to contributor actions so assistants an
 4. Preserve required heading anchors.
    - Keep contract-critical headings stable unless validator and guardrail updates ship in the same PR.
 5. Run docs validators before requesting review.
+
+```bash
+npm run docs:lint
+```
+
+Run individual validators directly when narrowing failures:
 
 ```bash
 npm run docs:validate:foundation

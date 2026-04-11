@@ -7,10 +7,12 @@ owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/lint-docs.cjs
   - dev/scripts/validate-documentation-registry.cjs
   - dev/scripts/validate-adr-records.cjs
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/tests/DocsLintEntrypointScript.test.ts
   - dev/tests/DocsFoundationValidationScript.test.ts
   - dev/tests/DocumentationRegistryValidationScript.test.ts
   - dev/tests/DocumentationRegistryCrossReferenceValidationStory642Guardrails.test.ts
@@ -64,6 +66,12 @@ Use this guide when you need a fast contract check for the documentation foundat
 ## Run Locally
 
 ```bash
+npm run docs:lint
+```
+
+Run individual validators directly when isolating a single rule family:
+
+```bash
 npm run docs:validate:foundation
 npm run docs:validate:registry
 npm run docs:validate:adr
@@ -74,6 +82,12 @@ npm run docs:validate:segmentation
 ## CI Usage
 
 Run the same command in CI to block changes that erode the baseline docs structure contract.
+
+```bash
+npm run docs:lint
+```
+
+If needed, run individual validator commands for targeted troubleshooting:
 
 ```bash
 npm run docs:validate:foundation
