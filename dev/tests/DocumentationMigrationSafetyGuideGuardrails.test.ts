@@ -52,6 +52,7 @@ describe("documentation migration safety guide guardrails", () => {
       "superseded_by",
       "documentation-supersession-and-redirect-conventions",
       "npm run docs:validate:foundation",
+      "npm run docs:validate:segmentation",
     ];
 
     for (const anchor of requiredAnchors) {

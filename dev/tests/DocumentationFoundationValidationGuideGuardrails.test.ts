@@ -32,10 +32,15 @@ describe("documentation foundation validation guide guardrails", () => {
 
     expect(guide).toContain("npm run docs:validate:foundation");
     expect(guideAi).toContain("npm run docs:validate:foundation");
+    expect(guide).toContain("npm run docs:validate:segmentation");
+    expect(guideAi).toContain("npm run docs:validate:segmentation");
     expect(guide).toContain("## CI Usage");
     expect(guideAi).toContain("## CI Contract");
     expect(packageJson.scripts?.["docs:validate:foundation"]).toBe(
       "node dev/scripts/validate-docs-foundation.cjs",
+    );
+    expect(packageJson.scripts?.["docs:validate:segmentation"]).toBe(
+      "node dev/scripts/validate-docs-segmentation.cjs",
     );
   });
 });

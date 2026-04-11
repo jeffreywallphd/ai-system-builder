@@ -273,3 +273,4 @@ When adding a new context pack:
 2. Routing/packs contracts and seeds remain parseable and consistent, including `context-map.json` pack/category/profile references and context-pack required headings.
 3. Relevant `dev/tests` guardrails are updated for new routing or pack behavior.
 4. `npm run docs:validate:foundation` passes.
+5. `npm run docs:validate:segmentation` passes when segmentation or supersession paths are touched.

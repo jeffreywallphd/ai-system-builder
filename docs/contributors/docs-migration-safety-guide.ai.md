@@ -8,6 +8,7 @@ last_reviewed: 2026-04-11
 related_code_paths:
   - docs
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/validate-docs-segmentation.cjs
   - dev/tests/DocumentationMigrationSafetyGuideGuardrails.test.ts
 ---
 
@@ -80,5 +81,6 @@ Use the new path as the canonical source.
 
 ```bash
 npm run docs:validate:foundation
+npm run docs:validate:segmentation
 bun test dev/tests/DocumentationMigrationSafetyGuideGuardrails.test.ts
 ```

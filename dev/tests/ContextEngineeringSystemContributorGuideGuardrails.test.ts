@@ -164,6 +164,7 @@ describe("context engineering system contributor guide guardrails", () => {
       "docs/context/packs/context-pack.contract.json",
       "docs/context/packs/context-pack-catalog.seed.json",
       "npm run docs:validate:foundation",
+      "npm run docs:validate:segmentation",
     ]) {
       expect(guide).toContain(path);
       expect(guideAi).toContain(path);

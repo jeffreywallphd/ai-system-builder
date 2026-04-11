@@ -270,3 +270,4 @@ New context packs:
 2. Routing and pack contracts/seeds remain aligned, including `context-map.json` pack/category/profile references and required context-pack headings.
 3. Relevant `dev/tests` guardrails are updated.
 4. `npm run docs:validate:foundation` passes.
+5. `npm run docs:validate:segmentation` passes when segmentation or supersession paths are touched.

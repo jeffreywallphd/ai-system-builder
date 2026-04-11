@@ -8,6 +8,7 @@ last_reviewed: 2026-04-11
 related_code_paths:
   - docs
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/validate-docs-segmentation.cjs
   - dev/tests/DocumentationMigrationSafetyGuideGuardrails.test.ts
 ---
 
@@ -39,6 +40,7 @@ Provide one safe, repeatable migration workflow for moving, splitting, or reclas
    - Use `status: deprecated` for soft retirement without a single replacement.
 5. Validate and review.
    - Run `npm run docs:validate:foundation`.
+   - Run `npm run docs:validate:segmentation`.
    - Run docs guardrail tests before merge.
 
 ## Moving Documents Safely
@@ -107,5 +109,6 @@ Use the new document as the canonical source.
 
 ```bash
 npm run docs:validate:foundation
+npm run docs:validate:segmentation
 bun test dev/tests/DocumentationMigrationSafetyGuideGuardrails.test.ts
 ```
