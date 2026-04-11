@@ -17,6 +17,7 @@
   ],
   "entryOptionalFields": [
     "tags",
+    "relatedDocRecordIds",
     "notes",
     "reviewExpectations"
   ],

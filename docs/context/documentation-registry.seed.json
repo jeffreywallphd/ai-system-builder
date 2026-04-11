@@ -1,4 +1,4 @@
-﻿{
+{
   "schemaVersion": "1.0.0",
   "artifactType": "documentation-registry",
   "status": "seed",
@@ -90,6 +90,10 @@
         "src/application",
         "src/domain"
       ],
+      "relatedRecordIds": [
+        "doc-architecture-layers-and-boundaries",
+        "doc-adr-001-single-authoritative-control-plane"
+      ],
       "relatedDocs": [
         "docs/architecture/layers-and-boundaries.md",
         "docs/adr/records/adr-001-single-authoritative-control-plane.md"
@@ -115,6 +119,9 @@
       "relatedCodePaths": [
         "src"
       ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-and-application-core"
+      ],
       "relatedDocs": [
         "docs/architecture/domain-and-application-core.md"
       ],
@@ -138,6 +145,10 @@
       ],
       "relatedCodePaths": [
         "docs"
+      ],
+      "relatedRecordIds": [
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
       ],
       "relatedDocs": [
         "docs/README.md",
@@ -166,6 +177,9 @@
         "src/hosts",
         "src/infrastructure"
       ],
+      "relatedRecordIds": [
+        "doc-adr-001-single-authoritative-control-plane"
+      ],
       "relatedDocs": [
         "docs/operations/README.md",
         "docs/trusted-device-workflows.md"
@@ -192,6 +206,9 @@
         "src/hosts/server",
         "src/application"
       ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-and-application-core"
+      ],
       "relatedDocs": [
         "docs/adr/records/adr-registry.json",
         "docs/architecture/domain-and-application-core.md"
@@ -216,6 +233,9 @@
       ],
       "relatedCodePaths": [
         "docs"
+      ],
+      "relatedRecordIds": [
+        "doc-context-documentation-taxonomy"
       ],
       "relatedDocs": [
         "docs/baselines/README.md",
@@ -243,9 +263,44 @@
         "docs/context",
         "dev/scripts/validate-docs-foundation.cjs"
       ],
+      "relatedRecordIds": [
+        "doc-context-documentation-identity-and-reference-conventions"
+      ],
       "relatedDocs": [
         "docs/context/documentation-indexed-document-metadata.md",
         "docs/context/documentation-registry.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-context-documentation-identity-and-reference-conventions",
+      "path": "docs/context/documentation-identity-and-reference-conventions.md",
+      "aiPath": "docs/context/documentation-identity-and-reference-conventions.ai.md",
+      "title": "Documentation Identity, Stable Keys, and Reference Conventions",
+      "docType": "ai-context",
+      "domain": "governance",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines stable document identity keys and cross-artifact reference conventions for durable routing and validation.",
+      "keywords": [
+        "identity",
+        "stable keys",
+        "registry references",
+        "findability"
+      ],
+      "relatedCodePaths": [
+        "docs/context",
+        "dev/scripts/validate-docs-foundation.cjs"
+      ],
+      "relatedRecordIds": [
+        "doc-context-documentation-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/context/documentation-indexed-document-metadata.md",
+        "docs/context/documentation-registry.md",
+        "docs/context/routing/prompt-routing-contract.md",
+        "docs/context/packs/README.md"
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
@@ -272,7 +327,8 @@
         "doc-baseline-documentation-migration-baseline"
       ],
       "ai-context": [
-        "doc-context-documentation-taxonomy"
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
       ]
     },
     "byStatus": {
@@ -284,13 +340,15 @@
         "doc-operations-node-bootstrap-identity",
         "doc-adr-001-single-authoritative-control-plane",
         "doc-baseline-documentation-migration-baseline",
-        "doc-context-documentation-taxonomy"
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
       ],
       "deprecated": [],
       "superseded": [],
       "archived": []
     },
     "byDomain": {
+      "documentation": [],
       "architecture": [
         "doc-architecture-domain-and-application-core",
         "doc-architecture-layers-and-boundaries"
@@ -308,8 +366,10 @@
         "doc-baseline-documentation-migration-baseline"
       ],
       "governance": [
-        "doc-context-documentation-taxonomy"
-      ]
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
+      ],
+      "identity-and-security": []
     },
     "byAuthoritativeness": {
       "canonical": [
@@ -318,7 +378,8 @@
         "doc-contributors-docs-placement-guide",
         "doc-operations-node-bootstrap-identity",
         "doc-adr-001-single-authoritative-control-plane",
-        "doc-context-documentation-taxonomy"
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
       ],
       "reference": [],
       "supplemental": [],

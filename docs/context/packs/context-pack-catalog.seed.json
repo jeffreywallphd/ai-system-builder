@@ -28,6 +28,10 @@
         "routing",
         "metadata"
       ],
+      "relatedDocRecordIds": [
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
+      ],
       "reviewExpectations": {
         "cadence": "per-epic-milestone",
         "lastReviewed": "2026-04-11"
@@ -142,6 +146,10 @@
         "taxonomy",
         "migration",
         "validation"
+      ],
+      "relatedDocRecordIds": [
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
       ],
       "reviewExpectations": {
         "cadence": "per-epic-milestone",

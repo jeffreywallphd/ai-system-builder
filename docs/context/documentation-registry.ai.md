@@ -8,6 +8,7 @@ last_reviewed: 2026-04-11
 related_code_paths:
   - docs/context/documentation-registry.seed.json
   - docs/context/documentation-indexed-document-metadata.contract.json
+  - docs/context/documentation-identity-and-reference.contract.json
   - dev/scripts/validate-docs-foundation.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
 ---
@@ -21,6 +22,7 @@ Use this file for the canonical machine-readable documentation registry shape an
 - Human-readable: `docs/context/documentation-registry.md`
 - AI-readable: `docs/context/documentation-registry.ai.md`
 - Machine-readable: `docs/context/documentation-registry.seed.json`
+- Identity conventions: `docs/context/documentation-identity-and-reference-conventions.ai.md`
 
 ## Registry Intent
 
@@ -55,6 +57,7 @@ Required per-entry fields:
 - `summary`
 
 Optional retrieval fields are inherited from `documentation-indexed-document-metadata.contract.json`.
+Use `relatedRecordIds` for durable stable-key links between registry entries.
 
 ## Seed Coverage Rule
 
@@ -65,6 +68,7 @@ The seed registry includes at least one entry for each major `docType` so findab
 - No full repository indexing pass in this story.
 - No search ranking/embedding system.
 - No complex per-team registry schema variants.
+- No replacement of path references where direct file resolution is needed.
 
 ## Guardrails
 

@@ -8,6 +8,7 @@ last_reviewed: 2026-04-11
 related_code_paths:
   - docs/context/documentation-registry.seed.json
   - docs/context/documentation-indexed-document-metadata.contract.json
+  - docs/context/documentation-identity-and-reference.contract.json
   - dev/scripts/validate-docs-foundation.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
 ---
@@ -25,6 +26,7 @@ Provide a durable, human-auditable JSON registry landing point for indexed docum
 - Human-readable guide: `docs/context/documentation-registry.md`
 - AI-readable guide: `docs/context/documentation-registry.ai.md`
 - Machine-readable seed registry: `docs/context/documentation-registry.seed.json`
+- Identity and reference conventions: `docs/context/documentation-identity-and-reference-conventions.md`
 
 ## Scope
 
@@ -49,6 +51,7 @@ Each entry must include:
 - Metadata contract required fields: `path`, `title`, `docType`, `domain`, `status`, `authoritativeness`, `summary`
 
 Optional fields such as `keywords`, `relatedDocs`, `relatedCodePaths`, `owner`, `lastReviewed`, and `aiPath` are used for findability and routing precision.
+For durable cross-artifact linking, entries may use `relatedRecordIds` in addition to path-based relationships.
 
 ## Seed Coverage Expectations
 
@@ -69,6 +72,7 @@ It should also include status and authoritativeness indexes, even when some cate
 - Keep structure explicit and readable; avoid introducing a large platform abstraction.
 - Add entries incrementally as docs are curated.
 - Preserve stable `recordId` values once introduced.
+- Keep `recordId` values in `doc-...` lowercase kebab-case and do not change them for path moves.
 - Keep registry entries aligned with `documentation-indexed-document-metadata.contract.json`.
 
 ## Validation

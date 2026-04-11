@@ -25,6 +25,7 @@ type RegistryEntry = {
   authoritativeness: string;
   summary: string;
   aiPath?: string;
+  relatedRecordIds?: string[];
 };
 
 type DocumentationRegistry = {
@@ -82,7 +83,7 @@ describe("story 6.1.3 documentation registry structure guardrails", () => {
     const metadataContract = readJson<IndexedMetadataContract>(metadataContractPath);
     const requiredFields = ["recordId", ...metadataContract.requiredFields];
 
-    expect(registry.entries.length).toBeGreaterThanOrEqual(7);
+    expect(registry.entries.length).toBeGreaterThanOrEqual(8);
 
     const recordIds = new Set<string>();
     const coveredDocTypes = new Set<string>();
@@ -104,8 +105,19 @@ describe("story 6.1.3 documentation registry structure guardrails", () => {
       }
 
       expect(recordIds.has(entry.recordId)).toBe(false);
+      expect(entry.recordId).toMatch(/^doc-[a-z0-9]+(?:-[a-z0-9]+)*$/);
       recordIds.add(entry.recordId);
       coveredDocTypes.add(entry.docType);
+    }
+
+    for (const entry of registry.entries) {
+      if (!entry.relatedRecordIds) {
+        continue;
+      }
+      for (const relatedRecordId of entry.relatedRecordIds) {
+        expect(recordIds.has(relatedRecordId)).toBe(true);
+        expect(relatedRecordId).not.toBe(entry.recordId);
+      }
     }
 
     expect([...coveredDocTypes].sort((left, right) => left.localeCompare(right))).toEqual(

@@ -45,6 +45,7 @@ const requiredCatalogFields = [
 
 const optionalCatalogFields = [
   "tags",
+  "relatedDocRecordIds",
   "notes",
   "reviewExpectations",
 ] as const;

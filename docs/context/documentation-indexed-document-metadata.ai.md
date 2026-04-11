@@ -7,6 +7,7 @@ Use this file for the canonical metadata shape of documentation index entries.
 - Human-readable: `docs/context/documentation-indexed-document-metadata.md`
 - AI-readable: `docs/context/documentation-indexed-document-metadata.ai.md`
 - Machine-readable: `docs/context/documentation-indexed-document-metadata.contract.json`
+- Identity conventions: `docs/context/documentation-identity-and-reference-conventions.ai.md`
 - Registry seed consumer: `docs/context/documentation-registry.seed.json`
 
 ## Required Fields
@@ -24,6 +25,7 @@ Use this file for the canonical metadata shape of documentation index entries.
 - `keywords`
 - `relatedCodePaths`
 - `relatedDocs`
+- `relatedRecordIds`
 - `owner`
 - `lastReviewed`
 - `aiPath`
@@ -35,6 +37,7 @@ Use this file for the canonical metadata shape of documentation index entries.
 - `path` points to canonical human `.md` documentation.
 - `aiPath` is optional and must point to `.ai.md` when set.
 - `docType`, `status`, and `authoritativeness` use taxonomy enums.
+- `relatedRecordIds` values reference existing registry `recordId` values when provided.
 - `supersedes` and `supersededBy` are mutually exclusive.
 - `status: superseded` requires `supersededBy`.
 - `lastReviewed` is optional; when present it must be `YYYY-MM-DD` and not in the future.
