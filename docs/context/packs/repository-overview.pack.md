@@ -24,9 +24,14 @@
 - Repository changes must preserve layered boundaries (domain -> application -> infrastructure/hosts/ui integration).
 - Authoritative behavior comes from canonical docs/contracts and tests; this pack is orientation only.
 - Prefer minimum sufficient context: load this pack first, then add mapped domain sources.
+- Prefer small, targeted changes over broad refactors unless task outcomes explicitly require structural rework.
+- Inspect nearby code and docs before editing so implementations match local conventions and existing domain language.
+- Reuse existing utilities, components, services, and established patterns before introducing new surfaces.
 - Protect boundary integrity; do not erode transport, runtime, domain, and composition seams.
 - Keep responsibilities intentionally distributed; avoid single-file or single-surface responsibility accumulation.
 - Maintain explicit contracts and guardrails (docs, schemas, tests); avoid bypasses.
+- Avoid speculative features, hidden scope, or placeholder logic unless explicitly requested by task outcomes.
+- For behavior changes, verify whether tests, docs, types, and examples also require updates.
 - Keep cross-cutting concerns (security, observability, policy, persistence discipline) in designated layers.
 - Prefer production-safe defaults and explicit profile governance over convenience shortcuts.
 
@@ -65,6 +70,9 @@
 - Letting observability, trust material, or policy checks leak into outer UI/transport entry points.
 - Treating development-mode defaults as production-ready without explicit deployment profile constraints.
 - Expanding oversized surfaces without matching architectural guardrails/tests, increasing cognitive-load and drift risk.
+- Writing tests that overfit implementation details while missing contract-level or user-visible behavior.
+- Claiming verification completion without explicitly stating what was checked, what was not checked, and why.
+- Finishing changes without a short self-review covering completed work, architecture alignment, and remaining risks.
 
 ## Related Packs
 

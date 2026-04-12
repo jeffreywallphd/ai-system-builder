@@ -18,6 +18,7 @@ Read in this order:
 4. `docs/context/routing/prompt-routing-contract.ai.md`
 
 Machine-readable artifacts are authoritative for categories, selection modes, and priorities.
+- When a routed document includes an intended `.ai.md` companion, prefer the `.ai.md` file for AI prompt context while keeping the same routed selection/order.
 
 ## Deterministic Routing Workflow
 

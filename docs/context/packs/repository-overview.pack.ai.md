@@ -24,9 +24,14 @@
 - Preserve layered direction: domain -> application -> infrastructure/hosts/ui integration.
 - Canonical authority remains in referenced docs/contracts/tests; this pack is orientation only.
 - Keep context minimal: use this pack first, then route into domain-specific assets.
+- Prefer small, targeted deltas over broad refactors unless requested outcomes explicitly require restructuring.
+- Read nearby code/docs before editing so implementations match local conventions and domain language.
+- Reuse existing utilities/components/services/patterns before creating new abstractions or surfaces.
 - Protect boundary integrity: avoid erosion of transport, runtime, domain, and composition seams.
 - Keep responsibilities intentionally distributed; avoid growth of single-file or single-surface "god objects."
 - Keep explicit contracts/guardrails enforceable in docs, schemas, and tests; avoid bypass paths.
+- Avoid speculative features, hidden scope, or placeholder logic unless explicitly requested.
+- For behavior changes, verify whether tests, docs, types, and examples also need updates.
 - Keep cross-cutting concerns (security, observability, policy, persistence discipline) in designated layers, not outer convenience paths.
 - Prefer production-safe defaults and profile clarity over convenience shortcuts that weaken deployment discipline.
 
@@ -65,6 +70,9 @@
 - Letting observability, secrets/trust handling, or policy enforcement leak into UI/outer transport entry points.
 - Accepting default dev-mode behavior as production-safe without explicit profile governance.
 - Growing broad surfaces without corresponding architectural guardrails/tests, increasing cognitive load and drift risk.
+- Writing tests that assert internals instead of contract-level or user-visible behavior.
+- Reporting verification as complete without clearly stating what was checked, what was not checked, and why.
+- Ending work without a short self-review covering completed work, architecture alignment, and remaining risks.
 
 ## Related Packs
 
