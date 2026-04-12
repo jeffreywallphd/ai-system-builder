@@ -87,3 +87,16 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
   - managed TLS runtime trust material resolution is centralized in `ManagedServerTlsRuntimeMaterialResolver`.
   - `ServerTlsMaterialCompositionModule` resolves managed TLS material from `HostSecureTransportConfig.trustMaterial` + resolver port, not ad hoc environment reads.
 - Result: reduced host-level secret/key handling sprawl and consistent resolution behavior across secret consumers and transport startup.
+
+## Story 3.2.1 Secret provider ports and scope-aware resolution model
+
+- Adds provider-facing application ports in:
+  - `src/application/security/ports/SecretProviderPorts.ts`
+- Contracts now distinguish:
+  - scope-aware selection (`server`/`workspace`/`user`)
+  - metadata/reference lookup vs raw secret-value resolution
+  - existence checks
+  - bootstrap/write operations for missing provider material
+- Adds infrastructure resolution model implementation in:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+- Migrates `SystemSecretBootstrapService` to consume the provider resolution/bootstrap port for metadata lookup, existence checks, bootstrap creation, and runtime validation.

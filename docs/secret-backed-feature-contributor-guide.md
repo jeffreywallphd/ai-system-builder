@@ -67,7 +67,7 @@ Selection checks:
 ### 1. Define secret dependency contract in application layer
 
 - Accept secret ID(s) and runtime governance context (`operationKey`, `serviceIdentity`, justification).
-- Depend on `ISecretRuntimeConsumptionAdapters` or `ServerPlatformSecretConsumers`.
+- Depend on `ISecretRuntimeConsumptionAdapters`, `ServerPlatformSecretConsumers`, or `ISecretProviderMaterialResolutionPort`.
 - Keep domain entities free from secret retrieval logic.
 
 ### 2. Keep transport contracts plaintext-safe
@@ -102,6 +102,8 @@ Selection checks:
   - use `resolveUserPersonalApiKey(...)`.
 - Server signing/session material:
   - use `resolveIdentitySessionSigningMaterial(...)` via `ServerPlatformSecretConsumers`.
+- Startup/bootstrap provider material:
+  - use `ISecretProviderMaterialResolutionPort` for `resolveSecretProviderMaterialMetadata(...)`, `secretProviderMaterialExists(...)`, `bootstrapSecretProviderMaterial(...)`, and `resolveSecretProviderMaterial(...)`.
 
 ## Contributor review checklist
 

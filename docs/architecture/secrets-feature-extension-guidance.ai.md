@@ -15,12 +15,14 @@ Story 8.3.7 baseline for Feature 8 / Epic 8.3: provide a contributor-safe extens
 - `src/shared/security/SecretRedaction.ts`
 - `src/shared/dto/security/SecretTransportDtos.ts`
 - `src/infrastructure/security/secrets/ServerPlatformSecretConsumers.ts`
+- `src/application/security/ports/SecretProviderPorts.ts`
+- `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
 - `docs/architecture/secrets-feature-extension-guidance.md`
 
 ## Core contributor rules
 
 - Choose secret scope by owner (`server`, `workspace`, `user`) and keep scope-owner invariants explicit.
-- Runtime secret reads must go through use cases/adapters (`ISecretRuntimeConsumptionAdapters` or `ServerPlatformSecretConsumers`).
+- Runtime secret reads must go through use cases/adapters (`ISecretRuntimeConsumptionAdapters`, `ServerPlatformSecretConsumers`, or `ISecretProviderMaterialResolutionPort`).
 - Keep command DTOs and query DTOs separated; never add plaintext fields to metadata/list/detail responses.
 - Route all secret operational logging/diagnostics through redaction helpers; never log plaintext/decrypted values.
 - Keep authorization/audit paths intact by supplying operation governance context (`operationKey`, `serviceIdentity`, justification).
