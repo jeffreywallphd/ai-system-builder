@@ -467,6 +467,7 @@ describe("task-to-context routing contract guardrails", () => {
     const aiGuide = readFileSync(aiRoutingGuidePath, "utf8");
 
     for (const heading of [
+      "## Default Foundation Pack Rule",
       "## Canonical Routing Sources",
       "## Deterministic Routing Workflow",
       "## Context Assembly Priority and Ordering Rules",
@@ -497,6 +498,8 @@ describe("task-to-context routing contract guardrails", () => {
     }
 
     for (const exclusionPhrase of [
+      "default first foundation pack",
+      "extremely narrow tasks",
       "stale historical material",
       "unrelated architecture domains",
       "non-authoritative",

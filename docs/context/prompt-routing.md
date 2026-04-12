@@ -2,6 +2,12 @@
 
 This guide complements the machine-readable routing artifacts with practical steps for contributors choosing context assets for a task.
 
+## Default Foundation Pack Rule
+
+- Treat `repository-overview` (`docs/context/packs/repository-overview.pack.md`) as the default first foundation pack for nearly all non-trivial tasks.
+- Skip `repository-overview` only for extremely narrow tasks where repository-level foundation context is already explicitly established in the prompt and constraints.
+- After the default foundation pack, continue deterministic routing to load only the minimum sufficient context and authoritative docs required for the selected task classification.
+
 ## Canonical Routing Sources
 
 Use these files together, in this order:

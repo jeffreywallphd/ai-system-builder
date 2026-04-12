@@ -92,10 +92,12 @@ describe("docs top-level contract guardrails", () => {
     expect(readme).toContain("./context/documentation-taxonomy.md");
     expect(readme).toContain("./context/documentation-supersession-and-redirect-conventions.md");
     expect(readme).toContain("./context/documentation-metadata-header.md");
+    expect(readme).toContain("./context/packs/repository-overview.pack.md");
     expect(aiReadme).toContain("./contributors/docs-placement-guide.md");
     expect(aiReadme).toContain("./context/documentation-taxonomy.ai.md");
     expect(aiReadme).toContain("./context/documentation-supersession-and-redirect-conventions.ai.md");
     expect(aiReadme).toContain("./context/documentation-metadata-header.ai.md");
+    expect(aiReadme).toContain("./context/packs/repository-overview.pack.ai.md");
   });
 
   it("keeps explicit high-value reader journeys in the root routers", () => {
