@@ -28,6 +28,10 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Image/media bounded composition module: `src/hosts/server/composition/ServerImageMediaCompositionModule.ts`
 - Generated-result bounded composition module: `src/hosts/server/composition/ServerGeneratedResultCompositionModule.ts`
 - Audit/diagnostics/platform cross-cutting bounded composition module: `src/hosts/server/composition/ServerAuditDiagnosticsPlatformCompositionModule.ts`
+- Execution-node management bounded composition module: `src/hosts/server/composition/ServerExecutionNodeManagementCompositionModule.ts`
+- Run scheduling bounded composition module: `src/hosts/server/composition/ServerRunSchedulingCompositionModule.ts`
+- Run orchestration bounded composition module: `src/hosts/server/composition/ServerRunOrchestrationCompositionModule.ts`
+- Orchestration recovery/reconciliation bounded composition module: `src/hosts/server/composition/ServerOrchestrationRecoveryCompositionModule.ts`
 - Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
@@ -89,6 +93,18 @@ Story 2.2.5 extracts audit-service assembly, diagnostics reconciliation/backends
 - `src/hosts/server/composition/ServerAuditDiagnosticsPlatformCompositionModule.ts`
 - regression coverage:
   - `src/hosts/server/tests/ServerAuditDiagnosticsPlatformCompositionModule.test.ts`
+
+Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation, and execution-node management assembly from inline `IdentityServerHost.ts` startup wiring into:
+
+- `src/hosts/server/composition/ServerExecutionNodeManagementCompositionModule.ts`
+- `src/hosts/server/composition/ServerRunSchedulingCompositionModule.ts`
+- `src/hosts/server/composition/ServerRunOrchestrationCompositionModule.ts`
+- `src/hosts/server/composition/ServerOrchestrationRecoveryCompositionModule.ts`
+- regression coverage:
+  - `src/hosts/server/tests/ServerExecutionNodeManagementCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerRunSchedulingCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerRunOrchestrationCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerOrchestrationRecoveryCompositionModule.test.ts`
 
 ## Control-plane composition responsibilities
 
@@ -290,6 +306,10 @@ Host assembly coverage lives in:
 - `src/hosts/server/tests/ServerImageMediaCompositionModule.test.ts`
 - `src/hosts/server/tests/ServerGeneratedResultCompositionModule.test.ts`
 - `src/hosts/server/tests/ServerAuditDiagnosticsPlatformCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerExecutionNodeManagementCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerRunSchedulingCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerRunOrchestrationCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerOrchestrationRecoveryCompositionModule.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
 ## Related ADRs
