@@ -266,6 +266,7 @@ export class RetireSecretVersionUseCase {
           userIdentityId: input.userIdentityId,
         }),
         occurredAt: input.occurredAt,
+        details: input.details,
       }));
     } catch {
       // Audit failures are intentionally non-fatal.

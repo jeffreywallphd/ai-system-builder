@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { SecretAccessActions, SecretActorTypes } from "@domain/security/SecretDomain";
+import type { SecretAccessAuditEvent } from "@application/security/ports/SecretServicePorts";
 import {
   SystemSecretBootstrapDiagnosticCodes,
   SystemSecretBootstrapStates,
@@ -63,6 +64,64 @@ describe("SystemSecretBootstrapService", () => {
     }
   });
 
+  it("emits lifecycle audit hooks for bootstrap creation and validation checks", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-audit-hooks-"));
+    createdRoots.push(root);
+    const capturedAuditEvents: SecretAccessAuditEvent[] = [];
+    const service = composeServerSecretService({
+      databasePath: path.join(root, "identity.sqlite"),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 19).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+      },
+      auditHook: async (event) => {
+        capturedAuditEvents.push(event);
+      },
+    });
+
+    try {
+      const result = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:provider:openai",
+          OPENAI_API_KEY: "sk-live-bootstrap",
+        },
+        secretService: service,
+        auditHook: async (event) => {
+          capturedAuditEvents.push(event);
+        },
+      });
+
+      expect(result.state).toBe(SystemSecretBootstrapStates.ready);
+      expect(capturedAuditEvents.some((event) => (
+        event.eventKind === "secret.operation"
+        && event.operation === SecretAccessActions.create
+        && event.status === "succeeded"
+        && event.target.secretId === "secret:server:provider:openai"
+      ))).toBeTrue();
+      expect(capturedAuditEvents.some((event) => (
+        event.eventKind === "secret.operation"
+        && event.operation === SecretAccessActions.readMetadata
+        && event.status === "missing"
+        && event.target.secretId === "secret:server:provider:openai"
+      ))).toBeTrue();
+      expect(capturedAuditEvents.some((event) => (
+        event.eventKind === "secret.operation"
+        && event.operation === SecretAccessActions.readMetadata
+        && event.status === "succeeded"
+        && event.target.secretId === "secret:server:provider:openai"
+      ))).toBeTrue();
+      expect(capturedAuditEvents.some((event) => (
+        event.eventKind === "secret.operation"
+        && event.operation === SecretAccessActions.retrievePlaintext
+        && event.status === "succeeded"
+        && event.target.secretId === "secret:server:provider:openai"
+      ))).toBeTrue();
+    } finally {
+      service.dispose();
+    }
+  });
+
   it("returns invalid when a required system secret is missing", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-missing-"));
     createdRoots.push(root);
@@ -92,6 +151,46 @@ describe("SystemSecretBootstrapService", () => {
         }),
       ]);
       expect(result.materialMetadata).toHaveLength(0);
+    } finally {
+      service.dispose();
+    }
+  });
+
+  it("emits audit lifecycle events for failed bootstrap validation attempts", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-audit-failed-validation-"));
+    createdRoots.push(root);
+    const capturedAuditEvents: SecretAccessAuditEvent[] = [];
+    const service = composeServerSecretService({
+      databasePath: path.join(root, "identity.sqlite"),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 20).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+      },
+      auditHook: async (event) => {
+        capturedAuditEvents.push(event);
+      },
+    });
+
+    try {
+      const result = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:provider:huggingface",
+          AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV: "false",
+        },
+        secretService: service,
+        auditHook: async (event) => {
+          capturedAuditEvents.push(event);
+        },
+      });
+
+      expect(result.state).toBe(SystemSecretBootstrapStates.invalid);
+      expect(capturedAuditEvents.some((event) => (
+        event.eventKind === "secret.operation"
+        && event.operation === SecretAccessActions.readMetadata
+        && event.status === "missing"
+        && event.target.secretId === "secret:server:provider:huggingface"
+      ))).toBeTrue();
     } finally {
       service.dispose();
     }

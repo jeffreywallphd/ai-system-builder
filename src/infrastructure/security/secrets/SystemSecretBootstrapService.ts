@@ -42,6 +42,7 @@ import {
   type SecretProviderMaterialMetadata,
   type SecretProviderMaterialSelector,
 } from "@application/security/ports/SecretProviderPorts";
+import type { SecretAccessAuditEvent } from "@application/security/ports/SecretServicePorts";
 import { ScopedSecretProviderMaterialRetrievalUseCase } from "@application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase";
 import { DefaultSecretProviderResolutionService } from "@infrastructure/security/DefaultSecretProviderResolutionService";
 
@@ -299,6 +300,7 @@ export interface BootstrapSystemSecretsFromEnvironmentInput {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly secretService: ServerComposedSecretService;
   readonly secretProviderResolutionPort?: ISecretProviderMaterialResolutionPort;
+  readonly auditHook?: (event: SecretAccessAuditEvent) => Promise<void> | void;
   readonly now?: () => Date;
 }
 
@@ -383,6 +385,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
   const scopedSecretProviderRetrievalUseCase = new ScopedSecretProviderMaterialRetrievalUseCase({
     secretProviderResolutionPort,
     secretAccessPolicyPort: input.secretService.secretAccessPolicyPort,
+    secretAccessAuditPort: new CallbackSecretAccessAuditPort(input.auditHook),
     now,
   });
 
@@ -851,4 +854,17 @@ function deduplicateMaterialMetadataBySecretId(
     bySecretId.set(item.secretId, item);
   }
   return Object.freeze([...bySecretId.values()]);
+}
+
+class CallbackSecretAccessAuditPort {
+  public constructor(
+    private readonly hook?: (event: SecretAccessAuditEvent) => Promise<void> | void,
+  ) {}
+
+  public async recordSecretAuditEvent(event: SecretAccessAuditEvent): Promise<void> {
+    if (!this.hook) {
+      return;
+    }
+    await this.hook(event);
+  }
 }
