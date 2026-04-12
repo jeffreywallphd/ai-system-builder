@@ -36,10 +36,12 @@ import { WorkspaceStorageEncryptionPolicyContextResolver } from "@infrastructure
 import { EncryptionEnforcementObservabilityReporter } from "@infrastructure/security/EncryptionEnforcementObservabilityReporter";
 import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
 import { resolveCriticalServerSecurityMaterial } from "./ResolveCriticalServerSecurityMaterial";
+import type { ServerComposedSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
 
 export interface ServerStorageAssetCompositionModuleInput {
   readonly databasePath: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly secretService: ServerComposedSecretService;
   readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
   readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
   readonly authoritativeAuditRecorder: AuthoritativeAuditRecordingService;
@@ -58,9 +60,9 @@ export interface ServerStorageAssetCompositionModuleOutput {
   readonly assetEncryptionPolicyEvaluationService: EncryptionPolicyEvaluationService;
 }
 
-export function composeServerStorageAssetCompositionModule(
+export async function composeServerStorageAssetCompositionModule(
   input: ServerStorageAssetCompositionModuleInput,
-): ServerStorageAssetCompositionModuleOutput {
+): Promise<ServerStorageAssetCompositionModuleOutput> {
   const storageInstanceRepository = input.persistentPlatformServices.storageInstanceRepository;
   const storageManagementAuditRecorder = input.persistentPlatformServices.storageManagementAuditRecorder;
   const assetRepository = input.persistentPlatformServices.assetRepository;
@@ -115,16 +117,18 @@ export function composeServerStorageAssetCompositionModule(
     policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
     objectAccessResolver: storageBackendAdapterRegistry,
   });
-  const assetDownloadGrantSecret = resolveCriticalServerSecurityMaterial({
+  const assetDownloadGrantSecret = await resolveCriticalServerSecurityMaterial({
     environment: input.env,
+    secretService: input.secretService,
     materialId: "material:server:asset-download-grant-secret",
     environmentKey: "AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET",
     startupSecurityMaterialValidation: input.startupSecurityMaterialValidation,
     logger: input.encryptionObservabilityLogger,
     materialFormat: "string-secret",
   });
-  const assetContentEncryptionKey = resolveCriticalServerSecurityMaterial({
+  const assetContentEncryptionKey = await resolveCriticalServerSecurityMaterial({
     environment: input.env,
+    secretService: input.secretService,
     materialId: "material:server:asset-content-encryption-key",
     environmentKey: "AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY",
     inheritedEnvironmentKey: "AI_LOOM_SECRET_MASTER_KEY",

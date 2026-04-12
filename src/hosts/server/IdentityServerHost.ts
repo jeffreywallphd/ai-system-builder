@@ -388,6 +388,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       name: "ca-init",
       run: async () => composeServerCertificateCompositionModule({
         env,
+        secretService,
         certificateAuthorityRepository,
         nodeTrustRepository,
         protectedSecretStore,
@@ -444,9 +445,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       workspaceClock,
     });
     const executionNodeManagementBackendApi = executionNodeManagementComposition.executionNodeManagementBackendApi;
-  const storageAssetComposition = composeServerStorageAssetCompositionModule({
+  const storageAssetComposition = await composeServerStorageAssetCompositionModule({
     databasePath: options.databasePath,
     env,
+    secretService,
     startupSecurityMaterialValidation: options.startupSecurityMaterialValidation,
     persistentPlatformServices,
     authoritativeAuditRecorder,
@@ -457,9 +459,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const storageLogicalAccessResolutionService = storageAssetComposition.storageLogicalAccessResolutionService;
   const workspaceAwareStoragePolicyEvaluationAdapter = storageAssetComposition.workspaceAwareStoragePolicyEvaluationAdapter;
   const assetEncryptionPolicyEvaluationService = storageAssetComposition.assetEncryptionPolicyEvaluationService;
-  imageMediaComposition = composeServerImageMediaCompositionModule({
+  imageMediaComposition = await composeServerImageMediaCompositionModule({
     databasePath,
     env,
+    secretService,
     startupSecurityMaterialValidation: options.startupSecurityMaterialValidation,
     persistentPlatformServices,
     authorizationDecisionEvaluator,
@@ -488,8 +491,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const auditLedgerBackendApi = auditDiagnosticsPlatformComposition.createAuditLedgerBackendApi({
     workspaceClock,
   });
-  const generatedResultComposition = composeServerGeneratedResultCompositionModule({
+  const generatedResultComposition = await composeServerGeneratedResultCompositionModule({
     env,
+    secretService,
     startupSecurityMaterialValidation: options.startupSecurityMaterialValidation,
     persistentPlatformServices,
     workspaceClock,

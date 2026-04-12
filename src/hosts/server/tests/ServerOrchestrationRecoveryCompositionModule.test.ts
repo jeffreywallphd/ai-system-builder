@@ -8,6 +8,7 @@ import { composeServerAuditDiagnosticsPlatformCompositionModule } from "../compo
 import { composeServerGeneratedResultCompositionModule } from "../composition/ServerGeneratedResultCompositionModule";
 import { composeServerOrchestrationRecoveryCompositionModule } from "../composition/ServerOrchestrationRecoveryCompositionModule";
 import { composeServerStorageAssetCompositionModule } from "../composition/ServerStorageAssetCompositionModule";
+import { composeServerSecretCompositionModule } from "../composition/ServerSecretCompositionModule";
 
 class CapturingStartupSpanLogger implements StartupSpanLogger {
   public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
@@ -43,14 +44,22 @@ describe("ServerOrchestrationRecoveryCompositionModule", () => {
         env: {},
         persistentPlatformServices: persistentServices,
       });
-      const storageAssetComposition = composeServerStorageAssetCompositionModule({
+      const secretComposition = await composeServerSecretCompositionModule({
         databasePath,
         env: configuredCriticalSecurityMaterial,
+        workspaceRepository: persistentServices.workspaceRepository,
+        authoritativeAuditRecorder: auditDiagnostics.authoritativeAuditRecorder,
+      });
+      const storageAssetComposition = await composeServerStorageAssetCompositionModule({
+        databasePath,
+        env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         authoritativeAuditRecorder: auditDiagnostics.authoritativeAuditRecorder,
       });
-      const generatedResultComposition = composeServerGeneratedResultCompositionModule({
+      const generatedResultComposition = await composeServerGeneratedResultCompositionModule({
         env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         workspaceClock: testClock,
         authoritativeAuditRecorder: auditDiagnostics.authoritativeAuditRecorder,
@@ -80,6 +89,7 @@ describe("ServerOrchestrationRecoveryCompositionModule", () => {
       expect(typeof composed.runStartupRecovery.summary.appliedCount).toBe("number");
       expect(typeof composed.auditStartupReconciliation.checkedAt).toBe("string");
       expect(startupLogger.errorEvents).toHaveLength(0);
+      secretComposition.secretService.dispose();
     } finally {
       persistentServices.dispose();
       rmSync(tempDirectory, { recursive: true, force: true });

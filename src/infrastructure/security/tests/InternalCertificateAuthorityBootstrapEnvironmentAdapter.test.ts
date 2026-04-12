@@ -6,6 +6,10 @@ import {
   EnvironmentCertificateAuthorityBootstrapConfigurationProvider,
   EnvironmentCertificateAuthoritySecretService,
 } from "../InternalCertificateAuthorityBootstrapEnvironmentAdapter";
+import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretManagementServiceContracts";
+import { SecretProviderMaterialKinds } from "@application/security/ports/SecretProviderPorts";
+import { SecretScopes } from "@domain/security/SecretDomain";
+import type { ScopedSecretProviderMaterialRetrievalUseCase } from "@application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase";
 import { ScopedAesGcmEncryptionService } from "../encryption/ScopedAesGcmEncryptionService";
 import { FileSystemProtectedSecretStore } from "../secrets/FileSystemProtectedSecretStore";
 
@@ -71,5 +75,51 @@ describe("InternalCertificateAuthorityBootstrapEnvironmentAdapter", () => {
     await expect(service.getSecretMetadata("secret-store:internal-ca:root-key")).rejects.toThrow(
       "unavailable",
     );
+  });
+
+  it("resolves secret metadata through provider-backed secret:<id> references", async () => {
+    const scopedUseCase = {
+      async getServerScopedSecretProviderMaterialMetadata() {
+        return {
+          ok: true,
+          value: Object.freeze({
+            providerId: "platform",
+            secretId: "secret:server:ca-root-cert",
+            scope: Object.freeze({
+              scope: SecretScopes.server,
+            }),
+            materialKind: SecretProviderMaterialKinds.trustMaterial,
+          }),
+        };
+      },
+    } as unknown as ScopedSecretProviderMaterialRetrievalUseCase;
+    const service = new EnvironmentCertificateAuthoritySecretService({}, {
+      scopedSecretProviderRetrievalUseCase: scopedUseCase,
+    });
+
+    const metadata = await service.getSecretMetadata("secret:server:ca-root-cert");
+    expect(metadata.exists).toBeTrue();
+    expect(metadata.source).toBe("secret-provider");
+  });
+
+  it("maps missing provider-backed secret:<id> references to exists=false", async () => {
+    const scopedUseCase = {
+      async getServerScopedSecretProviderMaterialMetadata() {
+        return {
+          ok: false,
+          error: Object.freeze({
+            code: SecretServiceErrorCodes.notFound,
+            message: "missing",
+          }),
+        };
+      },
+    } as unknown as ScopedSecretProviderMaterialRetrievalUseCase;
+    const service = new EnvironmentCertificateAuthoritySecretService({}, {
+      scopedSecretProviderRetrievalUseCase: scopedUseCase,
+    });
+
+    const metadata = await service.getSecretMetadata("secret:server:ca-root-key");
+    expect(metadata.exists).toBeFalse();
+    expect(metadata.source).toBe("secret-provider");
   });
 });

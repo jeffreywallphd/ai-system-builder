@@ -1,5 +1,21 @@
 import { createHash } from "node:crypto";
 import {
+  SecretAccessActions,
+  SecretActorTypes,
+  SecretKinds,
+  SecretScopes,
+  type SecretKind,
+} from "@domain/security/SecretDomain";
+import {
+  SecretProviderMaterialKinds,
+  type ISecretProviderMaterialResolutionPort,
+  type SecretProviderMaterialKind,
+} from "@application/security/ports/SecretProviderPorts";
+import { ScopedSecretProviderMaterialRetrievalUseCase } from "@application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase";
+import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretManagementServiceContracts";
+import { DefaultSecretProviderResolutionService } from "@infrastructure/security/DefaultSecretProviderResolutionService";
+import type { ServerComposedSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
+import {
   SecurityMaterialSourceKinds,
   type SecurityMaterialStartupValidationResult,
 } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
@@ -10,27 +26,126 @@ interface SecurityMaterialDiagnosticsLogger {
 
 export interface ResolveCriticalServerSecurityMaterialInput {
   readonly environment: Readonly<Record<string, string | undefined>>;
+  readonly secretService: ServerComposedSecretService;
   readonly materialId: string;
   readonly environmentKey: string;
   readonly inheritedEnvironmentKey?: string;
   readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
   readonly logger?: SecurityMaterialDiagnosticsLogger;
   readonly materialFormat: "string-secret" | "aes256-base64";
+  readonly secretProviderResolutionPort?: ISecretProviderMaterialResolutionPort;
 }
 
-export function resolveCriticalServerSecurityMaterial(
+interface CriticalServerSecurityMaterialBinding {
+  readonly providerId: string;
+  readonly secretId: string;
+  readonly materialKind: SecretProviderMaterialKind;
+  readonly secretName: string;
+  readonly secretKind: SecretKind;
+  readonly usage: string;
+}
+
+const CriticalServerSecurityMaterialBindings = new Map<string, CriticalServerSecurityMaterialBinding>([
+  [
+    "material:server:asset-download-grant-secret",
+    Object.freeze({
+      providerId: "platform",
+      secretId: "secret:server:asset-download-grant",
+      materialKind: SecretProviderMaterialKinds.generic,
+      secretName: "runtime.asset-download-grant.secret",
+      secretKind: SecretKinds.accessToken,
+      usage: "asset-download-grant",
+    }),
+  ],
+  [
+    "material:server:asset-content-encryption-key",
+    Object.freeze({
+      providerId: "platform",
+      secretId: "secret:server:asset-content-encryption-key",
+      materialKind: SecretProviderMaterialKinds.encryptionMaterial,
+      secretName: "runtime.asset-content-encryption.key",
+      secretKind: SecretKinds.generic,
+      usage: "asset-content-encryption",
+    }),
+  ],
+  [
+    "material:server:image-asset-storage-token-secret",
+    Object.freeze({
+      providerId: "platform",
+      secretId: "secret:server:image-asset-storage-token",
+      materialKind: SecretProviderMaterialKinds.generic,
+      secretName: "runtime.image-asset-storage-token.secret",
+      secretKind: SecretKinds.accessToken,
+      usage: "image-asset-storage-token",
+    }),
+  ],
+  [
+    "material:server:image-upload-session-token-secret",
+    Object.freeze({
+      providerId: "platform",
+      secretId: "secret:server:image-upload-session-token",
+      materialKind: SecretProviderMaterialKinds.generic,
+      secretName: "runtime.image-upload-session-token.secret",
+      secretKind: SecretKinds.accessToken,
+      usage: "image-upload-session-token",
+    }),
+  ],
+  [
+    "material:server:generated-result-preview-access-token-secret",
+    Object.freeze({
+      providerId: "platform",
+      secretId: "secret:server:generated-result-preview-access-token",
+      materialKind: SecretProviderMaterialKinds.generic,
+      secretName: "runtime.generated-result-preview-access-token.secret",
+      secretKind: SecretKinds.accessToken,
+      usage: "generated-result-preview-access-token",
+    }),
+  ],
+]);
+
+export async function resolveCriticalServerSecurityMaterial(
   input: ResolveCriticalServerSecurityMaterialInput,
-): string {
-  const configured = normalizeOptional(input.environment[input.environmentKey]);
-  if (configured) {
-    return configured;
+): Promise<string> {
+  const binding = resolveSecurityMaterialBinding(input);
+  const providerResolutionPort = input.secretProviderResolutionPort
+    ?? createDefaultSecretProviderResolutionPort(input.secretService);
+  const retrievalUseCase = new ScopedSecretProviderMaterialRetrievalUseCase({
+    secretProviderResolutionPort: providerResolutionPort,
+    secretAccessPolicyPort: input.secretService.secretAccessPolicyPort,
+  });
+  const now = new Date().toISOString();
+
+  const providerResult = await retrievalUseCase.retrieveServerScopedSecretProviderMaterial({
+    caller: Object.freeze({
+      actorId: "runtime:server:critical-security-material-resolver",
+      actorType: SecretActorTypes.serverRuntime,
+      grantedActions: Object.freeze([SecretAccessActions.retrievePlaintext]),
+    }),
+    providerId: binding.providerId,
+    secretId: binding.secretId,
+    materialKind: binding.materialKind,
+    access: {
+      operationKey: `op:runtime:critical-security-material:resolve:${binding.secretId}:${Date.now()}`,
+      serviceIdentity: "runtime:server:critical-security-material-resolver",
+      usage: binding.usage,
+      justification: `resolve critical server security material '${input.materialId}'`,
+      occurredAt: now,
+    },
+  });
+  if (providerResult.ok) {
+    return providerResult.value.rawValue;
   }
 
-  if (input.inheritedEnvironmentKey) {
-    const inherited = normalizeOptional(input.environment[input.inheritedEnvironmentKey]);
-    if (inherited) {
-      return inherited;
-    }
+  const configured = resolveLegacyConfiguredMaterial(input);
+  if (configured) {
+    await tryBootstrapLegacyValue({
+      input,
+      binding,
+      providerResolutionPort,
+      now,
+      plaintext: configured,
+    });
+    return configured;
   }
 
   const validation = input.startupSecurityMaterialValidation;
@@ -44,7 +159,9 @@ export function resolveCriticalServerSecurityMaterial(
   if (!isGovernedDevelopmentFallback) {
     throw new Error(buildMissingMaterialErrorMessage(
       input,
-      "Material is not eligible for governed development fallback in the current lifecycle policy.",
+      providerResult.error.code !== SecretServiceErrorCodes.notFound
+        ? `Provider retrieval failed (${providerResult.error.code}) and material is not eligible for governed development fallback in the current lifecycle policy.`
+        : "Material is not eligible for governed development fallback in the current lifecycle policy.",
     ));
   }
 
@@ -80,6 +197,118 @@ function deriveDeterministicDevelopmentFallback(
   }
 
   return `development-only:${input.materialId}:${hash.toString("base64url").slice(0, 24)}`;
+}
+
+function createDefaultSecretProviderResolutionPort(
+  secretService: ServerComposedSecretService,
+): ISecretProviderMaterialResolutionPort {
+  return new DefaultSecretProviderResolutionService({
+    runtimeSecretConsumptionAdapters: secretService.runtimeSecretConsumptionAdapters,
+    getSecretMetadata: (request) => secretService.getSecretMetadataUseCase.execute(request),
+    createSecret: (request) => secretService.createSecretUseCase.execute(request),
+    initializeServerSecretStore: async () => {
+      const repositoryCheck = await secretService.listSecretsUseCase.execute({
+        actor: Object.freeze({
+          actorId: "runtime:server:critical-security-material-resolver:init",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: Object.freeze([SecretAccessActions.list]),
+        }),
+        owner: Object.freeze({
+          scope: SecretScopes.server,
+        }),
+        limit: 1,
+        offset: 0,
+        includeDisabled: true,
+        includeArchived: true,
+        includeSoftDeleted: true,
+      });
+      if (!repositoryCheck.ok) {
+        throw new Error(`server-secret-repository-init-failed:${repositoryCheck.error.code}`);
+      }
+    },
+  });
+}
+
+async function tryBootstrapLegacyValue(input: {
+  readonly input: ResolveCriticalServerSecurityMaterialInput;
+  readonly binding: CriticalServerSecurityMaterialBinding;
+  readonly providerResolutionPort: ISecretProviderMaterialResolutionPort;
+  readonly now: string;
+  readonly plaintext: string;
+}): Promise<void> {
+  const result = await input.providerResolutionPort.bootstrapSecretProviderMaterial({
+    selector: Object.freeze({
+      providerId: input.binding.providerId,
+      secretId: input.binding.secretId,
+      scope: Object.freeze({
+        scope: SecretScopes.server,
+      }),
+      materialKind: input.binding.materialKind,
+    }),
+    access: {
+      operationKey: `op:runtime:critical-security-material:bootstrap:${input.binding.secretId}:${Date.now()}`,
+      serviceIdentity: "runtime:server:critical-security-material-resolver",
+      usage: input.binding.usage,
+      justification: `bootstrap critical server security material '${input.input.materialId}' from legacy configuration`,
+      occurredAt: input.now,
+    },
+    name: input.binding.secretName,
+    kind: input.binding.secretKind,
+    plaintext: input.plaintext,
+    metadata: Object.freeze({
+      tags: Object.freeze(["server", "runtime", "security-material"]),
+      labels: Object.freeze({
+        material: input.input.materialId,
+        usage: input.binding.usage,
+      }),
+    }),
+  });
+  if (!result.ok) {
+    input.input.logger?.warn(Object.freeze({
+      event: "authoritative-server.startup.security-material-provider-bootstrap-failed",
+      details: Object.freeze({
+        materialId: input.input.materialId,
+        secretId: input.binding.secretId,
+        errorCode: result.error.code,
+      }),
+    }));
+  }
+}
+
+function resolveLegacyConfiguredMaterial(input: ResolveCriticalServerSecurityMaterialInput): string | undefined {
+  const configured = normalizeOptional(input.environment[input.environmentKey]);
+  if (configured) {
+    return configured;
+  }
+
+  if (input.inheritedEnvironmentKey) {
+    const inherited = normalizeOptional(input.environment[input.inheritedEnvironmentKey]);
+    if (inherited) {
+      return inherited;
+    }
+  }
+
+  return undefined;
+}
+
+function resolveSecurityMaterialBinding(
+  input: ResolveCriticalServerSecurityMaterialInput,
+): CriticalServerSecurityMaterialBinding {
+  const known = CriticalServerSecurityMaterialBindings.get(input.materialId);
+  if (known) {
+    return known;
+  }
+
+  return Object.freeze({
+    providerId: "platform",
+    secretId: `secret:server:${input.materialId.replaceAll(":", "-")}`,
+    materialKind: input.materialFormat === "aes256-base64"
+      ? SecretProviderMaterialKinds.encryptionMaterial
+      : SecretProviderMaterialKinds.generic,
+    secretName: `runtime.${input.materialId.replaceAll(":", ".")}`,
+    secretKind: input.materialFormat === "aes256-base64" ? SecretKinds.generic : SecretKinds.accessToken,
+    usage: input.materialId,
+  });
 }
 
 function buildMissingMaterialErrorMessage(

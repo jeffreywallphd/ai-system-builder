@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { AuthoritativeAuditRecordingService } from "@application/audit/use-cases/AuthoritativeAuditRecordingService";
 import { createAuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 import { composeServerStorageAssetCompositionModule } from "../composition/ServerStorageAssetCompositionModule";
+import { composeServerSecretCompositionModule } from "../composition/ServerSecretCompositionModule";
 
 const configuredCriticalSecurityMaterial = Object.freeze({
   AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET: "asset-download-grant-secret-value-12345",
@@ -12,15 +13,24 @@ const configuredCriticalSecurityMaterial = Object.freeze({
 });
 
 describe("ServerStorageAssetCompositionModule", () => {
-  it("composes managed storage and protected asset backends behind a typed module contract", () => {
+  it("composes managed storage and protected asset backends behind a typed module contract", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-storage-asset-composition-module-"));
     const databasePath = join(tempDirectory, "storage-asset-composition-module.sqlite");
     const persistentServices = createAuthoritativePersistentPlatformServices({ databasePath });
 
     try {
-      const composed = composeServerStorageAssetCompositionModule({
+      const secretComposition = await composeServerSecretCompositionModule({
         databasePath,
         env: configuredCriticalSecurityMaterial,
+        workspaceRepository: persistentServices.workspaceRepository,
+        authoritativeAuditRecorder: new AuthoritativeAuditRecordingService({
+          repository: persistentServices.auditLedgerRepository,
+        }),
+      });
+      const composed = await composeServerStorageAssetCompositionModule({
+        databasePath,
+        env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         authoritativeAuditRecorder: new AuthoritativeAuditRecordingService({
           repository: persistentServices.auditLedgerRepository,
@@ -32,6 +42,7 @@ describe("ServerStorageAssetCompositionModule", () => {
       expect(composed.storageLogicalAccessResolutionService).toBeDefined();
       expect(composed.workspaceAwareStoragePolicyEvaluationAdapter).toBeDefined();
       expect(composed.assetEncryptionPolicyEvaluationService).toBeDefined();
+      secretComposition.secretService.dispose();
     } finally {
       persistentServices.dispose();
       rmSync(tempDirectory, { recursive: true, force: true });

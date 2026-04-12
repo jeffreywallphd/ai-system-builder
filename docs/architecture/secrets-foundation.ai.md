@@ -178,3 +178,22 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
 - diagnostics/admin readiness:
   - system bootstrap result now includes metadata-only `materialMetadata` for resolvable required secrets
   - secret diagnostics payload includes `bootstrap.materialMetadata` for governance and audit tooling without exposing plaintext
+
+## Story 3.2.6 Refactor existing secret consumers onto provider flows
+
+- migrates primary runtime secret consumers from scattered env/fallback reads onto provider-first retrieval flow in:
+  - `src/hosts/server/composition/ResolveCriticalServerSecurityMaterial.ts`
+- provider-first posture for server runtime material:
+  - resolve server-scoped provider material through `ScopedSecretProviderMaterialRetrievalUseCase`
+  - route retrieval/bootstrap through `DefaultSecretProviderResolutionService` and durable server backend seams
+  - keep governed deterministic development fallback centralized behind startup validation policy checks
+- host composition updates:
+  - `ServerStorageAssetCompositionModule`, `ServerImageMediaCompositionModule`, and `ServerGeneratedResultCompositionModule` now resolve security-critical token/encryption material through the provider resolver path
+  - these composition modules now receive `secretService` explicitly to keep runtime secret access governed and auditable
+- CA/signing material access updates:
+  - `EnvironmentCertificateAuthoritySecretService` now supports provider-backed `secret:<id>` metadata references through scoped server provider retrieval flow
+  - `ServerCertificateCompositionModule` composes scoped provider retrieval for CA bootstrap secret metadata checks
+- migration compatibility:
+  - when provider material is absent, legacy configured values can be used as migration input and bootstrap attempts are executed through provider bootstrap flow rather than direct consumer-level parsing
+- duplication reduction:
+  - secret resolution/parsing behavior is centralized in one composition resolver surface, reducing repeated env/inherited fallback logic across asset/image/generated-result consumers

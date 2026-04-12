@@ -7,6 +7,7 @@ import { createAuthoritativePersistentPlatformServices } from "@infrastructure/p
 import { composeServerWorkspaceAuthorizationCompositionModule } from "../composition/ServerWorkspaceAuthorizationCompositionModule";
 import { composeServerStorageAssetCompositionModule } from "../composition/ServerStorageAssetCompositionModule";
 import { composeServerImageMediaCompositionModule } from "../composition/ServerImageMediaCompositionModule";
+import { composeServerSecretCompositionModule } from "../composition/ServerSecretCompositionModule";
 
 const configuredCriticalSecurityMaterial = Object.freeze({
   AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET: "asset-download-grant-secret-value-12345",
@@ -16,7 +17,7 @@ const configuredCriticalSecurityMaterial = Object.freeze({
 });
 
 describe("ServerImageMediaCompositionModule", () => {
-  it("composes image/media preview backend services without route-layer coupling", () => {
+  it("composes image/media preview backend services without route-layer coupling", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-image-media-composition-module-"));
     const databasePath = join(tempDirectory, "image-media-composition-module.sqlite");
     const persistentServices = createAuthoritativePersistentPlatformServices({ databasePath });
@@ -30,16 +31,24 @@ describe("ServerImageMediaCompositionModule", () => {
         authorizationRepository: persistentServices.authorizationRepository,
         authoritativeAuditRecorder,
       });
-      const storageAssetComposition = composeServerStorageAssetCompositionModule({
+      const secretComposition = await composeServerSecretCompositionModule({
         databasePath,
         env: configuredCriticalSecurityMaterial,
+        workspaceRepository: persistentServices.workspaceRepository,
+        authoritativeAuditRecorder,
+      });
+      const storageAssetComposition = await composeServerStorageAssetCompositionModule({
+        databasePath,
+        env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         authoritativeAuditRecorder,
       });
 
-      const composed = composeServerImageMediaCompositionModule({
+      const composed = await composeServerImageMediaCompositionModule({
         databasePath,
         env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         authorizationDecisionEvaluator: workspaceAuthorizationComposition.authorizationDecisionEvaluator,
         authoritativeAuditRecorder,
@@ -49,6 +58,7 @@ describe("ServerImageMediaCompositionModule", () => {
 
       expect(composed.imageAssetManagementBackendApi).toBeDefined();
       composed.dispose();
+      secretComposition.secretService.dispose();
     } finally {
       persistentServices.dispose();
       rmSync(tempDirectory, { recursive: true, force: true });

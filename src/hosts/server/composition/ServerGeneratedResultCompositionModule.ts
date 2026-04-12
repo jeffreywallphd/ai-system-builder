@@ -16,9 +16,11 @@ import type { AuthoritativePersistentPlatformServices } from "@infrastructure/pe
 import type { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
 import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
 import { resolveCriticalServerSecurityMaterial } from "./ResolveCriticalServerSecurityMaterial";
+import type { ServerComposedSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
 
 export interface ServerGeneratedResultCompositionModuleInput {
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly secretService: ServerComposedSecretService;
   readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
   readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
   readonly workspaceClock: {
@@ -36,11 +38,12 @@ export interface ServerGeneratedResultCompositionModuleOutput {
   readonly runCollectedResultPersistencePort: SqliteRunCollectedResultPersistenceAdapter;
 }
 
-export function composeServerGeneratedResultCompositionModule(
+export async function composeServerGeneratedResultCompositionModule(
   input: ServerGeneratedResultCompositionModuleInput,
-): ServerGeneratedResultCompositionModuleOutput {
-  const generatedResultPreviewTokenSecret = resolveCriticalServerSecurityMaterial({
+): Promise<ServerGeneratedResultCompositionModuleOutput> {
+  const generatedResultPreviewTokenSecret = await resolveCriticalServerSecurityMaterial({
     environment: input.env,
+    secretService: input.secretService,
     materialId: "material:server:generated-result-preview-access-token-secret",
     environmentKey: "AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET",
     inheritedEnvironmentKey: "AI_LOOM_SECRET_MASTER_KEY",

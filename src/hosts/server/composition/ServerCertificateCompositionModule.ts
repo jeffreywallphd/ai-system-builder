@@ -14,15 +14,20 @@ import {
   EnvironmentCertificateAuthorityBootstrapConfigurationProvider,
   EnvironmentCertificateAuthoritySecretService,
 } from "@infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
+import { ScopedSecretProviderMaterialRetrievalUseCase } from "@application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase";
+import { DefaultSecretProviderResolutionService } from "@infrastructure/security/DefaultSecretProviderResolutionService";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "@infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
 import { InternalCertificateAuthorityIssuer } from "@infrastructure/security/ca/InternalCertificateAuthorityIssuer";
 import { RuntimeTrustMaterialDistributionService } from "@infrastructure/security/certificates/RuntimeTrustMaterialDistributionService";
 import type { SqliteCertificateAuthorityPersistenceAdapter } from "@infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
 import type { SqliteNodeTrustPersistenceAdapter } from "@infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
 import type { FileSystemProtectedSecretStore } from "@infrastructure/security/secrets/FileSystemProtectedSecretStore";
+import type { ServerComposedSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
+import { SecretAccessActions, SecretActorTypes, SecretScopes } from "@domain/security/SecretDomain";
 
 export interface ServerCertificateCompositionModuleInput {
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly secretService: ServerComposedSecretService;
   readonly certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter;
   readonly nodeTrustRepository: SqliteNodeTrustPersistenceAdapter;
   readonly protectedSecretStore: FileSystemProtectedSecretStore | undefined;
@@ -37,10 +42,41 @@ export interface ServerCertificateCompositionModuleOutput {
 export async function composeServerCertificateCompositionModule(
   input: ServerCertificateCompositionModuleInput,
 ): Promise<ServerCertificateCompositionModuleOutput> {
+  const secretProviderResolutionPort = new DefaultSecretProviderResolutionService({
+    runtimeSecretConsumptionAdapters: input.secretService.runtimeSecretConsumptionAdapters,
+    getSecretMetadata: (request) => input.secretService.getSecretMetadataUseCase.execute(request),
+    createSecret: (request) => input.secretService.createSecretUseCase.execute(request),
+    initializeServerSecretStore: async () => {
+      const repositoryCheck = await input.secretService.listSecretsUseCase.execute({
+        actor: Object.freeze({
+          actorId: "runtime:server:ca-bootstrap:init",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: Object.freeze([SecretAccessActions.list]),
+        }),
+        owner: Object.freeze({
+          scope: SecretScopes.server,
+        }),
+        limit: 1,
+        offset: 0,
+        includeDisabled: true,
+        includeArchived: true,
+        includeSoftDeleted: true,
+      });
+      if (!repositoryCheck.ok) {
+        throw new Error(`server-secret-repository-init-failed:${repositoryCheck.error.code}`);
+      }
+    },
+  });
+  const scopedSecretProviderRetrievalUseCase = new ScopedSecretProviderMaterialRetrievalUseCase({
+    secretProviderResolutionPort,
+    secretAccessPolicyPort: input.secretService.secretAccessPolicyPort,
+  });
   const startupStateResolver = new ResolveCertificateAuthorityStartupStateUseCase({
     configurationProvider: new EnvironmentCertificateAuthorityBootstrapConfigurationProvider(input.env),
     secretService: new EnvironmentCertificateAuthoritySecretService(input.env, {
       protectedSecretStore: input.protectedSecretStore,
+      scopedSecretProviderRetrievalUseCase,
+      providerId: "platform",
     }),
     certificateAuthorityRepository: input.certificateAuthorityRepository,
     trustMaterialRepository: input.certificateAuthorityRepository,
