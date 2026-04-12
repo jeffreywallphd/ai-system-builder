@@ -297,3 +297,27 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
     - rejects previous-key token after retirement window
   - `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
     - superseded version retrieval is denied by default and allowed only with explicit `allowSupersededVersion`
+
+## Story 3.3.5 Encryption key rollover strategy for protected content
+
+- implements a concrete rollover path for protected asset-content encryption keys:
+  - runtime path: `src/hosts/server/composition/ServerStorageAssetCompositionModule.ts`
+  - encryption key adapter: `src/infrastructure/security/encryption/VersionedServerScopedAssetContentEncryptionKeyPort.ts`
+- active-write behavior:
+  - each new protected asset-content write resolves the active secret version for `secret:server:asset-content-encryption-key` at runtime
+  - persisted asset-content encryption descriptors now carry versioned key-reference identifiers tied to the resolved secret version id
+- read-compatibility behavior:
+  - asset-content decryption resolves key material by the descriptor reference, including superseded secret versions when required
+  - this preserves readability for previously encrypted content after ordinary key activation/rotation
+  - legacy deterministic key references (`...:v1`) are mapped to the configured legacy baseline version id (`secret:server:asset-content-encryption-key:v1`) for compatibility
+- activation and governance posture:
+  - ordinary activation of a new encryption-key version requires no manual key-reference migration in asset records
+  - resolver fallback remains policy-aware: provider-backed secret material is authoritative; deterministic fallback key bytes are used only when provider-backed resolution is unavailable and lifecycle policy permits fallback material
+- explicit deferred scope:
+  - full bulk re-encryption of already encrypted asset payloads is not performed automatically in this story
+  - deferred re-encryption remains a separate governed operation path; this story guarantees read compatibility across key-version rollover for content already carrying key-versioned descriptors
+- test coverage additions:
+  - `src/infrastructure/security/encryption/tests/VersionedServerScopedAssetContentEncryptionKeyPort.test.ts`
+    - validates active-version write cutover
+    - validates previous-version content decryptability after rollover
+    - validates legacy deterministic reference compatibility behavior
