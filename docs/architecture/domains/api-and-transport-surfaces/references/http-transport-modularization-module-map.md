@@ -292,6 +292,44 @@ Cleanup posture:
 - top-level `IdentityHttpServer.ts` now keeps request entry, shared middleware gates, modular route-family dispatch, websocket/readiness lifecycle, and only the remaining inline fallback families.
 - legacy-fallback logging/dispatch is limited to route families that still have retained inline branches.
 
+## Story 1.3.6 Implementation Status
+
+Added a migrated-family route-parity regression suite:
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerRouteParityRegression.test.ts`
+
+Parity scope locked by this suite:
+- representative endpoint coverage across migrated modular families:
+  - `storage-management`
+  - `asset-management`
+  - `image-asset-management`
+  - `audit-ledger`
+  - `execution-node-management`
+  - `deployment-policy-read`
+  - `deployment-policy-write`
+  - `run-submission`
+  - `run-read`
+  - `run-mutation`
+  - `run-execution-update`
+  - `image-run-api`
+- shared auth and workspace guard parity:
+  - unauthenticated requests fail with `401`
+  - workspace-scoped routes fail with `400` when workspace scope is missing
+- trust/assurance parity:
+  - run execution lifecycle updates reject mismatched sender identity with `403`
+- transport-shape parity:
+  - representative JSON success envelopes remain `ok: true` with stable status mapping
+  - representative file/stream response (`image-asset-management` original content) preserves stream body and headers (`content-type`, `content-disposition`)
+- modularization parity:
+  - migrated families emit modular dispatch logs (`identity-http.route-family.modular-handled`)
+  - migrated families must not emit legacy fallback logs (`identity-http.route-family.legacy-fallback`)
+
+Expected scope for new migrated route-family modules:
+1. Add one representative parity case to `IdentityHttpServerRouteParityRegression.test.ts` for the new `routeFamilyId`.
+2. Include auth/workspace-gate assertions that match that route family's contract (`401`, plus `400` workspace missing when workspace-scoped).
+3. Include one authorization/trust assertion when the family has protected trust semantics (`403`/fail-closed behavior).
+4. Include one transport-shape assertion for the primary response type (JSON or stream/file headers/body).
+5. Assert modular dispatch and absence of legacy fallback for that route family id.
+
 ## Registration and Composition Seams
 
 Host seam remains authoritative:
