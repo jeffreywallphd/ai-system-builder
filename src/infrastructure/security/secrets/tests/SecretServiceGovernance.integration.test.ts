@@ -192,6 +192,66 @@ describe("Secret service governance integration", () => {
       });
       expect(rotateResult.ok).toBeTrue();
 
+      const deniedSupersededRuntimeRetrieval = await service.retrieveSecretPlaintextForRuntimeUseCase.execute({
+        actor: {
+          actorId: "system:runtime:workspace-alpha",
+          actorType: SecretActorTypes.workspaceService,
+          workspaceId: "workspace:alpha",
+          grantedActions: [SecretAccessActions.retrievePlaintext],
+        },
+        secretId,
+        operationKey: "op:secret:governance:retrieve:superseded:denied",
+        runtimeContext: {
+          serviceIdentity: "runtime:workspace-alpha:workflow-executor",
+          scope: {
+            scope: SecretScopes.workspace,
+            workspaceId: "workspace:alpha",
+          },
+          justification: "superseded version retrieval is denied by default",
+          versionId: "secret:workspace:alpha:openai:v1",
+        },
+      });
+      expect(deniedSupersededRuntimeRetrieval).toEqual({
+        ok: false,
+        error: {
+          code: SecretServiceErrorCodes.notFound,
+          message: `Secret '${secretId}' was not found.`,
+        },
+      });
+
+      const allowedSupersededRuntimeRetrieval = await service.retrieveSecretPlaintextForRuntimeUseCase.execute({
+        actor: {
+          actorId: "system:runtime:workspace-alpha",
+          actorType: SecretActorTypes.workspaceService,
+          workspaceId: "workspace:alpha",
+          grantedActions: [SecretAccessActions.retrievePlaintext],
+        },
+        secretId,
+        operationKey: "op:secret:governance:retrieve:superseded:allowed",
+        runtimeContext: {
+          serviceIdentity: "runtime:workspace-alpha:workflow-executor",
+          scope: {
+            scope: SecretScopes.workspace,
+            workspaceId: "workspace:alpha",
+          },
+          justification: "transition-window verification allows superseded version retrieval",
+          versionId: "secret:workspace:alpha:openai:v1",
+          allowSupersededVersion: true,
+        },
+      });
+      expect(allowedSupersededRuntimeRetrieval).toEqual({
+        ok: true,
+        value: {
+          secretId,
+          currentVersionId: "secret:workspace:alpha:openai:v2",
+          scope: {
+            scope: SecretScopes.workspace,
+            workspaceId: "workspace:alpha",
+          },
+          plaintext: initialPlaintext,
+        },
+      });
+
       const retrievedAfterRotation = await service.retrieveSecretPlaintextForRuntimeUseCase.execute({
         actor: {
           actorId: "system:runtime:workspace-alpha",

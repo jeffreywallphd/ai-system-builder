@@ -158,6 +158,41 @@ describe("ServerPlatformSecretConsumers", () => {
     } satisfies SecretServiceResult<never>);
   });
 
+  it("resolves explicit signing-key versions for transition-window token validation", async () => {
+    const adapters = new StubSecretRuntimeConsumptionAdapters();
+    const consumers = new ServerPlatformSecretConsumers(
+      adapters as unknown as SecretRuntimeConsumptionAdapters,
+    );
+
+    const result = await consumers.resolveServerSigningMaterial({
+      secretId: "secret:server:image-upload-session-token",
+      operationKey: "op:test:image-upload-session-signing:versioned",
+      serviceIdentity: "runtime:server:image-assets",
+      signingPurpose: "image-asset-upload-session-token-signing",
+      versionId: "secret:server:image-upload-session-token:v1",
+      allowSupersededVersion: true,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        secretId: "secret:server:image-upload-session-token",
+        currentVersionId: "secret:server:image-upload-session-token:v1",
+        credential: "credential-value",
+      },
+    });
+    expect(adapters.requests[0]).toEqual({
+      secretId: "secret:server:image-upload-session-token",
+      operationKey: "op:test:image-upload-session-signing:versioned",
+      serviceIdentity: "runtime:server:image-assets",
+      signingPurpose: "image-asset-upload-session-token-signing",
+      versionId: "secret:server:image-upload-session-token:v1",
+      allowSupersededVersion: true,
+      justification: "resolve server signing material for 'image-asset-upload-session-token-signing'",
+      occurredAt: undefined,
+    });
+  });
+
   it("resolves workspace provider credentials via the shared material resolver interface", async () => {
     const adapters = new StubSecretRuntimeConsumptionAdapters();
     const consumers = new ServerPlatformSecretConsumers(

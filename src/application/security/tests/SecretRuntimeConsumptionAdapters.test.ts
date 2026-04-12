@@ -174,6 +174,32 @@ describe("SecretRuntimeConsumptionAdapters", () => {
     });
   });
 
+  it("forwards explicit signing key version retrieval intent for transition-window validation", async () => {
+    const runtimeUseCase = new StubRuntimeResolutionUseCase();
+    const adapters = new SecretRuntimeConsumptionAdapters(runtimeUseCase);
+
+    await adapters.resolveServerSigningCredential({
+      secretId: "secret:server:image-upload-session-token",
+      operationKey: "op:runtime:server-signing:versioned",
+      serviceIdentity: "runtime:server:image-assets",
+      signingPurpose: "image-asset-upload-session-token-signing",
+      versionId: "secret:server:image-upload-session-token:v1",
+      allowSupersededVersion: true,
+      occurredAt: "2026-04-10T12:01:00.000Z",
+    });
+
+    expect(runtimeUseCase.calls).toHaveLength(1);
+    expect(runtimeUseCase.calls[0]?.runtimeContext).toEqual({
+      serviceIdentity: "runtime:server:image-assets",
+      scope: {
+        scope: SecretScopes.server,
+      },
+      justification: "resolve server signing credential for 'image-asset-upload-session-token-signing'",
+      versionId: "secret:server:image-upload-session-token:v1",
+      allowSupersededVersion: true,
+    });
+  });
+
   it("returns retrieval errors without bypassing the formal runtime retrieval path", async () => {
     const runtimeUseCase = new StubRuntimeResolutionUseCase();
     runtimeUseCase.queueResult({

@@ -36,6 +36,7 @@ import {
   ImageManipulationResilienceScopes,
   ImageManipulationResilienceStateKinds,
 } from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
+import type { IRuntimeSecurityMaterialResolverPort } from "@application/security/ports/SecurityMaterialResolutionPorts";
 import {
   ImageAssetManagementObservability,
   ImageAssetManagementObservabilityFlows,
@@ -65,6 +66,8 @@ import {
 
 interface ImageAssetUploadSessionTokenPayload {
   readonly version: 1;
+  readonly issuedAt?: string;
+  readonly signingKeyVersionId?: string;
   readonly reservationId: string;
   readonly workspaceId: string;
   readonly assetId: string;
@@ -83,7 +86,11 @@ export interface ImageAssetManagementBackendApiDependencies {
   readonly requestImageAssetPreviewContentUseCase: IRequestImageAssetPreviewContentUseCase;
   readonly openImageAssetPreviewContentUseCase: IOpenImageAssetPreviewContentUseCase;
   readonly imageAssetStoragePort: IImageAssetStoragePort;
-  readonly uploadSessionTokenSecret: string;
+  readonly uploadSessionTokenSecret?: string;
+  readonly runtimeSecurityMaterialResolver?: IRuntimeSecurityMaterialResolverPort;
+  readonly uploadSessionTokenSecretId?: string;
+  readonly uploadSessionTokenSigningPurpose?: string;
+  readonly uploadSessionTokenPreviousVersionValidationWindowMs?: number;
   readonly observability?: ImageAssetManagementObservability;
   readonly clock?: {
     now(): Date;
@@ -92,21 +99,37 @@ export interface ImageAssetManagementBackendApiDependencies {
 
 const UploadSessionTokenVersion = "img-upload-v1";
 const Sha256HexPattern = /^[a-f0-9]{64}$/;
+const DefaultUploadSessionTokenSecretId = "secret:server:image-upload-session-token";
+const DefaultUploadSessionTokenSigningPurpose = "image-asset-upload-session-token-signing";
+const DefaultUploadSessionTokenPreviousVersionValidationWindowMs = 15 * 60 * 1000;
 
 export class ImageAssetManagementBackendApi {
   private readonly clock: { now(): Date };
 
   private readonly uploadSessionTokenSecret: string;
+  private readonly runtimeSecurityMaterialResolver: IRuntimeSecurityMaterialResolverPort | undefined;
+  private readonly uploadSessionTokenSecretId: string;
+  private readonly uploadSessionTokenSigningPurpose: string;
+  private readonly uploadSessionTokenPreviousVersionValidationWindowMs: number;
 
   private readonly observability: ImageAssetManagementObservability;
 
   public constructor(private readonly dependencies: ImageAssetManagementBackendApiDependencies) {
-    const secret = dependencies.uploadSessionTokenSecret.trim();
-    if (!secret) {
+    const staticSecret = normalizeOptional(dependencies.uploadSessionTokenSecret);
+    const runtimeSecurityMaterialResolver = dependencies.runtimeSecurityMaterialResolver;
+    if (!staticSecret && !runtimeSecurityMaterialResolver) {
       throw new Error("ImageAssetManagementBackendApi requires uploadSessionTokenSecret.");
     }
 
-    this.uploadSessionTokenSecret = secret;
+    this.uploadSessionTokenSecret = staticSecret ?? "";
+    this.runtimeSecurityMaterialResolver = runtimeSecurityMaterialResolver;
+    this.uploadSessionTokenSecretId = normalizeOptional(dependencies.uploadSessionTokenSecretId)
+      ?? DefaultUploadSessionTokenSecretId;
+    this.uploadSessionTokenSigningPurpose = normalizeOptional(dependencies.uploadSessionTokenSigningPurpose)
+      ?? DefaultUploadSessionTokenSigningPurpose;
+    this.uploadSessionTokenPreviousVersionValidationWindowMs = normalizeTransitionWindowMilliseconds(
+      dependencies.uploadSessionTokenPreviousVersionValidationWindowMs,
+    );
     this.observability = dependencies.observability ?? new ImageAssetManagementObservability();
     this.clock = dependencies.clock ?? {
       now: () => new Date(),
@@ -162,16 +185,46 @@ export class ImageAssetManagementBackendApi {
       );
     }
 
-    const uploadSessionId = this.createUploadSessionToken({
-      version: 1,
-      reservationId: outcome.value.upload.reservation.reservationId,
-      workspaceId: outcome.value.imageAsset.workspaceId,
-      assetId: outcome.value.imageAsset.assetId,
-      mediaType: outcome.value.imageAsset.mediaType,
-      expectedSizeBytes: outcome.value.imageAsset.sizeBytes,
-      storageReference: outcome.value.upload.reservation.reference,
-      expiresAt: outcome.value.upload.reservation.expiresAt,
-    });
+    let uploadSessionId: string;
+    try {
+      uploadSessionId = await this.createUploadSessionToken({
+        version: 1,
+        issuedAt: this.clock.now().toISOString(),
+        reservationId: outcome.value.upload.reservation.reservationId,
+        workspaceId: outcome.value.imageAsset.workspaceId,
+        assetId: outcome.value.imageAsset.assetId,
+        mediaType: outcome.value.imageAsset.mediaType,
+        expectedSizeBytes: outcome.value.imageAsset.sizeBytes,
+        storageReference: outcome.value.upload.reservation.reference,
+        expiresAt: outcome.value.upload.reservation.expiresAt,
+      });
+    } catch (error) {
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.create,
+        request,
+        this.failed(
+          ImageAssetManagementApiErrorCodes.internal,
+          error instanceof Error ? error.message : "Upload session token signing material is unavailable.",
+          withImageAssetNormalizedFailureDetails(
+            undefined,
+            createImageAssetNormalizedFailure({
+              layer: ImageAssetFailureDefaults.layer.ingestion,
+              kind: ImageAssetFailureDefaults.kind.operational,
+              summaryCategory: ImageAssetFailureDefaults.summary.internal,
+              reason: "upload-session-signing-material-unavailable",
+              retryable: true,
+            }),
+          ),
+        ),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          correlationId: request.correlationId,
+          operationKey,
+          assetId: outcome.value.imageAsset.assetId,
+        }),
+      );
+    }
 
     const uploadPath = `/api/v1/image-assets/${encodeURIComponent(outcome.value.imageAsset.assetId)}/uploads/${encodeURIComponent(uploadSessionId)}/content`;
 
@@ -220,7 +273,7 @@ export class ImageAssetManagementBackendApi {
       );
     }
 
-    const uploadSession = this.resolveUploadSessionToken(request.uploadSessionId);
+    const uploadSession = await this.resolveUploadSessionToken(request.uploadSessionId);
     if (!uploadSession) {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadIngest,
@@ -432,7 +485,7 @@ export class ImageAssetManagementBackendApi {
       );
     }
 
-    const uploadSession = this.resolveUploadSessionToken(request.uploadSessionId);
+    const uploadSession = await this.resolveUploadSessionToken(request.uploadSessionId);
     if (!uploadSession) {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadFinalize,
@@ -882,21 +935,40 @@ export class ImageAssetManagementBackendApi {
     return response;
   }
 
-  private createUploadSessionToken(payload: ImageAssetUploadSessionTokenPayload): string {
-    const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-    const signature = createHmac("sha256", this.uploadSessionTokenSecret)
-      .update(`${UploadSessionTokenVersion}.${encodedPayload}`, "utf8")
+  private async createUploadSessionToken(payload: ImageAssetUploadSessionTokenPayload): Promise<string> {
+    const signingCredential = await this.resolveUploadSessionSigningCredential({
+      operationKey: `op:image-assets:upload-session-token:mint:${randomUUID()}`,
+    });
+    const signedPayload = payload.signingKeyVersionId
+      ? payload
+      : Object.freeze({
+        ...payload,
+        signingKeyVersionId: signingCredential.currentVersionId,
+      });
+    const finalEncodedPayload = Buffer.from(JSON.stringify(signedPayload), "utf8").toString("base64url");
+    const signature = createHmac("sha256", signingCredential.credential)
+      .update(`${UploadSessionTokenVersion}.${finalEncodedPayload}`, "utf8")
       .digest("base64url");
-    return `${UploadSessionTokenVersion}.${encodedPayload}.${signature}`;
+    return `${UploadSessionTokenVersion}.${finalEncodedPayload}.${signature}`;
   }
 
-  private resolveUploadSessionToken(token: string): ImageAssetUploadSessionTokenPayload | undefined {
+  private async resolveUploadSessionToken(token: string): Promise<ImageAssetUploadSessionTokenPayload | undefined> {
     const [version, encodedPayload, signature] = token.split(".");
     if (!version || !encodedPayload || !signature || version !== UploadSessionTokenVersion) {
       return undefined;
     }
 
-    const expectedSignature = createHmac("sha256", this.uploadSessionTokenSecret)
+    const payload = parseUploadSessionTokenPayload(encodedPayload);
+    if (!payload || !this.isValidUploadSessionPayload(payload)) {
+      return undefined;
+    }
+
+    const signingCredential = await this.resolveUploadSessionSigningCredential({
+      operationKey: `op:image-assets:upload-session-token:verify:${randomUUID()}`,
+      versionId: normalizeOptional(payload.signingKeyVersionId),
+      allowSupersededVersion: true,
+    });
+    const expectedSignature = createHmac("sha256", signingCredential.credential)
       .update(`${version}.${encodedPayload}`, "utf8")
       .digest("base64url");
     const signatureBuffer = Buffer.from(signature, "utf8");
@@ -908,27 +980,81 @@ export class ImageAssetManagementBackendApi {
       return undefined;
     }
 
-    try {
-      const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as ImageAssetUploadSessionTokenPayload;
-      if (payload.version !== 1) {
-        return undefined;
-      }
-      if (!normalizeRequired(payload.reservationId) || !normalizeRequired(payload.workspaceId) || !normalizeRequired(payload.assetId)) {
-        return undefined;
-      }
-      if (!payload.mediaType || !SupportedImageMediaTypes.includes(payload.mediaType)) {
-        return undefined;
-      }
-      if (!Number.isInteger(payload.expectedSizeBytes) || payload.expectedSizeBytes < 1) {
-        return undefined;
-      }
-      if (!payload.storageReference || !normalizeRequired(payload.storageReference.storageInstanceId) || !normalizeRequired(payload.storageReference.objectKey)) {
-        return undefined;
-      }
-      return payload;
-    } catch {
+    const issuedAt = normalizeOptional(payload.issuedAt);
+    const signingKeyVersionId = normalizeOptional(payload.signingKeyVersionId);
+    const isSupersededSigningVersion = Boolean(
+      signingKeyVersionId
+      && signingKeyVersionId !== signingCredential.currentVersionId,
+    );
+    if (
+      isSupersededSigningVersion
+      && (!issuedAt || this.isRetiredSupersededUploadSessionTokenVersion(issuedAt))
+    ) {
       return undefined;
     }
+
+    return payload;
+  }
+
+  private isValidUploadSessionPayload(payload: ImageAssetUploadSessionTokenPayload): boolean {
+    if (payload.version !== 1) {
+      return false;
+    }
+    if (!normalizeRequired(payload.reservationId) || !normalizeRequired(payload.workspaceId) || !normalizeRequired(payload.assetId)) {
+      return false;
+    }
+    if (!payload.mediaType || !SupportedImageMediaTypes.includes(payload.mediaType)) {
+      return false;
+    }
+    if (!Number.isInteger(payload.expectedSizeBytes) || payload.expectedSizeBytes < 1) {
+      return false;
+    }
+    if (!payload.storageReference || !normalizeRequired(payload.storageReference.storageInstanceId) || !normalizeRequired(payload.storageReference.objectKey)) {
+      return false;
+    }
+    if (payload.issuedAt && !normalizeIsoTimestamp(payload.issuedAt)) {
+      return false;
+    }
+    return true;
+  }
+
+  private isRetiredSupersededUploadSessionTokenVersion(issuedAt: string): boolean {
+    const issuedAtIso = normalizeIsoTimestamp(issuedAt);
+    if (!issuedAtIso) {
+      return true;
+    }
+
+    const ageMilliseconds = this.clock.now().getTime() - Date.parse(issuedAtIso);
+    return ageMilliseconds > this.uploadSessionTokenPreviousVersionValidationWindowMs;
+  }
+
+  private async resolveUploadSessionSigningCredential(input: {
+    readonly operationKey: string;
+    readonly versionId?: string;
+    readonly allowSupersededVersion?: boolean;
+  }): Promise<{ readonly secretId: string; readonly currentVersionId: string; readonly credential: string }> {
+    if (!this.runtimeSecurityMaterialResolver) {
+      return Object.freeze({
+        secretId: this.uploadSessionTokenSecretId,
+        currentVersionId: "static",
+        credential: this.uploadSessionTokenSecret,
+      });
+    }
+
+    const result = await this.runtimeSecurityMaterialResolver.resolveServerSigningMaterial({
+      secretId: this.uploadSessionTokenSecretId,
+      operationKey: input.operationKey,
+      serviceIdentity: "runtime:server:image-asset-upload-session-token-service",
+      signingPurpose: this.uploadSessionTokenSigningPurpose,
+      versionId: normalizeOptional(input.versionId),
+      allowSupersededVersion: input.allowSupersededVersion === true,
+      occurredAt: this.clock.now().toISOString(),
+    });
+    if (!result.ok) {
+      throw new Error(`Upload session token signing material resolution failed (${result.error.code}).`);
+    }
+
+    return result.value;
   }
 
   private failedFromCreateError(
@@ -1281,6 +1407,26 @@ function normalizeOptional(value: string | undefined): string | undefined {
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeIsoTimestamp(value: string | undefined): string | undefined {
+  const normalized = normalizeOptional(value);
+  if (!normalized) {
+    return undefined;
+  }
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+  return parsed.toISOString();
+}
+
+function parseUploadSessionTokenPayload(encodedPayload: string): ImageAssetUploadSessionTokenPayload | undefined {
+  try {
+    return JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as ImageAssetUploadSessionTokenPayload;
+  } catch {
+    return undefined;
+  }
+}
+
 function normalizeMediaType(value: string | undefined): string | undefined {
   const normalized = normalizeOptional(value)?.toLowerCase();
   if (!normalized) {
@@ -1296,4 +1442,12 @@ function normalizeSha256(value: string | undefined): string | undefined {
     return undefined;
   }
   return Sha256HexPattern.test(normalized) ? normalized : undefined;
+}
+
+function normalizeTransitionWindowMilliseconds(value: number | undefined): number {
+  if (!Number.isFinite(value) || value === undefined) {
+    return DefaultUploadSessionTokenPreviousVersionValidationWindowMs;
+  }
+  const rounded = Math.floor(value);
+  return rounded >= 0 ? rounded : 0;
 }

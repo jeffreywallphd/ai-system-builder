@@ -18,6 +18,7 @@ import type { StorageLogicalAccessResolutionService } from "@application/storage
 import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
 import { resolveCriticalServerSecurityMaterial } from "./ResolveCriticalServerSecurityMaterial";
 import type { ServerComposedSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
+import { ServerPlatformSecretConsumers } from "@infrastructure/security/secrets/ServerPlatformSecretConsumers";
 
 export interface ServerImageMediaCompositionModuleInput {
   readonly databasePath: string;
@@ -55,7 +56,7 @@ export async function composeServerImageMediaCompositionModule(
     logger: input.imageAssetObservabilityLogger,
     materialFormat: "string-secret",
   });
-  const imageAssetUploadSessionTokenSecret = await resolveCriticalServerSecurityMaterial({
+  await resolveCriticalServerSecurityMaterial({
     environment: input.env,
     secretService: input.secretService,
     materialId: "material:server:image-upload-session-token-secret",
@@ -65,6 +66,12 @@ export async function composeServerImageMediaCompositionModule(
     logger: input.imageAssetObservabilityLogger,
     materialFormat: "string-secret",
   });
+  const imageAssetUploadSessionTokenTransitionWindowMs = resolveUploadSessionTokenPreviousVersionValidationWindowMs(
+    input.env,
+  );
+  const runtimeSecurityMaterialResolver = new ServerPlatformSecretConsumers(
+    input.secretService.runtimeSecretConsumptionAdapters,
+  );
   const imageAssetStorageAdapter = new ManagedImageAssetStorageAdapter({
     storageLogicalAccessResolutionService: input.storageLogicalAccessResolutionService,
     tokenSecret: imageAssetStorageTokenSecret,
@@ -119,7 +126,10 @@ export async function composeServerImageMediaCompositionModule(
       auditSink: imageAssetAuditSink,
     }),
     imageAssetStoragePort: imageAssetStorageAdapter,
-    uploadSessionTokenSecret: imageAssetUploadSessionTokenSecret,
+    runtimeSecurityMaterialResolver,
+    uploadSessionTokenSecretId: "secret:server:image-upload-session-token",
+    uploadSessionTokenSigningPurpose: "image-asset-upload-session-token-signing",
+    uploadSessionTokenPreviousVersionValidationWindowMs: imageAssetUploadSessionTokenTransitionWindowMs,
     observability: new ImageAssetManagementObservability({
       logger: input.imageAssetObservabilityLogger,
     }),
@@ -131,4 +141,17 @@ export async function composeServerImageMediaCompositionModule(
       imageAssetRepository.dispose();
     },
   });
+}
+
+function resolveUploadSessionTokenPreviousVersionValidationWindowMs(
+  env: Readonly<Record<string, string | undefined>>,
+): number {
+  const parsed = Number.parseInt(
+    env.AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_PREVIOUS_VERSION_VALIDATION_WINDOW_MS ?? "",
+    10,
+  );
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 15 * 60 * 1000;
+  }
+  return parsed;
 }
