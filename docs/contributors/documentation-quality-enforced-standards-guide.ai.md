@@ -11,6 +11,7 @@ related_code_paths:
   - docs/contributors/docs-foundation-validation.ai.md
   - docs/contributors/docs-placement-guide.ai.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md
+  - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - docs/contributors/documentation-quality-worked-examples.ai.md
@@ -171,6 +172,17 @@ npm run validate:ci
 - `advisory`: non-blocking guidance.
 
 Escalate to additional manual review when authority meaning, supersession chains, or high-risk domains (identity, authorization, trust, secrets, runtime startup, routing contracts) are affected.
+
+## Exceptions and Escape Hatches (Story 7.4.2)
+
+- Allow exceptions only for legitimate non-standard cases:
+  - external contract mismatch,
+  - security/legal constraints,
+  - temporary migration constraints.
+- Do not allow exceptions for convenience, deadline pressure, or broad legacy waivers.
+- Keep scope narrow and path-specific; avoid directory-wide bypasses.
+- Record required fields (`rule_ids`, `paths`, `reason`, `owner`, `expiry_or_review_date`, `mitigation`) in PR text or a linked issue.
+- Use `docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md` for approval, expiry, and anti-abuse workflow.
 
 ## CI and Shared Automation Behavior (Story 7.3.2)
 

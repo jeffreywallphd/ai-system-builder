@@ -17,6 +17,7 @@ related_code_paths:
   - dev/scripts/validate-docs-category-compliance.cjs
   - docs/context/governance/documentation-quality-standard.ai.md
   - docs/contributors/documentation-quality-enforced-standards-guide.ai.md
+  - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - docs/contributors/documentation-quality-worked-examples.ai.md
@@ -161,3 +162,15 @@ Require manual review even with clean lint output when updates change:
 - supersession chains and redirect targets,
 - routing/context-map/registry behavior in high-risk areas,
 - identity, authorization, trust, secrets, or runtime startup guidance.
+
+## When a Legitimate Exception Is Needed (Story 7.4.2)
+
+Use exceptions only when direct remediation is blocked by:
+
+- external contract requirements,
+- security/legal constraints,
+- temporary migration constraints.
+
+Do not use exceptions for convenience or schedule pressure. Record exact `rule_ids` and `paths`, owner, mitigation, and expiry/review date in the PR or linked issue.
+
+Follow `docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md` for full request/approval boundaries.

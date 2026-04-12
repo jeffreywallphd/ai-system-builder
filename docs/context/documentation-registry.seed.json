@@ -1987,6 +1987,46 @@
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
+      "path": "docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md",
+      "aiPath": "docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md",
+      "title": "Documentation Quality Exceptions and Escape Hatches Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines a narrow exception and escape-hatch model for legitimate non-standard documentation cases, with required records, expiry, and anti-abuse boundaries.",
+      "keywords": [
+        "documentation quality",
+        "exceptions",
+        "escape hatches",
+        "governance",
+        "non-standard cases"
+      ],
+      "relatedCodePaths": [
+        "docs/context/governance/documentation-quality-standard.md",
+        "docs/contributors/documentation-quality-enforced-standards-guide.md",
+        "docs/contributors/documentation-quality-checks-run-and-fix-guide.md",
+        "docs/contributors/documentation-quality-rule-evolution-guide.md",
+        "docs/contributors/documentation-quality-tooling-maintenance-guide.md",
+        "dev/tests/DocumentationQualityExceptionsStory742Guardrails.test.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-tooling-maintenance-guide",
+        "doc-contributors-documentation-quality-worked-examples"
+      ],
+      "relatedDocs": [
+        "docs/context/governance/documentation-quality-standard.md",
+        "docs/contributors/documentation-quality-enforced-standards-guide.md",
+        "docs/contributors/documentation-quality-checks-run-and-fix-guide.md",
+        "docs/contributors/documentation-quality-rule-evolution-guide.md",
+        "docs/contributors/documentation-quality-tooling-maintenance-guide.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
     }
   ],
   "discoveryIndex": {
@@ -2024,7 +2064,8 @@
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
-        "doc-contributors-documentation-quality-tooling-maintenance-guide"
+        "doc-contributors-documentation-quality-tooling-maintenance-guide",
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
       ],
       "runbook": [
         "doc-operations-node-bootstrap-identity",
@@ -2107,7 +2148,8 @@
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
-        "doc-contributors-documentation-quality-tooling-maintenance-guide"
+        "doc-contributors-documentation-quality-tooling-maintenance-guide",
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
       ],
       "deprecated": [],
       "superseded": [
@@ -2155,7 +2197,8 @@
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
-        "doc-contributors-documentation-quality-tooling-maintenance-guide"
+        "doc-contributors-documentation-quality-tooling-maintenance-guide",
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
       ],
       "operations": [
         "doc-context-pack-runtime-and-host",
@@ -2220,7 +2263,8 @@
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
-        "doc-contributors-documentation-quality-tooling-maintenance-guide"
+        "doc-contributors-documentation-quality-tooling-maintenance-guide",
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
       ],
       "reference": [
         "doc-architecture-document-scope-boundaries",
@@ -2315,7 +2359,8 @@
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
-        "doc-contributors-documentation-quality-tooling-maintenance-guide"
+        "doc-contributors-documentation-quality-tooling-maintenance-guide",
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
       ]
     }
   },

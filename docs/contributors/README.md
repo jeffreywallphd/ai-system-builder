@@ -29,6 +29,7 @@
 - [Documentation Foundation Validation Guide](./docs-foundation-validation.md)
 - [Documentation Quality Enforced Standards Guide](./documentation-quality-enforced-standards-guide.md)
 - [Documentation Quality Checks Run and Fix Guide](./documentation-quality-checks-run-and-fix-guide.md)
+- [Documentation Quality Exceptions and Escape Hatches Guide](./documentation-quality-exceptions-and-escape-hatches-guide.md)
 - [Documentation Quality Rule Evolution Guide](./documentation-quality-rule-evolution-guide.md)
 - [Documentation Quality Tooling Maintenance Guide](./documentation-quality-tooling-maintenance-guide.md)
 - [Documentation Quality Worked Examples](./documentation-quality-worked-examples.md)
