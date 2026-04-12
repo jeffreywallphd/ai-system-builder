@@ -74,3 +74,16 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
   - production-capable startup now fails fast when required durable material resolves from missing/non-durable/disallowed sources.
   - development/test startup can continue with structured warning diagnostics for policy-allowed optional material.
 - Stage output now exposes structured `startupSecurityMaterialValidation` diagnostics for testability and readiness telemetry integration.
+
+## Story 3.1.5 Centralized Security Material Resolution Interfaces
+
+- Adds centralized resolver ports in:
+  - `src/application/security/ports/SecurityMaterialResolutionPorts.ts`
+- Separates read-only lookup from bootstrap mutation responsibilities:
+  - `SystemSecretBootstrapService` now depends on a runtime security material resolver port for runtime usability checks.
+  - bootstrap create/read behavior stays isolated in dedicated bootstrap persistence helpers.
+- Refactors host and transport consumers to typed resolver seams:
+  - `ServerPlatformSecretConsumers` now implements the runtime security material resolver port and supports server/workspace/user scope requests.
+  - managed TLS runtime trust material resolution is centralized in `ManagedServerTlsRuntimeMaterialResolver`.
+  - `ServerTlsMaterialCompositionModule` resolves managed TLS material from `HostSecureTransportConfig.trustMaterial` + resolver port, not ad hoc environment reads.
+- Result: reduced host-level secret/key handling sprawl and consistent resolution behavior across secret consumers and transport startup.

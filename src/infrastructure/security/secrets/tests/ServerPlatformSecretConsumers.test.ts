@@ -38,6 +38,45 @@ class StubSecretRuntimeConsumptionAdapters {
       },
     };
   }
+
+  public async resolveWorkspaceProviderCredential(
+    request: Parameters<SecretRuntimeConsumptionAdapters["resolveWorkspaceProviderCredential"]>[0],
+  ): Promise<Awaited<ReturnType<SecretRuntimeConsumptionAdapters["resolveWorkspaceProviderCredential"]>>> {
+    this.requests.push(request as unknown as Record<string, unknown>);
+    return {
+      ok: true,
+      value: {
+        secretId: request.secretId,
+        currentVersionId: `${request.secretId}:v1`,
+        scope: {
+          scope: SecretScopes.workspace,
+          workspaceId: request.workspaceId,
+        },
+        plaintext: "workspace-credential",
+        credential: "workspace-credential",
+      },
+    };
+  }
+
+  public async resolveUserPersonalApiKey(
+    request: Parameters<SecretRuntimeConsumptionAdapters["resolveUserPersonalApiKey"]>[0],
+  ): Promise<Awaited<ReturnType<SecretRuntimeConsumptionAdapters["resolveUserPersonalApiKey"]>>> {
+    this.requests.push(request as unknown as Record<string, unknown>);
+    return {
+      ok: true,
+      value: {
+        secretId: request.secretId,
+        currentVersionId: `${request.secretId}:v1`,
+        scope: {
+          scope: SecretScopes.user,
+          userIdentityId: request.userIdentityId,
+          workspaceId: request.workspaceId,
+        },
+        plaintext: "user-credential",
+        credential: "user-credential",
+      },
+    };
+  }
 }
 
 describe("ServerPlatformSecretConsumers", () => {
@@ -117,6 +156,55 @@ describe("ServerPlatformSecretConsumers", () => {
         message: "secret missing",
       },
     } satisfies SecretServiceResult<never>);
+  });
+
+  it("resolves workspace provider credentials via the shared material resolver interface", async () => {
+    const adapters = new StubSecretRuntimeConsumptionAdapters();
+    const consumers = new ServerPlatformSecretConsumers(
+      adapters as unknown as SecretRuntimeConsumptionAdapters,
+    );
+
+    const result = await consumers.resolveWorkspaceProviderCredential({
+      workspaceId: "workspace-alpha",
+      providerId: "openai",
+      secretId: "secret:workspace:provider:openai",
+      operationKey: "op:test:workspace-provider-openai",
+      serviceIdentity: "runtime:workspace:provider-client",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        secretId: "secret:workspace:provider:openai",
+        currentVersionId: "secret:workspace:provider:openai:v1",
+        credential: "workspace-credential",
+      },
+    });
+  });
+
+  it("resolves user provider credentials via the shared material resolver interface", async () => {
+    const adapters = new StubSecretRuntimeConsumptionAdapters();
+    const consumers = new ServerPlatformSecretConsumers(
+      adapters as unknown as SecretRuntimeConsumptionAdapters,
+    );
+
+    const result = await consumers.resolveUserProviderCredential({
+      userIdentityId: "user-alpha",
+      workspaceId: "workspace-alpha",
+      providerId: "openai",
+      secretId: "secret:user:provider:openai",
+      operationKey: "op:test:user-provider-openai",
+      serviceIdentity: "runtime:user:provider-client",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        secretId: "secret:user:provider:openai",
+        currentVersionId: "secret:user:provider:openai:v1",
+        credential: "user-credential",
+      },
+    });
   });
 });
 

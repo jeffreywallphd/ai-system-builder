@@ -28,6 +28,7 @@ import {
   ServerPlatformProviderIds,
   ServerPlatformSecretConsumers,
 } from "./ServerPlatformSecretConsumers";
+import type { IRuntimeSecurityMaterialResolverPort } from "@application/security/ports/SecurityMaterialResolutionPorts";
 
 const SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS = Object.freeze({
   requiredSecretIds: "AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS",
@@ -189,7 +190,19 @@ export interface SystemSecretBootstrapResult {
 export interface BootstrapSystemSecretsFromEnvironmentInput {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly secretService: ServerComposedSecretService;
+  readonly runtimeMaterialResolver?: IRuntimeSecurityMaterialResolverPort;
   readonly now?: () => Date;
+}
+
+interface SystemSecretBootstrapPersistencePort {
+  readonly encryptionConfigured: boolean;
+  getSecretMetadata(input: {
+    readonly actor: ReturnType<typeof createAdministrativeActor>;
+    readonly secretId: string;
+    readonly occurredAt: string;
+  }): ReturnType<ServerComposedSecretService["getSecretMetadataUseCase"]["execute"]>;
+  createSecret(input: Parameters<ServerComposedSecretService["createSecretUseCase"]["execute"]>[0]):
+    ReturnType<ServerComposedSecretService["createSecretUseCase"]["execute"]>;
 }
 
 export class SystemSecretBootstrapValidationError extends Error {
@@ -223,9 +236,9 @@ export async function bootstrapSystemSecretsFromEnvironment(
     input.env[SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.migrateLegacyEnvironmentValues],
   ) ?? true;
   const administrativeActor = createAdministrativeActor();
-  const platformSecretConsumers = new ServerPlatformSecretConsumers(
-    input.secretService.runtimeSecretConsumptionAdapters,
-  );
+  const runtimeMaterialResolver = input.runtimeMaterialResolver
+    ?? new ServerPlatformSecretConsumers(input.secretService.runtimeSecretConsumptionAdapters);
+  const bootstrapPersistence = createSystemSecretBootstrapPersistencePort(input.secretService);
 
   for (const secretId of requiredSecretIds) {
     const definition = SystemSecretDefinitionsById.get(secretId);
@@ -251,7 +264,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
       lifecycleStage,
     });
 
-    const existingMetadata = await input.secretService.getSecretMetadataUseCase.execute({
+    const existingMetadata = await bootstrapPersistence.getSecretMetadata({
       actor: administrativeActor,
       secretId: definition.secretId,
       occurredAt: now().toISOString(),
@@ -265,7 +278,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
       const canAttemptMigration = migrationEnabled && Boolean(legacyEnvironmentVariable && legacyValue);
 
       if (canAttemptMigration) {
-        if (!input.secretService.status.configured) {
+        if (!bootstrapPersistence.encryptionConfigured) {
           diagnostics.push(Object.freeze({
             code: SystemSecretBootstrapDiagnosticCodes.legacyMigrationUnavailable,
             secretId: definition.secretId,
@@ -279,7 +292,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
           continue;
         }
 
-        const createResult = await input.secretService.createSecretUseCase.execute({
+        const createResult = await bootstrapPersistence.createSecret({
           actor: administrativeActor,
           operationKey: `op:system-secret-bootstrap:create:${definition.secretId}:${now().getTime()}`,
           secretId: definition.secretId,
@@ -328,7 +341,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
     }
 
     const runtimeCheck = definition.runtimeConsumer === "provider-credential"
-      ? await platformSecretConsumers.resolveServerProviderCredential({
+      ? await runtimeMaterialResolver.resolveServerProviderCredential({
         providerId: definition.providerId as "openai" | "huggingface",
         secretId: definition.secretId,
         operationKey: `op:system-secret-bootstrap:validate:${definition.secretId}:${now().getTime()}`,
@@ -336,7 +349,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
         justification: `validate required system secret for '${definition.runtimePurpose}'`,
         occurredAt: now().toISOString(),
       })
-      : await platformSecretConsumers.resolveIdentitySessionSigningMaterial({
+      : await runtimeMaterialResolver.resolveIdentitySessionSigningMaterial({
         secretId: definition.secretId,
         operationKey: `op:system-secret-bootstrap:validate:${definition.secretId}:${now().getTime()}`,
         serviceIdentity: "runtime:server:system-secret-bootstrap",
@@ -385,6 +398,20 @@ export async function assertSystemSecretBootstrapSafe(
     );
   }
   return result;
+}
+
+function createSystemSecretBootstrapPersistencePort(
+  secretService: ServerComposedSecretService,
+): SystemSecretBootstrapPersistencePort {
+  return Object.freeze({
+    encryptionConfigured: secretService.status.configured,
+    getSecretMetadata: (input) => secretService.getSecretMetadataUseCase.execute({
+      actor: input.actor,
+      secretId: input.secretId,
+      occurredAt: input.occurredAt,
+    }),
+    createSecret: (input) => secretService.createSecretUseCase.execute(input),
+  });
 }
 
 function createAdministrativeActor() {
