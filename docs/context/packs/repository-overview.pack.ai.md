@@ -4,6 +4,7 @@
 
 - First-tier orientation for AI Loom Studio tasks: repository mission, high-level layout, and durable architecture themes.
 - Help assistants choose correct canonical docs/code surfaces before loading deeper domain context.
+- Reinforce repo-wide anti-drift guardrails that apply across all domains without replacing domain-pack detail.
 
 ## When To Use
 
@@ -23,6 +24,11 @@
 - Preserve layered direction: domain -> application -> infrastructure/hosts/ui integration.
 - Canonical authority remains in referenced docs/contracts/tests; this pack is orientation only.
 - Keep context minimal: use this pack first, then route into domain-specific assets.
+- Protect boundary integrity: avoid erosion of transport, runtime, domain, and composition seams.
+- Keep responsibilities intentionally distributed; avoid growth of single-file or single-surface "god objects."
+- Keep explicit contracts/guardrails enforceable in docs, schemas, and tests; avoid bypass paths.
+- Keep cross-cutting concerns (security, observability, policy, persistence discipline) in designated layers, not outer convenience paths.
+- Prefer production-safe defaults and profile clarity over convenience shortcuts that weaken deployment discipline.
 
 ## Authoritative Docs
 
@@ -53,12 +59,25 @@
 - Loading broad unrelated context instead of routing by `taskCategory` and `changedPaths`.
 - Breaking layer boundaries by mixing host/infrastructure concerns into domain logic.
 - Assuming browser fallback behavior is the primary runtime truth when desktop-host contracts apply.
+- Allowing boundary erosion via direct cross-layer calls, ad hoc adapters, or undocumented shortcuts.
+- Accumulating orchestration, policy, persistence, and transport logic into one file/surface for convenience.
+- Bypassing explicit contracts (typed interfaces, schema validation, routing contracts, startup composition constraints).
+- Letting observability, secrets/trust handling, or policy enforcement leak into UI/outer transport entry points.
+- Accepting default dev-mode behavior as production-safe without explicit profile governance.
+- Growing broad surfaces without corresponding architectural guardrails/tests, increasing cognitive load and drift risk.
 
 ## Related Packs
 
 - `context-system-foundations`: combine when editing context contracts, routing assets, governance docs, or metadata seeds.
 - `runtime-and-host`: prefer for runtime, desktop, host startup, and lifecycle diagnostics/implementation work.
-- Future domain packs: switch to those for deep behavior details once routing selects them.
+- Use architecture canonical docs and ADRs for deep authority (`docs/architecture/README.ai.md`, `docs/adr/README.ai.md`).
+- Follow-on context-pack needs (create as separate domain packs, not here):
+  - transport and API boundary discipline
+  - control-plane composition and startup assembly discipline
+  - security material and trust hardening
+  - persistence and migration governance
+  - observability and readiness diagnostics
+  - development-mode and deployment-profile governance
 
 ## Retrieval Order
 

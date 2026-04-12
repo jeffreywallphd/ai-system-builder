@@ -4,6 +4,7 @@
 
 - Provide first-tier orientation for AI Loom Studio tasks: what the product is, where major repository domains live, and which architecture themes must shape decisions.
 - Help contributors select the right authoritative docs and code surfaces quickly before loading domain-specific packs.
+- Reinforce repo-wide anti-drift guardrails that apply across domains without replacing domain-pack detail.
 
 ## When To Use
 
@@ -23,6 +24,11 @@
 - Repository changes must preserve layered boundaries (domain -> application -> infrastructure/hosts/ui integration).
 - Authoritative behavior comes from canonical docs/contracts and tests; this pack is orientation only.
 - Prefer minimum sufficient context: load this pack first, then add mapped domain sources.
+- Protect boundary integrity; do not erode transport, runtime, domain, and composition seams.
+- Keep responsibilities intentionally distributed; avoid single-file or single-surface responsibility accumulation.
+- Maintain explicit contracts and guardrails (docs, schemas, tests); avoid bypasses.
+- Keep cross-cutting concerns (security, observability, policy, persistence discipline) in designated layers.
+- Prefer production-safe defaults and explicit profile governance over convenience shortcuts.
 
 ## Authoritative Docs
 
@@ -53,12 +59,25 @@
 - Pulling unrelated docs/code "just in case" instead of routing by `changedPaths` and task category.
 - Violating layer boundaries by introducing host/infrastructure concerns directly into domain logic.
 - Assuming browser-only development behavior is authoritative when desktop-host contracts apply.
+- Allowing boundary erosion through direct cross-layer calls, ad hoc adapters, or undocumented shortcuts.
+- Concentrating orchestration, policy, persistence, and transport behavior into one convenience surface.
+- Bypassing explicit contracts (typed boundaries, schema validation, routing contracts, startup composition constraints).
+- Letting observability, trust material, or policy checks leak into outer UI/transport entry points.
+- Treating development-mode defaults as production-ready without explicit deployment profile constraints.
+- Expanding oversized surfaces without matching architectural guardrails/tests, increasing cognitive-load and drift risk.
 
 ## Related Packs
 
 - `context-system-foundations`: use with this pack when changing context contracts, routing maps, governance assets, or pack metadata.
 - `runtime-and-host`: prefer for runtime, desktop, host startup, and lifecycle implementation or diagnostics tasks.
-- Future domain packs (security, storage, workflow/runtime, studio UX): prefer those for deep implementation detail once selected by routing.
+- Use canonical architecture docs and ADRs for deep authority (`docs/architecture/README.md`, `docs/adr/README.md`).
+- Follow-on context-pack needs (to be authored separately, not expanded here):
+  - transport and API boundary discipline
+  - control-plane composition and startup assembly discipline
+  - security material and trust hardening
+  - persistence and migration governance
+  - observability and readiness diagnostics
+  - development-mode and deployment-profile governance
 
 ## Retrieval Order
 
