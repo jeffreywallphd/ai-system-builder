@@ -163,6 +163,10 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
   - startup composes a typed shutdown-disposal plan from composed runtime artifacts.
   - disposal order is explicit and deterministic: transport shutdown first, then persistence service/runtime disposal.
   - both normal stop and startup-failure cleanup consume the same staged disposal plan.
+- Story 2.4.1 adds composition-level startup and wiring guardrails for the staged bootstrap orchestrator:
+  - `src/hosts/server/tests/AuthoritativeServerBootstrapOrchestrator.test.ts` validates startup success wiring across bounded module composition seams and staged startup status output.
+  - verifies startup can complete with degraded non-blocking readiness and surfaces explicit readiness report aggregates/checks.
+  - verifies meaningful failure behavior for missing required stage contracts and missing required route-plan composition inputs.
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `subsystem-composition`
   - `security-material-resolution`
@@ -245,6 +249,7 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
 - `src/hosts/server/tests/AuthoritativeServerLifecycleComposition.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupTelemetry.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerBootstrapOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
 - `src/hosts/server/tests/AuthMinimalServerHostEntrypoint.test.ts`
