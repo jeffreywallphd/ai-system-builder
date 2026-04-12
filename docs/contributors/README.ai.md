@@ -33,6 +33,7 @@
 - [Documentation Quality Rule Evolution Guide](./documentation-quality-rule-evolution-guide.ai.md)
 - [Documentation Quality Tooling Maintenance Guide](./documentation-quality-tooling-maintenance-guide.ai.md)
 - [Documentation Quality Monitoring and Feedback Guide](./documentation-quality-monitoring-and-feedback-guide.ai.md)
+- [Documentation Quality Rollout Boundaries and Follow-On Opportunities Guide](./documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md)
 - [Documentation Quality Worked Examples](./documentation-quality-worked-examples.ai.md)
 - [Context Engineering System Contributor Guide](./context-engineering-system-guide.ai.md)
 - [Router and Overview Writing Standard](./router-overview-writing-standard.ai.md)

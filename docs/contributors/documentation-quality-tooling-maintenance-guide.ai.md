@@ -19,6 +19,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md
+  - docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md
   - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
 ---
@@ -122,6 +123,7 @@ Any pull request that changes docs-quality tooling or rule behavior should updat
 - `documentation-quality-exceptions-and-escape-hatches-guide`
 - `documentation-quality-rule-evolution-guide`
 - `documentation-quality-monitoring-and-feedback-guide`
+- `documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide`
 - this maintenance guide
 
 ## Completion Boundary for This Governance Slice (Story 7.4.1)

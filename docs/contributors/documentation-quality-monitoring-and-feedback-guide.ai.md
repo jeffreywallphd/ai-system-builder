@@ -12,6 +12,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
+  - docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md
   - dev/scripts/lint-docs.cjs
   - package.json
   - dev/tests/DocumentationQualityMonitoringStory743Guardrails.test.ts
@@ -118,3 +119,5 @@ Out of scope here:
 - introducing broad new validator families.
 
 Those belong in separate stories if lightweight monitoring proves insufficient.
+
+Use `docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md` to keep this monitoring loop aligned with current rollout scope and future-expansion boundaries.

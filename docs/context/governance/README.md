@@ -25,6 +25,7 @@
 - [Rule Evolution Guide for Contributors](../contributors/documentation-quality-rule-evolution-guide.md)
 - [Tooling Maintenance Guide for Contributors](../contributors/documentation-quality-tooling-maintenance-guide.md)
 - [Monitoring and Feedback Guide for Contributors](../contributors/documentation-quality-monitoring-and-feedback-guide.md)
+- [Rollout Boundaries and Follow-On Opportunities Guide for Contributors](../contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.md)
 - [Context Asset Lifecycle Guidance](./context-asset-lifecycle.md)
 - [High-Risk Context Pack Guidance](./high-risk-context-pack-guidance.md)
 - [Documentation Segmentation Rollout Boundaries and Follow-On Work](./documentation-segmentation-rollout-boundaries.md)

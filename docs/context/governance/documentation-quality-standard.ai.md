@@ -16,6 +16,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
   - docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md
+  - docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
@@ -28,6 +29,7 @@ related_code_paths:
   - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
   - dev/tests/DocumentationQualityExceptionsStory742Guardrails.test.ts
   - dev/tests/DocumentationQualityMonitoringStory743Guardrails.test.ts
+  - dev/tests/DocumentationQualityRolloutBoundariesStory744Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Quality Standard
@@ -289,6 +291,18 @@ Operational expectations:
 - Keep monitoring qualitative and actionable; do not require custom telemetry or mandatory KPI dashboards for this slice.
 
 Use `docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md` for contributor-facing monitoring loop and triage workflow.
+
+## Rollout Boundaries and Follow-On Opportunities (Story 7.4.4)
+
+The initial enforcement rollout is considered materially complete when the following remain true:
+
+- current blocking/non-blocking behavior is explicit and stable,
+- contributors can distinguish enforced contracts from guidance-only expectations,
+- known limits and intentional out-of-scope areas are documented rather than implicitly assumed.
+
+Follow-on opportunities (broader automation, richer linting, and deeper docs-system integration) should be delivered as separate scoped stories using warning-first rollout and monitoring evidence.
+
+Use `docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md` for contributor-facing coverage boundaries and future-enhancement framing.
 
 ## Recommended Guidance (Non-Blocking)
 
