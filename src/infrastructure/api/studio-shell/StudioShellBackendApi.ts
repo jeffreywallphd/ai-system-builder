@@ -138,6 +138,9 @@ import type { DatasetInstance } from "@domain/system-runtime/DatasetInstanceDoma
 import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {
   AuthorizationResponseAccessLevels,
   deriveAuthorizationResponseAccessLevel,
@@ -392,6 +395,7 @@ export interface IngestReferenceImageUploadReadModel {
     readonly format: string;
   };
   readonly selectedRecordId: string;
+  readonly storedFilePath?: string;
 }
 
 export interface PersistReferenceImageOutputsRequest {
@@ -1697,16 +1701,25 @@ export class StudioShellBackendApi {
       const ingestionSource = datasetBindingId === "reference-image-dataset"
         ? "reference-image-ui-faceid-upload"
         : "reference-image-ui-upload";
+      const storedFilePath = await this.materializeUploadedImagePayload({
+        payload,
+        fileName,
+        systemId: runtimeSystemId,
+        datasetBindingId,
+      });
 
       const ingested = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
         systemId: runtimeSystemId,
         instanceId: targetDataset.instanceId,
+        storageReference: storedFilePath,
+        storageProvider: "studio-shell-upload-cache",
         storageBindingArea,
         metadata: {
           ingestionSource,
           datasetBindingId,
           uploadedFileName: fileName,
           uploadedMimeType: request.mimeType?.trim() || "unknown",
+          storedFilePath,
         },
         provenance: {
           sourceType: "upload",
@@ -1771,6 +1784,7 @@ export class StudioShellBackendApi {
           format: ingested.image.format,
         }),
         selectedRecordId: ingested.recordId,
+        storedFilePath,
       });
     });
   }
@@ -3827,6 +3841,44 @@ export class StudioShellBackendApi {
     }
   }
 
+  private async materializeUploadedImagePayload(input: {
+    readonly payload: Uint8Array;
+    readonly fileName: string;
+    readonly systemId: string;
+    readonly datasetBindingId: ReferenceImageDatasetBindingId;
+  }): Promise<string> {
+    const safeFileName = this.sanitizeUploadFileName(input.fileName);
+    const safeSystemId = input.systemId.replace(/[^a-z0-9-_.:]/gi, "_");
+    const safeBindingId = input.datasetBindingId.replace(/[^a-z0-9-_.:]/gi, "_");
+    const now = this.now();
+    const stamp = [
+      now.getUTCFullYear().toString().padStart(4, "0"),
+      (now.getUTCMonth() + 1).toString().padStart(2, "0"),
+      now.getUTCDate().toString().padStart(2, "0"),
+      "-",
+      now.getUTCHours().toString().padStart(2, "0"),
+      now.getUTCMinutes().toString().padStart(2, "0"),
+      now.getUTCSeconds().toString().padStart(2, "0"),
+      "-",
+      now.getUTCMilliseconds().toString().padStart(3, "0"),
+    ].join("");
+    const unique = Math.random().toString(36).slice(2, 10);
+    const root = path.join(os.tmpdir(), "ai-loom-studio", "reference-image-uploads", safeSystemId, safeBindingId);
+    await fs.mkdir(root, { recursive: true });
+    const filePath = path.join(root, `${stamp}-${unique}-${safeFileName}`);
+    await fs.writeFile(filePath, Buffer.from(input.payload));
+    return filePath;
+  }
+
+  private sanitizeUploadFileName(fileName: string): string {
+    const trimmed = fileName.trim();
+    if (!trimmed) {
+      return "upload.bin";
+    }
+    const baseName = path.basename(trimmed).replace(/[^a-z0-9-_.]/gi, "_");
+    return baseName.length > 0 ? baseName : "upload.bin";
+  }
+
   private extractComfyResultFromRuntimeResult(
     runtimeOutput: unknown,
   ): {
@@ -4592,4 +4644,3 @@ export class StudioShellBackendApi {
     });
   }
 }
-

@@ -479,8 +479,10 @@ describe("StudioShellBackendApi", () => {
     } as unknown as Parameters<StudioShellBackendApi["ingestReferenceImageUpload"]>[0]);
 
     expect(upload.ok).toBeTrue();
-    expect(upload.data?.image.assetId).toContain("generated-output:storage-instance://");
+    expect(upload.data?.image.assetId).toContain("generated-output:");
+    expect(upload.data?.image.assetId).toContain("reference-image-uploads");
     expect(upload.data?.image.assetId).not.toContain("file://user/controlled/path.png");
+    expect(upload.data?.storedFilePath).toContain("reference-image-uploads");
   });
 
   it("starts rerun from historical execution context and persists run lineage metadata", async () => {
@@ -1856,4 +1858,3 @@ describe("StudioShellBackendApi", () => {
   });
 
 });
-

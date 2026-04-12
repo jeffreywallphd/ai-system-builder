@@ -1610,6 +1610,7 @@ export function ImageManipulationRuntimeEditorPanel({
   const [recentSystemsError, setRecentSystemsError] = useState<string | undefined>();
   const [isReopeningRecentSystemId, setIsReopeningRecentSystemId] = useState<string | undefined>();
   const [uploadProgressStage, setUploadProgressStage] = useState<UploadProgressStage>("idle");
+  const [uploadedPreviewPathsByFileName, setUploadedPreviewPathsByFileName] = useState<Readonly<Record<string, string>>>(Object.freeze({}));
   const [imageLibrarySearch, setImageLibrarySearch] = useState("");
   const [appliedImageLibrarySearch, setAppliedImageLibrarySearch] = useState("");
   const [imageLibraryAssets, setImageLibraryAssets] = useState<ReadonlyArray<ImageLibraryStudioImageAsset>>([]);
@@ -3357,6 +3358,7 @@ export function ImageManipulationRuntimeEditorPanel({
                 : undefined,
             }}
             disabled={context.isBusy || isUploading}
+            resolvedPreviewPathsByFileName={uploadedPreviewPathsByFileName}
             onUploadRequested={(event) => {
               const file = event.files[0];
               if (!file) {
@@ -3367,6 +3369,7 @@ export function ImageManipulationRuntimeEditorPanel({
                 return;
               }
               setStatusMessage(undefined);
+              setUploadedPreviewPathsByFileName(Object.freeze({}));
               setIsUploading(true);
               setUploadProgressStage("uploading");
               void encodeFileBase64(file)
@@ -3416,6 +3419,11 @@ export function ImageManipulationRuntimeEditorPanel({
                     syncPreviewRole: true,
                   }));
                   setStatusMessage("Photo ready.");
+                  if (response.data.storedFilePath) {
+                    setUploadedPreviewPathsByFileName(Object.freeze({
+                      [file.name]: response.data.storedFilePath,
+                    }));
+                  }
                   return response.data.recordId;
                 })
                 .then((preferredSourceRecordId) => Promise.all([
