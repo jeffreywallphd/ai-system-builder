@@ -24,7 +24,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "service-supervisor": "node src/infrastructure/runtime/service-supervisor.js",
-    "test": "bun test",
+    "test": "npm run docs:lint && npm run test:unit",
+    "test:unit": "bun test",
     "test:service-supervisor": "bun test src/infrastructure/runtime/tests/ServiceSupervisor.test.ts",
     "dev:browser": "vite --mode browser",
     "start:authoritative-server": "bun run src/hosts/server/AuthoritativeServerHostEntrypoint.ts",
@@ -40,7 +41,9 @@
     "docs:validate:architecture-domains": "node dev/scripts/validate-architecture-domains.cjs",
     "docs:validate:segmentation": "node dev/scripts/validate-docs-segmentation.cjs",
     "docs:validate:cross-references": "node dev/scripts/validate-docs-cross-references.cjs",
-    "docs:validate:category-compliance": "node dev/scripts/validate-docs-category-compliance.cjs"
+    "docs:validate:category-compliance": "node dev/scripts/validate-docs-category-compliance.cjs",
+    "validate": "npm run typecheck && npm run docs:lint",
+    "validate:ci": "npm run validate && npm run test:unit"
   },
   "dependencies": {
     "@huggingface/hub": "^2.6.1",
