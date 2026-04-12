@@ -25,3 +25,19 @@ This folder is the bounded contract surface for control-plane composition refact
 - Add new composition module logic under `src/hosts/server/composition/` and keep contract definitions in `contracts/`.
 - Keep business/domain logic out of this folder; compose existing application/domain services through typed ports.
 - Update contract tests in `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts` when module boundaries or dependencies change.
+
+## Dependency Guardrails
+
+- Composition modules may depend only on declared upstream module outputs and shared host startup/lifecycle contracts.
+- Composition modules may assemble infrastructure and application services, but must not absorb business logic or policy evaluation logic.
+- Composition modules must not absorb route logic, handler logic, or transport DTO mapping logic.
+- Cross-module dependencies must be declared in `contracts/AuthoritativeServerCompositionModuleMap.ts`.
+- Introducing new cross-module dependencies requires updating contracts and `AuthoritativeServerCompositionAssemblyContracts.test.ts` in the same change.
+
+## Naming And Placement Guidance
+
+- Module implementation names must follow `Server<Capability>CompositionModule`.
+- Module contract names must follow `Server<Capability>CompositionModuleContract`.
+- Keep typed artifacts explicit: `Server<Capability>CompositionModuleInput` and `Server<Capability>CompositionModuleOutput`.
+- Place module-specific helper code next to the module implementation; avoid shared generic `helpers` or `utils` catch-all files.
+- Keep top-level host orchestration in `AuthoritativeServerCompositionRoot.ts`; do not re-centralize module internals there.

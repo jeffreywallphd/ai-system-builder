@@ -49,6 +49,61 @@ describe("AuthoritativeServerCompositionAssemblyContracts", () => {
     }
   });
 
+  it("keeps explicit composition dependency allow-lists stable", () => {
+    const expectedDependenciesByModuleId = new Map<
+      AuthoritativeServerCompositionModuleId,
+      ReadonlyArray<AuthoritativeServerCompositionModuleId>
+    >([
+      [AuthoritativeServerCompositionModuleIds.startupConfiguration, []],
+      [AuthoritativeServerCompositionModuleIds.securityBootstrap, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.persistenceBootstrap, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+        AuthoritativeServerCompositionModuleIds.securityBootstrap,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.policyBootstrap, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+        AuthoritativeServerCompositionModuleIds.persistenceBootstrap,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.servicePlan, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.routePlan, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.executionAdapter, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.controlPlaneApi, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+        AuthoritativeServerCompositionModuleIds.securityBootstrap,
+        AuthoritativeServerCompositionModuleIds.persistenceBootstrap,
+        AuthoritativeServerCompositionModuleIds.policyBootstrap,
+        AuthoritativeServerCompositionModuleIds.servicePlan,
+        AuthoritativeServerCompositionModuleIds.routePlan,
+        AuthoritativeServerCompositionModuleIds.executionAdapter,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.orchestrationRecovery, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+        AuthoritativeServerCompositionModuleIds.policyBootstrap,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.transport, [
+        AuthoritativeServerCompositionModuleIds.controlPlaneApi,
+        AuthoritativeServerCompositionModuleIds.orchestrationRecovery,
+      ]],
+      [AuthoritativeServerCompositionModuleIds.diagnostics, [
+        AuthoritativeServerCompositionModuleIds.startupConfiguration,
+      ]],
+    ]);
+
+    for (const module of AuthoritativeServerCompositionModuleMap) {
+      const expectedDependencies = expectedDependenciesByModuleId.get(module.moduleId);
+      expect(expectedDependencies).toBeDefined();
+      expect(module.dependsOn).toEqual(expectedDependencies);
+    }
+  });
+
   it("keeps disposal ownership explicit for persistence and transport modules", () => {
     const mapById = new Map(
       AuthoritativeServerCompositionModuleMap.map((module) => [module.moduleId, module] as const),

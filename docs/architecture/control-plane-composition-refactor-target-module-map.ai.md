@@ -133,6 +133,53 @@ Ordering constraints remain unchanged:
 - Orchestration recovery remains pre-listen.
 - Auth-minimal remains same architecture with scoped outputs.
 
+## Composition Dependency Rules (Story 2.1.4)
+
+### Allowed dependencies for composition modules
+
+- Compose infrastructure adapters and application services through explicit typed module contracts.
+- Depend only on shared host startup/lifecycle contracts and declared prior module outputs in `AuthoritativeServerCompositionModuleMap`.
+- Consume cross-cutting diagnostics through `ServerDiagnosticsCompositionModule`.
+
+### Disallowed dependencies for composition modules
+
+- Must not absorb business logic (keep policy/rules in domain/application).
+- Must not absorb route logic (keep transport route handlers/DTO mapping in route-family modules).
+- Must not become ad hoc helper buckets.
+- Must not bypass typed contracts via process-global state or unrelated module internals.
+- Must not re-inline extracted composition concerns into top-level host startup files.
+
+### Explicit allowed module dependency map
+
+1. `ServerStartupConfigurationCompositionModule` -> `[]`
+2. `ServerSecurityBootstrapCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+3. `ServerPersistenceBootstrapCompositionModule` -> `[ServerStartupConfigurationCompositionModule, ServerSecurityBootstrapCompositionModule]`
+4. `ServerPolicyBootstrapCompositionModule` -> `[ServerStartupConfigurationCompositionModule, ServerPersistenceBootstrapCompositionModule]`
+5. `ServerServicePlanCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+6. `ServerRoutePlanCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+7. `ServerExecutionAdapterCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+8. `ServerControlPlaneApiCompositionModule` -> `[ServerStartupConfigurationCompositionModule, ServerSecurityBootstrapCompositionModule, ServerPersistenceBootstrapCompositionModule, ServerPolicyBootstrapCompositionModule, ServerServicePlanCompositionModule, ServerRoutePlanCompositionModule, ServerExecutionAdapterCompositionModule]`
+9. `ServerOrchestrationRecoveryCompositionModule` -> `[ServerStartupConfigurationCompositionModule, ServerPolicyBootstrapCompositionModule]`
+10. `ServerTransportCompositionModule` -> `[ServerControlPlaneApiCompositionModule, ServerOrchestrationRecoveryCompositionModule]`
+11. `ServerDiagnosticsCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+
+New cross-module dependencies are disallowed unless the map, contracts, and composition contract tests are updated together.
+
+## Naming And Placement Conventions (Story 2.1.4)
+
+- Keep composition module implementations under `src/hosts/server/composition/` in module-oriented files/folders.
+- Keep contracts in `src/hosts/server/composition/contracts/`.
+- Use `Server<Capability>CompositionModule` and `Server<Capability>CompositionModuleContract` naming.
+- Use explicit `*CompositionModuleInput` / `*CompositionModuleOutput` artifact names (avoid generic helper/context naming).
+- Keep any helper code colocated with one module responsibility.
+
+## Re-Centralization Prevention Checklist
+
+- Keep `AuthoritativeServerCompositionRoot.ts` orchestration-only.
+- Prevent `IdentityServerHost.ts` from becoming a second composition root after module extraction.
+- Require new modules to declare stage ownership, produced artifacts, disposal responsibilities, and dependencies in module-map contracts.
+- Require `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts` updates when module-map/dependency contracts change.
+
 ## High-Risk Seams
 
 1. TLS runtime material resolution and fail-fast posture.

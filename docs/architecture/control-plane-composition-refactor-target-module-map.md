@@ -179,6 +179,59 @@ Required contract direction:
 
 Cross-cutting diagnostics should be injectable from `DiagnosticsComposition` into all modules, not reimplemented per module.
 
+## Composition Dependency Rules (Story 2.1.4)
+
+### Allowed dependencies for composition modules
+
+- Modules may compose infrastructure adapters and application services through explicit typed contracts.
+- Modules may depend on shared host startup/lifecycle contracts and previously-composed module outputs declared in `AuthoritativeServerCompositionModuleMap`.
+- Modules may consume cross-cutting diagnostics hooks from `ServerDiagnosticsCompositionModule`.
+
+### Disallowed dependencies for composition modules
+
+- Modules must not absorb business logic; domain policy and business rules stay in domain/application services.
+- Modules must not absorb route logic; transport route handlers and DTO mapping stay in transport route-family modules.
+- Modules must not become ad hoc helper buckets; utility logic must stay bounded to explicit module responsibilities.
+- Modules must not bypass typed contracts by reaching into unrelated module internals or process-global state.
+- Top-level host startup files must not re-inline composition concerns extracted into bounded modules.
+
+### Explicit allowed module dependency map
+
+Allowed `dependsOn` relationships are:
+
+1. `ServerStartupConfigurationCompositionModule` -> `[]`
+2. `ServerSecurityBootstrapCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+3. `ServerPersistenceBootstrapCompositionModule` -> `[ServerStartupConfigurationCompositionModule, ServerSecurityBootstrapCompositionModule]`
+4. `ServerPolicyBootstrapCompositionModule` -> `[ServerStartupConfigurationCompositionModule, ServerPersistenceBootstrapCompositionModule]`
+5. `ServerServicePlanCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+6. `ServerRoutePlanCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+7. `ServerExecutionAdapterCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+8. `ServerControlPlaneApiCompositionModule` -> `[ServerStartupConfigurationCompositionModule, ServerSecurityBootstrapCompositionModule, ServerPersistenceBootstrapCompositionModule, ServerPolicyBootstrapCompositionModule, ServerServicePlanCompositionModule, ServerRoutePlanCompositionModule, ServerExecutionAdapterCompositionModule]`
+9. `ServerOrchestrationRecoveryCompositionModule` -> `[ServerStartupConfigurationCompositionModule, ServerPolicyBootstrapCompositionModule]`
+10. `ServerTransportCompositionModule` -> `[ServerControlPlaneApiCompositionModule, ServerOrchestrationRecoveryCompositionModule]`
+11. `ServerDiagnosticsCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
+
+New cross-module dependencies are disallowed unless this map, composition contracts, and contract tests are updated in the same change.
+
+## Naming And Placement Conventions (Story 2.1.4)
+
+- Composition module implementations belong in `src/hosts/server/composition/` under explicit module-oriented files or subfolders.
+- Module contracts remain in `src/hosts/server/composition/contracts/`.
+- Module names use `Server<Capability>CompositionModule` and contract names use `Server<Capability>CompositionModuleContract`.
+- Shared contract artifacts must use explicit names (`*CompositionModuleInput`, `*CompositionModuleOutput`) rather than generic `Context`, `Helper`, or `Utils` objects.
+- If module-local helpers are required, keep them colocated with that module and scoped to one module responsibility.
+
+## Re-Centralization Prevention Checklist
+
+- Keep `AuthoritativeServerCompositionRoot.ts` orchestration-focused (stage flow, artifact handoff, assertions, lifecycle cleanup).
+- Keep `IdentityServerHost.ts` from becoming a second composition root once module extraction is in place.
+- Require any new composition module to declare:
+  - explicit stage ownership,
+  - explicit produced artifacts,
+  - explicit disposal responsibilities,
+  - explicit dependencies in `AuthoritativeServerCompositionModuleMap`.
+- Require contract-test updates in `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts` for dependency or module-map changes.
+
 ## Startup Stage Mapping And Ordering Constraints
 
 Shared host bootstrap pipeline order remains authoritative and unchanged:

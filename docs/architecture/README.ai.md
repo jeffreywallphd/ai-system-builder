@@ -64,6 +64,8 @@ related_code_paths:
   [Studio and System Composition](./domains/studio-and-system-composition/overview.md)
 - Examine security-sensitive trust, authz, and secret-handling boundaries:
   [Identity Trust and Security](./domains/identity-trust-and-security/overview.md)
+- Define or review bounded control-plane composition module dependencies and startup decomposition guardrails:
+  [Control Plane Composition Refactor Target Module Map](./control-plane-composition-refactor-target-module-map.md)
 - Need worked navigation examples for architecture review, decomposition, runtime diagnostics, security-sensitive changes, and doc refactors:
   [Architecture Domain Navigation Worked Examples](../contributors/architecture-domain-navigation-worked-examples.ai.md)
 - Need worked examples for active-versus-historical source selection in decomposition, review, migration planning, and troubleshooting:
