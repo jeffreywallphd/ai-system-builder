@@ -11,6 +11,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.md
   - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.md
+  - docs/contributors/documentation-quality-monitoring-and-feedback-guide.md
   - dev/scripts/lint-docs.cjs
   - package.json
   - dev/tests/DocumentationRuleEvolutionStory735Guardrails.test.ts
@@ -93,6 +94,12 @@ Keep communication visible in canonical docs and contributor-facing guides, not 
 - If exceptions become frequent, tune scope/severity or split the rule so legitimate non-standard cases are explicitly modeled.
 - Keep exception handling narrow and path-bound; do not convert repeated exceptions into silent global bypass.
 - Use `docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md` to classify legitimate cases before changing rule policy.
+
+## Monitoring Feedback Loop (Story 7.4.3)
+
+- Use `docs/contributors/documentation-quality-monitoring-and-feedback-guide.md` as the recurring signal review loop.
+- Treat repeated false positives, noisy-rule patterns, and contributor-friction signals as rollout-readiness gates for promotion.
+- If monitoring shows stale standards (docs, validators, tests diverging), pause promotion and realign assets in one pull request.
 
 ## Contributor Workflow Expectations During Rule Rollout
 

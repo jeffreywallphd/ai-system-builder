@@ -15,6 +15,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
+  - docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
@@ -26,6 +27,7 @@ related_code_paths:
   - dev/tests/DocumentationRuleEvolutionStory735Guardrails.test.ts
   - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
   - dev/tests/DocumentationQualityExceptionsStory742Guardrails.test.ts
+  - dev/tests/DocumentationQualityMonitoringStory743Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Quality Standard
@@ -268,6 +270,25 @@ Escalation and anti-abuse boundaries:
 - scope is narrow: exceptions never waive unrelated findings.
 
 Use `docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md` for contributor workflow and record format.
+
+## Monitoring and Continuous Improvement Signals (Story 7.4.3)
+
+Use lightweight recurring monitoring to evaluate enforcement quality over time without introducing a heavy metrics program.
+
+- Monitor false positives by rule and path family; repeated classes should trigger scope tuning before severity escalation.
+- Monitor noisy rules that generate low-action warnings; keep warning-level, refine scope, or deprecate/replace when signal quality stays poor.
+- Monitor rule drift and stale standards: governance docs, validators, and guardrail tests should remain aligned in the same pull request.
+- Monitor contributor friction using PR remediation churn, repeated confusion on the same checks, and recurring exception requests.
+- Monitor exception churn (`rule_ids` + `paths` renewals) as a rule-design debt signal requiring tuning or migration planning.
+
+Operational expectations:
+
+- Run a practical cadence review (for example every two to four weeks or release-boundary review) using existing PR and lint evidence.
+- Prefer small corrective actions first: guidance clarification, scope narrowing, and warning-level policy tuning.
+- Document decisions and owners in PRs or linked issues so continuous improvement work remains explicit and finite.
+- Keep monitoring qualitative and actionable; do not require custom telemetry or mandatory KPI dashboards for this slice.
+
+Use `docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md` for contributor-facing monitoring loop and triage workflow.
 
 ## Recommended Guidance (Non-Blocking)
 

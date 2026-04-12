@@ -18,6 +18,7 @@ related_code_paths:
   - docs/context/governance/documentation-quality-standard.md
   - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md
   - docs/contributors/documentation-quality-rule-evolution-guide.md
+  - docs/contributors/documentation-quality-monitoring-and-feedback-guide.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.md
   - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
 ---
@@ -104,6 +105,13 @@ To keep maintenance cost proportional:
 - Do not allow exceptions to become hidden permanent bypasses; require renewal evidence and retire expired exceptions.
 - Align exception workflow updates across policy docs, contributor guides, and guardrail tests in the same pull request.
 
+## Monitoring Signals as Maintenance Input (Story 7.4.3)
+
+- Use the monitoring loop from `docs/contributors/documentation-quality-monitoring-and-feedback-guide.md` to detect false positives, noisy rules, stale standards, and contributor friction.
+- Treat recurring monitoring signals as planned maintenance input, not ad hoc one-off fixes.
+- Prioritize scope tuning and guidance clarity before adding stricter gates when contributor friction remains high.
+- Capture monitoring-driven decisions in linked issues or PR notes with owner and review date.
+
 ## Required Documentation Updates for Tooling Changes
 
 Any pull request that changes docs-quality tooling or rule behavior should update, when relevant:
@@ -113,6 +121,7 @@ Any pull request that changes docs-quality tooling or rule behavior should updat
 - `documentation-quality-checks-run-and-fix-guide`
 - `documentation-quality-exceptions-and-escape-hatches-guide`
 - `documentation-quality-rule-evolution-guide`
+- `documentation-quality-monitoring-and-feedback-guide`
 - this maintenance guide
 
 ## Completion Boundary for This Governance Slice (Story 7.4.1)

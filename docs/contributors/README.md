@@ -32,6 +32,7 @@
 - [Documentation Quality Exceptions and Escape Hatches Guide](./documentation-quality-exceptions-and-escape-hatches-guide.md)
 - [Documentation Quality Rule Evolution Guide](./documentation-quality-rule-evolution-guide.md)
 - [Documentation Quality Tooling Maintenance Guide](./documentation-quality-tooling-maintenance-guide.md)
+- [Documentation Quality Monitoring and Feedback Guide](./documentation-quality-monitoring-and-feedback-guide.md)
 - [Documentation Quality Worked Examples](./documentation-quality-worked-examples.md)
 - [Context Engineering System Contributor Guide](./context-engineering-system-guide.md)
 - [Router and Overview Writing Standard](./router-overview-writing-standard.md)
