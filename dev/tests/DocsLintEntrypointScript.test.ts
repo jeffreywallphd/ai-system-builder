@@ -22,6 +22,7 @@ describe("docs lint entrypoint script", () => {
     expect(result.stdout).toContain("- architecture-domains:");
     expect(result.stdout).toContain("- segmentation:");
     expect(result.stdout).toContain("- cross-references:");
+    expect(result.stdout).toContain("- category-compliance:");
   });
 
   it("runs a selected check successfully against the repository", () => {
@@ -44,6 +45,17 @@ describe("docs lint entrypoint script", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Docs lint passed.");
     expect(result.stdout).toContain("[PASS] cross-references");
+  });
+
+  it("runs the category-compliance check successfully against the repository", () => {
+    const result = spawnSync("node", [lintScriptPath, "--checks", "category-compliance"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Docs lint passed.");
+    expect(result.stdout).toContain("[PASS] category-compliance");
   });
 
   it("returns argument error for unknown check identifiers", () => {

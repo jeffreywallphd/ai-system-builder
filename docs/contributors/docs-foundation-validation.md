@@ -13,8 +13,10 @@ related_code_paths:
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
+  - dev/scripts/validate-docs-category-compliance.cjs
   - dev/tests/DocsLintEntrypointScript.test.ts
   - dev/tests/DocsFoundationValidationScript.test.ts
+  - dev/tests/DocsCategoryComplianceValidationScript.test.ts
   - dev/tests/DocumentationRegistryValidationScript.test.ts
   - dev/tests/DocumentationRegistryCrossReferenceValidationStory642Guardrails.test.ts
   - dev/tests/AdrValidationScript.test.ts
@@ -66,6 +68,7 @@ Use this guide when you need a fast contract check for the documentation foundat
 - Registry validation also enforces cross-reference integrity for indexed `relatedDocs` to `relatedRecordIds` alignment.
 - High-value docs link validation catches broken internal documentation links across architecture docs, ADR records, routing docs, index docs, and governance quality standards.
 - Cross-reference validation enforces routing doc path to `relatedDocRecordIds` alignment, documentation-index record/link alignment, architecture `## Related ADRs` registration integrity, and supersession-registry alignment for indexed superseded docs.
+- Category-compliance validation enforces ADR record placement in `docs/adr/records`, baseline/historical status-authority expectations, and routing references restricted to active non-historical registry records.
 
 ## Run Locally
 
@@ -82,6 +85,7 @@ npm run docs:validate:adr
 npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
 npm run docs:validate:cross-references
+npm run docs:validate:category-compliance
 ```
 
 ## CI Usage
@@ -101,6 +105,7 @@ npm run docs:validate:adr
 npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
 npm run docs:validate:cross-references
+npm run docs:validate:category-compliance
 ```
 
 ## Failure Output
@@ -176,6 +181,15 @@ Examples:
 - `INDEX_RECORD_REFERENCE_INVALID`
 - `INDEX_RECORD_LINK_MISMATCH`
 - `SUPERSESSION_REGISTRY_ALIGNMENT_INVALID`
+- `CATEGORY_SOURCE_INVALID`
+- `CATEGORY_ADR_PATH_INVALID`
+- `CATEGORY_ADR_REGISTRY_MISMATCH`
+- `CATEGORY_BASELINE_PATH_INVALID`
+- `CATEGORY_BASELINE_STATUS_INVALID`
+- `CATEGORY_BASELINE_AUTHORITY_INVALID`
+- `CATEGORY_HISTORICAL_AUTHORITY_INVALID`
+- `CATEGORY_ROUTING_STATUS_INVALID`
+- `CATEGORY_ROUTING_AUTHORITY_INVALID`
 
 ## Scope Notes
 
