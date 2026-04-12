@@ -41,13 +41,13 @@ export const AuthoritativeServerBootstrapReadinessStates = Object.freeze({
 export type AuthoritativeServerBootstrapReadinessState =
   typeof AuthoritativeServerBootstrapReadinessStates[keyof typeof AuthoritativeServerBootstrapReadinessStates];
 
-export const AuthoritativeServerBootstrapStageAdoptionStates = Object.freeze({
+export const AuthoritativeServerBootstrapPipelineStageAdoptionStates = Object.freeze({
   active: "active",
   planned: "planned",
 });
 
-export type AuthoritativeServerBootstrapStageAdoptionState =
-  typeof AuthoritativeServerBootstrapStageAdoptionStates[keyof typeof AuthoritativeServerBootstrapStageAdoptionStates];
+export type AuthoritativeServerBootstrapPipelineStageAdoptionState =
+  typeof AuthoritativeServerBootstrapPipelineStageAdoptionStates[keyof typeof AuthoritativeServerBootstrapPipelineStageAdoptionStates];
 
 export interface AuthoritativeServerBootstrapStageFailure {
   readonly name: string;
@@ -58,7 +58,7 @@ export interface AuthoritativeServerBootstrapPipelineStageDefinition {
   readonly stageId: AuthoritativeServerBootstrapPipelineStageId;
   readonly sequence: number;
   readonly description: string;
-  readonly adoptionState: AuthoritativeServerBootstrapStageAdoptionState;
+  readonly adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionState;
   readonly ownedModules: ReadonlyArray<AuthoritativeServerCompositionModuleId>;
   readonly hostBootstrapBindings: ReadonlyArray<HostBootstrapStageId>;
   readonly authoritativeStageBindings: ReadonlyArray<AuthoritativeServerBootstrapStageId>;
@@ -86,7 +86,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.configurationLoad,
     sequence: 1,
     description: "Resolve startup configuration, deployment profile, runtime metadata, and tracing prerequisites.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
+    adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.startupConfiguration,
       AuthoritativeServerCompositionModuleIds.diagnostics,
@@ -98,7 +98,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.securityMaterialResolution,
     sequence: 2,
     description: "Resolve transport trust and required secret material readiness before persistence and transport activation.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
+    adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.securityBootstrap,
     ]),
@@ -109,7 +109,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.persistenceInitialization,
     sequence: 3,
     description: "Initialize persistence runtime and compose persistent platform services for control-plane startup dependencies.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
+    adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.persistenceBootstrap,
     ]),
@@ -120,7 +120,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.migrationExecution,
     sequence: 4,
     description: "Execute persistence migrations and baseline data-shape checks before policy and transport composition.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
+    adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.persistenceBootstrap,
     ]),
@@ -131,7 +131,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.subsystemComposition,
     sequence: 5,
     description: "Compose policy, service/route plans, optional execution adapters, and control-plane API startup options.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
+    adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.policyBootstrap,
       AuthoritativeServerCompositionModuleIds.servicePlan,
@@ -153,7 +153,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.readinessVerification,
     sequence: 6,
     description: "Verify startup coverage assertions and readiness signals before exposing the transport as ready.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
+    adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.servicePlan,
       AuthoritativeServerCompositionModuleIds.routePlan,
@@ -166,7 +166,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.transportStartup,
     sequence: 7,
     description: "Start authoritative transport/runtime host using the composed startup options and verified readiness dependencies.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
+    adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.transport,
     ]),
@@ -177,7 +177,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.shutdownPreparation,
     sequence: 8,
     description: "Prepare deterministic shutdown/disposal contracts so startup-owned resources have explicit cleanup boundaries.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
+    adoptionState: AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.transport,
       AuthoritativeServerCompositionModuleIds.persistenceBootstrap,
