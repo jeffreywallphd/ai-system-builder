@@ -1,61 +1,26 @@
 # AI Companion: Secret-Backed Feature Contributor Guide
 
+Primary reference: `docs/secret-backed-feature-contributor-guide.md`
+
 ## Purpose
 
-Story 8.3.7 operational companion for Feature 8 / Epic 8.3: give contributors a concrete setup + implementation checklist for secret-backed features.
+Guide contributors on how to add secret-backed behavior while preserving hardened startup policy, scope boundaries, and diagnostics/audit safety.
 
-## Setup baseline
+## Core Expectations
 
-- Configure host envelope encryption (`AI_LOOM_SECRET_MASTER_KEY_ID`, `AI_LOOM_SECRET_MASTER_KEY`).
-- Configure required bootstrap secrets when needed (`AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`).
-- Validate health/diagnostics before integrating dependent runtime features.
+- choose explicit owner scope (`server`, `workspace`, `user`)
+- use scoped provider retrieval adapters; avoid direct env/persistence shortcuts
+- keep plaintext out of query/list/diagnostic surfaces
+- keep audit and log details redaction-safe
+- respect production fail-fast vs development/test optional policy behavior
 
-## Startup Security Material Baseline (Story 3.1.6)
+## Extension Paths
 
-- Production-like startup must use durable configured values for critical token/encryption secrets:
-  - `AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET`
-  - `AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY` (or durable legacy `AI_LOOM_SECRET_MASTER_KEY` source)
-  - `AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET` (or durable legacy `AI_LOOM_SECRET_MASTER_KEY` source)
-  - `AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET` (or durable legacy `AI_LOOM_SECRET_MASTER_KEY` source)
-  - `AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET` (or durable legacy `AI_LOOM_SECRET_MASTER_KEY` source)
-  - non-empty `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS` for required system signing/provider secret IDs.
-- Development/test startup may continue with warning diagnostics when startup policy marks material optional with governed ephemeral fallback.
-- Managed TLS startup policy:
-  - if `AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED=true`, configure `AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF` and a server-scoped `AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID` (`server:*`).
-  - if managed TLS is disabled, managed-CA key-reference validation is not required for startup.
+- new secret consumer: define classification/hierarchy/policy, route runtime retrieval through official ports, and add policy-aware tests
+- new provider backend: implement `ISecretProviderMaterialResolutionPort`, emit full metadata model, and integrate routing in `DefaultSecretProviderResolutionService`
 
-## Contributor implementation rules
+## Validation
 
-- Choose scope by ownership (`server`, `workspace`, `user`) and keep it explicit.
-- Runtime secret reads go through adapters/use cases (`ISecretRuntimeConsumptionAdapters`, `ServerPlatformSecretConsumers`, or `ISecretProviderMaterialResolutionPort`), not env vars/persistence shortcuts.
-- Server-scoped control-plane material (provider credentials, server signing keys, fail-fast runtime secrets) must resolve through `ISecretProviderMaterialResolutionPort`, which routes through the durable server backend.
-- Do not place workspace-shared or user-personal credentials into server-scoped material IDs.
-- Keep command/query DTO boundaries strict: plaintext only for mutation input.
-- Enforce log/audit redaction; plaintext and decrypted values are never allowed.
-- Handle `forbidden`/`conflict` outcomes deterministically; do not retry with broadened scope silently.
-- Treat rotation as active-version replacement; use optimistic version matching for sensitive update flows.
-
-## Recommended adapters
-
-- workspace credential: `resolveWorkspaceProviderCredential(...)`
-- user personal API key: `resolveUserPersonalApiKey(...)`
-- server signing/provider credentials: `ServerPlatformSecretConsumers`
-- provider bootstrap/read/metadata/existence: `ISecretProviderMaterialResolutionPort`
-
-## Related docs
-
-- `docs/architecture/secrets-feature-extension-guidance.md`
-- `docs/architecture/secrets-service-consumption-adapters.md`
-- `docs/secret-bootstrap-and-migration-operations.md`
-- `docs/secret-health-and-operational-diagnostics.md`
-
-## Story 8.3.8 regression baseline
-
-Final production-readiness hardening now expects these regression seams to stay green:
-
-- `src/application/security/tests/ReEncryptSecretsUseCase.test.ts`
-  - ensures re-encryption failure status uses safe fixed messages and does not persist raw exception text.
-- `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
-  - validates end-to-end lifecycle consistency across create/rotate/retrieve/re-encrypt/delete with audit redaction checks.
-- `src/infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
-  - validates API error sanitization for opaque sensitive token-like values.
+- verify `/api/v1/security/secrets/health`
+- verify trusted `/api/v1/security/secrets/diagnostics`
+- update docs/tests when adding new required secrets, policy behavior, or backend kinds
