@@ -52,8 +52,11 @@ import type {
   IdentityServerHost,
   IdentityServerHostOptions,
 } from "./IdentityServerHost";
+import { AuthoritativeServerReadinessCheckStates } from "./AuthoritativeServerBootstrapStageContracts";
 import type {
   AuthoritativeServerConfigBootstrapStage,
+  AuthoritativeServerReadinessCheck,
+  AuthoritativeServerReadinessCheckState,
   AuthoritativeServerSecurityBootstrapStage,
   AuthoritativeServerSecurityStageOutput,
 } from "./AuthoritativeServerBootstrapStageContracts";
@@ -67,6 +70,7 @@ import {
   type AuthoritativeServerBootstrapReadinessState,
   type AuthoritativeServerBootstrapStageFailure,
   createAuthoritativeServerBootstrapPipelineState,
+  deriveAuthoritativeServerBootstrapReadiness,
   listAuthoritativeServerBootstrapPipelineStages,
   updateAuthoritativeServerBootstrapPipelineStageState,
 } from "./composition/contracts/AuthoritativeServerBootstrapPipelineStateModel";
@@ -99,6 +103,16 @@ export interface AuthoritativeServerBootstrapOrchestratorStageStatus {
   readonly readiness: AuthoritativeServerBootstrapReadinessState;
 }
 
+export interface AuthoritativeServerBootstrapReadinessReport {
+  readonly state: AuthoritativeServerBootstrapReadinessState;
+  readonly checks: ReadonlyArray<AuthoritativeServerReadinessCheck>;
+  readonly totalCheckCount: number;
+  readonly readyCheckCount: number;
+  readonly degradedCheckCount: number;
+  readonly failedCheckCount: number;
+  readonly blockingFailureCount: number;
+}
+
 export interface AuthoritativeServerBootstrapOrchestratorResult {
   readonly startedHost: IdentityServerHost;
   readonly startupTracer: StartupTracer;
@@ -106,6 +120,7 @@ export interface AuthoritativeServerBootstrapOrchestratorResult {
   readonly persistenceRuntime?: SqlitePersistenceRuntime;
   readonly persistentPlatformServices?: AuthoritativePersistentPlatformServices;
   readonly stageStatus: AuthoritativeServerBootstrapOrchestratorStageStatus;
+  readonly readinessReport: AuthoritativeServerBootstrapReadinessReport;
 }
 
 export interface AuthoritativeServerBootstrapOrchestratorInput {
@@ -229,21 +244,93 @@ function createStageStatusSnapshot(
       failure: stage?.failure,
     } satisfies AuthoritativeServerBootstrapStageRuntimeStatus);
   });
-  const readiness = stageStatuses.some(
-    (stage) => stage.executionState === AuthoritativeServerBootstrapStageExecutionStates.failed,
-  )
-    ? AuthoritativeServerBootstrapReadinessStates.degraded
-    : (
-      runtimeStages.find((stage) => stage.stageId === AuthoritativeServerBootstrapPipelineStageIds.transportStartup)?.state
-        === AuthoritativeServerBootstrapStageExecutionStates.success
-      && runtimeStages.find((stage) => stage.stageId === AuthoritativeServerBootstrapPipelineStageIds.readinessVerification)?.state
-        === AuthoritativeServerBootstrapStageExecutionStates.success
-        ? AuthoritativeServerBootstrapReadinessStates.ready
-        : AuthoritativeServerBootstrapReadinessStates.notReady
-    );
   return Object.freeze({
     stages: Object.freeze(runtimeStages),
-    readiness,
+    readiness: deriveAuthoritativeServerBootstrapReadiness(stageStatuses),
+  });
+}
+
+function createReadinessCheck(input: {
+  readonly checkId: string;
+  readonly subsystem: string;
+  readonly state: AuthoritativeServerReadinessCheckState;
+  readonly summary: string;
+  readonly blocking: boolean;
+  readonly details?: Readonly<Record<string, string>>;
+}): AuthoritativeServerReadinessCheck {
+  return Object.freeze({
+    checkId: input.checkId,
+    subsystem: input.subsystem,
+    state: input.state,
+    summary: input.summary,
+    blocking: input.blocking,
+    details: input.details ? Object.freeze({ ...input.details }) : undefined,
+  });
+}
+
+function summarizeReadinessCheckState(
+  checks: ReadonlyArray<AuthoritativeServerReadinessCheck>,
+): {
+  readonly readyCheckCount: number;
+  readonly degradedCheckCount: number;
+  readonly failedCheckCount: number;
+  readonly blockingFailureCount: number;
+} {
+  let readyCheckCount = 0;
+  let degradedCheckCount = 0;
+  let failedCheckCount = 0;
+  let blockingFailureCount = 0;
+  for (const check of checks) {
+    if (check.state === AuthoritativeServerReadinessCheckStates.ready) {
+      readyCheckCount += 1;
+      continue;
+    }
+    if (check.state === AuthoritativeServerReadinessCheckStates.degraded) {
+      degradedCheckCount += 1;
+      if (check.blocking) {
+        blockingFailureCount += 1;
+      }
+      continue;
+    }
+    failedCheckCount += 1;
+    if (check.blocking) {
+      blockingFailureCount += 1;
+    }
+  }
+  return Object.freeze({
+    readyCheckCount,
+    degradedCheckCount,
+    failedCheckCount,
+    blockingFailureCount,
+  });
+}
+
+function deriveReadinessStateFromChecks(
+  checks: ReadonlyArray<AuthoritativeServerReadinessCheck>,
+): AuthoritativeServerBootstrapReadinessState {
+  if (checks.some((check) => (
+    check.state === AuthoritativeServerReadinessCheckStates.failed
+    || check.state === AuthoritativeServerReadinessCheckStates.degraded
+  ))) {
+    return AuthoritativeServerBootstrapReadinessStates.degraded;
+  }
+  return AuthoritativeServerBootstrapReadinessStates.ready;
+}
+
+function createReadinessReport(input: {
+  readonly checks: ReadonlyArray<AuthoritativeServerReadinessCheck>;
+  readonly stageStatuses: ReadonlyArray<AuthoritativeServerBootstrapPipelineStageStatus>;
+}): AuthoritativeServerBootstrapReadinessReport {
+  const checks = Object.freeze([...input.checks]);
+  const counts = summarizeReadinessCheckState(checks);
+  return Object.freeze({
+    state: deriveAuthoritativeServerBootstrapReadiness(input.stageStatuses),
+    checks,
+    totalCheckCount: checks.length,
+    readyCheckCount: counts.readyCheckCount,
+    degradedCheckCount: counts.degradedCheckCount,
+    failedCheckCount: counts.failedCheckCount,
+    blockingFailureCount: counts.blockingFailureCount,
   });
 }
 
@@ -303,6 +390,7 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
       let startedHost: IdentityServerHost | undefined;
       let persistenceRuntime: SqlitePersistenceRuntime | undefined;
       let persistentPlatformServices: AuthoritativePersistentPlatformServices | undefined;
+      const readinessChecks: AuthoritativeServerReadinessCheck[] = [];
       const configStage = input.bootstrap?.createConfigStage?.();
       const securityStage = input.bootstrap?.createSecurityStage?.();
       if (!configStage) {
@@ -469,6 +557,7 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
                   startupTracer,
                   hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
                 });
+                readinessChecks.push(...security.checks);
                 context.setArtifact(AuthoritativeServerSecurityBootstrapArtifactKey, security);
                 return security;
               },
@@ -563,6 +652,7 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
               metadata: Object.freeze({
                 hostBootstrapStageId: HostBootstrapStageIds.featureRegistration,
               }),
+              readinessState: AuthoritativeServerBootstrapReadinessStates.notReady,
               run: () => {
                 const plan = context.getArtifact<HostServiceRegistrationPlan>(
                   AuthoritativeServerServiceRegistrationPlanArtifactKey,
@@ -595,9 +685,96 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
                 if (!securityOutput) {
                   throw new Error("Authoritative server startup requires security material resolution before readiness verification.");
                 }
-                (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
-                (input.bootstrap?.assertApiRouteRegistrationCoverage
-                  ?? assertAuthoritativeServerApiRouteRegistrationCoverage)(apiRouteRegistrationPlan);
+                readinessChecks.push(createReadinessCheck({
+                  checkId: "persistence.runtime-started",
+                  subsystem: "persistence",
+                  state: persistenceRuntime
+                    ? AuthoritativeServerReadinessCheckStates.ready
+                    : AuthoritativeServerReadinessCheckStates.failed,
+                  summary: persistenceRuntime
+                    ? "Persistence runtime was initialized and started."
+                    : "Persistence runtime is missing.",
+                  blocking: true,
+                }));
+                readinessChecks.push(createReadinessCheck({
+                  checkId: "persistence.platform-services-composed",
+                  subsystem: "persistence",
+                  state: composedPersistentServices
+                    ? AuthoritativeServerReadinessCheckStates.ready
+                    : AuthoritativeServerReadinessCheckStates.failed,
+                  summary: composedPersistentServices
+                    ? "Persistent platform services are composed."
+                    : "Persistent platform services are missing.",
+                  blocking: true,
+                }));
+                readinessChecks.push(createReadinessCheck({
+                  checkId: "migrations.bootstrap-resolution",
+                  subsystem: "migrations",
+                  state: deploymentPolicyBootstrap
+                    ? AuthoritativeServerReadinessCheckStates.ready
+                    : AuthoritativeServerReadinessCheckStates.failed,
+                  summary: deploymentPolicyBootstrap
+                    ? "Deployment policy bootstrap resolution is available."
+                    : "Deployment policy bootstrap resolution is missing.",
+                  blocking: true,
+                }));
+
+                try {
+                  (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
+                  readinessChecks.push(createReadinessCheck({
+                    checkId: "composition.service-coverage",
+                    subsystem: "composition",
+                    state: AuthoritativeServerReadinessCheckStates.ready,
+                    summary: "Authoritative control-plane service coverage is complete.",
+                    blocking: true,
+                  }));
+                } catch (error) {
+                  readinessChecks.push(createReadinessCheck({
+                    checkId: "composition.service-coverage",
+                    subsystem: "composition",
+                    state: AuthoritativeServerReadinessCheckStates.failed,
+                    summary: "Authoritative control-plane service coverage verification failed.",
+                    blocking: true,
+                    details: Object.freeze({
+                      error: summarizeStageFailure(error).message,
+                    }),
+                  }));
+                  throw error;
+                }
+                try {
+                  (input.bootstrap?.assertApiRouteRegistrationCoverage
+                    ?? assertAuthoritativeServerApiRouteRegistrationCoverage)(apiRouteRegistrationPlan);
+                  readinessChecks.push(createReadinessCheck({
+                    checkId: "composition.route-coverage",
+                    subsystem: "composition",
+                    state: AuthoritativeServerReadinessCheckStates.ready,
+                    summary: "Authoritative API route registration coverage is complete.",
+                    blocking: true,
+                  }));
+                } catch (error) {
+                  readinessChecks.push(createReadinessCheck({
+                    checkId: "composition.route-coverage",
+                    subsystem: "composition",
+                    state: AuthoritativeServerReadinessCheckStates.failed,
+                    summary: "Authoritative API route registration coverage verification failed.",
+                    blocking: true,
+                    details: Object.freeze({
+                      error: summarizeStageFailure(error).message,
+                    }),
+                  }));
+                  throw error;
+                }
+                readinessChecks.push(createReadinessCheck({
+                  checkId: "orchestration-recovery.prerequisites",
+                  subsystem: "orchestration-recovery",
+                  state: deploymentPolicyBootstrap.contextResolver
+                    ? AuthoritativeServerReadinessCheckStates.ready
+                    : AuthoritativeServerReadinessCheckStates.degraded,
+                  summary: deploymentPolicyBootstrap.contextResolver
+                    ? "Orchestration recovery prerequisites are available."
+                    : "Orchestration recovery prerequisites are incomplete.",
+                  blocking: false,
+                }));
               },
             });
             await runBootstrapStage({
@@ -605,7 +782,7 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
               metadata: Object.freeze({
                 hostBootstrapStageId: HostBootstrapStageIds.featureRegistration,
               }),
-              readinessState: AuthoritativeServerBootstrapReadinessStates.ready,
+              readinessState: deriveReadinessStateFromChecks(readinessChecks),
               run: async () => {
                 const composedPersistentServices = context.getArtifact<AuthoritativePersistentPlatformServices>(
                   AuthoritativeServerPersistentPlatformServicesArtifactKey,
@@ -628,6 +805,27 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
                   routeRegistrationPlan: apiRouteRegistrationPlan as AuthoritativeApiRouteRegistrationPlan,
                   runExecutionAdapters: runExecutionAdapterRegistration,
                 });
+                const transportBindingReady = Number.isInteger(startedHost.port)
+                  && startedHost.port > 0
+                  && startedHost.address.trim().length > 0;
+                readinessChecks.push(createReadinessCheck({
+                  checkId: "transport.binding",
+                  subsystem: "transport",
+                  state: transportBindingReady
+                    ? AuthoritativeServerReadinessCheckStates.ready
+                    : AuthoritativeServerReadinessCheckStates.failed,
+                  summary: transportBindingReady
+                    ? "Transport binding is active and reports runtime address/port."
+                    : "Transport binding did not report a valid runtime address/port.",
+                  blocking: true,
+                  details: Object.freeze({
+                    address: startedHost.address,
+                    port: String(startedHost.port),
+                  }),
+                }));
+                if (!transportBindingReady) {
+                  throw new Error("Authoritative server startup produced an invalid transport binding.");
+                }
                 context.setArtifact(StartedHostArtifactKey, startedHost);
               },
             });
@@ -662,6 +860,10 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
           persistenceRuntime,
           persistentPlatformServices,
           stageStatus: createStageStatusSnapshot(bootstrapState.stages),
+          readinessReport: createReadinessReport({
+            checks: readinessChecks,
+            stageStatuses: bootstrapState.stages,
+          }),
         });
       } finally {
         startupRootSpan.complete();

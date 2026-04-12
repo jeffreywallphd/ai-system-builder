@@ -44,7 +44,10 @@ import {
   type AuthoritativeServerSecurityBootstrapStage,
 } from "./AuthoritativeServerSecurityBootstrapStage";
 import type { AuthoritativeServerStartupBaselineRecordResult } from "./AuthoritativeServerStartupBaselineRecorder";
-import { createAuthoritativeServerBootstrapOrchestrator } from "./AuthoritativeServerBootstrapOrchestrator";
+import {
+  createAuthoritativeServerBootstrapOrchestrator,
+  type AuthoritativeServerBootstrapReadinessReport,
+} from "./AuthoritativeServerBootstrapOrchestrator";
 import {
   AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
   AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
@@ -231,6 +234,15 @@ export function createAuthoritativeServerCompositionRoot(
         readonly durationMs?: number;
         readonly failure?: Readonly<Record<string, string>>;
       }> = [];
+      let startupReadinessReport: AuthoritativeServerBootstrapReadinessReport = Object.freeze({
+        state: "not-ready",
+        checks: Object.freeze([]),
+        totalCheckCount: 0,
+        readyCheckCount: 0,
+        degradedCheckCount: 0,
+        failedCheckCount: 0,
+        blockingFailureCount: 0,
+      });
       const pipelineStageSummaries: AuthoritativeServerPipelineStageSummary[] = [];
 
       await lifecycle.markComposing("compose-authoritative-server-host");
@@ -319,6 +331,7 @@ export function createAuthoritativeServerCompositionRoot(
         persistenceRuntime = bootstrapResult.persistenceRuntime;
         persistentPlatformServices = bootstrapResult.persistentPlatformServices;
         authoritativeStageStatus = bootstrapResult.stageStatus.stages;
+        startupReadinessReport = bootstrapResult.readinessReport;
 
         const activeHost = startedHost;
         const activePersistenceRuntime = persistenceRuntime;
@@ -416,6 +429,14 @@ export function createAuthoritativeServerCompositionRoot(
             sequence: stage.sequence,
             failure: stage.failure,
           }));
+        const summaryReadinessReport = (
+          startupReadinessReport.totalCheckCount > 0 || authoritativeStageStatus.length > 0
+            ? startupReadinessReport
+            : Object.freeze({
+              ...startupReadinessReport,
+              state: pipelineFailures.length > 0 ? "degraded" : "not-ready",
+            } satisfies AuthoritativeServerBootstrapReadinessReport)
+        );
         const startupSummary = Object.freeze({
           event: "authoritative-server.startup.summary",
           hostId: boot.host.hostId,
@@ -443,6 +464,10 @@ export function createAuthoritativeServerCompositionRoot(
                 sequence: stage.sequence,
                 failure: stage.failure,
               }))),
+          }),
+          startupResult: Object.freeze({
+            outcome: startupFailure ? "failed" : "succeeded",
+            readiness: summaryReadinessReport,
           }),
           startupFailure: startupFailure ? summarizeStartupError(startupFailure) : undefined,
         });

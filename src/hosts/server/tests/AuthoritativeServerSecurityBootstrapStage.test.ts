@@ -5,6 +5,7 @@ import { createStartupTracer } from "@hosts/bootstrap/startupTracer";
 import { advertiseHostRuntimeMetadata } from "@hosts/HostRuntimeMetadataCatalog";
 import { AuthoritativeServerHostRuntime } from "../../HostRuntimeCatalog";
 import { createAuthoritativeServerSecurityBootstrapStage } from "../AuthoritativeServerSecurityBootstrapStage";
+import { AuthoritativeServerReadinessCheckStates } from "../AuthoritativeServerBootstrapStageContracts";
 
 describe("AuthoritativeServerSecurityBootstrapStage", () => {
   it("returns readiness defaults when no custom checks are configured", async () => {
@@ -28,11 +29,29 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
       }),
     });
 
-    expect(output).toEqual({
-      transportTrustReady: true,
-      certificateAuthorityReady: true,
-      requiredSecretsValidated: true,
-    });
+    expect(output.checks).toEqual([
+      {
+        checkId: "security.transport-trust-material",
+        subsystem: "security",
+        state: AuthoritativeServerReadinessCheckStates.ready,
+        summary: "Transport trust material is available.",
+        blocking: false,
+      },
+      {
+        checkId: "security.certificate-authority-material",
+        subsystem: "security",
+        state: AuthoritativeServerReadinessCheckStates.ready,
+        summary: "Certificate authority material is available.",
+        blocking: false,
+      },
+      {
+        checkId: "security.required-secrets",
+        subsystem: "security",
+        state: AuthoritativeServerReadinessCheckStates.ready,
+        summary: "Required secret material is validated.",
+        blocking: false,
+      },
+    ]);
   });
 
   it("supports explicit readiness checks for independent stage execution", async () => {
@@ -78,8 +97,13 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
     });
 
     expect(calls).toEqual(["transport", "ca", "secrets"]);
-    expect(output.transportTrustReady).toBeTrue();
-    expect(output.certificateAuthorityReady).toBeTrue();
-    expect(output.requiredSecretsValidated).toBeFalse();
+    expect(output.checks.map((check) => check.checkId)).toEqual([
+      "security.transport-trust-material",
+      "security.certificate-authority-material",
+      "security.required-secrets",
+    ]);
+    expect(output.checks[0]?.state).toBe(AuthoritativeServerReadinessCheckStates.ready);
+    expect(output.checks[1]?.state).toBe(AuthoritativeServerReadinessCheckStates.ready);
+    expect(output.checks[2]?.state).toBe(AuthoritativeServerReadinessCheckStates.degraded);
   });
 });
