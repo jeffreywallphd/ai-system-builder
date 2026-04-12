@@ -4,6 +4,28 @@ import {
   type SharedApiErrorShape,
 } from "@shared/contracts/api/SharedApiContractPrimitives";
 
+type TransportErrorResponse = {
+  readonly ok: boolean;
+  readonly error?: {
+    readonly code?: string;
+  };
+};
+
+type TransportErrorStatusCodeByDomainCode = Readonly<Record<string, number>>;
+
+export interface TransportErrorTranslationOptions {
+  readonly successStatusCode?: number;
+  readonly statusCodeByDomainCode?: TransportErrorStatusCodeByDomainCode;
+  readonly fallbackStatusCode?: number;
+}
+
+export interface TransportErrorTranslationResult {
+  readonly statusCode: number;
+  readonly domainCode: string | undefined;
+  readonly sharedCode: SharedApiErrorCode | undefined;
+  readonly retryable: boolean;
+}
+
 type ErrorPayload = {
   readonly code?: string;
   readonly message?: string;
@@ -19,6 +41,71 @@ type ErrorEnvelope = {
 
 const SensitiveErrorMessagePattern =
   /([a-zA-Z]:\\|\/[A-Za-z0-9._-]+\/|password|secret|token|credential|stack|trace|sqlite|sql|exception)/i;
+
+const StandardAuthAndResourceStatusCodeByDomainCode = Object.freeze({
+  "invalid-request": 400,
+  "authentication-failed": 401,
+  forbidden: 403,
+  "not-found": 404,
+  conflict: 409,
+} satisfies Record<string, number>);
+
+const IdentityAuthStatusCodeByDomainCode = Object.freeze({
+  ...StandardAuthAndResourceStatusCodeByDomainCode,
+  "account-inactive": 403,
+  "unsupported-provider": 422,
+} satisfies Record<string, number>);
+
+const WorkspaceInvitationStatusCodeByDomainCode = Object.freeze({
+  ...StandardAuthAndResourceStatusCodeByDomainCode,
+  "invalid-invite": 400,
+} satisfies Record<string, number>);
+
+const WorkspaceAdministrationStatusCodeByDomainCode = Object.freeze({
+  ...StandardAuthAndResourceStatusCodeByDomainCode,
+  "invalid-transition": 422,
+} satisfies Record<string, number>);
+
+const StorageManagementStatusCodeByDomainCode = Object.freeze({
+  ...StandardAuthAndResourceStatusCodeByDomainCode,
+  "invalid-state": 422,
+  "capability-unsupported": 422,
+  "provisioning-failed": 409,
+} satisfies Record<string, number>);
+
+const AssetManagementStatusCodeByDomainCode = Object.freeze({
+  ...StandardAuthAndResourceStatusCodeByDomainCode,
+  "invalid-state": 422,
+} satisfies Record<string, number>);
+
+const ImageAssetManagementStatusCodeByDomainCode = Object.freeze({
+  ...StandardAuthAndResourceStatusCodeByDomainCode,
+  "invalid-state": 422,
+} satisfies Record<string, number>);
+
+const GeneratedResultManagementStatusCodeByDomainCode = Object.freeze({
+  "invalid-request": 400,
+  "authentication-failed": 401,
+  forbidden: 403,
+  "not-found": 404,
+  "invalid-state": 422,
+} satisfies Record<string, number>);
+
+const AuditLedgerStatusCodeByDomainCode = Object.freeze({
+  "invalid-request": 400,
+  "authentication-failed": 401,
+  forbidden: 403,
+  "not-found": 404,
+} satisfies Record<string, number>);
+
+const SystemRuntimeStatusCodeByDomainCode = Object.freeze({
+  "invalid-request": 400,
+  unauthorized: 401,
+  forbidden: 403,
+  "not-found": 404,
+  "quota-exceeded": 429,
+  "rate-limit-exceeded": 429,
+} satisfies Record<string, number>);
 
 export function normalizeSharedApiErrorEnvelope(payload: unknown): unknown {
   if (!isErrorEnvelope(payload)) {
@@ -107,6 +194,134 @@ export function mapSharedApiErrorCodeToStatusCode(code: SharedApiErrorCode): num
     default:
       return 500;
   }
+}
+
+export function translateTransportError(
+  response: TransportErrorResponse,
+  options: TransportErrorTranslationOptions = {},
+): TransportErrorTranslationResult {
+  const successStatusCode = options.successStatusCode ?? 200;
+  if (response.ok) {
+    return Object.freeze({
+      statusCode: successStatusCode,
+      domainCode: undefined,
+      sharedCode: undefined,
+      retryable: false,
+    });
+  }
+
+  const domainCode = normalizeString(response.error?.code);
+  const sharedCode = mapToSharedApiErrorCode(domainCode);
+  const normalizedDomainCode = domainCode?.toLowerCase();
+  const statusCodeByDomainCode = options.statusCodeByDomainCode;
+  const explicitStatusCode = normalizedDomainCode
+    ? statusCodeByDomainCode?.[normalizedDomainCode]
+    : undefined;
+  const fallbackStatusCode = options.fallbackStatusCode
+    ?? mapSharedApiErrorCodeToStatusCode(sharedCode);
+
+  return Object.freeze({
+    statusCode: explicitStatusCode ?? fallbackStatusCode,
+    domainCode,
+    sharedCode,
+    retryable: isRetryableSharedError(sharedCode),
+  });
+}
+
+function resolveTransportErrorStatusCode(
+  response: TransportErrorResponse,
+  options: TransportErrorTranslationOptions,
+): number {
+  return translateTransportError(response, options).statusCode;
+}
+
+export function mapIdentityAuthApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: IdentityAuthStatusCodeByDomainCode,
+  });
+}
+
+export function mapWorkspaceInvitationApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: WorkspaceInvitationStatusCodeByDomainCode,
+  });
+}
+
+export function mapWorkspaceAdministrationApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: WorkspaceAdministrationStatusCodeByDomainCode,
+  });
+}
+
+export function mapAuthorizationManagementApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: StandardAuthAndResourceStatusCodeByDomainCode,
+  });
+}
+
+export function mapNodeTrustApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: StandardAuthAndResourceStatusCodeByDomainCode,
+  });
+}
+
+export function mapExecutionNodeManagementApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: StandardAuthAndResourceStatusCodeByDomainCode,
+  });
+}
+
+export function mapCertificateOperationsApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: StandardAuthAndResourceStatusCodeByDomainCode,
+  });
+}
+
+export function mapSecretMetadataApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: StandardAuthAndResourceStatusCodeByDomainCode,
+  });
+}
+
+export function mapStorageManagementApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: StorageManagementStatusCodeByDomainCode,
+  });
+}
+
+export function mapAssetManagementApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: AssetManagementStatusCodeByDomainCode,
+  });
+}
+
+export function mapImageAssetManagementApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: ImageAssetManagementStatusCodeByDomainCode,
+  });
+}
+
+export function mapGeneratedResultManagementApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: GeneratedResultManagementStatusCodeByDomainCode,
+  });
+}
+
+export function mapAuditLedgerApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: AuditLedgerStatusCodeByDomainCode,
+  });
+}
+
+export function mapSystemRuntimeApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {
+    statusCodeByDomainCode: SystemRuntimeStatusCodeByDomainCode,
+    fallbackStatusCode: 500,
+  });
+}
+
+export function mapRunSubmissionApiStatusCode(response: TransportErrorResponse): number {
+  return resolveTransportErrorStatusCode(response, {});
 }
 
 function isErrorEnvelope(payload: unknown): payload is ErrorEnvelope {
