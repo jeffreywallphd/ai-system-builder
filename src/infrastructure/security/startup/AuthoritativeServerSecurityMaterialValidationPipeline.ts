@@ -1,11 +1,4 @@
 import {
-  SecurityMaterialConsumerSubsystems,
-  SecurityMaterialCreationModes,
-  SecurityMaterialHierarchyClasses,
-  SecurityMaterialOwningSubsystems,
-  SecurityMaterialRevocationModes,
-  SecurityMaterialRotationModes,
-  SecurityMaterialStorageSubsystems,
   SecurityMaterialCategories,
   SecurityMaterialDurabilityClasses,
   SecurityMaterialFallbackPolicies,
@@ -17,6 +10,15 @@ import {
   createSecurityMaterialClassificationContract,
   type SecurityMaterialLifecycleStage,
 } from "@application/security/contracts/SecurityMaterialClassificationContract";
+import {
+  SecurityMaterialConsumerSubsystems,
+  SecurityMaterialCreationModes,
+  SecurityMaterialHierarchyClasses,
+  SecurityMaterialOwningSubsystems,
+  SecurityMaterialRevocationModes,
+  SecurityMaterialRotationModes,
+  SecurityMaterialStorageSubsystems,
+} from "@application/security/contracts/SecurityMaterialKeyHierarchyContract";
 import {
   SecurityMaterialPersistenceKinds,
   SecurityMaterialSourceKinds,
