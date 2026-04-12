@@ -34,7 +34,6 @@ import {
   ChangeLocalPasswordCredentialVerificationModes,
   IdentityAuthApiErrorCodes,
   type ChangeLocalPasswordCredentialApiRequest,
-  type AuthenticatedIdentityPrincipalApiResponse,
   type GetIdentityAdminAccountStatusApiRequest,
   type GetIdentityAdminAccountStatusApiResponse,
   type ListTrustedDevicesApiRequest,
@@ -364,6 +363,14 @@ import {
 import { composeAuthoritativeApiRouteRegistrationPlan } from "../AuthoritativeApiRouteRegistrationCatalog";
 import { composeIdentityHttpTransport } from "./composition/IdentityHttpTransportComposition";
 import { buildIdentityHttpRouteCompositionLogDetails } from "./middleware/request-observability";
+import {
+  buildAuthenticatedSessionActorContext,
+  extractBearerSessionToken,
+  isSessionAssuranceAllowed,
+  normalizeSessionAssuranceLevel,
+  resolveAuthenticatedSessionFromRequest,
+  type AuthenticatedSessionActorContext,
+} from "./middleware/session-authentication";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 import {
   normalizeRequestContentType,
@@ -1062,34 +1069,22 @@ interface InboundHttpTransportConnectionState {
   readonly loopbackRequest: boolean;
 }
 
-interface AuthenticatedRequestContext {
-  readonly principal: AuthenticatedIdentityPrincipalApiResponse;
-  readonly session: ResolveAuthenticatedSessionApiResponse["session"];
-  readonly sessionToken: string;
-  readonly actor: {
-    readonly userIdentityId: string;
-    readonly username: string;
-  };
+interface AuthenticatedRequestContext extends AuthenticatedSessionActorContext<
+  InboundHttpTransportConnectionState,
+  {
+    readonly accessChannel: "desktop" | "thin-client";
+    readonly thinClient?: ThinClientSessionChannelContextDto;
+  },
+  {
+    readonly enforced: boolean;
+    readonly scenario: TransportSecurityScenario;
+    readonly actorType: TransportConnectionActorType;
+    readonly remotePeerType: TransportPeerType;
+  }
+> {
   readonly workspace?: {
     readonly workspaceId: string;
     readonly source: "query";
-  };
-  readonly sessionTrust: {
-    readonly assuranceLevel: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
-    readonly isTrusted: boolean;
-  };
-  readonly transport: {
-    readonly connection: InboundHttpTransportConnectionState;
-    readonly channel: {
-      readonly accessChannel: "desktop" | "thin-client";
-      readonly thinClient?: ThinClientSessionChannelContextDto;
-    };
-    readonly trustValidation: {
-      readonly enforced: boolean;
-      readonly scenario: TransportSecurityScenario;
-      readonly actorType: TransportConnectionActorType;
-      readonly remotePeerType: TransportPeerType;
-    };
   };
 }
 
@@ -9001,7 +8996,7 @@ async function handleWebSocketUpgrade(input: {
   }
 
   const requestedSubprotocols = parseWebSocketSubprotocolHeader(input.request.headers["sec-websocket-protocol"]);
-  const sessionToken = extractBearerToken(input.request.headers.authorization)
+  const sessionToken = extractBearerSessionToken(input.request.headers.authorization)
     ?? extractWebSocketBearerTokenFromSubprotocols(requestedSubprotocols);
   if (!sessionToken) {
     denyWebSocketUpgrade(input, requestId, correlationId, 401, {
@@ -9982,35 +9977,24 @@ async function requireAuthenticatedSession(
   } | undefined,
   onAuthenticated: (context: AuthenticatedRequestContext) => Promise<void>,
 ): Promise<void> {
-  const sessionToken = extractBearerToken(request.headers.authorization);
-  if (!sessionToken) {
-    const authFailure = buildAuthenticationFailedResponse("Missing Authorization bearer token.");
-    writeJson(response, 401, authFailure);
-    logResponse(logger, requestId, request, 401, Object.freeze({}), authFailure);
+  const sessionResolution = await resolveAuthenticatedSessionFromRequest(request, backendApi, {
+    mapStatusCode,
+  });
+  if (!sessionResolution.ok) {
+    writeJson(response, sessionResolution.statusCode, sessionResolution.body);
+    logResponse(
+      logger,
+      requestId,
+      request,
+      sessionResolution.statusCode,
+      sessionResolution.requestLogPayload,
+      sessionResolution.body,
+    );
     return;
   }
+  const { resolvedSession, sessionToken } = sessionResolution;
 
-  const resolvedSession = await backendApi.resolveAuthenticatedSession({ sessionToken });
-  if (!resolvedSession.ok) {
-    const statusCode = mapStatusCode(resolvedSession);
-    writeJson(response, statusCode, resolvedSession);
-    logResponse(logger, requestId, request, statusCode, Object.freeze({ sessionToken }), resolvedSession);
-    return;
-  }
-  if (!resolvedSession.data) {
-    const internalFailure: IdentityAuthApiResponse<never> = Object.freeze({
-      ok: false,
-      error: {
-        code: IdentityAuthApiErrorCodes.internal,
-        message: "Session resolution returned no payload.",
-      },
-    });
-    writeJson(response, 500, internalFailure);
-    logResponse(logger, requestId, request, 500, Object.freeze({ sessionToken }), internalFailure);
-    return;
-  }
-
-  const sessionAssuranceLevel = normalizeSessionAssuranceLevel(resolvedSession.data.session.deviceTrustContext?.sessionAssuranceLevel);
+  const sessionAssuranceLevel = normalizeSessionAssuranceLevel(resolvedSession.session.deviceTrustContext?.sessionAssuranceLevel);
   if (options?.minimumAssuranceLevel && !isSessionAssuranceAllowed(sessionAssuranceLevel, options.minimumAssuranceLevel)) {
     const forbidden: IdentityAuthApiResponse<never> = Object.freeze({
       ok: false,
@@ -10031,7 +10015,7 @@ async function requireAuthenticatedSession(
   const transportState = resolveInboundHttpTransportConnectionState(request);
   const defaultScenario = transportTrust?.defaultScenario ?? TransportSecurityScenarios.thinClientToControlPlane;
   const transportRouting = resolveTransportTrustRouting({
-    resolvedSession: resolvedSession.data,
+    resolvedSession,
     options,
     defaultScenario,
   });
@@ -10042,7 +10026,7 @@ async function requireAuthenticatedSession(
     const transportValidationRequest = buildTransportTrustValidationRequest({
       transportState,
       requestId,
-      resolvedSession: resolvedSession.data,
+      resolvedSession,
       routing: transportRouting,
       nodeId: options?.nodeId,
     });
@@ -10068,22 +10052,14 @@ async function requireAuthenticatedSession(
     }
   }
 
-  await onAuthenticated(Object.freeze({
-    principal: resolvedSession.data.principal,
-    session: resolvedSession.data.session,
+  await onAuthenticated(buildAuthenticatedSessionActorContext({
+    resolvedSession,
     sessionToken,
-    actor: Object.freeze({
-      userIdentityId: resolvedSession.data.principal.userIdentityId,
-      username: resolvedSession.data.principal.username,
-    }),
-    sessionTrust: Object.freeze({
-      assuranceLevel: sessionAssuranceLevel,
-      isTrusted: sessionAssuranceLevel === "authenticated-trusted",
-    }),
+    sessionAssuranceLevel,
     transport: Object.freeze({
       connection: transportState,
       channel: resolveTransportAccessChannelContext({
-        accessChannel: resolvedSession.data.session.accessChannel === "desktop" ? "desktop" : "thin-client",
+        accessChannel: resolvedSession.session.accessChannel === "desktop" ? "desktop" : "thin-client",
         request,
       }),
       trustValidation: Object.freeze({
@@ -13973,25 +13949,6 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>;
 }
 
-function extractBearerToken(authorizationHeader: string | string[] | undefined): string | undefined {
-  if (!authorizationHeader) {
-    return undefined;
-  }
-
-  const value = Array.isArray(authorizationHeader) ? authorizationHeader[0] : authorizationHeader;
-  if (!value) {
-    return undefined;
-  }
-
-  const match = value.match(/^\s*Bearer\s+(.+)\s*$/i);
-  if (!match) {
-    return undefined;
-  }
-
-  const token = match[1]?.trim();
-  return token ? token : undefined;
-}
-
 function parseWebSocketSubprotocolHeader(headerValue: string | string[] | undefined): ReadonlyArray<string> {
   if (!headerValue) {
     return Object.freeze([]);
@@ -14031,16 +13988,6 @@ function decodeBase64UrlToUtf8(value: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-function buildAuthenticationFailedResponse(message: string): IdentityAuthApiResponse<never> {
-  return Object.freeze({
-    ok: false,
-    error: {
-      code: IdentityAuthApiErrorCodes.authenticationFailed,
-      message,
-    },
-  });
 }
 
 function logResponse<TRequest extends Record<string, unknown>>(
@@ -14189,27 +14136,6 @@ function normalizeResponseHeaderValue(value: number | string | string[] | undefi
     return undefined;
   }
   return normalizeOptionalHeader(value);
-}
-
-function normalizeSessionAssuranceLevel(
-  value: ResolveAuthenticatedSessionApiResponse["session"]["deviceTrustContext"] extends { readonly sessionAssuranceLevel?: infer T } ? T : never,
-): "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted" {
-  if (value === "authenticated-trusted" || value === "authenticated-restricted") {
-    return value;
-  }
-  return "authenticated-untrusted";
-}
-
-function isSessionAssuranceAllowed(
-  actual: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted",
-  minimum: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted",
-): boolean {
-  const order = Object.freeze({
-    "authenticated-untrusted": 1,
-    "authenticated-restricted": 2,
-    "authenticated-trusted": 3,
-  });
-  return order[actual] >= order[minimum];
 }
 
 function resolveSessionActorContextWorkspaceId(

@@ -12,11 +12,13 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/composition/RouteModuleRegistry.ts
   - src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts
   - src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts
+  - src/infrastructure/transport/http-server/identity/middleware/session-authentication.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpRequestPrimitives.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpResponsePrimitives.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpFileResponsePrimitives.ts
   - src/infrastructure/transport/http-server/identity/tests/HttpTransportPrimitives.test.ts
   - src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerErrorTranslation.test.ts
+  - src/infrastructure/transport/http-server/identity/tests/SessionAuthenticationMiddleware.test.ts
   - src/hosts/server/AuthoritativeServerApiRouteComposition.ts
   - src/hosts/server/IdentityServerHost.ts
 ---
@@ -143,6 +145,16 @@ Implemented centralized transport error translation in production paths:
 
 Targeted regression coverage:
 - `identity/tests/IdentityHttpServerErrorTranslation.test.ts` verifies representative override mappings, shared fallback behavior, and runtime default-fallback parity.
+
+## Story 1.2.1 Implementation Status
+
+Implemented shared session-authentication middleware utilities in production paths:
+- `identity/middleware/session-authentication.ts` centralizes bearer-token extraction, authenticated session resolution, normalized invalid-session handling, session assurance helpers, and authenticated actor-context derivation.
+- `IdentityHttpServer.ts` now consumes the shared middleware utility for user-authenticated HTTP routes via `requireAuthenticatedSession(...)` instead of owning inline bearer/session resolution branches.
+- Existing auth semantics and transport trust sequencing are preserved; only session-auth transport concerns were extracted.
+
+Targeted regression coverage:
+- `identity/tests/SessionAuthenticationMiddleware.test.ts` covers missing bearer, malformed authorization header, expired/invalid session resolution, and valid session actor-context derivation flows.
 
 ## Registration and Composition Seams
 
