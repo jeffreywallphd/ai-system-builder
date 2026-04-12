@@ -24,6 +24,7 @@ import ImageManipulationRuntimeEditorPanel, {
   resolveRunOutputRecordId,
   resolveRunParameterSnapshot,
   resolveSelectionConfirmationMessage,
+  isPersistedReferenceUploadReady,
 } from "../ImageManipulationRuntimeEditorPanel";
 
 describe("ImageManipulationRuntimeEditorPanel", () => {
@@ -235,6 +236,22 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(formatAssetFileSize(512)).toBe("512 B");
     expect(formatAssetFileSize(3072)).toBe("3.0 KB");
     expect(formatAssetFileSize(2 * 1024 * 1024)).toBe("2.0 MB");
+  });
+
+  it("treats image upload success as persisted-only when stored file evidence exists", () => {
+    expect(isPersistedReferenceUploadReady({
+      storedFilePath: "/tmp/reference-image-uploads/input.png",
+      persistence: {
+        storedFilePathProduced: true,
+      },
+    })).toBeTrue();
+
+    expect(isPersistedReferenceUploadReady({
+      storedFilePath: undefined,
+      persistence: {
+        storedFilePathProduced: false,
+      },
+    })).toBeFalse();
   });
 
   it("builds selection confirmation copy from selected source/reference asset metadata", () => {

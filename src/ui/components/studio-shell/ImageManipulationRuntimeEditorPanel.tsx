@@ -191,6 +191,15 @@ function toDirectoryPath(filePath: string | undefined): string | undefined {
   return filePath.slice(0, separatorIndex);
 }
 
+export function isPersistedReferenceUploadReady(input: {
+  readonly storedFilePath?: string;
+  readonly persistence: {
+    readonly storedFilePathProduced: boolean;
+  };
+}): boolean {
+  return Boolean(input.storedFilePath && input.persistence.storedFilePathProduced);
+}
+
 const galleryPreviewRoleOrder: ReadonlyArray<ImageManipulationSelectionRole> = Object.freeze([
   "output",
   "source",
@@ -3426,6 +3435,10 @@ export function ImageManipulationRuntimeEditorPanel({
                     setStatusMessage("We couldn't upload this photo.");
                     return undefined;
                   }
+                  if (!isPersistedReferenceUploadReady(response.data)) {
+                    setStatusMessage("Photo upload could not be persisted. Please try again.");
+                    return undefined;
+                  }
                   setDatasetInstanceId(response.data.datasetInstanceId);
                   setSelection((current) => setRoleSelection(current, {
                     role: "source",
@@ -3437,11 +3450,9 @@ export function ImageManipulationRuntimeEditorPanel({
                     response.data.configuredUploadRootPath
                     ?? toDirectoryPath(response.data.storedFilePath),
                   );
-                  if (response.data.storedFilePath) {
-                    setUploadedPreviewPathsByFileName(Object.freeze({
-                      [file.name]: response.data.storedFilePath,
-                    }));
-                  }
+                  setUploadedPreviewPathsByFileName(Object.freeze({
+                    [file.name]: response.data.storedFilePath,
+                  }));
                   return response.data.recordId;
                 })
                 .then((preferredSourceRecordId) => Promise.all([
