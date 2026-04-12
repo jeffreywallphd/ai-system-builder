@@ -249,6 +249,34 @@ These contracts establish stable extension points for persistence adapters, auth
 - duplication reduction:
   - secret resolution/parsing behavior is centralized in one composition resolver surface, reducing repeated env/inherited fallback logic across asset/image/generated-result consumers
 
+## Story 3.3.1 Key Hierarchy and Ownership Model
+
+- adds explicit key hierarchy and lifecycle-governance contracts in:
+  - `src/application/security/contracts/SecurityMaterialKeyHierarchyContract.ts`
+- hierarchy classes now include:
+  - server root material
+  - token/signing keys
+  - certificate authority keys
+  - workspace encryption material
+  - storage/content encryption keys
+  - user/device trust material
+  - provider-credential and server-runtime secret classes for existing secret consumers
+- each classification now carries explicit ownership and governance fields:
+  - `ownerScope` (`server`/`workspace`/`user`/`storage-instance`)
+  - owning subsystem
+  - storage subsystem
+  - consuming subsystems
+  - creation/rotation/revocation/re-encryption lifecycle posture
+- classification integration:
+  - `src/application/security/contracts/SecurityMaterialClassificationContract.ts` now requires `hierarchy` and validates scope/category compatibility against hierarchy-class rules
+- runtime validation integration (non-doc-only):
+  - `src/infrastructure/security/startup/AuthoritativeServerSecurityMaterialValidationPipeline.ts` now assigns hierarchy ownership models to startup descriptors
+  - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts` now assigns hierarchy ownership models to provider and signing bootstrap material definitions
+- test coverage:
+  - `src/application/security/tests/SecurityMaterialKeyHierarchyContract.test.ts`
+  - updates to `src/application/security/tests/SecurityMaterialClassificationContract.test.ts`
+  - updates to `src/application/security/tests/SecurityMaterialStartupValidationPipeline.test.ts`
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import {
+  SecurityMaterialConsumerSubsystems,
+  SecurityMaterialCreationModes,
+  SecurityMaterialHierarchyClasses,
+  SecurityMaterialOwningSubsystems,
+  SecurityMaterialRevocationModes,
+  SecurityMaterialRotationModes,
+  SecurityMaterialStorageSubsystems,
+} from "../contracts/SecurityMaterialKeyHierarchyContract";
+import {
   SecurityMaterialCategories,
   SecurityMaterialDurabilityClasses,
   SecurityMaterialFallbackPolicies,
@@ -21,6 +30,21 @@ describe("SecurityMaterialClassificationContract", () => {
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.manual,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.providerCredential],
+      hierarchy: Object.freeze({
+        hierarchyClass: SecurityMaterialHierarchyClasses.providerCredentialMaterial,
+        ownership: Object.freeze({
+          ownerScope: SecurityMaterialScopes.server,
+          ownerSubsystem: SecurityMaterialOwningSubsystems.providerIntegrationService,
+          storageSubsystem: SecurityMaterialStorageSubsystems.durableServerSecretStore,
+          consumerSubsystems: Object.freeze([SecurityMaterialConsumerSubsystems.providerRuntime]),
+        }),
+        lifecycle: Object.freeze({
+          creationMode: SecurityMaterialCreationModes.externallyProvisioned,
+          rotationMode: SecurityMaterialRotationModes.manual,
+          revocationMode: SecurityMaterialRevocationModes.optional,
+          requiresReEncryptionOnRotation: false,
+        }),
+      }),
       defaultPolicy: {
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -51,6 +75,21 @@ describe("SecurityMaterialClassificationContract", () => {
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.onDemand,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.serverSigning],
+      hierarchy: Object.freeze({
+        hierarchyClass: SecurityMaterialHierarchyClasses.tokenSigningKey,
+        ownership: Object.freeze({
+          ownerScope: SecurityMaterialScopes.server,
+          ownerSubsystem: SecurityMaterialOwningSubsystems.identitySessionService,
+          storageSubsystem: SecurityMaterialStorageSubsystems.durableServerSecretStore,
+          consumerSubsystems: Object.freeze([SecurityMaterialConsumerSubsystems.identityTokenIssuance]),
+        }),
+        lifecycle: Object.freeze({
+          creationMode: SecurityMaterialCreationModes.generatedAtBootstrap,
+          rotationMode: SecurityMaterialRotationModes.onCompromise,
+          revocationMode: SecurityMaterialRevocationModes.required,
+          requiresReEncryptionOnRotation: false,
+        }),
+      }),
       defaultPolicy: {
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -82,6 +121,36 @@ describe("SecurityMaterialClassificationContract", () => {
       classification: contract,
       lifecycleStage: SecurityMaterialLifecycleStages.production,
     })).toBeTrue();
+  });
+
+  it("rejects hierarchy contracts that conflict with classification scope", () => {
+    expect(() => createSecurityMaterialClassificationContract({
+      materialId: "material:user:transport-trust",
+      category: SecurityMaterialCategories.transportTrust,
+      scope: SecurityMaterialScopes.user,
+      rotationPosture: SecurityMaterialRotationPostures.onDemand,
+      usageContexts: [SecurityMaterialUsageContexts.runtimeRequest],
+      hierarchy: Object.freeze({
+        hierarchyClass: SecurityMaterialHierarchyClasses.userDeviceTrustMaterial,
+        ownership: Object.freeze({
+          ownerScope: SecurityMaterialScopes.server,
+          ownerSubsystem: SecurityMaterialOwningSubsystems.userDeviceTrustService,
+          storageSubsystem: SecurityMaterialStorageSubsystems.localUserSecureStore,
+          consumerSubsystems: Object.freeze([SecurityMaterialConsumerSubsystems.userDeviceTrust]),
+        }),
+        lifecycle: Object.freeze({
+          creationMode: SecurityMaterialCreationModes.externallyProvisioned,
+          rotationMode: SecurityMaterialRotationModes.manual,
+          revocationMode: SecurityMaterialRevocationModes.required,
+          requiresReEncryptionOnRotation: false,
+        }),
+      }),
+      defaultPolicy: {
+        durabilityClass: SecurityMaterialDurabilityClasses.durable,
+        startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
+        fallbackPolicy: SecurityMaterialFallbackPolicies.none,
+      },
+    })).toThrow("does not match classification scope");
   });
 });
 
