@@ -274,6 +274,8 @@ type ReusableStudioImageAsset = Pick<
 >;
 
 type UploadProgressStage = "idle" | "uploading" | "processing";
+const librarySourceOptionPrefix = "library-source:";
+const libraryReferenceOptionPrefix = "library-reference:";
 
 type RecentImageAssetContinuityGroupKey = "today" | "week" | "older";
 
@@ -350,6 +352,18 @@ function toReferenceImageDatasetBindingId(
     || bindingId === "reference-image-dataset"
     ? bindingId
     : undefined;
+}
+
+function toLibraryAssetOptionValue(prefix: string, assetId: string): string {
+  return `${prefix}${assetId}`;
+}
+
+function fromLibraryAssetOptionValue(prefix: string, value: string): string | undefined {
+  if (!value.startsWith(prefix)) {
+    return undefined;
+  }
+  const assetId = value.slice(prefix.length).trim();
+  return assetId.length > 0 ? assetId : undefined;
 }
 
 function resolveRunStatusTone(state: ImageManipulationRunLifecycleSnapshot["state"]): "neutral" | "warning" | "danger" | "success" {
@@ -1723,6 +1737,22 @@ export function ImageManipulationRuntimeEditorPanel({
     [hydratedRuntime?.datasetBindings],
   );
   const sourceDatasetBinding = datasetBindingsById.get(roleBindings.sourceBindingId);
+  const sourceLibraryCandidateAssets = useMemo(() => {
+    const ingestedAssetIds = new Set(
+      sourceItems
+        .map((item) => item.sourceImage?.assetId?.trim())
+        .filter((assetId): assetId is string => Boolean(assetId && assetId.length > 0)),
+    );
+    return imageLibraryAssets.filter((asset) => !ingestedAssetIds.has(asset.assetId));
+  }, [imageLibraryAssets, sourceItems]);
+  const referenceLibraryCandidateAssets = useMemo(() => {
+    const ingestedAssetIds = new Set(
+      referenceItems
+        .map((item) => item.sourceImage?.assetId?.trim())
+        .filter((assetId): assetId is string => Boolean(assetId && assetId.length > 0)),
+    );
+    return imageLibraryAssets.filter((asset) => !ingestedAssetIds.has(asset.assetId));
+  }, [imageLibraryAssets, referenceItems]);
   const runtimeSystemAssetId = hydratedRuntime?.resolvedSystemAsset.assetId ?? draft?.assetId;
   const runtimeWorkflowAssetId = hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateAssetId
     ?? ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId;
@@ -3478,9 +3508,23 @@ export function ImageManipulationRuntimeEditorPanel({
                 id={sourceSelectId}
                 className="ui-input"
                 value={selection.sourceRecordId ?? ""}
-                disabled={sourceItems.length < 1 || isLoadingSources}
+                disabled={(sourceItems.length + sourceLibraryCandidateAssets.length) < 1 || isLoadingSources || Boolean(isReusingRecentImageAssetId)}
                 onChange={(event) => {
-                  const next = event.currentTarget.value || undefined;
+                  const rawValue = event.currentTarget.value;
+                  const libraryAssetId = fromLibraryAssetOptionValue(librarySourceOptionPrefix, rawValue);
+                  if (libraryAssetId) {
+                    const asset = sourceLibraryCandidateAssets.find((candidate) => candidate.assetId === libraryAssetId);
+                    if (!asset) {
+                      setStatusMessage("We couldn't load this library photo.");
+                      return;
+                    }
+                    void reuseRecentImageAsset({
+                      asset,
+                      targetDatasetBindingId: "input-image-dataset",
+                    });
+                    return;
+                  }
+                  const next = rawValue || undefined;
                   setSelection((current) => setRoleSelection(current, {
                     role: "source",
                     recordId: next,
@@ -3488,10 +3532,21 @@ export function ImageManipulationRuntimeEditorPanel({
                   }));
                 }}
               >
-                {sourceItems.length < 1 ? <option value="">No source photo yet</option> : null}
+                {sourceItems.length < 1 && sourceLibraryCandidateAssets.length < 1
+                  ? <option value="">No source photo yet</option>
+                  : null}
                 {sourceItems.map((item, index) => (
                   <option key={item.image.recordId} value={item.image.recordId}>
                     Source {index + 1}
+                  </option>
+                ))}
+                {sourceLibraryCandidateAssets.length > 0 ? <option disabled>──────────</option> : null}
+                {sourceLibraryCandidateAssets.map((asset, index) => (
+                  <option
+                    key={asset.assetId}
+                    value={toLibraryAssetOptionValue(librarySourceOptionPrefix, asset.assetId)}
+                  >
+                    Import from library: {asset.originalFilename || `Image ${index + 1}`}
                   </option>
                 ))}
               </select>
@@ -3502,9 +3557,23 @@ export function ImageManipulationRuntimeEditorPanel({
                 id={referenceSelectId}
                 className="ui-input"
                 value={selection.referenceRecordId ?? ""}
-                disabled={referenceItems.length < 1 || isLoadingReferences}
+                disabled={(referenceItems.length + referenceLibraryCandidateAssets.length) < 1 || isLoadingReferences || Boolean(isReusingRecentImageAssetId)}
                 onChange={(event) => {
-                  const nextReferenceRecordId = event.currentTarget.value || undefined;
+                  const rawValue = event.currentTarget.value;
+                  const libraryAssetId = fromLibraryAssetOptionValue(libraryReferenceOptionPrefix, rawValue);
+                  if (libraryAssetId) {
+                    const asset = referenceLibraryCandidateAssets.find((candidate) => candidate.assetId === libraryAssetId);
+                    if (!asset) {
+                      setStatusMessage("We couldn't load this library photo.");
+                      return;
+                    }
+                    void reuseRecentImageAsset({
+                      asset,
+                      targetDatasetBindingId: "reference-image-dataset",
+                    });
+                    return;
+                  }
+                  const nextReferenceRecordId = rawValue || undefined;
                   setSelection((current) => setRoleSelection(current, {
                     role: "reference",
                     recordId: nextReferenceRecordId,
@@ -3516,6 +3585,15 @@ export function ImageManipulationRuntimeEditorPanel({
                 {referenceItems.map((item, index) => (
                   <option key={item.image.recordId} value={item.image.recordId}>
                     Reference {index + 1}
+                  </option>
+                ))}
+                {referenceLibraryCandidateAssets.length > 0 ? <option disabled>──────────</option> : null}
+                {referenceLibraryCandidateAssets.map((asset, index) => (
+                  <option
+                    key={asset.assetId}
+                    value={toLibraryAssetOptionValue(libraryReferenceOptionPrefix, asset.assetId)}
+                  >
+                    Import from library: {asset.originalFilename || `Image ${index + 1}`}
                   </option>
                 ))}
               </select>
@@ -4563,5 +4641,3 @@ export function ImageManipulationRuntimeEditorPanel({
 }
 
 export default ImageManipulationRuntimeEditorPanel;
-
-
