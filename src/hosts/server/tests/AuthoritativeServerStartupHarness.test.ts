@@ -106,10 +106,13 @@ describe("AuthoritativeServer startup harness", () => {
       | undefined
     )?.stages;
     expect(authoritativeStages?.map((stage) => stage.stageId)).toEqual([
-      "services",
-      "security",
-      "persistence",
-      "transport",
+      "configuration-load",
+      "security-material-resolution",
+      "persistence-initialization",
+      "migration-execution",
+      "subsystem-composition",
+      "readiness-verification",
+      "transport-startup",
     ]);
     expect(authoritativeStages?.every((stage) => stage.state === "success")).toBeTrue();
   });
