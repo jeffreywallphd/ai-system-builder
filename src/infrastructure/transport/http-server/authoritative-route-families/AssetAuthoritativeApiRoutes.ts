@@ -10,6 +10,7 @@ export const AssetManagementAuthoritativeApiRouteFamily = Object.freeze({
   description: "Asset registration, ingestion, discovery, and lifecycle endpoints.",
   routePrefixes: Object.freeze([
     "/api/v1/assets",
+    "/api/v1/generated-results",
   ]),
   requiredBackendKeys: Object.freeze([
     AuthoritativeApiRouteBackendKeys.assetManagement,
