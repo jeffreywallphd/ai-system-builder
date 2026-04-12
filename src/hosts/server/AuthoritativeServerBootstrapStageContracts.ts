@@ -81,8 +81,71 @@ export interface AuthoritativeServerReadinessCheck {
   readonly details?: Readonly<Record<string, string>>;
 }
 
+export const AuthoritativeServerSecurityMaterialReadinessStates = Object.freeze({
+  ready: "ready",
+  degraded: "degraded",
+  blocked: "blocked",
+});
+
+export type AuthoritativeServerSecurityMaterialReadinessState =
+  typeof AuthoritativeServerSecurityMaterialReadinessStates[keyof typeof AuthoritativeServerSecurityMaterialReadinessStates];
+
+export const AuthoritativeServerSecurityMaterialDiagnosticStates = Object.freeze({
+  healthy: "healthy",
+  degraded: "degraded",
+  missing: "missing",
+  nonCompliant: "non-compliant",
+});
+
+export type AuthoritativeServerSecurityMaterialDiagnosticState =
+  typeof AuthoritativeServerSecurityMaterialDiagnosticStates[keyof typeof AuthoritativeServerSecurityMaterialDiagnosticStates];
+
+export interface AuthoritativeServerSecurityMaterialReadinessIssue {
+  readonly materialId: string;
+  readonly code: string;
+  readonly severity: "fatal" | "warning";
+  readonly message: string;
+  readonly sourceKind: string;
+  readonly details?: Readonly<Record<string, string>>;
+}
+
+export interface AuthoritativeServerSecurityMaterialReadinessEntry {
+  readonly materialId: string;
+  readonly state: AuthoritativeServerSecurityMaterialDiagnosticState;
+  readonly sourceKind: string;
+  readonly present: boolean;
+  readonly formatValid: boolean;
+  readonly persistence: "durable" | "ephemeral";
+  readonly issueCodes: ReadonlyArray<string>;
+  readonly fatalIssueCount: number;
+  readonly warningIssueCount: number;
+  readonly details?: Readonly<Record<string, string>>;
+}
+
+export interface AuthoritativeServerSecurityMaterialReadinessSummary {
+  readonly total: number;
+  readonly healthy: number;
+  readonly degraded: number;
+  readonly missing: number;
+  readonly nonCompliant: number;
+}
+
+export interface AuthoritativeServerSecurityMaterialReadinessReport {
+  readonly state: AuthoritativeServerSecurityMaterialReadinessState;
+  readonly blocking: boolean;
+  readonly lifecycleStage: string;
+  readonly productionCapable: boolean;
+  readonly issueCount: number;
+  readonly fatalIssueCount: number;
+  readonly warningIssueCount: number;
+  readonly summary: AuthoritativeServerSecurityMaterialReadinessSummary;
+  readonly issues: ReadonlyArray<AuthoritativeServerSecurityMaterialReadinessIssue>;
+  readonly entries: ReadonlyArray<AuthoritativeServerSecurityMaterialReadinessEntry>;
+}
+
 export interface AuthoritativeServerSecurityStageOutput {
   readonly checks: ReadonlyArray<AuthoritativeServerReadinessCheck>;
+  readonly securityMaterial: AuthoritativeServerSecurityMaterialReadinessReport;
   readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
 }
 
@@ -163,7 +226,7 @@ export const AuthoritativeServerBootstrapStageContracts = Object.freeze({
     description: "Establish transport trust, certificate authority, and required secret baseline.",
     boundary: Object.freeze({
       consumes: Object.freeze(["deploymentProfile", "environment", "enabledCapabilities", "runtimeMetadata", "startupTracer", "hostConfiguration"]),
-      produces: Object.freeze(["checks"]),
+      produces: Object.freeze(["checks", "securityMaterial", "startupSecurityMaterialValidation"]),
     }),
   } satisfies BootstrapStageContract<AuthoritativeServerSecurityStageInput, AuthoritativeServerSecurityStageOutput>),
   [AuthoritativeServerBootstrapStageIds.persistence]: Object.freeze({

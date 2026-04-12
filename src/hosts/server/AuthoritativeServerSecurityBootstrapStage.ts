@@ -1,8 +1,13 @@
 import {
   AuthoritativeServerBootstrapStageIds,
+  AuthoritativeServerSecurityMaterialDiagnosticStates,
+  AuthoritativeServerSecurityMaterialReadinessStates,
   AuthoritativeServerReadinessCheckStates,
   type AuthoritativeServerSecurityBootstrapStage,
   type AuthoritativeServerReadinessCheck,
+  type AuthoritativeServerSecurityMaterialReadinessEntry,
+  type AuthoritativeServerSecurityMaterialReadinessIssue,
+  type AuthoritativeServerSecurityMaterialReadinessReport,
   type AuthoritativeServerSecurityStageInput,
   type AuthoritativeServerSecurityStageOutput,
 } from "./AuthoritativeServerBootstrapStageContracts";
@@ -33,6 +38,8 @@ export interface AuthoritativeServerSecurityBootstrapStageOptions {
 export class AuthoritativeServerStartupSecurityMaterialValidationError extends Error {
   public constructor(
     public readonly validationResult: SecurityMaterialStartupValidationResult,
+    public readonly securityMaterial: AuthoritativeServerSecurityMaterialReadinessReport,
+    public readonly readinessChecks: ReadonlyArray<AuthoritativeServerReadinessCheck>,
   ) {
     super(buildValidationErrorMessage(validationResult));
     this.name = "AuthoritativeServerStartupSecurityMaterialValidationError";
@@ -59,8 +66,15 @@ export function createAuthoritativeServerSecurityBootstrapStage(
         logger: input.hostConfiguration.logger,
       });
 
+      const securityMaterial = buildSecurityMaterialReadinessReport(startupSecurityMaterialValidation);
+      const startupMaterialValidationCheck = createStartupMaterialValidationCheck(startupSecurityMaterialValidation);
+
       if (startupSecurityMaterialValidation.state === SecurityMaterialStartupValidationStates.invalid) {
-        throw new AuthoritativeServerStartupSecurityMaterialValidationError(startupSecurityMaterialValidation);
+        throw new AuthoritativeServerStartupSecurityMaterialValidationError(
+          startupSecurityMaterialValidation,
+          securityMaterial,
+          Object.freeze([startupMaterialValidationCheck]),
+        );
       }
 
       const transportTrustReady = await (
@@ -77,23 +91,7 @@ export function createAuthoritativeServerSecurityBootstrapStage(
       )(input);
 
       const checks: ReadonlyArray<AuthoritativeServerReadinessCheck> = Object.freeze([
-        Object.freeze({
-          checkId: "security.startup-material-validation",
-          subsystem: "security",
-          state: startupSecurityMaterialValidation.fatalIssues.length > 0
-            ? AuthoritativeServerReadinessCheckStates.failed
-            : AuthoritativeServerReadinessCheckStates.ready,
-          summary: startupSecurityMaterialValidation.issues.length > 0
-            ? `Startup security material validation produced ${startupSecurityMaterialValidation.issues.length} diagnostic issue(s).`
-            : "Startup security material validation passed without diagnostics.",
-          blocking: startupSecurityMaterialValidation.fatalIssues.length > 0,
-          details: Object.freeze({
-            lifecycleStage: startupSecurityMaterialValidation.lifecycleStage,
-            fatalIssueCount: String(startupSecurityMaterialValidation.fatalIssues.length),
-            warningCount: String(startupSecurityMaterialValidation.warnings.length),
-            productionCapable: startupSecurityMaterialValidation.productionCapable ? "true" : "false",
-          }),
-        }),
+        startupMaterialValidationCheck,
         Object.freeze({
           checkId: "security.transport-trust-material",
           subsystem: "security",
@@ -131,6 +129,7 @@ export function createAuthoritativeServerSecurityBootstrapStage(
 
       return Object.freeze({
         checks,
+        securityMaterial,
         startupSecurityMaterialValidation,
       });
     },
@@ -158,7 +157,7 @@ function emitStartupSecurityMaterialDiagnostics(input: {
         message: issue.message,
         lifecycleStage: input.validation.lifecycleStage,
         productionCapable: input.validation.productionCapable,
-        details: issue.details,
+        details: sanitizeSecurityMaterialDiagnosticDetails(issue.details),
       }),
     });
     if (issue.severity === SecurityMaterialValidationIssueSeverities.fatal) {
@@ -175,4 +174,175 @@ function buildValidationErrorMessage(result: SecurityMaterialStartupValidationRe
     `${index + 1}. ${issue.materialId}: ${issue.message} (code=${issue.code}, source=${issue.sourceKind})`
   ));
   return [header, ...issueLines].join(" ");
+}
+
+function createStartupMaterialValidationCheck(
+  validation: SecurityMaterialStartupValidationResult,
+): AuthoritativeServerReadinessCheck {
+  return Object.freeze({
+    checkId: "security.startup-material-validation",
+    subsystem: "security",
+    state: validation.fatalIssues.length > 0
+      ? AuthoritativeServerReadinessCheckStates.failed
+      : AuthoritativeServerReadinessCheckStates.ready,
+    summary: validation.issues.length > 0
+      ? `Startup security material validation produced ${validation.issues.length} diagnostic issue(s).`
+      : "Startup security material validation passed without diagnostics.",
+    blocking: validation.fatalIssues.length > 0,
+    details: Object.freeze({
+      lifecycleStage: validation.lifecycleStage,
+      fatalIssueCount: String(validation.fatalIssues.length),
+      warningCount: String(validation.warnings.length),
+      productionCapable: validation.productionCapable ? "true" : "false",
+    }),
+  });
+}
+
+function buildSecurityMaterialReadinessReport(
+  validation: SecurityMaterialStartupValidationResult,
+): AuthoritativeServerSecurityMaterialReadinessReport {
+  const issuesByMaterialId = new Map<string, {
+    fatalIssueCount: number;
+    warningIssueCount: number;
+    issueCodes: Set<string>;
+  }>();
+
+  const issues: ReadonlyArray<AuthoritativeServerSecurityMaterialReadinessIssue> = Object.freeze(
+    validation.issues.map((issue) => {
+      const existing = issuesByMaterialId.get(issue.materialId) ?? {
+        fatalIssueCount: 0,
+        warningIssueCount: 0,
+        issueCodes: new Set<string>(),
+      };
+      if (issue.severity === SecurityMaterialValidationIssueSeverities.fatal) {
+        existing.fatalIssueCount += 1;
+      } else {
+        existing.warningIssueCount += 1;
+      }
+      existing.issueCodes.add(issue.code);
+      issuesByMaterialId.set(issue.materialId, existing);
+
+      return Object.freeze({
+        materialId: issue.materialId,
+        code: issue.code,
+        severity: issue.severity,
+        message: issue.message,
+        sourceKind: issue.sourceKind,
+        details: sanitizeSecurityMaterialDiagnosticDetails(issue.details),
+      });
+    }),
+  );
+
+  const entries: ReadonlyArray<AuthoritativeServerSecurityMaterialReadinessEntry> = Object.freeze(
+    validation.observations.map((observation) => {
+      const issueSummary = issuesByMaterialId.get(observation.materialId);
+      const fatalIssueCount = issueSummary?.fatalIssueCount ?? 0;
+      const warningIssueCount = issueSummary?.warningIssueCount ?? 0;
+      const issueCodes = Object.freeze([...(issueSummary?.issueCodes ?? new Set<string>())]);
+
+      const state = !observation.present && observation.sourceKind !== "not-applicable"
+        ? AuthoritativeServerSecurityMaterialDiagnosticStates.missing
+        : fatalIssueCount > 0
+          ? AuthoritativeServerSecurityMaterialDiagnosticStates.nonCompliant
+          : warningIssueCount > 0 || !observation.formatValid || observation.persistence === "ephemeral"
+            ? AuthoritativeServerSecurityMaterialDiagnosticStates.degraded
+            : AuthoritativeServerSecurityMaterialDiagnosticStates.healthy;
+
+      return Object.freeze({
+        materialId: observation.materialId,
+        state,
+        sourceKind: observation.sourceKind,
+        present: observation.present,
+        formatValid: observation.formatValid,
+        persistence: observation.persistence,
+        issueCodes,
+        fatalIssueCount,
+        warningIssueCount,
+        details: sanitizeSecurityMaterialDiagnosticDetails(observation.details),
+      });
+    }),
+  );
+
+  const summary = summarizeSecurityMaterialEntries(entries);
+  const state = validation.fatalIssues.length > 0
+    ? AuthoritativeServerSecurityMaterialReadinessStates.blocked
+    : validation.warnings.length > 0
+      ? AuthoritativeServerSecurityMaterialReadinessStates.degraded
+      : AuthoritativeServerSecurityMaterialReadinessStates.ready;
+
+  return Object.freeze({
+    state,
+    blocking: state === AuthoritativeServerSecurityMaterialReadinessStates.blocked,
+    lifecycleStage: validation.lifecycleStage,
+    productionCapable: validation.productionCapable,
+    issueCount: validation.issues.length,
+    fatalIssueCount: validation.fatalIssues.length,
+    warningIssueCount: validation.warnings.length,
+    summary,
+    issues,
+    entries,
+  });
+}
+
+function summarizeSecurityMaterialEntries(
+  entries: ReadonlyArray<AuthoritativeServerSecurityMaterialReadinessEntry>,
+) {
+  let healthy = 0;
+  let degraded = 0;
+  let missing = 0;
+  let nonCompliant = 0;
+
+  for (const entry of entries) {
+    if (entry.state === AuthoritativeServerSecurityMaterialDiagnosticStates.healthy) {
+      healthy += 1;
+      continue;
+    }
+    if (entry.state === AuthoritativeServerSecurityMaterialDiagnosticStates.degraded) {
+      degraded += 1;
+      continue;
+    }
+    if (entry.state === AuthoritativeServerSecurityMaterialDiagnosticStates.missing) {
+      missing += 1;
+      continue;
+    }
+    nonCompliant += 1;
+  }
+
+  return Object.freeze({
+    total: entries.length,
+    healthy,
+    degraded,
+    missing,
+    nonCompliant,
+  });
+}
+
+function sanitizeSecurityMaterialDiagnosticDetails(
+  details: Readonly<Record<string, string>> | undefined,
+): Readonly<Record<string, string>> | undefined {
+  if (!details) {
+    return undefined;
+  }
+  const output: Record<string, string> = {};
+  for (const [key, value] of Object.entries(details)) {
+    output[key] = redactSecurityMaterialDiagnosticValue(value);
+  }
+  return Object.freeze(output);
+}
+
+function redactSecurityMaterialDiagnosticValue(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    return normalized;
+  }
+  if (normalized.includes("\n") || normalized.includes("\r")) {
+    return "[REDACTED]";
+  }
+  if (/-----BEGIN\s+[A-Z ]+-----/i.test(normalized)) {
+    return "[REDACTED]";
+  }
+  if (/^[A-Za-z0-9+/=]{48,}$/.test(normalized)) {
+    return "[REDACTED]";
+  }
+  return normalized;
 }

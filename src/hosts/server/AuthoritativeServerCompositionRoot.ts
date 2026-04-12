@@ -71,6 +71,19 @@ import {
   type AuthoritativeServerRecordStartupBaseline,
 } from "./AuthoritativeServerStartupTelemetry";
 
+interface BootstrapFailureDiagnosticsCarrier {
+  readonly bootstrapStageStatus?: {
+    readonly stages: ReadonlyArray<{
+      readonly stageId: string;
+      readonly sequence: number;
+      readonly state: string;
+      readonly durationMs?: number;
+      readonly failure?: Readonly<Record<string, string>>;
+    }>;
+  };
+  readonly bootstrapReadinessReport?: AuthoritativeServerBootstrapReadinessReport;
+}
+
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
   readonly address: string;
@@ -185,6 +198,24 @@ export function createAuthoritativeServerCompositionRoot(
       let startupReadinessReport: AuthoritativeServerBootstrapReadinessReport = Object.freeze({
         state: "not-ready",
         checks: Object.freeze([]),
+        securityMaterial: Object.freeze({
+          state: "degraded",
+          blocking: false,
+          lifecycleStage: "unknown",
+          productionCapable: false,
+          issueCount: 0,
+          fatalIssueCount: 0,
+          warningIssueCount: 0,
+          summary: Object.freeze({
+            total: 0,
+            healthy: 0,
+            degraded: 0,
+            missing: 0,
+            nonCompliant: 0,
+          }),
+          issues: Object.freeze([]),
+          entries: Object.freeze([]),
+        }),
         totalCheckCount: 0,
         readyCheckCount: 0,
         degradedCheckCount: 0,
@@ -320,6 +351,13 @@ export function createAuthoritativeServerCompositionRoot(
           stop,
         });
       } catch (error) {
+        const diagnostics = error as BootstrapFailureDiagnosticsCarrier;
+        if (diagnostics.bootstrapStageStatus?.stages) {
+          authoritativeStageStatus = diagnostics.bootstrapStageStatus.stages;
+        }
+        if (diagnostics.bootstrapReadinessReport) {
+          startupReadinessReport = diagnostics.bootstrapReadinessReport;
+        }
         let failure: unknown = error;
         try {
           const startupFailureCleanupHooks = shutdownDisposalPlan.steps.length > 0

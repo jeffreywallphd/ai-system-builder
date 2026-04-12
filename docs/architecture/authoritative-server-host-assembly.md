@@ -232,6 +232,11 @@ Story 2.3.2 adds typed readiness verification and startup result reporting:
   - startup failure (`outcome=failed`)
   - successful startup with full readiness (`outcome=succeeded`, readiness `ready`)
     - successful startup with degraded readiness (`outcome=succeeded`, readiness `degraded`)
+Story 3.4.2 integrates security material diagnostics into startup readiness reporting:
+- security-stage output now includes a structured `securityMaterial` readiness report (`state`, blocking flag, issue counts, per-material entries, and summarized diagnostic-state totals).
+- startup readiness now carries `securityMaterial` for both successful and failed startup attempts so operators can distinguish secure readiness from degraded/blocked security posture.
+- fail-fast startup validation failures now preserve startup readiness/security checks and attach them to startup failure diagnostics so startup summary logs still expose blocked security-material state.
+- security material issue/observation details included in readiness and startup diagnostics are sanitized to redact secret-like values (PEM/multiline/long token payloads).
 Story 2.3.3 implements controlled shutdown/disposal ordering:
   - `shutdown-preparation` now runs as an active authoritative stage.
   - startup composes a typed shutdown-disposal plan from composed runtime artifacts.

@@ -52,14 +52,19 @@ import type {
   IdentityServerHost,
   IdentityServerHostOptions,
 } from "./IdentityServerHost";
-import { AuthoritativeServerReadinessCheckStates } from "./AuthoritativeServerBootstrapStageContracts";
+import {
+  AuthoritativeServerReadinessCheckStates,
+  AuthoritativeServerSecurityMaterialReadinessStates,
+} from "./AuthoritativeServerBootstrapStageContracts";
 import type {
   AuthoritativeServerConfigBootstrapStage,
   AuthoritativeServerReadinessCheck,
   AuthoritativeServerReadinessCheckState,
+  AuthoritativeServerSecurityMaterialReadinessReport,
   AuthoritativeServerSecurityBootstrapStage,
   AuthoritativeServerSecurityStageOutput,
 } from "./AuthoritativeServerBootstrapStageContracts";
+import { AuthoritativeServerStartupSecurityMaterialValidationError } from "./AuthoritativeServerSecurityBootstrapStage";
 import {
   AuthoritativeServerBootstrapPipelineStageAdoptionStates,
   AuthoritativeServerBootstrapPipelineStageIds,
@@ -112,6 +117,7 @@ export interface AuthoritativeServerBootstrapOrchestratorStageStatus {
 export interface AuthoritativeServerBootstrapReadinessReport {
   readonly state: AuthoritativeServerBootstrapReadinessState;
   readonly checks: ReadonlyArray<AuthoritativeServerReadinessCheck>;
+  readonly securityMaterial: AuthoritativeServerSecurityMaterialReadinessReport;
   readonly totalCheckCount: number;
   readonly readyCheckCount: number;
   readonly degradedCheckCount: number;
@@ -324,8 +330,30 @@ function deriveReadinessStateFromChecks(
   return AuthoritativeServerBootstrapReadinessStates.ready;
 }
 
+function createDefaultSecurityMaterialReadinessReport(): AuthoritativeServerSecurityMaterialReadinessReport {
+  return Object.freeze({
+    state: AuthoritativeServerSecurityMaterialReadinessStates.degraded,
+    blocking: false,
+    lifecycleStage: "unknown",
+    productionCapable: false,
+    issueCount: 0,
+    fatalIssueCount: 0,
+    warningIssueCount: 0,
+    summary: Object.freeze({
+      total: 0,
+      healthy: 0,
+      degraded: 0,
+      missing: 0,
+      nonCompliant: 0,
+    }),
+    issues: Object.freeze([]),
+    entries: Object.freeze([]),
+  });
+}
+
 function createReadinessReport(input: {
   readonly checks: ReadonlyArray<AuthoritativeServerReadinessCheck>;
+  readonly securityMaterial: AuthoritativeServerSecurityMaterialReadinessReport;
   readonly stageStatuses: ReadonlyArray<AuthoritativeServerBootstrapPipelineStageStatus>;
 }): AuthoritativeServerBootstrapReadinessReport {
   const checks = Object.freeze([...input.checks]);
@@ -333,12 +361,31 @@ function createReadinessReport(input: {
   return Object.freeze({
     state: deriveAuthoritativeServerBootstrapReadiness(input.stageStatuses),
     checks,
+    securityMaterial: input.securityMaterial,
     totalCheckCount: checks.length,
     readyCheckCount: counts.readyCheckCount,
     degradedCheckCount: counts.degradedCheckCount,
     failedCheckCount: counts.failedCheckCount,
     blockingFailureCount: counts.blockingFailureCount,
   });
+}
+
+interface BootstrapFailureDiagnosticsCarrier {
+  readonly bootstrapStageStatus?: AuthoritativeServerBootstrapOrchestratorStageStatus;
+  readonly bootstrapReadinessReport?: AuthoritativeServerBootstrapReadinessReport;
+}
+
+function attachBootstrapFailureDiagnostics(input: {
+  readonly error: unknown;
+  readonly stageStatus: AuthoritativeServerBootstrapOrchestratorStageStatus;
+  readonly readinessReport: AuthoritativeServerBootstrapReadinessReport;
+}): void {
+  if (!(input.error instanceof Error)) {
+    return;
+  }
+  const carrier = input.error as Error & BootstrapFailureDiagnosticsCarrier;
+  carrier.bootstrapStageStatus = input.stageStatus;
+  carrier.bootstrapReadinessReport = input.readinessReport;
 }
 
 function createAuthoritativeServerShutdownDisposalPlan(input: {
@@ -457,6 +504,7 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
         steps: Object.freeze([]),
       });
       const readinessChecks: AuthoritativeServerReadinessCheck[] = [];
+      let securityMaterialReadiness = createDefaultSecurityMaterialReadinessReport();
       const configStage = input.bootstrap?.createConfigStage?.();
       const securityStage = input.bootstrap?.createSecurityStage?.();
       if (!configStage) {
@@ -609,25 +657,34 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
             });
           },
           [HostBootstrapStageIds.security]: async (context) => {
-            securityOutput = await runBootstrapStage({
-              stageId: AuthoritativeServerBootstrapPipelineStageIds.securityMaterialResolution,
-              metadata: Object.freeze({
-                hostBootstrapStageId: HostBootstrapStageIds.security,
-              }),
-              run: async () => {
-                const security = await securityStage.execute({
-                  deploymentProfile: context.deploymentProfile,
-                  environment: context.environment,
-                  enabledCapabilities: context.enabledCapabilities,
-                  runtimeMetadata,
-                  startupTracer,
-                  hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
-                });
-                readinessChecks.push(...security.checks);
-                context.setArtifact(AuthoritativeServerSecurityBootstrapArtifactKey, security);
-                return security;
-              },
-            });
+            try {
+              securityOutput = await runBootstrapStage({
+                stageId: AuthoritativeServerBootstrapPipelineStageIds.securityMaterialResolution,
+                metadata: Object.freeze({
+                  hostBootstrapStageId: HostBootstrapStageIds.security,
+                }),
+                run: async () => {
+                  const security = await securityStage.execute({
+                    deploymentProfile: context.deploymentProfile,
+                    environment: context.environment,
+                    enabledCapabilities: context.enabledCapabilities,
+                    runtimeMetadata,
+                    startupTracer,
+                    hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+                  });
+                  readinessChecks.push(...security.checks);
+                  securityMaterialReadiness = security.securityMaterial;
+                  context.setArtifact(AuthoritativeServerSecurityBootstrapArtifactKey, security);
+                  return security;
+                },
+              });
+            } catch (error) {
+              if (error instanceof AuthoritativeServerStartupSecurityMaterialValidationError) {
+                readinessChecks.push(...error.readinessChecks);
+                securityMaterialReadiness = error.securityMaterial;
+              }
+              throw error;
+            }
           },
           [HostBootstrapStageIds.persistence]: async (context) => {
             await runBootstrapStage({
@@ -944,6 +1001,7 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
           stageStatus: createStageStatusSnapshot(bootstrapState.stages),
           readinessReport: createReadinessReport({
             checks: readinessChecks,
+            securityMaterial: securityMaterialReadiness,
             stageStatuses: bootstrapState.stages,
           }),
         });
@@ -963,6 +1021,15 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
             "Authoritative server bootstrap failed and shutdown cleanup encountered failures.",
           );
         }
+        attachBootstrapFailureDiagnostics({
+          error,
+          stageStatus: createStageStatusSnapshot(bootstrapState.stages),
+          readinessReport: createReadinessReport({
+            checks: readinessChecks,
+            securityMaterial: securityMaterialReadiness,
+            stageStatuses: bootstrapState.stages,
+          }),
+        });
         throw error;
       } finally {
         startupRootSpan.complete();
