@@ -193,6 +193,72 @@ Targeted regression coverage:
 - `identity/tests/RequestMetadataMiddleware.test.ts` covers correlation precedence, invalid/fallback behavior, response header emission, and error-envelope correlation injection behavior.
 - `identity/tests/HttpQueryPrimitives.test.ts` covers shared pagination parsing/defaulting behavior and representative query normalization flows.
 
+## Story 1.2.6 Implementation Status
+
+Documented canonical middleware composition order and safety rules for route-family migrations:
+- order below is aligned with `IdentityHttpServer.ts` request handling and the extracted middleware/primitives modules.
+- guidance is intentionally fail-closed and precedence-preserving so route-family extraction does not change externally observable behavior.
+
+### Required HTTP Middleware Composition Order
+
+Apply the chain in this order for `/api/*` HTTP routes:
+1. request metadata bootstrap
+   - `resolveRequestCorrelationId(...)` then `setResponseCorrelationHeaders(...)`.
+2. request observability start
+   - request-received log emission and request timing tracking.
+3. CORS gate
+   - `evaluateApiCorsRequest(...)` and preflight short-circuit.
+4. secure-transport gate
+   - `enforceApiSecureTransport(...)` (`requireHttps` + loopback policy).
+5. route-family dispatch seam
+   - resolve family from `routeModuleRegistry.resolveRouteFamilyByPath(...)`, invoke `routeFamilyHandlers[routeFamilyId]`, then only fall back to inline legacy dispatch when handler returns `handled: false`.
+6. route-category authentication and trust gate
+   - pre-login routes: no session middleware.
+   - session routes: `requireAuthenticatedSession(...)` (`resolveAuthenticatedSessionFromRequest(...)` -> `enforceTrustedSessionAssurance(...)` -> transport trust validation).
+   - workspace routes: `requireAuthenticatedWorkspaceSession(...)` (session gate first, then `resolveWorkspaceContextFromRequest(...)`).
+   - node routes: `requireAuthenticatedNodeTransport(...)` (required `nodeId`, then mTLS trust path or session-principal fallback depending on transport-trust configuration).
+7. request parsing and normalization
+   - `parseJsonBody(...)` and route parsers after auth/trust gates in the normal path.
+   - query normalization through `HttpQueryPrimitives.ts` helpers where shared list/pagination semantics are required.
+8. backend invocation and status translation
+   - invoke backend API and map status via route-family translators from `IdentityHttpServerErrorTranslation.ts`.
+9. response and error envelope translation
+   - always emit via `writeJson(...)`, which applies `normalizeSharedApiErrorEnvelope(...)` and `addCorrelationIdToErrorEnvelope(...)`.
+10. terminal fallback behavior
+    - unmatched routes return 404.
+    - unhandled errors return 500 with sanitized diagnostics.
+
+### Middleware Safety Rules
+
+- Keep gate order immutable: metadata -> CORS -> secure transport -> auth/trust -> parse/validate -> backend -> status translation -> `writeJson(...)`.
+- Do not resolve workspace context before a successful authenticated-session gate.
+- Do not parse large/complex authenticated payloads before auth/trust checks unless the route requires parsed data to determine trust identity (see lifecycle exception below).
+- For node transport routes, do not substitute workspace/session middleware for `requireAuthenticatedNodeTransport(...)`; mTLS and node-id binding must stay authoritative when transport trust is configured.
+- Preserve `sessionAssuranceRequirement` semantics (`allow-untrusted`, `allow-pairing`, `require-trusted`) and keep defaults fail-closed for protected routes.
+- After any failed middleware/gate, write response and `return`; never continue downstream handler execution.
+- Keep status mapping centralized in `IdentityHttpServerErrorTranslation.ts`; avoid ad hoc per-route status switches.
+- Keep error envelope normalization centralized in `writeJson(...)`; avoid direct `writeJsonResponse(...)` calls from route handlers.
+- Preserve first-match route precedence and legacy fallback behavior across modular route-family migrations.
+
+### Common Route-Category Composition Examples
+
+- pre-login identity route (`POST /api/v1/identity/login`):
+  metadata -> CORS -> secure transport -> parse body -> backend -> `mapIdentityAuthApiStatusCode(...)` -> `writeJson(...)`.
+- session-only route (`GET /api/v1/security/secrets`):
+  metadata -> CORS -> secure transport -> `requireAuthenticatedSession(...)` -> backend -> `mapSecretMetadataApiStatusCode(...)` -> `writeJson(...)`.
+- workspace-scoped route (`GET /api/v1/assets`):
+  metadata -> CORS -> secure transport -> `requireAuthenticatedWorkspaceSession(...)` -> query normalization/pagination parsing -> backend -> `mapAssetManagementApiStatusCode(...)` -> `writeJson(...)`.
+- node route (`POST /api/v1/nodes/:nodeId/heartbeat`):
+  metadata -> CORS -> secure transport -> `requireAuthenticatedNodeTransport(...)` -> parse body -> backend -> `mapNodeTrustApiStatusCode(...)` -> `writeJson(...)`.
+- special-case authoritative lifecycle update (`POST /api/v1/runtime/runs/:runId/lifecycle`):
+  metadata -> CORS -> secure transport -> parse+validate body to extract `senderNodeId` -> `requireAuthenticatedNodeTransport(..., senderNodeId, ...)` -> backend -> `mapRunSubmissionApiStatusCode(...)` -> `writeJson(...)`.
+
+### WebSocket and Readiness Special Cases
+
+- websocket upgrade (`handleWebSocketUpgrade(...)`) has a parallel gate order:
+  secure-transport check -> websocket header validation -> bearer-session resolution -> thin-client origin policy -> purpose authorization -> websocket trust validation -> channel establishment.
+- root readiness probe (`GET /`) intentionally bypasses API CORS/auth middleware and returns a minimal service-readiness payload.
+
 ## Registration and Composition Seams
 
 Host seam remains authoritative:

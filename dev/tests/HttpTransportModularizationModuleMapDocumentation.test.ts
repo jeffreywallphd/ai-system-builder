@@ -31,6 +31,10 @@ describe("HTTP transport modularization module map documentation guardrails", ()
     const requiredSections = [
       "Current Transport Audit (Dev Branch)",
       "Shared Middleware Concerns To Extract",
+      "Story 1.2.6 Implementation Status",
+      "Required HTTP Middleware Composition Order",
+      "Middleware Safety Rules",
+      "Common Route-Category Composition Examples",
       "Target Module Map",
       "Registration and Composition Seams",
       "DTO Mapping Seams",
@@ -63,6 +67,32 @@ describe("HTTP transport modularization module map documentation guardrails", ()
       "websocket upgrade",
     ] as const;
     for (const token of requiredSpecialCaseTokens) {
+      expect(doc).toContain(token);
+    }
+
+    const requiredCompositionOrderTokens = [
+      "resolveRequestCorrelationId(...)",
+      "setResponseCorrelationHeaders(...)",
+      "evaluateApiCorsRequest(...)",
+      "enforceApiSecureTransport(...)",
+      "requireAuthenticatedSession(...)",
+      "requireAuthenticatedWorkspaceSession(...)",
+      "requireAuthenticatedNodeTransport(...)",
+      "normalizeSharedApiErrorEnvelope(...)",
+      "addCorrelationIdToErrorEnvelope(...)",
+    ] as const;
+    for (const token of requiredCompositionOrderTokens) {
+      expect(doc).toContain(token);
+    }
+
+    const requiredSafetyRuleTokens = [
+      "Keep gate order immutable",
+      "Do not resolve workspace context before a successful authenticated-session gate.",
+      "After any failed middleware/gate, write response and `return`",
+      "Preserve first-match route precedence and legacy fallback behavior",
+      "special-case authoritative lifecycle update (`POST /api/v1/runtime/runs/:runId/lifecycle`)",
+    ] as const;
+    for (const token of requiredSafetyRuleTokens) {
       expect(doc).toContain(token);
     }
   });
