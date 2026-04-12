@@ -1,5 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import {
+  SecurityMaterialConsumerSubsystems,
+  SecurityMaterialCreationModes,
+  SecurityMaterialHierarchyClasses,
+  SecurityMaterialOwningSubsystems,
+  SecurityMaterialRevocationModes,
+  SecurityMaterialRotationModes,
+  SecurityMaterialStorageSubsystems,
+} from "@application/security/contracts/SecurityMaterialKeyHierarchyContract";
+import {
   SecurityMaterialCategories,
   SecurityMaterialDurabilityClasses,
   SecurityMaterialFallbackPolicies,
@@ -26,6 +35,21 @@ describe("SecurityMaterialStartupValidationPipeline", () => {
     scope: SecurityMaterialScopes.server,
     rotationPosture: SecurityMaterialRotationPostures.manual,
     usageContexts: [SecurityMaterialUsageContexts.startupBootstrap],
+    hierarchy: Object.freeze({
+      hierarchyClass: SecurityMaterialHierarchyClasses.serverRuntimeSecretMaterial,
+      ownership: Object.freeze({
+        ownerScope: SecurityMaterialScopes.server,
+        ownerSubsystem: SecurityMaterialOwningSubsystems.serverControlPlane,
+        storageSubsystem: SecurityMaterialStorageSubsystems.durableServerSecretStore,
+        consumerSubsystems: Object.freeze([SecurityMaterialConsumerSubsystems.serverBootstrap]),
+      }),
+      lifecycle: Object.freeze({
+        creationMode: SecurityMaterialCreationModes.generatedAtBootstrap,
+        rotationMode: SecurityMaterialRotationModes.onCompromise,
+        revocationMode: SecurityMaterialRevocationModes.optional,
+        requiresReEncryptionOnRotation: false,
+      }),
+    }),
     defaultPolicy: Object.freeze({
       durabilityClass: SecurityMaterialDurabilityClasses.durable,
       startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,

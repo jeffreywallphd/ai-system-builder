@@ -1,3 +1,9 @@
+import {
+  assertSecurityMaterialKeyHierarchyCompatibility,
+  createSecurityMaterialKeyHierarchyContract,
+  type SecurityMaterialKeyHierarchyContract,
+} from "./SecurityMaterialKeyHierarchyContract";
+
 export const SecurityMaterialCategories = Object.freeze({
   secretCredential: "secret-credential",
   signingMaterial: "signing-material",
@@ -88,6 +94,7 @@ export interface SecurityMaterialClassificationIdentity {
 }
 
 export interface SecurityMaterialClassificationContract extends SecurityMaterialClassificationIdentity {
+  readonly hierarchy: SecurityMaterialKeyHierarchyContract;
   readonly defaultPolicy: SecurityMaterialEnvironmentPolicy;
   readonly developmentPolicy?: SecurityMaterialEnvironmentPolicy;
   readonly testPolicy?: SecurityMaterialEnvironmentPolicy;
@@ -131,12 +138,21 @@ export function createSecurityMaterialClassificationContract(
     }
   }
 
+  const hierarchy = createSecurityMaterialKeyHierarchyContract(input.hierarchy);
+  assertSecurityMaterialKeyHierarchyCompatibility({
+    materialId,
+    hierarchy,
+    scope: input.scope,
+    category: input.category,
+  });
+
   return Object.freeze({
     materialId,
     category: input.category,
     scope: input.scope,
     rotationPosture: input.rotationPosture,
     usageContexts: Object.freeze([...normalizedUsageContexts]),
+    hierarchy,
     defaultPolicy: createSecurityMaterialEnvironmentPolicy(input.defaultPolicy),
     developmentPolicy: input.developmentPolicy
       ? createSecurityMaterialEnvironmentPolicy(input.developmentPolicy)

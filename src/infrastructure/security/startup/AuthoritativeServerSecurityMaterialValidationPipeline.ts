@@ -1,4 +1,11 @@
 import {
+  SecurityMaterialConsumerSubsystems,
+  SecurityMaterialCreationModes,
+  SecurityMaterialHierarchyClasses,
+  SecurityMaterialOwningSubsystems,
+  SecurityMaterialRevocationModes,
+  SecurityMaterialRotationModes,
+  SecurityMaterialStorageSubsystems,
   SecurityMaterialCategories,
   SecurityMaterialDurabilityClasses,
   SecurityMaterialFallbackPolicies,
@@ -38,6 +45,7 @@ const serverStartupSecurityMaterialDescriptors: ReadonlyArray<SecurityMaterialSt
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.onDemand,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.runtimeRequest],
+      hierarchy: createServerRuntimeSecretHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -65,6 +73,7 @@ const serverStartupSecurityMaterialDescriptors: ReadonlyArray<SecurityMaterialSt
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.onDemand,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.runtimeRequest],
+      hierarchy: createStorageContentKeyHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -92,6 +101,7 @@ const serverStartupSecurityMaterialDescriptors: ReadonlyArray<SecurityMaterialSt
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.onDemand,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.runtimeRequest],
+      hierarchy: createServerRuntimeSecretHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -119,6 +129,7 @@ const serverStartupSecurityMaterialDescriptors: ReadonlyArray<SecurityMaterialSt
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.onDemand,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.runtimeRequest],
+      hierarchy: createServerRuntimeSecretHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -146,6 +157,7 @@ const serverStartupSecurityMaterialDescriptors: ReadonlyArray<SecurityMaterialSt
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.onDemand,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.runtimeRequest],
+      hierarchy: createServerRuntimeSecretHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -212,6 +224,7 @@ function createRequiredListDescriptor(): SecurityMaterialStartupValidationDescri
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.notApplicable,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap],
+      hierarchy: createServerRuntimeSecretHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -262,6 +275,7 @@ function createManagedTlsPrivateKeyDescriptor(): SecurityMaterialStartupValidati
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.onDemand,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.transportSecurity],
+      hierarchy: createCertificateAuthorityHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -363,6 +377,69 @@ function resolveEnvironmentMaterialObservation(input: {
     details: Object.freeze({
       environmentKey: input.environmentKey,
       inheritedEnvironmentKey: input.inheritedEnvironmentKey ?? "",
+    }),
+  });
+}
+
+function createServerRuntimeSecretHierarchy() {
+  return Object.freeze({
+    hierarchyClass: SecurityMaterialHierarchyClasses.serverRuntimeSecretMaterial,
+    ownership: Object.freeze({
+      ownerScope: SecurityMaterialScopes.server,
+      ownerSubsystem: SecurityMaterialOwningSubsystems.serverControlPlane,
+      storageSubsystem: SecurityMaterialStorageSubsystems.durableServerSecretStore,
+      consumerSubsystems: Object.freeze([
+        SecurityMaterialConsumerSubsystems.serverBootstrap,
+        SecurityMaterialConsumerSubsystems.assetStorage,
+      ]),
+    }),
+    lifecycle: Object.freeze({
+      creationMode: SecurityMaterialCreationModes.generatedAtBootstrap,
+      rotationMode: SecurityMaterialRotationModes.onCompromise,
+      revocationMode: SecurityMaterialRevocationModes.optional,
+      requiresReEncryptionOnRotation: false,
+    }),
+  });
+}
+
+function createStorageContentKeyHierarchy() {
+  return Object.freeze({
+    hierarchyClass: SecurityMaterialHierarchyClasses.storageContentKey,
+    ownership: Object.freeze({
+      ownerScope: SecurityMaterialScopes.server,
+      ownerSubsystem: SecurityMaterialOwningSubsystems.assetProtectionService,
+      storageSubsystem: SecurityMaterialStorageSubsystems.assetKeyStore,
+      consumerSubsystems: Object.freeze([
+        SecurityMaterialConsumerSubsystems.serverBootstrap,
+        SecurityMaterialConsumerSubsystems.assetStorage,
+      ]),
+    }),
+    lifecycle: Object.freeze({
+      creationMode: SecurityMaterialCreationModes.migratedFromLegacyInput,
+      rotationMode: SecurityMaterialRotationModes.onCompromise,
+      revocationMode: SecurityMaterialRevocationModes.required,
+      requiresReEncryptionOnRotation: true,
+    }),
+  });
+}
+
+function createCertificateAuthorityHierarchy() {
+  return Object.freeze({
+    hierarchyClass: SecurityMaterialHierarchyClasses.certificateAuthorityKey,
+    ownership: Object.freeze({
+      ownerScope: SecurityMaterialScopes.server,
+      ownerSubsystem: SecurityMaterialOwningSubsystems.certificateAuthorityService,
+      storageSubsystem: SecurityMaterialStorageSubsystems.certificateAuthorityStore,
+      consumerSubsystems: Object.freeze([
+        SecurityMaterialConsumerSubsystems.serverBootstrap,
+        SecurityMaterialConsumerSubsystems.transportSecurity,
+      ]),
+    }),
+    lifecycle: Object.freeze({
+      creationMode: SecurityMaterialCreationModes.externallyProvisioned,
+      rotationMode: SecurityMaterialRotationModes.scheduled,
+      revocationMode: SecurityMaterialRevocationModes.required,
+      requiresReEncryptionOnRotation: false,
     }),
   });
 }

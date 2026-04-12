@@ -6,6 +6,13 @@ import {
   type SecretKind,
 } from "@domain/security/SecretDomain";
 import {
+  SecurityMaterialConsumerSubsystems,
+  SecurityMaterialCreationModes,
+  SecurityMaterialHierarchyClasses,
+  SecurityMaterialOwningSubsystems,
+  SecurityMaterialRevocationModes,
+  SecurityMaterialRotationModes,
+  SecurityMaterialStorageSubsystems,
   SecurityMaterialCategories,
   SecurityMaterialDurabilityClasses,
   SecurityMaterialFallbackPolicies,
@@ -68,6 +75,7 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.manual,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.providerCredential],
+      hierarchy: createServerProviderCredentialHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -96,6 +104,7 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.manual,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.providerCredential],
+      hierarchy: createServerProviderCredentialHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -124,6 +133,7 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
       scope: SecurityMaterialScopes.server,
       rotationPosture: SecurityMaterialRotationPostures.onDemand,
       usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.serverSigning],
+      hierarchy: createServerTokenSigningHierarchy(),
       defaultPolicy: Object.freeze({
         durabilityClass: SecurityMaterialDurabilityClasses.durable,
         startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
@@ -151,6 +161,48 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
 const SystemSecretDefinitionsById = new Map(
   SystemSecretDefinitions.map((definition) => [definition.secretId, definition] as const),
 );
+
+function createServerProviderCredentialHierarchy() {
+  return Object.freeze({
+    hierarchyClass: SecurityMaterialHierarchyClasses.providerCredentialMaterial,
+    ownership: Object.freeze({
+      ownerScope: SecurityMaterialScopes.server,
+      ownerSubsystem: SecurityMaterialOwningSubsystems.providerIntegrationService,
+      storageSubsystem: SecurityMaterialStorageSubsystems.durableServerSecretStore,
+      consumerSubsystems: Object.freeze([
+        SecurityMaterialConsumerSubsystems.serverBootstrap,
+        SecurityMaterialConsumerSubsystems.providerRuntime,
+      ]),
+    }),
+    lifecycle: Object.freeze({
+      creationMode: SecurityMaterialCreationModes.migratedFromLegacyInput,
+      rotationMode: SecurityMaterialRotationModes.manual,
+      revocationMode: SecurityMaterialRevocationModes.optional,
+      requiresReEncryptionOnRotation: false,
+    }),
+  });
+}
+
+function createServerTokenSigningHierarchy() {
+  return Object.freeze({
+    hierarchyClass: SecurityMaterialHierarchyClasses.tokenSigningKey,
+    ownership: Object.freeze({
+      ownerScope: SecurityMaterialScopes.server,
+      ownerSubsystem: SecurityMaterialOwningSubsystems.identitySessionService,
+      storageSubsystem: SecurityMaterialStorageSubsystems.durableServerSecretStore,
+      consumerSubsystems: Object.freeze([
+        SecurityMaterialConsumerSubsystems.serverBootstrap,
+        SecurityMaterialConsumerSubsystems.identityTokenIssuance,
+      ]),
+    }),
+    lifecycle: Object.freeze({
+      creationMode: SecurityMaterialCreationModes.migratedFromLegacyInput,
+      rotationMode: SecurityMaterialRotationModes.onCompromise,
+      revocationMode: SecurityMaterialRevocationModes.required,
+      requiresReEncryptionOnRotation: false,
+    }),
+  });
+}
 
 export const SystemSecretBootstrapStates = Object.freeze({
   ready: "ready",
