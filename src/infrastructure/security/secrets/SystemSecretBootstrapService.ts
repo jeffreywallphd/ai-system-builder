@@ -1,10 +1,28 @@
-﻿import {
+import {
   SecretAccessActions,
   SecretActorTypes,
   SecretKinds,
   SecretScopes,
   type SecretKind,
 } from "@domain/security/SecretDomain";
+import {
+  SecurityMaterialCategories,
+  SecurityMaterialDurabilityClasses,
+  SecurityMaterialFallbackPolicies,
+  SecurityMaterialLifecycleStages,
+  SecurityMaterialRotationPostures,
+  SecurityMaterialScopes,
+  SecurityMaterialStartupRequirements,
+  SecurityMaterialUsageContexts,
+  createSecurityMaterialClassificationContract,
+  isFailFastRequiredSecurityMaterial,
+  resolveSecurityMaterialEnvironmentPolicy,
+  type SecurityMaterialClassificationContract,
+  type SecurityMaterialDurabilityClass,
+  type SecurityMaterialFallbackPolicy,
+  type SecurityMaterialLifecycleStage,
+  type SecurityMaterialStartupRequirement,
+} from "@application/security/contracts/SecurityMaterialClassificationContract";
 import type { ServerComposedSecretService } from "./SecretServiceComposition";
 import {
   ServerPlatformProviderIds,
@@ -23,6 +41,7 @@ interface SystemSecretDefinition {
   readonly secretId: string;
   readonly name: string;
   readonly kind: SecretKind;
+  readonly classification: SecurityMaterialClassificationContract;
   readonly metadata: {
     readonly tags: ReadonlyArray<string>;
     readonly labels: Readonly<Record<string, string>>;
@@ -38,6 +57,18 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
     secretId: "secret:server:provider:openai",
     name: "provider.openai.api-key",
     kind: SecretKinds.apiKey,
+    classification: createSecurityMaterialClassificationContract({
+      materialId: "material:server:provider:openai",
+      category: SecurityMaterialCategories.secretCredential,
+      scope: SecurityMaterialScopes.server,
+      rotationPosture: SecurityMaterialRotationPostures.manual,
+      usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.providerCredential],
+      defaultPolicy: Object.freeze({
+        durabilityClass: SecurityMaterialDurabilityClasses.durable,
+        startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
+        fallbackPolicy: SecurityMaterialFallbackPolicies.migrateLegacyInput,
+      }),
+    }),
     metadata: Object.freeze({
       tags: Object.freeze(["server", "provider", "openai"]),
       labels: Object.freeze({
@@ -54,6 +85,18 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
     secretId: "secret:server:provider:huggingface",
     name: "provider.huggingface.api-token",
     kind: SecretKinds.accessToken,
+    classification: createSecurityMaterialClassificationContract({
+      materialId: "material:server:provider:huggingface",
+      category: SecurityMaterialCategories.secretCredential,
+      scope: SecurityMaterialScopes.server,
+      rotationPosture: SecurityMaterialRotationPostures.manual,
+      usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.providerCredential],
+      defaultPolicy: Object.freeze({
+        durabilityClass: SecurityMaterialDurabilityClasses.durable,
+        startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
+        fallbackPolicy: SecurityMaterialFallbackPolicies.migrateLegacyInput,
+      }),
+    }),
     metadata: Object.freeze({
       tags: Object.freeze(["server", "provider", "huggingface"]),
       labels: Object.freeze({
@@ -70,6 +113,23 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
     secretId: "secret:server:signing:identity-session",
     name: "signing.identity.session.private-key",
     kind: SecretKinds.privateKey,
+    classification: createSecurityMaterialClassificationContract({
+      materialId: "material:server:identity-session-signing",
+      category: SecurityMaterialCategories.signingMaterial,
+      scope: SecurityMaterialScopes.server,
+      rotationPosture: SecurityMaterialRotationPostures.onDemand,
+      usageContexts: [SecurityMaterialUsageContexts.startupBootstrap, SecurityMaterialUsageContexts.serverSigning],
+      defaultPolicy: Object.freeze({
+        durabilityClass: SecurityMaterialDurabilityClasses.durable,
+        startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
+        fallbackPolicy: SecurityMaterialFallbackPolicies.migrateLegacyInput,
+      }),
+      developmentPolicy: Object.freeze({
+        durabilityClass: SecurityMaterialDurabilityClasses.ephemeral,
+        startupRequirement: SecurityMaterialStartupRequirements.optional,
+        fallbackPolicy: SecurityMaterialFallbackPolicies.generateEphemeralForDevelopment,
+      }),
+    }),
     metadata: Object.freeze({
       tags: Object.freeze(["server", "signing", "identity-session"]),
       labels: Object.freeze({
@@ -98,9 +158,11 @@ export type SystemSecretBootstrapState =
 export const SystemSecretBootstrapDiagnosticCodes = Object.freeze({
   unsupportedRequiredSecret: "unsupported-required-secret",
   requiredSecretMissing: "required-secret-missing",
+  optionalSecretMissing: "optional-secret-missing",
   legacyMigrationUnavailable: "legacy-migration-unavailable",
   legacyMigrationFailed: "legacy-migration-failed",
   requiredSecretUnusable: "required-secret-unusable",
+  optionalSecretUnusable: "optional-secret-unusable",
 });
 
 export type SystemSecretBootstrapDiagnosticCode =
@@ -110,6 +172,10 @@ export interface SystemSecretBootstrapDiagnostic {
   readonly code: SystemSecretBootstrapDiagnosticCode;
   readonly secretId: string;
   readonly message: string;
+  readonly severity: "error" | "warning";
+  readonly startupRequirement: SecurityMaterialStartupRequirement;
+  readonly durabilityClass: SecurityMaterialDurabilityClass;
+  readonly fallbackPolicy: SecurityMaterialFallbackPolicy;
   readonly legacyEnvironmentVariable?: string;
 }
 
@@ -140,6 +206,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
   input: BootstrapSystemSecretsFromEnvironmentInput,
 ): Promise<SystemSecretBootstrapResult> {
   const now = input.now ?? (() => new Date());
+  const lifecycleStage = resolveLifecycleStage(input.env);
   const requiredSecretIds = parseOptionalCsvList(input.env[SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.requiredSecretIds]);
   if (requiredSecretIds.length === 0) {
     return Object.freeze({
@@ -167,9 +234,22 @@ export async function bootstrapSystemSecretsFromEnvironment(
         code: SystemSecretBootstrapDiagnosticCodes.unsupportedRequiredSecret,
         secretId,
         message: `Required system secret '${secretId}' is not registered for bootstrap.`,
+        severity: "error",
+        startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
+        durabilityClass: SecurityMaterialDurabilityClasses.durable,
+        fallbackPolicy: SecurityMaterialFallbackPolicies.none,
       }));
       continue;
     }
+
+    const policy = resolveSecurityMaterialEnvironmentPolicy({
+      classification: definition.classification,
+      lifecycleStage,
+    });
+    const failFastRequired = isFailFastRequiredSecurityMaterial({
+      classification: definition.classification,
+      lifecycleStage,
+    });
 
     const existingMetadata = await input.secretService.getSecretMetadataUseCase.execute({
       actor: administrativeActor,
@@ -191,6 +271,10 @@ export async function bootstrapSystemSecretsFromEnvironment(
             secretId: definition.secretId,
             legacyEnvironmentVariable,
             message: "Legacy secret migration requires secret encryption configuration.",
+            severity: "error",
+            startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
+            durabilityClass: SecurityMaterialDurabilityClasses.durable,
+            fallbackPolicy: SecurityMaterialFallbackPolicies.migrateLegacyInput,
           }));
           continue;
         }
@@ -215,6 +299,10 @@ export async function bootstrapSystemSecretsFromEnvironment(
             secretId: definition.secretId,
             legacyEnvironmentVariable,
             message: `Legacy secret migration failed (${createResult.error.code}).`,
+            severity: "error",
+            startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
+            durabilityClass: SecurityMaterialDurabilityClasses.durable,
+            fallbackPolicy: SecurityMaterialFallbackPolicies.migrateLegacyInput,
           }));
           continue;
         }
@@ -222,10 +310,18 @@ export async function bootstrapSystemSecretsFromEnvironment(
         migratedSecretIds.push(definition.secretId);
       } else {
         diagnostics.push(Object.freeze({
-          code: SystemSecretBootstrapDiagnosticCodes.requiredSecretMissing,
+          code: failFastRequired
+            ? SystemSecretBootstrapDiagnosticCodes.requiredSecretMissing
+            : SystemSecretBootstrapDiagnosticCodes.optionalSecretMissing,
           secretId: definition.secretId,
           legacyEnvironmentVariable,
-          message: "Required system secret is missing.",
+          message: failFastRequired
+            ? "Required system secret is missing."
+            : "Optional startup secret is missing in the current lifecycle stage.",
+          severity: failFastRequired ? "error" : "warning",
+          startupRequirement: policy.startupRequirement,
+          durabilityClass: policy.durabilityClass,
+          fallbackPolicy: policy.fallbackPolicy,
         }));
         continue;
       }
@@ -251,14 +347,22 @@ export async function bootstrapSystemSecretsFromEnvironment(
 
     if (!runtimeCheck.ok) {
       diagnostics.push(Object.freeze({
-        code: SystemSecretBootstrapDiagnosticCodes.requiredSecretUnusable,
+        code: failFastRequired
+          ? SystemSecretBootstrapDiagnosticCodes.requiredSecretUnusable
+          : SystemSecretBootstrapDiagnosticCodes.optionalSecretUnusable,
         secretId: definition.secretId,
-        message: `Required system secret could not be resolved for runtime use (${runtimeCheck.error.code}).`,
+        message: failFastRequired
+          ? `Required system secret could not be resolved for runtime use (${runtimeCheck.error.code}).`
+          : `Optional startup secret could not be resolved for runtime use (${runtimeCheck.error.code}).`,
+        severity: failFastRequired ? "error" : "warning",
+        startupRequirement: policy.startupRequirement,
+        durabilityClass: policy.durabilityClass,
+        fallbackPolicy: policy.fallbackPolicy,
       }));
     }
   }
 
-  const state = diagnostics.length > 0
+  const state = diagnostics.some((diagnostic) => diagnostic.severity === "error")
     ? SystemSecretBootstrapStates.invalid
     : SystemSecretBootstrapStates.ready;
 
@@ -325,3 +429,15 @@ function normalizeOptional(value: string | undefined): string | undefined {
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
+function resolveLifecycleStage(
+  env: Readonly<Record<string, string | undefined>>,
+): SecurityMaterialLifecycleStage {
+  const nodeEnv = normalizeOptional(env.NODE_ENV)?.toLowerCase();
+  if (nodeEnv === "development") {
+    return SecurityMaterialLifecycleStages.development;
+  }
+  if (nodeEnv === "test") {
+    return SecurityMaterialLifecycleStages.test;
+  }
+  return SecurityMaterialLifecycleStages.production;
+}

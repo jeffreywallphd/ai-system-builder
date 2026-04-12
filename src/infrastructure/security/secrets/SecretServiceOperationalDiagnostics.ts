@@ -49,7 +49,9 @@ export class SecretServiceOperationalDiagnosticsProvider implements ISecretServi
 
     const bootstrapDiagnostics = bootstrapResult.diagnostics.map((diagnostic) => Object.freeze({
       code: diagnostic.code,
-      severity: SecretServiceDiagnosticSeverities.error,
+      severity: diagnostic.severity === "error"
+        ? SecretServiceDiagnosticSeverities.error
+        : SecretServiceDiagnosticSeverities.warning,
       message: diagnostic.message,
       secretId: diagnostic.secretId,
     }));

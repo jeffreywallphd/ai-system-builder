@@ -92,6 +92,23 @@ These contracts establish stable extension points for persistence adapters, auth
 - application contracts depend on domain types and abstract ports only
 - no storage, transport, UI, or host runtime behavior is introduced in domain contracts
 
+## Story 3.1.2 Security Material Classification
+
+- adds typed security material classification contracts in `src/application/security/contracts/SecurityMaterialClassificationContract.ts`
+- models security material by:
+  - category
+  - scope (`server`/`workspace`/`user`/`storage-instance`)
+  - durability (`durable` vs `ephemeral`)
+  - startup requirement (`fail-fast-required` vs `optional`)
+  - fallback policy
+  - rotation posture
+  - usage context
+  - lifecycle-stage policy override (`production`/`development`/`test`)
+- wires the classification contracts into a real startup path in `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts` so bootstrap diagnostics and startup validity are policy-derived instead of generic string handling
+- distinguishes fail-fast required runtime material from optional development-ephemeral material:
+  - provider credentials remain fail-fast required
+  - identity-session signing material stays fail-fast in production and is optional/ephemeral in development policy
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants

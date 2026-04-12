@@ -44,3 +44,20 @@ Service contract:
 - `ISecretManagementService` for create/read metadata/retrieve plaintext/rotate/disable/delete/list.
 
 The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/domain/application boundaries.
+
+## Story 3.1.2 Security Material Classification
+
+- Adds typed security material classification contracts in `src/application/security/contracts/SecurityMaterialClassificationContract.ts`.
+- Models security material by:
+  - category
+  - scope (`server`/`workspace`/`user`/`storage-instance`)
+  - durability (`durable` vs `ephemeral`)
+  - startup requirement (`fail-fast-required` vs `optional`)
+  - fallback policy
+  - rotation posture
+  - usage context
+  - lifecycle-stage policy override (`production`/`development`/`test`)
+- Wires the classification contracts into a real startup path in `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts` so bootstrap diagnostics and startup validity are policy-derived instead of generic string handling.
+- Distinguishes fail-fast required runtime material from optional development-ephemeral material:
+  - provider credentials remain fail-fast required.
+  - identity-session signing material stays fail-fast in production and is optional/ephemeral in development policy.
