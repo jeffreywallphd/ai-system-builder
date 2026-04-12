@@ -7,6 +7,8 @@
 ## Purpose
 - Shared context and taxonomy references used across the docs system.
 
+> **AI/coding-agent start here:** Load [repository-overview.pack.md](./packs/repository-overview.pack.md) as the default first foundation pack for nearly all non-trivial tasks, then use [prompt-routing guidance](./prompt-routing.md) to assemble minimum sufficient context and authoritative docs.
+
 ## Belongs Here
 - Cross-domain taxonomy overviews and glossary-style references.
 - Context packs that help readers map concepts across features.

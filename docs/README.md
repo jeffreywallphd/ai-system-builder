@@ -36,7 +36,7 @@ Use this page to pick the right documentation path quickly. It routes by reader 
 - Architecture reviewer: start in [docs/architecture/](./architecture/README.md), then open relevant ADRs in [docs/adr/](./adr/README.md).
 - Contributor implementing changes: start in [docs/contributors/](./contributors/README.md), then follow links to architecture or UI contracts.
 - Operator/support maintainer: start in [docs/operations/](./operations/README.md) for runtime and troubleshooting guidance.
-- AI assistant or cross-domain reader: start in [docs/context/](./context/README.md) for taxonomy and metadata conventions.
+- AI assistant: start in [docs/context/](./context/README.md), then load [repository-overview.pack.md](./context/packs/repository-overview.pack.md) as the default first foundation pack.
 
 ## Route By Task
 

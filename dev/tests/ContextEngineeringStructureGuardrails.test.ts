@@ -89,6 +89,7 @@ describe("context engineering structure guardrails", () => {
     expect(contextReadme).toContain("./templates/README.md");
     expect(contextReadme).toContain("./context-map.md");
     expect(contextReadme).toContain("./prompt-routing.md");
+    expect(contextReadme).toContain("./packs/repository-overview.pack.md");
     expect(contextReadme).toContain("./context-map.json");
     expect(contextReadme).toContain("./documentation-registry.md");
     expect(contextReadme).toContain("./documentation-identity-and-reference-conventions.md");
@@ -101,6 +102,7 @@ describe("context engineering structure guardrails", () => {
     expect(contextAiReadme).toContain("./templates/README.ai.md");
     expect(contextAiReadme).toContain("./context-map.ai.md");
     expect(contextAiReadme).toContain("./prompt-routing.ai.md");
+    expect(contextAiReadme).toContain("./packs/repository-overview.pack.ai.md");
     expect(contextAiReadme).toContain("./context-map.json");
     expect(contextAiReadme).toContain("./documentation-registry.ai.md");
     expect(contextAiReadme).toContain("./documentation-identity-and-reference-conventions.ai.md");

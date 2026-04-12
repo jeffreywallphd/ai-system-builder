@@ -7,6 +7,8 @@
 ## Purpose
 - Entry point for cross-domain context and taxonomy references.
 
+> **AI/coding-agent start here:** Load [repository-overview.pack.ai.md](./packs/repository-overview.pack.ai.md) as the default first foundation pack for nearly all non-trivial tasks, then use [prompt-routing guidance](./prompt-routing.ai.md) to assemble minimum sufficient context and authoritative docs.
+
 ## Belongs Here
 - Taxonomy/glossary references used across features.
 - Orientation context packs for humans and AI assistants.

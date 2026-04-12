@@ -36,7 +36,7 @@ Use this router to pick the correct documentation entry point by reader role or 
 - Architecture reviewer: start in [docs/architecture/](./architecture/README.ai.md), then review decisions in [docs/adr/](./adr/README.ai.md).
 - Contributor implementing a change: start in [docs/contributors/](./contributors/README.ai.md), then follow linked architecture/UI contracts.
 - Operator or support maintainer: start in [docs/operations/](./operations/README.ai.md).
-- AI assistant building context: start in [docs/context/](./context/README.ai.md).
+- AI assistant building context: start in [docs/context/](./context/README.ai.md), then load [repository-overview.pack.ai.md](./context/packs/repository-overview.pack.ai.md) as the default first foundation pack for non-trivial prompts.
 
 ## Route By Task
 
