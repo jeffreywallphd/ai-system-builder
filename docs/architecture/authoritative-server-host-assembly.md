@@ -55,6 +55,7 @@ The host validates startup dependency coverage and authoritative service coverag
 
 During authoritative startup, the `dependencies` stage composes an API route registration plan artifact and the `feature-registration` stage validates required route-family coverage before runtime host transport starts.
 The top-level HTTP server composition (`createIdentityHttpServer`) now consumes this registration plan through its route-module registry and supports per-route-family modular handlers with explicit legacy fallback.
+Top-level websocket upgrade entry wiring is isolated in `src/infrastructure/transport/http-server/identity/composition/IdentityHttpUpgradeBoundary.ts`, separating upgrade dispatch from standard HTTP route handling.
 This creates a hybrid migration seam where modular route-family dispatch can be introduced incrementally while unmatched or declined routes continue through existing monolithic handlers.
 
 The same `dependencies` stage now also composes optional ComfyUI execution adapter infrastructure (transport client + run-dispatch adapter + cancellation adapter + capability probe adapter + output discovery collector) as a host startup artifact when Comfy adapter config is enabled.

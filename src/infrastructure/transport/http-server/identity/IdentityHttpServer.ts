@@ -362,6 +362,7 @@ import {
 } from "../AuthoritativeApiRouteRegistration";
 import { composeAuthoritativeApiRouteRegistrationPlan } from "../AuthoritativeApiRouteRegistrationCatalog";
 import { composeIdentityHttpTransport } from "./composition/IdentityHttpTransportComposition";
+import { installIdentityHttpUpgradeBoundary } from "./composition/IdentityHttpUpgradeBoundary";
 import { createAuditLedgerRouteFamilyHandler } from "./route-families/AuditRouteFamilyHandler";
 import { createExecutionNodeManagementRouteFamilyHandler } from "./route-families/ExecutionNodeManagementRouteFamilyHandler";
 import {
@@ -7332,9 +7333,10 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     }
   });
 
-  if (options.webSocket) {
-    server.on("upgrade", (request, socket) => {
-      void handleWebSocketUpgrade({
+  installIdentityHttpUpgradeBoundary({
+    server,
+    dispatchUpgrade: options.webSocket
+      ? ({ request, socket }) => handleWebSocketUpgrade({
         request,
         socket,
         logger,
@@ -7345,24 +7347,24 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         transportTrust: options.transportTrust,
         webSocket: options.webSocket,
         channelRegistry,
-      }).catch((error) => {
-        const requestId = randomUUID();
-        const correlationId = resolveRequestCorrelationId(request, requestId);
-        logger.error(Object.freeze({
-          event: "identity-websocket.upgrade.unhandled-error",
-          requestId,
-          correlationId,
-          method: request.method,
-          path: request.url,
-          statusCode: 500,
-          details: Object.freeze({
-            error: normalizeError(error),
-          }),
-        }));
-        socket.destroy();
-      });
-    });
-  }
+      })
+      : undefined,
+    onUnhandledUpgradeError: ({ request, error }) => {
+      const requestId = randomUUID();
+      const correlationId = resolveRequestCorrelationId(request, requestId);
+      logger.error(Object.freeze({
+        event: "identity-websocket.upgrade.unhandled-error",
+        requestId,
+        correlationId,
+        method: request.method,
+        path: request.url,
+        statusCode: 500,
+        details: Object.freeze({
+          error: normalizeError(error),
+        }),
+      }));
+    },
+  });
 
   return server;
 }
