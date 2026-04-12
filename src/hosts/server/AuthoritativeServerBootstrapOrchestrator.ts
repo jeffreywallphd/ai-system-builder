@@ -242,7 +242,7 @@ function createStageStatusSnapshot(
   stageStatuses: ReadonlyArray<AuthoritativeServerBootstrapPipelineStageStatus>,
 ): AuthoritativeServerBootstrapOrchestratorStageStatus {
   const adoptedStages = listAuthoritativeServerBootstrapPipelineStages().filter(
-    (stage) => stage.adoptionState === AuthoritativeServerBootstrapStageAdoptionStates.active,
+    (stage) => stage.adoptionState === AuthoritativeServerBootstrapPipelineStageAdoptionStates.active,
   );
   const runtimeStages = adoptedStages.map((definition) => {
     const stage = stageStatuses.find((candidate) => candidate.stageId === definition.stageId);
