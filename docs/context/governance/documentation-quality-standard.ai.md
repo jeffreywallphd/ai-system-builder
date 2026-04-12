@@ -14,6 +14,7 @@ related_code_paths:
   - docs/context/governance/context-governance-policy.ai.md
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
+  - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
@@ -24,6 +25,7 @@ related_code_paths:
   - dev/tests/DocumentationCiFailurePolicyStory732Guardrails.test.ts
   - dev/tests/DocumentationRuleEvolutionStory735Guardrails.test.ts
   - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
+  - dev/tests/DocumentationQualityExceptionsStory742Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Quality Standard
@@ -235,6 +237,37 @@ Publish this in canonical governance and contributor docs within the same PR so 
 - Assign explicit owners for warning backlogs and recurring validator drift; avoid indefinite warning accumulation.
 - When checks become obsolete because documentation architecture evolves, deprecate or replace them with documented rationale and updated guardrails.
 - Keep shared enforcement references aligned (`package.json` docs scripts, contributor run/fix guidance, rule evolution guidance, and registry routing metadata).
+
+## Exceptions and Escape Hatch Policy (Story 7.4.2)
+
+Keep exception handling narrow. Use an exception only when required-rule compliance would create correctness, compliance, or safe-operation risk.
+
+Allowed exception cases:
+
+- external contract mismatch (vendor/regulatory format constraints),
+- security or legal constraints (mandatory redaction/disclosure boundaries),
+- transitional migration constraints with explicit follow-up cleanup path.
+
+Disallowed exception cases:
+
+- convenience or deadline pressure,
+- broad legacy waivers,
+- bypassing fixable `critical` contract findings.
+
+Every exception request should include:
+
+- exact `rule_ids`,
+- exact `paths` in scope (no wildcard bypass),
+- reason mapped to an allowed case,
+- owner, mitigation, and explicit expiry/review date.
+
+Escalation and anti-abuse boundaries:
+
+- high-risk domains require additional qualified review,
+- repeated renewals for same rule/path should trigger rule-tuning or migration work,
+- scope is narrow: exceptions never waive unrelated findings.
+
+Use `docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md` for contributor workflow and record format.
 
 ## Recommended Guidance (Non-Blocking)
 

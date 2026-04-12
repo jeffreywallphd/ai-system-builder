@@ -16,6 +16,7 @@ related_code_paths:
   - dev/scripts/validate-docs-cross-references.cjs
   - dev/scripts/validate-docs-category-compliance.cjs
   - docs/context/governance/documentation-quality-standard.ai.md
+  - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md
   - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
@@ -96,6 +97,13 @@ To keep maintenance cost proportional:
 - Avoid broad legacy cleanup gates on untouched files; use touch-policy and scoped follow-up work.
 - Keep high-risk contract checks strict (routing, registry, supersession, authority integrity).
 
+## Exception Path Governance (Story 7.4.2)
+
+- Keep exceptions lightweight but explicit: include stable rule IDs, exact paths, owner, mitigation, and expiry/review date.
+- Treat repeated exception patterns as maintenance signals for rule tuning or migration planning.
+- Prevent hidden permanent bypasses: require renewal evidence and retire expired exceptions.
+- Keep exception workflow updates aligned across policy docs, contributor guides, and guardrail tests in the same pull request.
+
 ## Required Documentation Updates for Tooling Changes
 
 Any pull request that changes docs-quality tooling or rule behavior should update, when relevant:
@@ -103,6 +111,7 @@ Any pull request that changes docs-quality tooling or rule behavior should updat
 - `documentation-quality-standard`
 - `documentation-quality-enforced-standards-guide`
 - `documentation-quality-checks-run-and-fix-guide`
+- `documentation-quality-exceptions-and-escape-hatches-guide`
 - `documentation-quality-rule-evolution-guide`
 - this maintenance guide
 

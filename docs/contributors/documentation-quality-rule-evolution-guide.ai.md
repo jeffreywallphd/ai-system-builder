@@ -9,6 +9,7 @@ related_code_paths:
   - docs/context/governance/documentation-quality-standard.ai.md
   - docs/contributors/documentation-quality-enforced-standards-guide.ai.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md
+  - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - dev/scripts/lint-docs.cjs
   - package.json
@@ -85,6 +86,13 @@ Keep this information in canonical contributor/governance docs, not only in scri
 - Keep at least one normal development cycle in warning-first mode before promoting maintainability rules.
 - Avoid blocking promotion when false-positive classes remain open.
 - If emergency blocking is required, include rollback criteria and owner in the same change.
+
+## Exception Signals and Rule Tuning (Story 7.4.2)
+
+- Repeated exceptions for the same rule/path family indicate rule-design debt.
+- If requests become frequent, tune scope/severity or split rules so legitimate non-standard cases are explicitly modeled.
+- Keep exception handling narrow and path-bound; do not normalize repeated exceptions into silent global bypass.
+- Use `docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.ai.md` to classify legitimate cases before changing rule policy.
 
 ## Contributor Workflow During Rollout
 

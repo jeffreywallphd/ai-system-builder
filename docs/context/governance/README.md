@@ -21,6 +21,7 @@
 - [Context Governance Policy](./context-governance-policy.md)
 - [Documentation Quality Standard](./documentation-quality-standard.md)
 - [Contributor Enforcement Guide](../contributors/documentation-quality-enforced-standards-guide.md)
+- [Exceptions and Escape Hatch Guide for Contributors](../contributors/documentation-quality-exceptions-and-escape-hatches-guide.md)
 - [Rule Evolution Guide for Contributors](../contributors/documentation-quality-rule-evolution-guide.md)
 - [Tooling Maintenance Guide for Contributors](../contributors/documentation-quality-tooling-maintenance-guide.md)
 - [Context Asset Lifecycle Guidance](./context-asset-lifecycle.md)

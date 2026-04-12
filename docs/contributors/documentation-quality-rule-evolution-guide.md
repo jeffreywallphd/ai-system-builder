@@ -9,6 +9,7 @@ related_code_paths:
   - docs/context/governance/documentation-quality-standard.md
   - docs/contributors/documentation-quality-enforced-standards-guide.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.md
+  - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.md
   - dev/scripts/lint-docs.cjs
   - package.json
@@ -85,6 +86,13 @@ Keep communication visible in canonical docs and contributor-facing guides, not 
 - Prefer at least one normal development cycle of warning-only operation before promoting new maintainability rules to blocking.
 - Do not promote a rule to blocking while false-positive categories are still unresolved.
 - If emergency blocking is required, document explicit rollback criteria and owner in the same change set.
+
+## Exception Signals and Rule Tuning (Story 7.4.2)
+
+- Treat recurring exception requests for the same rule/path family as a rule design signal.
+- If exceptions become frequent, tune scope/severity or split the rule so legitimate non-standard cases are explicitly modeled.
+- Keep exception handling narrow and path-bound; do not convert repeated exceptions into silent global bypass.
+- Use `docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md` to classify legitimate cases before changing rule policy.
 
 ## Contributor Workflow Expectations During Rule Rollout
 

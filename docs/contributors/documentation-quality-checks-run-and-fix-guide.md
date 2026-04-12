@@ -17,6 +17,7 @@ related_code_paths:
   - dev/scripts/validate-docs-category-compliance.cjs
   - docs/context/governance/documentation-quality-standard.md
   - docs/contributors/documentation-quality-enforced-standards-guide.md
+  - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md
   - docs/contributors/documentation-quality-rule-evolution-guide.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.md
   - docs/contributors/documentation-quality-worked-examples.md
@@ -161,3 +162,15 @@ Escalate even after lint passes when changes affect:
 - supersession chains and redirect behavior,
 - routing/context-map/registry mappings in high-risk areas,
 - identity, authorization, trust, secrets, or runtime startup guidance.
+
+## When a Legitimate Exception Is Needed (Story 7.4.2)
+
+Use exceptions only when direct remediation is blocked by:
+
+- external contract requirements,
+- security/legal constraints,
+- temporary migration constraints.
+
+Do not use exceptions for convenience or schedule pressure. Record exact `rule_ids` and `paths`, owner, mitigation, and expiry/review date in the PR or linked issue.
+
+Follow `docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md` for full request/approval boundaries.
