@@ -3278,14 +3278,6 @@ export function ImageManipulationRuntimeEditorPanel({
           loading
         />
       ) : null}
-      {!isHydrating && persistedSession ? (
-        <ImageStatusNotice
-          title="Session restored"
-          message={(isLoadingSources || isLoadingOutputs || isLoadingReferences || isLoadingRunHistory)
-            ? "Previous selections were restored. Authoritative collections are still refreshing."
-            : "Previous selections and settings were restored from your last runtime session."}
-        />
-      ) : null}
       {!isHydrating && collectionLoadingMessage ? (
         <ImageStatusNotice
           title="Refreshing image collections"
@@ -3302,15 +3294,11 @@ export function ImageManipulationRuntimeEditorPanel({
       ) : null}
       {refreshNeededState ? (
         <section className="ui-row ui-row--xs ui-row--middle">
-          <ImageStatusNotice
-            title={refreshNeededState.title}
-            message={refreshNeededState.message}
-            tone="warning"
-          />
           <button
             type="button"
             className="ui-button ui-button--ghost ui-button--sm"
             disabled={isRefreshingReview || isCheckingExecutionReadiness}
+            aria-label={refreshNeededState.message}
             onClick={() => {
               void refreshRecoveryContext();
             }}
@@ -4575,7 +4563,6 @@ export function ImageManipulationRuntimeEditorPanel({
 }
 
 export default ImageManipulationRuntimeEditorPanel;
-
 
 
 
