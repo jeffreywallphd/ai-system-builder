@@ -43,6 +43,7 @@ describe("createDeferredDesktopFeatureRuntime", () => {
 
   it("lazily creates workflow/studio/system runtime dependencies on first use", () => {
     const created: Record<string, number> = Object.create(null);
+    let capturedReferenceImageUploadRootPath: string | undefined;
     const increment = (key: string) => {
       created[key] = (created[key] ?? 0) + 1;
     };
@@ -102,8 +103,9 @@ describe("createDeferredDesktopFeatureRuntime", () => {
           increment("imageWorkflowSystemPersistence");
           return {} as never;
         },
-        createStudioShellBackendApi() {
+        createStudioShellBackendApi(args) {
           increment("studioShellBackendApi");
+          capturedReferenceImageUploadRootPath = args.referenceImageUploadRootPath;
           return {} as never;
         },
         createSystemStudioBackendApi() {
@@ -137,6 +139,7 @@ describe("createDeferredDesktopFeatureRuntime", () => {
     expect(created.imageRunHistoryRepository).toBe(1);
     expect(created.imageWorkflowSystemPersistence).toBe(1);
     expect(created.studioShellBackendApi).toBe(1);
+    expect(capturedReferenceImageUploadRootPath).toBe(path.join("assets", "reference-image-uploads"));
     expect(created.systemStudioBackendApi ?? 0).toBe(0);
     expect(created.systemRuntimeBackendApi ?? 0).toBe(0);
 

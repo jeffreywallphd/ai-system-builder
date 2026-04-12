@@ -38,6 +38,7 @@ type StudioShellDependencies = {
   readonly workflowPersistenceRepository: SqliteWorkflowPersistenceRepository;
   readonly imageRunHistoryRepository: SqliteImageRunHistoryRepository;
   readonly imageWorkflowSystemPersistence: SqliteImageWorkflowSystemPersistenceAdapter;
+  readonly referenceImageUploadRootPath: string;
 };
 
 type SystemRuntimeDependencies = {
@@ -179,6 +180,7 @@ function createDefaultFactories(
           ),
           imageSystemDefinitionRepository: args.imageWorkflowSystemPersistence,
           observabilityLogger,
+          referenceImageUploadRootPath: args.referenceImageUploadRootPath,
         },
       );
     },
@@ -340,6 +342,7 @@ export function createDeferredDesktopFeatureRuntime(
       workflowPersistenceRepository,
       imageRunHistoryRepository,
       imageWorkflowSystemPersistence,
+      referenceImageUploadRootPath: path.join(options.storagePaths.assetsDirectory, "reference-image-uploads"),
     });
     return studioDependencies;
   };

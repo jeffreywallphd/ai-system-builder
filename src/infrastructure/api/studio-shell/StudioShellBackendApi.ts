@@ -1005,6 +1005,7 @@ export class StudioShellBackendApi {
   private readonly getImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["getSystemDefinition"];
   private readonly listImageSystemDefinitionsUseCase: StudioImageSystemDefinitionUseCases["listSystemDefinitions"];
   private readonly observability: StudioShellObservability;
+  private readonly configuredReferenceImageUploadRootPath?: string;
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -1023,6 +1024,7 @@ export class StudioShellBackendApi {
       readonly referenceImageRunProtectedResourceType?: string;
       readonly workflowRunProtectedResourceType?: string;
       readonly observabilityLogger?: StudioShellObservabilityLogger;
+      readonly referenceImageUploadRootPath?: string;
     },
   ) {
     this.now = now;
@@ -1080,6 +1082,7 @@ export class StudioShellBackendApi {
     this.workflowRunProtectedResourceType = options?.workflowRunProtectedResourceType?.trim()
       || "workflow-run";
     this.observability = new StudioShellObservability(options?.observabilityLogger);
+    this.configuredReferenceImageUploadRootPath = options?.referenceImageUploadRootPath?.trim() || undefined;
     const imageSystemUseCases = createStudioImageSystemDefinitionUseCases({
       systemRepository: options?.imageSystemDefinitionRepository,
     });
@@ -3901,12 +3904,14 @@ export class StudioShellBackendApi {
   }
 
   private async resolveConfiguredUploadRootPath(): Promise<string | undefined> {
+    if (this.configuredReferenceImageUploadRootPath) {
+      return this.configuredReferenceImageUploadRootPath;
+    }
     try {
       const nodeRuntime = await this.resolveNodeUploadRuntime();
       return nodeRuntime.path.join(
         nodeRuntime.os.homedir(),
         ".ai-loom-studio",
-        "ai-loom-studio",
         "reference-image-uploads",
       );
     } catch {
