@@ -14,9 +14,9 @@ This folder is the bounded contract surface for control-plane composition refact
   - Canonical typed input/output contracts for each composition module.
   - Shared lifecycle/disposal hooks for composition modules.
 - `contracts/AuthoritativeServerCompositionModuleMap.ts`
-  - Ordered target module map with stage ownership, dependencies, produced artifacts, and disposal responsibilities.
+  - Ordered module map with stage ownership, dependencies, produced artifacts, and disposal responsibilities.
 - `contracts/AuthoritativeServerBootstrapPipelineStateModel.ts`
-  - Canonical staged bootstrap pipeline and typed startup-state/readiness model for incremental startup refactoring.
+  - Canonical staged bootstrap pipeline and typed startup-state/readiness model for startup sequencing.
 - `ServerIdentitySessionTrustedDeviceCompositionModule.ts`
   - Bounded identity/session/trusted-device assembly module used by `IdentityServerHost.ts`.
 - `ServerWorkspaceAuthorizationCompositionModule.ts`
@@ -71,3 +71,14 @@ This folder is the bounded contract surface for control-plane composition refact
 - Keep typed artifacts explicit: `Server<Capability>CompositionModuleInput` and `Server<Capability>CompositionModuleOutput`.
 - Place module-specific helper code next to the module implementation; avoid shared generic `helpers` or `utils` catch-all files.
 - Keep top-level host orchestration in `AuthoritativeServerCompositionRoot.ts`; do not re-centralize module internals there.
+
+## Startup Extension Workflow
+
+When extending authoritative startup composition:
+
+1. Add or update typed module contracts in `contracts/AuthoritativeServerCompositionModuleContracts.ts`.
+2. Declare dependency and stage ownership updates in `contracts/AuthoritativeServerCompositionModuleMap.ts`.
+3. Wire startup stage usage through `AuthoritativeServerBootstrapOrchestrator.ts`.
+4. Keep `AuthoritativeServerCompositionRoot.ts` orchestration-only and avoid re-inlining module internals.
+5. Update or add module tests under `src/hosts/server/tests/` and adjust `AuthoritativeServerCompositionAssemblyContracts.test.ts`.
+6. Update architecture documentation at `docs/architecture/control-plane-composition-refactor-target-module-map.md` in the same change.
