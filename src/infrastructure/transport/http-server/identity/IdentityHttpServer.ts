@@ -366,11 +366,14 @@ import { buildIdentityHttpRouteCompositionLogDetails } from "./middleware/reques
 import {
   buildAuthenticatedSessionActorContext,
   extractBearerSessionToken,
-  isSessionAssuranceAllowed,
   normalizeSessionAssuranceLevel,
   resolveAuthenticatedSessionFromRequest,
   type AuthenticatedSessionActorContext,
 } from "./middleware/session-authentication";
+import {
+  enforceTrustedSessionAssurance,
+  type SessionAssuranceRequirement,
+} from "./middleware/trusted-session-assurance";
 import {
   resolveWorkspaceContextFromRequest,
   type ResolveWorkspaceContextOptions,
@@ -1096,7 +1099,7 @@ interface AuthenticatedWorkspaceRequestContext extends AuthenticatedRequestConte
 
 interface RequireAuthenticatedWorkspaceSessionOptions extends ResolveWorkspaceContextOptions {
   readonly sessionOptions?: {
-    readonly minimumAssuranceLevel?: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
+    readonly sessionAssuranceRequirement?: SessionAssuranceRequirement;
     readonly transportScenario?: TransportSecurityScenario;
     readonly transportActorType?: TransportConnectionActorType;
     readonly transportRemotePeerType?: TransportPeerType;
@@ -1529,7 +1532,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const parsedRequest = await parseAndValidateRequest(
@@ -1568,7 +1571,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -1620,7 +1623,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const userIdentityId = decodePathTail(path, "/api/v1/identity/admin/accounts/");
@@ -1658,7 +1661,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const userIdentityId = decodePathTail(path, "/api/v1/identity/admin/accounts/", "/status");
@@ -1708,7 +1711,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -1779,7 +1782,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const sessionId = decodePathTail(path, "/api/v1/identity/admin/sessions/", "/revoke");
@@ -1827,7 +1830,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -1892,7 +1895,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const trustedDeviceId = decodePathTail(path, "/api/v1/identity/admin/trusted-devices/", "/revoke");
@@ -2292,7 +2295,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const apiResponse = await options.secretMetadataBackendApi.getSecretServiceDiagnostics({
@@ -2320,7 +2323,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const parsedBody = await parseJsonBody(request, maxBodyBytes);
@@ -2372,7 +2375,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const operationId = decodePathTail(path, "/api/v1/security/secrets/maintenance/re-encryption/");
@@ -2420,7 +2423,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const parsedRequest = await parseAndValidateSecretMetadataRequest(
@@ -2470,7 +2473,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -2578,7 +2581,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const secretId = decodePathTail(path, "/api/v1/security/secrets/");
@@ -2629,7 +2632,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const secretId = decodePathTail(path, "/api/v1/security/secrets/", "/rotate");
@@ -2698,7 +2701,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const secretId = decodePathTail(path, "/api/v1/security/secrets/", "/disable");
@@ -2756,7 +2759,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -2823,7 +2826,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -2943,7 +2946,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const serialNumber = decodePathTail(path, "/api/v1/security/certificates/");
@@ -2983,7 +2986,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const serialNumber = decodePathTail(path, "/api/v1/security/certificates/", "/revoke");
@@ -3033,7 +3036,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger,
           options.transportTrust,
           {
-            minimumAssuranceLevel: "authenticated-trusted",
+            sessionAssuranceRequirement: "require-trusted",
           },
           async (context) => {
             const serialNumber = decodePathTail(path, "/api/v1/security/certificates/", "/renew");
@@ -9964,7 +9967,7 @@ async function requireAuthenticatedSession(
   logger: IdentityHttpServerLogger,
   transportTrust: IdentityHttpServerTransportTrustOptions | undefined,
   options: {
-    readonly minimumAssuranceLevel?: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
+    readonly sessionAssuranceRequirement?: SessionAssuranceRequirement;
     readonly transportScenario?: TransportSecurityScenario;
     readonly transportActorType?: TransportConnectionActorType;
     readonly transportRemotePeerType?: TransportPeerType;
@@ -9990,20 +9993,28 @@ async function requireAuthenticatedSession(
   const { resolvedSession, sessionToken } = sessionResolution;
 
   const sessionAssuranceLevel = normalizeSessionAssuranceLevel(resolvedSession.session.deviceTrustContext?.sessionAssuranceLevel);
-  if (options?.minimumAssuranceLevel && !isSessionAssuranceAllowed(sessionAssuranceLevel, options.minimumAssuranceLevel)) {
-    const forbidden: IdentityAuthApiResponse<never> = Object.freeze({
-      ok: false,
-      error: {
-        code: IdentityAuthApiErrorCodes.forbidden,
-        message: "Session trust level is insufficient for this route.",
-      },
-    });
-    writeJson(response, 403, forbidden);
-    logResponse(logger, requestId, request, 403, Object.freeze({
-      sessionToken,
-      sessionAssuranceLevel,
-      minimumAssuranceLevel: options.minimumAssuranceLevel,
-    }), forbidden);
+  const sessionAssuranceEnforcement = enforceTrustedSessionAssurance({
+    sessionAssuranceLevel,
+    requirement: options?.sessionAssuranceRequirement,
+    buildForbiddenResponse: buildForbiddenResponse,
+  });
+  if (!sessionAssuranceEnforcement.ok) {
+    writeJson(
+      response,
+      sessionAssuranceEnforcement.failure.statusCode,
+      sessionAssuranceEnforcement.failure.body,
+    );
+    logResponse(
+      logger,
+      requestId,
+      request,
+      sessionAssuranceEnforcement.failure.statusCode,
+      Object.freeze({
+        sessionToken,
+        ...sessionAssuranceEnforcement.failure.requestLogPayload,
+      }),
+      sessionAssuranceEnforcement.failure.body,
+    );
     return;
   }
 
@@ -14152,3 +14163,4 @@ class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
     console.error(`${JSON.stringify(event)}\n`);
   }
 }
+
