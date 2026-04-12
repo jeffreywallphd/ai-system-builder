@@ -144,6 +144,121 @@ describe("IdentityHttpServer", () => {
     expect(modularEvent).toBeDefined();
   });
 
+  it("modularly handles representative audit, execution-node, and run submission routes", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      auditLedgerBackendApi: {
+        async listAuditEvents() {
+          return Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              query: Object.freeze({ totalCount: 0, hasMore: false }),
+              events: Object.freeze([]),
+              facets: Object.freeze([]),
+            }),
+          });
+        },
+        async listGovernanceAuditEvents() { return Object.freeze({ ok: true, data: Object.freeze({ query: Object.freeze({ totalCount: 0, hasMore: false }), events: Object.freeze([]), facets: Object.freeze([]) }) }); },
+        async getAuditEventDetail() { return Object.freeze({ ok: false, error: Object.freeze({ code: "not-found", message: "not-found" }) }); },
+        async getGovernanceAuditEventDetail() { return Object.freeze({ ok: false, error: Object.freeze({ code: "not-found", message: "not-found" }) }); },
+      } as any,
+      executionNodeManagementBackendApi: {
+        async listNodes() { return Object.freeze({ ok: true, data: Object.freeze({ contractVersion: "execution-node-management-api/v1", items: Object.freeze([]), totalCount: 0, asOf: "2026-04-08T00:00:00.000Z" }) }); },
+        async checkReadiness() { return Object.freeze({ ok: true, data: Object.freeze({ contractVersion: "execution-node-management-api/v1", checkedAt: "2026-04-08T00:00:00.000Z", readyForExecution: true, readiness: "ready", nodeResults: Object.freeze([]), issues: Object.freeze([]) }) }); },
+        async checkEligibility() { return Object.freeze({ ok: true, data: Object.freeze({ contractVersion: "execution-node-management-api/v1", checkedAt: "2026-04-08T00:00:00.000Z", evaluations: Object.freeze([]) }) }); },
+        async listBackendAvailability() { return Object.freeze({ ok: true, data: Object.freeze({ contractVersion: "execution-node-management-api/v1", asOf: "2026-04-08T00:00:00.000Z", backends: Object.freeze([]) }) }); },
+        async setAvailabilityOverride() { return Object.freeze({ ok: false, error: Object.freeze({ code: "not-found", message: "not-found" }) }); },
+        async getNode() { return Object.freeze({ ok: false, error: Object.freeze({ code: "not-found", message: "not-found" }) }); },
+      } as any,
+      authoritativeRunSubmissionBackendApi: {
+        async submitRun() {
+          return Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              run: Object.freeze({
+                contractVersion: "run-orchestration-transport/v1",
+                runId: "run:modular:1",
+                workflowId: "workflow:modular",
+                workspaceId: "workspace-alpha",
+                source: "api",
+                state: "submitted",
+                assignmentStatus: "unassigned",
+                executionOutcome: "none",
+                submittedAt: "2026-04-08T00:00:00.000Z",
+                updatedAt: "2026-04-08T00:00:00.000Z",
+                submission: Object.freeze({}),
+                assignment: Object.freeze({ status: "unassigned" }),
+                execution: Object.freeze({ outcome: "none" }),
+                retry: Object.freeze({ attempt: 1, maxAttempts: 1 }),
+              }),
+              mutation: Object.freeze({
+                changed: true,
+                mutationId: "mutation:modular:1",
+                occurredAt: "2026-04-08T00:00:00.000Z",
+              }),
+            }),
+          });
+        },
+      } as any,
+    });
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: "modular.route.user",
+        credential: { candidate: "StrongPass!2026" },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerSubject: "modular.route.user",
+        credential: { candidate: "StrongPass!2026" },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+    const token = loginBody.data.sessionToken as string;
+
+    const audit = await fetch(`${baseUrl}/api/v1/audit/events?workspaceId=workspace-alpha`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(audit.status).toBe(200);
+
+    const nodes = await fetch(`${baseUrl}/api/v1/execution-nodes?limit=10`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(nodes.status).toBe(200);
+
+    const run = await fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        runtimeTarget: {
+          systemId: "system-modular",
+          versionId: "version-1",
+          async: true,
+        },
+      }),
+    });
+    expect(run.status).toBe(200);
+
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.modular-handled" && entry.path === "/api/v1/audit/events")).toBeTrue();
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.modular-handled" && entry.path === "/api/v1/execution-nodes")).toBeTrue();
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.modular-handled" && entry.path === "/api/v1/runtime/runs/start")).toBeTrue();
+
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.legacy-fallback" && entry.path === "/api/v1/audit/events")).toBeFalse();
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.legacy-fallback" && entry.path === "/api/v1/execution-nodes")).toBeFalse();
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.legacy-fallback" && entry.path === "/api/v1/runtime/runs/start")).toBeFalse();
+  });
+
   it("starts with explicit modular route registration plans in deterministic order", async () => {
     const logger = new CapturingLogger();
     const routeRegistrationPlan = composeAuthoritativeApiRouteRegistrationPlan({
