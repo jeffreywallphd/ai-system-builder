@@ -25,8 +25,8 @@ This index is generated from the machine-readable documentation registry so cont
 
 ## At a Glance
 
-- Indexed records: **50**
-- Active records: **45**
+- Indexed records: **51**
+- Active records: **46**
 - Non-active records: **5**
 - Document types covered: **7**
 - Domains covered: **8**
@@ -59,13 +59,14 @@ This index is generated from the machine-readable documentation registry so cont
 - [Shared Asset Contracts (Legacy Link Stub)](../architecture/shared-asset-contracts.md) (`doc-architecture-superseded-shared-asset-contracts`)
 - [Workflow Execution and Tools (Legacy Link Stub)](../architecture/workflow-execution-and-tools.md) (`doc-architecture-superseded-workflow-execution-and-tools`)
 
-### `contributor-guide` (7)
+### `contributor-guide` (8)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.md) (`doc-contributors-adr-informed-implementation-and-review-examples`)
 - [Context Engineering System Contributor Guide](../contributors/context-engineering-system-guide.md) (`doc-contributors-context-engineering-system-guide`)
 - [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.md) (`doc-contributors-docs-foundation-validation-guide`)
 - [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
+- [Documentation Quality Rule Evolution Guide](../contributors/documentation-quality-rule-evolution-guide.md) (`doc-contributors-documentation-quality-rule-evolution-guide`)
 - [Documentation Quality Worked Examples](../contributors/documentation-quality-worked-examples.md) (`doc-contributors-documentation-quality-worked-examples`)
 
 ### `runbook` (5)
@@ -136,7 +137,7 @@ This index is generated from the machine-readable documentation registry so cont
 - [Runtime Host Surfaces Domain Overview](../architecture/domains/runtime-host-surfaces/overview.md) (`doc-architecture-domain-runtime-host-surfaces-overview`)
 - [Secret Health and Operational Diagnostics](../secret-health-and-operational-diagnostics.md) (`doc-operations-secret-health-diagnostics`)
 
-### `documentation-change` (7)
+### `documentation-change` (8)
 - Routing task IDs: `documentation-refactor-context-and-architecture`
 - Context-map mapping IDs: `context-map-documentation-change-v1`
 - Selection mode / priority: `single` / `normal`
@@ -146,6 +147,7 @@ This index is generated from the machine-readable documentation registry so cont
 - [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
+- [Documentation Quality Rule Evolution Guide](../contributors/documentation-quality-rule-evolution-guide.md) (`doc-contributors-documentation-quality-rule-evolution-guide`)
 - [Documentation Quality Worked Examples](../contributors/documentation-quality-worked-examples.md) (`doc-contributors-documentation-quality-worked-examples`)
 - [Documentation Refactor Context Pack](./packs/documentation-refactor.pack.md) (`doc-context-pack-documentation-refactor`)
 
@@ -223,13 +225,14 @@ This index is generated from the machine-readable documentation registry so cont
 - [Documentation Segmentation Migration Inventory](../documentation-segmentation-migration-inventory.md) (`doc-baseline-documentation-segmentation-migration-inventory`)
 - [Feature 1 Documentation Foundation Completion Handoff](../baselines/feature-1-documentation-foundation-handoff.md) (`doc-baseline-feature-1-documentation-foundation-handoff`)
 
-### `contributors` (7)
+### `contributors` (8)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.md) (`doc-contributors-adr-informed-implementation-and-review-examples`)
 - [Context Engineering System Contributor Guide](../contributors/context-engineering-system-guide.md) (`doc-contributors-context-engineering-system-guide`)
 - [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.md) (`doc-contributors-docs-foundation-validation-guide`)
 - [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
+- [Documentation Quality Rule Evolution Guide](../contributors/documentation-quality-rule-evolution-guide.md) (`doc-contributors-documentation-quality-rule-evolution-guide`)
 - [Documentation Quality Worked Examples](../contributors/documentation-quality-worked-examples.md) (`doc-contributors-documentation-quality-worked-examples`)
 
 ### `decision-records` (6)
@@ -268,7 +271,7 @@ This index is generated from the machine-readable documentation registry so cont
 ### `draft` (0)
 - No indexed records.
 
-### `active` (45)
+### `active` (46)
 - [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.md) (`doc-adr-001-single-authoritative-control-plane`)
 - [ADR-002 Workspace-Centered Tenancy and Resource Ownership](../adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md) (`doc-adr-002-workspace-centered-tenancy-and-resource-ownership`)
 - [ADR-003 Storage as Managed Platform Resource](../adr/records/adr-003-storage-as-managed-platform-resource.md) (`doc-adr-003-storage-as-managed-platform-resource`)
@@ -295,6 +298,7 @@ This index is generated from the machine-readable documentation registry so cont
 - [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Documentation Migration Safety Guide](../contributors/docs-migration-safety-guide.md) (`doc-contributors-docs-migration-safety-guide`)
 - [Documentation Placement Guide](../contributors/docs-placement-guide.md) (`doc-contributors-docs-placement-guide`)
+- [Documentation Quality Rule Evolution Guide](../contributors/documentation-quality-rule-evolution-guide.md) (`doc-contributors-documentation-quality-rule-evolution-guide`)
 - [Documentation Quality Worked Examples](../contributors/documentation-quality-worked-examples.md) (`doc-contributors-documentation-quality-worked-examples`)
 - [Documentation Refactor Context Pack](./packs/documentation-refactor.pack.md) (`doc-context-pack-documentation-refactor`)
 - [Documentation Segmentation Migration Inventory](../documentation-segmentation-migration-inventory.md) (`doc-baseline-documentation-segmentation-migration-inventory`)

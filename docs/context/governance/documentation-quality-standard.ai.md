@@ -12,6 +12,7 @@ related_code_paths:
   - docs/context/routing/task-to-context-routing.seed.json
   - docs/context/documentation-registry.seed.json
   - docs/context/governance/context-governance-policy.ai.md
+  - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
@@ -20,6 +21,7 @@ related_code_paths:
   - dev/tests/DocumentationQualityOwnershipReviewStory715Guardrails.test.ts
   - dev/tests/DocsCategoryComplianceValidationScript.test.ts
   - dev/tests/DocumentationCiFailurePolicyStory732Guardrails.test.ts
+  - dev/tests/DocumentationRuleEvolutionStory735Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Quality Standard
@@ -179,6 +181,50 @@ Require at least one additional qualified reviewer for:
 - Use severity plus trigger guidance to classify outcomes as block-now, warn-and-fix-soon, or advisory-only.
 - Keep manual review focused on semantic correctness, authority boundaries, and high-risk impact that automation cannot fully judge.
 - Keep validator contracts and reviewer judgment complementary: automation enforces structure, reviewers enforce trustworthiness.
+
+## Rule Evolution and Contributor Stability (Story 7.3.5)
+
+Use this staged rollout policy for new or promoted docs-quality rules so enforcement improves while contributor workflows stay stable.
+
+### Rule Introduction Stages
+
+1. Define contract and scope.
+   - Provide stable rule ID, path scope, and default severity.
+   - Keep checks deterministic and lightweight for normal `npm run docs:lint` runs.
+2. Start with warning-first trial.
+   - Default to non-blocking warning-level rollout except trust-critical contract checks.
+   - Use trial findings to tune scope and reduce false positives.
+3. Run scoped cleanup.
+   - Prioritize active canonical docs and high-frequency findings.
+   - Use strict escalation (`npm run docs:lint -- --strict-important`) only in scheduled cleanup windows.
+4. Promote when ready.
+   - Promote to blocking only after signal quality and cleanup readiness are documented.
+
+### Warning-First Defaults
+
+- New maintainability/readability checks should begin as warning-level.
+- Immediate blocking is reserved for routing/indexing/authority contract integrity failures.
+- Keep warning-first mode while unresolved false-positive classes remain.
+
+### Legacy Documentation Policy
+
+- Do not block unrelated contributor work on untouched legacy docs.
+- Apply touch policy:
+  - changed legacy docs improve in touched scope,
+  - untouched legacy docs are handled through tracked cleanup backlog.
+- Keep reduced enforcement for historical/superseded/baseline docs except identity/status/redirect integrity checks.
+
+### Communication Requirements for Enforcement Changes
+
+For each rule/severity change, communicate:
+
+- what changed (rule ID, scope, severity),
+- why changed (risk and contributor impact),
+- when escalation occurs (warning start and blocking date/condition),
+- how to remediate (commands plus canonical guides),
+- how legacy handling works during transition.
+
+Publish this in canonical governance and contributor docs within the same PR so contributors can predict enforcement behavior.
 
 ## Recommended Guidance (Non-Blocking)
 

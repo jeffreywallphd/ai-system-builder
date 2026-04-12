@@ -17,6 +17,7 @@ related_code_paths:
   - dev/scripts/validate-docs-category-compliance.cjs
   - docs/context/governance/documentation-quality-standard.ai.md
   - docs/contributors/documentation-quality-enforced-standards-guide.ai.md
+  - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-worked-examples.ai.md
   - docs/contributors/docs-foundation-validation.ai.md
   - docs/context/templates/README.ai.md
@@ -133,6 +134,7 @@ Default enforcement blocks only on `critical` unless strict escalation is intent
 
 - Quality policy and severity model: `docs/context/governance/documentation-quality-standard.ai.md`
 - Contributor standards and rule-group expectations: `docs/contributors/documentation-quality-enforced-standards-guide.ai.md`
+- New-rule rollout and enforcement-change policy: `docs/contributors/documentation-quality-rule-evolution-guide.ai.md`
 - Validator behavior and stable issue-code catalog: `docs/contributors/docs-foundation-validation.ai.md`
 - Authoring templates: `docs/context/templates/README.ai.md`
 - Placement and authority routing: `docs/contributors/docs-placement-guide.ai.md`

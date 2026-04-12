@@ -1913,6 +1913,43 @@
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-documentation-quality-rule-evolution-guide",
+      "path": "docs/contributors/documentation-quality-rule-evolution-guide.md",
+      "aiPath": "docs/contributors/documentation-quality-rule-evolution-guide.ai.md",
+      "title": "Documentation Quality Rule Evolution Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines contributor-safe rollout policy for introducing new documentation quality rules, warning-first enforcement, and legacy-document transition handling.",
+      "keywords": [
+        "documentation quality",
+        "rule rollout",
+        "warning first",
+        "legacy documentation",
+        "enforcement communication"
+      ],
+      "relatedCodePaths": [
+        "docs/context/governance/documentation-quality-standard.md",
+        "docs/contributors/documentation-quality-enforced-standards-guide.md",
+        "docs/contributors/documentation-quality-checks-run-and-fix-guide.md",
+        "dev/scripts/lint-docs.cjs"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-documentation-quality-worked-examples",
+        "doc-context-documentation-identity-and-reference-conventions"
+      ],
+      "relatedDocs": [
+        "docs/context/governance/documentation-quality-standard.md",
+        "docs/contributors/documentation-quality-enforced-standards-guide.md",
+        "docs/contributors/documentation-quality-checks-run-and-fix-guide.md",
+        "docs/contributors/documentation-quality-worked-examples.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
     }
   ],
   "discoveryIndex": {
@@ -1948,7 +1985,8 @@
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
-        "doc-contributors-documentation-quality-worked-examples"
+        "doc-contributors-documentation-quality-worked-examples",
+        "doc-contributors-documentation-quality-rule-evolution-guide"
       ],
       "runbook": [
         "doc-operations-node-bootstrap-identity",
@@ -2029,7 +2067,8 @@
         "doc-operations-storage-administration",
         "doc-baseline-documentation-segmentation-migration-inventory",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
-        "doc-contributors-documentation-quality-worked-examples"
+        "doc-contributors-documentation-quality-worked-examples",
+        "doc-contributors-documentation-quality-rule-evolution-guide"
       ],
       "deprecated": [],
       "superseded": [
@@ -2075,7 +2114,8 @@
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
-        "doc-contributors-documentation-quality-worked-examples"
+        "doc-contributors-documentation-quality-worked-examples",
+        "doc-contributors-documentation-quality-rule-evolution-guide"
       ],
       "operations": [
         "doc-context-pack-runtime-and-host",
@@ -2138,7 +2178,8 @@
         "doc-contributors-docs-placement-guide",
         "doc-operations-node-bootstrap-identity",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
-        "doc-contributors-documentation-quality-worked-examples"
+        "doc-contributors-documentation-quality-worked-examples",
+        "doc-contributors-documentation-quality-rule-evolution-guide"
       ],
       "reference": [
         "doc-architecture-document-scope-boundaries",
@@ -2231,7 +2272,8 @@
         "doc-contributors-docs-foundation-validation-guide",
         "doc-context-documentation-identity-and-reference-conventions",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
-        "doc-contributors-documentation-quality-worked-examples"
+        "doc-contributors-documentation-quality-worked-examples",
+        "doc-contributors-documentation-quality-rule-evolution-guide"
       ]
     }
   },
