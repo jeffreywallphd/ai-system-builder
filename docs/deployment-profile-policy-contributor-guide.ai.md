@@ -17,6 +17,7 @@ Implementation workflow for adding policy families, preset behavior, and feature
 - Keep feature-facing decisions in `src/application/policy-administration/*` evaluation interfaces/services.
 - Keep authoritative policy mutation validation/permission enforcement in `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`.
 - Keep authoritative write transport/backend wiring in `src/infrastructure/api/deployment/DeploymentPolicyWriteBackendApi.ts` and `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`.
+- Keep deployment policy read/write HTTP handling routed through the identity transport route-family modular handlers (`deployment-policy-read`, `deployment-policy-write`) before any legacy fallback behavior.
 - Keep admin inspection read-model/UI composition aligned with `docs/architecture/deployment-profile-policy-admin-ui-read-models.md`.
 - Keep admin safe-update workflows aligned with `docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md`.
 - Keep admin permission-boundary posture aligned with `docs/architecture/deployment-profile-policy-admin-permission-boundaries.md`.

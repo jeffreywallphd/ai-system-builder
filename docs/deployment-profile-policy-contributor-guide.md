@@ -76,6 +76,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 2. Keep authoritative write transport/backend adapters in:
    - `src/infrastructure/api/deployment/DeploymentPolicyWriteBackendApi.ts`
    - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+   - route deployment-policy read/write requests through route-family modular handlers (`deployment-policy-read`, `deployment-policy-write`) before any legacy transport fallback.
 3. Validate updates at write time (before persistence):
    - supported scope semantics,
    - known family/setting identifiers,
