@@ -1,4 +1,4 @@
-﻿import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { createServer as createHttpsServer } from "node:https";
@@ -242,6 +242,7 @@ import type {
 } from "@application/security/ports/TransportSecurityPorts";
 import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
 import { createStartupTracer, type StartupSpan, type StartupTracer } from "@hosts/bootstrap/startupTracer";
+import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
 
 export interface IdentityServerHostOptions {
   readonly databasePath: string;
@@ -267,6 +268,7 @@ export interface IdentityServerHostOptions {
   readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
   readonly runExecutionAdapters?: AuthoritativeRunExecutionAdapterRegistration;
   readonly startupTracer?: StartupTracer;
+  readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
 }
 
 export interface IdentityServerHost {
@@ -445,6 +447,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const storageAssetComposition = composeServerStorageAssetCompositionModule({
     databasePath: options.databasePath,
     env,
+    startupSecurityMaterialValidation: options.startupSecurityMaterialValidation,
     persistentPlatformServices,
     authoritativeAuditRecorder,
     encryptionObservabilityLogger: auditDiagnosticsPlatformComposition.encryptionOperationalLogger,
@@ -457,6 +460,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   imageMediaComposition = composeServerImageMediaCompositionModule({
     databasePath,
     env,
+    startupSecurityMaterialValidation: options.startupSecurityMaterialValidation,
     persistentPlatformServices,
     authorizationDecisionEvaluator,
     authoritativeAuditRecorder,
@@ -486,10 +490,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
   const generatedResultComposition = composeServerGeneratedResultCompositionModule({
     env,
+    startupSecurityMaterialValidation: options.startupSecurityMaterialValidation,
     persistentPlatformServices,
     workspaceClock,
     authoritativeAuditRecorder,
     storageLogicalAccessResolutionService,
+    securityMaterialLogger: options.logger,
   });
   const generatedResultManagementBackendApi = generatedResultComposition.generatedResultManagementBackendApi;
   const runCollectedResultPersistencePort = generatedResultComposition.runCollectedResultPersistencePort;

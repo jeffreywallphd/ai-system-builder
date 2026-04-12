@@ -98,6 +98,14 @@ class CapturingStartupSpanLogger implements StartupSpanLogger {
   }
 }
 
+const configuredCriticalRuntimeSecurityMaterial = Object.freeze({
+  AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET: "asset-download-grant-secret-value-12345",
+  AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET: "image-storage-token-secret-value-12345",
+  AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET: "image-upload-session-token-secret-value-12345",
+  AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET: "generated-result-preview-token-secret-12345",
+});
+
 async function startAuthoritativeServerHostForTest(
   options: IdentityServerHostOptions,
 ): Promise<IdentityServerHost> {
@@ -241,6 +249,7 @@ describe("IdentityServerHost", () => {
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
         bootstrapSeedDefaults: true,
       }),
+      env: configuredCriticalRuntimeSecurityMaterial,
       startupTracer,
     });
 

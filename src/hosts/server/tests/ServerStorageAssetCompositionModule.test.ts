@@ -6,6 +6,11 @@ import { AuthoritativeAuditRecordingService } from "@application/audit/use-cases
 import { createAuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 import { composeServerStorageAssetCompositionModule } from "../composition/ServerStorageAssetCompositionModule";
 
+const configuredCriticalSecurityMaterial = Object.freeze({
+  AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET: "asset-download-grant-secret-value-12345",
+  AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+});
+
 describe("ServerStorageAssetCompositionModule", () => {
   it("composes managed storage and protected asset backends behind a typed module contract", () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-storage-asset-composition-module-"));
@@ -15,7 +20,7 @@ describe("ServerStorageAssetCompositionModule", () => {
     try {
       const composed = composeServerStorageAssetCompositionModule({
         databasePath,
-        env: {},
+        env: configuredCriticalSecurityMaterial,
         persistentPlatformServices: persistentServices,
         authoritativeAuditRecorder: new AuthoritativeAuditRecordingService({
           repository: persistentServices.auditLedgerRepository,

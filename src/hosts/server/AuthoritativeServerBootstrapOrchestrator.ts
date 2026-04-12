@@ -867,6 +867,7 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
                   startupTracer,
                   deploymentProfile: context.deploymentProfile,
                   deploymentPolicyBootstrap: deploymentPolicyBootstrap as DeploymentPolicyBootstrapResolutionResult,
+                  startupSecurityMaterialValidation: securityOutput?.startupSecurityMaterialValidation,
                   persistentPlatformServices: composedPersistentServices as AuthoritativePersistentPlatformServices,
                   routeRegistrationPlan: apiRouteRegistrationPlan as AuthoritativeApiRouteRegistrationPlan,
                   runExecutionAdapters: runExecutionAdapterRegistration,

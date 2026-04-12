@@ -1,4 +1,3 @@
-import { createHash, randomUUID } from "node:crypto";
 import type { AuthoritativeAuditRecordingService } from "@application/audit/use-cases/AuthoritativeAuditRecordingService";
 import { GenerateGeneratedResultPreviewUseCase } from "@application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCase";
 import { GetGeneratedResultOriginalContentUseCase } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCase";
@@ -15,15 +14,21 @@ import { SharpGeneratedResultPreviewImageProcessor } from "@infrastructure/media
 import { SqliteRunCollectedResultPersistenceAdapter } from "@infrastructure/persistence/generated-results/SqliteRunCollectedResultPersistenceAdapter";
 import type { AuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 import type { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
+import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
+import { resolveCriticalServerSecurityMaterial } from "./ResolveCriticalServerSecurityMaterial";
 
 export interface ServerGeneratedResultCompositionModuleInput {
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
   readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
   readonly workspaceClock: {
     now(): Date;
   };
   readonly authoritativeAuditRecorder: AuthoritativeAuditRecordingService;
   readonly storageLogicalAccessResolutionService: StorageLogicalAccessResolutionService;
+  readonly securityMaterialLogger?: {
+    warn(event: Readonly<Record<string, unknown>>): void;
+  };
 }
 
 export interface ServerGeneratedResultCompositionModuleOutput {
@@ -34,8 +39,17 @@ export interface ServerGeneratedResultCompositionModuleOutput {
 export function composeServerGeneratedResultCompositionModule(
   input: ServerGeneratedResultCompositionModuleInput,
 ): ServerGeneratedResultCompositionModuleOutput {
+  const generatedResultPreviewTokenSecret = resolveCriticalServerSecurityMaterial({
+    environment: input.env,
+    materialId: "material:server:generated-result-preview-access-token-secret",
+    environmentKey: "AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET",
+    inheritedEnvironmentKey: "AI_LOOM_SECRET_MASTER_KEY",
+    startupSecurityMaterialValidation: input.startupSecurityMaterialValidation,
+    logger: input.securityMaterialLogger,
+    materialFormat: "string-secret",
+  });
   const generatedResultPreviewAccessPort = new TokenizedGeneratedResultPreviewAccessPort(
-    resolveGeneratedResultPreviewAccessTokenSecret(input.env),
+    generatedResultPreviewTokenSecret,
   );
   const generatedResultAuditSink = new AuthoritativeGeneratedResultAuditSink(input.authoritativeAuditRecorder);
   const generatedResultPreviewGenerationUseCase = new GenerateGeneratedResultPreviewUseCase({
@@ -100,22 +114,4 @@ export function composeServerGeneratedResultCompositionModule(
     generatedResultManagementBackendApi,
     runCollectedResultPersistencePort,
   });
-}
-
-function resolveGeneratedResultPreviewAccessTokenSecret(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
-  if (inheritedSecretKey) {
-    return inheritedSecretKey;
-  }
-
-  return createHash("sha256")
-    .update(`generated-result-preview-access:${randomUUID()}`)
-    .digest("base64");
 }

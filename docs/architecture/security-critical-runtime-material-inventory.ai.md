@@ -79,3 +79,17 @@ Provide a complete implementation-level inventory of security-critical runtime m
 - Enforcement posture:
   - production-capable startup fails fast on missing/non-durable/disallowed required material.
   - development/test startup emits non-fatal structured diagnostics for policy-allowed optional material.
+
+## Story 3.1.4 Runtime Fallback Hardening
+
+- Removed random runtime fallback generation from:
+  - `resolveAssetDownloadGrantSecret(...)`
+  - `resolveAssetContentEncryptionKey(...)`
+  - `resolveImageAssetStorageTokenSecret(...)`
+  - `resolveImageAssetUploadSessionTokenSecret(...)`
+  - `resolveGeneratedResultPreviewAccessTokenSecret(...)`
+- Added centralized policy-aware material resolution:
+  - `src/hosts/server/composition/ResolveCriticalServerSecurityMaterial.ts`
+- Runtime behavior now uses:
+  - explicit provider-backed values in production-capable startup paths;
+  - deterministic development/test fallback only when startup validation policy explicitly allows generated-ephemeral material, with diagnostic surfacing.
