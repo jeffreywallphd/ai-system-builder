@@ -13,6 +13,9 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/composition/IdentityHttpUpgradeBoundary.ts
   - src/infrastructure/transport/http-server/identity/composition/RouteModuleRegistry.ts
   - src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts
+  - src/infrastructure/transport/http-server/identity/route-families/IdentityAndTrustedDeviceRouteFamilyHandler.ts
+  - src/infrastructure/transport/http-server/identity/route-families/WorkspaceRouteFamilyHandler.ts
+  - src/infrastructure/transport/http-server/identity/route-families/AuthorizationRouteFamilyHandler.ts
   - src/infrastructure/transport/http-server/identity/route-families/AuditRouteFamilyHandler.ts
   - src/infrastructure/transport/http-server/identity/route-families/ExecutionNodeManagementRouteFamilyHandler.ts
   - src/infrastructure/transport/http-server/identity/route-families/RunRouteFamilyHandlers.ts
@@ -68,6 +71,10 @@ Shared transport seams:
 5. When a route family has no modular handler ownership, request handling continues through the canonical route implementations in `IdentityHttpServer.ts` without migration-specific fallback markers.
 
 Current modular handler ownership (in `defaultRouteFamilyHandlers`) includes:
+- `identity-auth`
+- `workspace-invitations`
+- `workspace-administration`
+- `authorization-management`
 - `storage-management`
 - `asset-management`
 - `image-asset-management`
@@ -82,10 +89,6 @@ Current modular handler ownership (in `defaultRouteFamilyHandlers`) includes:
 - `image-run-api`
 
 Current route families that are still implemented in `IdentityHttpServer.ts` inline handlers:
-- `identity-auth`
-- `workspace-invitations`
-- `workspace-administration`
-- `authorization-management`
 - `node-trust`
 - `security-certificate-operations`
 - `security-secret-metadata`
