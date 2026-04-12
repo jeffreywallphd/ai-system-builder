@@ -44,13 +44,13 @@ Primary transport entrypoint:
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts` (`createIdentityHttpServer(...)`)
 
 Current shape:
-- One large request listener with ordered inline route dispatch.
+- One large request listener with modular route-family dispatch and a reduced inline fallback shell for route families not yet migrated.
 - One large websocket upgrade/realtime handler path (`server.on("upgrade", ...)` -> `handleWebSocketUpgrade(...)`).
 - Large shared helper surface in the same file (auth guards, schema parse helpers, path/query parsing, status mapping, response shaping).
 
-Route-family metadata already exists, but is not yet the execution router:
+Route-family metadata now drives first-pass execution routing:
 - `AuthoritativeApiRouteRegistrationCatalog.ts` composes route-family plans.
-- In `IdentityHttpServer.ts`, `routeRegistrationPlan` is currently logged for observability, but request matching still uses inline `if (...)` chains.
+- In `IdentityHttpServer.ts`, `routeRegistrationPlan` is used by `routeModuleRegistry` for modular dispatch before any retained inline fallback branches.
 
 Current inline route-family execution order in `IdentityHttpServer.ts`:
 1. `identity-auth`
@@ -271,6 +271,26 @@ Behavioral posture:
 - shared workspace-auth/session assurance gates continue to be enforced through shared middleware (`requireAuthenticatedWorkspaceSession(...)`).
 - stream/file response behavior (headers, disposition, no-store cache posture, and byte streaming) remains transport-compatible with prior production behavior.
 - route-family modular dispatch remains hybrid-safe: modular handlers execute first and may intentionally fall back for non-migrated paths.
+
+## Story 1.3.5 Implementation Status
+
+Removed legacy inline dispatch branches for route families now owned by modular handlers:
+- `storage-management`
+- `asset-management`
+- `image-asset-management`
+- `image-run-api`
+- `audit-ledger`
+- `execution-node-management`
+- `deployment-policy-read`
+- `deployment-policy-write`
+- `run-submission`
+- `run-read`
+- `run-mutation`
+- `run-execution-update`
+
+Cleanup posture:
+- top-level `IdentityHttpServer.ts` now keeps request entry, shared middleware gates, modular route-family dispatch, websocket/readiness lifecycle, and only the remaining inline fallback families.
+- legacy-fallback logging/dispatch is limited to route families that still have retained inline branches.
 
 ## Registration and Composition Seams
 

@@ -259,6 +259,88 @@ describe("IdentityHttpServer", () => {
     expect(logger.events.some((entry) => entry.event === "identity-http.route-family.legacy-fallback" && entry.path === "/api/v1/runtime/runs/start")).toBeFalse();
   });
 
+  it("does not apply legacy fallback when a migrated route family handler declines handling", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      authoritativeRunSubmissionBackendApi: {
+        async submitRun() {
+          return Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              run: Object.freeze({
+                contractVersion: "run-orchestration-transport/v1",
+                runId: "run:should-not-execute",
+                workflowId: "workflow:should-not-execute",
+                workspaceId: "workspace-alpha",
+                source: "api",
+                state: "submitted",
+                assignmentStatus: "unassigned",
+                executionOutcome: "none",
+                submittedAt: "2026-04-08T00:00:00.000Z",
+                updatedAt: "2026-04-08T00:00:00.000Z",
+                submission: Object.freeze({}),
+                assignment: Object.freeze({ status: "unassigned" }),
+                execution: Object.freeze({ outcome: "none" }),
+                retry: Object.freeze({ attempt: 1, maxAttempts: 1 }),
+              }),
+              mutation: Object.freeze({
+                changed: true,
+                mutationId: "mutation:should-not-execute",
+                occurredAt: "2026-04-08T00:00:00.000Z",
+              }),
+            }),
+          });
+        },
+      } as any,
+      routeFamilyHandlers: Object.freeze({
+        "run-submission": async () => Object.freeze({ handled: false }),
+      }),
+    });
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: "no.legacy.fallback.user",
+        credential: { candidate: "StrongPass!2026" },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerSubject: "no.legacy.fallback.user",
+        credential: { candidate: "StrongPass!2026" },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+    const token = loginBody.data.sessionToken as string;
+
+    const runResponse = await fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        runtimeTarget: {
+          systemId: "system-modular",
+          versionId: "version-1",
+          async: true,
+        },
+      }),
+    });
+    expect(runResponse.status).toBe(404);
+
+    expect(logger.events.some((entry) => (
+      entry.event === "identity-http.route-family.legacy-fallback"
+      && entry.path === "/api/v1/runtime/runs/start"
+    ))).toBeFalse();
+  });
+
   it("starts with explicit modular route registration plans in deterministic order", async () => {
     const logger = new CapturingLogger();
     const routeRegistrationPlan = composeAuthoritativeApiRouteRegistrationPlan({
