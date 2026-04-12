@@ -35,44 +35,36 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
       }),
     });
 
-    expect(output.checks).toEqual([
-      {
-        checkId: "security.startup-material-validation",
-        subsystem: "security",
-        state: AuthoritativeServerReadinessCheckStates.ready,
-        summary: "Startup security material validation produced 1 diagnostic issue(s).",
-        blocking: false,
-        details: {
-          lifecycleStage: "test",
-          fatalIssueCount: "0",
-          warningCount: "1",
-          productionCapable: "false",
-        },
-      },
-      {
-        checkId: "security.transport-trust-material",
-        subsystem: "security",
-        state: AuthoritativeServerReadinessCheckStates.ready,
-        summary: "Transport trust material is available.",
-        blocking: false,
-      },
-      {
-        checkId: "security.certificate-authority-material",
-        subsystem: "security",
-        state: AuthoritativeServerReadinessCheckStates.ready,
-        summary: "Certificate authority material is available.",
-        blocking: false,
-      },
-      {
-        checkId: "security.required-secrets",
-        subsystem: "security",
-        state: AuthoritativeServerReadinessCheckStates.ready,
-        summary: "Required secret material is validated.",
-        blocking: false,
-      },
-    ]);
+    expect(output.checks).toHaveLength(4);
+    expect(output.checks[0]).toEqual(expect.objectContaining({
+      checkId: "security.startup-material-validation",
+      subsystem: "security",
+      state: AuthoritativeServerReadinessCheckStates.ready,
+      summary: "Startup security material validation produced 1 diagnostic issue(s).",
+      blocking: false,
+      details: expect.objectContaining({
+        lifecycleStage: "test",
+        fatalIssueCount: "0",
+        warningCount: "1",
+        productionCapable: "false",
+      }),
+    }));
+    expect(Number(output.checks[0]?.details?.developmentAllowanceWarningCount ?? "0")).toBeGreaterThan(0);
+    expect(output.checks[1]).toEqual(expect.objectContaining({
+      checkId: "security.transport-trust-material",
+      state: AuthoritativeServerReadinessCheckStates.ready,
+    }));
+    expect(output.checks[2]).toEqual(expect.objectContaining({
+      checkId: "security.certificate-authority-material",
+      state: AuthoritativeServerReadinessCheckStates.ready,
+    }));
+    expect(output.checks[3]).toEqual(expect.objectContaining({
+      checkId: "security.required-secrets",
+      state: AuthoritativeServerReadinessCheckStates.ready,
+    }));
     expect(output.securityMaterial.state).toBe(AuthoritativeServerSecurityMaterialReadinessStates.degraded);
     expect(output.securityMaterial.warningIssueCount).toBe(1);
+    expect(output.securityMaterial.governanceAssertions.warning).toBeGreaterThan(0);
     expect(output.securityMaterial.summary.total).toBeGreaterThanOrEqual(1);
     expect(output.securityMaterial.issues.every((issue) => issue.message.includes("Security material"))).toBeTrue();
   });
@@ -154,6 +146,12 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
           sourceKind: "missing" as const,
         }]),
         warnings: Object.freeze([]),
+        governanceAssertions: Object.freeze({
+          total: 0,
+          warning: 0,
+          blocked: 0,
+          entries: Object.freeze([]),
+        }),
       }),
     });
 

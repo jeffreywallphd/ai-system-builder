@@ -107,6 +107,22 @@ export interface SecretServiceOperationalDiagnosticsViewDto extends SecretServic
       readonly missing: number;
       readonly nonCompliant: number;
     };
+    readonly governanceAssertions: {
+      readonly total: number;
+      readonly warning: number;
+      readonly blocked: number;
+      readonly entries: ReadonlyArray<{
+        readonly assertionId: string;
+        readonly secretId: string;
+        readonly materialId: string;
+        readonly allowanceKind: "ephemeral-bootstrap-material" | "relaxed-validation-mode" | "conditional-provider-backend";
+        readonly lifecycleStage: "production" | "development" | "test";
+        readonly productionCapable: boolean;
+        readonly enforcement: "warning" | "blocked";
+        readonly message: string;
+        readonly details?: Readonly<Record<string, string>>;
+      }>;
+    };
     readonly entries: ReadonlyArray<{
       readonly secretId: string;
       readonly state: SecurityMaterialDiagnosticState;

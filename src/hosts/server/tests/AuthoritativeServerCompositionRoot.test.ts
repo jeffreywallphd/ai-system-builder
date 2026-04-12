@@ -1339,6 +1339,12 @@ describe("AuthoritativeServerCompositionRoot", () => {
               }),
             }]),
             warnings: Object.freeze([]),
+            governanceAssertions: Object.freeze({
+              total: 0,
+              warning: 0,
+              blocked: 0,
+              entries: Object.freeze([]),
+            }),
           }),
         }),
       },

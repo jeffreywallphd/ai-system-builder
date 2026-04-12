@@ -44,12 +44,24 @@ Detailed diagnostics include `securityMaterial` with:
 
 - lifecycle stage: `production`, `development`, or `test`
 - summary counts: `healthy`, `degraded`, `missing`, `nonCompliant`
+- `governanceAssertions` summary (`total`, `warning`, `blocked`) and assertion entries
 - per-secret entries containing:
   - classification (`materialId`, category, scope, rotation posture, usage contexts)
   - policy (`startupRequirement`, `durabilityClass`, `fallbackPolicy`)
   - provider/backend metadata and rotation status
   - validation failures and warnings
-  - `fallbackModeActive` signal when optional fallback policy is active
+- `fallbackModeActive` signal when optional fallback policy is active
+
+Governance assertion entries make development-only allowances explicit and inspectable:
+
+- `allowanceKind`
+  - `ephemeral-bootstrap-material`
+  - `relaxed-validation-mode`
+  - `conditional-provider-backend`
+- `enforcement`
+  - `warning` in allowed development/test contexts
+  - `blocked` when the same allowance appears in production-capable context
+- `message` + optional metadata-safe `details`
 
 Per-entry state interpretation:
 
@@ -72,6 +84,8 @@ Per-entry state interpretation:
   - ensure migration prerequisites or complete explicit manual bootstrap
 - `optional-secret-missing` / `optional-secret-unusable`
   - acceptable only in non-production lifecycle policy; review before production promotion
+- governance assertions with `enforcement=blocked`
+  - treat as explicit production-policy violation; remove development-only allowance before promotion
 
 ## Operator triage sequence
 
@@ -79,7 +93,8 @@ Per-entry state interpretation:
 2. If degraded/unhealthy, query `/diagnostics` from a trusted session.
 3. Resolve repository and encryption prerequisites first.
 4. Resolve required bootstrap secret issues next.
-5. Re-run health/diagnostics and confirm `runtimeDependenciesHealthy=true` before production traffic.
+5. Resolve any `securityMaterial.governanceAssertions.entries` with `enforcement=blocked`.
+6. Re-run health/diagnostics and confirm `runtimeDependenciesHealthy=true` before production traffic.
 
 ## Governance and audit safety
 

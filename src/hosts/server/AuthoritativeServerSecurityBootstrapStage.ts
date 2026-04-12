@@ -166,6 +166,28 @@ function emitStartupSecurityMaterialDiagnostics(input: {
     }
     input.logger?.warn(payload);
   }
+
+  for (const assertion of input.validation.governanceAssertions.entries) {
+    const payload = Object.freeze({
+      event: "authoritative-server.startup.security-material-governance-assertion",
+      details: Object.freeze({
+        assertionId: assertion.assertionId,
+        materialId: assertion.materialId,
+        allowanceKind: assertion.allowanceKind,
+        enforcement: assertion.enforcement,
+        lifecycleStage: assertion.lifecycleStage,
+        productionCapable: assertion.productionCapable,
+        sourceKind: assertion.sourceKind,
+        message: assertion.message,
+        details: sanitizeSecurityMaterialDiagnosticDetails(assertion.details),
+      }),
+    });
+    if (assertion.enforcement === "blocked") {
+      input.logger?.error(payload);
+      continue;
+    }
+    input.logger?.warn(payload);
+  }
 }
 
 function buildValidationErrorMessage(result: SecurityMaterialStartupValidationResult): string {
@@ -189,12 +211,14 @@ function createStartupMaterialValidationCheck(
       ? `Startup security material validation produced ${validation.issues.length} diagnostic issue(s).`
       : "Startup security material validation passed without diagnostics.",
     blocking: validation.fatalIssues.length > 0,
-    details: Object.freeze({
-      lifecycleStage: validation.lifecycleStage,
-      fatalIssueCount: String(validation.fatalIssues.length),
-      warningCount: String(validation.warnings.length),
-      productionCapable: validation.productionCapable ? "true" : "false",
-    }),
+      details: Object.freeze({
+        lifecycleStage: validation.lifecycleStage,
+        fatalIssueCount: String(validation.fatalIssues.length),
+        warningCount: String(validation.warnings.length),
+        developmentAllowanceWarningCount: String(validation.governanceAssertions.warning),
+        developmentAllowanceBlockedCount: String(validation.governanceAssertions.blocked),
+        productionCapable: validation.productionCapable ? "true" : "false",
+      }),
   });
 }
 
@@ -265,8 +289,10 @@ function buildSecurityMaterialReadinessReport(
 
   const summary = summarizeSecurityMaterialEntries(entries);
   const state = validation.fatalIssues.length > 0
+    || validation.governanceAssertions.blocked > 0
     ? AuthoritativeServerSecurityMaterialReadinessStates.blocked
     : validation.warnings.length > 0
+      || validation.governanceAssertions.warning > 0
       ? AuthoritativeServerSecurityMaterialReadinessStates.degraded
       : AuthoritativeServerSecurityMaterialReadinessStates.ready;
 
@@ -281,6 +307,22 @@ function buildSecurityMaterialReadinessReport(
     summary,
     issues,
     entries,
+    governanceAssertions: Object.freeze({
+      total: validation.governanceAssertions.total,
+      warning: validation.governanceAssertions.warning,
+      blocked: validation.governanceAssertions.blocked,
+      entries: Object.freeze(validation.governanceAssertions.entries.map((assertion) => Object.freeze({
+        assertionId: assertion.assertionId,
+        materialId: assertion.materialId,
+        allowanceKind: assertion.allowanceKind,
+        lifecycleStage: assertion.lifecycleStage,
+        productionCapable: assertion.productionCapable,
+        enforcement: assertion.enforcement,
+        message: assertion.message,
+        sourceKind: assertion.sourceKind,
+        details: sanitizeSecurityMaterialDiagnosticDetails(assertion.details),
+      }))),
+    }),
   });
 }
 

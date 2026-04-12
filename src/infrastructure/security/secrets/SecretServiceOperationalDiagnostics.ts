@@ -8,6 +8,7 @@ import {
 import type { ServerComposedSecretService } from "./SecretServiceComposition";
 import {
   type SecretProviderMaterialMetadataDto,
+  type SecretServiceOperationalDiagnosticsViewDto,
   SecurityMaterialDiagnosticStates,
   SecretServiceDiagnosticSeverities,
   SecretServiceHealthStates,
@@ -15,7 +16,6 @@ import {
   type SecretServiceHealthState,
   type SecretServiceHealthViewDto,
   type SecretServiceOperationalDiagnosticDto,
-  type SecretServiceOperationalDiagnosticsViewDto,
 } from "@shared/dto/security/SecretServiceOperationalDiagnosticsDtos";
 
 const SECRET_BOOTSTRAP_MIGRATION_ENV_KEY = "AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV";
@@ -75,6 +75,17 @@ export class SecretServiceOperationalDiagnosticsProvider implements ISecretServi
       })
     ));
     const securityMaterialSummary = summarizeSecurityMaterialEntries(securityMaterialEntries);
+    const governanceAssertions = summarizeDevelopmentAllowanceGovernanceAssertions({
+      lifecycleStage,
+      entries: securityMaterialEntries,
+    });
+    if (governanceAssertions.blocked > 0) {
+      diagnostics.push(Object.freeze({
+        code: "development-allowance-blocked",
+        severity: SecretServiceDiagnosticSeverities.error,
+        message: "Development-only security material allowance is blocked in the current lifecycle stage.",
+      }));
+    }
 
     const encryptionMaterialAvailable = this.input.secretService.status.configured;
     if (!encryptionMaterialAvailable) {
@@ -86,7 +97,9 @@ export class SecretServiceOperationalDiagnosticsProvider implements ISecretServi
     }
 
     const bootstrapSecretsHealthy = bootstrapResult.state === SystemSecretBootstrapStates.ready;
-    const runtimeDependenciesHealthy = encryptionMaterialAvailable && bootstrapSecretsHealthy;
+    const runtimeDependenciesHealthy = encryptionMaterialAvailable
+      && bootstrapSecretsHealthy
+      && governanceAssertions.blocked === 0;
     const healthFlags: SecretServiceHealthFlagsDto = Object.freeze({
       encryptionMaterialAvailable,
       repositoryReachable,
@@ -98,6 +111,7 @@ export class SecretServiceOperationalDiagnosticsProvider implements ISecretServi
       repositoryReachable,
       encryptionMaterialAvailable,
       bootstrapSecretsHealthy,
+      governanceAllowancesBlocked: governanceAssertions.blocked > 0,
     });
 
     return Object.freeze({
@@ -115,6 +129,7 @@ export class SecretServiceOperationalDiagnosticsProvider implements ISecretServi
       securityMaterial: Object.freeze({
         lifecycleStage,
         summary: securityMaterialSummary,
+        governanceAssertions,
         entries: Object.freeze(securityMaterialEntries),
       }),
     });
@@ -260,12 +275,13 @@ function resolveHealthState(input: {
   readonly repositoryReachable: boolean;
   readonly encryptionMaterialAvailable: boolean;
   readonly bootstrapSecretsHealthy: boolean;
+  readonly governanceAllowancesBlocked: boolean;
 }): SecretServiceHealthState {
   if (!input.repositoryReachable) {
     return SecretServiceHealthStates.unhealthy;
   }
 
-  if (!input.encryptionMaterialAvailable || !input.bootstrapSecretsHealthy) {
+  if (!input.encryptionMaterialAvailable || !input.bootstrapSecretsHealthy || input.governanceAllowancesBlocked) {
     return SecretServiceHealthStates.degraded;
   }
 
@@ -392,6 +408,130 @@ function summarizeSecurityMaterialEntries(
     degraded,
     missing,
     nonCompliant,
+  });
+}
+
+function summarizeDevelopmentAllowanceGovernanceAssertions(input: {
+  readonly lifecycleStage: "production" | "development" | "test";
+  readonly entries: ReadonlyArray<{
+    readonly secretId: string;
+    readonly fallbackModeActive: boolean;
+    readonly classification: {
+      readonly materialId: string;
+    };
+    readonly policy: {
+      readonly startupRequirement: "fail-fast-required" | "optional";
+      readonly durabilityClass: "durable" | "ephemeral";
+      readonly fallbackPolicy: "none" | "migrate-legacy-input" | "generate-ephemeral-for-development";
+    };
+    readonly backend?: {
+      readonly backendKind: string;
+    };
+  }>;
+}) {
+  const assertions: Array<{
+    readonly assertionId: string;
+    readonly secretId: string;
+    readonly materialId: string;
+    readonly allowanceKind: "ephemeral-bootstrap-material" | "relaxed-validation-mode" | "conditional-provider-backend";
+    readonly lifecycleStage: "production" | "development" | "test";
+    readonly productionCapable: boolean;
+    readonly enforcement: "warning" | "blocked";
+    readonly message: string;
+    readonly details?: Readonly<Record<string, string>>;
+  }> = [];
+  const assertionIds = new Set<string>();
+  const productionCapable = input.lifecycleStage === "production";
+  const enforcement = productionCapable ? "blocked" : "warning";
+
+  for (const entry of input.entries) {
+    if (
+      entry.policy.fallbackPolicy === "generate-ephemeral-for-development"
+      || entry.policy.durabilityClass === "ephemeral"
+      || entry.fallbackModeActive
+    ) {
+      const assertionId = `${entry.secretId}:ephemeral-bootstrap-material:${input.lifecycleStage}`;
+      if (!assertionIds.has(assertionId)) {
+        assertionIds.add(assertionId);
+        assertions.push(Object.freeze({
+          assertionId,
+          secretId: entry.secretId,
+          materialId: entry.classification.materialId,
+          allowanceKind: "ephemeral-bootstrap-material",
+          lifecycleStage: input.lifecycleStage,
+          productionCapable,
+          enforcement,
+          message: productionCapable
+            ? "Development-only ephemeral bootstrap material allowance is blocked for production-capable diagnostics state."
+            : "Development-only ephemeral bootstrap material allowance is active.",
+          details: Object.freeze({
+            fallbackModeActive: entry.fallbackModeActive ? "true" : "false",
+            fallbackPolicy: entry.policy.fallbackPolicy,
+          }),
+        }));
+      }
+    }
+
+    if (entry.policy.startupRequirement === "optional") {
+      const assertionId = `${entry.secretId}:relaxed-validation-mode:${input.lifecycleStage}`;
+      if (!assertionIds.has(assertionId)) {
+        assertionIds.add(assertionId);
+        assertions.push(Object.freeze({
+          assertionId,
+          secretId: entry.secretId,
+          materialId: entry.classification.materialId,
+          allowanceKind: "relaxed-validation-mode",
+          lifecycleStage: input.lifecycleStage,
+          productionCapable,
+          enforcement,
+          message: productionCapable
+            ? "Development-only relaxed validation allowance is blocked for production-capable diagnostics state."
+            : "Development-only relaxed validation allowance is active.",
+          details: Object.freeze({
+            startupRequirement: entry.policy.startupRequirement,
+          }),
+        }));
+      }
+    }
+
+    if (entry.backend?.backendKind === "local-user-secure-secret-store") {
+      const assertionId = `${entry.secretId}:conditional-provider-backend:${input.lifecycleStage}`;
+      if (!assertionIds.has(assertionId)) {
+        assertionIds.add(assertionId);
+        assertions.push(Object.freeze({
+          assertionId,
+          secretId: entry.secretId,
+          materialId: entry.classification.materialId,
+          allowanceKind: "conditional-provider-backend",
+          lifecycleStage: input.lifecycleStage,
+          productionCapable,
+          enforcement,
+          message: productionCapable
+            ? "Development-only conditional provider backend allowance is blocked for production-capable diagnostics state."
+            : "Development-only conditional provider backend allowance is active.",
+          details: Object.freeze({
+            backendKind: entry.backend.backendKind,
+          }),
+        }));
+      }
+    }
+  }
+
+  let warning = 0;
+  let blocked = 0;
+  for (const assertion of assertions) {
+    if (assertion.enforcement === "blocked") {
+      blocked += 1;
+      continue;
+    }
+    warning += 1;
+  }
+
+  return Object.freeze({
+    total: assertions.length,
+    warning,
+    blocked,
+    entries: Object.freeze(assertions),
   });
 }
 
