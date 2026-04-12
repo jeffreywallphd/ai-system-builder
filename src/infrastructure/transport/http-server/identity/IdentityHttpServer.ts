@@ -348,6 +348,8 @@ import {
   type AuthoritativeApiRouteRegistrationPlan,
 } from "../AuthoritativeApiRouteRegistration";
 import { composeAuthoritativeApiRouteRegistrationPlan } from "../AuthoritativeApiRouteRegistrationCatalog";
+import { composeIdentityHttpTransport } from "./composition/IdentityHttpTransportComposition";
+import { buildIdentityHttpRouteCompositionLogDetails } from "./middleware/request-observability";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
@@ -1100,17 +1102,21 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
   const routeRegistrationPlan = options.routeRegistrationPlan ?? composeAuthoritativeApiRouteRegistrationPlan({
     backendAvailability: resolveRouteBackendAvailability(options),
   });
+  const transportComposition = composeIdentityHttpTransport({
+    routeRegistrationPlan,
+    serverFactory,
+  });
+  const routeCompositionLogDetails = buildIdentityHttpRouteCompositionLogDetails(
+    transportComposition.routeModuleRegistry.toSnapshot(),
+  );
   logger.info(Object.freeze({
     event: "identity-http.route-families.composed",
     requestId: "startup-route-composition",
-    details: Object.freeze({
-      routeFamilyIds: routeRegistrationPlan.registeredRouteFamilies.map((family) => family.routeFamilyId),
-      routePrefixes: routeRegistrationPlan.registeredRoutePrefixes,
-    }),
+    details: routeCompositionLogDetails,
   }));
 
   let hasLoggedRootReadinessProbe = false;
-  const server = serverFactory(async (request, response) => {
+  const server = transportComposition.serverAdapter.createServer(async (request, response) => {
     const requestStartedAt = Date.now();
     const requestId = randomUUID();
     const correlationId = resolveRequestCorrelationId(request, requestId);

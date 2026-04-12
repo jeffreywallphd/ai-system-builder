@@ -8,6 +8,9 @@ last_reviewed: 2026-04-11
 related_code_paths:
   - src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts
   - src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts
+  - src/infrastructure/transport/http-server/identity/composition/IdentityHttpTransportComposition.ts
+  - src/infrastructure/transport/http-server/identity/composition/RouteModuleRegistry.ts
+  - src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts
   - src/hosts/server/AuthoritativeServerApiRouteComposition.ts
   - src/hosts/server/IdentityServerHost.ts
 ---
@@ -15,7 +18,7 @@ related_code_paths:
 
 Feature: 1  
 Epic: 1.1  
-Story: 1.1.1
+Story: 1.1.2
 
 ## Purpose
 
@@ -101,6 +104,19 @@ Target module families:
 Boundary rule:
 - Domain/application policy stays in backend APIs/use-cases; transport modules remain adapters.
 
+## Story 1.1.2 Implementation Status
+
+Implemented scaffolding in production paths:
+- `identity/composition/IdentityHttpTransportComposition.ts` creates a transport composition artifact from server adapter + route plan + route-module registry.
+- `identity/composition/RouteModuleRegistry.ts` defines typed route-family module contracts and deterministic registration/lookup behavior.
+- `identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts` provides explicit route-family modules mapped to existing authoritative route metadata.
+- `identity/dto/IdentityHttpRouteRegistryDtos.ts`, `identity/primitives/RoutePrefixMatcher.ts`, and `identity/middleware/request-observability.ts` provide shared registry DTO/primitives/observability helpers.
+- `identity/adapters/IdentityHttpTransportAdapterContracts.ts` establishes the transport adapter interface used by server composition.
+
+Behavioral posture:
+- `IdentityHttpServer.ts` now composes route families through `composeIdentityHttpTransport(...)` during startup.
+- Request dispatch order and existing inline handler behavior remain unchanged in this story.
+
 ## Registration and Composition Seams
 
 Host seam remains authoritative:
@@ -140,8 +156,8 @@ Create family-scoped transport DTO mappers so route handlers stop owning schema 
 
 ## Validation Expectations
 
-No production behavior changes in Story 1.1.1:
-- documentation and guardrails only
+No production behavior changes in Story 1.1.2:
+- structural scaffolding + composition contracts only
 - preserve existing external API behavior and host composition contracts
 
 Key verification anchors:
