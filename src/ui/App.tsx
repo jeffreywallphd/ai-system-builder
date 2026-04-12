@@ -106,8 +106,6 @@ export default function App({
     }
 
     let cancelled = false;
-    const bootstrapAbortController = new AbortController();
-
     const publishInitializationProgress = (progress: AppInitializationProgressUpdate): void => {
       if (cancelled) {
         return;
@@ -140,7 +138,6 @@ export default function App({
     const resolveInitialSession = async () => {
       const result = await sessionCoordinator.bootstrap({
         onProgress: publishInitializationProgress,
-        signal: bootstrapAbortController.signal,
       });
       if (cancelled) {
         return;
@@ -185,7 +182,6 @@ export default function App({
       }
 
       void sessionCoordinator.refreshIfAuthenticated({
-        signal: bootstrapAbortController.signal,
       }).then((result) => {
         if (cancelled) {
           return;
@@ -214,7 +210,6 @@ export default function App({
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       cancelled = true;
-      bootstrapAbortController.abort();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isAuthenticated, sessionCoordinator, sessionStore]);

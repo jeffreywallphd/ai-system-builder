@@ -233,9 +233,6 @@ function createDefaultIdentityAuthClient(): IdentityAuthClient {
 }
 
 function logIdentityApiDiagnostic(event: SharedApiClientDiagnosticEvent): void {
-  if (!event.stage.startsWith("request-transport") && !event.stage.startsWith("request-timeout")) {
-    return;
-  }
   const message = [
     "[ai-loom][identity-api]",
     event.stage,
@@ -243,6 +240,9 @@ function logIdentityApiDiagnostic(event: SharedApiClientDiagnosticEvent): void {
     `url=${event.url}`,
     `attempt=${event.attempt}/${event.maxAttempts}`,
     event.status !== undefined ? `status=${event.status}` : undefined,
+    event.sharedCode ? `sharedCode=${event.sharedCode}` : undefined,
+    event.retryable !== undefined ? `retryable=${event.retryable}` : undefined,
+    event.delayMs !== undefined ? `delayMs=${event.delayMs}` : undefined,
     event.errorName ? `error=${event.errorName}` : undefined,
     event.errorMessage ? `message=${event.errorMessage}` : undefined,
   ]
@@ -255,4 +255,3 @@ function logIdentityApiDiagnostic(event: SharedApiClientDiagnosticEvent): void {
   }
   console.info(message);
 }
-
