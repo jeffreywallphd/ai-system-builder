@@ -29,18 +29,14 @@ describe("HTTP transport modularization module map documentation guardrails", ()
     const doc = readFileSync(moduleMapDocPath, "utf8");
 
     const requiredSections = [
-      "Current Transport Audit (Dev Branch)",
-      "Shared Middleware Concerns To Extract",
-      "Story 1.2.6 Implementation Status",
-      "Story 1.4.3 Verification Status",
-      "Required HTTP Middleware Composition Order",
-      "Middleware Safety Rules",
-      "Common Route-Category Composition Examples",
-      "Target Module Map",
-      "Registration and Composition Seams",
+      "Final Module Layout",
+      "Route-Family Registry Model",
+      "Middleware Composition Rules",
       "DTO Mapping Seams",
-      "Execution-Ordered Migration Plan",
-      "Known Migration Risks",
+      "Upgrade Boundary Separation",
+      "Contributor Workflow: Add or Modify a Route Family",
+      "Testing and Verification Expectations",
+      "Boundary Rules",
     ] as const;
     for (const section of requiredSections) {
       expect(doc).toContain(section);
@@ -48,8 +44,10 @@ describe("HTTP transport modularization module map documentation guardrails", ()
 
     const requiredRouteFamilyTokens = [
       "`identity-auth`",
+      "`workspace-invitations`",
       "`workspace-administration`",
       "`authorization-management`",
+      "`storage-management`",
       "`run-submission`",
       "`run-read`",
       "`run-mutation`",
@@ -60,53 +58,42 @@ describe("HTTP transport modularization module map documentation guardrails", ()
       expect(doc).toContain(token);
     }
 
-    const requiredSpecialCaseTokens = [
-      "trusted-session enforcement",
-      "workspace context derivation",
-      "node-authenticated transport",
-      "stream/file response",
-      "websocket upgrade",
-    ] as const;
-    for (const token of requiredSpecialCaseTokens) {
-      expect(doc).toContain(token);
-    }
-
     const requiredCompositionOrderTokens = [
-      "resolveRequestCorrelationId(...)",
-      "setResponseCorrelationHeaders(...)",
-      "evaluateApiCorsRequest(...)",
-      "enforceApiSecureTransport(...)",
-      "requireAuthenticatedSession(...)",
-      "requireAuthenticatedWorkspaceSession(...)",
-      "requireAuthenticatedNodeTransport(...)",
-      "normalizeSharedApiErrorEnvelope(...)",
-      "addCorrelationIdToErrorEnvelope(...)",
+      "resolveRequestCorrelationId",
+      "setResponseCorrelationHeaders",
+      "evaluateApiCorsRequest",
+      "enforceApiSecureTransport",
+      "requireAuthenticatedSession",
+      "requireAuthenticatedWorkspaceSession",
+      "requireAuthenticatedNodeTransport",
+      "normalizeSharedApiErrorEnvelope",
+      "correlation injection",
     ] as const;
     for (const token of requiredCompositionOrderTokens) {
       expect(doc).toContain(token);
     }
 
-    const requiredSafetyRuleTokens = [
-      "Keep gate order immutable",
-      "Do not resolve workspace context before a successful authenticated-session gate.",
-      "After any failed middleware/gate, write response and `return`",
-      "Preserve first-match route precedence and legacy fallback behavior",
-      "special-case authoritative lifecycle update (`POST /api/v1/runtime/runs/:runId/lifecycle`)",
+    const requiredWorkflowTokens = [
+      "AuthoritativeApiRouteRegistrationCatalog.ts",
+      "AuthoritativeIdentityRouteFamilyModules.ts",
+      "defaultRouteFamilyHandlers",
+      "AuthoritativeServerApiRouteComposition.ts",
+      "do not push transport mapping into application/domain",
     ] as const;
-    for (const token of requiredSafetyRuleTokens) {
+    for (const token of requiredWorkflowTokens) {
       expect(doc).toContain(token);
     }
 
-    const requiredVerificationTokens = [
-      "Startup and dispatch verification anchors",
-      "dispatch-overhead benchmark guardrail",
-      "route registration determinism",
-      "maintainability outcomes",
-      "11,779",
-      "15,153",
-      "22.3%",
+    const requiredTestingTokens = [
+      "AuthoritativeApiRouteRegistrationCatalog.test.ts",
+      "IdentityHttpTransportComposition.test.ts",
+      "IdentityHttpServer.test.ts",
+      "IdentityHttpServerRouteParityRegression.test.ts",
+      "AuthoritativeServerStartupHarness.test.ts",
+      "HttpTransportModularizationMaintainabilityGuardrails.test.ts",
+      "HttpTransportModularizationModuleMapDocumentation.test.ts",
     ] as const;
-    for (const token of requiredVerificationTokens) {
+    for (const token of requiredTestingTokens) {
       expect(doc).toContain(token);
     }
   });

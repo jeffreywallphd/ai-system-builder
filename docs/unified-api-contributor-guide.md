@@ -4,11 +4,12 @@ doc_type: contributor-guide
 status: active
 authoritativeness: reference
 owned_by: team:developer-experience
-last_reviewed: 2026-04-11
+last_reviewed: 2026-04-12
 related_code_paths:
   - src/shared/contracts
   - src/shared/schemas
   - src/infrastructure/api
+  - src/infrastructure/transport/http-server
   - src/ui/shared
 ---
 
@@ -22,8 +23,9 @@ Contributors adding or modifying protected client-facing operations for desktop,
 
 1. `docs/architecture/unified-api-authoritative-surface.md`
 2. `docs/architecture/unified-api-endpoint-reference.md`
-3. Historical transition baseline: `docs/baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.md`
-4. `docs/architecture/shared-api-contract-package.md`
+3. `docs/architecture/domains/api-and-transport-surfaces/references/http-transport-modularization-module-map.md`
+4. Historical transition baseline: `docs/baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.md`
+5. `docs/architecture/shared-api-contract-package.md`
 
 ## Where to add new shared contracts
 
@@ -36,12 +38,33 @@ Contributors adding or modifying protected client-facing operations for desktop,
    - HTTP runtime handler assembly: `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 5. Cross-client shared clients: `src/ui/shared/<domain>/`
 
+## HTTP transport route-family workflow
+
+Use this sequence when adding or modifying authoritative HTTP route families:
+
+1. Update or add the route-family registration module in `src/infrastructure/transport/http-server/authoritative-route-families/*` with stable `routeFamilyId`, canonical `routePrefixes`, and required backend keys.
+2. Wire backend availability in `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`.
+3. Keep deterministic registry ownership in `src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts`.
+4. Implement route-family handler behavior in `src/infrastructure/transport/http-server/identity/route-families/*` and register it in `defaultRouteFamilyHandlers` inside `IdentityHttpServer.ts` when migrating away from inline fallback.
+5. Keep middleware order unchanged: metadata -> CORS -> secure transport -> auth/trust -> parse/map -> backend -> status translation -> response envelope.
+6. Keep transport DTO mapping in `src/infrastructure/transport/http-server/identity/dto/*` and keep business policy in backend APIs/use-cases.
+7. If startup requires coverage for the route family, update `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`.
+
+Reference: `docs/architecture/domains/api-and-transport-surfaces/references/http-transport-modularization-module-map.md`
+
 ## Implementation rules
 
 1. Define contract and schema first, then implement backend/transport, then integrate clients.
 2. Keep one shared envelope and error behavior across desktop and thin clients.
 3. Reuse `src/ui/shared/api/SharedApiClient.ts` for new HTTP client operations unless a documented exception exists.
 4. Keep desktop IPC additions as temporary host adapters only; do not introduce new protected business mutation shortcuts.
+
+## Transport boundary rules (must hold)
+
+1. Do not move transport parsing, protocol, or middleware concerns into `src/application` or `src/domain`.
+2. Do not implement business policy in transport handlers or DTO mappers.
+3. Do not bypass shared error/status mapping (`IdentityHttpServerErrorTranslation.ts`) or correlation envelope behavior.
+4. Do not bypass shared auth/workspace/node trust gates for route-specific convenience.
 
 ## Explicitly prohibited for new work
 
