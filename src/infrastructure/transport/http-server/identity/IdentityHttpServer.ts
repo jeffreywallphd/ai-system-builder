@@ -371,6 +371,12 @@ import {
   type AuthenticatedSessionActorContext,
 } from "./middleware/session-authentication";
 import {
+  authorizeSessionNodeRoutePrincipal,
+  buildSessionNodeRouteTransportContext,
+  resolveMutualTlsNodeRouteTransportContext,
+  resolveRequiredNodeRouteNodeId,
+} from "./middleware/node-route-authentication";
+import {
   enforceTrustedSessionAssurance,
   type SessionAssuranceRequirement,
 } from "./middleware/trusted-session-assurance";
@@ -10125,12 +10131,17 @@ async function requireAuthenticatedNodeTransport(
   nodeId: string | undefined,
   onAuthenticated: (context: AuthenticatedNodeTransportContext) => Promise<void>,
 ): Promise<void> {
-  if (!nodeId) {
-    const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
-    writeJson(response, 400, invalid);
-    logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+  const requiredNodeId = resolveRequiredNodeRouteNodeId({
+    nodeId,
+    buildInvalidResponse: buildNodeTrustInvalidRequestResponse,
+  });
+  if (!requiredNodeId.ok) {
+    writeJson(response, requiredNodeId.statusCode, requiredNodeId.body);
+    logResponse(logger, requestId, request, requiredNodeId.statusCode, requiredNodeId.requestLogPayload, requiredNodeId.body);
     return;
   }
+
+  const resolvedNodeId = requiredNodeId.nodeId;
 
   if (!transportTrust) {
     await requireAuthenticatedSession(
@@ -10144,29 +10155,30 @@ async function requireAuthenticatedNodeTransport(
         transportScenario: TransportSecurityScenarios.nodeToControlPlane,
         transportActorType: TransportConnectionActorTypes.nodeIdentity,
         transportRemotePeerType: TransportPeerTypes.nodeRuntime,
-        nodeId,
+        nodeId: resolvedNodeId,
       },
       async (context) => {
-        if (!isAuthenticatedNodePrincipalForNode(context, nodeId)) {
-          const forbidden = buildNodeTrustForbiddenResponse(
-            `Authenticated session is not authorized to establish node transport for '${nodeId}'.`,
+        const principalAuthorization = authorizeSessionNodeRoutePrincipal({
+          nodeId: resolvedNodeId,
+          context,
+          buildForbiddenResponse: buildNodeTrustForbiddenResponse,
+        });
+        if (!principalAuthorization.ok) {
+          writeJson(response, principalAuthorization.statusCode, principalAuthorization.body);
+          logResponse(
+            logger,
+            requestId,
+            request,
+            principalAuthorization.statusCode,
+            principalAuthorization.requestLogPayload,
+            principalAuthorization.body,
           );
-          writeJson(response, 403, forbidden);
-          logResponse(logger, requestId, request, 403, Object.freeze({
-            nodeId,
-            principalUserIdentityId: context.principal.userIdentityId,
-            principalUsername: context.principal.username,
-            sessionProviderSubject: context.session.providerSubject,
-          }), forbidden);
           return;
         }
 
-        await onAuthenticated(Object.freeze({
-          nodeId,
-          transport: Object.freeze({
-            connection: context.transport.connection,
-            trustValidation: context.transport.trustValidation,
-          }),
+        await onAuthenticated(buildSessionNodeRouteTransportContext({
+          nodeId: resolvedNodeId,
+          context,
         }));
       },
     );
@@ -10176,35 +10188,32 @@ async function requireAuthenticatedNodeTransport(
   const transportState = resolveInboundHttpTransportConnectionState(request);
   const mutualTlsValidation = await validateNodeMutualTlsTransport({
     requestId,
-    nodeId,
+    nodeId: resolvedNodeId,
     transportState,
     ports: Object.freeze({
       trustValidator: transportTrust.httpValidator,
       nodeIdentityResolver: nodeTrustBackendApi,
     }),
   });
-  if (!mutualTlsValidation.ok) {
-    writeJson(response, mutualTlsValidation.statusCode, mutualTlsValidation.body);
-    logResponse(logger, requestId, request, mutualTlsValidation.statusCode, Object.freeze({
-      nodeId,
-      transport: Object.freeze({
-        channelType: transportState.channelType,
-        encryptedTransportEstablished: transportState.encryptedTransportEstablished,
-        mutualTlsEstablished: transportState.mutualTlsEstablished,
-        peerCertificatePresented: transportState.peerCertificatePresented,
-        peerCertificateSerialNumber: transportState.peerCertificateSerialNumber,
-      }),
-    }), mutualTlsValidation.body);
+  const mutualTlsResolution = resolveMutualTlsNodeRouteTransportContext({
+    nodeId: resolvedNodeId,
+    transportState,
+    validation: mutualTlsValidation,
+  });
+  if (!mutualTlsResolution.ok) {
+    writeJson(response, mutualTlsResolution.statusCode, mutualTlsResolution.body);
+    logResponse(
+      logger,
+      requestId,
+      request,
+      mutualTlsResolution.statusCode,
+      mutualTlsResolution.requestLogPayload,
+      mutualTlsResolution.body,
+    );
     return;
   }
 
-  await onAuthenticated(Object.freeze({
-    nodeId: mutualTlsValidation.node.nodeId,
-    transport: Object.freeze({
-      connection: transportState,
-      trustValidation: mutualTlsValidation.trust,
-    }),
-  }));
+  await onAuthenticated(mutualTlsResolution.context);
 }
 
 async function handleLogin(
@@ -13810,20 +13819,6 @@ function buildForbiddenResponse(message: string): IdentityAuthApiResponse<never>
       message,
     },
   });
-}
-
-function isAuthenticatedNodePrincipalForNode(context: AuthenticatedRequestContext, nodeId: string): boolean {
-  const expectedNodeId = nodeId.trim();
-  if (!expectedNodeId) {
-    return false;
-  }
-
-  const candidateValues = [
-    context.principal.userIdentityId,
-    context.principal.username,
-    context.session.providerSubject,
-  ];
-  return candidateValues.some((candidate) => candidate.trim() === expectedNodeId);
 }
 
 function buildQueryValidationError(path: string, message: string): IdentityAuthApiResponse<never> {
