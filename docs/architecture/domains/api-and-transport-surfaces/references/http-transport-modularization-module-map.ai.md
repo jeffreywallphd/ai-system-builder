@@ -68,7 +68,7 @@ Shared request/response concerns currently mixed into route handlers:
 - request correlation and structured request/response/timing logging
 - API CORS evaluation + preflight handling
 - secure transport gates (`requireHttps` / `requireWss` with loopback policy)
-- authenticated session guard, including trusted-session enforcement (`minimumAssuranceLevel: "authenticated-trusted"`)
+- authenticated session guard, including trusted-session enforcement (`sessionAssuranceRequirement: "require-trusted"`)
 - workspace context derivation (`requireAuthenticatedWorkspaceSession(...)` from query/path context)
 - node-authenticated transport guard (`requireAuthenticatedNodeTransport(...)`) with mTLS trust path
 - standardized parse/validation wrappers (JSON body parsing + schema translation)
@@ -167,6 +167,16 @@ Implemented shared workspace-context resolution middleware utilities in producti
 
 Targeted regression coverage:
 - `identity/tests/WorkspaceContextMiddleware.test.ts` covers query-scoped resolution, explicit route-scoped resolution, custom workspace query keys, and representative missing/blank workspace rejection flows.
+
+## Story 1.2.3 Implementation Status
+
+Implemented shared trusted-session/device-assurance enforcement middleware in production paths:
+- `identity/middleware/trusted-session-assurance.ts` centralizes assurance requirement mapping (`allow-untrusted`, `allow-pairing`, `require-trusted`) and fail-closed enforcement responses for protected routes.
+- `IdentityHttpServer.ts` now consumes shared assurance middleware in `requireAuthenticatedSession(...)`, so protected route declarations use `sessionAssuranceRequirement` instead of route-local trust checks.
+- User-session trust and node transport trust remain separate gates; node transport routes continue to use `requireAuthenticatedNodeTransport(...)` without conflating trust domains.
+
+Targeted regression coverage:
+- `identity/tests/TrustedSessionAssuranceMiddleware.test.ts` covers requirement mapping, passing assurance levels, and failing trust posture with consistent forbidden response metadata.
 
 ## Registration and Composition Seams
 
