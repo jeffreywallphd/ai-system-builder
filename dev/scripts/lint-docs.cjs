@@ -32,6 +32,11 @@ const CHECK_CATALOG = [
     description: "Validate high-value docs internal links and cross-reference integrity.",
     scriptPath: "dev/scripts/validate-docs-cross-references.cjs",
   },
+  {
+    id: "category-compliance",
+    description: "Validate category-specific doc placement and lifecycle compliance rules.",
+    scriptPath: "dev/scripts/validate-docs-category-compliance.cjs",
+  },
 ];
 
 function parseCheckIds(rawValue) {

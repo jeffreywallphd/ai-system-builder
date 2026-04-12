@@ -18,7 +18,9 @@ related_code_paths:
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
+  - dev/scripts/validate-docs-category-compliance.cjs
   - dev/tests/DocsLintEntrypointScript.test.ts
+  - dev/tests/DocsCategoryComplianceValidationScript.test.ts
   - dev/tests/DocumentationQualityContributorStandardsStory716Guardrails.test.ts
 ---
 
@@ -67,6 +69,7 @@ npm run docs:validate:adr
 npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
 npm run docs:validate:cross-references
+npm run docs:validate:category-compliance
 ```
 
 ## Rule Categories and Contributor Actions
@@ -93,6 +96,10 @@ npm run docs:validate:cross-references
   - `docs/context/context-map.json`
   - `docs/context/routing/task-to-context-routing.seed.json`
   - `docs/context/documentation-registry.seed.json`
+- Keep category-specific placement contracts stable:
+  - ADR records stay in `docs/adr/records/`.
+  - Baseline docs keep baseline placement and historical authority semantics.
+  - Routing references stay on active non-historical records.
 - Treat context packs and routing assets as strict/high-risk enforcement surfaces.
 
 ### Cross-Link and Reference Hygiene (Rule Group 4)
@@ -132,6 +139,8 @@ npm run docs:validate:cross-references
   - Fix broken markdown paths, ADR/documentation cross-links, and registry references.
 - Routing/registry contracts (`CONTEXT_*`, `ROUTING_*`, `REGISTRY_*`):
   - Reconcile IDs, mapped paths, and contract fields across context-system artifacts.
+- Category-compliance (`CATEGORY_*`):
+  - Fix ADR path/category mismatches, baseline status/authority drift, and routing references to non-active historical records.
 - Readability boundaries (`DOCUMENTATION_QUALITY_STANDARD_INVALID`, `READ-*` scoped checks):
   - Restore required anchors or measurable router/overview constraints.
 

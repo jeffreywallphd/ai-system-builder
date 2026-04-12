@@ -15,7 +15,9 @@ related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
+  - dev/scripts/validate-docs-category-compliance.cjs
   - dev/tests/DocumentationQualityOwnershipReviewStory715Guardrails.test.ts
+  - dev/tests/DocsCategoryComplianceValidationScript.test.ts
 ---
 
 # AI Companion: Documentation Quality Standard
@@ -160,7 +162,7 @@ Require at least one additional qualified reviewer for:
 
 ### How This Fits Normal Repository Maintenance
 
-- Run lightweight validators locally before review (`npm run docs:validate:foundation`, `npm run docs:validate:registry`, `npm run docs:validate:adr`, `npm run docs:validate:architecture-domains`, `npm run docs:validate:segmentation`, `npm run docs:validate:cross-references`).
+- Run lightweight validators locally before review (`npm run docs:validate:foundation`, `npm run docs:validate:registry`, `npm run docs:validate:adr`, `npm run docs:validate:architecture-domains`, `npm run docs:validate:segmentation`, `npm run docs:validate:cross-references`, `npm run docs:validate:category-compliance`).
 - Use `docs/contributors/documentation-quality-enforced-standards-guide.ai.md` for pre-validation workflow, templates/examples, and common failure-category triage before running validators.
 - Use severity plus trigger guidance to classify outcomes as block-now, warn-and-fix-soon, or advisory-only.
 - Keep manual review focused on semantic correctness, authority boundaries, and high-risk impact that automation cannot fully judge.
