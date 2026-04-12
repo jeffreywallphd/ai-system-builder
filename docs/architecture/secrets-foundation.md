@@ -173,7 +173,27 @@ These contracts establish stable extension points for persistence adapters, auth
   - callers continue to depend on `ISecretProviderMaterialResolutionPort`
   - backend injection seam in `DefaultSecretProviderResolutionService` preserves compatibility with future external secret-store adapters
 
+## Story 3.2.3 Optional local secure storage for user/device secrets
+
+- adds an optional user-local secure store backend and keytar adapter seam:
+  - `src/infrastructure/security/secrets/LocalUserSecureSecretStoreBackend.ts`
+- updates provider-resolution routing to support optional user-local resolution without changing server/workspace authority:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+- scope boundary posture:
+  - server scope remains authoritative and always routes to `DurableServerSecretStoreBackend`
+  - workspace scope remains managed through runtime secret consumption adapters
+  - optional local secure storage is user scope only and rejects server/workspace selectors
+- runtime/build posture:
+  - `keytar` is loaded dynamically when available and is not required for core runtime/test execution
+  - when `keytar` is unavailable, user-scope resolution falls back to managed secret-service adapters
+  - this avoids forcing a brittle native dependency into environments that cannot support keytar packaging
+- provider architecture posture:
+  - callers continue to use `ISecretProviderMaterialResolutionPort`
+  - local secure storage remains an infrastructure adapter detail, preserving caller isolation from storage implementation choices
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants
 - `src/application/security/tests/SecretServiceContracts.test.ts` validates contract-level operation semantics over in-memory adapters for all required operation categories
+- `src/infrastructure/security/secrets/tests/LocalUserSecureSecretStoreBackend.test.ts` validates user-scope-only local secure store behavior and optional keytar availability handling
+- `src/infrastructure/security/tests/DefaultSecretProviderResolutionService.test.ts` validates user-scope local-store routing preference with managed fallback and unchanged server/workspace routing boundaries

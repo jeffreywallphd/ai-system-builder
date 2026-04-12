@@ -29,6 +29,7 @@ import {
   DurableServerSecretStoreBackend,
   type DurableServerSecretStoreBackendDependencies,
 } from "@infrastructure/security/secrets/DurableServerSecretStoreBackend";
+import { LocalUserSecureSecretStoreBackend } from "@infrastructure/security/secrets/LocalUserSecureSecretStoreBackend";
 
 export interface DefaultSecretProviderResolutionServiceDependencies {
   readonly runtimeSecretConsumptionAdapters: SecretRuntimeConsumptionAdapters;
@@ -36,14 +37,17 @@ export interface DefaultSecretProviderResolutionServiceDependencies {
   readonly createSecret: (request: CreateSecretRequest) => Promise<SecretServiceResult<CreateSecretResult>>;
   readonly initializeServerSecretStore?: () => Promise<void>;
   readonly serverSecretStoreBackend?: DurableServerSecretStoreBackend;
+  readonly localUserSecureSecretStoreBackend?: LocalUserSecureSecretStoreBackend;
 }
 
 export class DefaultSecretProviderResolutionService implements ISecretProviderMaterialResolutionPort {
   private readonly serverSecretStoreBackend: DurableServerSecretStoreBackend;
+  private readonly localUserSecureSecretStoreBackend: LocalUserSecureSecretStoreBackend | undefined;
 
   public constructor(private readonly dependencies: DefaultSecretProviderResolutionServiceDependencies) {
     this.serverSecretStoreBackend = dependencies.serverSecretStoreBackend
       ?? new DurableServerSecretStoreBackend(toServerSecretStoreBackendDependencies(dependencies));
+    this.localUserSecureSecretStoreBackend = dependencies.localUserSecureSecretStoreBackend;
   }
 
   public async resolveSecretProviderMaterial(
@@ -89,30 +93,26 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
       };
     }
 
-    const result = await this.dependencies.runtimeSecretConsumptionAdapters.resolveUserPersonalApiKey({
-      userIdentityId: input.selector.scope.userIdentityId as string,
-      workspaceId: input.selector.scope.workspaceId,
-      providerId: input.selector.providerId,
-      secretId: input.selector.secretId,
-      operationKey: input.access.operationKey,
-      serviceIdentity: input.access.serviceIdentity,
-      justification,
-      occurredAt: input.access.occurredAt,
-    });
-    if (!result.ok) {
-      return result;
-    }
-    return {
-      ok: true,
-      value: Object.freeze({
-        providerId: input.selector.providerId,
-        secretId: result.value.secretId,
-        currentVersionId: result.value.currentVersionId,
-        scope: result.value.scope,
-        materialKind: input.selector.materialKind,
-        rawValue: result.value.credential,
+    const localResult = await this.resolveLocalUserMaterialIfConfigured({
+      selector: input.selector,
+      access: Object.freeze({
+        ...input.access,
+        justification,
       }),
-    };
+    });
+    if (localResult) {
+      if (localResult.ok || localResult.error.code !== SecretServiceErrorCodes.notFound) {
+        return localResult;
+      }
+    }
+
+    return this.resolveManagedUserMaterial({
+      selector: input.selector,
+      access: Object.freeze({
+        ...input.access,
+        justification,
+      }),
+    });
   }
 
   public async resolveSecretProviderMaterialMetadata(
@@ -120,6 +120,13 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
   ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
     if (input.selector.scope.scope === SecretScopes.server) {
       return this.serverSecretStoreBackend.resolveServerMaterialMetadata(input);
+    }
+
+    if (input.selector.scope.scope === SecretScopes.user && this.localUserSecureSecretStoreBackend) {
+      const local = await this.localUserSecureSecretStoreBackend.resolveUserMaterialMetadata(input);
+      if (local.ok || local.error.code !== SecretServiceErrorCodes.notFound) {
+        return local;
+      }
     }
 
     const metadata = await this.dependencies.getSecretMetadata({
@@ -186,6 +193,13 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
       return this.serverSecretStoreBackend.bootstrapServerMaterial(input);
     }
 
+    if (input.selector.scope.scope === SecretScopes.user && this.localUserSecureSecretStoreBackend) {
+      const local = await this.localUserSecureSecretStoreBackend.bootstrapUserMaterial(input);
+      if (local.ok || local.error.code !== SecretServiceErrorCodes.notFound) {
+        return local;
+      }
+    }
+
     const metadata = await this.resolveSecretProviderMaterialMetadata({
       selector: input.selector,
       access: input.access,
@@ -243,6 +257,45 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
       value: Object.freeze({
         outcome: SecretProviderBootstrapOutcomes.created,
         reference,
+      }),
+    };
+  }
+
+  private async resolveLocalUserMaterialIfConfigured(
+    input: ResolveSecretProviderMaterialInput,
+  ): Promise<SecretServiceResult<ResolvedSecretProviderMaterialValue> | undefined> {
+    if (input.selector.scope.scope !== SecretScopes.user || !this.localUserSecureSecretStoreBackend) {
+      return undefined;
+    }
+
+    return this.localUserSecureSecretStoreBackend.resolveUserMaterial(input);
+  }
+
+  private async resolveManagedUserMaterial(
+    input: ResolveSecretProviderMaterialInput,
+  ): Promise<SecretServiceResult<ResolvedSecretProviderMaterialValue>> {
+    const result = await this.dependencies.runtimeSecretConsumptionAdapters.resolveUserPersonalApiKey({
+      userIdentityId: input.selector.scope.userIdentityId as string,
+      workspaceId: input.selector.scope.workspaceId,
+      providerId: input.selector.providerId,
+      secretId: input.selector.secretId,
+      operationKey: input.access.operationKey,
+      serviceIdentity: input.access.serviceIdentity,
+      justification: input.access.justification,
+      occurredAt: input.access.occurredAt,
+    });
+    if (!result.ok) {
+      return result;
+    }
+    return {
+      ok: true,
+      value: Object.freeze({
+        providerId: input.selector.providerId,
+        secretId: result.value.secretId,
+        currentVersionId: result.value.currentVersionId,
+        scope: result.value.scope,
+        materialKind: input.selector.materialKind,
+        rawValue: result.value.credential,
       }),
     };
   }
