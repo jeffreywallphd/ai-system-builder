@@ -24,6 +24,7 @@ Index durable contract-level architecture references for `api-and-transport-surf
 ## Canonical Reference Documents
 
 - [Unified API Surface Contracts](./unified-api-surface-contracts.md)
+- [HTTP Transport Modularization Module Map](./http-transport-modularization-module-map.md)
 
 ## Migration Backlog (Not Yet Canonical)
 
