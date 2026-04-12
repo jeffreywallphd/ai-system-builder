@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { createIdentityHttpServer } from "../IdentityHttpServer";
+import {
+  createIdentityHttpServer,
+  type IdentityHttpServerLogEvent,
+  type IdentityHttpServerLogger,
+} from "../IdentityHttpServer";
 import type { GeneratedResultManagementBackendApi } from "../../../../api/generated-results/GeneratedResultManagementBackendApi";
 import type {
   GetGeneratedResultApiRequest,
@@ -16,6 +20,19 @@ import type {
 } from "../../../../api/generated-results/sdk/PublicGeneratedResultManagementApiContract";
 
 const servers: Server[] = [];
+
+class CapturingLogger implements IdentityHttpServerLogger {
+  public readonly events: IdentityHttpServerLogEvent[] = [];
+  public info(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public warn(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public error(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+}
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => {
@@ -373,11 +390,13 @@ class StubGeneratedResultManagementBackendApi {
 
 async function startServer(
   generatedResultBackendApi: StubGeneratedResultManagementBackendApi,
+  logger?: CapturingLogger,
 ): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
     generatedResultManagementBackendApi: generatedResultBackendApi as unknown as GeneratedResultManagementBackendApi,
+    logger,
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -422,7 +441,8 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 describe("IdentityHttpServer generated-result protected original retrieval", () => {
   it("lists generated results through authenticated workspace sessions", async () => {
     const backend = new StubGeneratedResultManagementBackendApi();
-    const baseUrl = await startServer(backend);
+    const logger = new CapturingLogger();
+    const baseUrl = await startServer(backend, logger);
     const token = await registerAndLogin(baseUrl, "generated.result.route.list.success.1");
 
     const response = await fetch(
@@ -440,6 +460,9 @@ describe("IdentityHttpServer generated-result protected original retrieval", () 
     expect(payload.data.items.length).toBe(1);
     expect(payload.data.items[0].resultAssetId).toBe("gr-asset-001");
     expect(backend.lastListRequest?.workspaceId).toBe("workspace-alpha");
+    expect(
+      logger.events.some((event) => event.event === "identity-http.route-family.modular-handled" && event.path === "/api/v1/generated-results"),
+    ).toBeTrue();
   });
 
   it("returns generated-result detail records", async () => {

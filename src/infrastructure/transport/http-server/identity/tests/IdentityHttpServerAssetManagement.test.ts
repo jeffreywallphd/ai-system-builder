@@ -2,7 +2,11 @@
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { createIdentityHttpServer } from "../IdentityHttpServer";
+import {
+  createIdentityHttpServer,
+  type IdentityHttpServerLogEvent,
+  type IdentityHttpServerLogger,
+} from "../IdentityHttpServer";
 import { AssetManagementBackendApi } from "../../../../api/assets/AssetManagementBackendApi";
 import { AssetUploadInitiationService } from "@application/assets/use-cases/AssetUploadInitiationService";
 import { AssetUploadIngestionService } from "@application/assets/use-cases/AssetUploadIngestionService";
@@ -25,6 +29,19 @@ import {
 } from "@domain/assets/AssetDomain";
 
 const servers: Server[] = [];
+
+class CapturingLogger implements IdentityHttpServerLogger {
+  public readonly events: IdentityHttpServerLogEvent[] = [];
+  public info(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public warn(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public error(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+}
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => {
@@ -387,6 +404,7 @@ async function startServer(
   generatedOutputService = new StubAssetGeneratedOutputRegistrationService(),
   previewService = new StubAssetPreviewService(),
   lifecycleService = new StubAssetLifecycleService(),
+  logger?: CapturingLogger,
 ): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const assetManagementBackendApi = new AssetManagementBackendApi({
@@ -403,6 +421,7 @@ async function startServer(
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
     assetManagementBackendApi,
+    logger,
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -641,7 +660,16 @@ describe("IdentityHttpServer asset management routes", () => {
 
   it("supports authenticated scoped asset listing", async () => {
     const service = new StubAssetUploadInitiationService();
-    const baseUrl = await startServer(service);
+    const logger = new CapturingLogger();
+    const baseUrl = await startServer(
+      service,
+      new StubAssetUploadIngestionService(),
+      new StubAssetDownloadService(),
+      new StubAssetGeneratedOutputRegistrationService(),
+      new StubAssetPreviewService(),
+      new StubAssetLifecycleService(),
+      logger,
+    );
     const token = await registerAndLogin(baseUrl, "asset.http.owner.4");
 
     const response = await fetch(
@@ -660,6 +688,9 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(body.data.items).toHaveLength(1);
     expect(body.data.items[0]?.assetId).toBe("asset-upload-001");
     expect(body.data.pagination.returned).toBe(1);
+    expect(
+      logger.events.some((event) => event.event === "identity-http.route-family.modular-handled" && event.path === "/api/v1/assets"),
+    ).toBeTrue();
   });
 
   it("accepts canonical repeated filter parameter names for asset list retrieval", async () => {

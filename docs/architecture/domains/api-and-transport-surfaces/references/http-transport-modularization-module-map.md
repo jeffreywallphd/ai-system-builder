@@ -259,6 +259,19 @@ Apply the chain in this order for `/api/*` HTTP routes:
   secure-transport check -> websocket header validation -> bearer-session resolution -> thin-client origin policy -> purpose authorization -> websocket trust validation -> channel establishment.
 - root readiness probe (`GET /`) intentionally bypasses API CORS/auth middleware and returns a minimal service-readiness payload.
 
+## Story 1.3.3 Implementation Status
+
+Migrated storage and asset-heavy route families to modular route-family handlers through the existing route-module registry:
+- `storage-management` modular handler now owns storage create/list/detail/health/metadata/lifecycle endpoints.
+- `asset-management` modular handler now owns logical asset register/list/detail/lifecycle/upload/download/preview endpoints.
+- `image-asset-management` modular handler now owns image asset create/list/detail/upload/finalize/preview/original endpoints.
+- generated-result retrieval/preview/original/lineage routes are now handled through modular route-family handlers, including run-scoped generated-result listing on `/api/v1/image-runs/:runId/generated-results`.
+
+Behavioral posture:
+- shared workspace-auth/session assurance gates continue to be enforced through shared middleware (`requireAuthenticatedWorkspaceSession(...)`).
+- stream/file response behavior (headers, disposition, no-store cache posture, and byte streaming) remains transport-compatible with prior production behavior.
+- route-family modular dispatch remains hybrid-safe: modular handlers execute first and may intentionally fall back for non-migrated paths.
+
 ## Registration and Composition Seams
 
 Host seam remains authoritative:

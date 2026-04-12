@@ -1170,7 +1170,1541 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
   const routeCompositionLogDetails = buildIdentityHttpRouteCompositionLogDetails(
     transportComposition.routeModuleRegistry.toSnapshot(),
   );
+  const handleStorageManagementRouteFamily = async ({
+    request,
+    response,
+    requestId,
+    logger,
+    path,
+    method,
+  }: IdentityHttpRouteFamilyHandlerContext): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+    if (!options.storageManagementBackendApi) {
+      return Object.freeze({ handled: false });
+    }
+
+    const searchParams = resolveRequestSearchParams(request.url);
+
+    if (method === "POST" && path === "/api/v1/storage/instances") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = await parseAndValidateStorageCreateRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const apiResponse = await options.storageManagementBackendApi!.createStorageInstance(parsedRequest.data);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path === "/api/v1/storage/instances") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parseArrayEnum = <TValue extends string>(
+            key: string,
+            values: ReadonlyArray<string>,
+            schema: z.ZodType<ReadonlyArray<TValue>>,
+          ): { readonly ok: true; readonly data: ReadonlyArray<TValue> } | { readonly ok: false } => {
+            const validation = schema.safeParse(values);
+            if (validation.success) {
+              return { ok: true, data: validation.data };
+            }
+            const invalid = buildStorageManagementQueryValidationError(key, `${key} values are invalid.`);
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return { ok: false };
+          };
+
+          const backendTypesValidation = parseArrayEnum("backendType", searchParams.getAll("backendType"), z.array(StorageBackendTypeValues));
+          if (!backendTypesValidation.ok) {
+            return;
+          }
+          const lifecycleStatesValidation = parseArrayEnum("lifecycleState", searchParams.getAll("lifecycleState"), z.array(StorageLifecycleStateValues));
+          if (!lifecycleStatesValidation.ok) {
+            return;
+          }
+          const accessModesValidation = parseArrayEnum("accessMode", searchParams.getAll("accessMode"), z.array(StorageAccessModeValues));
+          if (!accessModesValidation.ok) {
+            return;
+          }
+          const accessScopesValidation = parseArrayEnum("accessScope", searchParams.getAll("accessScope"), z.array(StorageAccessScopeValues));
+          if (!accessScopesValidation.ok) {
+            return;
+          }
+
+          const listRequestDto = {
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            backendTypes: backendTypesValidation.data.length > 0 ? backendTypesValidation.data : undefined,
+            lifecycleStates: lifecycleStatesValidation.data.length > 0 ? lifecycleStatesValidation.data : undefined,
+            accessModes: accessModesValidation.data.length > 0 ? accessModesValidation.data : undefined,
+            accessScopes: accessScopesValidation.data.length > 0 ? accessScopesValidation.data : undefined,
+            limit: parseOptionalInteger(searchParams.get("limit")),
+            offset: parseOptionalInteger(searchParams.get("offset")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          };
+
+          try {
+            parseListStorageInstancesRequestDto(listRequestDto);
+          } catch (error) {
+            if (error instanceof StorageTransportSchemaValidationError) {
+              const invalid = buildStorageManagementValidationErrors(error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({ query: Object.fromEntries(searchParams.entries()) }), invalid);
+              return;
+            }
+            throw error;
+          }
+
+          const listRequest: ListStorageInstancesApiRequest = Object.freeze({
+            ...listRequestDto,
+            includeCapabilities: parseOptionalBoolean(searchParams.get("includeCapabilities")),
+          });
+          const apiResponse = await options.storageManagementBackendApi!.listStorageInstances(listRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            query: Object.fromEntries(searchParams.entries()),
+          }), apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/storage/instances/") && path.endsWith("/health")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/health");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const healthRequest: GetStorageInstanceHealthApiRequest = {
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            storageInstanceId,
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          };
+          try {
+            parseGetStorageInstanceDetailRequestDto(healthRequest);
+          } catch (error) {
+            if (error instanceof StorageTransportSchemaValidationError) {
+              const invalid = buildStorageManagementValidationErrors(error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, healthRequest, invalid);
+              return;
+            }
+            throw error;
+          }
+
+          const apiResponse = await options.storageManagementBackendApi!.getStorageInstanceHealth(healthRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, healthRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "PATCH" && path.startsWith("/api/v1/storage/instances/") && path.endsWith("/metadata")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/metadata");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const parsedRequest = await parseAndValidateStorageMetadataUpdateRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            storageInstanceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const apiResponse = await options.storageManagementBackendApi!.updateStorageMetadata(parsedRequest.data);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/storage/instances/") && path.endsWith("/activate")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/activate");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const parsedRequest = await parseAndValidateStorageLifecycleRequest(
+            request,
+            ActivateStorageInstanceRequestSchema,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const activateRequest: ActivateStorageInstanceApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            storageInstanceId,
+            ...parsedRequest.data,
+          });
+          const apiResponse = await options.storageManagementBackendApi!.activateStorageInstance(activateRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, activateRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/storage/instances/") && path.endsWith("/deactivate")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/deactivate");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const parsedRequest = await parseAndValidateStorageLifecycleRequest(
+            request,
+            DeactivateStorageInstanceRequestSchema,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const deactivateRequest: DeactivateStorageInstanceApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            storageInstanceId,
+            ...parsedRequest.data,
+          });
+          const apiResponse = await options.storageManagementBackendApi!.deactivateStorageInstance(deactivateRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, deactivateRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/storage/instances/")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const detailRequestDto = {
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            storageInstanceId,
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          };
+          try {
+            parseGetStorageInstanceDetailRequestDto(detailRequestDto);
+          } catch (error) {
+            if (error instanceof StorageTransportSchemaValidationError) {
+              const invalid = buildStorageManagementValidationErrors(error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, detailRequestDto, invalid);
+              return;
+            }
+            throw error;
+          }
+
+          const detailRequest: GetStorageInstanceDetailApiRequest = Object.freeze({
+            ...detailRequestDto,
+            includeCapabilities: parseOptionalBoolean(searchParams.get("includeCapabilities")),
+          });
+          const apiResponse = await options.storageManagementBackendApi!.getStorageInstanceDetail(detailRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    return Object.freeze({ handled: false });
+  };
+  const handleGeneratedResultRouteFamily = async ({
+    request,
+    response,
+    requestId,
+    logger,
+    path,
+    method,
+  }: IdentityHttpRouteFamilyHandlerContext): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+    if (!options.generatedResultManagementBackendApi) {
+      return Object.freeze({ handled: false });
+    }
+
+    const searchParams = resolveRequestSearchParams(request.url);
+
+    if (method === "GET" && path.startsWith("/api/v1/image-runs/") && path.endsWith("/generated-results")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and runId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const runId = decodePathTail(path, "/api/v1/image-runs/", "/generated-results");
+          if (!runId || runId.includes("/")) {
+            const invalid = buildGeneratedResultManagementInvalidRequestResponse("workspaceId and runId are required.");
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+          const listRequest: ListGeneratedResultsByRunApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            runId,
+            limit: parseOptionalInteger(searchParams.get("limit")),
+            offset: parseOptionalInteger(searchParams.get("offset")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.listGeneratedResultsByRun(listRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path === "/api/v1/generated-results") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const listRequest: ListGeneratedResultsApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            ownerUserIds: parseOptionalMultiStringList(searchParams, "ownerUserId", "ownerUserIds"),
+            runId: normalizeOptionalString(searchParams.get("runId")),
+            systemId: normalizeOptionalString(searchParams.get("systemId")),
+            workflowId: normalizeOptionalString(searchParams.get("workflowId")),
+            workflowTemplateId: normalizeOptionalString(searchParams.get("workflowTemplateId")),
+            executionNodeId: normalizeOptionalString(searchParams.get("executionNodeId")),
+            statuses: parseOptionalMultiStringList(searchParams, "status", "statuses"),
+            visibilities: parseOptionalMultiStringList(searchParams, "visibility", "visibilities"),
+            mediaTypes: parseOptionalMultiStringList(searchParams, "mediaType", "mediaTypes"),
+            createdAfter: normalizeOptionalString(searchParams.get("createdAfter")),
+            createdBefore: normalizeOptionalString(searchParams.get("createdBefore")),
+            updatedAfter: normalizeOptionalString(searchParams.get("updatedAfter")),
+            updatedBefore: normalizeOptionalString(searchParams.get("updatedBefore")),
+            previewStates: parseOptionalMultiStringList(searchParams, "previewState", "previewStates"),
+            hasPreview: parseOptionalBoolean(searchParams.get("hasPreview")),
+            lineageInputAssetIds: parseOptionalMultiStringList(searchParams, "lineageInputAssetId", "lineageInputAssetIds"),
+            requiredInputPurposes: parseOptionalMultiStringList(searchParams, "requiredInputPurpose", "requiredInputPurposes"),
+            requiredAssetClasses: parseOptionalMultiStringList(searchParams, "requiredAssetClass", "requiredAssetClasses"),
+            requiredMediaClasses: parseOptionalMultiStringList(searchParams, "requiredMediaClass", "requiredMediaClasses"),
+            reuseReadyOnly: parseOptionalBoolean(searchParams.get("reuseReadyOnly")),
+            includeArchived: parseOptionalBoolean(searchParams.get("includeArchived")),
+            limit: parseOptionalInteger(searchParams.get("limit")),
+            offset: parseOptionalInteger(searchParams.get("offset")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+
+          const apiResponse = await options.generatedResultManagementBackendApi!.listGeneratedResults(listRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/preview/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, resultAssetId, and previewToken are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/preview/content");
+          const previewToken = normalizeOptionalString(searchParams.get("previewToken"));
+          if (!resultAssetId || resultAssetId.includes("/") || !previewToken) {
+            const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+              "workspaceId, resultAssetId, and previewToken are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const streamRequest: OpenGeneratedResultPreviewContentStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            previewToken,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.openGeneratedResultPreviewContentStream(
+            streamRequest,
+          );
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
+            return;
+          }
+
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/original")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/original");
+          if (!resultAssetId || resultAssetId.includes("/")) {
+            const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+              "workspaceId and resultAssetId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+          const streamRequest: OpenGeneratedResultOriginalContentStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.openGeneratedResultOriginalContentStream(
+            streamRequest,
+          );
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
+            return;
+          }
+
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/preview")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/preview");
+          if (!resultAssetId || resultAssetId.includes("/")) {
+            const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+              "workspaceId and resultAssetId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+          const previewRequest: RequestGeneratedResultPreviewApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            preferredPreviewKind: normalizeOptionalString(searchParams.get("preferredPreviewKind")),
+            preferredMediaType: normalizeOptionalString(searchParams.get("preferredMediaType")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.requestGeneratedResultPreview(previewRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, previewRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/lineage/summary")) {
+      const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/lineage/summary");
+      if (!resultAssetId || resultAssetId.includes("/")) {
+        return Object.freeze({ handled: false });
+      }
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const summaryRequest: GetGeneratedResultLineageSummaryApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.getGeneratedResultLineageSummary(summaryRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, summaryRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/lineage")) {
+      const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/lineage");
+      if (!resultAssetId || resultAssetId.includes("/")) {
+        return Object.freeze({ handled: false });
+      }
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const detailRequest: GetGeneratedResultLineageDetailApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.getGeneratedResultLineageDetail(detailRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (
+      method === "GET"
+      && path.startsWith("/api/v1/generated-results/")
+      && !path.endsWith("/lineage/summary")
+      && !path.endsWith("/lineage")
+      && !path.endsWith("/preview/content")
+      && !path.endsWith("/preview")
+      && !path.endsWith("/original")
+    ) {
+      const resultAssetId = decodePathTail(path, "/api/v1/generated-results/");
+      if (!resultAssetId || resultAssetId.includes("/")) {
+        return Object.freeze({ handled: false });
+      }
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const getRequest: GetGeneratedResultApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.getGeneratedResult(getRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, getRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    return Object.freeze({ handled: false });
+  };
+  const handleAssetRouteFamily = async ({
+    request,
+    response,
+    requestId,
+    logger,
+    path,
+    method,
+  }: IdentityHttpRouteFamilyHandlerContext): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+    if (!options.assetManagementBackendApi) {
+      return Object.freeze({ handled: false });
+    }
+    const searchParams = resolveRequestSearchParams(request.url);
+
+    if (method === "GET" && path === "/api/v1/assets") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = parseAndValidateAssetListRequest(
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            searchParams,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.listAssets(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path === "/api/v1/assets/register") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = await parseAndValidateAssetRegisterRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.registerAsset(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path === "/api/v1/assets/generated-outputs/register") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = await parseAndValidateGeneratedOutputRegisterRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.registerGeneratedOutput(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/") && path.endsWith("/uploads/initiate")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/uploads/initiate");
+          if (!assetId) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = await parseAndValidateAssetUploadInitiationRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            assetId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.initiateAssetUpload(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/upload-sessions/") && path.endsWith("/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and uploadSessionId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const uploadSessionId = decodePathTail(path, "/api/v1/assets/upload-sessions/", "/content");
+          if (!uploadSessionId) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and uploadSessionId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = parseAssetUploadContentRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            uploadSessionId,
+          );
+          const apiResponse = await options.assetManagementBackendApi!.ingestAssetUploadContent(parsedRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/") && path.endsWith("/downloads/authorize")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/downloads/authorize");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = await parseAndValidateAssetDownloadAuthorizationRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            assetId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.authorizeAssetDownload(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/assets/") && path.endsWith("/downloads/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, assetId, and contentToken are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/downloads/content");
+          const contentToken = normalizeOptionalString(searchParams.get("contentToken"));
+          if (!assetId || assetId.includes("/") || !contentToken) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId, assetId, and contentToken are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const streamRequest: OpenAuthorizedAssetDownloadStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            contentToken,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.assetManagementBackendApi!.openAuthorizedAssetDownloadStream(streamRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            return;
+          }
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/assets/") && path.endsWith("/preview")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/preview");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = parseAndValidateAssetPreviewRequest(
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            assetId,
+            searchParams,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.resolveAssetPreview(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/assets/")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const detailRequest: GetAssetDetailApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+          });
+          const apiResponse = await options.assetManagementBackendApi!.getAssetDetail(detailRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/") && path.endsWith("/archive")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/archive");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const archiveRequest: ArchiveAssetApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            operationKey: normalizeOptionalString(searchParams.get("operationKey")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.assetManagementBackendApi!.archiveAsset(archiveRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, archiveRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/") && path.endsWith("/delete")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/delete");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const deleteRequest: DeleteAssetApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            operationKey: normalizeOptionalString(searchParams.get("operationKey")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.assetManagementBackendApi!.deleteAsset(deleteRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, deleteRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    return Object.freeze({ handled: false });
+  };
+  const handleImageAssetRouteFamily = async ({
+    request,
+    response,
+    requestId,
+    logger,
+    path,
+    method,
+  }: IdentityHttpRouteFamilyHandlerContext): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+    if (!options.imageAssetManagementBackendApi) {
+      return Object.freeze({ handled: false });
+    }
+
+    const searchParams = resolveRequestSearchParams(request.url);
+
+    if (method === "POST" && path === "/api/v1/image-assets") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = await parseAndValidateImageAssetCreateRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.imageAssetManagementBackendApi!.createImageAsset(parsedRequest.data);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path === "/api/v1/image-assets") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const listRequest: ListImageAssetMetadataApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            ownerUserIds: mergeOptionalStringLists(
+              parseOptionalMultiStringList(searchParams, "ownerUserId", "ownerUserIds"),
+              parseOptionalMultiStringList(searchParams, "ownerUserIds", "ownerUserIds"),
+            ),
+            originKinds: parseOptionalMultiStringList(searchParams, "originKind", "originKinds"),
+            statuses: parseOptionalMultiStringList(searchParams, "status", "statuses"),
+            visibilities: parseOptionalMultiStringList(searchParams, "visibility", "visibilities"),
+            mediaTypes: parseOptionalMultiStringList(searchParams, "mediaType", "mediaTypes"),
+            storageInstanceIds: parseOptionalMultiStringList(searchParams, "storageInstanceId", "storageInstanceIds"),
+            includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+            limit: parseOptionalInteger(searchParams.get("limit")),
+            offset: parseOptionalInteger(searchParams.get("offset")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.listImageAssetMetadata(listRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, assetId, and uploadSessionId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const decoded = decodeImageAssetUploadSessionPath(path, "/content");
+          if (!decoded) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId, assetId, and uploadSessionId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const ingestRequest: IngestImageAssetUploadContentApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId: decoded.assetId,
+            uploadSessionId: decoded.uploadSessionId,
+            contentType: typeof request.headers["content-type"] === "string" ? request.headers["content-type"] : undefined,
+            content: toRequestBodyStream(request),
+            expectedSizeBytes: parseOptionalInteger(searchParams.get("expectedSizeBytes")),
+            expectedChecksumSha256: normalizeOptionalString(searchParams.get("expectedChecksumSha256")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.ingestImageAssetUploadContent(ingestRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, ingestRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/complete")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, assetId, and uploadSessionId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const decoded = decodeImageAssetUploadSessionPath(path, "/complete");
+          if (!decoded) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId, assetId, and uploadSessionId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+
+          const parsedRequest = await parseAndValidateImageAssetCompleteRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            decoded.assetId,
+            decoded.uploadSessionId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const apiResponse = await options.imageAssetManagementBackendApi!.completeImageAssetUpload(parsedRequest.data);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/preview/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, assetId, and previewToken are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/image-assets/", "/preview/content");
+          const previewToken = normalizeOptionalString(searchParams.get("previewToken"));
+          if (!assetId || assetId.includes("/") || !previewToken) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId, assetId, and previewToken are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const streamRequest: OpenImageAssetPreviewContentStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            previewToken,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.openImageAssetPreviewContentStream(streamRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            return;
+          }
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/preview")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/image-assets/", "/preview");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = parseAndValidateImageAssetPreviewRequest(
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            assetId,
+            searchParams,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.imageAssetManagementBackendApi!.requestImageAssetPreview(parsedRequest.data);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/original")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/image-assets/", "/original");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const streamRequest: OpenImageAssetOriginalContentStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.openImageAssetOriginalContentStream(streamRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            return;
+          }
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/image-assets/")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/image-assets/");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const detailRequest: GetImageAssetMetadataApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.getImageAssetMetadata(detailRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    return Object.freeze({ handled: false });
+  };
   const defaultRouteFamilyHandlers: Readonly<Partial<Record<string, IdentityHttpRouteFamilyHandler>>> = Object.freeze({
+    "storage-management": handleStorageManagementRouteFamily,
+    "asset-management": async (context) => {
+      const generated = await handleGeneratedResultRouteFamily(context);
+      if (generated.handled) {
+        return generated;
+      }
+      return handleAssetRouteFamily(context);
+    },
+    "image-asset-management": handleImageAssetRouteFamily,
+    "image-run-api": handleGeneratedResultRouteFamily,
     "deployment-policy-read": async ({ request, response, requestId, logger }) => {
       if (
         !options.deploymentPolicyReadBackendApi
@@ -13398,7 +14932,10 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.certificateOperations]: Boolean(options.certificateOperationsBackendApi),
     [AuthoritativeApiRouteBackendKeys.secretMetadata]: Boolean(options.secretMetadataBackendApi),
     [AuthoritativeApiRouteBackendKeys.storageManagement]: Boolean(options.storageManagementBackendApi),
-    [AuthoritativeApiRouteBackendKeys.assetManagement]: Boolean(options.assetManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.assetManagement]: Boolean(
+      options.assetManagementBackendApi
+      || options.generatedResultManagementBackendApi,
+    ),
     [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: Boolean(options.imageAssetManagementBackendApi),
     [AuthoritativeApiRouteBackendKeys.systemRuntime]: Boolean(options.systemRuntimeBackendApi),
     [AuthoritativeApiRouteBackendKeys.runSubmission]: Boolean(options.authoritativeRunSubmissionBackendApi),
@@ -13433,6 +14970,14 @@ function parseOptionalBoolean(value: string | null): boolean | undefined {
     return false;
   }
   return undefined;
+}
+
+function parseOptionalMultiStringList(
+  searchParams: URLSearchParams,
+  repeatedKey: string,
+  csvFallbackKey: string,
+): ReadonlyArray<string> | undefined {
+  return parseOptionalStringList(searchParams, repeatedKey, csvFallbackKey);
 }
 
 function parseOptionalEnum<TValue extends string>(

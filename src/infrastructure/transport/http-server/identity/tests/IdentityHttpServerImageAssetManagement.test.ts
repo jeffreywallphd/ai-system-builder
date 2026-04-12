@@ -6,7 +6,11 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { createIdentityHttpServer } from "../IdentityHttpServer";
+import {
+  createIdentityHttpServer,
+  type IdentityHttpServerLogEvent,
+  type IdentityHttpServerLogger,
+} from "../IdentityHttpServer";
 import { ImageAssetManagementBackendApi } from "../../../../api/image-assets/ImageAssetManagementBackendApi";
 import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import type { ImageAssetAuditEvent, ImageAssetAuditSink } from "@application/image-assets/ports/ImageAssetAuditPort";
@@ -66,6 +70,19 @@ const servers: Server[] = [];
 const createdRoots: string[] = [];
 const sqliteDisposables: SqliteImageAssetPersistenceAdapter[] = [];
 
+class CapturingLogger implements IdentityHttpServerLogger {
+  public readonly events: IdentityHttpServerLogEvent[] = [];
+  public info(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public warn(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public error(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+}
+
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => {
     server.close((error) => {
@@ -120,7 +137,7 @@ class ImageAssetStateStore {
   });
 }
 
-async function startServer(): Promise<string> {
+async function startServer(logger?: CapturingLogger): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const store = new ImageAssetStateStore();
 
@@ -296,6 +313,7 @@ async function startServer(): Promise<string> {
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
     imageAssetManagementBackendApi,
+    logger,
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -783,7 +801,8 @@ async function startProductionImageAssetServer(): Promise<ProductionImageAssetSe
 
 describe("IdentityHttpServer image asset management routes", () => {
   it("enforces auth/workspace guards and serves create/upload/finalize/get/list flows", async () => {
-    const baseUrl = await startServer();
+    const logger = new CapturingLogger();
+    const baseUrl = await startServer(logger);
     const token = await registerAndLogin(baseUrl, "image.asset.http.owner");
 
     const unauthenticated = await fetch(`${baseUrl}/api/v1/image-assets?workspaceId=workspace-alpha`);
@@ -890,6 +909,9 @@ describe("IdentityHttpServer image asset management routes", () => {
     expect(previewContent.headers.get("content-type")).toBe("image/png");
     expect(previewContent.headers.get("content-disposition")).toContain("inline");
     expect(await previewContent.text()).toBe("hello");
+    expect(
+      logger.events.some((event) => event.event === "identity-http.route-family.modular-handled" && event.path === "/api/v1/image-assets"),
+    ).toBeTrue();
   });
 
   it("runs end-to-end API-to-storage flows with persistence, policy seams, and audit hooks", async () => {
