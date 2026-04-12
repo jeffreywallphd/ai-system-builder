@@ -122,6 +122,19 @@ These contracts establish stable extension points for persistence adapters, auth
   - development/test startup can continue with structured warning diagnostics for policy-allowed optional material
 - stage output now exposes structured `startupSecurityMaterialValidation` diagnostics for testability and readiness telemetry integration
 
+## Story 3.1.5 Centralized Security Material Resolution Interfaces
+
+- adds centralized resolver ports in:
+  - `src/application/security/ports/SecurityMaterialResolutionPorts.ts`
+- separates read-only security material lookup from bootstrap mutation flow:
+  - `SystemSecretBootstrapService` now uses an explicit runtime material resolver port for credential usability checks
+  - bootstrap create/read responsibilities remain isolated behind bootstrap persistence helpers
+- aligns host and transport startup composition to shared resolution interfaces:
+  - `ServerPlatformSecretConsumers` now implements the runtime security material resolver port and supports server/workspace/user scope requests
+  - managed TLS runtime trust material resolution is centralized in `ManagedServerTlsRuntimeMaterialResolver`
+  - `ServerTlsMaterialCompositionModule` consumes typed `HostSecureTransportConfig.trustMaterial` fields plus the managed TLS resolver port, instead of ad hoc environment parsing
+- reduces host-level secret/key lookup sprawl by enforcing one resolver seam for secret credentials and one resolver seam for managed TLS transport material
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants
