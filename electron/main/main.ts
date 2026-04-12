@@ -57,6 +57,17 @@ const isPackaged = app.isPackaged;
 const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5174";
 const preloadScriptPath = resolvePreloadScriptPath();
 validateDesktopStartupContract();
+const consoleGreen = "\u001b[32m";
+const consoleReset = "\u001b[0m";
+
+function logDevelopmentUserDataPath(userDataPath: string): void {
+  if (isPackaged) {
+    return;
+  }
+  const headerRule = "----------------------------------------------------------------";
+  const formattedPathBlock = `${consoleGreen}${headerRule}\n\n${userDataPath}\n\n${headerRule}${consoleReset}`;
+  console.info(`[ai-loom][startup] Development user data path:\n${formattedPathBlock}`);
+}
 
 /**
  * Resolves the preload bundle path by probing packaged and development output locations in priority order.
@@ -267,6 +278,7 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
       userDataPath: app.getPath("userData"),
       logsPath: app.getPath("logs"),
     });
+    logDevelopmentUserDataPath(storagePaths.appDataDirectory);
     storageDatabase = new DesktopStorageDatabase({ paths: storagePaths });
     await new InitializeProductionStorageUseCase(storageDatabase).execute({
       scope: ProductionStorageInitializationScopes.authShellPreLogin,
