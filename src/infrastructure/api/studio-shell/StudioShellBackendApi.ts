@@ -3889,13 +3889,11 @@ export class StudioShellBackendApi {
       now.getUTCMilliseconds().toString().padStart(3, "0"),
     ].join("");
     const unique = Math.random().toString(36).slice(2, 10);
-    const root = nodeRuntime.path.join(
-      nodeRuntime.os.tmpdir(),
-      "ai-loom-studio",
-      "reference-image-uploads",
-      safeSystemId,
-      safeBindingId,
-    );
+    const uploadRoot = await this.resolveConfiguredUploadRootPath();
+    if (!uploadRoot) {
+      throw new StudioShellInvalidRequestError("Reference image upload cache root could not be resolved.");
+    }
+    const root = nodeRuntime.path.join(uploadRoot, safeSystemId, safeBindingId);
     await nodeRuntime.fs.mkdir(root, { recursive: true });
     const filePath = nodeRuntime.path.join(root, `${stamp}-${unique}-${safeFileName}`);
     await nodeRuntime.fs.writeFile(filePath, Buffer.from(input.payload));
@@ -3906,7 +3904,8 @@ export class StudioShellBackendApi {
     try {
       const nodeRuntime = await this.resolveNodeUploadRuntime();
       return nodeRuntime.path.join(
-        nodeRuntime.os.tmpdir(),
+        nodeRuntime.os.homedir(),
+        ".ai-loom-studio",
         "ai-loom-studio",
         "reference-image-uploads",
       );
@@ -3932,7 +3931,10 @@ export class StudioShellBackendApi {
       readonly mkdir: (path: string, options?: { recursive?: boolean }) => Promise<void>;
       readonly writeFile: (file: string, data: Uint8Array) => Promise<void>;
     };
-    readonly os: { readonly tmpdir: () => string };
+    readonly os: {
+      readonly homedir: () => string;
+      readonly tmpdir: () => string;
+    };
     readonly path: { readonly join: (...parts: ReadonlyArray<string>) => string };
   }> {
     try {

@@ -1623,7 +1623,7 @@ export function ImageManipulationRuntimeEditorPanel({
   const [uploadProgressStage, setUploadProgressStage] = useState<UploadProgressStage>("idle");
   const [uploadedPreviewPathsByFileName, setUploadedPreviewPathsByFileName] = useState<Readonly<Record<string, string>>>(Object.freeze({}));
   const [configuredUploadSavePath, setConfiguredUploadSavePath] = useState<string | undefined>();
-  const uploadSavePathHint = configuredUploadSavePath ?? "[os.tmpdir]/ai-loom-studio/reference-image-uploads";
+  const uploadSavePathHint = configuredUploadSavePath ?? "~/.ai-loom-studio/ai-loom-studio/reference-image-uploads";
   const [imageLibrarySearch, setImageLibrarySearch] = useState("");
   const [appliedImageLibrarySearch, setAppliedImageLibrarySearch] = useState("");
   const [imageLibraryAssets, setImageLibraryAssets] = useState<ReadonlyArray<ImageLibraryStudioImageAsset>>([]);
