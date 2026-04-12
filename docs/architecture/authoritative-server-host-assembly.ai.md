@@ -28,6 +28,7 @@
 - Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - Auth-minimal persistence composition seam: `src/infrastructure/persistence/AuthMinimalPersistenceComposition.ts`
+- Bootstrap orchestrator seam: `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`
 - Route registration composition seam: `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
 - Auth-minimal route registration composition seam: `src/hosts/server/AuthMinimalServerApiRouteComposition.ts`
 
@@ -115,8 +116,9 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
   - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
   - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
 - Story 1.2.3 adds one stage orchestrator seam at `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts`.
-- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now consumes config/security stage modules and routes `services`, `security`, `persistence`, and `transport` through that orchestrator for centralized sequential stage execution.
-- Story 1.3.1 adds a startup status model at that orchestrator seam. `createAuthoritativeServerBootstrapStageOrchestrator(...)` now exposes `getStatus()` with ordered stage entries and states:
+- Story 2.3.1 adds a concrete bootstrap orchestrator seam at `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`.
+- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now delegates startup execution to `createAuthoritativeServerBootstrapOrchestrator(...)`, keeping top-level host composition focused on lifecycle/summary/cleanup concerns.
+- Story 1.3.1 stage-status behavior is now surfaced through the bootstrap orchestrator status snapshot with ordered stage entries and states:
   - `pending`
   - `running`
   - `success`
@@ -135,7 +137,7 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
   - startup failures surfaced by the entrypoint include `startupCorrelationId` when available
 - Story 1.4.1 adds a startup harness regression test that simulates authoritative startup and enforces stage order contracts across:
   - shared host bootstrap stages (`configuration`, `dependencies`, `logging`, `security`, `persistence`, `feature-registration`)
-  - authoritative staged decomposition (`services`, `security`, `persistence`, `transport`)
+  - authoritative staged decomposition (`configuration-load`, `security-material-resolution`, `persistence-initialization`, `migration-execution`, `subsystem-composition`, `readiness-verification`, `transport-startup`)
 - Story 1.4.2 adds local startup performance baseline recording for authoritative startup:
   - successful startup runs append baseline samples to `authoritative-server-startup-baseline.json` in the authoritative database directory
   - each baseline sample records total startup duration and per-stage durations across shared pipeline and authoritative staged decomposition
@@ -147,10 +149,12 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
   - warning event payload includes baseline and current duration, regression delta, threshold, and sample counts
   - baseline comparison and warning emission remain non-blocking for startup completion
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
-  - `services`
-  - `security`
-  - `persistence`
-  - `transport`
+  - `subsystem-composition`
+  - `security-material-resolution`
+  - `persistence-initialization`
+  - `migration-execution`
+  - `readiness-verification`
+  - `transport-startup`
   - `config-load`
   - `migrations`
   - `persistence-setup`

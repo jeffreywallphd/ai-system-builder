@@ -931,24 +931,30 @@ describe("AuthoritativeServerCompositionRoot", () => {
       .filter((event) => event.event === "startup.span.completed")
       .map((event) => event.spanName);
     expect(completedSpanNames).toContain("config-load");
-    expect(completedSpanNames).toContain("services");
-    expect(completedSpanNames).toContain("security");
-    expect(completedSpanNames).toContain("persistence");
-    expect(completedSpanNames).toContain("transport");
+    expect(completedSpanNames).toContain("subsystem-composition");
+    expect(completedSpanNames).toContain("security-material-resolution");
+    expect(completedSpanNames).toContain("persistence-initialization");
+    expect(completedSpanNames).toContain("migration-execution");
+    expect(completedSpanNames).toContain("readiness-verification");
+    expect(completedSpanNames).toContain("transport-startup");
     expect(completedSpanNames).toContain("persistence-setup");
     expect(completedSpanNames).toContain("migrations");
 
     const stageSpanSequence = completedSpanNames.filter((spanName) => (
-      spanName === "services"
-      || spanName === "security"
-      || spanName === "persistence"
-      || spanName === "transport"
+      spanName === "subsystem-composition"
+      || spanName === "security-material-resolution"
+      || spanName === "persistence-initialization"
+      || spanName === "migration-execution"
+      || spanName === "readiness-verification"
+      || spanName === "transport-startup"
     ));
     expect(stageSpanSequence).toEqual([
-      "services",
-      "security",
-      "persistence",
-      "transport",
+      "subsystem-composition",
+      "security-material-resolution",
+      "persistence-initialization",
+      "migration-execution",
+      "readiness-verification",
+      "transport-startup",
     ]);
 
     const migrationSpan = startupLogger.infoEvents.find((event) => event.spanName === "migrations");
@@ -989,7 +995,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(summary?.startupCorrelationId).toBe(summary?.traceId);
     expect(summary?.durationMs).toBeTypeOf("number");
     expect((summary?.pipeline as Record<string, unknown> | undefined)?.stageCount).toBe(6);
-    expect((summary?.authoritativeStages as Record<string, unknown> | undefined)?.stageCount).toBe(4);
+    expect((summary?.authoritativeStages as Record<string, unknown> | undefined)?.stageCount).toBe(7);
     expect(hostLogger.errorEvents).toHaveLength(0);
   });
 

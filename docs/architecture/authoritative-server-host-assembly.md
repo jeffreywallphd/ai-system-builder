@@ -17,6 +17,7 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - Dedicated entrypoint assembly: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
 - Runtime host implementation composed by the root: `src/hosts/server/IdentityServerHost.ts`
+- Bootstrap orchestrator seam: `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`
 - Identity/session/trusted-device bounded composition module: `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
 - Workspace/authorization/sharing bounded composition module: `src/hosts/server/composition/ServerWorkspaceAuthorizationCompositionModule.ts`
 - Deployment-policy administration bounded composition module: `src/hosts/server/composition/ServerDeploymentPolicyCompositionModule.ts`
@@ -179,12 +180,13 @@ Story 1.2.2 extracts the first authoritative bootstrap stage implementations int
 - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
 
 Story 1.2.3 adds a dedicated stage orchestrator in `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts`.
+Story 2.3.1 adds a concrete bootstrap orchestrator seam in `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`.
 
-`AuthoritativeServerCompositionRoot.ts` now composes config/security stage modules and routes remaining startup stages (`services`, `security`, `persistence`, `transport`) through that orchestrator so stage execution stays sequential and centralized.
+`AuthoritativeServerCompositionRoot.ts` now delegates startup execution to `createAuthoritativeServerBootstrapOrchestrator(...)` so top-level host composition remains focused on lifecycle transitions, startup summary emission, and cleanup ordering.
 
 The contract catalog maps those logical authoritative stages onto the current shared pipeline (`services -> dependencies`, `transport -> feature-registration`) so decomposition can proceed without changing runtime startup order.
 
-Story 1.3.1 introduces a startup status model at the same orchestrator seam. `createAuthoritativeServerBootstrapStageOrchestrator(...)` now exposes `getStatus()` with ordered stage entries whose state is one of:
+Story 1.3.1 introduces a startup status model at the same seam. The bootstrap orchestrator now surfaces an ordered status snapshot whose state is one of:
 - `pending`
 - `running`
 - `success`
@@ -206,7 +208,7 @@ Story 1.3.3 adds startup correlation ID propagation for startup observability. A
 
 Story 1.4.1 introduces a dedicated startup harness regression test to simulate full authoritative startup and enforce stage ordering contracts across both startup models:
 - shared host bootstrap pipeline order (`configuration -> dependencies -> logging -> security -> persistence -> feature-registration`)
-- authoritative staged decomposition order (`services -> security -> persistence -> transport`)
+- authoritative staged decomposition order (`configuration-load -> security-material-resolution -> persistence-initialization -> migration-execution -> subsystem-composition -> readiness-verification -> transport-startup`)
 
 Story 1.4.2 adds local startup performance baseline recording for authoritative startup. The authoritative entrypoint now persists successful startup duration baselines as JSON:
 - file path defaults to the authoritative database directory as `authoritative-server-startup-baseline.json`
@@ -221,10 +223,12 @@ Story 1.4.3 adds startup regression alerts against those baselines:
 - baseline comparison and warning publication are best-effort and never block startup completion
 
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) aligned to logical bootstrap stages plus nested diagnostics:
-- `services`
-- `security`
-- `persistence`
-- `transport`
+- `subsystem-composition`
+- `security-material-resolution`
+- `persistence-initialization`
+- `migration-execution`
+- `readiness-verification`
+- `transport-startup`
 - `config-load`
 - `migrations`
 - `persistence-setup`
