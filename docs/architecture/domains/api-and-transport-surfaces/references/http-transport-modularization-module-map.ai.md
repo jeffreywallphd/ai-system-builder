@@ -11,6 +11,12 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/composition/IdentityHttpTransportComposition.ts
   - src/infrastructure/transport/http-server/identity/composition/RouteModuleRegistry.ts
   - src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts
+  - src/infrastructure/transport/http-server/identity/route-families/AuditRouteFamilyHandler.ts
+  - src/infrastructure/transport/http-server/identity/route-families/ExecutionNodeManagementRouteFamilyHandler.ts
+  - src/infrastructure/transport/http-server/identity/route-families/RunRouteFamilyHandlers.ts
+  - src/infrastructure/transport/http-server/identity/dto/AuditRouteDtoMapper.ts
+  - src/infrastructure/transport/http-server/identity/dto/ExecutionNodeManagementRouteDtoMapper.ts
+  - src/infrastructure/transport/http-server/identity/dto/RunRouteDtoMapper.ts
   - src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts
   - src/infrastructure/transport/http-server/identity/middleware/session-authentication.ts
   - src/infrastructure/transport/http-server/identity/middleware/workspace-context.ts
@@ -25,6 +31,9 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerErrorTranslation.test.ts
   - src/infrastructure/transport/http-server/identity/tests/SessionAuthenticationMiddleware.test.ts
   - src/infrastructure/transport/http-server/identity/tests/WorkspaceContextMiddleware.test.ts
+  - src/infrastructure/transport/http-server/identity/tests/AuditRouteDtoMapper.test.ts
+  - src/infrastructure/transport/http-server/identity/tests/ExecutionNodeManagementRouteDtoMapper.test.ts
+  - src/infrastructure/transport/http-server/identity/tests/RunRouteDtoMapper.test.ts
   - src/hosts/server/AuthoritativeServerApiRouteComposition.ts
   - src/hosts/server/IdentityServerHost.ts
 ---
@@ -329,6 +338,23 @@ Expected scope for new migrated route-family modules:
 3. Include one authorization/trust assertion when the family has protected trust semantics (`403`/fail-closed behavior).
 4. Include one transport-shape assertion for the primary response type (JSON or stream/file headers/body).
 5. Assert modular dispatch and absence of legacy fallback for that route family id.
+
+## Story 1.4.1 Implementation Status
+
+Introduced explicit transport DTO request mappers at modular route boundaries to keep handlers thin and make mapping seams directly testable:
+- `identity/dto/AuditRouteDtoMapper.ts` now maps authenticated workspace context + parsed transport query/path inputs into audit backend requests.
+- `identity/dto/ExecutionNodeManagementRouteDtoMapper.ts` now maps execution-node HTTP query primitives into schema-validated request payloads and actor-scoped backend requests.
+- `identity/dto/RunRouteDtoMapper.ts` now maps run route auth/workspace context into submission, read, mutation, and execution-update backend request shapes.
+
+Handler clarity and coupling posture:
+- route-family handlers now call focused mapper functions instead of inlining repeated request-shaping objects.
+- shared schema validation remains in place; mappers sit at the transport boundary and feed existing parse/validate and backend invocation paths.
+- external HTTP behavior, route precedence, status mapping, and middleware ordering are preserved.
+
+Targeted mapper seam coverage:
+- `identity/tests/AuditRouteDtoMapper.test.ts`
+- `identity/tests/ExecutionNodeManagementRouteDtoMapper.test.ts`
+- `identity/tests/RunRouteDtoMapper.test.ts`
 
 ## Registration and Composition Seams
 

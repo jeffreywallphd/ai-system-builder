@@ -2,12 +2,20 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { URLSearchParams } from "node:url";
 import type { IdentityHttpRouteFamilyHandler, IdentityHttpRouteFamilyHandlerResult } from "../IdentityHttpServer";
+import {
+  toRunCancellationApiRequest,
+  toRunDetailApiRequest,
+  toRunExecutionUpdateApiRequest,
+  toRunQueryApiRequest,
+  toRunReevaluateDeferredRunsApiRequest,
+  toRunReleaseStaleReservationApiRequest,
+  toRunRetryApiRequest,
+  toRunStatusApiRequest,
+  toRunSubmissionApiRequest,
+  type RunRouteAuthenticatedWorkspaceContext,
+} from "../dto/RunRouteDtoMapper";
 
-interface AuthenticatedWorkspaceContext {
-  readonly actor: { readonly userIdentityId: string };
-  readonly workspace: { readonly workspaceId: string };
-  readonly session: { readonly authenticatedAt: string };
-}
+type AuthenticatedWorkspaceContext = RunRouteAuthenticatedWorkspaceContext;
 
 interface AuthenticatedNodeContext {
   readonly nodeId: string;
@@ -125,14 +133,6 @@ interface CreateRunRouteFamilyHandlerDependencies {
   };
 }
 
-function buildAuthorization(context: AuthenticatedWorkspaceContext): Readonly<Record<string, string>> {
-  return Object.freeze({
-    actorUserIdentityId: context.actor.userIdentityId,
-    activeWorkspaceId: context.workspace.workspaceId,
-    authenticatedAt: context.session.authenticatedAt,
-  });
-}
-
 export function createRunSubmissionRouteFamilyHandler(
   deps: CreateRunRouteFamilyHandlerDependencies,
 ): IdentityHttpRouteFamilyHandler {
@@ -161,11 +161,8 @@ export function createRunSubmissionRouteFamilyHandler(
           deps.logResponse(logger, requestId, request, 400, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId }), parsedRequest.body);
           return;
         }
-        const apiResponse = await deps.options.authoritativeRunSubmissionBackendApi!.submitRun({
-          actorUserIdentityId: context.actor.userIdentityId,
-          workspaceId: context.workspace.workspaceId,
-          submission: parsedRequest.data,
-        });
+        const apiRequest = toRunSubmissionApiRequest(context, parsedRequest.data);
+        const apiResponse = await deps.options.authoritativeRunSubmissionBackendApi!.submitRun(apiRequest);
         const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
         deps.writeJson(response, statusCode, apiResponse);
         deps.logResponse(logger, requestId, request, statusCode, Object.freeze({
@@ -221,11 +218,8 @@ export function createRunSubmissionRouteFamilyHandler(
           deps.logResponse(logger, requestId, request, 400, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId, systemId }), parsedRequest.body);
           return;
         }
-        const apiResponse = await deps.options.authoritativeRunSubmissionBackendApi!.submitRun({
-          actorUserIdentityId: context.actor.userIdentityId,
-          workspaceId: context.workspace.workspaceId,
-          submission: parsedRequest.data,
-        });
+        const apiRequest = toRunSubmissionApiRequest(context, parsedRequest.data);
+        const apiResponse = await deps.options.authoritativeRunSubmissionBackendApi!.submitRun(apiRequest);
         const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
         deps.writeJson(response, statusCode, apiResponse);
         deps.logResponse(logger, requestId, request, statusCode, Object.freeze({
@@ -272,10 +266,8 @@ export function createRunReadRouteFamilyHandler(
           deps.logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId }), parsedRequest.body);
           return;
         }
-        const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.getExecutionReadiness({
-          ...parsedRequest.data,
-          authorization: buildAuthorization(context),
-        });
+        const apiRequest = toRunQueryApiRequest(context, parsedRequest.data);
+        const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.getExecutionReadiness(apiRequest);
         const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
         deps.writeJson(response, statusCode, apiResponse);
         deps.logResponse(logger, requestId, request, statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId, query: Object.fromEntries(searchParams.entries()) }), apiResponse);
@@ -302,11 +294,8 @@ export function createRunReadRouteFamilyHandler(
           deps.logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
           return;
         }
-        const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.getRunStatus({
-          runId,
-          workspaceId: context.workspace.workspaceId,
-          authorization: buildAuthorization(context),
-        });
+        const apiRequest = toRunStatusApiRequest(context, runId);
+        const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.getRunStatus(apiRequest);
         const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
         deps.writeJson(response, statusCode, apiResponse);
         deps.logResponse(logger, requestId, request, statusCode, Object.freeze({ runId, workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId }), apiResponse);
@@ -346,10 +335,8 @@ async function handleRunListRequest(
       deps.logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId }), parsedRequest.body);
       return;
     }
-    const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.listRuns({
-      ...parsedRequest.data,
-      authorization: buildAuthorization(context),
-    });
+    const apiRequest = toRunQueryApiRequest(context, parsedRequest.data);
+    const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.listRuns(apiRequest);
     const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
     deps.writeJson(response, statusCode, apiResponse);
     deps.logResponse(logger, requestId, request, statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId, query: Object.fromEntries(searchParams.entries()) }), apiResponse);
@@ -376,11 +363,8 @@ async function handleRunDetailRequest(
       deps.logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
       return;
     }
-    const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.getRunDetail({
-      runId,
-      workspaceId: context.workspace.workspaceId,
-      authorization: buildAuthorization(context),
-    });
+    const apiRequest = toRunDetailApiRequest(context, runId);
+    const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.getRunDetail(apiRequest);
     const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
     deps.writeJson(response, statusCode, apiResponse);
     deps.logResponse(logger, requestId, request, statusCode, Object.freeze({ runId, workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId }), apiResponse);
@@ -408,10 +392,8 @@ async function handleQueueStatusRequest(
       deps.logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId }), parsedRequest.body);
       return;
     }
-    const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.listQueueStatus({
-      ...parsedRequest.data,
-      authorization: buildAuthorization(context),
-    });
+    const apiRequest = toRunQueryApiRequest(context, parsedRequest.data);
+    const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.listQueueStatus(apiRequest);
     const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
     deps.writeJson(response, statusCode, apiResponse);
     deps.logResponse(logger, requestId, request, statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId, query: Object.fromEntries(searchParams.entries()) }), apiResponse);
@@ -439,10 +421,8 @@ async function handleSchedulingStaleReservationsRequest(
       deps.logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId }), parsedRequest.body);
       return;
     }
-    const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.listStaleSchedulingReservations({
-      ...parsedRequest.data,
-      authorization: buildAuthorization(context),
-    });
+    const apiRequest = toRunQueryApiRequest(context, parsedRequest.data);
+    const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.listStaleSchedulingReservations(apiRequest);
     const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
     deps.writeJson(response, statusCode, apiResponse);
     deps.logResponse(logger, requestId, request, statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId, query: Object.fromEntries(searchParams.entries()) }), apiResponse);
@@ -485,11 +465,10 @@ export function createRunMutationRouteFamilyHandler(
           deps.logResponse(logger, requestId, request, 400, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId }), parsedRequest.body);
           return;
         }
-        const apiResponse = await deps.options.authoritativeRunMutationBackendApi!.releaseStaleSchedulingReservation({
-          workspaceId: context.workspace.workspaceId,
-          authorization: buildAuthorization(context),
-          release: parsedRequest.data,
-        });
+        const apiRequest = toRunReleaseStaleReservationApiRequest(context, parsedRequest.data);
+        const apiResponse = await deps.options.authoritativeRunMutationBackendApi!.releaseStaleSchedulingReservation(
+          apiRequest,
+        );
         const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
         deps.writeJson(response, statusCode, apiResponse);
         deps.logResponse(logger, requestId, request, statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId, runId: parsedRequest.data.runId }), apiResponse);
@@ -513,11 +492,10 @@ export function createRunMutationRouteFamilyHandler(
           deps.logResponse(logger, requestId, request, 400, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId }), parsedRequest.body);
           return;
         }
-        const apiResponse = await deps.options.authoritativeRunMutationBackendApi!.reevaluateDeferredSchedulingRuns({
-          workspaceId: context.workspace.workspaceId,
-          authorization: buildAuthorization(context),
-          reevaluate: parsedRequest.data,
-        });
+        const apiRequest = toRunReevaluateDeferredRunsApiRequest(context, parsedRequest.data);
+        const apiResponse = await deps.options.authoritativeRunMutationBackendApi!.reevaluateDeferredSchedulingRuns(
+          apiRequest,
+        );
         const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
         deps.writeJson(response, statusCode, apiResponse);
         deps.logResponse(logger, requestId, request, statusCode, Object.freeze({
@@ -569,8 +547,12 @@ async function cancelOrRetryRun(
       return;
     }
     const apiResponse = action === "cancel"
-      ? await deps.options.authoritativeRunMutationBackendApi!.cancelRun({ workspaceId: context.workspace.workspaceId, authorization: buildAuthorization(context), cancellation: parsedRequest.data })
-      : await deps.options.authoritativeRunMutationBackendApi!.retryRun({ workspaceId: context.workspace.workspaceId, authorization: buildAuthorization(context), retry: parsedRequest.data });
+      ? await deps.options.authoritativeRunMutationBackendApi!.cancelRun(
+        toRunCancellationApiRequest(context, parsedRequest.data),
+      )
+      : await deps.options.authoritativeRunMutationBackendApi!.retryRun(
+        toRunRetryApiRequest(context, parsedRequest.data),
+      );
     const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
     deps.writeJson(response, statusCode, apiResponse);
     deps.logResponse(logger, requestId, request, statusCode, Object.freeze({ workspaceId: context.workspace.workspaceId, actorUserIdentityId: context.actor.userIdentityId, runId }), apiResponse);
@@ -616,11 +598,10 @@ export function createRunExecutionUpdateRouteFamilyHandler(
       deps.options.transportTrust,
       parsedRequest.data.senderNodeId,
       async (context) => {
-        const apiResponse = await deps.options.authoritativeRunExecutionUpdateBackendApi!.ingestExecutionUpdate({
-          runId,
-          senderNodeId: context.nodeId,
-          update: parsedRequest.data,
-        });
+        const apiRequest = toRunExecutionUpdateApiRequest(runId, context.nodeId, parsedRequest.data);
+        const apiResponse = await deps.options.authoritativeRunExecutionUpdateBackendApi!.ingestExecutionUpdate(
+          apiRequest,
+        );
         const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
         deps.writeJson(response, statusCode, apiResponse);
         deps.logResponse(logger, requestId, request, statusCode, Object.freeze({

@@ -1,15 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { URLSearchParams } from "node:url";
 import type { IdentityHttpRouteFamilyHandler, IdentityHttpRouteFamilyHandlerResult } from "../IdentityHttpServer";
+import {
+  toAuditLedgerDetailApiRequest,
+  toAuditLedgerListApiRequest,
+  toAuditLedgerQueryLogPayload,
+  type AuditRouteAuthenticatedWorkspaceContext,
+} from "../dto/AuditRouteDtoMapper";
 
-interface AuthenticatedWorkspaceContext {
-  readonly actor: {
-    readonly userIdentityId: string;
-  };
-  readonly workspace: {
-    readonly workspaceId: string;
-  };
-}
+type AuthenticatedWorkspaceContext = AuditRouteAuthenticatedWorkspaceContext;
 
 interface CreateAuditLedgerRouteFamilyHandlerDependencies {
   readonly options: {
@@ -84,24 +83,17 @@ export function createAuditLedgerRouteFamilyHandler(
               requestId,
               request,
               parsedQuery.statusCode,
-              Object.freeze({ query: Object.fromEntries(searchParams.entries()) }),
+              toAuditLedgerQueryLogPayload(searchParams),
               parsedQuery.body,
             );
             return;
           }
 
-          const apiResponse = await deps.options.auditLedgerBackendApi!.listAuditEvents(Object.freeze({
-            actorUserIdentityId: context.actor.userIdentityId,
-            workspaceId: context.workspace.workspaceId,
-            query: parsedQuery.data,
-          }));
+          const apiRequest = toAuditLedgerListApiRequest(context, parsedQuery.data);
+          const apiResponse = await deps.options.auditLedgerBackendApi!.listAuditEvents(apiRequest);
           const statusCode = deps.mapAuditLedgerStatusCode(apiResponse);
           deps.writeJson(response, statusCode, apiResponse);
-          deps.logResponse(logger, requestId, request, statusCode, Object.freeze({
-            actorUserIdentityId: context.actor.userIdentityId,
-            workspaceId: context.workspace.workspaceId,
-            query: parsedQuery.data,
-          }), apiResponse);
+          deps.logResponse(logger, requestId, request, statusCode, apiRequest, apiResponse);
         },
       );
       return Object.freeze({ handled: true });
@@ -128,24 +120,17 @@ export function createAuditLedgerRouteFamilyHandler(
               requestId,
               request,
               parsedQuery.statusCode,
-              Object.freeze({ query: Object.fromEntries(searchParams.entries()) }),
+              toAuditLedgerQueryLogPayload(searchParams),
               parsedQuery.body,
             );
             return;
           }
 
-          const apiResponse = await deps.options.auditLedgerBackendApi!.listGovernanceAuditEvents(Object.freeze({
-            actorUserIdentityId: context.actor.userIdentityId,
-            workspaceId: context.workspace.workspaceId,
-            query: parsedQuery.data,
-          }));
+          const apiRequest = toAuditLedgerListApiRequest(context, parsedQuery.data);
+          const apiResponse = await deps.options.auditLedgerBackendApi!.listGovernanceAuditEvents(apiRequest);
           const statusCode = deps.mapAuditLedgerStatusCode(apiResponse);
           deps.writeJson(response, statusCode, apiResponse);
-          deps.logResponse(logger, requestId, request, statusCode, Object.freeze({
-            actorUserIdentityId: context.actor.userIdentityId,
-            workspaceId: context.workspace.workspaceId,
-            query: parsedQuery.data,
-          }), apiResponse);
+          deps.logResponse(logger, requestId, request, statusCode, apiRequest, apiResponse);
         },
       );
       return Object.freeze({ handled: true });
@@ -172,18 +157,11 @@ export function createAuditLedgerRouteFamilyHandler(
             return;
           }
 
-          const apiResponse = await deps.options.auditLedgerBackendApi!.getAuditEventDetail(Object.freeze({
-            actorUserIdentityId: context.actor.userIdentityId,
-            workspaceId: context.workspace.workspaceId,
-            eventId,
-          }));
+          const apiRequest = toAuditLedgerDetailApiRequest(context, eventId);
+          const apiResponse = await deps.options.auditLedgerBackendApi!.getAuditEventDetail(apiRequest);
           const statusCode = deps.mapAuditLedgerStatusCode(apiResponse);
           deps.writeJson(response, statusCode, apiResponse);
-          deps.logResponse(logger, requestId, request, statusCode, Object.freeze({
-            actorUserIdentityId: context.actor.userIdentityId,
-            workspaceId: context.workspace.workspaceId,
-            eventId,
-          }), apiResponse);
+          deps.logResponse(logger, requestId, request, statusCode, apiRequest, apiResponse);
         },
       );
       return Object.freeze({ handled: true });
@@ -210,18 +188,11 @@ export function createAuditLedgerRouteFamilyHandler(
             return;
           }
 
-          const apiResponse = await deps.options.auditLedgerBackendApi!.getGovernanceAuditEventDetail(Object.freeze({
-            actorUserIdentityId: context.actor.userIdentityId,
-            workspaceId: context.workspace.workspaceId,
-            eventId,
-          }));
+          const apiRequest = toAuditLedgerDetailApiRequest(context, eventId);
+          const apiResponse = await deps.options.auditLedgerBackendApi!.getGovernanceAuditEventDetail(apiRequest);
           const statusCode = deps.mapAuditLedgerStatusCode(apiResponse);
           deps.writeJson(response, statusCode, apiResponse);
-          deps.logResponse(logger, requestId, request, statusCode, Object.freeze({
-            actorUserIdentityId: context.actor.userIdentityId,
-            workspaceId: context.workspace.workspaceId,
-            eventId,
-          }), apiResponse);
+          deps.logResponse(logger, requestId, request, statusCode, apiRequest, apiResponse);
         },
       );
       return Object.freeze({ handled: true });

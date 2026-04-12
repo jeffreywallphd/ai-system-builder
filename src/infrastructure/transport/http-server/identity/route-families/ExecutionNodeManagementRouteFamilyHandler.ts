@@ -1,6 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { URLSearchParams } from "node:url";
 import type { IdentityHttpRouteFamilyHandler, IdentityHttpRouteFamilyHandlerResult } from "../IdentityHttpServer";
+import {
+  buildExecutionNodeBackendAvailabilityRequestPayload,
+  buildExecutionNodeListRequestPayload,
+  buildExecutionNodeReadinessRequestPayload,
+  toExecutionNodeActorScopedApiRequest,
+  toExecutionNodeGetApiRequest,
+} from "../dto/ExecutionNodeManagementRouteDtoMapper";
 
 interface AuthenticatedSessionContext {
   readonly principal: {
@@ -90,40 +97,11 @@ export function createExecutionNodeManagementRouteFamilyHandler(
         deps.options.transportTrust,
         undefined,
         async (context) => {
-          const listRequestPayload = Object.freeze({
-            nodeIds: deps.parseOptionalStringList(searchParams, "nodeId", "nodeIds"),
-            nodeTypes: deps.parseOptionalStringList(searchParams, "nodeType", "nodeTypes"),
-            approvalStatuses: deps.parseOptionalStringList(searchParams, "approvalStatus", "approvalStatuses"),
-            trustStates: deps.parseOptionalStringList(searchParams, "trustState", "trustStates"),
-            activationStatuses: deps.parseOptionalStringList(searchParams, "activationStatus", "activationStatuses"),
-            healthStatuses: deps.parseOptionalStringList(searchParams, "healthStatus", "healthStatuses"),
-            operationalAvailabilityModes: deps.parseOptionalStringList(
-              searchParams,
-              "operationalAvailabilityMode",
-              "operationalAvailabilityModes",
-            ),
-            backendFamilies: deps.parseOptionalStringList(searchParams, "backendFamily", "backendFamilies"),
-            executionTargets: deps.parseOptionalStringList(searchParams, "executionTarget", "executionTargets"),
-            requiredCapabilitiesAnyOf: deps.parseOptionalStringList(
-              searchParams,
-              "requiredCapability",
-              "requiredCapabilitiesAnyOf",
-            ),
-            supportsRemoteScheduling: deps.parseOptionalBoolean(searchParams.get("supportsRemoteScheduling")),
-            deploymentTagAnyOf: deps.parseOptionalStringList(searchParams, "deploymentTag", "deploymentTagAnyOf"),
-            includeRevoked: deps.parseOptionalBoolean(searchParams.get("includeRevoked")),
-            lastSeenAfter: deps.normalizeOptionalString(searchParams.get("lastSeenAfter")),
-            lastSeenBefore: deps.normalizeOptionalString(searchParams.get("lastSeenBefore")),
-            limit: deps.parseOptionalInteger(searchParams.get("limit")),
-            offset: deps.parseOptionalInteger(searchParams.get("offset")),
-          });
+          const listRequestPayload = buildExecutionNodeListRequestPayload(searchParams, deps);
 
           try {
             const parsedListRequest = deps.parseExecutionNodeListRequestDto(listRequestPayload);
-            const apiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedListRequest,
-            });
+            const apiRequest = toExecutionNodeActorScopedApiRequest(context.principal.userIdentityId, parsedListRequest);
             const apiResponse = await deps.options.executionNodeManagementBackendApi!.listNodes(apiRequest);
             const statusCode = deps.mapExecutionNodeManagementStatusCode(apiResponse);
             deps.writeJson(response, statusCode, apiResponse);
@@ -148,32 +126,14 @@ export function createExecutionNodeManagementRouteFamilyHandler(
         deps.options.transportTrust,
         undefined,
         async (context) => {
-          const readinessRequestPayload = Object.freeze({
-            workspaceId: deps.normalizeOptionalString(searchParams.get("workspaceId")),
-            workflowId: deps.normalizeOptionalString(searchParams.get("workflowId")),
-            runId: deps.normalizeOptionalString(searchParams.get("runId")),
-            candidateNodeIds: deps.parseOptionalStringList(searchParams, "candidateNodeId", "candidateNodeIds"),
-            requiredBackendFamilies: deps.parseOptionalStringList(searchParams, "requiredBackendFamily", "requiredBackendFamilies"),
-            requiredExecutionTarget: deps.normalizeOptionalString(searchParams.get("requiredExecutionTarget")),
-            requiredNodeCapabilities: deps.parseOptionalStringList(searchParams, "requiredNodeCapability", "requiredNodeCapabilities"),
-            requiresRemoteScheduling: deps.parseOptionalBoolean(searchParams.get("requiresRemoteScheduling")),
-            requiredOperationKind: deps.normalizeOptionalString(searchParams.get("requiredOperationKind")),
-            requiredOperationCapability: deps.normalizeOptionalString(searchParams.get("requiredOperationCapability")),
-            requiredInputKinds: deps.parseOptionalStringList(searchParams, "requiredInputKind", "requiredInputKinds"),
-            requiredOutputKinds: deps.parseOptionalStringList(searchParams, "requiredOutputKind", "requiredOutputKinds"),
-            requiredTranslationContractVersion: deps.normalizeOptionalString(searchParams.get("requiredTranslationContractVersion")),
-            preferredResourceClassHints: deps.parseOptionalStringList(searchParams, "preferredResourceClassHint", "preferredResourceClassHints"),
-            allowDegraded: deps.parseOptionalBoolean(searchParams.get("allowDegraded")),
-            maxLastSeenAgeMs: deps.parseOptionalInteger(searchParams.get("maxLastSeenAgeMs")),
-            now: deps.normalizeOptionalString(searchParams.get("now")),
-          });
+          const readinessRequestPayload = buildExecutionNodeReadinessRequestPayload(searchParams, deps);
 
           try {
             const parsedReadinessRequest = deps.parseExecutionNodeReadinessCheckRequestDto(readinessRequestPayload);
-            const apiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedReadinessRequest,
-            });
+            const apiRequest = toExecutionNodeActorScopedApiRequest(
+              context.principal.userIdentityId,
+              parsedReadinessRequest,
+            );
             const apiResponse = await deps.options.executionNodeManagementBackendApi!.checkReadiness(apiRequest);
             const statusCode = deps.mapExecutionNodeManagementStatusCode(apiResponse);
             deps.writeJson(response, statusCode, apiResponse);
@@ -198,32 +158,14 @@ export function createExecutionNodeManagementRouteFamilyHandler(
         deps.options.transportTrust,
         undefined,
         async (context) => {
-          const eligibilityRequestPayload = Object.freeze({
-            workspaceId: deps.normalizeOptionalString(searchParams.get("workspaceId")),
-            workflowId: deps.normalizeOptionalString(searchParams.get("workflowId")),
-            runId: deps.normalizeOptionalString(searchParams.get("runId")),
-            candidateNodeIds: deps.parseOptionalStringList(searchParams, "candidateNodeId", "candidateNodeIds"),
-            requiredBackendFamilies: deps.parseOptionalStringList(searchParams, "requiredBackendFamily", "requiredBackendFamilies"),
-            requiredExecutionTarget: deps.normalizeOptionalString(searchParams.get("requiredExecutionTarget")),
-            requiredNodeCapabilities: deps.parseOptionalStringList(searchParams, "requiredNodeCapability", "requiredNodeCapabilities"),
-            requiresRemoteScheduling: deps.parseOptionalBoolean(searchParams.get("requiresRemoteScheduling")),
-            requiredOperationKind: deps.normalizeOptionalString(searchParams.get("requiredOperationKind")),
-            requiredOperationCapability: deps.normalizeOptionalString(searchParams.get("requiredOperationCapability")),
-            requiredInputKinds: deps.parseOptionalStringList(searchParams, "requiredInputKind", "requiredInputKinds"),
-            requiredOutputKinds: deps.parseOptionalStringList(searchParams, "requiredOutputKind", "requiredOutputKinds"),
-            requiredTranslationContractVersion: deps.normalizeOptionalString(searchParams.get("requiredTranslationContractVersion")),
-            preferredResourceClassHints: deps.parseOptionalStringList(searchParams, "preferredResourceClassHint", "preferredResourceClassHints"),
-            allowDegraded: deps.parseOptionalBoolean(searchParams.get("allowDegraded")),
-            maxLastSeenAgeMs: deps.parseOptionalInteger(searchParams.get("maxLastSeenAgeMs")),
-            now: deps.normalizeOptionalString(searchParams.get("now")),
-          });
+          const eligibilityRequestPayload = buildExecutionNodeReadinessRequestPayload(searchParams, deps);
 
           try {
             const parsedEligibilityRequest = deps.parseExecutionNodeEligibilityCheckRequestDto(eligibilityRequestPayload);
-            const apiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedEligibilityRequest,
-            });
+            const apiRequest = toExecutionNodeActorScopedApiRequest(
+              context.principal.userIdentityId,
+              parsedEligibilityRequest,
+            );
             const apiResponse = await deps.options.executionNodeManagementBackendApi!.checkEligibility(apiRequest);
             const statusCode = deps.mapExecutionNodeManagementStatusCode(apiResponse);
             deps.writeJson(response, statusCode, apiResponse);
@@ -248,18 +190,14 @@ export function createExecutionNodeManagementRouteFamilyHandler(
         deps.options.transportTrust,
         undefined,
         async (context) => {
-          const availabilityRequestPayload = Object.freeze({
-            backendFamilies: deps.parseOptionalStringList(searchParams, "backendFamily", "backendFamilies"),
-            executionTarget: deps.normalizeOptionalString(searchParams.get("executionTarget")),
-            includeUnavailable: deps.parseOptionalBoolean(searchParams.get("includeUnavailable")),
-          });
+          const availabilityRequestPayload = buildExecutionNodeBackendAvailabilityRequestPayload(searchParams, deps);
 
           try {
             const parsedAvailabilityRequest = deps.parseExecutionNodeBackendAvailabilityReadRequestDto(availabilityRequestPayload);
-            const apiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedAvailabilityRequest,
-            });
+            const apiRequest = toExecutionNodeActorScopedApiRequest(
+              context.principal.userIdentityId,
+              parsedAvailabilityRequest,
+            );
             const apiResponse = await deps.options.executionNodeManagementBackendApi!.listBackendAvailability(apiRequest);
             const statusCode = deps.mapExecutionNodeManagementStatusCode(apiResponse);
             deps.writeJson(response, statusCode, apiResponse);
@@ -332,10 +270,7 @@ export function createExecutionNodeManagementRouteFamilyHandler(
             return;
           }
 
-          const getRequest = Object.freeze({
-            actorUserIdentityId: context.principal.userIdentityId,
-            nodeId,
-          });
+          const getRequest = toExecutionNodeGetApiRequest(context.principal.userIdentityId, nodeId);
 
           const apiResponse = await deps.options.executionNodeManagementBackendApi!.getNode(getRequest);
           const statusCode = deps.mapExecutionNodeManagementStatusCode(apiResponse);
