@@ -16,6 +16,14 @@ related_code_paths:
 
 Use this as the implementation-truth handoff for Feature 1 documentation foundation scope.
 
+## Documentation Status
+
+- Segment: `Baselines`
+- Lifecycle status (`status`): `archived`
+- Authority state (`authoritativeness`): `historical`
+- Current guidance stance: this handoff is historical evidence and not authoritative for current implementation behavior.
+- Canonical active path(s): `docs/README.ai.md`, `docs/context/governance/documentation-quality-standard.ai.md`, and `docs/contributors/documentation-quality-enforced-standards-guide.ai.md`
+
 ## Baseline That Is Now In Force
 
 - Fixed top-level docs areas + routers: `architecture`, `contributors`, `operations`, `baselines`, `adr`, `context`, `prompts`, `ui`.

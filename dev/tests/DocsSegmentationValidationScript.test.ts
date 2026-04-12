@@ -19,6 +19,7 @@ describe("docs segmentation validation script", () => {
     expect(result.stdout).toContain("Checked status-signal anchor docs:");
     expect(result.stdout).toContain("Checked supersession registry entries and redirect cross-references:");
     expect(result.stdout).toContain("Checked active router docs for invalid superseded links:");
+    expect(result.stdout).toContain("Checked non-active registry docs for metadata/status/structure signals:");
   });
 
   it("detects missing status signal markers on anchor docs", () => {
@@ -151,5 +152,71 @@ describe("docs segmentation validation script", () => {
     const combinedOutput = `${result.stdout}\n${result.stderr}`;
     expect(result.status).toBe(1);
     expect(combinedOutput).toContain("[BASELINE_DESTINATION_INVALID]");
+  });
+
+  it("detects missing required metadata on non-active registry docs", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-segmentation-validator-non-active-metadata-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const baselinePath = join(fixtureRoot, "docs", "baselines", "feature-1-documentation-foundation-handoff.md");
+    const baselineContent = readFileSync(baselinePath, "utf8").replace(
+      /last_reviewed:\s*2026-04-11\r?\n/,
+      "",
+    );
+    writeFileSync(baselinePath, baselineContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[NON_ACTIVE_METADATA_FIELD_MISSING]");
+    expect(combinedOutput).toContain("feature-1-documentation-foundation-handoff.md");
+  });
+
+  it("detects missing documentation status section on archived registry docs", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-segmentation-validator-non-active-status-structure-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const baselinePath = join(fixtureRoot, "docs", "baselines", "feature-1-documentation-foundation-handoff.md");
+    const baselineContent = readFileSync(baselinePath, "utf8").replace(
+      "## Documentation Status",
+      "## Baseline Status",
+    );
+    writeFileSync(baselinePath, baselineContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[NON_ACTIVE_STRUCTURE_MISSING]");
+    expect(combinedOutput).toContain("feature-1-documentation-foundation-handoff.md");
+  });
+
+  it("detects missing supersession sections on superseded registry docs", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-segmentation-validator-non-active-supersession-structure-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const supersededDocPath = join(fixtureRoot, "docs", "architecture", "presentation-and-state.md");
+    const supersededDocContent = readFileSync(supersededDocPath, "utf8").replace(
+      "## Redirect",
+      "## Destination",
+    );
+    writeFileSync(supersededDocPath, supersededDocContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[NON_ACTIVE_STRUCTURE_MISSING]");
+    expect(combinedOutput).toContain("presentation-and-state.md");
   });
 });

@@ -14,6 +14,14 @@ related_code_paths:
 
 # Feature 1 Documentation Foundation Completion Handoff (Story 1.4.3)
 
+## Documentation Status
+
+- Segment: `Baselines`
+- Lifecycle status (`status`): `archived`
+- Authority state (`authoritativeness`): `historical`
+- Current guidance stance: this handoff is historical evidence and not authoritative for current implementation behavior.
+- Canonical active path(s): `docs/README.md`, `docs/context/documentation-quality-standard.md`, and `docs/contributors/documentation-quality-enforced-standards-guide.md`
+
 ## Snapshot Scope and Date
 
 This handoff closes Feature 1 documentation-foundation work as implemented in this repository as of 2026-04-11. It documents the baseline architecture and guardrails that later documentation features should build on.

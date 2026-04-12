@@ -78,6 +78,7 @@ npm run docs:validate:segmentation
 ### Status and Authority (Rule Group 2)
 
 - Keep superseded docs explicit with valid `superseded_by` and redirect targets.
+- For non-active registry docs (`archived`, `superseded`, `deprecated`), keep required metadata fields, taxonomy enums, and required status/supersession sections present.
 - Follow lifecycle/status conventions:
   - `docs/context/documentation-status-signals.ai.md`
   - `docs/context/documentation-supersession-and-redirect-conventions.ai.md`
@@ -119,7 +120,7 @@ npm run docs:validate:segmentation
 
 - Metadata and pair alignment (`FRONTMATTER_INVALID`, `HEADER_ENUM_INVALID`, `SEED_PAIR_MISMATCH`):
   - Correct frontmatter shape, enum values, and companion metadata alignment.
-- Status and redirect integrity (`STATUS_SIGNAL_MARKER_MISSING`, `SUPERSESSION_*`, `ACTIVE_PATH_REFERENCE_INVALID`):
+- Status and redirect integrity (`STATUS_SIGNAL_MARKER_MISSING`, `SUPERSESSION_*`, `ACTIVE_PATH_REFERENCE_INVALID`, `NON_ACTIVE_*`):
   - Repair status markers, redirect targets, and active-router destination links.
 - Reference hygiene (`*_REFERENCE_INVALID`, `*_LINK_MISSING`):
   - Fix broken markdown paths, ADR/documentation cross-links, and registry references.

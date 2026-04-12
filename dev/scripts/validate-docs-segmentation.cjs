@@ -41,6 +41,8 @@ const ACTIVE_PATH_DOCS = [
 
 const SEGMENTATION_INVENTORY_PATH = "docs/documentation-segmentation-migration-inventory.inventory.json";
 const SUPERSESSION_REGISTRY_PATH = "docs/architecture/architecture-supersession-registry.json";
+const DOCUMENTATION_REGISTRY_PATH = "docs/context/documentation-registry.seed.json";
+const DOCUMENTATION_TAXONOMY_CONTRACT_PATH = "docs/context/documentation-taxonomy.contract.json";
 const SEGMENTATION_CATEGORIES = new Set([
   "mixed-purpose",
   "historical",
@@ -48,6 +50,19 @@ const SEGMENTATION_CATEGORIES = new Set([
   "transitional",
   "superseded",
 ]);
+const NON_ACTIVE_LIFECYCLE_STATUSES = new Set([
+  "archived",
+  "superseded",
+  "deprecated",
+]);
+const REQUIRED_HEADER_FIELDS = [
+  "title",
+  "doc_type",
+  "status",
+  "authoritativeness",
+  "owned_by",
+  "last_reviewed",
+];
 
 function normalizePath(pathValue) {
   return pathValue.replace(/\\/g, "/");
@@ -81,6 +96,15 @@ function readJson(pathValue) {
 
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isValidIsoDate(dateValue) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return false;
+  }
+
+  const parsedDate = new Date(`${dateValue}T00:00:00.000Z`);
+  return Number.isFinite(parsedDate.getTime()) && parsedDate.toISOString().startsWith(dateValue);
 }
 
 function parseFrontmatter(markdownContent) {
@@ -159,10 +183,30 @@ function extractBacktickedValues(text) {
 
 function extractSectionBody(markdownContent, heading) {
   const normalized = markdownContent.replace(/\r\n/g, "\n");
-  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const sectionPattern = new RegExp(`^${escapedHeading}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|\\n#\\s+|$)`, "m");
-  const match = normalized.match(sectionPattern);
-  return match ? match[1] : "";
+  const lines = normalized.split("\n");
+  let sectionStartIndex = -1;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index].trim() === heading) {
+      sectionStartIndex = index + 1;
+      break;
+    }
+  }
+
+  if (sectionStartIndex === -1) {
+    return "";
+  }
+
+  const sectionLines = [];
+  for (let index = sectionStartIndex; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^##\s+/.test(line) || /^#\s+/.test(line)) {
+      break;
+    }
+    sectionLines.push(line);
+  }
+
+  return sectionLines.join("\n");
 }
 
 function looksLikeRepoPath(pathValue) {
@@ -256,6 +300,268 @@ function validateStatusSignals({ issues, repoRoot }) {
       }
     }
   }
+}
+
+function resolveMetadataEnums({ issues, repoRoot }) {
+  const taxonomyContractPath = resolve(repoRoot, DOCUMENTATION_TAXONOMY_CONTRACT_PATH);
+  if (!existsSync(taxonomyContractPath)) {
+    addIssue(
+      issues,
+      "NON_ACTIVE_METADATA_ENUMS_MISSING",
+      `Missing taxonomy contract used for non-active metadata validation: ${DOCUMENTATION_TAXONOMY_CONTRACT_PATH}`,
+    );
+    return null;
+  }
+
+  let taxonomyContract;
+  try {
+    taxonomyContract = readJson(taxonomyContractPath);
+  } catch (error) {
+    addIssue(
+      issues,
+      "NON_ACTIVE_METADATA_ENUMS_MISSING",
+      `${DOCUMENTATION_TAXONOMY_CONTRACT_PATH} is not valid JSON: ${error.message}`,
+    );
+    return null;
+  }
+
+  const docTypeValues = taxonomyContract?.metadataFields?.document_type?.allowedValues;
+  const statusValues = taxonomyContract?.metadataFields?.status?.allowedValues;
+  const authoritativenessValues = taxonomyContract?.metadataFields?.authoritativeness?.allowedValues;
+
+  if (!Array.isArray(docTypeValues) || !Array.isArray(statusValues) || !Array.isArray(authoritativenessValues)) {
+    addIssue(
+      issues,
+      "NON_ACTIVE_METADATA_ENUMS_MISSING",
+      `${DOCUMENTATION_TAXONOMY_CONTRACT_PATH} must define metadataFields document_type/status/authoritativeness allowedValues arrays.`,
+    );
+    return null;
+  }
+
+  return {
+    allowedDocTypes: new Set(docTypeValues),
+    allowedStatuses: new Set(statusValues),
+    allowedAuthoritativeness: new Set(authoritativenessValues),
+  };
+}
+
+function validateNonActiveDocumentationSignals({ issues, repoRoot }) {
+  const registryPath = resolve(repoRoot, DOCUMENTATION_REGISTRY_PATH);
+  if (!existsSync(registryPath)) {
+    addIssue(
+      issues,
+      "NON_ACTIVE_REGISTRY_MISSING",
+      `Missing documentation registry required for non-active checks: ${DOCUMENTATION_REGISTRY_PATH}`,
+    );
+    return { checkedDocumentCount: 0 };
+  }
+
+  let registry;
+  try {
+    registry = readJson(registryPath);
+  } catch (error) {
+    addIssue(
+      issues,
+      "NON_ACTIVE_REGISTRY_INVALID",
+      `${DOCUMENTATION_REGISTRY_PATH} is not valid JSON: ${error.message}`,
+    );
+    return { checkedDocumentCount: 0 };
+  }
+
+  if (!Array.isArray(registry.entries)) {
+    addIssue(
+      issues,
+      "NON_ACTIVE_REGISTRY_INVALID",
+      `${DOCUMENTATION_REGISTRY_PATH} must include an entries array.`,
+    );
+    return { checkedDocumentCount: 0 };
+  }
+
+  const metadataEnums = resolveMetadataEnums({ issues, repoRoot });
+  const todayUtc = new Date();
+  todayUtc.setUTCHours(0, 0, 0, 0);
+
+  let checkedDocumentCount = 0;
+  for (const entry of registry.entries) {
+    if (!NON_ACTIVE_LIFECYCLE_STATUSES.has(entry?.status)) {
+      continue;
+    }
+
+    const entryId = isNonEmptyString(entry?.recordId) ? entry.recordId : "<unknown-record-id>";
+    const documentPaths = [entry?.path, entry?.aiPath]
+      .filter((pathValue) => isNonEmptyString(pathValue));
+
+    for (const relativePath of documentPaths) {
+      checkedDocumentCount += 1;
+      const absolutePath = resolve(repoRoot, relativePath);
+      if (!existsSync(absolutePath)) {
+        addIssue(
+          issues,
+          "NON_ACTIVE_DOC_MISSING",
+          `${entryId} references missing non-active doc path '${relativePath}'.`,
+        );
+        continue;
+      }
+
+      const content = readFileSync(absolutePath, "utf8");
+      let frontmatter;
+      try {
+        frontmatter = parseFrontmatter(content);
+      } catch (error) {
+        addIssue(
+          issues,
+          "NON_ACTIVE_METADATA_INVALID",
+          `${relativePath}: ${error.message}`,
+        );
+        continue;
+      }
+
+      for (const field of REQUIRED_HEADER_FIELDS) {
+        if (!isNonEmptyString(frontmatter[field])) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_METADATA_FIELD_MISSING",
+            `${relativePath} is missing required metadata field '${field}'.`,
+          );
+        }
+      }
+
+      if (metadataEnums) {
+        if (isNonEmptyString(frontmatter.doc_type) && !metadataEnums.allowedDocTypes.has(frontmatter.doc_type)) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_METADATA_ENUM_INVALID",
+            `${relativePath} has unsupported doc_type '${frontmatter.doc_type}'.`,
+          );
+        }
+        if (isNonEmptyString(frontmatter.status) && !metadataEnums.allowedStatuses.has(frontmatter.status)) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_METADATA_ENUM_INVALID",
+            `${relativePath} has unsupported status '${frontmatter.status}'.`,
+          );
+        }
+        if (
+          isNonEmptyString(frontmatter.authoritativeness)
+          && !metadataEnums.allowedAuthoritativeness.has(frontmatter.authoritativeness)
+        ) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_METADATA_ENUM_INVALID",
+            `${relativePath} has unsupported authoritativeness '${frontmatter.authoritativeness}'.`,
+          );
+        }
+      }
+
+      if (isNonEmptyString(frontmatter.last_reviewed)) {
+        if (!isValidIsoDate(frontmatter.last_reviewed)) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_METADATA_DATE_INVALID",
+            `${relativePath} has invalid last_reviewed '${frontmatter.last_reviewed}'.`,
+          );
+        } else {
+          const reviewedDate = new Date(`${frontmatter.last_reviewed}T00:00:00.000Z`);
+          if (reviewedDate.getTime() > todayUtc.getTime()) {
+            addIssue(
+              issues,
+              "NON_ACTIVE_METADATA_DATE_INVALID",
+              `${relativePath} has future last_reviewed '${frontmatter.last_reviewed}'.`,
+            );
+          }
+        }
+      }
+
+      if (isNonEmptyString(entry?.docType) && frontmatter.doc_type !== entry.docType) {
+        addIssue(
+          issues,
+          "NON_ACTIVE_REGISTRY_METADATA_MISMATCH",
+          `${relativePath} doc_type '${frontmatter.doc_type}' does not match registry docType '${entry.docType}' for ${entryId}.`,
+        );
+      }
+      if (isNonEmptyString(entry?.status) && frontmatter.status !== entry.status) {
+        addIssue(
+          issues,
+          "NON_ACTIVE_REGISTRY_METADATA_MISMATCH",
+          `${relativePath} status '${frontmatter.status}' does not match registry status '${entry.status}' for ${entryId}.`,
+        );
+      }
+      if (isNonEmptyString(entry?.authoritativeness) && frontmatter.authoritativeness !== entry.authoritativeness) {
+        addIssue(
+          issues,
+          "NON_ACTIVE_REGISTRY_METADATA_MISMATCH",
+          `${relativePath} authoritativeness '${frontmatter.authoritativeness}' does not match registry authoritativeness '${entry.authoritativeness}' for ${entryId}.`,
+        );
+      }
+
+      if (entry.status === "superseded") {
+        for (const marker of ["## Supersession Notice", "## Redirect"]) {
+          if (!content.includes(marker)) {
+            addIssue(
+              issues,
+              "NON_ACTIVE_STRUCTURE_MISSING",
+              `${relativePath} is superseded and must include required section '${marker}'.`,
+            );
+          }
+        }
+
+        if (!isNonEmptyString(frontmatter.superseded_by)) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_SUPERSESSION_LINK_MISSING",
+            `${relativePath} is superseded and must set superseded_by in frontmatter.`,
+          );
+        } else if (!existsSync(resolve(repoRoot, frontmatter.superseded_by))) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_SUPERSESSION_LINK_MISSING",
+            `${relativePath} superseded_by target is missing: ${frontmatter.superseded_by}`,
+          );
+        }
+      } else {
+        if (!content.includes("## Documentation Status")) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_STRUCTURE_MISSING",
+            `${relativePath} must include '## Documentation Status' for non-active lifecycle clarity.`,
+          );
+          continue;
+        }
+
+        const statusBody = extractSectionBody(content, "## Documentation Status");
+        for (const marker of REQUIRED_STATUS_SIGNAL_MARKERS.slice(1)) {
+          if (!statusBody.includes(marker)) {
+            addIssue(
+              issues,
+              "NON_ACTIVE_STATUS_SIGNAL_MISSING",
+              `${relativePath} documentation status block is missing '${marker}'.`,
+            );
+          }
+        }
+
+        if (isNonEmptyString(frontmatter.status) && !statusBody.includes(frontmatter.status)) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_STATUS_SIGNAL_MISMATCH",
+            `${relativePath} documentation status block must include frontmatter status '${frontmatter.status}'.`,
+          );
+        }
+
+        if (
+          isNonEmptyString(frontmatter.authoritativeness)
+          && !statusBody.includes(frontmatter.authoritativeness)
+        ) {
+          addIssue(
+            issues,
+            "NON_ACTIVE_STATUS_SIGNAL_MISMATCH",
+            `${relativePath} documentation status block must include frontmatter authoritativeness '${frontmatter.authoritativeness}'.`,
+          );
+        }
+      }
+    }
+  }
+
+  return { checkedDocumentCount };
 }
 
 function validateSegmentationInventory({ issues, repoRoot }) {
@@ -715,8 +1021,13 @@ function validateDocsSegmentation(repoRoot) {
   validateSegmentationInventory({ issues, repoRoot });
   const { supersededPaths } = validateSupersessionRegistry({ issues, repoRoot });
   validateActivePathLinks({ issues, repoRoot, supersededPaths });
+  const { checkedDocumentCount } = validateNonActiveDocumentationSignals({ issues, repoRoot });
 
-  return { issues, supersededPathCount: supersededPaths.size };
+  return {
+    issues,
+    supersededPathCount: supersededPaths.size,
+    nonActiveRegistryDocumentCount: checkedDocumentCount,
+  };
 }
 
 function main() {
@@ -728,7 +1039,7 @@ function main() {
     process.exit(2);
   }
 
-  const { issues, supersededPathCount } = validateDocsSegmentation(repoRoot);
+  const { issues, supersededPathCount, nonActiveRegistryDocumentCount } = validateDocsSegmentation(repoRoot);
 
   if (issues.length > 0) {
     process.stderr.write("Docs segmentation validation failed.\n");
@@ -745,6 +1056,7 @@ function main() {
     "Checked segmentation inventory category and baseline-destination invariants.",
     `Checked supersession registry entries and redirect cross-references: ${supersededPathCount}`,
     `Checked active router docs for invalid superseded links: ${ACTIVE_PATH_DOCS.length}`,
+    `Checked non-active registry docs for metadata/status/structure signals: ${nonActiveRegistryDocumentCount}`,
   ].join("\n") + "\n");
 }
 
