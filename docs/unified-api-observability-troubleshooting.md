@@ -56,6 +56,26 @@ Transport observability uses centralized redaction across event details and fail
 
 The hook receives the same sanitized `IdentityHttpServerLogEvent` shape that the transport logger receives, including request and correlation identifiers.
 
+## Desktop main-process operational sinks
+
+Desktop runtime/server observability events now flow through a single Electron main-process logger adapter:
+
+- Console sink: structured JSON emitted in the Electron main process (visible in terminal during development).
+- File sink: `desktop-operational.log` under `app.getPath("logs")/ai-loom-studio` (for example, on macOS: `~/Library/Logs/ai-loom-studio/desktop-operational.log`).
+
+This adapter is injected into:
+
+1. auth-minimal server host startup (`startAuthMinimalServerHostAssembly(...)` host logger path);
+2. deferred desktop runtime composition for `SystemRuntimeBackendApi` observability.
+
+Redaction behavior is preserved because upstream observability adapters still sanitize payloads before logger delivery.
+
+### Dev vs packaged inspection
+
+1. Development (`npm run start:desktop`): inspect terminal output for JSON events and correlate with `desktop-operational.log`.
+2. Packaged desktop builds: inspect `app.getPath(\"logs\")/ai-loom-studio/desktop-operational.log` on the target OS.
+3. Use `correlationId`, `requestId`, `executionId`, or `assetId` to trace runtime/image-upload sequences end-to-end.
+
 ## Troubleshooting flow
 
 1. Collect `x-correlation-id` (or `x-request-id`) from the failing client response/frame.

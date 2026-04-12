@@ -15,6 +15,7 @@ import { createDesktopAgentRuntimeProvider, type DesktopAgentRuntimeProvider } f
 import { createCanonicalRegistryRuntimeProvider, type CanonicalRegistryRuntimeProvider } from "./CanonicalRegistryRuntimeProvider";
 import type { DesktopStorageDatabase } from "../../../src/infrastructure/desktop/DesktopStorageDatabase";
 import type { DesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRuntimeStatusStore";
+import type { DesktopOperationalEventLogger } from "../DesktopOperationalEventLogger";
 
 const DesktopServiceSupervisorPort = 8790;
 
@@ -47,6 +48,7 @@ type CreatePostLoginRuntimeBootstrapperParams = {
     readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
   }) => void;
   readonly launchRuntimeWindowFromContract: (launchContractJson: string) => Promise<LaunchSystemRuntimeWindowReadModel>;
+  readonly getOperationalLogger: () => DesktopOperationalEventLogger | undefined;
 };
 
 type PostLoginRuntimeComposition = {
@@ -81,6 +83,7 @@ export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntim
     readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
     readonly runtimeConfigValues: AppRuntimeConfigValues;
     readonly repoRoot: string;
+    readonly observabilityLogger?: DesktopOperationalEventLogger;
   }) => DeferredDesktopFeatureRuntime) | undefined;
 
   async function ensureDeferredDesktopFeatureRuntimeFactory(): Promise<(
@@ -88,6 +91,7 @@ export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntim
       readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
       readonly runtimeConfigValues: AppRuntimeConfigValues;
       readonly repoRoot: string;
+      readonly observabilityLogger?: DesktopOperationalEventLogger;
     },
   ) => DeferredDesktopFeatureRuntime> {
     if (deferredDesktopFeatureRuntimeFactory) {
@@ -190,6 +194,7 @@ export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntim
       storagePaths,
       runtimeConfigValues: runtimeConfig.toValues(),
       repoRoot: params.repoRoot,
+      observabilityLogger: params.getOperationalLogger(),
     });
     params.setDeferredFeatureRuntime(featureRuntime);
     logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready", bootstrapStartedAt);
