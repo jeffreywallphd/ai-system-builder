@@ -138,9 +138,6 @@ import type { DatasetInstance } from "@domain/system-runtime/DatasetInstanceDoma
 import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
-import { promises as fs } from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import {
   AuthorizationResponseAccessLevels,
   deriveAuthorizationResponseAccessLevel,
@@ -3847,6 +3844,7 @@ export class StudioShellBackendApi {
     readonly systemId: string;
     readonly datasetBindingId: ReferenceImageDatasetBindingId;
   }): Promise<string> {
+    const nodeRuntime = await this.resolveNodeUploadRuntime();
     const safeFileName = this.sanitizeUploadFileName(input.fileName);
     const safeSystemId = input.systemId.replace(/[^a-z0-9-_.:]/gi, "_");
     const safeBindingId = input.datasetBindingId.replace(/[^a-z0-9-_.:]/gi, "_");
@@ -3863,10 +3861,16 @@ export class StudioShellBackendApi {
       now.getUTCMilliseconds().toString().padStart(3, "0"),
     ].join("");
     const unique = Math.random().toString(36).slice(2, 10);
-    const root = path.join(os.tmpdir(), "ai-loom-studio", "reference-image-uploads", safeSystemId, safeBindingId);
-    await fs.mkdir(root, { recursive: true });
-    const filePath = path.join(root, `${stamp}-${unique}-${safeFileName}`);
-    await fs.writeFile(filePath, Buffer.from(input.payload));
+    const root = nodeRuntime.path.join(
+      nodeRuntime.os.tmpdir(),
+      "ai-loom-studio",
+      "reference-image-uploads",
+      safeSystemId,
+      safeBindingId,
+    );
+    await nodeRuntime.fs.mkdir(root, { recursive: true });
+    const filePath = nodeRuntime.path.join(root, `${stamp}-${unique}-${safeFileName}`);
+    await nodeRuntime.fs.writeFile(filePath, Buffer.from(input.payload));
     return filePath;
   }
 
@@ -3875,8 +3879,40 @@ export class StudioShellBackendApi {
     if (!trimmed) {
       return "upload.bin";
     }
-    const baseName = path.basename(trimmed).replace(/[^a-z0-9-_.]/gi, "_");
+    const baseName = (trimmed
+      .split(/[\\/]/)
+      .pop()
+      ?.replace(/[^a-z0-9-_.]/gi, "_")) ?? "";
     return baseName.length > 0 ? baseName : "upload.bin";
+  }
+
+  private async resolveNodeUploadRuntime(): Promise<{
+    readonly fs: {
+      readonly mkdir: (path: string, options?: { recursive?: boolean }) => Promise<void>;
+      readonly writeFile: (file: string, data: Uint8Array) => Promise<void>;
+    };
+    readonly os: { readonly tmpdir: () => string };
+    readonly path: { readonly join: (...parts: ReadonlyArray<string>) => string };
+  }> {
+    try {
+      const [fsModule, osModule, pathModule] = await Promise.all([
+        import("node:fs"),
+        import("node:os"),
+        import("node:path"),
+      ]);
+      if (!fsModule.promises?.mkdir || !fsModule.promises?.writeFile) {
+        throw new Error("Node fs.promises APIs are unavailable.");
+      }
+      return Object.freeze({
+        fs: fsModule.promises,
+        os: osModule.default,
+        path: pathModule.default,
+      });
+    } catch (error) {
+      throw new StudioShellInvalidRequestError(
+        `Image upload caching requires a Node.js filesystem runtime (${error instanceof Error ? error.message : String(error)}).`,
+      );
+    }
   }
 
   private extractComfyResultFromRuntimeResult(
