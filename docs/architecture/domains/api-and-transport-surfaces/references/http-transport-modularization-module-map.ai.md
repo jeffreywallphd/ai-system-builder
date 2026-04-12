@@ -155,6 +155,13 @@ Transport seam additions:
 - Preserve today's first-match behavior for overlapping paths (especially runtime routes where authoritative and system-runtime handlers share path shapes).
 - Keep websocket startup bound to explicit `webSocket` options from host composition.
 
+Route-family registration checklist for new transport slices:
+1. Add/update family metadata in `src/infrastructure/transport/http-server/authoritative-route-families/*` and keep canonical `routeFamilyId` + `routePrefixes` stable.
+2. Ensure backend-key wiring in `AuthoritativeApiRouteRegistrationCatalog.ts` composes the family only when required backend adapters are available.
+3. Add the module to `identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts` and preserve deterministic module list ordering.
+4. If authoritative startup must require the family, update `AuthoritativeServerRequiredRouteFamilyIds` in `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`.
+5. Extend transport bootstrap regression coverage (`IdentityHttpTransportComposition.test.ts`, `IdentityHttpServer.test.ts`, and host startup harness tests) for success path + invalid registration guards.
+
 ## DTO Mapping Seams
 
 Create family-scoped transport DTO mappers so route handlers stop owning schema and mapping logic inline:
@@ -191,5 +198,6 @@ Key verification anchors:
 - `src/infrastructure/transport/http-server/identity/tests/*.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 
 

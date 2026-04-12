@@ -8,6 +8,11 @@ import {
   type IdentityHttpServerLogEvent,
   type IdentityHttpServerLogger,
 } from "../IdentityHttpServer";
+import {
+  AuthoritativeApiRouteBackendKeys,
+  type AuthoritativeApiRouteRegistrationPlan,
+} from "../../AuthoritativeApiRouteRegistration";
+import { composeAuthoritativeApiRouteRegistrationPlan } from "../../AuthoritativeApiRouteRegistrationCatalog";
 
 class CapturingLogger implements IdentityHttpServerLogger {
   public readonly events: IdentityHttpServerLogEvent[] = [];
@@ -137,6 +142,88 @@ describe("IdentityHttpServer", () => {
       && entry.path === "/api/v1/identity/session"
     ));
     expect(modularEvent).toBeDefined();
+  });
+
+  it("starts with explicit modular route registration plans in deterministic order", async () => {
+    const logger = new CapturingLogger();
+    const routeRegistrationPlan = composeAuthoritativeApiRouteRegistrationPlan({
+      backendAvailability: Object.freeze({
+        [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: true,
+        [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
+        [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
+        [AuthoritativeApiRouteBackendKeys.executionNodeManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
+        [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
+        [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
+        [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
+        [AuthoritativeApiRouteBackendKeys.runRead]: true,
+        [AuthoritativeApiRouteBackendKeys.runMutation]: true,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: false,
+      }),
+    });
+
+    await startServer(logger, {}, {
+      routeRegistrationPlan,
+    });
+
+    const event = logger.events.find((entry) => entry.event === "identity-http.route-families.composed");
+    const details = event?.details as { routeFamilyIds?: unknown } | undefined;
+    expect(details?.routeFamilyIds).toEqual([
+      "identity-auth",
+      "workspace-invitations",
+      "workspace-administration",
+      "run-submission",
+      "run-read",
+      "run-mutation",
+      "image-run-api",
+    ]);
+  });
+
+  it("fails startup when an explicit modular route registration plan includes duplicate route families", async () => {
+    const harness = await createIdentityAuthTestHarness();
+    const basePlan = composeAuthoritativeApiRouteRegistrationPlan({
+      backendAvailability: Object.freeze({
+        [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: false,
+        [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: false,
+        [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
+        [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
+        [AuthoritativeApiRouteBackendKeys.executionNodeManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
+        [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
+        [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
+        [AuthoritativeApiRouteBackendKeys.runSubmission]: false,
+        [AuthoritativeApiRouteBackendKeys.runRead]: false,
+        [AuthoritativeApiRouteBackendKeys.runMutation]: false,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: false,
+      }),
+    });
+    const duplicatePlan: AuthoritativeApiRouteRegistrationPlan = Object.freeze({
+      ...basePlan,
+      registeredRouteFamilies: Object.freeze([
+        basePlan.registeredRouteFamilies[0]!,
+        basePlan.registeredRouteFamilies[0]!,
+      ]),
+    });
+
+    expect(() => createIdentityHttpServer({
+      backendApi: harness.backendApi,
+      routeRegistrationPlan: duplicatePlan,
+    })).toThrow("duplicate route family");
   });
 
   it("supports development login route when explicitly enabled", async () => {
