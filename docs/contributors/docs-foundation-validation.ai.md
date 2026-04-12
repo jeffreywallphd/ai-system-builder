@@ -6,6 +6,7 @@ authoritativeness: canonical
 owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
+  - package.json
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/lint-docs.cjs
   - dev/scripts/validate-documentation-registry.cjs
@@ -22,6 +23,7 @@ related_code_paths:
   - dev/tests/AdrValidationScript.test.ts
   - dev/tests/ArchitectureDomainValidationScript.test.ts
   - dev/tests/DocsSegmentationValidationScript.test.ts
+  - dev/tests/DocumentationWorkflowIntegrationStory731Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Foundation Validation Guide
@@ -86,6 +88,34 @@ npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
 npm run docs:validate:cross-references
 npm run docs:validate:category-compliance
+```
+
+## Workflow Integration Entry Points (Story 7.3.1)
+
+Documentation quality checks are integrated into normal repository workflows:
+
+- Default repository test workflow (docs checks + unit tests):
+
+```bash
+npm test
+```
+
+- Unit-test-only fast loop when docs are unchanged:
+
+```bash
+npm run test:unit
+```
+
+- Local pre-PR verification (typecheck + docs checks):
+
+```bash
+npm run validate
+```
+
+- CI-friendly full verification entrypoint:
+
+```bash
+npm run validate:ci
 ```
 
 ## CI Contract

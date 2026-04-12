@@ -6,6 +6,7 @@ authoritativeness: canonical
 owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
+  - package.json
   - docs/context/governance/documentation-quality-standard.md
   - docs/contributors/docs-foundation-validation.md
   - docs/contributors/docs-placement-guide.md
@@ -22,6 +23,7 @@ related_code_paths:
   - dev/tests/DocsLintEntrypointScript.test.ts
   - dev/tests/DocsCategoryComplianceValidationScript.test.ts
   - dev/tests/DocumentationQualityContributorStandardsStory716Guardrails.test.ts
+  - dev/tests/DocumentationWorkflowIntegrationStory731Guardrails.test.ts
 ---
 
 # Documentation Quality Enforced Standards Guide
@@ -70,6 +72,15 @@ npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
 npm run docs:validate:cross-references
 npm run docs:validate:category-compliance
+```
+
+Integrated repository workflow entry points:
+
+```bash
+npm test
+npm run test:unit
+npm run validate
+npm run validate:ci
 ```
 
 ## Rule Categories: What To Do
