@@ -9,9 +9,11 @@ related_code_paths:
   - docs/context/governance/documentation-quality-standard.ai.md
   - docs/contributors/documentation-quality-enforced-standards-guide.ai.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md
+  - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - dev/scripts/lint-docs.cjs
   - package.json
   - dev/tests/DocumentationRuleEvolutionStory735Guardrails.test.ts
+  - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Quality Rule Evolution Guide
@@ -97,4 +99,5 @@ Keep this information in canonical contributor/governance docs, not only in scri
 - `docs/context/governance/documentation-quality-standard.ai.md`
 - `docs/contributors/documentation-quality-enforced-standards-guide.ai.md`
 - `docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md`
+- `docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md`
 - `docs/contributors/documentation-quality-worked-examples.ai.md`

@@ -1950,6 +1950,43 @@
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-documentation-quality-tooling-maintenance-guide",
+      "path": "docs/contributors/documentation-quality-tooling-maintenance-guide.md",
+      "aiPath": "docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md",
+      "title": "Documentation Quality Tooling Maintenance Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines sustainable maintenance expectations for docs-quality tooling, ownership, validator/test upkeep, and obsolete-check handling.",
+      "keywords": [
+        "documentation quality",
+        "tooling maintenance",
+        "validator ownership",
+        "guardrail test upkeep",
+        "obsolete checks"
+      ],
+      "relatedCodePaths": [
+        "dev/scripts/lint-docs.cjs",
+        "dev/scripts/validate-docs-foundation.cjs",
+        "dev/scripts/validate-documentation-registry.cjs",
+        "dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-worked-examples"
+      ],
+      "relatedDocs": [
+        "docs/contributors/docs-foundation-validation.md",
+        "docs/contributors/documentation-quality-rule-evolution-guide.md",
+        "docs/contributors/documentation-quality-worked-examples.md",
+        "docs/context/governance/documentation-quality-standard.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
     }
   ],
   "discoveryIndex": {
@@ -1986,7 +2023,8 @@
         "doc-contributors-docs-placement-guide",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
-        "doc-contributors-documentation-quality-rule-evolution-guide"
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-tooling-maintenance-guide"
       ],
       "runbook": [
         "doc-operations-node-bootstrap-identity",
@@ -2068,7 +2106,8 @@
         "doc-baseline-documentation-segmentation-migration-inventory",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
-        "doc-contributors-documentation-quality-rule-evolution-guide"
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-tooling-maintenance-guide"
       ],
       "deprecated": [],
       "superseded": [
@@ -2115,7 +2154,8 @@
         "doc-contributors-docs-placement-guide",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
-        "doc-contributors-documentation-quality-rule-evolution-guide"
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-tooling-maintenance-guide"
       ],
       "operations": [
         "doc-context-pack-runtime-and-host",
@@ -2179,7 +2219,8 @@
         "doc-operations-node-bootstrap-identity",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
-        "doc-contributors-documentation-quality-rule-evolution-guide"
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-tooling-maintenance-guide"
       ],
       "reference": [
         "doc-architecture-document-scope-boundaries",
@@ -2273,7 +2314,8 @@
         "doc-context-documentation-identity-and-reference-conventions",
         "doc-contributors-documentation-index-assisted-discovery-worked-examples",
         "doc-contributors-documentation-quality-worked-examples",
-        "doc-contributors-documentation-quality-rule-evolution-guide"
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-tooling-maintenance-guide"
       ]
     }
   },

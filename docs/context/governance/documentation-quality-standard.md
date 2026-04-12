@@ -13,6 +13,7 @@ related_code_paths:
   - docs/context/documentation-registry.seed.json
   - docs/context/governance/context-governance-policy.md
   - docs/contributors/documentation-quality-rule-evolution-guide.md
+  - docs/contributors/documentation-quality-tooling-maintenance-guide.md
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
@@ -22,6 +23,7 @@ related_code_paths:
   - dev/tests/DocsCategoryComplianceValidationScript.test.ts
   - dev/tests/DocumentationCiFailurePolicyStory732Guardrails.test.ts
   - dev/tests/DocumentationRuleEvolutionStory735Guardrails.test.ts
+  - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
 ---
 
 # Documentation Quality Standard
@@ -223,6 +225,14 @@ Every rule/severity change must explicitly communicate:
 - how legacy docs are handled during transition.
 
 Record this in canonical governance/contributor docs in the same PR so enforcement changes remain predictable and trustable.
+
+### Ongoing Tooling Maintenance Expectations (Story 7.4.1)
+
+- Treat docs-quality tooling as maintained infrastructure, not one-time rollout work.
+- Keep rule-policy docs, validators, and tests updated together in the same pull request when rule scope or severity changes.
+- Assign explicit owners for warning backlogs and recurring validator drift; avoid indefinite warning accumulation.
+- When checks become obsolete because documentation architecture evolves, deprecate or replace them with documented rationale and updated guardrails.
+- Keep shared enforcement references aligned (`package.json` docs scripts, contributor run/fix guidance, rule evolution guidance, and registry routing metadata).
 
 ## Recommended Guidance (Non-Blocking)
 
