@@ -81,6 +81,15 @@ This scaffold intentionally does not move runtime behavior yet. It introduces:
 - an ordered module map with dependency direction, stage ownership hints, produced artifacts, and disposal responsibilities;
 - regression coverage to keep module-map shape and dependency ordering stable for follow-on extraction stories.
 
+## Story 2.2.1 Identity/Session/Trusted-Device Composition Extraction
+
+Story 2.2.1 extracts identity, session, and trusted-device composition from inline host startup assembly into:
+
+- `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
+- regression coverage: `src/hosts/server/tests/ServerIdentitySessionTrustedDeviceCompositionModule.test.ts`
+
+This extraction keeps route logic, DTO shaping, and domain behavior unchanged while moving only construction, dependency wiring, configuration input handling, and lifecycle-disposal composition concerns.
+
 ## Story 2.1.3 Staged Bootstrap Pipeline and Startup State Model
 
 Story 2.1.3 adds an explicit staged bootstrap model and typed startup/readiness states for the authoritative control-plane startup boundary:

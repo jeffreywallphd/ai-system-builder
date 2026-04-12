@@ -17,6 +17,7 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - Dedicated entrypoint assembly: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
 - Runtime host implementation composed by the root: `src/hosts/server/IdentityServerHost.ts`
+- Identity/session/trusted-device bounded composition module: `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
 - Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
@@ -37,6 +38,11 @@ Story 2.1.2 adds the first bounded-control-plane composition scaffold:
 - module map: `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleMap.ts`
 - composition placement guidance: `src/hosts/server/composition/README.md`
 - contract guardrail test: `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts`
+
+Story 2.2.1 extracts identity/session/trusted-device assembly from `IdentityServerHost.ts` into:
+
+- `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
+- regression coverage: `src/hosts/server/tests/ServerIdentitySessionTrustedDeviceCompositionModule.test.ts`
 
 ## Control-plane composition responsibilities
 
