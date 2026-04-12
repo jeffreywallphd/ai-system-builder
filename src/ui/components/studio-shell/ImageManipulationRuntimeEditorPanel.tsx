@@ -96,6 +96,7 @@ import {
   mapGeneratedResultToOutputGalleryItem,
   mapGeneratedResultsToRunHistory,
 } from "./image-manipulation/GeneratedResultGalleryHistoryAdapter";
+import type { IdentityAuthPersistedSession } from "../../shared/identity/IdentityAuthSessionStore";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "gif", "webp"]),
@@ -189,6 +190,16 @@ function toDirectoryPath(filePath: string | undefined): string | undefined {
     return undefined;
   }
   return filePath.slice(0, separatorIndex);
+}
+
+export function resolveWorkspaceIdFromSession(session: IdentityAuthPersistedSession | undefined): string | undefined {
+  if (!session) {
+    return undefined;
+  }
+  return session.workspaceContext?.resolvedWorkspaceId
+    ?? session.workspaceContext?.requestedWorkspaceId
+    ?? session.initialCapabilityState?.workspaceId
+    ?? session.workspaceContext?.workspaces.find((workspace) => workspace.workspaceId.trim().length > 0)?.workspaceId;
 }
 
 export function isPersistedReferenceUploadReady(input: {
@@ -1875,7 +1886,7 @@ export function ImageManipulationRuntimeEditorPanel({
   });
   const session = useMemo(() => authSessionStore.getSession(), [authSessionStore]);
   const actorUserIdentityId = session?.userIdentityId;
-  const workspaceId = session?.workspaceContext?.resolvedWorkspaceId ?? session?.initialCapabilityState?.workspaceId;
+  const workspaceId = resolveWorkspaceIdFromSession(session);
   const sessionToken = session?.sessionToken;
 
   const activeGallery = useMemo(() => {
