@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { createIdentityHttpServer } from "../IdentityHttpServer";
+import {
+  createIdentityHttpServer,
+  type IdentityHttpServerLogEvent,
+  type IdentityHttpServerLogger,
+} from "../IdentityHttpServer";
 import type { DeploymentPolicyWriteBackendApi } from "../../../../api/deployment/DeploymentPolicyWriteBackendApi";
 
 const servers: Server[] = [];
@@ -96,13 +100,31 @@ class StubDeploymentPolicyWriteBackendApi {
   }
 }
 
+class CapturingLogger implements IdentityHttpServerLogger {
+  public readonly events: IdentityHttpServerLogEvent[] = [];
+
+  public info(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+
+  public warn(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+
+  public error(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+}
+
 async function startServer(
   deploymentPolicyWriteBackendApi: StubDeploymentPolicyWriteBackendApi,
-): Promise<string> {
+): Promise<{ readonly baseUrl: string; readonly logger: CapturingLogger }> {
   const identityHarness = await createIdentityAuthTestHarness();
+  const logger = new CapturingLogger();
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
     deploymentPolicyWriteBackendApi: deploymentPolicyWriteBackendApi as unknown as DeploymentPolicyWriteBackendApi,
+    logger,
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -113,7 +135,10 @@ async function startServer(
   });
   servers.push(server);
   const address = server.address() as AddressInfo;
-  return `http://127.0.0.1:${address.port}`;
+  return Object.freeze({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    logger,
+  });
 }
 
 async function registerAndLogin(baseUrl: string, username: string): Promise<string> {
@@ -147,7 +172,7 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 describe("IdentityHttpServer deployment policy write routes", () => {
   it("updates active deployment profile through authenticated authoritative route", async () => {
     const backendApi = new StubDeploymentPolicyWriteBackendApi();
-    const baseUrl = await startServer(backendApi);
+    const { baseUrl, logger } = await startServer(backendApi);
     const token = await registerAndLogin(baseUrl, "deployment.policy.write.user.1");
 
     const response = await fetch(
@@ -172,11 +197,15 @@ describe("IdentityHttpServer deployment policy write routes", () => {
     expect(body.data.result.snapshot.profileId).toBe("organization");
     expect(backendApi.lastActiveProfileRequest?.workspaceId).toBe("workspace-alpha");
     expect(backendApi.lastActiveProfileRequest?.correlationId).toBe("corr-policy-write-1");
+    expect(logger.events.some((event) => (
+      event.event === "identity-http.route-family.modular-handled"
+      && event.path === "/api/v1/deployment/policy/active-profile"
+    ))).toBeTrue();
   });
 
   it("returns invalid request when write payload fails schema validation", async () => {
     const backendApi = new StubDeploymentPolicyWriteBackendApi();
-    const baseUrl = await startServer(backendApi);
+    const { baseUrl } = await startServer(backendApi);
     const token = await registerAndLogin(baseUrl, "deployment.policy.write.user.2");
 
     const response = await fetch(
@@ -201,7 +230,7 @@ describe("IdentityHttpServer deployment policy write routes", () => {
 
   it("returns authentication failed for unauthenticated write attempts", async () => {
     const backendApi = new StubDeploymentPolicyWriteBackendApi();
-    const baseUrl = await startServer(backendApi);
+    const { baseUrl } = await startServer(backendApi);
 
     const response = await fetch(
       `${baseUrl}/api/v1/deployment/policy/active-profile?workspaceId=workspace-alpha`,
@@ -224,7 +253,7 @@ describe("IdentityHttpServer deployment policy write routes", () => {
 
   it("maps forbidden override updates to 403", async () => {
     const backendApi = new StubDeploymentPolicyWriteBackendApi();
-    const baseUrl = await startServer(backendApi);
+    const { baseUrl } = await startServer(backendApi);
     const token = await registerAndLogin(baseUrl, "deployment.policy.write.user.3");
 
     const response = await fetch(

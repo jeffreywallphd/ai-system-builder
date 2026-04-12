@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { createIdentityHttpServer } from "../IdentityHttpServer";
+import {
+  createIdentityHttpServer,
+  type IdentityHttpServerLogEvent,
+  type IdentityHttpServerLogger,
+} from "../IdentityHttpServer";
 import type { DeploymentPolicyReadBackendApi } from "../../../../api/deployment/DeploymentPolicyReadBackendApi";
 
 const servers: Server[] = [];
@@ -89,13 +93,31 @@ class StubDeploymentPolicyReadBackendApi {
   }
 }
 
+class CapturingLogger implements IdentityHttpServerLogger {
+  public readonly events: IdentityHttpServerLogEvent[] = [];
+
+  public info(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+
+  public warn(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+
+  public error(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+}
+
 async function startServer(
   deploymentPolicyReadBackendApi: StubDeploymentPolicyReadBackendApi,
-): Promise<string> {
+): Promise<{ readonly baseUrl: string; readonly logger: CapturingLogger }> {
   const identityHarness = await createIdentityAuthTestHarness();
+  const logger = new CapturingLogger();
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
     deploymentPolicyReadBackendApi: deploymentPolicyReadBackendApi as unknown as DeploymentPolicyReadBackendApi,
+    logger,
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -106,7 +128,10 @@ async function startServer(
   });
   servers.push(server);
   const address = server.address() as AddressInfo;
-  return `http://127.0.0.1:${address.port}`;
+  return Object.freeze({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    logger,
+  });
 }
 
 async function registerAndLogin(baseUrl: string, username: string): Promise<string> {
@@ -140,7 +165,7 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 describe("IdentityHttpServer deployment policy read routes", () => {
   it("returns authoritative deployment policy state for authenticated workspace requests", async () => {
     const deploymentPolicyReadBackendApi = new StubDeploymentPolicyReadBackendApi();
-    const baseUrl = await startServer(deploymentPolicyReadBackendApi);
+    const { baseUrl, logger } = await startServer(deploymentPolicyReadBackendApi);
     const token = await registerAndLogin(baseUrl, "deployment.policy.read.user.1");
 
     const response = await fetch(
@@ -160,11 +185,15 @@ describe("IdentityHttpServer deployment policy read routes", () => {
     expect(body.data.activeProfile.profileId).toBe("organization");
     expect(deploymentPolicyReadBackendApi.lastRequest?.workspaceId).toBe("workspace-alpha");
     expect(deploymentPolicyReadBackendApi.lastRequest?.correlationId).toBe("corr-policy-read-1");
+    expect(logger.events.some((event) => (
+      event.event === "identity-http.route-family.modular-handled"
+      && event.path === "/api/v1/deployment/policy/state"
+    ))).toBeTrue();
   });
 
   it("returns invalid request when deployment policy read query is malformed", async () => {
     const deploymentPolicyReadBackendApi = new StubDeploymentPolicyReadBackendApi();
-    const baseUrl = await startServer(deploymentPolicyReadBackendApi);
+    const { baseUrl } = await startServer(deploymentPolicyReadBackendApi);
     const token = await registerAndLogin(baseUrl, "deployment.policy.read.user.2");
 
     const response = await fetch(
@@ -186,7 +215,7 @@ describe("IdentityHttpServer deployment policy read routes", () => {
   it("maps forbidden policy-state reads to 403 responses", async () => {
     const deploymentPolicyReadBackendApi = new StubDeploymentPolicyReadBackendApi();
     deploymentPolicyReadBackendApi.forceForbidden = true;
-    const baseUrl = await startServer(deploymentPolicyReadBackendApi);
+    const { baseUrl } = await startServer(deploymentPolicyReadBackendApi);
     const token = await registerAndLogin(baseUrl, "deployment.policy.read.user.3");
 
     const response = await fetch(
