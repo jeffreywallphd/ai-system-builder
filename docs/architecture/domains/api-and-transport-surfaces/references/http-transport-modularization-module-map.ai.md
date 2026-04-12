@@ -18,6 +18,10 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/route-families/AuthorizationRouteFamilyHandler.ts
   - src/infrastructure/transport/http-server/identity/route-families/AuditRouteFamilyHandler.ts
   - src/infrastructure/transport/http-server/identity/route-families/ExecutionNodeManagementRouteFamilyHandler.ts
+  - src/infrastructure/transport/http-server/identity/route-families/DeploymentPolicyRouteFamilyHandler.ts
+  - src/infrastructure/transport/http-server/identity/route-families/SecretMetadataRouteFamilyHandler.ts
+  - src/infrastructure/transport/http-server/identity/route-families/CertificateOperationsRouteFamilyHandler.ts
+  - src/infrastructure/transport/http-server/identity/route-families/NodeTrustRouteFamilyHandler.ts
   - src/infrastructure/transport/http-server/identity/route-families/RunRouteFamilyHandlers.ts
   - src/infrastructure/transport/http-server/identity/dto/AuditRouteDtoMapper.ts
   - src/infrastructure/transport/http-server/identity/dto/ExecutionNodeManagementRouteDtoMapper.ts
@@ -82,6 +86,9 @@ Current modular handler ownership (in `defaultRouteFamilyHandlers`) includes:
 - `execution-node-management`
 - `deployment-policy-read`
 - `deployment-policy-write`
+- `security-secret-metadata`
+- `security-certificate-operations`
+- `node-trust`
 - `run-submission`
 - `run-read`
 - `run-mutation`
@@ -89,9 +96,6 @@ Current modular handler ownership (in `defaultRouteFamilyHandlers`) includes:
 - `image-run-api`
 
 Current route families that are still implemented in `IdentityHttpServer.ts` inline handlers:
-- `node-trust`
-- `security-certificate-operations`
-- `security-secret-metadata`
 - `system-runtime`
 
 ## Middleware Composition Rules

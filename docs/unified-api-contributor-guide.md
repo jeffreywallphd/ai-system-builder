@@ -46,6 +46,11 @@ Use this sequence when adding or modifying authoritative HTTP route families:
 2. Wire backend availability in `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`.
 3. Keep deterministic registry ownership in `src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts`.
 4. Implement route-family handler behavior in `src/infrastructure/transport/http-server/identity/route-families/*` and register it in `defaultRouteFamilyHandlers` inside `IdentityHttpServer.ts` when migrating away from inline fallback.
+   - Security/governance route-family handlers are now modularized in:
+     - `DeploymentPolicyRouteFamilyHandler.ts`
+     - `SecretMetadataRouteFamilyHandler.ts`
+     - `CertificateOperationsRouteFamilyHandler.ts`
+     - `NodeTrustRouteFamilyHandler.ts`
 5. Keep middleware order unchanged: metadata -> CORS -> secure transport -> auth/trust -> parse/map -> backend -> status translation -> response envelope.
 6. Keep transport DTO mapping in `src/infrastructure/transport/http-server/identity/dto/*` and keep business policy in backend APIs/use-cases.
 7. If startup requires coverage for the route family, update `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`.
