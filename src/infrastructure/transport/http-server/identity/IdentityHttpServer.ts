@@ -358,6 +358,7 @@ import type {
 import {
   AuthoritativeApiRouteBackendKeys,
   type AuthoritativeApiRouteBackendKey,
+  type AuthoritativeApiRouteFamilyRegistration,
   type AuthoritativeApiRouteRegistrationPlan,
 } from "../AuthoritativeApiRouteRegistration";
 import { composeAuthoritativeApiRouteRegistrationPlan } from "../AuthoritativeApiRouteRegistrationCatalog";
@@ -1017,6 +1018,7 @@ export interface IdentityHttpServerOptions {
   readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
   readonly webSocket?: IdentityHttpServerWebSocketOptions;
   readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
+  readonly routeFamilyHandlers?: Readonly<Partial<Record<string, IdentityHttpRouteFamilyHandler>>>;
   readonly observability?: {
     onOperationalEvent?(event: IdentityHttpServerLogEvent): void;
   };
@@ -1024,6 +1026,25 @@ export interface IdentityHttpServerOptions {
     readonly enableDevLoginRoute?: boolean;
   };
 }
+
+export interface IdentityHttpRouteFamilyHandlerContext {
+  readonly request: IncomingMessage;
+  readonly response: ServerResponse;
+  readonly requestId: string;
+  readonly correlationId: string;
+  readonly path: string;
+  readonly method: string | undefined;
+  readonly logger: IdentityHttpServerLogger;
+  readonly routeFamily: AuthoritativeApiRouteFamilyRegistration;
+}
+
+export interface IdentityHttpRouteFamilyHandlerResult {
+  readonly handled: boolean;
+}
+
+export type IdentityHttpRouteFamilyHandler = (
+  context: IdentityHttpRouteFamilyHandlerContext,
+) => IdentityHttpRouteFamilyHandlerResult | Promise<IdentityHttpRouteFamilyHandlerResult> | void | Promise<void>;
 
 export type IdentityHttpServerInstance = Server | HttpsServer;
 export type IdentityHttpServerFactory = (requestListener: RequestListener) => IdentityHttpServerInstance;
@@ -1138,6 +1159,9 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
   const routeCompositionLogDetails = buildIdentityHttpRouteCompositionLogDetails(
     transportComposition.routeModuleRegistry.toSnapshot(),
   );
+  const routeFamilyHandlers: Readonly<Partial<Record<string, IdentityHttpRouteFamilyHandler>>> = (
+    options.routeFamilyHandlers ?? Object.freeze({})
+  );
   logger.info(Object.freeze({
     event: "identity-http.route-families.composed",
     requestId: "startup-route-composition",
@@ -1212,6 +1236,48 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             transport: transportState,
           }), secureTransportDecision.body);
           return;
+        }
+      }
+
+      const matchedRouteFamily = transportComposition.routeModuleRegistry.resolveRouteFamilyByPath(path);
+      if (matchedRouteFamily) {
+        const routeFamilyHandler = routeFamilyHandlers[matchedRouteFamily.routeFamilyId];
+        if (routeFamilyHandler) {
+          const handlerResult = await routeFamilyHandler({
+            request,
+            response,
+            requestId,
+            correlationId,
+            path,
+            method: request.method,
+            logger,
+            routeFamily: matchedRouteFamily,
+          });
+          const handled = handlerResult?.handled ?? true;
+          if (handled) {
+            logger.info(Object.freeze({
+              event: "identity-http.route-family.modular-handled",
+              requestId,
+              correlationId,
+              method: request.method,
+              path,
+              details: Object.freeze({
+                routeFamilyId: matchedRouteFamily.routeFamilyId,
+              }),
+            }));
+            return;
+          }
+
+          logger.info(Object.freeze({
+            event: "identity-http.route-family.legacy-fallback",
+            requestId,
+            correlationId,
+            method: request.method,
+            path,
+            details: Object.freeze({
+              routeFamilyId: matchedRouteFamily.routeFamilyId,
+            }),
+          }));
         }
       }
 

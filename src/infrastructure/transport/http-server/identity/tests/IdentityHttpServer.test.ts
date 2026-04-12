@@ -80,6 +80,65 @@ describe("IdentityHttpServer", () => {
     expect(details?.routeFamilyIds).toEqual(["identity-auth"]);
   });
 
+  it("supports hybrid modular and legacy route handling during migration", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      routeFamilyHandlers: Object.freeze({
+        "identity-auth": ({ path, method, response }) => {
+          if (method !== "GET" || path !== "/api/v1/identity/session") {
+            return Object.freeze({ handled: false });
+          }
+
+          response.statusCode = 200;
+          response.setHeader("content-type", "application/json; charset=utf-8");
+          response.end(JSON.stringify({
+            ok: true,
+            data: {
+              delegated: true,
+            },
+          }));
+          return Object.freeze({ handled: true });
+        },
+      }),
+    });
+
+    const legacyRouteResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "hybrid.route.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(legacyRouteResponse.status).toBe(200);
+    const legacyRouteBody = await legacyRouteResponse.json();
+    expect(legacyRouteBody.ok).toBe(true);
+
+    const modularRouteResponse = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+    });
+    expect(modularRouteResponse.status).toBe(200);
+    const modularRouteBody = await modularRouteResponse.json();
+    expect(modularRouteBody.ok).toBe(true);
+    expect(modularRouteBody.data.delegated).toBe(true);
+
+    const fallbackEvent = logger.events.find((entry) => (
+      entry.event === "identity-http.route-family.legacy-fallback"
+      && entry.path === "/api/v1/identity/register"
+    ));
+    expect(fallbackEvent).toBeDefined();
+
+    const modularEvent = logger.events.find((entry) => (
+      entry.event === "identity-http.route-family.modular-handled"
+      && entry.path === "/api/v1/identity/session"
+    ));
+    expect(modularEvent).toBeDefined();
+  });
+
   it("supports development login route when explicitly enabled", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger, {}, {
