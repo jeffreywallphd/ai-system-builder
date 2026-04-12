@@ -39,19 +39,21 @@ export async function composeServerSecretCompositionModule(
   input: ServerSecretCompositionModuleInput,
 ): Promise<ServerSecretCompositionModuleOutput> {
   const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(input.env);
+  const secretAuditHook = composeBestEffortSecretAuditHooks(
+    input.legacySecretAccessAuditHook,
+    createAuthoritativeSecretAccessAuditHook(input.authoritativeAuditRecorder),
+  );
   const secretService = composeServerSecretService({
     databasePath: input.databasePath,
     env: input.env,
     observabilityLogger: input.observabilityLogger,
-    auditHook: composeBestEffortSecretAuditHooks(
-      input.legacySecretAccessAuditHook,
-      createAuthoritativeSecretAccessAuditHook(input.authoritativeAuditRecorder),
-    ),
+    auditHook: secretAuditHook,
   });
 
   await assertSystemSecretBootstrapSafe({
     env: input.env,
     secretService,
+    auditHook: secretAuditHook,
   });
 
   const secretMetadataBackendApi = new SecretMetadataBackendApi({

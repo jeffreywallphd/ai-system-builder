@@ -47,6 +47,20 @@ Migration toggle:
 - Bootstrap-generated signing keys are tagged with metadata indicating bootstrap source/policy and remain durable across restarts.
 - Runtime critical-material resolver no longer performs provider bootstrap writes during lookup; mutation now stays in explicit bootstrap flows.
 
+## Story 3.4.3 security material lifecycle audit hooks
+
+- Scoped provider metadata/existence/runtime retrieval checks now emit secret audit events for:
+  - access decisions (`allowed` / `denied`)
+  - operation outcomes (`succeeded` / `missing` / `denied` / `rejected` / `failed`)
+- Bootstrap lifecycle paths now produce audit records for:
+  - bootstrap creation and first-activation of required secrets
+  - bootstrap validation attempts that fail due to missing or unusable material
+  - backend-resolved metadata/runtime checks (including backend kind in safe details where available)
+- Secret lifecycle mutation events (`create`, `rotate`, `revoke-version`, `retire-version`) now carry safe contextual details in audit payloads.
+- Audit payload safety posture:
+  - no raw secret plaintext, key bytes, or token material is emitted
+  - operation details are redacted through shared secret-redaction safeguards before authoritative persistence.
+
 ## Test posture
 
 Coverage verifies:

@@ -154,6 +154,21 @@ describe("Secret version lifecycle use cases", () => {
     if (!revoked.ok) {
       return;
     }
+    const revokeOperationEvent = audit.events.find((event) => (
+      event.eventKind === "secret.operation"
+      && event.operation === SecretAccessActions.revokeVersion
+      && event.status === "succeeded"
+    ));
+    expect(revokeOperationEvent).toBeDefined();
+    expect(revokeOperationEvent).toMatchObject({
+      eventKind: "secret.operation",
+      operation: SecretAccessActions.revokeVersion,
+      status: "succeeded",
+      reasonCode: "operation-succeeded",
+      details: {
+        versionId: `${seeded.record.secretId}:v1`,
+      },
+    });
     expect(revoked.value.currentVersionId).toBe(`${seeded.record.secretId}:v2`);
 
     const persisted = await repository.findSecretById(seeded.record.secretId);
@@ -225,6 +240,21 @@ describe("Secret version lifecycle use cases", () => {
     if (!retired.ok) {
       return;
     }
+    const retireOperationEvent = audit.events.find((event) => (
+      event.eventKind === "secret.operation"
+      && event.operation === SecretAccessActions.retireVersion
+      && event.status === "succeeded"
+    ));
+    expect(retireOperationEvent).toBeDefined();
+    expect(retireOperationEvent).toMatchObject({
+      eventKind: "secret.operation",
+      operation: SecretAccessActions.retireVersion,
+      status: "succeeded",
+      reasonCode: "operation-succeeded",
+      details: {
+        versionId: `${seeded.record.secretId}:v2`,
+      },
+    });
     expect(retired.value.currentVersionId).toBeUndefined();
 
     const persisted = await repository.findSecretById(seeded.record.secretId);

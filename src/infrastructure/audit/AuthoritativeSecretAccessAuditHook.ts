@@ -4,6 +4,7 @@ import {
   type SecretAccessAuditEvent,
 } from "@application/security/ports/SecretServicePorts";
 import { AuditActorKinds, AuditEventOutcomes, AuditScopeKinds } from "@domain/audit/AuditDomain";
+import { redactSecretMaterial } from "@shared/security/SecretRedaction";
 
 export function createAuthoritativeSecretAccessAuditHook(
   recorder: AuthoritativeAuditRecordingPort,
@@ -13,6 +14,7 @@ export function createAuthoritativeSecretAccessAuditHook(
     const actor = resolveActor(event);
     const scope = resolveScope(event);
     const secretId = normalizeOptional(event.target.secretId);
+    const sanitizedDetails = sanitizeSecretAuditDetails(event.details);
     const operationKey = normalizeOptional(event.operationKey)
       ?? `secret:${event.eventKind}:${operation}:${secretId ?? "unknown"}:${event.occurredAt}`;
 
@@ -46,11 +48,13 @@ export function createAuthoritativeSecretAccessAuditHook(
           scope: event.target.scope,
           workspaceId: normalizeOptional(event.target.workspaceId),
           userIdentityId: normalizeOptional(event.target.userIdentityId),
+          detailKeys: sanitizedDetails ? Object.freeze(Object.keys(sanitizedDetails)) : undefined,
         }),
         adminOnlyDetails: Object.freeze({
           operationKey: normalizeOptional(event.operationKey),
           serviceIdentity: normalizeOptional(event.serviceIdentity),
           justification: "justification" in event ? normalizeOptional(event.justification) : undefined,
+          details: sanitizedDetails,
         }),
       }),
     });
@@ -154,4 +158,14 @@ function resolveOutcome(
 function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function sanitizeSecretAuditDetails(
+  details: Readonly<Record<string, unknown>> | undefined,
+): Readonly<Record<string, unknown>> | undefined {
+  if (!details) {
+    return undefined;
+  }
+
+  return redactSecretMaterial(details);
 }

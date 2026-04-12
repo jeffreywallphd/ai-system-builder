@@ -239,6 +239,19 @@ describe("RotateSecretUseCase", () => {
       rotatedAt: "2026-04-06T11:00:00.000Z",
     });
     expect(firstRotate.ok).toBeTrue();
+    const firstRotateAudit = audit.events.find((event) => (
+      event.eventKind === "secret.operation"
+      && event.operation === SecretAccessActions.rotate
+      && event.status === "succeeded"
+      && event.target.secretId === seeded.secretId
+    ));
+    expect(firstRotateAudit).toBeDefined();
+    expect(firstRotateAudit).toMatchObject({
+      details: {
+        activatedVersionId: `${seeded.secretId}:v2`,
+        previousVersionId: `${seeded.secretId}:v1`,
+      },
+    });
 
     const secondRotate = await rotateUseCase.execute({
       actor: createServerAdminActor([SecretAccessActions.rotate]),
