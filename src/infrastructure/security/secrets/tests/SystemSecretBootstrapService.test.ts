@@ -46,6 +46,8 @@ describe("SystemSecretBootstrapService", () => {
       expect(result.state).toBe(SystemSecretBootstrapStates.ready);
       expect(result.migratedSecretIds).toEqual(["secret:server:provider:openai"]);
       expect(result.diagnostics).toHaveLength(0);
+      expect(result.materialMetadata).toHaveLength(1);
+      expect((result.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
 
       const metadata = await service.getSecretMetadataUseCase.execute({
         actor: {
@@ -89,6 +91,7 @@ describe("SystemSecretBootstrapService", () => {
           secretId: "secret:server:provider:huggingface",
         }),
       ]);
+      expect(result.materialMetadata).toHaveLength(0);
     } finally {
       service.dispose();
     }
@@ -118,6 +121,7 @@ describe("SystemSecretBootstrapService", () => {
           secretId: "secret:server:provider:openai",
         }),
       ]);
+      expect(result.materialMetadata).toHaveLength(0);
     } finally {
       service.dispose();
     }
@@ -147,6 +151,8 @@ describe("SystemSecretBootstrapService", () => {
       expect(result.state).toBe(SystemSecretBootstrapStates.ready);
       expect(result.migratedSecretIds).toEqual(["secret:server:signing:identity-session"]);
       expect(result.diagnostics).toHaveLength(0);
+      expect(result.materialMetadata).toHaveLength(1);
+      expect((result.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
     } finally {
       service.dispose();
     }
@@ -185,6 +191,7 @@ describe("SystemSecretBootstrapService", () => {
           fallbackPolicy: "generate-ephemeral-for-development",
         }),
       ]);
+      expect(result.materialMetadata).toHaveLength(0);
     } finally {
       service.dispose();
     }
@@ -223,6 +230,7 @@ describe("SystemSecretBootstrapService", () => {
           fallbackPolicy: "migrate-legacy-input",
         }),
       ]);
+      expect(result.materialMetadata).toHaveLength(0);
     } finally {
       service.dispose();
     }

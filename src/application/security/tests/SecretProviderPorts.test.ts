@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { SecretKinds, SecretScopes } from "@domain/security/SecretDomain";
 import {
+  SecretProviderMaterialBackendKinds,
   SecretProviderBootstrapOutcomes,
   SecretProviderMaterialKinds,
+  SecretProviderMaterialRotationStatuses,
   type ISecretProviderMaterialResolutionPort,
 } from "../ports/SecretProviderPorts";
 
@@ -37,6 +39,10 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
           scope: SecretScopes.server,
         },
         materialKind: SecretProviderMaterialKinds.providerCredential,
+        backend: {
+          backendId: SecretProviderMaterialBackendKinds.durableServerSecretStore,
+          backendKind: SecretProviderMaterialBackendKinds.durableServerSecretStore,
+        },
         reference: {
           secretId: "secret:server:provider:openai",
           name: "provider.openai.api-key",
@@ -49,6 +55,18 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
             labels: {},
           },
           updatedAt: "2026-04-08T00:00:00.000Z",
+        },
+        timestamps: {
+          updatedAt: "2026-04-08T00:00:00.000Z",
+        },
+        rotation: {
+          status: SecretProviderMaterialRotationStatuses.active,
+          currentVersionId: "secret:server:provider:openai:v1",
+        },
+        policyFlags: {
+          metadataSafeForDiagnostics: true,
+          plaintextAccessRequiresDedicatedRetrievalFlow: true,
+          failFastRequiredOnStartup: true,
         },
       },
     };
@@ -79,6 +97,10 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
             scope: SecretScopes.server,
           },
           materialKind: SecretProviderMaterialKinds.providerCredential,
+          backend: {
+            backendId: SecretProviderMaterialBackendKinds.durableServerSecretStore,
+            backendKind: SecretProviderMaterialBackendKinds.durableServerSecretStore,
+          },
           reference: {
             secretId: "secret:server:provider:openai",
             name: "provider.openai.api-key",
@@ -92,6 +114,18 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
             },
             updatedAt: "2026-04-08T00:00:00.000Z",
           },
+          timestamps: {
+            updatedAt: "2026-04-08T00:00:00.000Z",
+          },
+          rotation: {
+            status: SecretProviderMaterialRotationStatuses.active,
+            currentVersionId: "secret:server:provider:openai:v1",
+          },
+          policyFlags: {
+            metadataSafeForDiagnostics: true,
+            plaintextAccessRequiresDedicatedRetrievalFlow: true,
+            failFastRequiredOnStartup: true,
+          },
         },
       },
     };
@@ -102,6 +136,7 @@ describe("SecretProviderPorts", () => {
   it("defines typed provider material kinds and bootstrap outcomes", () => {
     expect(SecretProviderMaterialKinds.providerCredential).toBe("provider-credential");
     expect(SecretProviderMaterialKinds.signingMaterial).toBe("signing-material");
+    expect(SecretProviderMaterialBackendKinds.durableServerSecretStore).toBe("durable-server-secret-store");
     expect(SecretProviderBootstrapOutcomes.created).toBe("created");
     expect(SecretProviderBootstrapOutcomes.existing).toBe("existing");
   });
@@ -130,5 +165,30 @@ describe("SecretProviderPorts", () => {
         exists: true,
       },
     });
+  });
+
+  it("returns metadata models without raw secret values in metadata flow", async () => {
+    const port = new StubSecretProviderResolutionPort();
+    const metadata = await port.resolveSecretProviderMaterialMetadata({
+      selector: {
+        providerId: "openai",
+        secretId: "secret:server:provider:openai",
+        scope: {
+          scope: SecretScopes.server,
+        },
+        materialKind: SecretProviderMaterialKinds.providerCredential,
+      },
+      access: {
+        operationKey: "op:test:provider:metadata",
+        serviceIdentity: "runtime:server:test",
+        usage: "metadata-check",
+      },
+    });
+
+    expect(metadata.ok).toBeTrue();
+    if (!metadata.ok) {
+      return;
+    }
+    expect((metadata.value as Record<string, unknown>).rawValue).toBeUndefined();
   });
 });

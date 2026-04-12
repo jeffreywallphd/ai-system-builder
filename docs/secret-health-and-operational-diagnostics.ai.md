@@ -21,11 +21,14 @@ Story 8.3.5 baseline for Feature 8 / Epic 8.3: add production-safe secret servic
 
 General health intentionally returns state + flags only. Detailed diagnostics adds top-level service diagnostics plus required-secret IDs and bootstrap diagnostics codes/messages/severities.
 
+Detailed diagnostics now also expose `bootstrap.materialMetadata`: metadata-only provider-material descriptors (identity, scope, backend, timestamps, rotation posture, policy flags, and reference metadata) for required bootstrap secrets that resolved successfully.
+
 ## Safety posture
 
 - No plaintext values.
 - No encrypted payload refs, key material, or secret-store locators.
 - Diagnostic message sanitization still applies through existing secret error redaction safeguards.
+- `bootstrap.materialMetadata` remains metadata-only and does not include `rawValue` or decrypted payload fields.
 
 ## Health signals
 

@@ -41,8 +41,9 @@ Detailed diagnostics include:
 - `diagnostics[]`: overall service findings (for example repository or encryption posture)
 - `bootstrap.requiredSecretIds`
 - `bootstrap.diagnostics[]`
+- `bootstrap.materialMetadata[]`: metadata-only provider-material descriptors for required bootstrap secrets that resolved successfully (identity/scope/backend/timestamps/rotation/policy/reference metadata)
 
-All diagnostic entries contain code/severity/message/secretId only.
+All diagnostic entries contain code/severity/message/secretId only. `bootstrap.materialMetadata[]` remains metadata-only and excludes raw secret/decrypted value fields.
 
 Common diagnostic codes:
 

@@ -10,6 +10,8 @@ import {
 import type { ISecretAccessPolicyPort } from "../ports/SecretServicePorts";
 import {
   SecretProviderMaterialKinds,
+  SecretProviderMaterialBackendKinds,
+  SecretProviderMaterialRotationStatuses,
   type ISecretProviderMaterialResolutionPort,
   type ResolveSecretProviderMaterialExistenceInput,
   type ResolveSecretProviderMaterialInput,
@@ -57,6 +59,10 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
         secretId: input.selector.secretId,
         scope: input.selector.scope,
         materialKind: input.selector.materialKind,
+        backend: {
+          backendId: SecretProviderMaterialBackendKinds.managedSecretService,
+          backendKind: SecretProviderMaterialBackendKinds.managedSecretService,
+        },
         reference: {
           secretId: input.selector.secretId,
           name: "provider.openai.api-key",
@@ -71,6 +77,17 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
             labels: {},
           },
           updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+        timestamps: {
+          updatedAt: "2026-04-10T00:00:00.000Z",
+        },
+        rotation: {
+          status: SecretProviderMaterialRotationStatuses.active,
+          currentVersionId: `${input.selector.secretId}:v1`,
+        },
+        policyFlags: {
+          metadataSafeForDiagnostics: true,
+          plaintextAccessRequiresDedicatedRetrievalFlow: true,
         },
       },
     };
@@ -199,6 +216,9 @@ describe("ScopedSecretProviderMaterialRetrievalUseCase", () => {
     const exists = await useCase.userScopedSecretProviderMaterialExists(request);
 
     expect(metadata.ok).toBeTrue();
+    if (metadata.ok) {
+      expect((metadata.value as Record<string, unknown>).rawValue).toBeUndefined();
+    }
     expect(exists).toEqual({
       ok: true,
       value: {

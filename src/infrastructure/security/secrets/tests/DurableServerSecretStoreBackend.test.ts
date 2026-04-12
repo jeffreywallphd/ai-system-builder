@@ -133,6 +133,10 @@ describe("DurableServerSecretStoreBackend", () => {
         access: createAccess("op:test:server-secret:metadata-after-restart"),
       });
       expect(metadata.ok).toBeTrue();
+      if (metadata.ok) {
+        expect(metadata.value.backend.backendKind).toBe("durable-server-secret-store");
+        expect((metadata.value as Record<string, unknown>).rawValue).toBeUndefined();
+      }
 
       const runtime = await backendTwo.resolveServerMaterial({
         selector: createServerSelector("secret:server:provider:openai"),

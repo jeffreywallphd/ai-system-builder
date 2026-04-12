@@ -11,9 +11,9 @@ import type {
   ResolveSecretProviderMaterialExistenceInput,
   ResolveSecretProviderMaterialMetadataInput,
   ResolveSecretProviderMaterialInput,
+  SecretProviderMaterialMetadata,
   ResolvedSecretProviderMaterialValue,
   SecretProviderMaterialKind,
-  SecretProviderMaterialReference,
 } from "../ports/SecretProviderPorts";
 import type { ISecretAccessPolicyPort } from "../ports/SecretServicePorts";
 import {
@@ -99,7 +99,7 @@ export class ScopedSecretProviderMaterialRetrievalUseCase {
 
   public async getServerScopedSecretProviderMaterialMetadata(
     request: GetServerScopedSecretProviderMaterialMetadataRequest,
-  ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
+  ): Promise<SecretServiceResult<SecretProviderMaterialMetadata>> {
     return this.getScopedSecretProviderMaterialMetadata(request, {
       scope: SecretScopes.server,
     });
@@ -107,7 +107,7 @@ export class ScopedSecretProviderMaterialRetrievalUseCase {
 
   public async getWorkspaceScopedSecretProviderMaterialMetadata(
     request: GetWorkspaceScopedSecretProviderMaterialMetadataRequest,
-  ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
+  ): Promise<SecretServiceResult<SecretProviderMaterialMetadata>> {
     return this.getScopedSecretProviderMaterialMetadata(request, {
       scope: SecretScopes.workspace,
       workspaceId: request.workspaceId,
@@ -116,7 +116,7 @@ export class ScopedSecretProviderMaterialRetrievalUseCase {
 
   public async getUserScopedSecretProviderMaterialMetadata(
     request: GetUserScopedSecretProviderMaterialMetadataRequest,
-  ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
+  ): Promise<SecretServiceResult<SecretProviderMaterialMetadata>> {
     return this.getScopedSecretProviderMaterialMetadata(request, {
       scope: SecretScopes.user,
       workspaceId: request.workspaceId,
@@ -176,7 +176,7 @@ export class ScopedSecretProviderMaterialRetrievalUseCase {
   private async getScopedSecretProviderMaterialMetadata(
     request: ScopedSecretProviderMaterialRequestBase,
     ownerInput: SecretScopeOwner,
-  ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
+  ): Promise<SecretServiceResult<SecretProviderMaterialMetadata>> {
     const prepared = await this.prepareRequest(request, ownerInput, SecretAccessActions.readMetadata);
     if (!prepared.ok) {
       return prepared;

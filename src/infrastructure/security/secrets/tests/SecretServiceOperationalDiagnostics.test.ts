@@ -54,6 +54,8 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
       expect(diagnostics.healthFlags.bootstrapSecretsHealthy).toBeTrue();
       expect(diagnostics.diagnostics).toHaveLength(0);
       expect(diagnostics.bootstrap.diagnostics).toHaveLength(0);
+      expect(diagnostics.bootstrap.materialMetadata).toHaveLength(1);
+      expect((diagnostics.bootstrap.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
     } finally {
       secretService.dispose();
       rmSync(root, { recursive: true, force: true });
@@ -85,6 +87,7 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
       expect(diagnostics.healthFlags.repositoryReachable).toBeTrue();
       expect(diagnostics.healthFlags.bootstrapSecretsHealthy).toBeFalse();
       expect(diagnostics.bootstrap.requiredSecretIds).toEqual(["secret:server:provider:openai"]);
+      expect(diagnostics.bootstrap.materialMetadata).toHaveLength(0);
       expect(diagnostics.diagnostics.some((entry) => entry.code === "secret-encryption-unavailable")).toBeTrue();
       expect(diagnostics.bootstrap.diagnostics.some((entry) => entry.code === "required-secret-missing")).toBeTrue();
       expect(diagnostics.bootstrap.diagnostics.some((entry) => entry.message.includes("sk-live"))).toBeFalse();
