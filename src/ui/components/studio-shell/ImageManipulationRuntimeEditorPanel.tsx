@@ -3383,26 +3383,67 @@ export function ImageManipulationRuntimeEditorPanel({
             resolvedPreviewPathsByFileName={uploadedPreviewPathsByFileName}
             configuredSavePath={uploadSavePathHint}
             onUploadRequested={(event) => {
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("Upload Requested...");
+              console.log(" ");
+              console.log("------------------------------------------------------");
               const file = event.files[0];
               if (!file) {
                 return;
               }
+
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("File received...");
+              console.log(" ");
+              console.log("------------------------------------------------------");
+
               if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+                console.log("------------------------------------------------------");
+                console.log(" ");
+                console.log("Identity not confirmed");
+                console.log(" ");
+                console.log("------------------------------------------------------");
                 setStatusMessage("Sign in to upload images.");
                 return;
               }
+
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("Identity confirmed");
+              console.log(" ");
+              console.log("------------------------------------------------------");
+
               setStatusMessage(undefined);
               setUploadedPreviewPathsByFileName(Object.freeze({}));
               setIsUploading(true);
               setUploadProgressStage("uploading");
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("Preparing to encode...");
+              console.log(" ");
+              console.log("------------------------------------------------------");
               void encodeFileBase64(file)
                 .then(async (payloadBase64) => {
+                  console.log("------------------------------------------------------");
+                  console.log(" ");
+                  console.log("Uploading...");
+                  console.log(" ");
+                  console.log("------------------------------------------------------");
                   const uploaded = await imageAssets.uploadStudioSourceImage({
                     file,
                     actorUserIdentityId,
                     workspaceId,
                     sessionToken,
                   });
+                  console.log("------------------------------------------------------");
+                  console.log(" ");
+                  console.log("Uploaded:");
+                  console.log(uploaded);
+                  console.log(" ");
+                  console.log("------------------------------------------------------");
+
                   if (!uploaded.ok || !uploaded.data) {
                     setStatusMessage(uploaded.error?.message ?? "We couldn't upload this photo.");
                     return undefined;

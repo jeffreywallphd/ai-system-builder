@@ -66,6 +66,13 @@ export class ImageAssetManagementService {
       return this.failed("invalid-request", "This image type is not supported.");
     }
 
+    console.log("------------------------------------------------------");
+    console.log(" ");
+    console.log("Incoming Request:");
+    console.log(request);
+    console.log(" ");
+    console.log("------------------------------------------------------");
+
     const fingerprint = await this.computeSha256Digest(request.file);
     const createRequest: CreateImageAssetApiRequest = Object.freeze({
       actorUserIdentityId: request.actorUserIdentityId,
@@ -83,10 +90,25 @@ export class ImageAssetManagementService {
       }),
     });
 
+    console.log("------------------------------------------------------");
+    console.log(" ");
+    console.log("Configured Request:");
+    console.log(createRequest);
+    console.log(" ");
+    console.log("------------------------------------------------------");
+
     const created = await this.requestJson<CreateImageAssetApiResponse>("POST", ImageAssetTransportRoutes.createImageAsset, {
       sessionToken: request.sessionToken,
       body: createRequest,
     });
+
+    console.log("------------------------------------------------------");
+    console.log(" ");
+    console.log("Response:");
+    console.log(created);
+    console.log(" ");
+    console.log("------------------------------------------------------");
+
     if (!created.ok || !created.data) {
       return created as ImageAssetManagementApiResponse<{ readonly assetId: string }>;
     }
