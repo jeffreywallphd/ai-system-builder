@@ -17,6 +17,7 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - Dedicated entrypoint assembly: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
 - Runtime host implementation composed by the root: `src/hosts/server/IdentityServerHost.ts`
+- Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
 The entrypoint composes and starts the host through:
@@ -29,6 +30,13 @@ Story B.2.1 also introduces an auth-minimal startup entrypoint for pre-login des
 - `src/hosts/server/AuthMinimalIdentityServerHost.ts`
 
 This path still uses the shared authoritative host lifecycle/startup pipeline, but narrows route registration and startup persistence composition to auth-critical concerns.
+
+Story 2.1.2 adds the first bounded-control-plane composition scaffold:
+
+- module contracts: `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleContracts.ts`
+- module map: `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleMap.ts`
+- composition placement guidance: `src/hosts/server/composition/README.md`
+- contract guardrail test: `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts`
 
 ## Control-plane composition responsibilities
 
