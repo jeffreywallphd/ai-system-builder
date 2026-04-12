@@ -64,6 +64,36 @@ describe("ResolveCriticalServerSecurityMaterial", () => {
     expect(first).toBe(second);
     expect(Buffer.from(first, "base64").length).toBe(32);
   });
+
+  it("rejects generated fallback when startup validation marks the lifecycle as production-capable", () => {
+    expect(() => resolveCriticalServerSecurityMaterial({
+      environment: Object.freeze({}),
+      materialId: "material:server:asset-download-grant-secret",
+      environmentKey: "AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET",
+      materialFormat: "string-secret",
+      startupSecurityMaterialValidation: createValidationResult({
+        materialId: "material:server:asset-download-grant-secret",
+        lifecycleStage: "production",
+        productionCapable: true,
+        sourceKind: "generated-ephemeral",
+      }),
+    })).toThrow("Material is not eligible for governed development fallback in the current lifecycle policy.");
+  });
+
+  it("rejects fallback when observation source is not generated-ephemeral", () => {
+    expect(() => resolveCriticalServerSecurityMaterial({
+      environment: Object.freeze({}),
+      materialId: "material:server:image-upload-session-token-secret",
+      environmentKey: "AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET",
+      materialFormat: "string-secret",
+      startupSecurityMaterialValidation: createValidationResult({
+        materialId: "material:server:image-upload-session-token-secret",
+        lifecycleStage: "development",
+        productionCapable: false,
+        sourceKind: "environment",
+      }),
+    })).toThrow("Material is not eligible for governed development fallback in the current lifecycle policy.");
+  });
 });
 
 function createValidationResult(input: {

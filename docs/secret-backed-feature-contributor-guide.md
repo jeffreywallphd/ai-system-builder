@@ -26,6 +26,28 @@ Use this document when implementing any feature that needs:
 
 If health is `degraded` or `unhealthy`, resolve repository/encryption/bootstrap diagnostics before adding dependent runtime features.
 
+## Startup security material baseline (Story 3.1.6)
+
+Authoritative startup now enforces regression-tested fail-fast behavior for security-critical material. Use this baseline when running locally:
+
+- Production-like startup (`AI_LOOM_ENVIRONMENT_NAME=production` or `NODE_ENV=production`) requires durable configured values for:
+  - `AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET`
+  - `AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY` (or durable `AI_LOOM_SECRET_MASTER_KEY` legacy source)
+  - `AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET` (or durable `AI_LOOM_SECRET_MASTER_KEY` legacy source)
+  - `AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET` (or durable `AI_LOOM_SECRET_MASTER_KEY` legacy source)
+  - `AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET` (or durable `AI_LOOM_SECRET_MASTER_KEY` legacy source)
+  - `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS` (non-empty list for required system secrets such as signing/provider secrets)
+- Development/test startup (`AI_LOOM_ENVIRONMENT_NAME=development`, `NODE_ENV=development`, or `NODE_ENV=test`) can continue with warning diagnostics when optional ephemeral fallback policy applies.
+- Managed TLS startup is policy-gated:
+  - when `AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED=true`, set `AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF` and keep `AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID` server-scoped (`server:*`),
+  - when managed TLS is disabled, CA private-key reference validation is not required for startup.
+
+Recommended local development pattern:
+
+1. Keep explicit durable values in your local environment for production-like validation runs.
+2. Use development profile for day-to-day work when intentionally exercising governed warning-only fallback behavior.
+3. Include signing/provider material IDs in `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS` so startup checks validate the same critical inventory expected in deployment.
+
 ## Scope and ownership decision guide
 
 Use ownership-first selection:
