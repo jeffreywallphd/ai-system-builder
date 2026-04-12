@@ -108,6 +108,26 @@ npm run docs:validate:cross-references
 npm run docs:validate:category-compliance
 ```
 
+## Lint Output Triage Flow
+
+`npm run docs:lint` now prints actionable failure sections in this order:
+
+1. Check status summary (`[PASS]` / `[FAIL]`).
+2. Severity summary (`critical`, `important`, `advisory` counts).
+3. Per-check triage block:
+   - check description,
+   - quick-fix guidance,
+   - canonical guide paths,
+   - issue list with severity + stable code + message,
+   - extracted `file:` reference when present,
+   - raw validator output for deep debugging.
+
+Use this order to fix issues quickly without scanning policy docs first:
+
+- Start with `critical` issues.
+- Use the `file:` line to open the failing artifact immediately.
+- Use `Guides:` links only when message context is insufficient.
+
 ## Failure Output
 
 Failures are printed with stable error codes so contributors can quickly locate the issue type.
