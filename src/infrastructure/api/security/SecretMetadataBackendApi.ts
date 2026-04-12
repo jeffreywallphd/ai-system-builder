@@ -1007,6 +1007,9 @@ function sanitizeSecretServiceOperationalDiagnostics(
       severity: entry.severity,
       message: toSafeClientErrorMessage(entry.message, "Secret service diagnostic emitted."),
       secretId: normalizeOptional(entry.secretId),
+      startupRequirement: entry.startupRequirement,
+      durabilityClass: entry.durabilityClass,
+      fallbackPolicy: entry.fallbackPolicy,
     }))),
     bootstrap: Object.freeze({
       requiredSecretIds: Object.freeze([...input.bootstrap.requiredSecretIds]),
@@ -1015,6 +1018,9 @@ function sanitizeSecretServiceOperationalDiagnostics(
         severity: entry.severity,
         message: toSafeClientErrorMessage(entry.message, "Secret service diagnostic emitted."),
         secretId: normalizeOptional(entry.secretId),
+        startupRequirement: entry.startupRequirement,
+        durabilityClass: entry.durabilityClass,
+        fallbackPolicy: entry.fallbackPolicy,
       }))),
       materialMetadata: Object.freeze(input.bootstrap.materialMetadata.map((item) => Object.freeze({
         providerId: normalizeOptional(item.providerId) ?? "",
@@ -1056,6 +1062,70 @@ function sanitizeSecretServiceOperationalDiagnostics(
           metadataSafeForDiagnostics: true,
           plaintextAccessRequiresDedicatedRetrievalFlow: true,
           failFastRequiredOnStartup: item.policyFlags.failFastRequiredOnStartup,
+        }),
+      }))),
+    }),
+    securityMaterial: Object.freeze({
+      lifecycleStage: input.securityMaterial.lifecycleStage,
+      summary: Object.freeze({
+        total: input.securityMaterial.summary.total,
+        healthy: input.securityMaterial.summary.healthy,
+        degraded: input.securityMaterial.summary.degraded,
+        missing: input.securityMaterial.summary.missing,
+        nonCompliant: input.securityMaterial.summary.nonCompliant,
+      }),
+      entries: Object.freeze(input.securityMaterial.entries.map((entry) => Object.freeze({
+        secretId: normalizeOptional(entry.secretId) ?? "",
+        state: entry.state,
+        present: entry.present,
+        degraded: entry.degraded,
+        nonCompliant: entry.nonCompliant,
+        fallbackModeActive: entry.fallbackModeActive,
+        provider: Object.freeze({
+          providerId: normalizeOptional(entry.provider.providerId) ?? "unknown",
+          materialKind: entry.provider.materialKind,
+        }),
+        classification: Object.freeze({
+          materialId: normalizeOptional(entry.classification.materialId) ?? "material:unknown",
+          category: entry.classification.category,
+          scope: entry.classification.scope,
+          rotationPosture: entry.classification.rotationPosture,
+          usageContexts: Object.freeze([...entry.classification.usageContexts]),
+        }),
+        policy: Object.freeze({
+          startupRequirement: entry.policy.startupRequirement,
+          durabilityClass: entry.policy.durabilityClass,
+          fallbackPolicy: entry.policy.fallbackPolicy,
+        }),
+        backend: entry.backend
+          ? Object.freeze({
+            backendId: normalizeOptional(entry.backend.backendId) ?? "unknown",
+            backendKind: normalizeOptional(entry.backend.backendKind) ?? "unknown",
+          })
+          : undefined,
+        rotation: Object.freeze({
+          status: normalizeOptional(entry.rotation.status) ?? "unknown",
+          currentVersionId: normalizeOptional(entry.rotation.currentVersionId),
+        }),
+        validation: Object.freeze({
+          failures: Object.freeze(entry.validation.failures.map((failure) => Object.freeze({
+            code: normalizeOptional(failure.code) ?? "secret-diagnostic",
+            severity: failure.severity,
+            message: toSafeClientErrorMessage(failure.message, "Secret service diagnostic emitted."),
+            secretId: normalizeOptional(failure.secretId),
+            startupRequirement: failure.startupRequirement,
+            durabilityClass: failure.durabilityClass,
+            fallbackPolicy: failure.fallbackPolicy,
+          }))),
+          warnings: Object.freeze(entry.validation.warnings.map((warning) => Object.freeze({
+            code: normalizeOptional(warning.code) ?? "secret-diagnostic",
+            severity: warning.severity,
+            message: toSafeClientErrorMessage(warning.message, "Secret service diagnostic emitted."),
+            secretId: normalizeOptional(warning.secretId),
+            startupRequirement: warning.startupRequirement,
+            durabilityClass: warning.durabilityClass,
+            fallbackPolicy: warning.fallbackPolicy,
+          }))),
         }),
       }))),
     }),

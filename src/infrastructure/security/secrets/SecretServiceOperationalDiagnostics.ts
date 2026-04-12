@@ -2,10 +2,13 @@
 import {
   SystemSecretBootstrapStates,
   bootstrapSystemSecretsFromEnvironment,
+  resolveSystemSecretBootstrapLifecycleStage,
+  resolveSystemSecretGovernanceDescriptor,
 } from "./SystemSecretBootstrapService";
 import type { ServerComposedSecretService } from "./SecretServiceComposition";
 import {
   type SecretProviderMaterialMetadataDto,
+  SecurityMaterialDiagnosticStates,
   SecretServiceDiagnosticSeverities,
   SecretServiceHealthStates,
   type SecretServiceHealthFlagsDto,
@@ -55,9 +58,23 @@ export class SecretServiceOperationalDiagnosticsProvider implements ISecretServi
         : SecretServiceDiagnosticSeverities.warning,
       message: diagnostic.message,
       secretId: diagnostic.secretId,
+      startupRequirement: diagnostic.startupRequirement,
+      durabilityClass: diagnostic.durabilityClass,
+      fallbackPolicy: diagnostic.fallbackPolicy,
     }));
 
     diagnostics.push(...bootstrapDiagnostics);
+
+    const lifecycleStage = resolveSystemSecretBootstrapLifecycleStage(this.input.env);
+    const securityMaterialEntries = bootstrapResult.requiredSecretIds.map((secretId) => (
+      this.toSecurityMaterialEntry({
+        secretId,
+        lifecycleStage,
+        bootstrapDiagnostics,
+        materialMetadata: bootstrapResult.materialMetadata.map((item) => toSecretProviderMaterialMetadataDto(item)),
+      })
+    ));
+    const securityMaterialSummary = summarizeSecurityMaterialEntries(securityMaterialEntries);
 
     const encryptionMaterialAvailable = this.input.secretService.status.configured;
     if (!encryptionMaterialAvailable) {
@@ -94,6 +111,107 @@ export class SecretServiceOperationalDiagnosticsProvider implements ISecretServi
         materialMetadata: Object.freeze(
           bootstrapResult.materialMetadata.map((item) => toSecretProviderMaterialMetadataDto(item)),
         ),
+      }),
+      securityMaterial: Object.freeze({
+        lifecycleStage,
+        summary: securityMaterialSummary,
+        entries: Object.freeze(securityMaterialEntries),
+      }),
+    });
+  }
+
+  private toSecurityMaterialEntry(input: {
+    readonly secretId: string;
+    readonly lifecycleStage: "production" | "development" | "test";
+    readonly bootstrapDiagnostics: ReadonlyArray<SecretServiceOperationalDiagnosticDto>;
+    readonly materialMetadata: ReadonlyArray<SecretProviderMaterialMetadataDto>;
+  }) {
+    const governance = resolveSystemSecretGovernanceDescriptor(input.secretId);
+    const validation = input.bootstrapDiagnostics.filter((entry) => entry.secretId === input.secretId);
+    const failures = validation.filter((entry) => entry.severity === SecretServiceDiagnosticSeverities.error);
+    const warnings = validation.filter((entry) => entry.severity !== SecretServiceDiagnosticSeverities.error);
+    const metadata = input.materialMetadata.find((entry) => entry.secretId === input.secretId);
+    const resolvedPolicy = governance
+      ? resolveGovernancePolicyForLifecycle({
+        lifecycleStage: input.lifecycleStage,
+        defaultPolicy: governance.policies.defaultPolicy,
+        developmentPolicy: governance.policies.developmentPolicy,
+        testPolicy: governance.policies.testPolicy,
+      })
+      : undefined;
+    const present = Boolean(metadata);
+    const nonCompliant = failures.length > 0;
+    const degraded = !present || nonCompliant || warnings.length > 0;
+    const fallbackModeActive = warnings.some((entry) => (
+      entry.code === "optional-secret-missing"
+      || entry.code === "optional-secret-unusable"
+      || entry.code === "non-durable-source"
+      || entry.code === "disallowed-source"
+    ));
+    const state = !present
+      ? SecurityMaterialDiagnosticStates.missing
+      : nonCompliant
+        ? SecurityMaterialDiagnosticStates.nonCompliant
+        : degraded
+          ? SecurityMaterialDiagnosticStates.degraded
+          : SecurityMaterialDiagnosticStates.healthy;
+
+    return Object.freeze({
+      secretId: input.secretId,
+      state,
+      present,
+      degraded,
+      nonCompliant,
+      fallbackModeActive,
+      provider: Object.freeze({
+        providerId: governance?.providerId ?? metadata?.providerId ?? "unknown",
+        materialKind: governance?.materialKind ?? (
+          metadata?.materialKind === "signing-material" ? "signing-material" : "provider-credential"
+        ),
+      }),
+      classification: Object.freeze({
+        materialId: governance?.classification.materialId ?? "material:unknown",
+        category: governance?.classification.category ?? "secret-credential",
+        scope: governance?.classification.scope ?? (
+          metadata?.scope === "workspace"
+            ? "workspace"
+            : metadata?.scope === "user"
+              ? "user"
+              : "server"
+        ),
+        rotationPosture: governance?.classification.rotationPosture ?? "manual",
+        usageContexts: Object.freeze(
+          governance?.classification.usageContexts
+            ?? ["startup-bootstrap"],
+        ),
+      }),
+      policy: Object.freeze({
+        startupRequirement: resolvedPolicy?.startupRequirement
+          ?? warnings[0]?.startupRequirement
+          ?? failures[0]?.startupRequirement
+          ?? "optional",
+        durabilityClass: resolvedPolicy?.durabilityClass
+          ?? warnings[0]?.durabilityClass
+          ?? failures[0]?.durabilityClass
+          ?? "durable",
+        fallbackPolicy: resolvedPolicy?.fallbackPolicy
+          ?? warnings[0]?.fallbackPolicy
+          ?? failures[0]?.fallbackPolicy
+          ?? "none",
+      }),
+      backend: metadata
+        ? Object.freeze({
+          backendId: metadata.backend.backendId,
+          backendKind: metadata.backend.backendKind,
+        })
+        : undefined,
+      rotation: Object.freeze({
+        status: metadata?.rotation.status ?? "unknown",
+        currentVersionId: metadata?.rotation.currentVersionId,
+      }),
+      validation: Object.freeze({
+        failures: Object.freeze(failures),
+        warnings: Object.freeze(warnings),
       }),
     });
   }
@@ -240,5 +358,67 @@ function toSecretProviderMaterialMetadataDto(input: {
       failFastRequiredOnStartup: input.policyFlags.failFastRequiredOnStartup,
     }),
   });
+}
+
+function summarizeSecurityMaterialEntries(
+  entries: ReadonlyArray<{
+    readonly state: "healthy" | "degraded" | "missing" | "non-compliant";
+  }>,
+) {
+  let healthy = 0;
+  let degraded = 0;
+  let missing = 0;
+  let nonCompliant = 0;
+
+  for (const entry of entries) {
+    if (entry.state === SecurityMaterialDiagnosticStates.healthy) {
+      healthy += 1;
+      continue;
+    }
+    if (entry.state === SecurityMaterialDiagnosticStates.degraded) {
+      degraded += 1;
+      continue;
+    }
+    if (entry.state === SecurityMaterialDiagnosticStates.missing) {
+      missing += 1;
+      continue;
+    }
+    nonCompliant += 1;
+  }
+
+  return Object.freeze({
+    total: entries.length,
+    healthy,
+    degraded,
+    missing,
+    nonCompliant,
+  });
+}
+
+function resolveGovernancePolicyForLifecycle(input: {
+  readonly lifecycleStage: "production" | "development" | "test";
+  readonly defaultPolicy: {
+    readonly durabilityClass: "durable" | "ephemeral";
+    readonly startupRequirement: "fail-fast-required" | "optional";
+    readonly fallbackPolicy: "none" | "migrate-legacy-input" | "generate-ephemeral-for-development";
+  };
+  readonly developmentPolicy?: {
+    readonly durabilityClass: "durable" | "ephemeral";
+    readonly startupRequirement: "fail-fast-required" | "optional";
+    readonly fallbackPolicy: "none" | "migrate-legacy-input" | "generate-ephemeral-for-development";
+  };
+  readonly testPolicy?: {
+    readonly durabilityClass: "durable" | "ephemeral";
+    readonly startupRequirement: "fail-fast-required" | "optional";
+    readonly fallbackPolicy: "none" | "migrate-legacy-input" | "generate-ephemeral-for-development";
+  };
+}) {
+  if (input.lifecycleStage === "development" && input.developmentPolicy) {
+    return input.developmentPolicy;
+  }
+  if (input.lifecycleStage === "test" && input.testPolicy) {
+    return input.testPolicy;
+  }
+  return input.defaultPolicy;
 }
 

@@ -23,12 +23,15 @@ General health intentionally returns state + flags only. Detailed diagnostics ad
 
 Detailed diagnostics now also expose `bootstrap.materialMetadata`: metadata-only provider-material descriptors (identity, scope, backend, timestamps, rotation posture, policy flags, and reference metadata) for required bootstrap secrets that resolved successfully.
 
+Detailed diagnostics now also expose `securityMaterial` entries for governed required material, including classification (`materialId`, category, scope, rotation posture, usage contexts), lifecycle policy (`startupRequirement`, durability class, fallback policy), presence/backend/rotation status, and per-material validation failures/warnings with aggregate summary counts (`healthy`, `degraded`, `missing`, `non-compliant`).
+
 ## Safety posture
 
 - No plaintext values.
 - No encrypted payload refs, key material, or secret-store locators.
 - Diagnostic message sanitization still applies through existing secret error redaction safeguards.
 - `bootstrap.materialMetadata` remains metadata-only and does not include `rawValue` or decrypted payload fields.
+- `securityMaterial` diagnostics are metadata/governance only and do not include plaintext or decrypted payload fields.
 
 ## Health signals
 
@@ -48,3 +51,4 @@ Health flags:
 - `secret-repository-unreachable`: fix persistence adapter/database health first.
 - `secret-encryption-unavailable`: configure `AI_LOOM_SECRET_MASTER_KEY_ID` + `AI_LOOM_SECRET_MASTER_KEY`.
 - bootstrap diagnostics (`required-secret-missing`, `required-secret-unusable`, etc.): reconcile declared required secret IDs and runtime retrieval viability.
+- `optional-secret-missing`/`optional-secret-unusable`: indicates degraded optional lifecycle material; review fallback/development posture before promoting to production.

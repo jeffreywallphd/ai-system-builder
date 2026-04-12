@@ -189,6 +189,28 @@ const SystemSecretDefinitionsById = new Map(
   SystemSecretDefinitions.map((definition) => [definition.secretId, definition] as const),
 );
 
+export interface SystemSecretGovernanceDescriptor {
+  readonly secretId: string;
+  readonly providerId: string;
+  readonly materialKind: "provider-credential" | "signing-material";
+  readonly classification: {
+    readonly materialId: string;
+    readonly category: SecurityMaterialClassificationContract["category"];
+    readonly scope: SecurityMaterialClassificationContract["scope"];
+    readonly rotationPosture: SecurityMaterialClassificationContract["rotationPosture"];
+    readonly usageContexts: ReadonlyArray<SecurityMaterialClassificationContract["usageContexts"][number]>;
+  };
+  readonly policies: {
+    readonly defaultPolicy: SecurityMaterialClassificationContract["defaultPolicy"];
+    readonly developmentPolicy?: SecurityMaterialClassificationContract["developmentPolicy"];
+    readonly testPolicy?: SecurityMaterialClassificationContract["testPolicy"];
+  };
+  readonly bootstrap: {
+    readonly creationPolicy: SystemSecretBootstrapCreationPolicy;
+    readonly generationStrategy?: SystemSecretBootstrapGenerationStrategy;
+  };
+}
+
 function createServerProviderCredentialHierarchy() {
   return Object.freeze({
     hierarchyClass: SecurityMaterialHierarchyClasses.providerCredentialMaterial,
@@ -280,6 +302,26 @@ export interface BootstrapSystemSecretsFromEnvironmentInput {
   readonly now?: () => Date;
 }
 
+export function listSystemSecretGovernanceDescriptors(): ReadonlyArray<SystemSecretGovernanceDescriptor> {
+  return Object.freeze(SystemSecretDefinitions.map((definition) => (
+    toSystemSecretGovernanceDescriptor(definition)
+  )));
+}
+
+export function resolveSystemSecretGovernanceDescriptor(
+  secretId: string,
+): SystemSecretGovernanceDescriptor | undefined {
+  const normalizedSecretId = normalizeOptional(secretId);
+  if (!normalizedSecretId) {
+    return undefined;
+  }
+  const definition = SystemSecretDefinitionsById.get(normalizedSecretId);
+  if (!definition) {
+    return undefined;
+  }
+  return toSystemSecretGovernanceDescriptor(definition);
+}
+
 export class SystemSecretBootstrapValidationError extends Error {
   public constructor(
     message: string,
@@ -294,7 +336,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
   input: BootstrapSystemSecretsFromEnvironmentInput,
 ): Promise<SystemSecretBootstrapResult> {
   const now = input.now ?? (() => new Date());
-  const lifecycleStage = resolveLifecycleStage(input.env);
+  const lifecycleStage = resolveSystemSecretBootstrapLifecycleStage(input.env);
   const requiredSecretIds = parseOptionalCsvList(input.env[SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.requiredSecretIds]);
   if (requiredSecretIds.length === 0) {
     return Object.freeze({
@@ -669,7 +711,7 @@ function normalizeOptional(value: string | undefined): string | undefined {
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
-function resolveLifecycleStage(
+export function resolveSystemSecretBootstrapLifecycleStage(
   env: Readonly<Record<string, string | undefined>>,
 ): SecurityMaterialLifecycleStage {
   const nodeEnv = normalizeOptional(env.NODE_ENV)?.toLowerCase();
@@ -680,6 +722,44 @@ function resolveLifecycleStage(
     return SecurityMaterialLifecycleStages.test;
   }
   return SecurityMaterialLifecycleStages.production;
+}
+
+function toSystemSecretGovernanceDescriptor(
+  definition: SystemSecretDefinition,
+): SystemSecretGovernanceDescriptor {
+  return Object.freeze({
+    secretId: definition.secretId,
+    providerId: definition.providerId ?? "platform",
+    materialKind: definition.runtimeConsumer === "provider-credential"
+      ? "provider-credential"
+      : "signing-material",
+    classification: Object.freeze({
+      materialId: definition.classification.materialId,
+      category: definition.classification.category,
+      scope: definition.classification.scope,
+      rotationPosture: definition.classification.rotationPosture,
+      usageContexts: Object.freeze([...definition.classification.usageContexts]),
+    }),
+    policies: Object.freeze({
+      defaultPolicy: Object.freeze({
+        ...definition.classification.defaultPolicy,
+      }),
+      developmentPolicy: definition.classification.developmentPolicy
+        ? Object.freeze({
+          ...definition.classification.developmentPolicy,
+        })
+        : undefined,
+      testPolicy: definition.classification.testPolicy
+        ? Object.freeze({
+          ...definition.classification.testPolicy,
+        })
+        : undefined,
+    }),
+    bootstrap: Object.freeze({
+      creationPolicy: definition.bootstrapCreationPolicy,
+      generationStrategy: definition.bootstrapGenerationStrategy,
+    }),
+  });
 }
 
 function createSystemSecretMaterialSelector(

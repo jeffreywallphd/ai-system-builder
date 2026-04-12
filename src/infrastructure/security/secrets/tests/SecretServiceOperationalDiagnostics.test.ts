@@ -55,6 +55,16 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
       expect(diagnostics.diagnostics).toHaveLength(0);
       expect(diagnostics.bootstrap.diagnostics).toHaveLength(0);
       expect(diagnostics.bootstrap.materialMetadata).toHaveLength(1);
+      expect(diagnostics.securityMaterial.lifecycleStage).toBe("production");
+      expect(diagnostics.securityMaterial.summary).toEqual({
+        total: 1,
+        healthy: 1,
+        degraded: 0,
+        missing: 0,
+        nonCompliant: 0,
+      });
+      expect(diagnostics.securityMaterial.entries[0]?.state).toBe("healthy");
+      expect(diagnostics.securityMaterial.entries[0]?.backend?.backendKind).toBe("durable-server-secret-store");
       expect((diagnostics.bootstrap.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
     } finally {
       secretService.dispose();
@@ -90,6 +100,15 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
       expect(diagnostics.bootstrap.materialMetadata).toHaveLength(0);
       expect(diagnostics.diagnostics.some((entry) => entry.code === "secret-encryption-unavailable")).toBeTrue();
       expect(diagnostics.bootstrap.diagnostics.some((entry) => entry.code === "required-secret-missing")).toBeTrue();
+      expect(diagnostics.securityMaterial.summary).toEqual({
+        total: 1,
+        healthy: 0,
+        degraded: 0,
+        missing: 1,
+        nonCompliant: 0,
+      });
+      expect(diagnostics.securityMaterial.entries[0]?.state).toBe("missing");
+      expect(diagnostics.securityMaterial.entries[0]?.policy.startupRequirement).toBe("fail-fast-required");
       expect(diagnostics.bootstrap.diagnostics.some((entry) => entry.message.includes("sk-live"))).toBeFalse();
     } finally {
       secretService.dispose();
@@ -129,8 +148,20 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
         expect.objectContaining({
           code: "optional-secret-missing",
           severity: "warning",
+          startupRequirement: "optional",
+          durabilityClass: "ephemeral",
+          fallbackPolicy: "generate-ephemeral-for-development",
         }),
       ]);
+      expect(diagnostics.securityMaterial.lifecycleStage).toBe("development");
+      expect(diagnostics.securityMaterial.summary).toEqual({
+        total: 1,
+        healthy: 0,
+        degraded: 0,
+        missing: 1,
+        nonCompliant: 0,
+      });
+      expect(diagnostics.securityMaterial.entries[0]?.fallbackModeActive).toBeTrue();
     } finally {
       secretService.dispose();
       rmSync(root, { recursive: true, force: true });

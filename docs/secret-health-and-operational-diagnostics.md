@@ -42,6 +42,8 @@ Detailed diagnostics include:
 - `bootstrap.requiredSecretIds`
 - `bootstrap.diagnostics[]`
 - `bootstrap.materialMetadata[]`: metadata-only provider-material descriptors for required bootstrap secrets that resolved successfully (identity/scope/backend/timestamps/rotation/policy/reference metadata)
+- `securityMaterial.entries[]`: governed material diagnostics with classification, lifecycle policy, presence/backend/rotation posture, and validation failures/warnings
+- `securityMaterial.summary`: aggregate counts for `healthy`, `degraded`, `missing`, and `non-compliant` material states
 
 All diagnostic entries contain code/severity/message/secretId only. `bootstrap.materialMetadata[]` remains metadata-only and excludes raw secret/decrypted value fields.
 
@@ -52,6 +54,8 @@ Common diagnostic codes:
 - `unsupported-required-secret`: configured required id is not registered for bootstrap.
 - `legacy-migration-unavailable`: migration path unavailable during validation posture.
 - `legacy-migration-failed`: migration attempt failed.
+- `optional-secret-missing`: optional lifecycle material is missing and currently degraded.
+- `optional-secret-unusable`: optional lifecycle material exists but cannot be consumed in the current posture.
 - `secret-encryption-unavailable`: encryption key material is not configured.
 - `secret-repository-unreachable`: repository metadata health probe failed.
 
