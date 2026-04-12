@@ -24,6 +24,9 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Certificate/CA bounded composition module: `src/hosts/server/composition/ServerCertificateCompositionModule.ts`
 - Node trust bounded composition module: `src/hosts/server/composition/ServerNodeTrustCompositionModule.ts`
 - TLS material + transport trust bounded composition module: `src/hosts/server/composition/ServerTlsMaterialCompositionModule.ts`
+- Storage + protected asset bounded composition module: `src/hosts/server/composition/ServerStorageAssetCompositionModule.ts`
+- Image/media bounded composition module: `src/hosts/server/composition/ServerImageMediaCompositionModule.ts`
+- Generated-result bounded composition module: `src/hosts/server/composition/ServerGeneratedResultCompositionModule.ts`
 - Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
@@ -69,6 +72,16 @@ Story 2.2.3 extracts node trust, certificates, TLS material, and secret-service 
   - `src/hosts/server/tests/ServerCertificateCompositionModule.test.ts`
   - `src/hosts/server/tests/ServerNodeTrustCompositionModule.test.ts`
   - `src/hosts/server/tests/ServerTlsMaterialCompositionModule.test.ts`
+
+Story 2.2.4 extracts storage/asset/media/generated-result assembly from inline `IdentityServerHost.ts` startup wiring into:
+
+- `src/hosts/server/composition/ServerStorageAssetCompositionModule.ts`
+- `src/hosts/server/composition/ServerImageMediaCompositionModule.ts`
+- `src/hosts/server/composition/ServerGeneratedResultCompositionModule.ts`
+- regression coverage:
+  - `src/hosts/server/tests/ServerStorageAssetCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerImageMediaCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerGeneratedResultCompositionModule.test.ts`
 
 ## Control-plane composition responsibilities
 
@@ -266,6 +279,9 @@ Host assembly coverage lives in:
 - `src/hosts/server/tests/ServerCertificateCompositionModule.test.ts`
 - `src/hosts/server/tests/ServerNodeTrustCompositionModule.test.ts`
 - `src/hosts/server/tests/ServerTlsMaterialCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerStorageAssetCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerImageMediaCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerGeneratedResultCompositionModule.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
 ## Related ADRs
