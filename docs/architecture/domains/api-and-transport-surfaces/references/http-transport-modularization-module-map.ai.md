@@ -13,12 +13,14 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts
   - src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts
   - src/infrastructure/transport/http-server/identity/middleware/session-authentication.ts
+  - src/infrastructure/transport/http-server/identity/middleware/workspace-context.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpRequestPrimitives.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpResponsePrimitives.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpFileResponsePrimitives.ts
   - src/infrastructure/transport/http-server/identity/tests/HttpTransportPrimitives.test.ts
   - src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerErrorTranslation.test.ts
   - src/infrastructure/transport/http-server/identity/tests/SessionAuthenticationMiddleware.test.ts
+  - src/infrastructure/transport/http-server/identity/tests/WorkspaceContextMiddleware.test.ts
   - src/hosts/server/AuthoritativeServerApiRouteComposition.ts
   - src/hosts/server/IdentityServerHost.ts
 ---
@@ -155,6 +157,16 @@ Implemented shared session-authentication middleware utilities in production pat
 
 Targeted regression coverage:
 - `identity/tests/SessionAuthenticationMiddleware.test.ts` covers missing bearer, malformed authorization header, expired/invalid session resolution, and valid session actor-context derivation flows.
+
+## Story 1.2.2 Implementation Status
+
+Implemented shared workspace-context resolution middleware utilities in production paths:
+- `identity/middleware/workspace-context.ts` centralizes workspace scope extraction from route/query inputs and returns a normalized workspace transport context (`workspaceId`, `source`, and scope key metadata).
+- `IdentityHttpServer.ts` now consumes the shared workspace-context utility through `requireAuthenticatedWorkspaceSession(...)` so workspace-scoped handlers receive normalized context instead of inline scope parsing.
+- Existing behavior remains transport-safe: missing or blank workspace scope still rejects early as `invalid-request`, while downstream authorization/business policy remains in backend APIs.
+
+Targeted regression coverage:
+- `identity/tests/WorkspaceContextMiddleware.test.ts` covers query-scoped resolution, explicit route-scoped resolution, custom workspace query keys, and representative missing/blank workspace rejection flows.
 
 ## Registration and Composition Seams
 
