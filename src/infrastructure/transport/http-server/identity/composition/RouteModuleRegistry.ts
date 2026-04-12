@@ -46,8 +46,17 @@ export function createIdentityHttpRouteModuleRegistry(input: {
   const requireModuleCoverage = input.requireModuleCoverage ?? true;
   const routeFamilies: AuthoritativeApiRouteFamilyRegistration[] = [];
   const routePrefixes: Array<{ readonly routeFamilyId: string; readonly routePrefix: string }> = [];
+  const plannedRouteFamilyIds = new Set<string>();
+  const routeFamilyIdByRegisteredPrefix = new Map<string, string>();
 
   for (const plannedRouteFamily of input.routeRegistrationPlan.registeredRouteFamilies) {
+    if (plannedRouteFamilyIds.has(plannedRouteFamily.routeFamilyId)) {
+      throw new IdentityHttpRouteModuleRegistryError(
+        `Identity HTTP route registration plan has duplicate route family '${plannedRouteFamily.routeFamilyId}'.`,
+      );
+    }
+    plannedRouteFamilyIds.add(plannedRouteFamily.routeFamilyId);
+
     const module = moduleByFamilyId.get(plannedRouteFamily.routeFamilyId);
     if (!module) {
       if (requireModuleCoverage) {
@@ -84,10 +93,19 @@ export function createIdentityHttpRouteModuleRegistry(input: {
     }
 
     routeFamilies.push(plannedRouteFamily);
-    routePrefixes.push(...deduplicatedPrefixes.map((routePrefix) => Object.freeze({
-      routeFamilyId: plannedRouteFamily.routeFamilyId,
-      routePrefix,
-    })));
+    for (const routePrefix of deduplicatedPrefixes) {
+      const previouslyRegisteredFamilyId = routeFamilyIdByRegisteredPrefix.get(routePrefix);
+      if (previouslyRegisteredFamilyId && previouslyRegisteredFamilyId !== plannedRouteFamily.routeFamilyId) {
+        throw new IdentityHttpRouteModuleRegistryError(
+          `Identity HTTP route prefix '${routePrefix}' is registered by both '${previouslyRegisteredFamilyId}' and '${plannedRouteFamily.routeFamilyId}'.`,
+        );
+      }
+      routeFamilyIdByRegisteredPrefix.set(routePrefix, plannedRouteFamily.routeFamilyId);
+      routePrefixes.push(Object.freeze({
+        routeFamilyId: plannedRouteFamily.routeFamilyId,
+        routePrefix,
+      }));
+    }
   }
 
   const routeFamilyById = new Map(routeFamilies.map((routeFamily) => [routeFamily.routeFamilyId, routeFamily] as const));
