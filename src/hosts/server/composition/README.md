@@ -23,6 +23,14 @@ This folder is the bounded contract surface for control-plane composition refact
   - Bounded workspace lifecycle + authorization/sharing assembly module used by `IdentityServerHost.ts`.
 - `ServerDeploymentPolicyCompositionModule.ts`
   - Bounded deployment-policy administration assembly module used by `IdentityServerHost.ts`.
+- `ServerSecretCompositionModule.ts`
+  - Bounded secret-service assembly module used by `IdentityServerHost.ts`.
+- `ServerCertificateCompositionModule.ts`
+  - Bounded certificate/CA operations composition module used by `IdentityServerHost.ts`.
+- `ServerNodeTrustCompositionModule.ts`
+  - Bounded node enrollment/trust and execution-node management composition module used by `IdentityServerHost.ts`.
+- `ServerTlsMaterialCompositionModule.ts`
+  - Bounded TLS material resolution and transport-trust composition module used by `IdentityServerHost.ts`.
 - `contracts/index.ts`
   - Barrel export for composition contract consumers and tests.
 

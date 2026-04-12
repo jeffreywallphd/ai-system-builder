@@ -20,6 +20,10 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Identity/session/trusted-device bounded composition module: `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
 - Workspace/authorization/sharing bounded composition module: `src/hosts/server/composition/ServerWorkspaceAuthorizationCompositionModule.ts`
 - Deployment-policy administration bounded composition module: `src/hosts/server/composition/ServerDeploymentPolicyCompositionModule.ts`
+- Secret-service bounded composition module: `src/hosts/server/composition/ServerSecretCompositionModule.ts`
+- Certificate/CA bounded composition module: `src/hosts/server/composition/ServerCertificateCompositionModule.ts`
+- Node trust bounded composition module: `src/hosts/server/composition/ServerNodeTrustCompositionModule.ts`
+- TLS material + transport trust bounded composition module: `src/hosts/server/composition/ServerTlsMaterialCompositionModule.ts`
 - Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
@@ -53,6 +57,18 @@ Story 2.2.2 extracts workspace lifecycle, authorization/sharing, and deployment-
 - regression coverage:
   - `src/hosts/server/tests/ServerWorkspaceAuthorizationCompositionModule.test.ts`
   - `src/hosts/server/tests/ServerDeploymentPolicyCompositionModule.test.ts`
+
+Story 2.2.3 extracts node trust, certificates, TLS material, and secret-service assembly from inline `IdentityServerHost.ts` startup wiring into:
+
+- `src/hosts/server/composition/ServerSecretCompositionModule.ts`
+- `src/hosts/server/composition/ServerCertificateCompositionModule.ts`
+- `src/hosts/server/composition/ServerNodeTrustCompositionModule.ts`
+- `src/hosts/server/composition/ServerTlsMaterialCompositionModule.ts`
+- regression coverage:
+  - `src/hosts/server/tests/ServerSecretCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerCertificateCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerNodeTrustCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerTlsMaterialCompositionModule.test.ts`
 
 ## Control-plane composition responsibilities
 
@@ -246,6 +262,10 @@ Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
 - `src/hosts/server/tests/ServerWorkspaceAuthorizationCompositionModule.test.ts`
 - `src/hosts/server/tests/ServerDeploymentPolicyCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerSecretCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerCertificateCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerNodeTrustCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerTlsMaterialCompositionModule.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
 ## Related ADRs
