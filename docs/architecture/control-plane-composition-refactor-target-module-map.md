@@ -138,6 +138,18 @@ Story 2.2.1 extracts identity, session, and trusted-device composition from inli
 
 This extraction keeps route logic, DTO shaping, and domain behavior unchanged while moving only construction, dependency wiring, configuration input handling, and lifecycle-disposal composition concerns.
 
+## Story 2.2.2 Workspace/Authorization/Deployment-Policy Composition Extraction
+
+Story 2.2.2 extracts workspace lifecycle, authorization/sharing, and deployment-policy administration composition from inline `IdentityServerHost.ts` startup assembly into:
+
+- `src/hosts/server/composition/ServerWorkspaceAuthorizationCompositionModule.ts`
+- `src/hosts/server/composition/ServerDeploymentPolicyCompositionModule.ts`
+- regression coverage:
+  - `src/hosts/server/tests/ServerWorkspaceAuthorizationCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerDeploymentPolicyCompositionModule.test.ts`
+
+This extraction preserves route-level behavior and policy semantics while narrowing `IdentityServerHost.ts` responsibilities to consuming typed module outputs.
+
 ## Story 2.1.3 Staged Bootstrap Pipeline and Startup State Model
 
 Story 2.1.3 adds an explicit staged bootstrap model and typed startup/readiness states for the authoritative control-plane startup boundary:

@@ -245,6 +245,8 @@ import {
   composeServerIdentitySessionTrustedDeviceCompositionModule,
   type ServerIdentitySessionTrustedDeviceCompositionModuleOutput,
 } from "./composition/ServerIdentitySessionTrustedDeviceCompositionModule";
+import { composeServerWorkspaceAuthorizationCompositionModule } from "./composition/ServerWorkspaceAuthorizationCompositionModule";
+import { composeServerDeploymentPolicyCompositionModule } from "./composition/ServerDeploymentPolicyCompositionModule";
 import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   evaluateTransportConnectionTrust,
@@ -337,20 +339,6 @@ class SystemIdentityClock implements IIdentityClock {
 class RandomIdentityIdGenerator implements IIdentityIdGenerator {
   public nextId(namespace: IdentityIdNamespace): string {
     return `${normalizeNamespace(namespace)}:${randomUUID()}`;
-  }
-}
-
-class SystemWorkspaceClock
-  implements WorkspaceInvitationIssuanceClock, WorkspaceInvitationLifecycleClock, AuthenticatedWorkspaceOnboardingClock {
-  public now(): Date {
-    return new Date();
-  }
-}
-
-class RandomWorkspaceIdGenerator
-  implements WorkspaceInvitationIssuanceIdGenerator, WorkspaceInvitationLifecycleIdGenerator {
-  public nextId(namespace: WorkspaceIdNamespace): string {
-    return `${namespace}:${randomUUID()}`;
   }
 }
 
@@ -508,202 +496,22 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     });
     const backendApi = identitySessionTrustedDeviceComposition.backendApi;
     const trustedDeviceManagementService = identitySessionTrustedDeviceComposition.trustedDeviceManagementService;
-    const workspaceClock = new SystemWorkspaceClock();
-    const workspaceIdGenerator = new RandomWorkspaceIdGenerator();
-    const workspaceAuthorizationPolicyReadAdapter = new WorkspaceAuthorizationPolicyReadAdapter({
-      workspaceAuthorizationReadRepository: workspaceRepository,
+    const workspaceAuthorizationComposition = composeServerWorkspaceAuthorizationCompositionModule({
+      workspaceRepository,
+      authorizationRepository,
+      authoritativeAuditRecorder,
+      deploymentPolicyBootstrap: options.deploymentPolicyBootstrap,
     });
-    const workspaceAdministrationAuthorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
-      roleGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
-      sharingGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
-      resourcePolicyMetadataReadRepository: workspaceAuthorizationPolicyReadAdapter,
-      clock: workspaceClock,
-    });
-    const authorizationPolicyReadAdapter = new SqliteAuthorizationPolicyReadAdapter({
-      authorizationPersistenceAdapter: authorizationRepository,
-    });
-    const authorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
-      roleGrantReadRepository: authorizationPolicyReadAdapter,
-      sharingGrantReadRepository: authorizationPolicyReadAdapter,
-      resourcePolicyMetadataReadRepository: authorizationPolicyReadAdapter,
-      clock: workspaceClock,
-    });
-    const authorizationMutationService = new AuthorizationPolicyMutationService({
-      ports: {
-        roleAssignmentPersistenceRepository: authorizationRepository,
-        sharingGrantPersistenceRepository: authorizationRepository,
-        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
-      },
-      policyEventRecorder: new AuthoritativeAuthorizationPolicyEventRecorder(authoritativeAuditRecorder),
-      clock: workspaceClock,
-    });
+    const workspaceClock = workspaceAuthorizationComposition.workspaceClock;
+    const authorizationDecisionEvaluator = workspaceAuthorizationComposition.authorizationDecisionEvaluator;
+    const workspaceBackendApi = workspaceAuthorizationComposition.workspaceBackendApi;
+    const workspaceAdministrationBackendApi = workspaceAuthorizationComposition.workspaceAdministrationBackendApi;
+    const authorizationManagementBackendApi = workspaceAuthorizationComposition.authorizationManagementBackendApi;
     const nodeTrustAuditSink = new FanoutNodeTrustAuditSink([
       nodeTrustAuditRecorder,
       new AuthoritativeNodeTrustAuditSink(authoritativeAuditRecorder),
     ]);
     const executionNodeManagementAuditSink = new AuthoritativeExecutionNodeManagementAuditSink(authoritativeAuditRecorder);
-
-  const resolveWorkspaceInvitationLifecycleUseCase = new ResolveWorkspaceInvitationLifecycleUseCase({
-    workspaceRepository,
-    invitationRepository: workspaceRepository,
-    membershipRepository: workspaceRepository,
-    roleAssignmentRepository: workspaceRepository,
-    authorizationReadRepository: workspaceRepository,
-    transactionManager: workspaceRepository,
-    idGenerator: workspaceIdGenerator,
-    clock: workspaceClock,
-  });
-  const workspaceBackendApi = new WorkspaceInvitationBackendApi({
-    issueWorkspaceInvitationUseCase: new IssueWorkspaceInvitationUseCase({
-      invitationRepository: workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      transactionManager: workspaceRepository,
-      idGenerator: workspaceIdGenerator,
-      tokenIssuer: new Sha256WorkspaceInvitationTokenIssuer(),
-      clock: workspaceClock,
-    }),
-    resolveAuthenticatedWorkspaceOnboardingUseCase: new ResolveAuthenticatedWorkspaceOnboardingUseCase({
-      invitationLifecycleUseCase: resolveWorkspaceInvitationLifecycleUseCase,
-      clock: workspaceClock,
-    }),
-  });
-  const workspaceAdministrationBackendApi = new WorkspaceAdministrationBackendApi({
-    workspaceQueryService: new WorkspaceAdministrationQueryService({
-      workspaceRepository,
-      membershipRepository: workspaceRepository,
-      roleAssignmentRepository: workspaceRepository,
-      invitationRepository: workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      clock: workspaceClock,
-    }),
-    workspaceRepository,
-    membershipRepository: workspaceRepository,
-    roleAssignmentRepository: workspaceRepository,
-    invitationRepository: workspaceRepository,
-    authorizationReadRepository: workspaceRepository,
-    createWorkspaceUseCase: new CreateWorkspaceUseCase({
-      workspaceRepository,
-      membershipRepository: workspaceRepository,
-      roleAssignmentRepository: workspaceRepository,
-      transactionManager: workspaceRepository,
-      idGenerator: workspaceIdGenerator,
-      clock: workspaceClock,
-      deploymentAuthorizationPolicyPort: options.deploymentPolicyBootstrap?.evaluationService,
-      deploymentPolicyContextResolver: options.deploymentPolicyBootstrap?.contextResolver,
-    }),
-    updateWorkspaceUseCase: new UpdateWorkspaceUseCase({
-      workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      clock: workspaceClock,
-    }),
-    transitionWorkspaceLifecycleUseCase: new TransitionWorkspaceLifecycleUseCase({
-      workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      clock: workspaceClock,
-    }),
-    addWorkspaceMemberUseCase: new AddWorkspaceMemberUseCase({
-      membershipRepository: workspaceRepository,
-      roleAssignmentRepository: workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      transactionManager: workspaceRepository,
-      idGenerator: workspaceIdGenerator,
-      clock: workspaceClock,
-    }),
-    changeWorkspaceMembershipStatusUseCase: new ChangeWorkspaceMembershipStatusUseCase({
-      membershipRepository: workspaceRepository,
-      roleAssignmentRepository: workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      transactionManager: workspaceRepository,
-      clock: workspaceClock,
-    }),
-    removeWorkspaceMemberUseCase: new RemoveWorkspaceMemberUseCase({
-      membershipRepository: workspaceRepository,
-      roleAssignmentRepository: workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      transactionManager: workspaceRepository,
-      clock: workspaceClock,
-    }),
-    assignWorkspaceRoleUseCase: new AssignWorkspaceRoleUseCase({
-      membershipRepository: workspaceRepository,
-      roleAssignmentRepository: workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      transactionManager: workspaceRepository,
-      idGenerator: workspaceIdGenerator,
-      clock: workspaceClock,
-    }),
-    reassignWorkspaceRoleUseCase: new ReassignWorkspaceRoleUseCase({
-      membershipRepository: workspaceRepository,
-      roleAssignmentRepository: workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      transactionManager: workspaceRepository,
-      idGenerator: workspaceIdGenerator,
-      clock: workspaceClock,
-    }),
-    revokeWorkspaceRoleUseCase: new RevokeWorkspaceRoleUseCase({
-      membershipRepository: workspaceRepository,
-      roleAssignmentRepository: workspaceRepository,
-      authorizationReadRepository: workspaceRepository,
-      transactionManager: workspaceRepository,
-      clock: workspaceClock,
-    }),
-    resolveWorkspaceInvitationLifecycleUseCase: resolveWorkspaceInvitationLifecycleUseCase,
-    authorizationPolicyDecisionEvaluator: workspaceAdministrationAuthorizationDecisionEvaluator,
-    workspaceAdministrationCapabilityResourceType: "workspace-administration",
-    clock: workspaceClock,
-  });
-  const authorizationManagementBackendApi = new AuthorizationManagementBackendApi({
-    grantSharingAccessUseCase: new GrantAuthorizationSharingAccessUseCase({
-      mutationService: authorizationMutationService,
-      decisionEvaluator: authorizationDecisionEvaluator,
-      persistencePorts: {
-        roleAssignmentPersistenceRepository: authorizationRepository,
-        sharingGrantPersistenceRepository: authorizationRepository,
-        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
-      },
-      clock: workspaceClock,
-    }),
-    revokeSharingAccessUseCase: new RevokeAuthorizationSharingAccessUseCase({
-      mutationService: authorizationMutationService,
-      decisionEvaluator: authorizationDecisionEvaluator,
-      persistencePorts: {
-        roleAssignmentPersistenceRepository: authorizationRepository,
-        sharingGrantPersistenceRepository: authorizationRepository,
-        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
-      },
-      clock: workspaceClock,
-    }),
-    updateVisibilityUseCase: new UpdateAuthorizationVisibilityUseCase({
-      mutationService: authorizationMutationService,
-      decisionEvaluator: authorizationDecisionEvaluator,
-      persistencePorts: {
-        roleAssignmentPersistenceRepository: authorizationRepository,
-        sharingGrantPersistenceRepository: authorizationRepository,
-        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
-      },
-      clock: workspaceClock,
-    }),
-    bulkGrantWorkspaceRoleAccessUseCase: new BulkGrantAuthorizationWorkspaceRoleAccessUseCase({
-      mutationService: authorizationMutationService,
-      decisionEvaluator: authorizationDecisionEvaluator,
-      persistencePorts: {
-        roleAssignmentPersistenceRepository: authorizationRepository,
-        sharingGrantPersistenceRepository: authorizationRepository,
-        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
-      },
-      clock: workspaceClock,
-    }),
-    listEffectiveAccessUseCase: new ListAuthorizationEffectiveAccessUseCase({
-      decisionEvaluator: authorizationDecisionEvaluator,
-      roleGrantReadRepository: authorizationPolicyReadAdapter,
-      sharingGrantReadRepository: authorizationPolicyReadAdapter,
-      resourcePolicyMetadataReadRepository: authorizationPolicyReadAdapter,
-    }),
-    decisionEvaluator: authorizationDecisionEvaluator,
-    roleAssignmentPersistenceRepository: authorizationRepository,
-    sharingGrantPersistenceRepository: authorizationRepository,
-    resourcePolicyMetadataPersistenceRepository: authorizationRepository,
-    clock: workspaceClock,
-  });
   const runtimeTrustMaterialDistributionService = protectedSecretStore
     ? new RuntimeTrustMaterialDistributionService({
       certificateAuthorityRepository,
@@ -1136,54 +944,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     observability: runOrchestrationObservability,
     now: () => workspaceClock.now(),
   });
-  const deploymentPolicyPermissionService = new WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService({
-    workspaceRoleAssignmentRepository: persistentPlatformServices.workspaceRepository,
+  const deploymentPolicyComposition = composeServerDeploymentPolicyCompositionModule({
+    persistentPlatformServices,
+    authoritativeAuditRecorder,
+    observabilityLogger: createDeploymentPolicyAdministrationOperationalLogger(options.logger),
+    hostLogger: options.logger,
   });
-  const deploymentPolicyAdministrationObservabilityPort = new PlatformDeploymentPolicyAdministrationObservabilityPort({
-    logger: createDeploymentPolicyAdministrationOperationalLogger(options.logger),
-  });
-  const deploymentPolicyReadBackendApi = new DeploymentPolicyReadBackendApi({
-    readDeploymentPolicyStateUseCase: new ReadDeploymentPolicyAdministrationUseCase({
-      deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
-      permissionService: deploymentPolicyPermissionService,
-      observabilityPort: deploymentPolicyAdministrationObservabilityPort,
-    }),
-    observabilityPort: deploymentPolicyAdministrationObservabilityPort,
-  });
-  const deploymentPolicyGovernanceEventSink = new FanoutDeploymentPolicyGovernanceEventSink([
-    new PlatformDeploymentPolicyGovernanceEventSink(
-      persistentPlatformServices.platformPersistenceRepository,
-      options.logger
-        ? {
-          info: (event) => options.logger?.info(Object.freeze({
-            event: event.event,
-            requestId: "deployment-policy-governance",
-            details: Object.freeze({
-              operation: event.operation,
-              outcome: event.outcome,
-              scopeKind: event.scopeKind,
-              scopeId: event.scopeId,
-              actorUserIdentityId: event.actorUserIdentityId,
-              profileId: event.profileId,
-              policyFamilyIds: event.policyFamilyIds,
-              details: event.details,
-              occurredAt: event.occurredAt,
-            }),
-          })),
-        }
-        : undefined,
-    ),
-    new AuthoritativeDeploymentPolicyGovernanceEventSink(authoritativeAuditRecorder),
-  ]);
-  const deploymentPolicyWriteBackendApi = new DeploymentPolicyWriteBackendApi({
-    updateDeploymentPolicyStateUseCase: new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
-      deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
-      permissionService: deploymentPolicyPermissionService,
-      governanceEventSink: deploymentPolicyGovernanceEventSink,
-      observabilityPort: deploymentPolicyAdministrationObservabilityPort,
-    }),
-    observabilityPort: deploymentPolicyAdministrationObservabilityPort,
-  });
+  const deploymentPolicyReadBackendApi = deploymentPolicyComposition.deploymentPolicyReadBackendApi;
+  const deploymentPolicyWriteBackendApi = deploymentPolicyComposition.deploymentPolicyWriteBackendApi;
   const auditLedgerBackendApi = new AuditLedgerBackendApi({
     auditLedgerQueryService: new AuditLedgerQueryService({
       repository: persistentPlatformServices.auditLedgerRepository,

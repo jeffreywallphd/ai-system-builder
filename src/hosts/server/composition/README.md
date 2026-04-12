@@ -19,6 +19,10 @@ This folder is the bounded contract surface for control-plane composition refact
   - Canonical staged bootstrap pipeline and typed startup-state/readiness model for incremental startup refactoring.
 - `ServerIdentitySessionTrustedDeviceCompositionModule.ts`
   - Bounded identity/session/trusted-device assembly module used by `IdentityServerHost.ts`.
+- `ServerWorkspaceAuthorizationCompositionModule.ts`
+  - Bounded workspace lifecycle + authorization/sharing assembly module used by `IdentityServerHost.ts`.
+- `ServerDeploymentPolicyCompositionModule.ts`
+  - Bounded deployment-policy administration assembly module used by `IdentityServerHost.ts`.
 - `contracts/index.ts`
   - Barrel export for composition contract consumers and tests.
 
