@@ -18,6 +18,8 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Dedicated entrypoint assembly: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
 - Runtime host implementation composed by the root: `src/hosts/server/IdentityServerHost.ts`
 - Bootstrap orchestrator seam: `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`
+- Lifecycle helper seam: `src/hosts/server/AuthoritativeServerLifecycleComposition.ts`
+- Startup telemetry seam: `src/hosts/server/AuthoritativeServerStartupTelemetry.ts`
 - Identity/session/trusted-device bounded composition module: `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
 - Workspace/authorization/sharing bounded composition module: `src/hosts/server/composition/ServerWorkspaceAuthorizationCompositionModule.ts`
 - Deployment-policy administration bounded composition module: `src/hosts/server/composition/ServerDeploymentPolicyCompositionModule.ts`
@@ -182,7 +184,7 @@ Story 1.2.2 extracts the first authoritative bootstrap stage implementations int
 Story 1.2.3 adds a dedicated stage orchestrator in `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts`.
 Story 2.3.1 adds a concrete bootstrap orchestrator seam in `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`.
 
-`AuthoritativeServerCompositionRoot.ts` now delegates startup execution to `createAuthoritativeServerBootstrapOrchestrator(...)` so top-level host composition remains focused on lifecycle transitions, startup summary emission, and cleanup ordering.
+`AuthoritativeServerCompositionRoot.ts` now stays thin as a composition entrypoint: staged startup delegates to `createAuthoritativeServerBootstrapOrchestrator(...)`, lifecycle hook composition delegates to `AuthoritativeServerLifecycleComposition.ts`, and startup summary/baseline emission delegates to `AuthoritativeServerStartupTelemetry.ts`.
 
 The contract catalog maps those logical authoritative stages onto the current shared pipeline (`services -> dependencies`, `transport -> feature-registration`) so decomposition can proceed without changing runtime startup order.
 
@@ -308,6 +310,8 @@ In addition to the direct server script entrypoint above, runtime startup consum
 
 Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerLifecycleComposition.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerStartupTelemetry.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`

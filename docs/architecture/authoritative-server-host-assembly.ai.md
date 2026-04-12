@@ -29,6 +29,8 @@
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - Auth-minimal persistence composition seam: `src/infrastructure/persistence/AuthMinimalPersistenceComposition.ts`
 - Bootstrap orchestrator seam: `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`
+- Lifecycle helper seam: `src/hosts/server/AuthoritativeServerLifecycleComposition.ts`
+- Startup telemetry seam: `src/hosts/server/AuthoritativeServerStartupTelemetry.ts`
 - Route registration composition seam: `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
 - Auth-minimal route registration composition seam: `src/hosts/server/AuthMinimalServerApiRouteComposition.ts`
 
@@ -117,7 +119,7 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
   - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
 - Story 1.2.3 adds one stage orchestrator seam at `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts`.
 - Story 2.3.1 adds a concrete bootstrap orchestrator seam at `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`.
-- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now delegates startup execution to `createAuthoritativeServerBootstrapOrchestrator(...)`, keeping top-level host composition focused on lifecycle/summary/cleanup concerns.
+- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now remains a thin composition entrypoint that delegates staged startup to `createAuthoritativeServerBootstrapOrchestrator(...)`, lifecycle hook composition to `AuthoritativeServerLifecycleComposition.ts`, and startup summary/baseline emission to `AuthoritativeServerStartupTelemetry.ts`.
 - Story 1.3.1 stage-status behavior is now surfaced through the bootstrap orchestrator status snapshot with ordered stage entries and states:
   - `pending`
   - `running`
@@ -240,6 +242,8 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
 
 ## Tests
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerLifecycleComposition.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerStartupTelemetry.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`

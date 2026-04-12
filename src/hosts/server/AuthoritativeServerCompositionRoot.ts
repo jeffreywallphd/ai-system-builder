@@ -26,7 +26,6 @@ import {
 } from "./IdentityServerHost";
 import {
   createHostLifecycleCoordinator,
-  type HostLifecycleCleanupHook,
 } from "../lifecycle/HostLifecycleCoordinator";
 import type { SqlitePersistenceRuntime } from "@infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
 import type { AuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
@@ -46,7 +45,6 @@ import {
   createAuthoritativeServerSecurityBootstrapStage,
   type AuthoritativeServerSecurityBootstrapStage,
 } from "./AuthoritativeServerSecurityBootstrapStage";
-import type { AuthoritativeServerStartupBaselineRecordResult } from "./AuthoritativeServerStartupBaselineRecorder";
 import {
   createAuthoritativeServerBootstrapOrchestrator,
   type AuthoritativeServerBootstrapReadinessReport,
@@ -61,6 +59,17 @@ import {
   AuthoritativeServerSecurityBootstrapArtifactKey,
   AuthoritativeServerServiceRegistrationPlanArtifactKey,
 } from "./AuthoritativeServerBootstrapArtifactKeys";
+import {
+  combineStartupLifecycleHooks,
+  createLifecycleCleanupHooksFromShutdownPlan,
+} from "./AuthoritativeServerLifecycleComposition";
+import {
+  attachStartupCorrelationIdToError,
+  emitAuthoritativeServerStartupTelemetry,
+  summarizeStartupError,
+  type AuthoritativeServerPipelineStageSummary,
+  type AuthoritativeServerRecordStartupBaseline,
+} from "./AuthoritativeServerStartupTelemetry";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -122,18 +131,7 @@ export interface AuthoritativeServerCompositionRootOptions {
     }) => StartupTracer;
     readonly createConfigStage?: () => AuthoritativeServerConfigBootstrapStage;
     readonly createSecurityStage?: () => AuthoritativeServerSecurityBootstrapStage;
-    readonly recordStartupBaseline?: (measurement: {
-      readonly hostId: string;
-      readonly startupReason: string;
-      readonly outcome: "succeeded" | "failed";
-      readonly durationMs: number;
-      readonly startedAt: string;
-      readonly completedAt: string;
-      readonly traceId?: string;
-      readonly startupCorrelationId?: string;
-      readonly pipelineStageDurations: Readonly<Record<string, number>>;
-      readonly authoritativeStageDurations: Readonly<Record<string, number>>;
-    }) => Promise<AuthoritativeServerStartupBaselineRecordResult | void> | AuthoritativeServerStartupBaselineRecordResult | void;
+    readonly recordStartupBaseline?: AuthoritativeServerRecordStartupBaseline;
   };
 }
 
@@ -146,77 +144,6 @@ export {
   AuthoritativeServerSecurityBootstrapArtifactKey,
   AuthoritativeServerServiceRegistrationPlanArtifactKey,
 };
-
-interface AuthoritativeServerPipelineStageSummary {
-  readonly stageId: string;
-  readonly sequence: number;
-  readonly status: "completed" | "failed";
-  readonly startedAt: string;
-  readonly endedAt: string;
-  readonly durationMs: number;
-  readonly failure?: Readonly<Record<string, string>>;
-}
-
-function summarizeStartupError(error: unknown): Readonly<Record<string, string>> {
-  if (error instanceof Error) {
-    return Object.freeze({
-      name: error.name || "Error",
-      message: error.message || "Authoritative server startup failed.",
-    });
-  }
-  return Object.freeze({
-    name: "Error",
-    message: String(error),
-  });
-}
-
-function attachStartupCorrelationIdToError(
-  error: unknown,
-  startupCorrelationId: string | undefined,
-): void {
-  if (!(error instanceof Error) || !startupCorrelationId) {
-    return;
-  }
-  (error as Error & { startupCorrelationId?: string }).startupCorrelationId = startupCorrelationId;
-  (error as Error & { traceId?: string }).traceId = startupCorrelationId;
-}
-
-function combineStartupLifecycleHooks(
-  primary: HostStartupLifecycleHooks | undefined,
-  secondary: HostStartupLifecycleHooks | undefined,
-): HostStartupLifecycleHooks {
-  return Object.freeze({
-    onStageStarting: async (event) => {
-      await primary?.onStageStarting?.(event);
-      await secondary?.onStageStarting?.(event);
-    },
-    onStageCompleted: async (event) => {
-      await primary?.onStageCompleted?.(event);
-      await secondary?.onStageCompleted?.(event);
-    },
-    onStageFailed: async (event) => {
-      await primary?.onStageFailed?.(event);
-      await secondary?.onStageFailed?.(event);
-    },
-    onPipelineCompleted: async (event) => {
-      await primary?.onPipelineCompleted?.(event);
-      await secondary?.onPipelineCompleted?.(event);
-    },
-  });
-}
-
-function createLifecycleCleanupHooksFromShutdownPlan(input: {
-  readonly plan: AuthoritativeServerShutdownDisposalPlan;
-  readonly reason: string;
-}): ReadonlyArray<{
-  readonly hookId: string;
-  readonly run: HostLifecycleCleanupHook;
-}> {
-  return input.plan.steps.map((step) => Object.freeze({
-    hookId: step.hookId,
-    run: () => step.dispose(input.reason),
-  }));
-}
 
 export function createAuthoritativeServerCompositionRoot(
   input: AuthoritativeServerCompositionRootOptions,
@@ -420,128 +347,18 @@ export function createAuthoritativeServerCompositionRoot(
         attachStartupCorrelationIdToError(failure, startupTracer?.startupCorrelationId);
         throw failure;
       } finally {
-        const startupCompletedAtMs = Date.now();
-        const startupCompletedAt = new Date(startupCompletedAtMs).toISOString();
-        const pipelineFailures = pipelineStageSummaries
-          .filter((stage) => stage.status === "failed")
-          .map((stage) => Object.freeze({
-            stageId: stage.stageId,
-            sequence: stage.sequence,
-            failure: stage.failure,
-          }));
-        const summaryReadinessReport = (
-          startupReadinessReport.totalCheckCount > 0 || authoritativeStageStatus.length > 0
-            ? startupReadinessReport
-            : Object.freeze({
-              ...startupReadinessReport,
-              state: pipelineFailures.length > 0 ? "degraded" : "not-ready",
-            } satisfies AuthoritativeServerBootstrapReadinessReport)
-        );
-        const startupSummary = Object.freeze({
-          event: "authoritative-server.startup.summary",
-          hostId: boot.host.hostId,
-          startupReason: boot.startupReason,
-          outcome: startupFailure ? "failed" : "succeeded",
-          traceId: startupTracer?.traceId,
-          startupCorrelationId: startupTracer?.startupCorrelationId,
-          startedAt: startupStartedAt,
-          completedAt: startupCompletedAt,
-          durationMs: Math.max(0, startupCompletedAtMs - startupStartedAtMs),
-          pipeline: Object.freeze({
-            stageCount: pipelineStageSummaries.length,
-            stages: Object.freeze([...pipelineStageSummaries]),
-            failedStageCount: pipelineFailures.length,
-            failures: Object.freeze(pipelineFailures),
-          }),
-          authoritativeStages: Object.freeze({
-            stageCount: authoritativeStageStatus.length,
-            stages: Object.freeze(authoritativeStageStatus),
-            failedStageCount: authoritativeStageStatus.filter((stage) => stage.state === "failed").length,
-            failures: Object.freeze(authoritativeStageStatus
-              .filter((stage) => stage.state === "failed")
-              .map((stage) => Object.freeze({
-                stageId: stage.stageId,
-                sequence: stage.sequence,
-                failure: stage.failure,
-              }))),
-          }),
-          startupResult: Object.freeze({
-            outcome: startupFailure ? "failed" : "succeeded",
-            readiness: summaryReadinessReport,
-          }),
-          startupFailure: startupFailure ? summarizeStartupError(startupFailure) : undefined,
+        await emitAuthoritativeServerStartupTelemetry({
+          boot,
+          startupTracer,
+          startupStartedAtMs,
+          startupStartedAt,
+          startupFailure,
+          pipelineStageSummaries,
+          authoritativeStageStatus,
+          startupReadinessReport,
+          logger: input.hostOptions.logger,
+          recordStartupBaseline: input.bootstrap?.recordStartupBaseline,
         });
-        if (startupFailure) {
-          if (input.hostOptions.logger) {
-            input.hostOptions.logger.error(startupSummary);
-          } else {
-            console.error(startupSummary);
-          }
-        } else if (input.hostOptions.logger) {
-          input.hostOptions.logger.info(startupSummary);
-        } else {
-          console.info(startupSummary);
-        }
-
-        const startupBaselineMeasurement = Object.freeze({
-          hostId: boot.host.hostId,
-          startupReason: boot.startupReason,
-          outcome: startupSummary.outcome,
-          durationMs: startupSummary.durationMs,
-          startedAt: startupSummary.startedAt,
-          completedAt: startupSummary.completedAt,
-          traceId: startupSummary.traceId,
-          startupCorrelationId: startupSummary.startupCorrelationId,
-          pipelineStageDurations: Object.freeze(Object.fromEntries(
-            pipelineStageSummaries.map((stage) => [stage.stageId, stage.durationMs] as const),
-          )),
-          authoritativeStageDurations: Object.freeze(Object.fromEntries(
-            authoritativeStageStatus
-              .filter((stage) => typeof stage.durationMs === "number")
-              .map((stage) => [stage.stageId, stage.durationMs ?? 0] as const),
-          )),
-        });
-        if (input.bootstrap?.recordStartupBaseline) {
-          try {
-            const baselineRecord = await input.bootstrap.recordStartupBaseline(startupBaselineMeasurement);
-            const regressionWarning = baselineRecord?.regressionWarning;
-            if (regressionWarning) {
-              const regressionEvent = Object.freeze({
-                event: "authoritative-server.startup.baseline-regression.detected",
-                hostId: boot.host.hostId,
-                startupReason: boot.startupReason,
-                traceId: startupSummary.traceId,
-                startupCorrelationId: startupSummary.startupCorrelationId,
-                baselinePath: baselineRecord?.baselinePath,
-                sampleCount: baselineRecord?.sampleCount,
-                thresholdMs: regressionWarning.thresholdMs,
-                baselineDurationMs: regressionWarning.baselineDurationMs,
-                currentDurationMs: regressionWarning.currentDurationMs,
-                regressionDurationMs: regressionWarning.regressionDurationMs,
-                previousSampleCount: regressionWarning.previousSampleCount,
-              });
-              if (input.hostOptions.logger) {
-                input.hostOptions.logger.warn(regressionEvent);
-              } else {
-                console.warn(regressionEvent);
-              }
-            }
-          } catch (baselineError) {
-            const baselineErrorSummary = Object.freeze({
-              event: "authoritative-server.startup.baseline-recording.failed",
-              hostId: boot.host.hostId,
-              startupReason: boot.startupReason,
-              traceId: startupSummary.traceId,
-              startupCorrelationId: startupSummary.startupCorrelationId,
-              error: summarizeStartupError(baselineError),
-            });
-            if (input.hostOptions.logger) {
-              input.hostOptions.logger.warn(baselineErrorSummary);
-            } else {
-              console.warn(baselineErrorSummary);
-            }
-          }
-        }
       }
     },
   });
