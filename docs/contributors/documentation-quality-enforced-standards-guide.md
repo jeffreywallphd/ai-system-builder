@@ -17,6 +17,7 @@ related_code_paths:
   - dev/scripts/validate-adr-records.cjs
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/scripts/validate-docs-cross-references.cjs
   - dev/tests/DocsLintEntrypointScript.test.ts
   - dev/tests/DocumentationQualityContributorStandardsStory716Guardrails.test.ts
 ---
@@ -65,6 +66,7 @@ npm run docs:validate:registry
 npm run docs:validate:adr
 npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
+npm run docs:validate:cross-references
 ```
 
 ## Rule Categories: What To Do
@@ -97,6 +99,10 @@ npm run docs:validate:segmentation
 
 - Resolve every local markdown and registry/catalog path you add.
 - Keep ADR and architecture related-reference sections consistent.
+- Keep high-value routing, index, and supersession cross-references aligned:
+  - Routing doc paths and `relatedDocRecordIds`.
+  - Documentation index links and record IDs.
+  - Documentation registry superseded entries and architecture supersession registry targets.
 - Keep docs-system JSON contracts/seed files parseable and shape-compatible.
 
 ### Readability Boundaries (Rule Group 5)

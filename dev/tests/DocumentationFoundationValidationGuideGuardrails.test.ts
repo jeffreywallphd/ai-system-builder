@@ -36,6 +36,8 @@ describe("documentation foundation validation guide guardrails", () => {
     expect(guideAi).toContain("npm run docs:validate:foundation");
     expect(guide).toContain("npm run docs:validate:segmentation");
     expect(guideAi).toContain("npm run docs:validate:segmentation");
+    expect(guide).toContain("npm run docs:validate:cross-references");
+    expect(guideAi).toContain("npm run docs:validate:cross-references");
     expect(guide).toContain("## CI Usage");
     expect(guideAi).toContain("## CI Contract");
     expect(packageJson.scripts?.["docs:lint"]).toBe(
@@ -46,6 +48,9 @@ describe("documentation foundation validation guide guardrails", () => {
     );
     expect(packageJson.scripts?.["docs:validate:segmentation"]).toBe(
       "node dev/scripts/validate-docs-segmentation.cjs",
+    );
+    expect(packageJson.scripts?.["docs:validate:cross-references"]).toBe(
+      "node dev/scripts/validate-docs-cross-references.cjs",
     );
   });
 });

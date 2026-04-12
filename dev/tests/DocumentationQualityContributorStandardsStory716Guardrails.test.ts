@@ -77,6 +77,7 @@ describe("story 7.1.6 contributor-facing standards guidance guardrails", () => {
         "npm run docs:validate:adr",
         "npm run docs:validate:architecture-domains",
         "npm run docs:validate:segmentation",
+        "npm run docs:validate:cross-references",
       ]) {
         expect(content).toContain(command);
       }

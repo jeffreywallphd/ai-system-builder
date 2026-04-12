@@ -14,6 +14,7 @@ related_code_paths:
   - docs/context/governance/context-governance-policy.md
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/scripts/validate-docs-cross-references.cjs
   - dev/tests/DocumentationQualityOwnershipReviewStory715Guardrails.test.ts
 ---
 
@@ -159,7 +160,7 @@ Apply at least one additional qualified reviewer for documentation changes in:
 
 ### How This Fits Normal Repository Maintenance
 
-- Contributors run lightweight validators locally (`npm run docs:validate:foundation`, `npm run docs:validate:registry`, `npm run docs:validate:adr`, `npm run docs:validate:architecture-domains`, `npm run docs:validate:segmentation`) before requesting review.
+- Contributors run lightweight validators locally (`npm run docs:validate:foundation`, `npm run docs:validate:registry`, `npm run docs:validate:adr`, `npm run docs:validate:architecture-domains`, `npm run docs:validate:segmentation`, `npm run docs:validate:cross-references`) before requesting review.
 - Contributors use `docs/contributors/documentation-quality-enforced-standards-guide.md` for preflight checks, templates/examples, and failure-category triage before running validators.
 - Maintainers use severity and trigger guidance in this standard to decide whether a change is block-now, warn-and-fix-soon, or advisory-only.
 - Manual review focuses on semantic correctness, authority boundaries, and high-risk change impact that automation cannot fully judge.
