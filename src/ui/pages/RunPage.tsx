@@ -50,6 +50,10 @@ import { resolveIdentityAccessChannel } from "../shared/identity/IdentityAuthEnv
 import { toUserFacingAssetWorkflowError } from "@shared/assets/AssetWorkflowClient";
 import type { AssetDetailDto } from "@shared/contracts/assets/AssetTransportContracts";
 
+
+
+type AssetDetailByExecutionAndAssetId = Readonly<Record<string, Readonly<Record<string, AssetDetailDto | undefined>>>>;
+type AssetActionStateByExecutionAndAssetId = Readonly<Record<string, Readonly<Record<string, OperationalProtectedAssetActionState | undefined>>>>;
 interface RunPageProps {
   readonly runtimeOperationsService?: RuntimeOperationsService;
   readonly runtimeRealtimeSubscriptionService?: RuntimeRealtimeSubscriptionService;
@@ -165,8 +169,8 @@ export default function RunPage(props: RunPageProps): JSX.Element {
   const [isRunDetailLoading, setIsRunDetailLoading] = useState(false);
   const [runtimeExecutionError, setRuntimeExecutionError] = useState<string | undefined>();
   const [selectedResultExecutionId, setSelectedResultExecutionId] = useState<string | undefined>();
-  const [assetDetailByExecutionAndAssetId, setAssetDetailByExecutionAndAssetId] = useState<Readonly<Record<string, Readonly<Record<string, AssetDetailDto | undefined>>>>(Object.freeze({}));
-  const [assetActionStateByExecutionAndAssetId, setAssetActionStateByExecutionAndAssetId] = useState<Readonly<Record<string, Readonly<Record<string, OperationalProtectedAssetActionState | undefined>>>>(Object.freeze({}));
+  const [assetDetailByExecutionAndAssetId, setAssetDetailByExecutionAndAssetId] = useState<AssetDetailByExecutionAndAssetId>(Object.freeze({}));
+  const [assetActionStateByExecutionAndAssetId, setAssetActionStateByExecutionAndAssetId] = useState<AssetActionStateByExecutionAndAssetId>(Object.freeze({}));
 
   const refreshRuntimeQueue = useCallback(async (): Promise<void> => {
     setIsRuntimeQueueLoading(true);
