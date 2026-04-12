@@ -26,8 +26,27 @@ import {
 } from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import type { StorageInstanceProvisioningContract } from "@application/system-runtime/StorageInstanceProvisioningContract";
 import { createStorageInstanceProvisioningResult } from "@application/system-runtime/StorageInstanceProvisioningContract";
+import type { StudioShellObservabilityEvent } from "../StudioShellObservability";
 
 describe("StudioShellBackendApi", () => {
+  class CapturingStudioShellObservabilityLogger {
+    public readonly infoEvents: StudioShellObservabilityEvent[] = [];
+    public readonly warnEvents: StudioShellObservabilityEvent[] = [];
+    public readonly errorEvents: StudioShellObservabilityEvent[] = [];
+
+    public info(event: StudioShellObservabilityEvent): void {
+      this.infoEvents.push(event);
+    }
+
+    public warn(event: StudioShellObservabilityEvent): void {
+      this.warnEvents.push(event);
+    }
+
+    public error(event: StudioShellObservabilityEvent): void {
+      this.errorEvents.push(event);
+    }
+  }
+
   it("saves, updates, and reopens authoritative image system definitions from system studio drafts", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const initialized = await api.initializeStudio("studio-system", "System Studio");
@@ -450,7 +469,17 @@ describe("StudioShellBackendApi", () => {
   });
 
   it("ignores caller-provided upload path hints and ingests through dataset storage bindings", async () => {
-    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const logger = new CapturingStudioShellObservabilityLogger();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        observabilityLogger: logger,
+      },
+    );
     const initialized = await api.initializeStudio("studio-system", "System Studio");
     const sessionId = initialized.data!.activeSessionId!;
     const created = await api.createDraft({
@@ -483,6 +512,12 @@ describe("StudioShellBackendApi", () => {
     expect(upload.data?.image.assetId).toContain("reference-image-uploads");
     expect(upload.data?.image.assetId).not.toContain("file://user/controlled/path.png");
     expect(upload.data?.storedFilePath).toContain("reference-image-uploads");
+    expect(upload.data?.configuredUploadRootPath).toContain("reference-image-uploads");
+    const observedEvent = logger.infoEvents.find((event) => event.action === "ingest-reference-image-upload");
+    expect(observedEvent?.outcome).toBe("success");
+    expect(observedEvent?.studioId).toBe("studio-system");
+    expect(observedEvent?.draftId).toBe(created.data!.draft!.draftId);
+    expect(observedEvent?.datasetBindingId).toBe("input-image-dataset");
   });
 
   it("starts rerun from historical execution context and persists run lineage metadata", async () => {

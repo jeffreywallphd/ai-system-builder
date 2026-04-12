@@ -61,6 +61,7 @@ describe("image-system components", () => {
     const uploadHtml = renderToStaticMarkup(
       React.createElement(ImageUploadPanel, {
         acceptedMimeTypes: ["image/png", "image/jpeg"],
+        configuredSavePath: "/tmp/ai-loom-studio/reference-image-uploads",
       }),
     );
     const viewerHtml = renderToStaticMarkup(
@@ -104,6 +105,7 @@ describe("image-system components", () => {
 
     expect(uploadHtml).toContain("Upload images");
     expect(uploadHtml).toContain("Choose files");
+    expect(uploadHtml).toContain("Upload save path");
     expect(viewerHtml).toContain("Fit: contain");
     expect(viewerHtml).toContain("Dimensions");
     expect(formHtml).toContain("Parameters");

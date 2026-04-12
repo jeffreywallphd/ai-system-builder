@@ -180,6 +180,17 @@ function toSelectionRole(value: string | undefined): ImageManipulationSelectionR
   return undefined;
 }
 
+function toDirectoryPath(filePath: string | undefined): string | undefined {
+  if (!filePath) {
+    return undefined;
+  }
+  const separatorIndex = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
+  if (separatorIndex <= 0) {
+    return undefined;
+  }
+  return filePath.slice(0, separatorIndex);
+}
+
 const galleryPreviewRoleOrder: ReadonlyArray<ImageManipulationSelectionRole> = Object.freeze([
   "output",
   "source",
@@ -1611,6 +1622,8 @@ export function ImageManipulationRuntimeEditorPanel({
   const [isReopeningRecentSystemId, setIsReopeningRecentSystemId] = useState<string | undefined>();
   const [uploadProgressStage, setUploadProgressStage] = useState<UploadProgressStage>("idle");
   const [uploadedPreviewPathsByFileName, setUploadedPreviewPathsByFileName] = useState<Readonly<Record<string, string>>>(Object.freeze({}));
+  const [configuredUploadSavePath, setConfiguredUploadSavePath] = useState<string | undefined>();
+  const uploadSavePathHint = configuredUploadSavePath ?? "[os.tmpdir]/ai-loom-studio/reference-image-uploads";
   const [imageLibrarySearch, setImageLibrarySearch] = useState("");
   const [appliedImageLibrarySearch, setAppliedImageLibrarySearch] = useState("");
   const [imageLibraryAssets, setImageLibraryAssets] = useState<ReadonlyArray<ImageLibraryStudioImageAsset>>([]);
@@ -3359,6 +3372,7 @@ export function ImageManipulationRuntimeEditorPanel({
             }}
             disabled={context.isBusy || isUploading}
             resolvedPreviewPathsByFileName={uploadedPreviewPathsByFileName}
+            configuredSavePath={uploadSavePathHint}
             onUploadRequested={(event) => {
               const file = event.files[0];
               if (!file) {
@@ -3419,6 +3433,10 @@ export function ImageManipulationRuntimeEditorPanel({
                     syncPreviewRole: true,
                   }));
                   setStatusMessage("Photo ready.");
+                  setConfiguredUploadSavePath(
+                    response.data.configuredUploadRootPath
+                    ?? toDirectoryPath(response.data.storedFilePath),
+                  );
                   if (response.data.storedFilePath) {
                     setUploadedPreviewPathsByFileName(Object.freeze({
                       [file.name]: response.data.storedFilePath,

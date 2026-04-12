@@ -178,6 +178,7 @@ function createDefaultFactories(
             args.storageRootDirectory,
           ),
           imageSystemDefinitionRepository: args.imageWorkflowSystemPersistence,
+          observabilityLogger,
         },
       );
     },

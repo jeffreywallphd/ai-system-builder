@@ -12,6 +12,7 @@ export interface ImageUploadPanelProps extends ImageUploadPanelPropsContract, Im
   readonly className?: string;
   readonly disabled?: boolean;
   readonly resolvedPreviewPathsByFileName?: Readonly<Record<string, string>>;
+  readonly configuredSavePath?: string;
 }
 
 function buildSelectionSummary(issues: ReadonlyArray<ImageUploadValidationIssue>): string {
@@ -35,6 +36,7 @@ export function ImageUploadPanel({
   className,
   disabled = false,
   resolvedPreviewPathsByFileName,
+  configuredSavePath,
 }: ImageUploadPanelProps): JSX.Element {
   const [isDragActive, setIsDragActive] = useState(false);
   const [validation, setValidation] = useState<ImageUploadValidationResult>({
@@ -159,6 +161,11 @@ export function ImageUploadPanel({
         <h3 className="ui-image-upload-panel__title ui-image-surface__title">{title}</h3>
         <span className="ui-text-small ui-text-secondary">{summary}</span>
       </header>
+      {configuredSavePath ? (
+        <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+          Upload save path: <code>{configuredSavePath}</code>
+        </p>
+      ) : null}
       <div
         className={[
           "ui-image-upload-panel__dropzone",
