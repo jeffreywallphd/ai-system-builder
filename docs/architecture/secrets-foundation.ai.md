@@ -239,3 +239,34 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
 - regression coverage:
   - updates to `src/infrastructure/security/secrets/tests/SystemSecretBootstrapService.test.ts`
   - updates to `src/hosts/server/tests/ResolveCriticalServerSecurityMaterial.test.ts`
+
+## Story 3.3.3 Rotation contracts and rotation metadata
+
+- Adds explicit rotation-contract primitives for security material versions in:
+  - `src/application/security/contracts/SecurityMaterialRotationContract.ts`
+- Rotation contracts now model:
+  - version state (`active` / `previous` / `pending`)
+  - effective dates (`effectiveFrom`, optional `effectiveUntil`)
+  - predecessor/successor version linkage
+  - rotation policy metadata (`rotationMode`, cutover strategy, optional cadence/overlap windows, last/next rotation timestamps)
+- Extends key hierarchy lifecycle governance to carry optional rotation policy metadata:
+  - `src/application/security/contracts/SecurityMaterialKeyHierarchyContract.ts`
+- Extends provider material metadata rotation envelope to carry:
+  - active, previous, and pending version ids
+  - effective-as-of timestamp
+  - typed version timeline entries
+  - optional rotation policy metadata
+  - implementation path: `src/application/security/ports/SecretProviderPorts.ts`
+- Provider metadata derivation now emits rotation-aware timelines for server/workspace/user material lookups:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+  - `src/infrastructure/security/secrets/DurableServerSecretStoreBackend.ts`
+  - `src/infrastructure/security/secrets/LocalUserSecureSecretStoreBackend.ts`
+- Local user secure store persistence now supports durable rotation metadata snapshots (active/previous/pending + timeline + policy) with backward-compatible parsing for prior records.
+- Regression coverage additions:
+  - `src/application/security/tests/SecurityMaterialRotationContract.test.ts`
+  - updates to `src/application/security/tests/SecurityMaterialKeyHierarchyContract.test.ts`
+  - updates to provider metadata tests under:
+    - `src/application/security/tests/SecretProviderPorts.test.ts`
+    - `src/application/security/tests/ScopedSecretProviderMaterialRetrievalUseCase.test.ts`
+    - `src/infrastructure/security/tests/DefaultSecretProviderResolutionService.test.ts`
+    - `src/infrastructure/security/secrets/tests/LocalUserSecureSecretStoreBackend.test.ts`

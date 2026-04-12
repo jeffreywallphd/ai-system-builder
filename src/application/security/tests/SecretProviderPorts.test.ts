@@ -62,6 +62,11 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
         rotation: {
           status: SecretProviderMaterialRotationStatuses.active,
           currentVersionId: "secret:server:provider:openai:v1",
+          versions: [{
+            versionId: "secret:server:provider:openai:v1",
+            state: "active",
+            effectiveFrom: "2026-04-08T00:00:00.000Z",
+          }],
         },
         policyFlags: {
           metadataSafeForDiagnostics: true,
@@ -120,6 +125,11 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
           rotation: {
             status: SecretProviderMaterialRotationStatuses.active,
             currentVersionId: "secret:server:provider:openai:v1",
+            versions: [{
+              versionId: "secret:server:provider:openai:v1",
+              state: "active",
+              effectiveFrom: "2026-04-08T00:00:00.000Z",
+            }],
           },
           policyFlags: {
             metadataSafeForDiagnostics: true,

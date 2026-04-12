@@ -84,6 +84,11 @@ class StubSecretProviderResolutionPort implements ISecretProviderMaterialResolut
         rotation: {
           status: SecretProviderMaterialRotationStatuses.active,
           currentVersionId: `${input.selector.secretId}:v1`,
+          versions: [{
+            versionId: `${input.selector.secretId}:v1`,
+            state: "active",
+            effectiveFrom: "2026-04-10T00:00:00.000Z",
+          }],
         },
         policyFlags: {
           metadataSafeForDiagnostics: true,

@@ -291,6 +291,37 @@ These contracts establish stable extension points for persistence adapters, auth
   - updates to `src/infrastructure/security/secrets/tests/SystemSecretBootstrapService.test.ts`
   - updates to `src/hosts/server/tests/ResolveCriticalServerSecurityMaterial.test.ts`
 
+## Story 3.3.3 Rotation contracts and rotation metadata
+
+- adds explicit rotation-contract primitives for security material versions in:
+  - `src/application/security/contracts/SecurityMaterialRotationContract.ts`
+- rotation contracts now model:
+  - version state (`active` / `previous` / `pending`)
+  - effective dates (`effectiveFrom`, optional `effectiveUntil`)
+  - predecessor/successor version linkage
+  - rotation policy metadata (`rotationMode`, cutover strategy, optional cadence/overlap windows, last/next rotation timestamps)
+- extends key hierarchy lifecycle governance to carry optional rotation policy metadata:
+  - `src/application/security/contracts/SecurityMaterialKeyHierarchyContract.ts`
+- extends provider material metadata rotation envelope to carry:
+  - active, previous, and pending version ids
+  - effective-as-of timestamp
+  - typed version timeline entries
+  - optional rotation policy metadata
+  - implementation path: `src/application/security/ports/SecretProviderPorts.ts`
+- provider metadata derivation now emits rotation-aware timelines for server/workspace/user material lookups:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+  - `src/infrastructure/security/secrets/DurableServerSecretStoreBackend.ts`
+  - `src/infrastructure/security/secrets/LocalUserSecureSecretStoreBackend.ts`
+- local user secure store persistence now supports durable rotation metadata snapshots (active/previous/pending + timeline + policy) with backward-compatible parsing for prior records.
+- regression coverage additions:
+  - `src/application/security/tests/SecurityMaterialRotationContract.test.ts`
+  - updates to `src/application/security/tests/SecurityMaterialKeyHierarchyContract.test.ts`
+  - updates to provider metadata tests under:
+    - `src/application/security/tests/SecretProviderPorts.test.ts`
+    - `src/application/security/tests/ScopedSecretProviderMaterialRetrievalUseCase.test.ts`
+    - `src/infrastructure/security/tests/DefaultSecretProviderResolutionService.test.ts`
+    - `src/infrastructure/security/secrets/tests/LocalUserSecureSecretStoreBackend.test.ts`
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants
