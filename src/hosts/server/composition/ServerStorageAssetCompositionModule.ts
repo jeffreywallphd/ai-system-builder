@@ -77,6 +77,16 @@ export async function composeServerStorageAssetCompositionModule(
   });
   const localStorageObjectAdapter = new ServerManagedLocalStorageObjectAdapter({
     managedStorageRootPath,
+    diagnosticsLogger: input.encryptionObservabilityLogger
+      ? {
+        info: (event) => {
+          input.encryptionObservabilityLogger?.info(event);
+        },
+        error: (event) => {
+          input.encryptionObservabilityLogger?.error(event);
+        },
+      }
+      : undefined,
   });
   const storageBackendAdapterRegistry = createStorageBackendAdapterRegistry([{
     backendType: "managed-filesystem",

@@ -24,8 +24,10 @@ Required correlation dimensions are optional per event but should be populated w
 The image slice now emits structured resilience diagnostics across these services:
 - Run API observability via `RunOrchestrationObservability`.
 - Image asset API observability via `ImageAssetManagementObservability`.
+- System-runtime start observability via `SystemRuntimeObservability` (`SystemRuntimeBackendApi`).
 - Comfy execution observability via `ComfyUiExecutionObservability`.
 - Result/preview persistence diagnostics via `SqliteRunCollectedResultPersistenceAdapter` and `IPersistenceDiagnosticsLogger`.
+- Local managed-storage object-write diagnostics via `ServerManagedLocalStorageObjectAdapter` (success/failure write events include resolved absolute path for operator troubleshooting).
 
 Each service follows the same baseline:
 - Emit `slice` and normalized `correlation` metadata.
@@ -44,6 +46,19 @@ For degraded/failure triage across the slice:
 2. Follow run and execution events by `runId` + `executionJobId`.
 3. Follow result persistence and preview events by `resultAssetId` + `previewDerivativeId`.
 4. Use `resilience.code`, `resilience.scope`, and `resilience.recoveryKind` to identify retry vs terminal behavior.
+
+### Locating persisted uploaded image files
+
+For managed-filesystem storage instances, uploaded image bytes are written under the server-managed storage root with this layout:
+
+`<managedStorageRootPath>/workspaces/<workspace-safe-segment>/storage/<storage-safe-segment>/objects/<objectKey>`
+
+Where:
+- `managedStorageRootPath` defaults to `<server-database-directory>/runtime-assets/managed-storage` when not overridden.
+- `<workspace-safe-segment>` and `<storage-safe-segment>` are deterministic slug/hash safe segments derived from workspace/storage IDs.
+- `<objectKey>` is the logical object key (for image assets this is usually `workspaces/<workspaceId>/image-assets/<assetId>/<area>/<partition>/<filename>`).
+
+`storage.local.write.succeeded` diagnostics include both `objectKey` and `absolutePath` so operators can jump directly to the on-disk file that was written.
 
 ## Guardrails for extensions
 When adding new image-slice infrastructure services:
