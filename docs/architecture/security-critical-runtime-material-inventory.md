@@ -97,6 +97,16 @@ Provide an implementation-level inventory of security-critical material resolved
   - Missing optional token/key secrets can silently generate non-durable per-process material in several composition modules.
   - Empty required-system-secret list bypasses bootstrap secret validation.
 
+## Story 3.1.3 Follow-On Enforcement
+
+- Inventory findings now feed an explicit startup validation stage through:
+  - `src/application/security/services/SecurityMaterialStartupValidationPipeline.ts`
+  - `src/infrastructure/security/startup/AuthoritativeServerSecurityMaterialValidationPipeline.ts`
+  - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+- Enforcement posture:
+  - production-capable startup fails fast on missing/non-durable/disallowed required material
+  - development/test startup emits non-fatal structured diagnostics for policy-allowed optional material
+
 ## Related ADRs
 
 - [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.md)

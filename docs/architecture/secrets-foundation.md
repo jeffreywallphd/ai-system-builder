@@ -109,6 +109,19 @@ These contracts establish stable extension points for persistence adapters, auth
   - provider credentials remain fail-fast required
   - identity-session signing material stays fail-fast in production and is optional/ephemeral in development policy
 
+## Story 3.1.3 Startup Security Material Validation Pipeline
+
+- adds reusable startup validation pipeline contracts in:
+  - `src/application/security/services/SecurityMaterialStartupValidationPipeline.ts`
+- adds authoritative-server security material catalog + host-profile lifecycle mapping in:
+  - `src/infrastructure/security/startup/AuthoritativeServerSecurityMaterialValidationPipeline.ts`
+- integrates validation into early authoritative security stage:
+  - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+- startup behavior changes:
+  - production-capable startup now fails fast when required durable material resolves from missing/non-durable/disallowed sources
+  - development/test startup can continue with structured warning diagnostics for policy-allowed optional material
+- stage output now exposes structured `startupSecurityMaterialValidation` diagnostics for testability and readiness telemetry integration
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants

@@ -61,3 +61,16 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
 - Distinguishes fail-fast required runtime material from optional development-ephemeral material:
   - provider credentials remain fail-fast required.
   - identity-session signing material stays fail-fast in production and is optional/ephemeral in development policy.
+
+## Story 3.1.3 Startup Security Material Validation Pipeline
+
+- Adds reusable startup validation pipeline contracts in:
+  - `src/application/security/services/SecurityMaterialStartupValidationPipeline.ts`
+- Adds authoritative-server security material catalog + host-profile lifecycle mapping in:
+  - `src/infrastructure/security/startup/AuthoritativeServerSecurityMaterialValidationPipeline.ts`
+- Integrates validation into early authoritative security stage:
+  - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+- Startup behavior changes:
+  - production-capable startup now fails fast when required durable material resolves from missing/non-durable/disallowed sources.
+  - development/test startup can continue with structured warning diagnostics for policy-allowed optional material.
+- Stage output now exposes structured `startupSecurityMaterialValidation` diagnostics for testability and readiness telemetry integration.

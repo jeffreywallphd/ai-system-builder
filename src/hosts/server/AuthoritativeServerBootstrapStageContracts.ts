@@ -11,6 +11,7 @@ import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/tran
 import type { ComfyUiExecutionAdapterInfrastructure } from "@infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition";
 import type { AuthoritativeRunExecutionAdapterRegistration } from "@infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration";
 import type { IdentityServerHost, IdentityServerHostOptions } from "./IdentityServerHost";
+import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
 
 export const AuthoritativeServerBootstrapStageIds = Object.freeze({
   config: "config",
@@ -82,6 +83,7 @@ export interface AuthoritativeServerReadinessCheck {
 
 export interface AuthoritativeServerSecurityStageOutput {
   readonly checks: ReadonlyArray<AuthoritativeServerReadinessCheck>;
+  readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
 }
 
 export interface AuthoritativeServerPersistenceStageInput extends AuthoritativeServerConfigStageOutput {

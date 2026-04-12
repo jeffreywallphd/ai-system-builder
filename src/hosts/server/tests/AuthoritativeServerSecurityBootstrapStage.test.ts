@@ -4,7 +4,10 @@ import { createHostDeploymentProfile } from "@hosts/bootstrap/HostBootstrapPipel
 import { createStartupTracer } from "@hosts/bootstrap/startupTracer";
 import { advertiseHostRuntimeMetadata } from "@hosts/HostRuntimeMetadataCatalog";
 import { AuthoritativeServerHostRuntime } from "../../HostRuntimeCatalog";
-import { createAuthoritativeServerSecurityBootstrapStage } from "../AuthoritativeServerSecurityBootstrapStage";
+import {
+  AuthoritativeServerStartupSecurityMaterialValidationError,
+  createAuthoritativeServerSecurityBootstrapStage,
+} from "../AuthoritativeServerSecurityBootstrapStage";
 import { AuthoritativeServerReadinessCheckStates } from "../AuthoritativeServerBootstrapStageContracts";
 
 describe("AuthoritativeServerSecurityBootstrapStage", () => {
@@ -30,6 +33,19 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
     });
 
     expect(output.checks).toEqual([
+      {
+        checkId: "security.startup-material-validation",
+        subsystem: "security",
+        state: AuthoritativeServerReadinessCheckStates.ready,
+        summary: "Startup security material validation produced 1 diagnostic issue(s).",
+        blocking: false,
+        details: {
+          lifecycleStage: "test",
+          fatalIssueCount: "0",
+          warningCount: "1",
+          productionCapable: "false",
+        },
+      },
       {
         checkId: "security.transport-trust-material",
         subsystem: "security",
@@ -98,12 +114,58 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
 
     expect(calls).toEqual(["transport", "ca", "secrets"]);
     expect(output.checks.map((check) => check.checkId)).toEqual([
+      "security.startup-material-validation",
       "security.transport-trust-material",
       "security.certificate-authority-material",
       "security.required-secrets",
     ]);
-    expect(output.checks[0]?.state).toBe(AuthoritativeServerReadinessCheckStates.ready);
     expect(output.checks[1]?.state).toBe(AuthoritativeServerReadinessCheckStates.ready);
-    expect(output.checks[2]?.state).toBe(AuthoritativeServerReadinessCheckStates.degraded);
+    expect(output.checks[2]?.state).toBe(AuthoritativeServerReadinessCheckStates.ready);
+    expect(output.checks[3]?.state).toBe(AuthoritativeServerReadinessCheckStates.degraded);
+  });
+
+  it("fails fast when startup security material validation reports fatal diagnostics", async () => {
+    const stage = createAuthoritativeServerSecurityBootstrapStage({
+      validateStartupSecurityMaterial: () => Object.freeze({
+        state: "invalid" as const,
+        lifecycleStage: "production" as const,
+        productionCapable: true,
+        observations: Object.freeze([]),
+        issues: Object.freeze([{
+          materialId: "material:test:fatal",
+          code: "missing" as const,
+          severity: "fatal" as const,
+          message: "Required security material is missing.",
+          sourceKind: "missing" as const,
+        }]),
+        fatalIssues: Object.freeze([{
+          materialId: "material:test:fatal",
+          code: "missing" as const,
+          severity: "fatal" as const,
+          message: "Required security material is missing.",
+          sourceKind: "missing" as const,
+        }]),
+        warnings: Object.freeze([]),
+      }),
+    });
+
+    await expect(stage.execute({
+      deploymentProfile: createHostDeploymentProfile({
+        profileId: "organization",
+        environmentName: "production",
+        releaseChannel: "stable",
+      }),
+      environment: Object.freeze({ NODE_ENV: "production" }),
+      enabledCapabilities: AuthoritativeServerHostRuntime.capabilities,
+      runtimeMetadata: advertiseHostRuntimeMetadata({
+        host: AuthoritativeServerHostRuntime,
+      }),
+      startupTracer: createStartupTracer({
+        startupReason: "authoritative-server-security-stage-fail-fast-test",
+      }),
+      hostConfiguration: Object.freeze({
+        databasePath: "test.sqlite",
+      }),
+    })).rejects.toBeInstanceOf(AuthoritativeServerStartupSecurityMaterialValidationError);
   });
 });

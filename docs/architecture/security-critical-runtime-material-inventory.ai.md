@@ -69,3 +69,13 @@ Provide a complete implementation-level inventory of security-critical runtime m
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/application/identity/services/TrustedDevicePairingService.ts`
 - `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
+
+## Story 3.1.3 Follow-On Enforcement
+
+- Inventory findings now feed an explicit startup validation stage through:
+  - `src/application/security/services/SecurityMaterialStartupValidationPipeline.ts`
+  - `src/infrastructure/security/startup/AuthoritativeServerSecurityMaterialValidationPipeline.ts`
+  - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+- Enforcement posture:
+  - production-capable startup fails fast on missing/non-durable/disallowed required material.
+  - development/test startup emits non-fatal structured diagnostics for policy-allowed optional material.
