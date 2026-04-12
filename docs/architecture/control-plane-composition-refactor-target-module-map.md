@@ -150,6 +150,22 @@ Story 2.2.2 extracts workspace lifecycle, authorization/sharing, and deployment-
 
 This extraction preserves route-level behavior and policy semantics while narrowing `IdentityServerHost.ts` responsibilities to consuming typed module outputs.
 
+## Story 2.2.3 Node-Trust/Certificate/TLS/Secret Composition Extraction
+
+Story 2.2.3 extracts security-heavy startup composition from inline `IdentityServerHost.ts` startup assembly into:
+
+- `src/hosts/server/composition/ServerSecretCompositionModule.ts`
+- `src/hosts/server/composition/ServerCertificateCompositionModule.ts`
+- `src/hosts/server/composition/ServerNodeTrustCompositionModule.ts`
+- `src/hosts/server/composition/ServerTlsMaterialCompositionModule.ts`
+- regression coverage:
+  - `src/hosts/server/tests/ServerSecretCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerCertificateCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerNodeTrustCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerTlsMaterialCompositionModule.test.ts`
+
+This extraction preserves fail-closed startup behavior while making secret, trust, certificate, and TLS composition dependencies explicit and bounded for follow-on hardening stories.
+
 ## Story 2.1.3 Staged Bootstrap Pipeline and Startup State Model
 
 Story 2.1.3 adds an explicit staged bootstrap model and typed startup/readiness states for the authoritative control-plane startup boundary:

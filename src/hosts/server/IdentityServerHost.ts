@@ -247,6 +247,10 @@ import {
 } from "./composition/ServerIdentitySessionTrustedDeviceCompositionModule";
 import { composeServerWorkspaceAuthorizationCompositionModule } from "./composition/ServerWorkspaceAuthorizationCompositionModule";
 import { composeServerDeploymentPolicyCompositionModule } from "./composition/ServerDeploymentPolicyCompositionModule";
+import { composeServerSecretCompositionModule } from "./composition/ServerSecretCompositionModule";
+import { composeServerCertificateCompositionModule } from "./composition/ServerCertificateCompositionModule";
+import { composeServerNodeTrustCompositionModule } from "./composition/ServerNodeTrustCompositionModule";
+import { composeServerTlsMaterialCompositionModule } from "./composition/ServerTlsMaterialCompositionModule";
 import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   evaluateTransportConnectionTrust,
@@ -309,22 +313,6 @@ export interface InitializeCertificateAuthorityForFirstSetupOptions {
   readonly auditHook?: (event: CertificateAuthorityInitializationAuditEvent) => Promise<void> | void;
 }
 
-interface ManagedIdentityServerTlsRuntimeMaterial {
-  readonly certPem: string;
-  readonly keyPem: string;
-  readonly caPem?: string;
-}
-
-const MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS = Object.freeze({
-  enabled: "AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED",
-  targetReferenceId: "AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID",
-  actorUserIdentityId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_ACTOR_USER_IDENTITY_ID",
-  workspaceId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_WORKSPACE_ID",
-  certificateAuthorityId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_CERTIFICATE_AUTHORITY_ID",
-  serialNumber: "AI_LOOM_INTERNAL_CA_SERVER_TLS_SERIAL_NUMBER",
-  privateKeyMaterialRef: "AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF",
-});
-
 interface IdentityDefaultConfigurationRepository {
   saveAuthProvider(provider: AuthProvider): Promise<AuthProvider>;
   saveCredentialPolicy(policy: CredentialPolicy): Promise<CredentialPolicy>;
@@ -339,25 +327,6 @@ class SystemIdentityClock implements IIdentityClock {
 class RandomIdentityIdGenerator implements IIdentityIdGenerator {
   public nextId(namespace: IdentityIdNamespace): string {
     return `${normalizeNamespace(namespace)}:${randomUUID()}`;
-  }
-}
-
-class BaselineTransportSecurityPolicyResolver {
-  public async resolveTransportSecurityPolicy(request: ResolveTransportSecurityPolicyRequest) {
-    return Object.freeze({
-      policy: resolveBaselineTransportSecurityPolicy(request.scenario),
-      source: "baseline" as const,
-    });
-  }
-}
-
-class DomainTransportConnectionPolicyEvaluator {
-  public async evaluateTransportConnectionPolicy(request: EvaluateTransportConnectionPolicyRequest) {
-    return evaluateTransportConnectionTrust({
-      policy: request.policy,
-      context: request.context,
-      evaluatedAt: request.evaluatedAt,
-    });
   }
 }
 
@@ -432,22 +401,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       },
     });
     const legacySecretAccessAuditHook = createSecretAccessAuditHook(options.logger);
-    const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);
-    secretService = composeServerSecretService({
+    const secretComposition = await composeServerSecretCompositionModule({
       databasePath: options.databasePath,
       env,
+      workspaceRepository,
+      authoritativeAuditRecorder,
       observabilityLogger: createSecretOperationalLogger(options.logger),
-      auditHook: composeBestEffortSecretAuditHooks(
-        legacySecretAccessAuditHook
-          ? (event) => legacySecretAccessAuditHook(event as unknown as Record<string, unknown>)
-          : undefined,
-        createAuthoritativeSecretAccessAuditHook(authoritativeAuditRecorder),
-      ),
+      legacySecretAccessAuditHook,
     });
-    await assertSystemSecretBootstrapSafe({
-      env,
-      secretService,
-    });
+    secretService = secretComposition.secretService;
+    const protectedSecretStore = secretComposition.protectedSecretStore;
     const providerAccountPolicies = await runStartupStepSpan({
       tracer: startupTracer,
       parentSpan: startupRootSpan,
@@ -463,14 +426,18 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         await applyIdentityStartupConfiguration(repository, providerAccountPolicies);
       },
     });
-    await runStartupStepSpan({
+    const certificateComposition = await runStartupStepSpan({
       tracer: startupTracer,
       parentSpan: startupRootSpan,
       name: "ca-init",
-      run: async () => {
-        await validateCertificateAuthorityStartup(certificateAuthorityRepository, env);
-      },
+      run: async () => composeServerCertificateCompositionModule({
+        env,
+        certificateAuthorityRepository,
+        nodeTrustRepository,
+        protectedSecretStore,
+      }),
     });
+    const certificateOperationsBackendApi = certificateComposition.certificateOperationsBackendApi;
 
     const authenticator = new LocalPasswordIdentityAuthenticator(new ScryptLocalPasswordCredentialService());
     const identityPolicyService = new IdentityPolicyService(repository);
@@ -507,166 +474,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     const workspaceBackendApi = workspaceAuthorizationComposition.workspaceBackendApi;
     const workspaceAdministrationBackendApi = workspaceAuthorizationComposition.workspaceAdministrationBackendApi;
     const authorizationManagementBackendApi = workspaceAuthorizationComposition.authorizationManagementBackendApi;
-    const nodeTrustAuditSink = new FanoutNodeTrustAuditSink([
+    const secretMetadataBackendApi = secretComposition.secretMetadataBackendApi;
+    const nodeTrustComposition = composeServerNodeTrustCompositionModule({
+      nodeTrustRepository,
+      executionNodeRepository,
       nodeTrustAuditRecorder,
-      new AuthoritativeNodeTrustAuditSink(authoritativeAuditRecorder),
-    ]);
-    const executionNodeManagementAuditSink = new AuthoritativeExecutionNodeManagementAuditSink(authoritativeAuditRecorder);
-  const runtimeTrustMaterialDistributionService = protectedSecretStore
-    ? new RuntimeTrustMaterialDistributionService({
-      certificateAuthorityRepository,
-      issuedCertificateRepository: certificateAuthorityRepository,
-      trustMaterialReferenceRepository: certificateAuthorityRepository,
-      certificateMaterialStorage: new ProtectedCertificateAuthorityRootMaterialStorage(protectedSecretStore),
-      certificateLifecycleEventRepository: certificateAuthorityRepository,
-    })
-    : undefined;
-  const resolveRuntimeTrustMaterialPackageUseCase = runtimeTrustMaterialDistributionService
-    ? new ResolveRuntimeTrustMaterialPackageUseCase({
-      trustMaterialDistributionPort: runtimeTrustMaterialDistributionService,
-    })
-    : undefined;
-  const startupStateResolver = new ResolveCertificateAuthorityStartupStateUseCase({
-    configurationProvider: new EnvironmentCertificateAuthorityBootstrapConfigurationProvider(env),
-    secretService: new EnvironmentCertificateAuthoritySecretService(env, {
-      protectedSecretStore,
-    }),
-    certificateAuthorityRepository,
-    trustMaterialRepository: certificateAuthorityRepository,
-  });
-  const certificateMaterialStorage = protectedSecretStore
-    ? new ProtectedCertificateAuthorityRootMaterialStorage(protectedSecretStore)
-    : undefined;
-  const certificateAuthorityIssuer = certificateMaterialStorage
-    ? new InternalCertificateAuthorityIssuer({
-      certificateAuthorityRepository,
-      trustMaterialRepository: certificateAuthorityRepository,
-      rootMaterialStorage: certificateMaterialStorage,
-    })
-    : undefined;
-  const nodeCertificateEligibilityPort = new ResolveApprovedNodeCertificateEligibilityUseCase({
-    nodeRepository: nodeTrustRepository,
-    enrollmentRequestRepository: nodeTrustRepository,
-  });
-  const renewIssuedCertificateUseCase = certificateMaterialStorage && certificateAuthorityIssuer
-    ? new RenewIssuedCertificateUseCase({
-      certificateAuthorityRepository,
-      issuedCertificateRepository: certificateAuthorityRepository,
-      trustMaterialRepository: certificateAuthorityRepository,
-      certificateMaterialStorage,
-      issuer: certificateAuthorityIssuer,
-      nodeCertificateEligibilityPort,
-    })
-    : {
-      execute: async () => {
-        throw new Error("Certificate renewal is unavailable because protected secret storage is not configured.");
-      },
-    } as RenewIssuedCertificateUseCase;
-  const certificateOperationsBackendApi = new CertificateOperationsBackendApi({
-    getCertificateAuthorityStatusIntrospectionUseCase: new GetCertificateAuthorityStatusIntrospectionUseCase({
-      startupStateResolver,
-      certificateAuthorityRepository,
-      issuedCertificateRepository: certificateAuthorityRepository,
-      certificateLifecycleEventRepository: certificateAuthorityRepository,
-    }),
-    listIssuedCertificateMetadataUseCase: new ListIssuedCertificateMetadataUseCase({
-      issuedCertificateRepository: certificateAuthorityRepository,
-    }),
-    getIssuedCertificateMetadataUseCase: new GetIssuedCertificateMetadataUseCase({
-      issuedCertificateRepository: certificateAuthorityRepository,
-    }),
-    revokeIssuedCertificateUseCase: new RevokeIssuedCertificateUseCase({
-      issuedCertificateRepository: certificateAuthorityRepository,
-      certificateLifecycleEventRepository: certificateAuthorityRepository,
-    }),
-    renewIssuedCertificateUseCase,
-  });
-  const secretMetadataBackendApi = new SecretMetadataBackendApi({
-    createSecretUseCase: secretService.createSecretUseCase,
-    getSecretMetadataUseCase: secretService.getSecretMetadataUseCase,
-    listSecretsUseCase: secretService.listSecretsUseCase,
-    disableSecretUseCase: secretService.disableSecretUseCase,
-    rotateSecretUseCase: secretService.rotateSecretUseCase,
-    reEncryptSecretsUseCase: secretService.reEncryptSecretsUseCase,
-    workspaceAuthorizationReadRepository: workspaceRepository,
-    secretOperationalDiagnosticsProvider: new SecretServiceOperationalDiagnosticsProvider({
-      env,
-      secretService,
-    }),
-  });
-  const nodeTrustBackendApi = new NodeTrustBackendApi({
-    registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({
-      enrollmentRequestRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-    reviewPendingNodeEnrollmentUseCase: new ReviewPendingNodeEnrollmentUseCase({
-      enrollmentRequestRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-    getNodeEnrollmentDetailUseCase: new GetNodeEnrollmentDetailUseCase({
-      enrollmentRequestRepository: nodeTrustRepository,
-    }),
-    getNodeInventoryDetailUseCase: new GetNodeInventoryDetailUseCase({
-      nodeRepository: nodeTrustRepository,
-      enrollmentRequestRepository: nodeTrustRepository,
-    }),
-    approveNodeEnrollmentUseCase: new ApproveNodeEnrollmentUseCase({
-      enrollmentRequestRepository: nodeTrustRepository,
-      nodeRepository: nodeTrustRepository,
-      transactionManager: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-    rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
-      enrollmentRequestRepository: nodeTrustRepository,
-      nodeRepository: nodeTrustRepository,
-      transactionManager: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-    revokeNodeTrustUseCase: new RevokeNodeTrustUseCase({
-      nodeRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-    recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
-      nodeRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-    recordNodeOperationalUpdateUseCase: new RecordNodeOperationalUpdateUseCase({
-      nodeRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-    resolveApprovedNodeRuntimeTrustMaterialUseCase: new ResolveApprovedNodeRuntimeTrustMaterialUseCase({
-      nodeRepository: nodeTrustRepository,
-      runtimeTrustMaterialResolver: resolveRuntimeTrustMaterialPackageUseCase,
-    }),
-    resolveNodeMutualTlsTransportIdentityUseCase: new ResolveNodeMutualTlsTransportIdentityUseCase({
-      nodeRepository: nodeTrustRepository,
-    }),
-    listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
-      nodeRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-    listNodeInventoryUseCase: new ListNodeInventoryUseCase({
-      nodeRepository: nodeTrustRepository,
-      enrollmentRequestRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditSink,
-    }),
-  });
-  const executionNodeManagementBackendApi = new ExecutionNodeManagementBackendApi({
-    listExecutionNodesUseCase: new ListExecutionNodesUseCase({
-      nodeRepository: executionNodeRepository,
-    }),
-    getExecutionNodeDetailUseCase: new GetExecutionNodeDetailUseCase({
-      nodeRepository: executionNodeRepository,
-    }),
-    setExecutionNodeAvailabilityOverrideUseCase: new SetExecutionNodeAvailabilityOverrideUseCase({
-      nodeRepository: executionNodeRepository,
-      auditSink: executionNodeManagementAuditSink,
-    }),
-    eligibilityService: new ImageRunNodeEligibilityEvaluationService({
-      nodeRepository: executionNodeRepository,
-    }),
-    clock: workspaceClock,
-  });
+      authoritativeAuditRecorder,
+      runtimeTrustMaterialResolver: certificateComposition.runtimeTrustMaterialResolver,
+      workspaceClock,
+    });
+    const nodeTrustBackendApi = nodeTrustComposition.nodeTrustBackendApi;
+    const executionNodeManagementBackendApi = nodeTrustComposition.executionNodeManagementBackendApi;
   const managedStorageRootPath = resolveManagedStorageRootPath(path.resolve(options.databasePath), env);
   const localStorageBackendAdapter = new ServerManagedLocalStorageBackendAdapter({
     managedStorageRootPath,
@@ -1111,68 +929,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       }),
     });
   }
-  const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
-    trustedDeviceManagementService: trustedDeviceManagementService,
-    nodeTrustIdentityRepository: nodeTrustRepository,
-    certificateRevocationStatusRegistry: new ResolveCertificateRevocationStatusUseCase({
-      issuedCertificateRepository: certificateAuthorityRepository,
-      certificateLifecycleEventRepository: certificateAuthorityRepository,
-    }),
-  });
-  const transportSecurityObservability = new TransportSecurityObservabilityReporter({
-    logger: {
-      info: (event) => options.logger?.info({
-        event: event.event,
-        requestId: event.details.connectionId,
-        details: Object.freeze({
-          level: event.level,
-          transport: event.details,
-        }),
-      }),
-      warn: (event) => options.logger?.warn({
-        event: event.event,
-        requestId: event.details.connectionId,
-        details: Object.freeze({
-          level: event.level,
-          transport: event.details,
-        }),
-      }),
-      error: (event) => options.logger?.error({
-        event: event.event,
-        requestId: event.details.connectionId,
-        details: Object.freeze({
-          level: event.level,
-          transport: event.details,
-        }),
-      }),
-    },
-  });
-  const transportTrustValidator = new ValidateTransportConnectionTrustUseCase({
-    transportSecurityPolicyResolverPort: new BaselineTransportSecurityPolicyResolver(),
-    transportConnectionPolicyEvaluatorPort: new DomainTransportConnectionPolicyEvaluator(),
-    trustedDeviceStateResolverPort: transportTrustStateResolver,
-    nodeStateResolverPort: transportTrustStateResolver,
-    peerCertificateStateResolverPort: transportTrustStateResolver,
-    transportConnectionPolicyAuditPort: transportSecurityObservability,
-  });
-  const httpTransportTrustValidator = new HttpTransportTrustValidationAdapter(
-    transportTrustValidator,
-    transportSecurityObservability,
-  );
-  const websocketTransportTrustValidator = new WebSocketTransportTrustValidationAdapter(
-    transportTrustValidator,
-    transportSecurityObservability,
-  );
-  const managedTlsMaterial = await resolveManagedIdentityServerTlsRuntimeMaterial({
-    certificateAuthorityRepository,
+  const tlsComposition = await composeServerTlsMaterialCompositionModule({
     env,
+    logger: options.logger,
+    secureTransportConfig,
+    certificateAuthorityRepository,
+    nodeTrustRepository,
+    trustedDeviceManagementService,
+    protectedSecretStore,
   });
   const enableDevLoginRoute = resolveIdentityDevLoginRouteEnabled(env);
-  if (secureTransportConfig.requireSecureHttp && !managedTlsMaterial) {
-    throw new Error(
-      "Identity server secure transport configuration requires HTTPS startup, but managed TLS material is unavailable.",
-    );
-  }
 
   const server = createIdentityHttpServer({
     backendApi,
@@ -1202,16 +968,8 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       requireWss: secureTransportConfig.requireSecureWebSocket,
       allowInsecureLoopback: secureTransportConfig.allowInsecureLoopback,
     }),
-    serverFactory: managedTlsMaterial
-      ? createManagedIdentityServerTlsFactory(managedTlsMaterial)
-      : undefined,
-    transportTrust: secureTransportConfig.enforceTransportTrustValidation
-      ? Object.freeze({
-        httpValidator: httpTransportTrustValidator,
-        websocketValidator: websocketTransportTrustValidator,
-        allowInsecureLoopback: secureTransportConfig.allowInsecureLoopback,
-      })
-      : undefined,
+    serverFactory: tlsComposition.serverFactory,
+    transportTrust: tlsComposition.transportTrust,
     webSocket: Object.freeze({
       channelPathPrefix: "/ws",
     }),
@@ -1814,153 +1572,6 @@ async function runStartupStepSpan<TResult>(input: {
     span.fail(error);
     throw error;
   }
-}
-
-async function validateCertificateAuthorityStartup(
-  certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter,
-  env: Readonly<Record<string, string | undefined>>,
-): Promise<void> {
-  const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);
-  const startupStateUseCase = new ResolveCertificateAuthorityStartupStateUseCase({
-    configurationProvider: new EnvironmentCertificateAuthorityBootstrapConfigurationProvider(env),
-    secretService: new EnvironmentCertificateAuthoritySecretService(env, {
-      protectedSecretStore,
-    }),
-    certificateAuthorityRepository,
-    trustMaterialRepository: certificateAuthorityRepository,
-  });
-
-  const startupState = await startupStateUseCase.execute();
-  assertCertificateAuthorityStartupSafe(startupState);
-}
-
-function createManagedIdentityServerTlsFactory(
-  tlsMaterial: ManagedIdentityServerTlsRuntimeMaterial,
-): IdentityHttpServerFactory {
-  return (requestListener) => createHttpsServer({
-    cert: tlsMaterial.certPem,
-    key: tlsMaterial.keyPem,
-    ca: tlsMaterial.caPem,
-    requestCert: true,
-    rejectUnauthorized: false,
-  }, requestListener);
-}
-
-async function resolveManagedIdentityServerTlsRuntimeMaterial(input: {
-  readonly certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter;
-  readonly env: Readonly<Record<string, string | undefined>>;
-}): Promise<ManagedIdentityServerTlsRuntimeMaterial | undefined> {
-  const tlsEnabled = parseOptionalBoolean(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.enabled]) ?? false;
-  if (!tlsEnabled) {
-    return undefined;
-  }
-
-  const targetReferenceId = normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.targetReferenceId])
-    ?? "server:authoritative";
-  if (!targetReferenceId.startsWith("server:")) {
-    throw new Error("Managed identity-server TLS requires AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID to start with 'server:'.");
-  }
-
-  const privateKeyMaterialRef = normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.privateKeyMaterialRef]);
-  if (!privateKeyMaterialRef) {
-    throw new Error("Managed identity-server TLS requires AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF.");
-  }
-
-  const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(input.env);
-  if (!protectedSecretStore) {
-    throw new Error("Managed identity-server TLS requires protected secret storage configuration.");
-  }
-
-  const certificateMaterialStorage = new ProtectedCertificateAuthorityRootMaterialStorage(protectedSecretStore);
-  const runtimeTrustMaterialDistributionService = new RuntimeTrustMaterialDistributionService({
-    certificateAuthorityRepository: input.certificateAuthorityRepository,
-    issuedCertificateRepository: input.certificateAuthorityRepository,
-    trustMaterialReferenceRepository: input.certificateAuthorityRepository,
-    certificateMaterialStorage,
-    certificateLifecycleEventRepository: input.certificateAuthorityRepository,
-  });
-  const resolveRuntimeTrustMaterialPackageUseCase = new ResolveRuntimeTrustMaterialPackageUseCase({
-    trustMaterialDistributionPort: runtimeTrustMaterialDistributionService,
-  });
-
-  const actorUserIdentityId = normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.actorUserIdentityId])
-    ?? "system:identity-server-host";
-  const runtimeTrustPackage = await resolveRuntimeTrustMaterialPackageUseCase.execute({
-    operationKey: `identity-server-managed-tls-runtime-package:${targetReferenceId}:${Date.now()}`,
-    actorUserIdentityId,
-    targetKind: "server",
-    targetReferenceId,
-    workspaceId: normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.workspaceId]),
-    certificateAuthorityId: normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.certificateAuthorityId]),
-    serialNumber: normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.serialNumber]),
-    includeLeafCertificate: true,
-    includeCertificateChain: true,
-    includeTrustBundle: true,
-  });
-
-  if (!runtimeTrustPackage.ok) {
-    throw new Error(
-      `Managed identity-server TLS startup failed: runtime trust package retrieval failed (${runtimeTrustPackage.error.code}).`,
-    );
-  }
-
-  if (!runtimeTrustPackage.value.serialNumber) {
-    throw new Error("Managed identity-server TLS startup failed: server runtime trust package is missing serialNumber.");
-  }
-
-  const revocationStatusUseCase = new ResolveCertificateRevocationStatusUseCase({
-    issuedCertificateRepository: input.certificateAuthorityRepository,
-    certificateLifecycleEventRepository: input.certificateAuthorityRepository,
-  });
-  const revocationStatus = await revocationStatusUseCase.resolveCertificateRevocationStatus({
-    serialNumber: runtimeTrustPackage.value.serialNumber,
-  });
-  if (!revocationStatus.usable || revocationStatus.status !== "active") {
-    throw new Error(
-      `Managed identity-server TLS startup failed: server certificate '${runtimeTrustPackage.value.serialNumber}' is not usable (status='${revocationStatus.status}').`,
-    );
-  }
-
-  const privateKeyMaterial = await input.certificateAuthorityRepository.findTrustMaterialByRef(privateKeyMaterialRef);
-  if (!privateKeyMaterial) {
-    throw new Error("Managed identity-server TLS startup failed: private key trust material is unavailable.");
-  }
-
-  if (privateKeyMaterial.kind !== TrustMaterialKinds.privateKeyEncryptedPem) {
-    throw new Error("Managed identity-server TLS startup failed: private key trust material kind is invalid.");
-  }
-
-  const loadedPrivateKey = await certificateMaterialStorage.loadRootMaterials({
-    certificateAuthorityId: runtimeTrustPackage.value.certificateAuthorityId,
-    reason: "identity-server-managed-tls-startup",
-    materials: [{
-      materialRef: privateKeyMaterial.materialRef,
-      kind: privateKeyMaterial.kind,
-      secretRef: privateKeyMaterial.storageLocator,
-    }],
-  });
-  const privateKeyPem = loadedPrivateKey[0]?.plaintextValue?.trim();
-  if (!privateKeyPem) {
-    throw new Error("Managed identity-server TLS startup failed: private key material is unavailable.");
-  }
-
-  const leafCertificatePem = runtimeTrustPackage.value.leafCertificatePem?.trim();
-  if (!leafCertificatePem) {
-    throw new Error("Managed identity-server TLS startup failed: leaf certificate material is unavailable.");
-  }
-
-  const certificateFragments = [
-    leafCertificatePem,
-    runtimeTrustPackage.value.certificateChainPem?.trim(),
-  ].filter((value): value is string => Boolean(value && value.length > 0));
-
-  return Object.freeze({
-    certPem: `${certificateFragments.join("\n")}\n`,
-    keyPem: `${privateKeyPem}\n`,
-    caPem: runtimeTrustPackage.value.trustBundlePem?.trim()
-      ? `${runtimeTrustPackage.value.trustBundlePem.trim()}\n`
-      : undefined,
-  });
 }
 
 export async function initializeCertificateAuthorityForFirstSetup(
