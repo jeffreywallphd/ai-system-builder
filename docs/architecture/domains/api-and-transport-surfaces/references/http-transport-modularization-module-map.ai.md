@@ -4,7 +4,7 @@ doc_type: architecture-reference
 status: active
 authoritativeness: canonical
 owned_by: team:platform-architecture
-last_reviewed: 2026-04-11
+last_reviewed: 2026-04-12
 related_code_paths:
   - src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts
   - src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts
@@ -14,10 +14,14 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts
   - src/infrastructure/transport/http-server/identity/middleware/session-authentication.ts
   - src/infrastructure/transport/http-server/identity/middleware/workspace-context.ts
+  - src/infrastructure/transport/http-server/identity/middleware/request-metadata.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpRequestPrimitives.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpResponsePrimitives.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpFileResponsePrimitives.ts
+  - src/infrastructure/transport/http-server/identity/primitives/HttpQueryPrimitives.ts
   - src/infrastructure/transport/http-server/identity/tests/HttpTransportPrimitives.test.ts
+  - src/infrastructure/transport/http-server/identity/tests/HttpQueryPrimitives.test.ts
+  - src/infrastructure/transport/http-server/identity/tests/RequestMetadataMiddleware.test.ts
   - src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerErrorTranslation.test.ts
   - src/infrastructure/transport/http-server/identity/tests/SessionAuthenticationMiddleware.test.ts
   - src/infrastructure/transport/http-server/identity/tests/WorkspaceContextMiddleware.test.ts
@@ -177,6 +181,17 @@ Implemented shared trusted-session/device-assurance enforcement middleware in pr
 
 Targeted regression coverage:
 - `identity/tests/TrustedSessionAssuranceMiddleware.test.ts` covers requirement mapping, passing assurance levels, and failing trust posture with consistent forbidden response metadata.
+
+## Story 1.2.5 Implementation Status
+
+Implemented shared request metadata and query normalization utilities in production paths:
+- `identity/middleware/request-metadata.ts` centralizes request/correlation header names, inbound correlation resolution, response correlation header emission, response-header normalization, and error-envelope correlation metadata injection.
+- `identity/primitives/HttpQueryPrimitives.ts` centralizes optional query-string normalization, shared list pagination parsing, enum-list query normalization, and deduplicated repeated/csv query-list handling.
+- `IdentityHttpServer.ts` now consumes these shared helpers instead of keeping correlation and shared pagination/query parsing logic inline, preserving current route behavior and diagnostics envelope compatibility.
+
+Targeted regression coverage:
+- `identity/tests/RequestMetadataMiddleware.test.ts` covers correlation precedence, invalid/fallback behavior, response header emission, and error-envelope correlation injection behavior.
+- `identity/tests/HttpQueryPrimitives.test.ts` covers shared pagination parsing/defaulting behavior and representative query normalization flows.
 
 ## Registration and Composition Seams
 
