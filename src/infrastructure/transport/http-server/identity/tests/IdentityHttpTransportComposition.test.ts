@@ -47,6 +47,30 @@ function composeRoutePlan(overrides: Partial<Record<keyof typeof AuthoritativeAp
   });
 }
 
+function composeAllBackendsRoutePlan(): AuthoritativeApiRouteRegistrationPlan {
+  return composeRoutePlan({
+    identityAuth: true,
+    workspaceInvitation: true,
+    workspaceAdministration: true,
+    authorizationManagement: true,
+    auditLedger: true,
+    nodeTrust: true,
+    executionNodeManagement: true,
+    certificateOperations: true,
+    secretMetadata: true,
+    storageManagement: true,
+    assetManagement: true,
+    imageAssetManagement: true,
+    deploymentPolicyRead: true,
+    deploymentPolicyWrite: true,
+    systemRuntime: true,
+    runSubmission: true,
+    runRead: true,
+    runMutation: true,
+    runExecutionUpdate: true,
+  });
+}
+
 describe("IdentityHttpTransportComposition", () => {
   it("composes a deterministic route module registry from a route registration plan", () => {
     const routePlan = composeRoutePlan({
@@ -204,5 +228,76 @@ describe("IdentityHttpTransportComposition", () => {
       routeFamilyModules: conflictingModules,
       serverFactory: (requestListener) => createServer(requestListener),
     })).toThrow("registered by both");
+  });
+
+  it("keeps route registration snapshots deterministic across repeated compositions", () => {
+    const routePlan = composeAllBackendsRoutePlan();
+    const snapshots = Array.from({ length: 4 }).map(() => composeIdentityHttpTransport({
+      routeRegistrationPlan: routePlan,
+      serverFactory: (requestListener) => createServer(requestListener),
+    }).routeModuleRegistry.toSnapshot());
+
+    const canonical = snapshots[0]!;
+    for (const snapshot of snapshots.slice(1)) {
+      expect(snapshot).toEqual(canonical);
+    }
+
+    expect(canonical.routeFamilies.length).toBeGreaterThanOrEqual(18);
+    expect(canonical.routePrefixes.length).toBeGreaterThanOrEqual(canonical.routeFamilies.length);
+  });
+
+  it("keeps modular route-family dispatch lookup overhead within cutover budget", () => {
+    const routePlan = composeAllBackendsRoutePlan();
+    const composition = composeIdentityHttpTransport({
+      routeRegistrationPlan: routePlan,
+      serverFactory: (requestListener) => createServer(requestListener),
+    });
+    const lookupPaths = Object.freeze([
+      "/api/v1/identity/login",
+      "/api/v1/workspaces/invitations",
+      "/api/v1/workspaces/workspace-alpha/members",
+      "/api/v1/authorization/reporting/workspaces/workspace-alpha",
+      "/api/v1/deployment/policy/state",
+      "/api/v1/audit/events",
+      "/api/v1/execution-nodes",
+      "/api/v1/security/certificates",
+      "/api/v1/security/secrets",
+      "/api/v1/storage/instances",
+      "/api/v1/assets",
+      "/api/v1/image-assets",
+      "/api/v1/runtime/runs/start",
+      "/api/v1/runtime/runs",
+      "/api/v1/runtime/runs/run%3A1/cancel",
+      "/api/v1/runtime/runs/run%3A1/lifecycle",
+      "/api/v1/runtime/queue",
+      "/api/v1/image-runs/run%3A1/generated-results",
+      "/api/v1/unmatched/path",
+    ]);
+    const iterations = 20_000;
+    let warmupMatches = 0;
+    for (let i = 0; i < 2_000; i += 1) {
+      for (const path of lookupPaths) {
+        if (composition.routeModuleRegistry.resolveRouteFamilyByPath(path)) {
+          warmupMatches += 1;
+        }
+      }
+    }
+    expect(warmupMatches).toBeGreaterThan(0);
+
+    const startedAt = performance.now();
+    let totalMatches = 0;
+    for (let i = 0; i < iterations; i += 1) {
+      for (const path of lookupPaths) {
+        if (composition.routeModuleRegistry.resolveRouteFamilyByPath(path)) {
+          totalMatches += 1;
+        }
+      }
+    }
+    const elapsedMs = performance.now() - startedAt;
+    const lookups = iterations * lookupPaths.length;
+    const averageLookupMicros = (elapsedMs * 1000) / lookups;
+
+    expect(totalMatches).toBeGreaterThan(lookups / 2);
+    expect(averageLookupMicros).toBeLessThan(40);
   });
 });

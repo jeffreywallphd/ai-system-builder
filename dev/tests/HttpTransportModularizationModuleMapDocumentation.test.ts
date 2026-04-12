@@ -32,6 +32,7 @@ describe("HTTP transport modularization module map documentation guardrails", ()
       "Current Transport Audit (Dev Branch)",
       "Shared Middleware Concerns To Extract",
       "Story 1.2.6 Implementation Status",
+      "Story 1.4.3 Verification Status",
       "Required HTTP Middleware Composition Order",
       "Middleware Safety Rules",
       "Common Route-Category Composition Examples",
@@ -93,6 +94,19 @@ describe("HTTP transport modularization module map documentation guardrails", ()
       "special-case authoritative lifecycle update (`POST /api/v1/runtime/runs/:runId/lifecycle`)",
     ] as const;
     for (const token of requiredSafetyRuleTokens) {
+      expect(doc).toContain(token);
+    }
+
+    const requiredVerificationTokens = [
+      "Startup and dispatch verification anchors",
+      "dispatch-overhead benchmark guardrail",
+      "route registration determinism",
+      "maintainability outcomes",
+      "11,779",
+      "15,153",
+      "22.3%",
+    ] as const;
+    for (const token of requiredVerificationTokens) {
       expect(doc).toContain(token);
     }
   });
