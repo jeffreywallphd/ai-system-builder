@@ -191,6 +191,26 @@ These contracts establish stable extension points for persistence adapters, auth
   - callers continue to use `ISecretProviderMaterialResolutionPort`
   - local secure storage remains an infrastructure adapter detail, preserving caller isolation from storage implementation choices
 
+## Story 3.2.4 Scoped secret retrieval use cases
+
+- adds application-layer scoped provider retrieval and metadata/existence use-case flows in:
+  - `src/application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase.ts`
+- scoped flows are explicit and permission-aware:
+  - server-scoped retrieval/metadata/existence
+  - workspace-scoped retrieval/metadata/existence
+  - user-scoped retrieval/metadata/existence
+- permission posture:
+  - each scoped flow evaluates caller context against requested scope owner before provider-port access
+  - retrieval requires `retrieve-plaintext` permission
+  - metadata/existence requires `read-metadata` permission
+  - out-of-scope requests are denied before storage/provider resolution is attempted
+- runtime integration posture:
+  - `SystemSecretBootstrapService` now validates required server-scoped material through the scoped retrieval use case for metadata existence checks and runtime usability checks
+  - direct provider-port reads in bootstrap validation paths are reduced to preserve policy-aware retrieval boundaries
+- minimal secret exposure posture:
+  - metadata/existence flows remain available without plaintext retrieval permissions
+  - plaintext is only resolved through explicit runtime-retrieval paths
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants

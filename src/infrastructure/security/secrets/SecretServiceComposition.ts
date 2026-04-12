@@ -67,6 +67,7 @@ export interface ServerComposedSecretService {
   readonly deleteSecretUseCase: DeleteSecretUseCase;
   readonly listSecretsUseCase: ListSecretsUseCase;
   readonly secretScopeResolver: SecretScopeResolver;
+  readonly secretAccessPolicyPort: ISecretAccessPolicyPort;
   readonly runtimeSecretConsumptionAdapters: SecretRuntimeConsumptionAdapters;
   readonly status: SecretServiceCompositionStatus;
   dispose(): void;
@@ -168,6 +169,7 @@ export function composeServerSecretService(input: ComposeServerSecretServiceInpu
       secretRecordRepository,
       secretAccessPolicyPort: accessPolicyPort,
     }),
+    secretAccessPolicyPort: accessPolicyPort,
     runtimeSecretConsumptionAdapters: new SecretRuntimeConsumptionAdapters(retrieveSecretPlaintextForRuntimeUseCase),
     status,
     dispose: () => {

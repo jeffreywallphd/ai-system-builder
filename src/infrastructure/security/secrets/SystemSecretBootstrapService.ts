@@ -30,6 +30,7 @@ import {
   type ISecretProviderMaterialResolutionPort,
   type SecretProviderMaterialSelector,
 } from "@application/security/ports/SecretProviderPorts";
+import { ScopedSecretProviderMaterialRetrievalUseCase } from "@application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase";
 import { DefaultSecretProviderResolutionService } from "@infrastructure/security/DefaultSecretProviderResolutionService";
 
 const SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS = Object.freeze({
@@ -252,6 +253,11 @@ export async function bootstrapSystemSecretsFromEnvironment(
         }
       },
     });
+  const scopedSecretProviderRetrievalUseCase = new ScopedSecretProviderMaterialRetrievalUseCase({
+    secretProviderResolutionPort,
+    secretAccessPolicyPort: input.secretService.secretAccessPolicyPort,
+    now,
+  });
 
   for (const secretId of requiredSecretIds) {
     const definition = SystemSecretDefinitionsById.get(secretId);
@@ -278,8 +284,11 @@ export async function bootstrapSystemSecretsFromEnvironment(
     });
     const selector = createSystemSecretMaterialSelector(definition);
 
-    const metadataExists = await secretProviderResolutionPort.secretProviderMaterialExists({
-      selector,
+    const metadataExists = await scopedSecretProviderRetrievalUseCase.serverScopedSecretProviderMaterialExists({
+      caller: createBootstrapScopeCheckActor(),
+      providerId: selector.providerId,
+      secretId: selector.secretId,
+      materialKind: selector.materialKind,
       access: {
         operationKey: `op:system-secret-bootstrap:metadata:${definition.secretId}:${now().getTime()}`,
         serviceIdentity: "runtime:server:system-secret-bootstrap",
@@ -374,8 +383,11 @@ export async function bootstrapSystemSecretsFromEnvironment(
       }
     }
 
-    const runtimeCheck = await secretProviderResolutionPort.resolveSecretProviderMaterial({
-      selector,
+    const runtimeCheck = await scopedSecretProviderRetrievalUseCase.retrieveServerScopedSecretProviderMaterial({
+      caller: createBootstrapRuntimeRetrievalActor(),
+      providerId: selector.providerId,
+      secretId: selector.secretId,
+      materialKind: selector.materialKind,
       access: {
         operationKey: `op:system-secret-bootstrap:validate:${definition.secretId}:${now().getTime()}`,
         serviceIdentity: "runtime:server:system-secret-bootstrap",
@@ -425,6 +437,22 @@ export async function assertSystemSecretBootstrapSafe(
     );
   }
   return result;
+}
+
+function createBootstrapScopeCheckActor() {
+  return Object.freeze({
+    actorId: "runtime:server:system-secret-bootstrap",
+    actorType: SecretActorTypes.serverRuntime,
+    grantedActions: Object.freeze([SecretAccessActions.readMetadata]),
+  });
+}
+
+function createBootstrapRuntimeRetrievalActor() {
+  return Object.freeze({
+    actorId: "runtime:server:system-secret-bootstrap",
+    actorType: SecretActorTypes.serverRuntime,
+    grantedActions: Object.freeze([SecretAccessActions.retrievePlaintext]),
+  });
 }
 
 function parseOptionalCsvList(value: string | undefined): ReadonlyArray<string> {
