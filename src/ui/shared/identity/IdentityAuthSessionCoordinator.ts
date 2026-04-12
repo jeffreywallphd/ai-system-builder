@@ -316,6 +316,9 @@ export class IdentityAuthSessionCoordinator {
         workspaceCount: result.data?.workspaceContext.workspaces.length,
         durationMs: Date.now() - startedAt,
       }));
+      if (failureKind === IdentityActorContextFailureKinds.unknown && result.error) {
+        logUnknownActorContextFailure(result.error);
+      }
       return result;
     })();
 
@@ -381,6 +384,14 @@ export class IdentityAuthSessionCoordinator {
 function logInitDiagnostic(event: string, details?: Readonly<Record<string, unknown>>): void {
   const payload = details ? ` ${JSON.stringify(details)}` : "";
   console.info(`\n[ai-loom][init] ${event}${payload}\n`);
+}
+
+function logUnknownActorContextFailure(error: unknown): void {
+  const stackTrace = extractStackTraceForDiagnostics(error);
+  console.error(
+    `%c[ai-loom][init] resolveSessionActorContext:unknown-failure\n${stackTrace}`,
+    "color: #ff4d4f; font-weight: 700;",
+  );
 }
 
 function normalizeWorkspaceId(value: string | undefined): string | undefined {
@@ -559,4 +570,22 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 function readOptionalString(record: Readonly<Record<string, unknown>>, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function extractStackTraceForDiagnostics(error: unknown): string {
+  if (error instanceof Error && typeof error.stack === "string" && error.stack.trim().length > 0) {
+    return error.stack;
+  }
+  if (isRecord(error)) {
+    const stack = readOptionalString(error, "stack");
+    if (typeof stack === "string" && stack.trim().length > 0) {
+      return stack;
+    }
+    const nestedCause = (error as { cause?: unknown }).cause;
+    if (nestedCause instanceof Error && typeof nestedCause.stack === "string" && nestedCause.stack.trim().length > 0) {
+      return nestedCause.stack;
+    }
+    return JSON.stringify(error, null, 2);
+  }
+  return String(error);
 }
