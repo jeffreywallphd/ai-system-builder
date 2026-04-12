@@ -1,8 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import {
+  mapIdentityAuthApiStatusCode,
+  mapStorageManagementApiStatusCode,
+  mapSystemRuntimeApiStatusCode,
+  mapWorkspaceAdministrationApiStatusCode,
   mapSharedApiErrorCodeToStatusCode,
   mapToSharedApiErrorCode,
   normalizeSharedApiErrorEnvelope,
+  translateTransportError,
 } from "../IdentityHttpServerErrorTranslation";
 
 describe("IdentityHttpServerErrorTranslation", () => {
@@ -15,6 +20,36 @@ describe("IdentityHttpServerErrorTranslation", () => {
     expect(mapToSharedApiErrorCode("rate-limited")).toBe("rate-limited");
     expect(mapToSharedApiErrorCode("transient-failure")).toBe("temporarily-unavailable");
     expect(mapSharedApiErrorCodeToStatusCode("temporarily-unavailable")).toBe(503);
+  });
+
+  it("maps route-family-specific transport errors through centralized status overrides", () => {
+    expect(mapIdentityAuthApiStatusCode({ ok: false, error: { code: "unsupported-provider" } })).toBe(422);
+    expect(mapIdentityAuthApiStatusCode({ ok: false, error: { code: "account-inactive" } })).toBe(403);
+    expect(mapWorkspaceAdministrationApiStatusCode({ ok: false, error: { code: "invalid-transition" } })).toBe(422);
+    expect(mapStorageManagementApiStatusCode({ ok: false, error: { code: "provisioning-failed" } })).toBe(409);
+    expect(mapStorageManagementApiStatusCode({ ok: false, error: { code: "capability-unsupported" } })).toBe(422);
+  });
+
+  it("uses shared fallback mapping for unknown route-family errors", () => {
+    expect(mapIdentityAuthApiStatusCode({ ok: false, error: { code: "transient-failure" } })).toBe(503);
+    expect(mapStorageManagementApiStatusCode({ ok: false, error: { code: "rate-limited" } })).toBe(429);
+  });
+
+  it("preserves system-runtime default fallback semantics for unknown errors", () => {
+    expect(mapSystemRuntimeApiStatusCode({ ok: false, error: { code: "quota-exceeded" } })).toBe(429);
+    expect(mapSystemRuntimeApiStatusCode({ ok: false, error: { code: "transient-failure" } })).toBe(500);
+  });
+
+  it("returns transport translation metadata for correlation-safe diagnostics", () => {
+    const translated = translateTransportError(
+      { ok: false, error: { code: "temporarily-unavailable" } },
+      {},
+    );
+
+    expect(translated.statusCode).toBe(503);
+    expect(translated.sharedCode).toBe("temporarily-unavailable");
+    expect(translated.domainCode).toBe("temporarily-unavailable");
+    expect(translated.retryable).toBeTrue();
   });
 
   it("preserves safe messages and enriches client-visible error metadata", () => {

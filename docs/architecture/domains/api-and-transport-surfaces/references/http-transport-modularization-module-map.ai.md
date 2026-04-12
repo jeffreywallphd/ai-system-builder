@@ -11,10 +11,12 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/composition/IdentityHttpTransportComposition.ts
   - src/infrastructure/transport/http-server/identity/composition/RouteModuleRegistry.ts
   - src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts
+  - src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpRequestPrimitives.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpResponsePrimitives.ts
   - src/infrastructure/transport/http-server/identity/primitives/HttpFileResponsePrimitives.ts
   - src/infrastructure/transport/http-server/identity/tests/HttpTransportPrimitives.test.ts
+  - src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerErrorTranslation.test.ts
   - src/hosts/server/AuthoritativeServerApiRouteComposition.ts
   - src/hosts/server/IdentityServerHost.ts
 ---
@@ -22,7 +24,7 @@ related_code_paths:
 
 Feature: 1  
 Epic: 1.1  
-Story: 1.1.3
+Story: 1.1.4
 
 ## Purpose
 
@@ -131,6 +133,16 @@ Implemented shared request/response primitives in production paths:
 
 Targeted regression coverage:
 - `identity/tests/HttpTransportPrimitives.test.ts` covers JSON body parsing limits/error behavior, request body streaming, content-type and URL normalization, JSON/no-content response writing, stream response writing, and file content-disposition primitives.
+
+## Story 1.1.4 Implementation Status
+
+Implemented centralized transport error translation in production paths:
+- `identity/IdentityHttpServerErrorTranslation.ts` now contains explicit, testable route-family status translation helpers plus shared fallback mapping for canonical error categories.
+- `IdentityHttpServer.ts` consumes shared status translators for identity, workspace, authorization, node, storage, asset/image/generated-result, audit, runtime, and run-submission routes instead of in-file per-family status switch blocks.
+- Translation metadata (`domainCode`, `sharedCode`, `retryable`) is available from shared helpers to support correlation-friendly diagnostics payloads/logs without leaking unsafe internals.
+
+Targeted regression coverage:
+- `identity/tests/IdentityHttpServerErrorTranslation.test.ts` verifies representative override mappings, shared fallback behavior, and runtime default-fallback parity.
 
 ## Registration and Composition Seams
 
