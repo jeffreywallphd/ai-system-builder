@@ -16,8 +16,10 @@ related_code_paths:
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/scripts/validate-docs-cross-references.cjs
   - dev/scripts/validate-docs-category-compliance.cjs
+  - dev/scripts/lint-docs.cjs
   - dev/tests/DocumentationQualityOwnershipReviewStory715Guardrails.test.ts
   - dev/tests/DocsCategoryComplianceValidationScript.test.ts
+  - dev/tests/DocumentationCiFailurePolicyStory732Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Quality Standard
@@ -76,6 +78,16 @@ Severity assignment contract:
 - Recommended guidance maps to `advisory` unless explicitly promoted through governance review.
 - CI behavior is severity-driven: fail on `critical`, warn on `important`, report-only on `advisory`.
 - Profile overrides are allowed for targeted quality campaigns, but default repo behavior stays pragmatic and warning-first for non-structural issues.
+
+Shared automation enforcement profile (Story 7.3.2):
+
+- Required CI/shared automation gate command is `npm run docs:lint` (also used transitively by `npm test`, `npm run validate`, and `npm run validate:ci`).
+- Default severity-driven gate behavior:
+  - Block on one or more `critical` findings.
+  - Keep `important` and `advisory` findings non-blocking; emit warnings/info for triage and planning.
+- If a validator exits non-zero without parseable issue codes, treat it as blocking until triage restores severity clarity.
+- For scoped cleanup campaigns, strict escalation is available with `npm run docs:lint -- --strict-important`, which promotes `important` findings to blocking in shared automation.
+- For transitional and historical docs, keep identity/status/redirect integrity blocking while readability/hygiene drift remains warning-first by default.
 
 ## Documentation Category Rule Scope Matrix
 

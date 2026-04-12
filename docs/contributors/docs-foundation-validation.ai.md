@@ -24,6 +24,7 @@ related_code_paths:
   - dev/tests/ArchitectureDomainValidationScript.test.ts
   - dev/tests/DocsSegmentationValidationScript.test.ts
   - dev/tests/DocumentationWorkflowIntegrationStory731Guardrails.test.ts
+  - dev/tests/DocumentationCiFailurePolicyStory732Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Foundation Validation Guide
@@ -120,7 +121,19 @@ npm run validate:ci
 
 ## CI Contract
 
-Use the same command in CI so baseline structure regressions fail fast with clear codes.
+Use the same command in CI/shared automation. Default behavior is severity-driven: `critical` findings block, while `important` and `advisory` findings are non-blocking.
+
+```bash
+npm run docs:lint
+```
+
+For scoped cleanup campaigns, use strict escalation:
+
+```bash
+npm run docs:lint -- --strict-important
+```
+
+If a validator fails without parseable issue codes, treat it as blocking until triage restores severity clarity.
 
 ## Targeted Test Coverage
 
@@ -155,6 +168,7 @@ Primary targeted suites:
 `npm run docs:lint` now prints actionable failure sections in this order:
 
 1. Check status summary (`[PASS]` / `[FAIL]`).
+   - Non-blocking warning outcomes appear as `[WARN]`.
 2. Severity summary (`critical`, `important`, `advisory` counts).
 3. Per-check triage block:
    - check description,
