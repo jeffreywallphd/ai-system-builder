@@ -10,13 +10,6 @@ import {
   type SecretKind,
 } from "@domain/security/SecretDomain";
 import {
-  SecurityMaterialConsumerSubsystems,
-  SecurityMaterialCreationModes,
-  SecurityMaterialHierarchyClasses,
-  SecurityMaterialOwningSubsystems,
-  SecurityMaterialRevocationModes,
-  SecurityMaterialRotationModes,
-  SecurityMaterialStorageSubsystems,
   SecurityMaterialCategories,
   SecurityMaterialDurabilityClasses,
   SecurityMaterialFallbackPolicies,
@@ -34,6 +27,15 @@ import {
   type SecurityMaterialLifecycleStage,
   type SecurityMaterialStartupRequirement,
 } from "@application/security/contracts/SecurityMaterialClassificationContract";
+import {
+  SecurityMaterialConsumerSubsystems,
+  SecurityMaterialCreationModes,
+  SecurityMaterialHierarchyClasses,
+  SecurityMaterialOwningSubsystems,
+  SecurityMaterialRevocationModes,
+  SecurityMaterialRotationModes,
+  SecurityMaterialStorageSubsystems,
+} from "@application/security/contracts/SecurityMaterialKeyHierarchyContract";
 import type { ServerComposedSecretService } from "./SecretServiceComposition";
 import { ServerPlatformProviderIds } from "./ServerPlatformSecretConsumers";
 import {
