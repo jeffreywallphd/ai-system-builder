@@ -1698,25 +1698,35 @@ export class StudioShellBackendApi {
       const ingestionSource = datasetBindingId === "reference-image-dataset"
         ? "reference-image-ui-faceid-upload"
         : "reference-image-ui-upload";
-      const storedFilePath = await this.materializeUploadedImagePayload({
-        payload,
-        fileName,
-        systemId: runtimeSystemId,
-        datasetBindingId,
-      });
+      const storedFilePath = sourceImageAssetId
+        ? undefined
+        : await this.materializeUploadedImagePayload({
+          payload,
+          fileName,
+          systemId: runtimeSystemId,
+          datasetBindingId,
+        });
+      const storageReference = sourceImageAssetId ?? storedFilePath;
+      if (!storageReference) {
+        throw new StudioShellInvalidRequestError("Image upload could not be materialized for dataset ingestion.");
+      }
+      const storageProvider = sourceImageAssetId
+        ? "image-asset-management"
+        : "studio-shell-upload-cache";
 
       const ingested = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
         systemId: runtimeSystemId,
         instanceId: targetDataset.instanceId,
-        storageReference: storedFilePath,
-        storageProvider: "studio-shell-upload-cache",
+        storageReference,
+        storageProvider,
         storageBindingArea,
         metadata: {
           ingestionSource,
           datasetBindingId,
           uploadedFileName: fileName,
           uploadedMimeType: request.mimeType?.trim() || "unknown",
-          storedFilePath,
+          ...(storedFilePath ? { storedFilePath } : {}),
+          ...(sourceImageAssetId ? { sourceImageAssetId } : {}),
         },
         provenance: {
           sourceType: "upload",

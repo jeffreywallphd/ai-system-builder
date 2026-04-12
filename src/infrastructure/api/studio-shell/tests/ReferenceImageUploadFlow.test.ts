@@ -43,4 +43,38 @@ describe("Reference image upload flow", () => {
     expect(upload.data?.storedFilePath).toBeString();
     expect(fs.existsSync(upload.data!.storedFilePath!)).toBeTrue();
   });
+
+  it("uses canonical asset storage references when sourceImageAssetId is provided", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const initialized = await api.initializeStudio("studio-system", "System Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const created = await api.createDraft({
+      studioId: "studio-system",
+      sessionId,
+      assetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+      content: JSON.stringify({ systemSpec: {} }),
+      metadata: {
+        title: "Reference image",
+        tags: ["system"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+
+    const upload = await api.ingestReferenceImageUpload({
+      studioId: "studio-system",
+      draftId: created.data!.draft!.draftId,
+      fileName: "demo.png",
+      mimeType: "image/png",
+      payloadBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z2YcAAAAASUVORK5CYII=",
+      sourceImageAssetId: "asset:image:uploaded-source-1",
+    });
+
+    expect(upload.ok).toBeTrue();
+    expect(String(upload.data?.image.assetId)).toBe("asset:image:uploaded-source-1");
+    expect(upload.data?.storedFilePath).toBeUndefined();
+  });
 });
