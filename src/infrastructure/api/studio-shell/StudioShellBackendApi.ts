@@ -139,6 +139,11 @@ import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authori
 import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
+  StudioShellObservability,
+  type StudioShellObservabilityAction,
+  type StudioShellObservabilityLogger,
+} from "./StudioShellObservability";
+import {
   AuthorizationResponseAccessLevels,
   deriveAuthorizationResponseAccessLevel,
   shapeAuthorizationAwareResponse,
@@ -393,6 +398,7 @@ export interface IngestReferenceImageUploadReadModel {
   };
   readonly selectedRecordId: string;
   readonly storedFilePath?: string;
+  readonly configuredUploadRootPath?: string;
 }
 
 export interface PersistReferenceImageOutputsRequest {
@@ -998,6 +1004,7 @@ export class StudioShellBackendApi {
   private readonly updateImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["updateSystemDefinition"];
   private readonly getImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["getSystemDefinition"];
   private readonly listImageSystemDefinitionsUseCase: StudioImageSystemDefinitionUseCases["listSystemDefinitions"];
+  private readonly observability: StudioShellObservability;
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -1015,6 +1022,7 @@ export class StudioShellBackendApi {
       readonly referenceImageProtectedResourceType?: string;
       readonly referenceImageRunProtectedResourceType?: string;
       readonly workflowRunProtectedResourceType?: string;
+      readonly observabilityLogger?: StudioShellObservabilityLogger;
     },
   ) {
     this.now = now;
@@ -1071,6 +1079,7 @@ export class StudioShellBackendApi {
       || "reference-image-run";
     this.workflowRunProtectedResourceType = options?.workflowRunProtectedResourceType?.trim()
       || "workflow-run";
+    this.observability = new StudioShellObservability(options?.observabilityLogger);
     const imageSystemUseCases = createStudioImageSystemDefinitionUseCases({
       systemRepository: options?.imageSystemDefinitionRepository,
     });
@@ -1658,7 +1667,13 @@ export class StudioShellBackendApi {
   public async ingestReferenceImageUpload(
     request: IngestReferenceImageUploadRequest,
   ): Promise<StudioShellApiResponse<IngestReferenceImageUploadReadModel>> {
-    return this.wrap(async () => {
+    return this.executeReferenceImageOperationWithObservability(
+      "ingest-reference-image-upload",
+      {
+        ...request,
+        targetDatasetBindingId: request.targetDatasetBindingId ?? "input-image-dataset",
+      },
+      async () => {
       const snapshot = await this.requireSnapshot(request.studioId);
       const draft = snapshot.draft;
       if (!draft) {
@@ -1685,6 +1700,7 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError("sourceImageAssetId must be a logical asset identifier.");
       }
       const payload = this.decodeBase64Payload(request.payloadBase64);
+      const configuredUploadRootPath = await this.resolveConfiguredUploadRootPath();
       const datasetBindingId = request.targetDatasetBindingId ?? "input-image-dataset";
       const includeOptionalReferenceDatasets = datasetBindingId === "reference-image-dataset";
       const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId, {
@@ -1792,14 +1808,16 @@ export class StudioShellBackendApi {
         }),
         selectedRecordId: ingested.recordId,
         storedFilePath,
+        configuredUploadRootPath,
       });
-    });
+      },
+    );
   }
 
   public async persistReferenceImageOutputs(
     request: PersistReferenceImageOutputsRequest,
   ): Promise<StudioShellApiResponse<PersistReferenceImageOutputsReadModel>> {
-    return this.wrap(async () => {
+    return this.executeReferenceImageOperationWithObservability("persist-reference-image-outputs", request, async () => {
       const snapshot = await this.requireSnapshot(request.studioId);
       const draft = snapshot.draft;
       if (!draft) {
@@ -3884,6 +3902,19 @@ export class StudioShellBackendApi {
     return filePath;
   }
 
+  private async resolveConfiguredUploadRootPath(): Promise<string | undefined> {
+    try {
+      const nodeRuntime = await this.resolveNodeUploadRuntime();
+      return nodeRuntime.path.join(
+        nodeRuntime.os.tmpdir(),
+        "ai-loom-studio",
+        "reference-image-uploads",
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
   private sanitizeUploadFileName(fileName: string): string {
     const trimmed = fileName.trim();
     if (!trimmed) {
@@ -3923,6 +3954,31 @@ export class StudioShellBackendApi {
         `Image upload caching requires a Node.js filesystem runtime (${error instanceof Error ? error.message : String(error)}).`,
       );
     }
+  }
+
+  private async executeReferenceImageOperationWithObservability<T>(
+    action: StudioShellObservabilityAction,
+    request: {
+      readonly studioId?: string;
+      readonly draftId?: string;
+      readonly executionId?: string;
+      readonly targetDatasetBindingId?: string;
+    },
+    operation: () => Promise<T>,
+  ): Promise<StudioShellApiResponse<T>> {
+    const response = await this.wrap(operation);
+    this.observability.recordApiOutcome({
+      action,
+      response,
+      request: {
+        studioId: request.studioId,
+        draftId: request.draftId,
+        executionId: request.executionId,
+        datasetBindingId: request.targetDatasetBindingId,
+      },
+      occurredAt: this.now().toISOString(),
+    });
+    return response;
   }
 
   private extractComfyResultFromRuntimeResult(
