@@ -61,6 +61,24 @@ describe("AuthoritativeServerStartupTelemetry", () => {
       startupReadinessReport: Object.freeze({
         state: "ready",
         checks: Object.freeze([]),
+        securityMaterial: Object.freeze({
+          state: "ready",
+          blocking: false,
+          lifecycleStage: "test",
+          productionCapable: false,
+          issueCount: 0,
+          fatalIssueCount: 0,
+          warningIssueCount: 0,
+          summary: Object.freeze({
+            total: 0,
+            healthy: 0,
+            degraded: 0,
+            missing: 0,
+            nonCompliant: 0,
+          }),
+          issues: Object.freeze([]),
+          entries: Object.freeze([]),
+        }),
         totalCheckCount: 0,
         readyCheckCount: 0,
         degradedCheckCount: 0,
@@ -87,6 +105,7 @@ describe("AuthoritativeServerStartupTelemetry", () => {
     const startupResult = summary?.startupResult as Record<string, unknown> | undefined;
     const readiness = startupResult?.readiness as Record<string, unknown> | undefined;
     expect(readiness?.state).toBe("ready");
+    expect((readiness?.securityMaterial as Record<string, unknown> | undefined)?.state).toBe("ready");
 
     const regressionWarning = logger.warnEvents.find(
       (event) => event.event === "authoritative-server.startup.baseline-regression.detected",
@@ -122,6 +141,24 @@ describe("AuthoritativeServerStartupTelemetry", () => {
       startupReadinessReport: Object.freeze({
         state: "degraded",
         checks: Object.freeze([]),
+        securityMaterial: Object.freeze({
+          state: "blocked",
+          blocking: true,
+          lifecycleStage: "production",
+          productionCapable: true,
+          issueCount: 1,
+          fatalIssueCount: 1,
+          warningIssueCount: 0,
+          summary: Object.freeze({
+            total: 1,
+            healthy: 0,
+            degraded: 0,
+            missing: 1,
+            nonCompliant: 0,
+          }),
+          issues: Object.freeze([]),
+          entries: Object.freeze([]),
+        }),
         totalCheckCount: 0,
         readyCheckCount: 0,
         degradedCheckCount: 0,
@@ -141,6 +178,9 @@ describe("AuthoritativeServerStartupTelemetry", () => {
       name: "Error",
       message: "startup-failed",
     });
+    const startupResult = summary?.startupResult as Record<string, unknown> | undefined;
+    const readiness = startupResult?.readiness as Record<string, unknown> | undefined;
+    expect((readiness?.securityMaterial as Record<string, unknown> | undefined)?.state).toBe("blocked");
 
     const baselineWarning = logger.warnEvents.find(
       (event) => event.event === "authoritative-server.startup.baseline-recording.failed",

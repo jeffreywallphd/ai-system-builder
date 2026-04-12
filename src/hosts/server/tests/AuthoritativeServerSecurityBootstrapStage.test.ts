@@ -8,7 +8,10 @@ import {
   AuthoritativeServerStartupSecurityMaterialValidationError,
   createAuthoritativeServerSecurityBootstrapStage,
 } from "../AuthoritativeServerSecurityBootstrapStage";
-import { AuthoritativeServerReadinessCheckStates } from "../AuthoritativeServerBootstrapStageContracts";
+import {
+  AuthoritativeServerSecurityMaterialReadinessStates,
+  AuthoritativeServerReadinessCheckStates,
+} from "../AuthoritativeServerBootstrapStageContracts";
 
 describe("AuthoritativeServerSecurityBootstrapStage", () => {
   it("returns readiness defaults when no custom checks are configured", async () => {
@@ -68,6 +71,10 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
         blocking: false,
       },
     ]);
+    expect(output.securityMaterial.state).toBe(AuthoritativeServerSecurityMaterialReadinessStates.degraded);
+    expect(output.securityMaterial.warningIssueCount).toBe(1);
+    expect(output.securityMaterial.summary.total).toBeGreaterThanOrEqual(1);
+    expect(output.securityMaterial.issues.every((issue) => issue.message.includes("Security material"))).toBeTrue();
   });
 
   it("supports explicit readiness checks for independent stage execution", async () => {
@@ -122,6 +129,7 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
     expect(output.checks[1]?.state).toBe(AuthoritativeServerReadinessCheckStates.ready);
     expect(output.checks[2]?.state).toBe(AuthoritativeServerReadinessCheckStates.ready);
     expect(output.checks[3]?.state).toBe(AuthoritativeServerReadinessCheckStates.degraded);
+    expect(output.securityMaterial.state).toBe(AuthoritativeServerSecurityMaterialReadinessStates.degraded);
   });
 
   it("fails fast when startup security material validation reports fatal diagnostics", async () => {
@@ -149,23 +157,35 @@ describe("AuthoritativeServerSecurityBootstrapStage", () => {
       }),
     });
 
-    await expect(stage.execute({
-      deploymentProfile: createHostDeploymentProfile({
-        profileId: "organization",
-        environmentName: "production",
-        releaseChannel: "stable",
-      }),
-      environment: Object.freeze({ NODE_ENV: "production" }),
-      enabledCapabilities: AuthoritativeServerHostRuntime.capabilities,
-      runtimeMetadata: advertiseHostRuntimeMetadata({
-        host: AuthoritativeServerHostRuntime,
-      }),
-      startupTracer: createStartupTracer({
-        startupReason: "authoritative-server-security-stage-fail-fast-test",
-      }),
-      hostConfiguration: Object.freeze({
-        databasePath: "test.sqlite",
-      }),
-    })).rejects.toBeInstanceOf(AuthoritativeServerStartupSecurityMaterialValidationError);
+    try {
+      await stage.execute({
+        deploymentProfile: createHostDeploymentProfile({
+          profileId: "organization",
+          environmentName: "production",
+          releaseChannel: "stable",
+        }),
+        environment: Object.freeze({ NODE_ENV: "production" }),
+        enabledCapabilities: AuthoritativeServerHostRuntime.capabilities,
+        runtimeMetadata: advertiseHostRuntimeMetadata({
+          host: AuthoritativeServerHostRuntime,
+        }),
+        startupTracer: createStartupTracer({
+          startupReason: "authoritative-server-security-stage-fail-fast-test",
+        }),
+        hostConfiguration: Object.freeze({
+          databasePath: "test.sqlite",
+        }),
+      });
+      throw new Error("Expected startup validation to fail fast.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthoritativeServerStartupSecurityMaterialValidationError);
+      const failure = error as AuthoritativeServerStartupSecurityMaterialValidationError;
+      expect(failure.securityMaterial.state).toBe(AuthoritativeServerSecurityMaterialReadinessStates.blocked);
+      expect(failure.securityMaterial.blocking).toBeTrue();
+      expect(failure.securityMaterial.fatalIssueCount).toBe(1);
+      expect(failure.readinessChecks).toHaveLength(1);
+      expect(failure.readinessChecks[0]?.checkId).toBe("security.startup-material-validation");
+      expect(failure.readinessChecks[0]?.blocking).toBeTrue();
+    }
   });
 });

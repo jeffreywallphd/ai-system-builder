@@ -159,6 +159,7 @@ describe("AuthoritativeServerBootstrapOrchestrator", () => {
     expect(result.stageStatus.readiness).toBe("ready");
 
     expect(result.readinessReport.state).toBe("ready");
+    expect(result.readinessReport.securityMaterial.state).toBe("degraded");
     expect(result.readinessReport.checks.map((check) => check.checkId)).toContain("composition.service-coverage");
     expect(result.readinessReport.checks.map((check) => check.checkId)).toContain("composition.route-coverage");
     expect(result.readinessReport.checks.map((check) => check.checkId)).toContain("transport.binding");
@@ -220,6 +221,7 @@ describe("AuthoritativeServerBootstrapOrchestrator", () => {
     expect(result.stageStatus.stages.every((stage) => stage.state === "success")).toBeTrue();
     expect(result.stageStatus.readiness).toBe("degraded");
     expect(result.readinessReport.state).toBe("degraded");
+    expect(result.readinessReport.securityMaterial.state).toBe("degraded");
     expect(result.readinessReport.degradedCheckCount).toBeGreaterThanOrEqual(1);
     expect(result.readinessReport.checks.some((check) => (
       check.checkId === "security.required-secrets"

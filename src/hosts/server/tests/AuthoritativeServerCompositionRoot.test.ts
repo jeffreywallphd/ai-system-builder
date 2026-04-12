@@ -33,6 +33,7 @@ import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/tran
 import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
 import { createStartupTracer, type StartupSpanLogger } from "../../bootstrap/startupTracer";
 import {
+  AuthoritativeServerSecurityMaterialReadinessStates,
   AuthoritativeServerReadinessCheckStates,
   type AuthoritativeServerSecurityStageOutput,
 } from "../AuthoritativeServerBootstrapStageContracts";
@@ -275,11 +276,13 @@ describe("AuthoritativeServerCompositionRoot", () => {
 
     const runtime = await root.compose(boot);
     expect(observedSecurity?.checks.map((check) => check.checkId)).toEqual([
+      "security.startup-material-validation",
       "security.transport-trust-material",
       "security.certificate-authority-material",
       "security.required-secrets",
     ]);
     expect(observedSecurity?.checks.every((check) => check.state === "ready")).toBeTrue();
+    expect(observedSecurity?.securityMaterial.state).toBe(AuthoritativeServerSecurityMaterialReadinessStates.degraded);
     await runtime.stop();
   });
 
@@ -1236,6 +1239,9 @@ describe("AuthoritativeServerCompositionRoot", () => {
     const readiness = startupResult?.readiness as Record<string, unknown> | undefined;
     expect(readiness?.state).toBe("ready");
     expect(readiness?.totalCheckCount).toBeGreaterThanOrEqual(7);
+    const securityMaterial = readiness?.securityMaterial as Record<string, unknown> | undefined;
+    expect(securityMaterial?.state).toBe(AuthoritativeServerSecurityMaterialReadinessStates.degraded);
+    expect(securityMaterial?.issueCount).toBeTypeOf("number");
     expect(hostLogger.errorEvents).toHaveLength(0);
   });
 
@@ -1277,6 +1283,8 @@ describe("AuthoritativeServerCompositionRoot", () => {
     const readiness = startupResult?.readiness as Record<string, unknown> | undefined;
     expect(readiness?.state).toBe("degraded");
     expect(readiness?.degradedCheckCount).toBeGreaterThanOrEqual(1);
+    const securityMaterial = readiness?.securityMaterial as Record<string, unknown> | undefined;
+    expect(securityMaterial?.state).toBe(AuthoritativeServerSecurityMaterialReadinessStates.degraded);
     const checks = readiness?.checks as ReadonlyArray<{
       readonly checkId: string;
       readonly state: string;
@@ -1285,6 +1293,81 @@ describe("AuthoritativeServerCompositionRoot", () => {
       check.checkId === "security.required-secrets"
       && check.state === AuthoritativeServerReadinessCheckStates.degraded
     ))).toBeTrue();
+  });
+
+  it("reports blocked security material readiness when fail-fast security validation stops startup", async () => {
+    const hostLogger = new CapturingHostLogger();
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+        logger: hostLogger,
+      },
+      startHost: async () => ({
+        port: 5904,
+        address: "127.0.0.1:5904",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        createSecurityStage: () => createAuthoritativeServerSecurityBootstrapStage({
+          validateStartupSecurityMaterial: () => Object.freeze({
+            state: "invalid" as const,
+            lifecycleStage: "production" as const,
+            productionCapable: true,
+            observations: Object.freeze([]),
+            issues: Object.freeze([{
+              materialId: "material:test:required",
+              code: "missing" as const,
+              severity: "fatal" as const,
+              message: "Required security material is missing.",
+              sourceKind: "missing" as const,
+              details: Object.freeze({
+                environmentKey: "AI_LOOM_TEST_SECRET",
+                sampledValue: "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
+              }),
+            }]),
+            fatalIssues: Object.freeze([{
+              materialId: "material:test:required",
+              code: "missing" as const,
+              severity: "fatal" as const,
+              message: "Required security material is missing.",
+              sourceKind: "missing" as const,
+              details: Object.freeze({
+                environmentKey: "AI_LOOM_TEST_SECRET",
+                sampledValue: "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
+              }),
+            }]),
+            warnings: Object.freeze([]),
+          }),
+        }),
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-startup-summary-security-blocked-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    await expect(root.compose(boot)).rejects.toThrow(
+      "Authoritative startup security material validation failed.",
+    );
+
+    const summary = hostLogger.errorEvents.find((event) => event.event === "authoritative-server.startup.summary");
+    expect(summary).toBeDefined();
+    const startupResult = summary?.startupResult as Record<string, unknown> | undefined;
+    const readiness = startupResult?.readiness as Record<string, unknown> | undefined;
+    expect(readiness?.state).toBe("degraded");
+    const securityMaterial = readiness?.securityMaterial as Record<string, unknown> | undefined;
+    expect(securityMaterial?.state).toBe(AuthoritativeServerSecurityMaterialReadinessStates.blocked);
+    expect(securityMaterial?.fatalIssueCount).toBe(1);
+    const issues = securityMaterial?.issues as ReadonlyArray<Record<string, unknown>> | undefined;
+    expect(issues?.[0]?.details).toEqual({
+      environmentKey: "AI_LOOM_TEST_SECRET",
+      sampledValue: "[REDACTED]",
+    });
   });
 
   it("emits warning logs when startup baseline regression exceeds threshold", async () => {
