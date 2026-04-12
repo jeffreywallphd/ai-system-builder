@@ -12,6 +12,7 @@ related_code_paths:
   - docs/contributors/docs-placement-guide.ai.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
+  - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - docs/contributors/documentation-quality-worked-examples.ai.md
   - docs/contributors/router-overview-writing-standard.ai.md
   - docs/context/templates/README.ai.md
@@ -145,6 +146,7 @@ npm run validate:ci
 - Failure-code and validator reference: `docs/contributors/docs-foundation-validation.ai.md`.
 - Step-by-step local run/fix workflow: `docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md`.
 - Sustainable rollout policy for new rules: `docs/contributors/documentation-quality-rule-evolution-guide.ai.md`.
+- Ongoing ownership and maintenance workflow for docs tooling: `docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md`.
 - Passing/failing repository-grounded examples: `docs/contributors/documentation-quality-worked-examples.ai.md`.
 
 ## Interpreting Common Failure Categories

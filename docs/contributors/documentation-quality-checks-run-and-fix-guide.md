@@ -18,6 +18,7 @@ related_code_paths:
   - docs/context/governance/documentation-quality-standard.md
   - docs/contributors/documentation-quality-enforced-standards-guide.md
   - docs/contributors/documentation-quality-rule-evolution-guide.md
+  - docs/contributors/documentation-quality-tooling-maintenance-guide.md
   - docs/contributors/documentation-quality-worked-examples.md
   - docs/contributors/docs-foundation-validation.md
   - docs/context/templates/README.md
@@ -135,6 +136,7 @@ Default policy blocks on `critical` only. Use `--strict-important` only for scop
 - Enforcement policy and severity model: `docs/context/governance/documentation-quality-standard.md`
 - Contributor standards checklist and failure taxonomy: `docs/contributors/documentation-quality-enforced-standards-guide.md`
 - New-rule rollout and enforcement-change policy: `docs/contributors/documentation-quality-rule-evolution-guide.md`
+- Ongoing tooling ownership and obsolete-check update workflow: `docs/contributors/documentation-quality-tooling-maintenance-guide.md`
 - Validator behavior and stable code list: `docs/contributors/docs-foundation-validation.md`
 - Templates for new docs and paired assets: `docs/context/templates/README.md`
 - Placement and authority boundaries: `docs/contributors/docs-placement-guide.md`

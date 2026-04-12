@@ -22,6 +22,7 @@
 - [Documentation Quality Standard](./documentation-quality-standard.md)
 - [Contributor Enforcement Guide](../contributors/documentation-quality-enforced-standards-guide.md)
 - [Rule Evolution Guide for Contributors](../contributors/documentation-quality-rule-evolution-guide.md)
+- [Tooling Maintenance Guide for Contributors](../contributors/documentation-quality-tooling-maintenance-guide.md)
 - [Context Asset Lifecycle Guidance](./context-asset-lifecycle.md)
 - [High-Risk Context Pack Guidance](./high-risk-context-pack-guidance.md)
 - [Documentation Segmentation Rollout Boundaries and Follow-On Work](./documentation-segmentation-rollout-boundaries.md)

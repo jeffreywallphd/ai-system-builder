@@ -9,9 +9,11 @@ related_code_paths:
   - docs/context/governance/documentation-quality-standard.md
   - docs/contributors/documentation-quality-enforced-standards-guide.md
   - docs/contributors/documentation-quality-checks-run-and-fix-guide.md
+  - docs/contributors/documentation-quality-tooling-maintenance-guide.md
   - dev/scripts/lint-docs.cjs
   - package.json
   - dev/tests/DocumentationRuleEvolutionStory735Guardrails.test.ts
+  - dev/tests/DocumentationQualityToolingMaintenanceStory741Guardrails.test.ts
 ---
 
 # Documentation Quality Rule Evolution Guide
@@ -97,4 +99,5 @@ Keep communication visible in canonical docs and contributor-facing guides, not 
 - `docs/context/governance/documentation-quality-standard.md`
 - `docs/contributors/documentation-quality-enforced-standards-guide.md`
 - `docs/contributors/documentation-quality-checks-run-and-fix-guide.md`
+- `docs/contributors/documentation-quality-tooling-maintenance-guide.md`
 - `docs/contributors/documentation-quality-worked-examples.md`
