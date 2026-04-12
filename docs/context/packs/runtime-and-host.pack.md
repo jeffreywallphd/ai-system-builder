@@ -34,6 +34,7 @@
 - `docs/architecture/host-runtime-composition-boundaries.md`
 - `docs/architecture/host-bootstrap-pipeline.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
+- `docs/architecture/control-plane-composition-refactor-target-module-map.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/architecture/desktop-auth-first-startup-boundary.md`
 - `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`

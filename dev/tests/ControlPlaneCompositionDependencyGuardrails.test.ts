@@ -26,20 +26,27 @@ describe("control-plane composition dependency guardrails", () => {
     const aiDoc = readFileSync(moduleMapAiDocPath, "utf8");
 
     for (const requiredToken of [
+      "## Final Implemented Composition Model (Dev Branch)",
+      "## Bootstrap Stages, Readiness, and Lifecycle Rules",
       "## Composition Dependency Rules (Story 2.1.4)",
       "### Allowed dependencies for composition modules",
       "### Disallowed dependencies for composition modules",
       "### Explicit allowed module dependency map",
       "## Naming And Placement Conventions (Story 2.1.4)",
+      "## Contributor Extension Workflow",
       "## Re-Centralization Prevention Checklist",
       "must not absorb business logic",
       "must not absorb route logic",
       "must not become ad hoc helper buckets",
       "AuthoritativeServerCompositionModuleMap",
+      "AuthoritativeServerBootstrapOrchestrator.ts",
     ]) {
       expect(humanDoc).toContain(requiredToken);
       expect(aiDoc).toContain(requiredToken);
     }
+
+    expect(humanDoc).not.toContain("This scaffold intentionally does not move runtime behavior yet.");
+    expect(aiDoc).not.toContain("This scaffold intentionally does not move runtime behavior yet.");
   });
 
   it("keeps control-plane composition guidance discoverable from architecture routers", () => {
@@ -62,6 +69,8 @@ describe("control-plane composition dependency guardrails", () => {
       "Server<Capability>CompositionModule",
       "Server<Capability>CompositionModuleContract",
       "AuthoritativeServerCompositionRoot.ts",
+      "## Startup Extension Workflow",
+      "AuthoritativeServerBootstrapOrchestrator.ts",
     ]) {
       expect(compositionReadme).toContain(requiredToken);
     }

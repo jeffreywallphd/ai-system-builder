@@ -1,56 +1,40 @@
-# AI Companion: Control Plane Composition Refactor Target Module Map
+# AI Companion: Control Plane Composition Module Map and Extension Guide
 
 Feature: 2  
-Epic: 2.1  
-Story: 2.1.3
+Epic: 2.4  
+Story: 2.4.3
 
 ## Purpose
 
-Capture the current authoritative server composition state on `dev` and define the target bounded composition module map for Feature 2 refactoring with behavior parity.
+Document the final implemented authoritative control-plane composition model on `dev` so AI agents and contributors can extend startup safely without reintroducing a monolithic host pattern.
 
-## Current Composition Audit (Dev)
+## Scope
 
-### Current top-level host composition load
+This guide covers:
 
-`src/hosts/server/AuthoritativeServerCompositionRoot.ts` currently combines host orchestration with significant startup composition detail:
+- authoritative server composition contracts and module map in `src/hosts/server/composition/contracts/`
+- staged startup orchestration in `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`
+- runtime composition modules in `src/hosts/server/composition/`
+- host entrypoint and orchestration boundary in `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 
-- Shared bootstrap stage handler composition.
-- Service/route coverage plan composition.
-- Persistence runtime and persistent-platform-service startup wiring.
-- Deployment policy bootstrap resolution.
-- Optional execution adapter composition.
-- Startup diagnostics summary/correlation/baseline emission.
+Out of scope:
 
-### Current runtime host composition load
+- route handler/business logic internals in domain/application layers
+- historical migration narratives already captured in baselines
 
-`src/hosts/server/IdentityServerHost.ts` remains a broad inline composition boundary:
+## Final Implemented Composition Model (Dev Branch)
 
-- Config/bootstrap resolution and identity startup defaults.
-- Secret + CA + trust/TLS bootstrap logic.
-- Persistence adapter materialization for multiple domains.
-- Authorization/policy/deployment composition.
-- Node management, storage/asset/media, and run orchestration composition.
-- Orchestration + audit startup recovery.
-- Observability logger adaptation.
-- HTTP transport assembly/startup.
+The implemented control-plane composition model is contract-first and bounded by explicit module seams.
 
-### Existing seams to preserve and expand
+### Contract and orchestration anchors
 
-- `HostBootstrapPipeline` and `HostLifecycleCoordinator`.
-- `AuthoritativeServerBootstrapStageContracts`.
-- Config/security stage modules + orchestrator.
-- Route plan composition seams for authoritative and auth-minimal startup.
+- Module contracts and IDs: `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleContracts.ts`
+- Module dependency and stage ownership map: `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleMap.ts`
+- Startup state/readiness model: `src/hosts/server/composition/contracts/AuthoritativeServerBootstrapPipelineStateModel.ts`
+- Startup stage execution orchestrator: `src/hosts/server/AuthoritativeServerBootstrapOrchestrator.ts`
+- Host composition root (orchestration boundary): `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 
-## Target Module Map
-
-Host root should retain only orchestration-level concerns:
-
-- lifecycle/stage flow
-- artifact handoff
-- coverage assertions
-- startup summary and cleanup coordination
-
-Bounded composition modules:
+### Implemented bounded modules
 
 1. `ServerStartupConfigurationCompositionModule`
 2. `ServerSecurityBootstrapCompositionModule`
@@ -64,84 +48,36 @@ Bounded composition modules:
 10. `ServerTransportCompositionModule`
 11. `ServerDiagnosticsCompositionModule`
 
-## Story 2.1.2 Implementation Scaffold
+### Runtime module extraction surfaces used by `IdentityServerHost.ts`
 
-Story 2.1.2 adds the initial bounded composition contract scaffold under:
+- `ServerIdentitySessionTrustedDeviceCompositionModule.ts`
+- `ServerWorkspaceAuthorizationCompositionModule.ts`
+- `ServerDeploymentPolicyCompositionModule.ts`
+- `ServerSecretCompositionModule.ts`
+- `ServerCertificateCompositionModule.ts`
+- `ServerNodeTrustCompositionModule.ts`
+- `ServerTlsMaterialCompositionModule.ts`
+- `ServerStorageAssetCompositionModule.ts`
+- `ServerImageMediaCompositionModule.ts`
+- `ServerGeneratedResultCompositionModule.ts`
+- `ServerAuditDiagnosticsPlatformCompositionModule.ts`
+- `ServerExecutionNodeManagementCompositionModule.ts`
+- `ServerRunSchedulingCompositionModule.ts`
+- `ServerRunOrchestrationCompositionModule.ts`
+- `ServerOrchestrationRecoveryCompositionModule.ts`
 
-- `src/hosts/server/composition/README.md`
-- `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleContracts.ts`
-- `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleMap.ts`
-- `src/hosts/server/composition/contracts/index.ts`
-- `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts`
+## Bootstrap Stages, Readiness, and Lifecycle Rules
 
-This scaffold intentionally does not move runtime behavior yet. It introduces:
+### Shared host bootstrap stage order (authoritative)
 
-- explicit typed input/output contracts for all target modules;
-- lifecycle/disposal contract hooks for composition modules;
-- an ordered module map with dependency direction, stage ownership hints, produced artifacts, and disposal responsibilities;
-- regression coverage to keep module-map shape and dependency ordering stable for follow-on extraction stories.
+1. `configuration`
+2. `dependencies`
+3. `logging`
+4. `security`
+5. `persistence`
+6. `feature-registration`
 
-## Story 2.2.1 Identity/Session/Trusted-Device Composition Extraction
-
-Story 2.2.1 extracts identity, session, and trusted-device composition from inline host startup assembly into:
-
-- `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
-- regression coverage: `src/hosts/server/tests/ServerIdentitySessionTrustedDeviceCompositionModule.test.ts`
-
-This extraction keeps route logic, DTO shaping, and domain behavior unchanged while moving only construction, dependency wiring, configuration input handling, and lifecycle-disposal composition concerns.
-
-## Story 2.2.2 Workspace/Authorization/Deployment-Policy Composition Extraction
-
-Story 2.2.2 extracts workspace lifecycle, authorization/sharing, and deployment-policy administration composition from inline `IdentityServerHost.ts` startup assembly into:
-
-- `src/hosts/server/composition/ServerWorkspaceAuthorizationCompositionModule.ts`
-- `src/hosts/server/composition/ServerDeploymentPolicyCompositionModule.ts`
-- regression coverage:
-  - `src/hosts/server/tests/ServerWorkspaceAuthorizationCompositionModule.test.ts`
-  - `src/hosts/server/tests/ServerDeploymentPolicyCompositionModule.test.ts`
-
-This extraction preserves route-level behavior and policy semantics while narrowing `IdentityServerHost.ts` responsibilities to consuming typed module outputs.
-
-## Story 2.2.3 Node-Trust/Certificate/TLS/Secret Composition Extraction
-
-Story 2.2.3 extracts security-heavy startup composition from inline `IdentityServerHost.ts` startup assembly into:
-
-- `src/hosts/server/composition/ServerSecretCompositionModule.ts`
-- `src/hosts/server/composition/ServerCertificateCompositionModule.ts`
-- `src/hosts/server/composition/ServerNodeTrustCompositionModule.ts`
-- `src/hosts/server/composition/ServerTlsMaterialCompositionModule.ts`
-- regression coverage:
-  - `src/hosts/server/tests/ServerSecretCompositionModule.test.ts`
-  - `src/hosts/server/tests/ServerCertificateCompositionModule.test.ts`
-  - `src/hosts/server/tests/ServerNodeTrustCompositionModule.test.ts`
-  - `src/hosts/server/tests/ServerTlsMaterialCompositionModule.test.ts`
-
-This extraction preserves fail-closed startup behavior while making secret, trust, certificate, and TLS composition dependencies explicit and bounded for follow-on hardening stories.
-
-## Story 2.2.6 Orchestration/Scheduling/Execution-Node Composition Extraction
-
-Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation, and execution-node management composition from inline `IdentityServerHost.ts` startup assembly into:
-
-- `src/hosts/server/composition/ServerExecutionNodeManagementCompositionModule.ts`
-- `src/hosts/server/composition/ServerRunSchedulingCompositionModule.ts`
-- `src/hosts/server/composition/ServerRunOrchestrationCompositionModule.ts`
-- `src/hosts/server/composition/ServerOrchestrationRecoveryCompositionModule.ts`
-- regression coverage:
-  - `src/hosts/server/tests/ServerExecutionNodeManagementCompositionModule.test.ts`
-  - `src/hosts/server/tests/ServerRunSchedulingCompositionModule.test.ts`
-  - `src/hosts/server/tests/ServerRunOrchestrationCompositionModule.test.ts`
-  - `src/hosts/server/tests/ServerOrchestrationRecoveryCompositionModule.test.ts`
-
-This extraction keeps startup recovery ordering and scheduling behavior unchanged while reducing control-plane wiring concentration in `IdentityServerHost.ts`.
-
-## Story 2.1.3 Staged Bootstrap Pipeline and Startup State Model
-
-Story 2.1.3 adds an explicit staged bootstrap model and typed startup/readiness states for the authoritative control-plane startup boundary:
-
-- `src/hosts/server/composition/contracts/AuthoritativeServerBootstrapPipelineStateModel.ts`
-- `src/hosts/server/tests/AuthoritativeServerBootstrapPipelineStateModel.test.ts`
-
-Canonical bootstrap stage order for control-plane startup:
+### Authoritative staged startup state model order (authoritative)
 
 1. `configuration-load`
 2. `security-material-resolution`
@@ -152,58 +88,34 @@ Canonical bootstrap stage order for control-plane startup:
 7. `transport-startup`
 8. `shutdown-preparation`
 
-State model coverage:
+### Startup and shutdown invariants
 
-- stage execution state: `pending`, `running`, `success`, `failed`, `skipped`
-- stage readiness state: `not-ready`, `ready`, `degraded`
-- pipeline readiness derivation:
-  - `ready` only when readiness verification and transport startup are successful
-  - `degraded` when any stage fails
-  - `not-ready` otherwise
-
-Incremental-adoption safety:
-
-- stage definitions are explicit and immutable;
-- each stage declares module ownership and current host/authoritative stage bindings;
-- `shutdown-preparation` is now active and composes the authoritative shutdown-disposal plan.
-- disposal sequencing is explicit and deterministic: `transport` module disposal runs before `persistenceBootstrap` disposal.
-
-## Dependency And Stage Contracts
-
-Contract direction:
-
-1. configuration ->
-2. security + service/route plans + execution adapter registration ->
-3. persistence ->
-4. deployment policy bootstrap ->
-5. control-plane API composition + startup recovery ->
-6. transport start
-
-Ordering constraints remain unchanged:
-
-- Shared stages: `configuration -> dependencies -> logging -> security -> persistence -> feature-registration`
-- Authoritative staged order: `services -> security -> persistence -> transport`
-- Transport start requires coverage assertions and prerequisite artifacts.
-- Orchestration recovery remains pre-listen.
-- Auth-minimal remains same architecture with scoped outputs.
+- Startup can only transition to ready transport after `readiness-verification` succeeds for blocking checks.
+- Degraded non-blocking checks are surfaced explicitly in startup readiness reports.
+- Shutdown cleanup order is explicit and deterministic via `AuthoritativeServerRuntimeDisposalModuleOrder`:
+  1. `transport`
+  2. `persistenceBootstrap`
+- Startup-failure cleanup and normal shutdown consume the same composed disposal-plan semantics.
 
 ## Composition Dependency Rules (Story 2.1.4)
 
 ### Allowed dependencies for composition modules
 
-- Compose infrastructure adapters and application services through explicit typed module contracts.
-- Depend only on shared host startup/lifecycle contracts and declared prior module outputs in `AuthoritativeServerCompositionModuleMap`.
-- Consume cross-cutting diagnostics through `ServerDiagnosticsCompositionModule`.
+- Composition modules may depend only on explicit upstream outputs and shared startup/lifecycle contracts declared by `AuthoritativeServerCompositionModuleMap`.
+- Composition modules may compose infrastructure adapters and application services through typed contracts.
+- Cross-cutting startup diagnostics can be consumed through `ServerDiagnosticsCompositionModule` outputs.
 
 ### Disallowed dependencies for composition modules
 
-- Must not absorb business logic (keep policy/rules in domain/application).
-- Must not absorb route logic (keep transport route handlers/DTO mapping in route-family modules).
-- Must not become ad hoc helper buckets.
-- Must not bypass typed contracts via process-global state or unrelated module internals.
-- Must not re-inline extracted composition concerns into top-level host startup files.
+- Composition modules must not absorb business logic.
+- Composition modules must not absorb route logic.
+- Composition modules must not become ad hoc helper buckets.
+- Composition modules must not bypass typed contracts through hidden module internals or process-global state.
+- Top-level host startup files must not re-inline extracted module responsibilities.
 
 ### Explicit allowed module dependency map
+
+Allowed `dependsOn` relationships are:
 
 1. `ServerStartupConfigurationCompositionModule` -> `[]`
 2. `ServerSecurityBootstrapCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
@@ -217,49 +129,46 @@ Ordering constraints remain unchanged:
 10. `ServerTransportCompositionModule` -> `[ServerControlPlaneApiCompositionModule, ServerOrchestrationRecoveryCompositionModule]`
 11. `ServerDiagnosticsCompositionModule` -> `[ServerStartupConfigurationCompositionModule]`
 
-New cross-module dependencies are disallowed unless the map, contracts, and composition contract tests are updated together.
+New cross-module dependencies are disallowed unless `AuthoritativeServerCompositionModuleMap`, contracts, tests, and this doc are updated together.
 
 ## Naming And Placement Conventions (Story 2.1.4)
 
-- Keep composition module implementations under `src/hosts/server/composition/` in module-oriented files/folders.
-- Keep contracts in `src/hosts/server/composition/contracts/`.
-- Use `Server<Capability>CompositionModule` and `Server<Capability>CompositionModuleContract` naming.
-- Use explicit `*CompositionModuleInput` / `*CompositionModuleOutput` artifact names (avoid generic helper/context naming).
-- Keep any helper code colocated with one module responsibility.
+- Module implementations belong in `src/hosts/server/composition/`.
+- Module contracts belong in `src/hosts/server/composition/contracts/`.
+- Module names use `Server<Capability>CompositionModule`.
+- Module contract names use `Server<Capability>CompositionModuleContract`.
+- Typed artifacts must use explicit `*CompositionModuleInput` and `*CompositionModuleOutput` names.
+- Module-specific helper code stays colocated with one module responsibility.
+
+## Contributor Extension Workflow
+
+When adding new control-plane composition behavior:
+
+1. Decide whether behavior belongs in an existing module or a new `Server<Capability>CompositionModule`.
+2. Add or update typed contract surfaces in `AuthoritativeServerCompositionModuleContracts.ts`.
+3. Add or update module descriptors/dependencies/stage ownership in `AuthoritativeServerCompositionModuleMap.ts`.
+4. Wire composition in `AuthoritativeServerBootstrapOrchestrator.ts` (or module implementation files) without changing domain/application ownership boundaries.
+5. Keep `AuthoritativeServerCompositionRoot.ts` orchestration-only.
+6. Update tests:
+   - `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts`
+   - affected module tests in `src/hosts/server/tests/`
+   - `dev/tests/ControlPlaneCompositionDependencyGuardrails.test.ts` when documentation contracts change
+7. Update this guide and `src/hosts/server/composition/README.md` in the same change.
 
 ## Re-Centralization Prevention Checklist
 
 - Keep `AuthoritativeServerCompositionRoot.ts` orchestration-only.
-- Prevent `IdentityServerHost.ts` from becoming a second composition root after module extraction.
-- Require new modules to declare stage ownership, produced artifacts, disposal responsibilities, and dependencies in module-map contracts.
-- Require `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts` updates when module-map/dependency contracts change.
+- Prevent `IdentityServerHost.ts` from accumulating cross-domain startup composition that belongs in bounded modules.
+- Require every new module to declare stage ownership, produced artifacts, disposal responsibilities, and dependencies in `AuthoritativeServerCompositionModuleMap`.
+- Reject changes that bypass contract types for convenience wiring.
+- Keep startup and lifecycle behavior validated by contract-level tests before merge.
 
-## High-Risk Seams
+## Related Files
 
-1. TLS runtime material resolution and fail-fast posture.
-2. Secret bootstrap fallback semantics.
-3. Orchestration recovery placement/idempotence.
-4. Startup diagnostics and correlation wiring.
-
-## Safe Migration Sequence
-
-1. Extract contracts/adapters around existing logic.
-2. Extract diagnostics composition.
-3. Extract transport composition.
-4. Extract orchestration recovery composition.
-5. Extract control-plane API composition.
-6. Extract policy/persistence/security composition.
-7. Reduce host root to orchestration-only.
-8. Keep parity via startup harness/composition tests.
-
-## Cross-Cutting Concerns That Must Not Stay Buried
-
-- TLS/transport trust posture outcomes.
-- Secret bootstrap posture.
-- Deployment policy readiness.
-- Orchestration/audit recovery outcomes.
-- Startup diagnostics/correlation/baseline policies.
-- Service and route coverage assertions.
+- `src/hosts/server/composition/README.md`
+- `docs/architecture/authoritative-server-host-assembly.ai.md`
+- `docs/architecture/host-bootstrap-pipeline.ai.md`
+- `docs/architecture/host-service-registration-composition-rules.ai.md`
 
 ## Related ADRs
 
