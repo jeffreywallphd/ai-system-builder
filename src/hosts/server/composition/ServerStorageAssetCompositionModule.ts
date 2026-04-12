@@ -31,12 +31,13 @@ import {
 } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { EncryptedAssetDownloadGrantAdapter } from "@infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter";
 import { AesGcmAssetContentCipherPort } from "@infrastructure/security/encryption/AesGcmAssetContentCipherPort";
-import { DeterministicScopeEncryptionKeyPort } from "@infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
+import { VersionedServerScopedAssetContentEncryptionKeyPort } from "@infrastructure/security/encryption/VersionedServerScopedAssetContentEncryptionKeyPort";
 import { WorkspaceStorageEncryptionPolicyContextResolver } from "@infrastructure/security/encryption/WorkspaceStorageEncryptionPolicyContextResolver";
 import { EncryptionEnforcementObservabilityReporter } from "@infrastructure/security/EncryptionEnforcementObservabilityReporter";
 import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
 import { resolveCriticalServerSecurityMaterial } from "./ResolveCriticalServerSecurityMaterial";
 import type { ServerComposedSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
+import { ServerPlatformSecretConsumers } from "@infrastructure/security/secrets/ServerPlatformSecretConsumers";
 
 export interface ServerStorageAssetCompositionModuleInput {
   readonly databasePath: string;
@@ -136,9 +137,15 @@ export async function composeServerStorageAssetCompositionModule(
     logger: input.encryptionObservabilityLogger,
     materialFormat: "aes256-base64",
   });
-  const assetContentKeyPort = new DeterministicScopeEncryptionKeyPort({
-    encodedKey: assetContentEncryptionKey,
+  const runtimeSecurityMaterialResolver = new ServerPlatformSecretConsumers(
+    input.secretService.runtimeSecretConsumptionAdapters,
+  );
+  const assetContentKeyPort = new VersionedServerScopedAssetContentEncryptionKeyPort({
+    runtimeSecurityMaterialResolver,
+    secretId: "secret:server:asset-content-encryption-key",
+    fallbackEncodedKey: assetContentEncryptionKey,
     keyPrefix: normalizeOptional(input.env.AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY_PREFIX) ?? "kek:asset-content",
+    legacyDeterministicVersionId: "secret:server:asset-content-encryption-key:v1",
   });
   const assetEncryptionPolicyContextResolver = new WorkspaceStorageEncryptionPolicyContextResolver({
     workspaceRepository,
