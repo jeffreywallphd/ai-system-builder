@@ -322,6 +322,33 @@ These contracts establish stable extension points for persistence adapters, auth
     - `src/infrastructure/security/tests/DefaultSecretProviderResolutionService.test.ts`
     - `src/infrastructure/security/secrets/tests/LocalUserSecureSecretStoreBackend.test.ts`
 
+## Story 3.3.4 Signing and token key rotation flow
+
+- implements a concrete rotation flow for the image upload-session token signing key family:
+  - secret id: `secret:server:image-upload-session-token`
+  - consumer: `src/infrastructure/api/image-assets/ImageAssetManagementBackendApi.ts`
+- active key resolution now routes through provider-backed runtime security material resolution instead of startup-only static secret injection:
+  - composition wiring: `src/hosts/server/composition/ServerImageMediaCompositionModule.ts`
+  - runtime resolver: `src/infrastructure/security/secrets/ServerPlatformSecretConsumers.ts`
+- upload-session tokens now include key-version metadata used for rotation-safe verification:
+  - payload fields: `issuedAt`, `signingKeyVersionId`
+  - mint path resolves active signing material each issuance
+  - verify path resolves the specific key version through provider routing
+- transition compatibility behavior:
+  - superseded signing key versions can be used for verification only when explicitly requested by the consumer flow
+  - compatibility is bounded by `AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_PREVIOUS_VERSION_VALIDATION_WINDOW_MS` (default: 15 minutes)
+  - after the window, superseded key versions are treated as retired for upload-session validation
+- runtime secret retrieval now supports explicit version resolution with controlled superseded-version allowance for rotation windows:
+  - contracts: `src/application/security/use-cases/SecretManagementServiceContracts.ts`
+  - adapter routing: `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`
+  - retrieval enforcement: `src/application/security/use-cases/RetrieveSecretPlaintextForRuntimeUseCase.ts`
+- test coverage:
+  - `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`
+    - accepts token minted by previous key during transition window
+    - rejects previous-key token after retirement window
+  - `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
+    - superseded version retrieval is denied by default and allowed only with explicit `allowSupersededVersion`
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants

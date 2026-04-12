@@ -37,6 +37,8 @@ export interface ResolveServerSigningCredentialRequest {
   readonly operationKey: string;
   readonly serviceIdentity: string;
   readonly signingPurpose: string;
+  readonly versionId?: string;
+  readonly allowSupersededVersion?: boolean;
   readonly justification?: string;
   readonly occurredAt?: string;
 }
@@ -142,6 +144,16 @@ export class SecretRuntimeConsumptionAdapters implements ISecretRuntimeConsumpti
         scope,
         justification: normalizeOptional(request.justification)
           ?? `resolve server signing credential for '${request.signingPurpose}'`,
+        ...(normalizeOptional(request.versionId)
+          ? Object.freeze({
+            versionId: normalizeOptional(request.versionId),
+          })
+          : undefined),
+        ...(request.allowSupersededVersion
+          ? Object.freeze({
+            allowSupersededVersion: true,
+          })
+          : undefined),
       },
       occurredAt: request.occurredAt,
     });

@@ -10,6 +10,15 @@ import { ImageAssetStorageObjectAreas } from "@application/image-assets/ports/Im
 import { ImageAssetManagementBackendApi } from "../ImageAssetManagementBackendApi";
 import { ImageAssetManagementObservability } from "../ImageAssetManagementObservability";
 import type { ImageAssetManagementObservabilityLogEvent, ImageAssetManagementObservabilityLogger } from "../ImageAssetManagementObservability";
+import type {
+  IRuntimeSecurityMaterialResolverPort,
+  ResolveServerProviderCredentialMaterialInput,
+  ResolveServerSigningMaterialInput,
+  ResolveUserProviderCredentialMaterialInput,
+  ResolveWorkspaceProviderCredentialMaterialInput,
+  ResolvedSecurityMaterialCredential,
+} from "@application/security/ports/SecurityMaterialResolutionPorts";
+import type { SecretServiceResult } from "@application/security/use-cases/SecretManagementServiceContracts";
 
 const baseAsset = Object.freeze({
   assetId: "image-asset:001",
@@ -55,6 +64,79 @@ describe("ImageAssetManagementBackendApi", () => {
 
     public error(event: ImageAssetManagementObservabilityLogEvent): void {
       this.errorEvents.push(event);
+    }
+  }
+
+  class MutableClock {
+    public constructor(private nowValue: Date) {}
+
+    public now(): Date {
+      return new Date(this.nowValue);
+    }
+
+    public setNow(value: string): void {
+      this.nowValue = new Date(value);
+    }
+  }
+
+  class StubRuntimeSecurityMaterialResolver implements IRuntimeSecurityMaterialResolverPort {
+    private activeSigningVersionId = "secret:server:image-upload-session-token:v1";
+    private readonly signingMaterialByVersion = new Map<string, string>([
+      ["secret:server:image-upload-session-token:v1", "upload-token-signing-secret-v1"],
+      ["secret:server:image-upload-session-token:v2", "upload-token-signing-secret-v2"],
+    ]);
+
+    public setActiveSigningVersion(versionId: string): void {
+      this.activeSigningVersionId = versionId;
+    }
+
+    public async resolveServerProviderCredential(
+      _input: ResolveServerProviderCredentialMaterialInput,
+    ): Promise<SecretServiceResult<ResolvedSecurityMaterialCredential>> {
+      throw new Error("not used");
+    }
+
+    public async resolveIdentitySessionSigningMaterial(
+      input: ResolveServerSigningMaterialInput,
+    ): Promise<SecretServiceResult<ResolvedSecurityMaterialCredential>> {
+      return this.resolveServerSigningMaterial(input);
+    }
+
+    public async resolveServerSigningMaterial(
+      input: ResolveServerSigningMaterialInput,
+    ): Promise<SecretServiceResult<ResolvedSecurityMaterialCredential>> {
+      const requestedVersionId = input.versionId?.trim() || this.activeSigningVersionId;
+      const credential = this.signingMaterialByVersion.get(requestedVersionId);
+      if (!credential) {
+        return {
+          ok: false,
+          error: {
+            code: "secret-not-found",
+            message: `Missing signing material for '${requestedVersionId}'.`,
+          },
+        };
+      }
+
+      return {
+        ok: true,
+        value: {
+          secretId: input.secretId,
+          currentVersionId: this.activeSigningVersionId,
+          credential,
+        },
+      };
+    }
+
+    public async resolveWorkspaceProviderCredential(
+      _input: ResolveWorkspaceProviderCredentialMaterialInput,
+    ): Promise<SecretServiceResult<ResolvedSecurityMaterialCredential>> {
+      throw new Error("not used");
+    }
+
+    public async resolveUserProviderCredential(
+      _input: ResolveUserProviderCredentialMaterialInput,
+    ): Promise<SecretServiceResult<ResolvedSecurityMaterialCredential>> {
+      throw new Error("not used");
     }
   }
 
@@ -323,6 +405,177 @@ describe("ImageAssetManagementBackendApi", () => {
       workspaceId: "workspace-alpha",
       assetId: "image-asset:001",
       uploadSessionId: "invalid",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+    expect(response.error.code).toBe("invalid-request");
+  });
+
+  it("validates upload session tokens signed by a superseded key during the transition window", async () => {
+    const clock = new MutableClock(new Date("2026-04-08T10:00:00.000Z"));
+    const runtimeSecurityMaterialResolver = new StubRuntimeSecurityMaterialResolver();
+    const backend = new ImageAssetManagementBackendApi({
+      runtimeSecurityMaterialResolver,
+      uploadSessionTokenSecretId: "secret:server:image-upload-session-token",
+      uploadSessionTokenSigningPurpose: "image-asset-upload-session-token-signing",
+      clock,
+      initiateImageAssetCreationUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              imageAsset: baseAsset,
+              upload: Object.freeze({
+                status: "upload-pending" as const,
+                reservation: Object.freeze({
+                  reservationId: "reservation-001",
+                  reference: Object.freeze({
+                    storageInstanceId: "storage-alpha",
+                    objectKey: "workspaces/workspace-alpha/image-assets/image-asset-001/original/image.png",
+                    area: ImageAssetStorageObjectAreas.original,
+                  }),
+                  expiresAt: "2026-04-08T12:00:00.000Z",
+                }),
+              }),
+            }),
+          };
+        },
+      },
+      finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() {
+          return Object.freeze({
+            reference: Object.freeze({
+              storageInstanceId: "storage-alpha",
+              objectKey: "workspaces/workspace-alpha/image-assets/image-asset-001/original/image.png",
+              area: ImageAssetStorageObjectAreas.original,
+            }),
+            sizeBytes: 4,
+            checksum: Object.freeze({
+              algorithm: "sha256" as const,
+              digest: "b".repeat(64),
+            }),
+            writtenAt: "2026-04-08T10:04:00.000Z",
+          });
+        },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const created = await backend.createImageAsset({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      mediaType: "image/png",
+      originalFilename: "image.png",
+      sizeBytes: 4,
+      fingerprint: {
+        algorithm: "sha256",
+        digest: "a".repeat(64),
+      },
+    });
+    expect(created.ok).toBeTrue();
+    if (!created.ok || !created.data) {
+      return;
+    }
+
+    runtimeSecurityMaterialResolver.setActiveSigningVersion("secret:server:image-upload-session-token:v2");
+    clock.setNow("2026-04-08T10:05:00.000Z");
+    const ingested = await backend.ingestImageAssetUploadContent({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      uploadSessionId: created.data.upload.uploadSessionId,
+      contentType: "image/png",
+      content: (async function* bytes() {
+        yield new Uint8Array([1, 2, 3, 4]);
+      })(),
+    });
+
+    expect(ingested.ok).toBeTrue();
+  });
+
+  it("retires superseded upload token signing keys after the configured transition window", async () => {
+    const clock = new MutableClock(new Date("2026-04-08T10:00:00.000Z"));
+    const runtimeSecurityMaterialResolver = new StubRuntimeSecurityMaterialResolver();
+    const backend = new ImageAssetManagementBackendApi({
+      runtimeSecurityMaterialResolver,
+      uploadSessionTokenSecretId: "secret:server:image-upload-session-token",
+      uploadSessionTokenSigningPurpose: "image-asset-upload-session-token-signing",
+      uploadSessionTokenPreviousVersionValidationWindowMs: 5 * 60 * 1000,
+      clock,
+      initiateImageAssetCreationUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              imageAsset: baseAsset,
+              upload: Object.freeze({
+                status: "upload-pending" as const,
+                reservation: Object.freeze({
+                  reservationId: "reservation-001",
+                  reference: Object.freeze({
+                    storageInstanceId: "storage-alpha",
+                    objectKey: "workspaces/workspace-alpha/image-assets/image-asset-001/original/image.png",
+                    area: ImageAssetStorageObjectAreas.original,
+                  }),
+                  expiresAt: "2026-04-08T12:00:00.000Z",
+                }),
+              }),
+            }),
+          };
+        },
+      },
+      finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() { throw new Error("not used"); },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const created = await backend.createImageAsset({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      mediaType: "image/png",
+      originalFilename: "image.png",
+      sizeBytes: 4,
+      fingerprint: {
+        algorithm: "sha256",
+        digest: "a".repeat(64),
+      },
+    });
+    expect(created.ok).toBeTrue();
+    if (!created.ok || !created.data) {
+      return;
+    }
+
+    runtimeSecurityMaterialResolver.setActiveSigningVersion("secret:server:image-upload-session-token:v2");
+    clock.setNow("2026-04-08T10:07:00.000Z");
+    const response = await backend.completeImageAssetUpload({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      uploadSessionId: created.data.upload.uploadSessionId,
     });
 
     expect(response.ok).toBeFalse();

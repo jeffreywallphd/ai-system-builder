@@ -28,6 +28,8 @@ export interface ResolveServerSigningMaterialInput {
   readonly operationKey: string;
   readonly serviceIdentity: string;
   readonly signingPurpose: string;
+  readonly versionId?: string;
+  readonly allowSupersededVersion?: boolean;
   readonly justification?: string;
   readonly occurredAt?: string;
 }
@@ -62,11 +64,27 @@ export class ServerPlatformSecretConsumers implements IRuntimeSecurityMaterialRe
   public async resolveIdentitySessionSigningMaterial(
     input: ResolveServerSigningMaterialInput,
   ): Promise<SecretServiceResult<ServerPlatformResolvedCredential>> {
+    return this.resolveServerSigningMaterial(input);
+  }
+
+  public async resolveServerSigningMaterial(
+    input: ResolveServerSigningMaterialInput,
+  ): Promise<SecretServiceResult<ServerPlatformResolvedCredential>> {
     const result = await this.runtimeSecretConsumptionAdapters.resolveServerSigningCredential({
       secretId: input.secretId,
       operationKey: input.operationKey,
       serviceIdentity: input.serviceIdentity,
       signingPurpose: input.signingPurpose,
+      ...(normalizeOptional(input.versionId)
+        ? Object.freeze({
+          versionId: normalizeOptional(input.versionId),
+        })
+        : undefined),
+      ...(input.allowSupersededVersion === true
+        ? Object.freeze({
+          allowSupersededVersion: true,
+        })
+        : undefined),
       justification: normalizeOptional(input.justification)
         ?? `resolve server signing material for '${input.signingPurpose}'`,
       occurredAt: input.occurredAt,

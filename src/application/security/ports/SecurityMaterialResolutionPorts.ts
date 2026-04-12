@@ -20,6 +20,8 @@ export interface ResolveServerSigningMaterialInput {
   readonly operationKey: string;
   readonly serviceIdentity: string;
   readonly signingPurpose: string;
+  readonly versionId?: string;
+  readonly allowSupersededVersion?: boolean;
   readonly justification?: string;
   readonly occurredAt?: string;
 }
@@ -48,6 +50,9 @@ export interface ResolveUserProviderCredentialMaterialInput {
 export interface IRuntimeSecurityMaterialResolverPort {
   resolveServerProviderCredential(
     input: ResolveServerProviderCredentialMaterialInput,
+  ): Promise<SecretServiceResult<ResolvedSecurityMaterialCredential>>;
+  resolveServerSigningMaterial(
+    input: ResolveServerSigningMaterialInput,
   ): Promise<SecretServiceResult<ResolvedSecurityMaterialCredential>>;
   resolveIdentitySessionSigningMaterial(
     input: ResolveServerSigningMaterialInput,

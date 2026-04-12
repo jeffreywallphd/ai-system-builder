@@ -63,6 +63,8 @@ export interface RetrieveSecretPlaintextRequest {
     readonly serviceIdentity: string;
     readonly scope: SecretScopeOwner;
     readonly justification: string;
+    readonly versionId?: string;
+    readonly allowSupersededVersion?: boolean;
   };
   readonly occurredAt?: string;
 }
