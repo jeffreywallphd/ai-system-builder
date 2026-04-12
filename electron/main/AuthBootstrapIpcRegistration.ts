@@ -70,11 +70,13 @@ export function registerAuthBootstrapIpc(params: RegisterAuthBootstrapIpcParams)
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.storageGetItem, (event, key: string) => {
     event.returnValue = params.storage.getItem(key);
   });
-  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.storageSetItem, (_event, key: string, value: string) => {
+  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.storageSetItem, (event, key: string, value: string) => {
     params.storage.setItem(key, value);
+    event.returnValue = true;
   });
-  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.storageRemoveItem, (_event, key: string) => {
+  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.storageRemoveItem, (event, key: string) => {
     params.storage.removeItem(key);
+    event.returnValue = true;
   });
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady, (event) => {
     event.returnValue = params.isDeferredFeatureIpcReady();
@@ -95,10 +97,12 @@ export function registerAuthBootstrapIpc(params: RegisterAuthBootstrapIpcParams)
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsGet, (event, key: string) => {
     event.returnValue = params.secrets.getSecret(key);
   });
-  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsSet, (_event, key: string, value: string) => {
+  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsSet, (event, key: string, value: string) => {
     params.secrets.setSecret(key, value);
+    event.returnValue = true;
   });
-  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsRemove, (_event, key: string) => {
+  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsRemove, (event, key: string) => {
     params.secrets.removeSecret(key);
+    event.returnValue = true;
   });
 }

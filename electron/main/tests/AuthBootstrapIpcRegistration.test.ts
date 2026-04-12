@@ -146,8 +146,13 @@ describe("registerAuthBootstrapIpc", () => {
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.storageGetItem)?.(storageGetEvent, "session");
     expect(storageGetEvent.returnValue).toBe("abc123");
 
-    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.storageSetItem)?.({}, "session", "next");
-    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.storageRemoveItem)?.({}, "session");
+    const storageSetEvent: { returnValue?: unknown } = {};
+    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.storageSetItem)?.(storageSetEvent, "session", "next");
+    expect(storageSetEvent.returnValue).toBe(true);
+
+    const storageRemoveEvent: { returnValue?: unknown } = {};
+    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.storageRemoveItem)?.(storageRemoveEvent, "session");
+    expect(storageRemoveEvent.returnValue).toBe(true);
     expect(storage.get("session")).toBeUndefined();
 
     const secretAvailableEvent: { returnValue?: unknown } = {};
@@ -158,8 +163,13 @@ describe("registerAuthBootstrapIpc", () => {
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsGet)?.(secretGetEvent, "token");
     expect(secretGetEvent.returnValue).toBe("secret-value");
 
-    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsSet)?.({}, "token", "updated");
-    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsRemove)?.({}, "token");
+    const secretsSetEvent: { returnValue?: unknown } = {};
+    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsSet)?.(secretsSetEvent, "token", "updated");
+    expect(secretsSetEvent.returnValue).toBe(true);
+
+    const secretsRemoveEvent: { returnValue?: unknown } = {};
+    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsRemove)?.(secretsRemoveEvent, "token");
+    expect(secretsRemoveEvent.returnValue).toBe(true);
     expect(secrets.get("token")).toBeUndefined();
 
     const deferredReadyEvent: { returnValue?: unknown } = {};
