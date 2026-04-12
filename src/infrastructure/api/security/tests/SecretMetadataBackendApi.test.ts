@@ -320,6 +320,7 @@ describe("SecretMetadataBackendApi", () => {
               message: "Required system secret is missing.",
               secretId: "secret:server:provider:openai",
             })]),
+            materialMetadata: Object.freeze([]),
           }),
         }),
       },
@@ -363,6 +364,43 @@ describe("SecretMetadataBackendApi", () => {
               message: "secret-store:/sensitive/path leaked",
               secretId: "secret:server:provider:openai",
             })]),
+            materialMetadata: Object.freeze([Object.freeze({
+              providerId: "openai",
+              secretId: "secret:server:provider:openai",
+              scope: "server",
+              materialKind: "provider-credential",
+              backend: Object.freeze({
+                backendId: "durable-server-secret-store",
+                backendKind: "durable-server-secret-store",
+              }),
+              reference: Object.freeze({
+                secretId: "secret:server:provider:openai",
+                name: "provider.openai.api-key",
+                scope: "server",
+                kind: "api-key",
+                state: "active",
+                currentVersionId: "secret:server:provider:openai:v1",
+                metadata: Object.freeze({
+                  tags: Object.freeze(["server", "openai"]),
+                  labels: Object.freeze({
+                    provider: "openai",
+                  }),
+                }),
+                updatedAt: "2026-04-06T12:00:00.000Z",
+              }),
+              timestamps: Object.freeze({
+                updatedAt: "2026-04-06T12:00:00.000Z",
+              }),
+              rotation: Object.freeze({
+                status: "active",
+                currentVersionId: "secret:server:provider:openai:v1",
+              }),
+              policyFlags: Object.freeze({
+                metadataSafeForDiagnostics: true,
+                plaintextAccessRequiresDedicatedRetrievalFlow: true,
+                failFastRequiredOnStartup: true,
+              }),
+            })]),
           }),
         }),
       },
@@ -378,6 +416,8 @@ describe("SecretMetadataBackendApi", () => {
     }
 
     expect(response.data.diagnostics.bootstrap.requiredSecretIds).toEqual(["secret:server:provider:openai"]);
+    expect(response.data.diagnostics.bootstrap.materialMetadata).toHaveLength(1);
+    expect((response.data.diagnostics.bootstrap.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
     expect(response.data.diagnostics.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
     expect(response.data.diagnostics.bootstrap.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
   });

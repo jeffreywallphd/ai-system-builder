@@ -5,6 +5,7 @@ import {
 } from "./SystemSecretBootstrapService";
 import type { ServerComposedSecretService } from "./SecretServiceComposition";
 import {
+  type SecretProviderMaterialMetadataDto,
   SecretServiceDiagnosticSeverities,
   SecretServiceHealthStates,
   type SecretServiceHealthFlagsDto,
@@ -90,6 +91,9 @@ export class SecretServiceOperationalDiagnosticsProvider implements ISecretServi
       bootstrap: Object.freeze({
         requiredSecretIds: bootstrapResult.requiredSecretIds,
         diagnostics: Object.freeze(bootstrapDiagnostics),
+        materialMetadata: Object.freeze(
+          bootstrapResult.materialMetadata.map((item) => toSecretProviderMaterialMetadataDto(item)),
+        ),
       }),
     });
   }
@@ -148,5 +152,93 @@ function resolveHealthState(input: {
   }
 
   return SecretServiceHealthStates.healthy;
+}
+
+function toSecretProviderMaterialMetadataDto(input: {
+  readonly providerId: string;
+  readonly secretId: string;
+  readonly scope: {
+    readonly scope: "server" | "workspace" | "user";
+    readonly workspaceId?: string;
+    readonly userIdentityId?: string;
+  };
+  readonly materialKind: string;
+  readonly backend: {
+    readonly backendId: string;
+    readonly backendKind: string;
+  };
+  readonly reference: {
+    readonly secretId: string;
+    readonly name: string;
+    readonly scope: "server" | "workspace" | "user";
+    readonly workspaceId?: string;
+    readonly userIdentityId?: string;
+    readonly kind: string;
+    readonly state: string;
+    readonly currentVersionId?: string;
+    readonly metadata: {
+      readonly displayName?: string;
+      readonly description?: string;
+      readonly tags: ReadonlyArray<string>;
+      readonly labels: Readonly<Record<string, string>>;
+    };
+    readonly updatedAt: string;
+  };
+  readonly timestamps: {
+    readonly createdAt?: string;
+    readonly updatedAt: string;
+  };
+  readonly rotation: {
+    readonly status: string;
+    readonly currentVersionId?: string;
+  };
+  readonly policyFlags: {
+    readonly metadataSafeForDiagnostics: true;
+    readonly plaintextAccessRequiresDedicatedRetrievalFlow: true;
+    readonly failFastRequiredOnStartup?: boolean;
+  };
+}): SecretProviderMaterialMetadataDto {
+  return Object.freeze({
+    providerId: input.providerId,
+    secretId: input.secretId,
+    scope: input.scope.scope,
+    workspaceId: input.scope.workspaceId,
+    userIdentityId: input.scope.userIdentityId,
+    materialKind: input.materialKind,
+    backend: Object.freeze({
+      backendId: input.backend.backendId,
+      backendKind: input.backend.backendKind,
+    }),
+    reference: Object.freeze({
+      secretId: input.reference.secretId,
+      name: input.reference.name,
+      scope: input.reference.scope,
+      workspaceId: input.reference.workspaceId,
+      userIdentityId: input.reference.userIdentityId,
+      kind: input.reference.kind,
+      state: input.reference.state,
+      currentVersionId: input.reference.currentVersionId,
+      metadata: Object.freeze({
+        displayName: input.reference.metadata.displayName,
+        description: input.reference.metadata.description,
+        tags: Object.freeze([...input.reference.metadata.tags]),
+        labels: Object.freeze({ ...input.reference.metadata.labels }),
+      }),
+      updatedAt: input.reference.updatedAt,
+    }),
+    timestamps: Object.freeze({
+      createdAt: input.timestamps.createdAt,
+      updatedAt: input.timestamps.updatedAt,
+    }),
+    rotation: Object.freeze({
+      status: input.rotation.status,
+      currentVersionId: input.rotation.currentVersionId,
+    }),
+    policyFlags: Object.freeze({
+      metadataSafeForDiagnostics: true,
+      plaintextAccessRequiresDedicatedRetrievalFlow: true,
+      failFastRequiredOnStartup: input.policyFlags.failFastRequiredOnStartup,
+    }),
+  });
 }
 

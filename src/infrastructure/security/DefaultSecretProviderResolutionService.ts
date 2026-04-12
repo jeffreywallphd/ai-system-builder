@@ -15,15 +15,18 @@ import type {
 import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretManagementServiceContracts";
 import type { SecretRuntimeConsumptionAdapters } from "@application/security/services/SecretRuntimeConsumptionAdapters";
 import {
+  SecretProviderMaterialBackendKinds,
   SecretProviderBootstrapOutcomes,
+  SecretProviderMaterialKinds,
+  SecretProviderMaterialRotationStatuses,
   type ISecretProviderMaterialResolutionPort,
   type ResolveSecretProviderMaterialExistenceInput,
   type ResolveSecretProviderMaterialInput,
   type ResolveSecretProviderMaterialMetadataInput,
+  type SecretProviderMaterialMetadata,
   type ResolvedSecretProviderMaterialValue,
   type SecretProviderBootstrapResult,
   type SecretProviderMaterialBootstrapInput,
-  type SecretProviderMaterialReference,
 } from "@application/security/ports/SecretProviderPorts";
 import {
   DurableServerSecretStoreBackend,
@@ -117,7 +120,7 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
 
   public async resolveSecretProviderMaterialMetadata(
     input: ResolveSecretProviderMaterialMetadataInput,
-  ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
+  ): Promise<SecretServiceResult<SecretProviderMaterialMetadata>> {
     if (input.selector.scope.scope === SecretScopes.server) {
       return this.serverSecretStoreBackend.resolveServerMaterialMetadata(input);
     }
@@ -144,12 +147,10 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
 
     return {
       ok: true,
-      value: Object.freeze({
-        providerId: input.selector.providerId,
-        secretId: input.selector.secretId,
-        scope: input.selector.scope,
-        materialKind: input.selector.materialKind,
+      value: toSecretProviderMaterialMetadata({
+        selector: input.selector,
         reference: metadata.value,
+        backendKind: SecretProviderMaterialBackendKinds.managedSecretService,
       }),
     };
   }
@@ -251,7 +252,11 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
       return created;
     }
 
-    const reference = toMaterialReference(input, created.value.secret);
+    const reference = toSecretProviderMaterialMetadata({
+      selector: input.selector,
+      reference: created.value.secret,
+      backendKind: SecretProviderMaterialBackendKinds.managedSecretService,
+    });
     return {
       ok: true,
       value: Object.freeze({
@@ -309,19 +314,6 @@ function toServerSecretStoreBackendDependencies(
     getSecretMetadata: dependencies.getSecretMetadata,
     createSecret: dependencies.createSecret,
     initialize: dependencies.initializeServerSecretStore,
-  });
-}
-
-function toMaterialReference(
-  input: SecretProviderMaterialBootstrapInput,
-  reference: SecretProviderMaterialReference["reference"],
-): SecretProviderMaterialReference {
-  return Object.freeze({
-    providerId: input.selector.providerId,
-    secretId: input.selector.secretId,
-    scope: input.selector.scope,
-    materialKind: input.selector.materialKind,
-    reference,
   });
 }
 
@@ -399,4 +391,58 @@ function defaultResolutionJustification(input: ResolveSecretProviderMaterialInpu
 function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function toSecretProviderMaterialMetadata(input: {
+  readonly selector: ResolveSecretProviderMaterialInput["selector"];
+  readonly reference: SecretReference;
+  readonly backendKind: typeof SecretProviderMaterialBackendKinds[keyof typeof SecretProviderMaterialBackendKinds];
+}): SecretProviderMaterialMetadata {
+  return Object.freeze({
+    providerId: input.selector.providerId,
+    secretId: input.selector.secretId,
+    scope: input.selector.scope,
+    materialKind: input.selector.materialKind,
+    backend: Object.freeze({
+      backendId: input.backendKind,
+      backendKind: input.backendKind,
+    }),
+    reference: input.reference,
+    timestamps: Object.freeze({
+      updatedAt: input.reference.updatedAt,
+    }),
+    rotation: Object.freeze({
+      status: toRotationStatus(input.reference.state),
+      currentVersionId: input.reference.currentVersionId,
+    }),
+    policyFlags: Object.freeze({
+      metadataSafeForDiagnostics: true,
+      plaintextAccessRequiresDedicatedRetrievalFlow: true,
+      failFastRequiredOnStartup: input.selector.scope.scope === SecretScopes.server
+        && (
+          input.selector.materialKind === SecretProviderMaterialKinds.providerCredential
+          || input.selector.materialKind === SecretProviderMaterialKinds.signingMaterial
+        )
+        ? true
+        : undefined,
+    }),
+  });
+}
+
+function toRotationStatus(
+  state: SecretReference["state"],
+): typeof SecretProviderMaterialRotationStatuses[keyof typeof SecretProviderMaterialRotationStatuses] {
+  if (state === "active") {
+    return SecretProviderMaterialRotationStatuses.active;
+  }
+  if (state === "disabled") {
+    return SecretProviderMaterialRotationStatuses.disabled;
+  }
+  if (state === "archived") {
+    return SecretProviderMaterialRotationStatuses.archived;
+  }
+  if (state === "soft-deleted") {
+    return SecretProviderMaterialRotationStatuses.softDeleted;
+  }
+  return SecretProviderMaterialRotationStatuses.unknown;
 }

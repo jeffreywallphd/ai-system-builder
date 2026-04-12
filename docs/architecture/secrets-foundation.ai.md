@@ -159,3 +159,22 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
 - Secret exposure minimization:
   - metadata/existence remain available without plaintext retrieval permissions
   - plaintext resolution remains isolated to explicit runtime retrieval flows
+
+## Story 3.2.5 Secret metadata and reference modeling
+
+- adds explicit provider-material metadata modeling in:
+  - `src/application/security/ports/SecretProviderPorts.ts`
+- metadata/reference flows now return `SecretProviderMaterialMetadata` (never raw values) with:
+  - secret identity (`providerId`, `secretId`, `materialKind`)
+  - explicit scope ownership (`server`/`workspace`/`user`)
+  - backend identity (`durable-server-secret-store`, `managed-secret-service`, `local-user-secure-secret-store`)
+  - lifecycle timestamps (`updatedAt`, optional `createdAt`)
+  - rotation posture (`status`, `currentVersionId`)
+  - policy flags (`metadataSafeForDiagnostics`, `plaintextAccessRequiresDedicatedRetrievalFlow`, optional fail-fast flag)
+- provider implementations now emit metadata through this model:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+  - `src/infrastructure/security/secrets/DurableServerSecretStoreBackend.ts`
+  - `src/infrastructure/security/secrets/LocalUserSecureSecretStoreBackend.ts`
+- diagnostics/admin readiness:
+  - system bootstrap result now includes metadata-only `materialMetadata` for resolvable required secrets
+  - secret diagnostics payload includes `bootstrap.materialMetadata` for governance and audit tooling without exposing plaintext

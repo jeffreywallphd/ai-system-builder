@@ -44,6 +44,59 @@ export interface SecretProviderMaterialReference {
   readonly reference: SecretReference;
 }
 
+export const SecretProviderMaterialBackendKinds = Object.freeze({
+  durableServerSecretStore: "durable-server-secret-store",
+  managedSecretService: "managed-secret-service",
+  localUserSecureSecretStore: "local-user-secure-secret-store",
+});
+
+export type SecretProviderMaterialBackendKind =
+  typeof SecretProviderMaterialBackendKinds[keyof typeof SecretProviderMaterialBackendKinds];
+
+export interface SecretProviderMaterialBackendDescriptor {
+  readonly backendId: string;
+  readonly backendKind: SecretProviderMaterialBackendKind;
+}
+
+export const SecretProviderMaterialRotationStatuses = Object.freeze({
+  active: "active",
+  disabled: "disabled",
+  archived: "archived",
+  softDeleted: "soft-deleted",
+  unknown: "unknown",
+});
+
+export type SecretProviderMaterialRotationStatus =
+  typeof SecretProviderMaterialRotationStatuses[keyof typeof SecretProviderMaterialRotationStatuses];
+
+export interface SecretProviderMaterialPolicyFlags {
+  readonly metadataSafeForDiagnostics: true;
+  readonly plaintextAccessRequiresDedicatedRetrievalFlow: true;
+  readonly failFastRequiredOnStartup?: boolean;
+}
+
+export interface SecretProviderMaterialLifecycleTimestamps {
+  readonly createdAt?: string;
+  readonly updatedAt: string;
+}
+
+export interface SecretProviderMaterialRotationMetadata {
+  readonly status: SecretProviderMaterialRotationStatus;
+  readonly currentVersionId?: string;
+}
+
+export interface SecretProviderMaterialMetadata {
+  readonly providerId: string;
+  readonly secretId: string;
+  readonly scope: SecretScopeOwner;
+  readonly materialKind: SecretProviderMaterialKind;
+  readonly backend: SecretProviderMaterialBackendDescriptor;
+  readonly reference: SecretReference;
+  readonly timestamps: SecretProviderMaterialLifecycleTimestamps;
+  readonly rotation: SecretProviderMaterialRotationMetadata;
+  readonly policyFlags: SecretProviderMaterialPolicyFlags;
+}
+
 export interface ResolveSecretProviderMaterialInput {
   readonly selector: SecretProviderMaterialSelector;
   readonly access: SecretProviderAccessContext;
@@ -78,7 +131,7 @@ export type SecretProviderBootstrapOutcome =
 
 export interface SecretProviderBootstrapResult {
   readonly outcome: SecretProviderBootstrapOutcome;
-  readonly reference: SecretProviderMaterialReference;
+  readonly reference: SecretProviderMaterialMetadata;
 }
 
 export interface ISecretProviderMaterialReadPort {
@@ -90,7 +143,7 @@ export interface ISecretProviderMaterialReadPort {
 export interface ISecretProviderMaterialMetadataPort {
   resolveSecretProviderMaterialMetadata(
     input: ResolveSecretProviderMaterialMetadataInput,
-  ): Promise<SecretServiceResult<SecretProviderMaterialReference>>;
+  ): Promise<SecretServiceResult<SecretProviderMaterialMetadata>>;
   secretProviderMaterialExists(
     input: ResolveSecretProviderMaterialExistenceInput,
   ): Promise<SecretServiceResult<{ readonly exists: boolean }>>;

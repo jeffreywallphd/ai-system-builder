@@ -14,15 +14,17 @@ import type {
 } from "@application/security/use-cases/SecretManagementServiceContracts";
 import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretManagementServiceContracts";
 import {
+  SecretProviderMaterialBackendKinds,
   SecretProviderBootstrapOutcomes,
+  SecretProviderMaterialRotationStatuses,
   SecretProviderMaterialKinds,
   type ResolveSecretProviderMaterialExistenceInput,
   type ResolveSecretProviderMaterialInput,
   type ResolveSecretProviderMaterialMetadataInput,
+  type SecretProviderMaterialMetadata,
   type ResolvedSecretProviderMaterialValue,
   type SecretProviderBootstrapResult,
   type SecretProviderMaterialBootstrapInput,
-  type SecretProviderMaterialReference,
 } from "@application/security/ports/SecretProviderPorts";
 
 export interface DurableServerSecretStoreBackendDependencies {
@@ -77,7 +79,7 @@ export class DurableServerSecretStoreBackend {
 
   public async resolveServerMaterialMetadata(
     input: ResolveSecretProviderMaterialMetadataInput,
-  ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
+  ): Promise<SecretServiceResult<SecretProviderMaterialMetadata>> {
     if (input.selector.scope.scope !== SecretScopes.server) {
       return createInvalidScopeResult();
     }
@@ -97,12 +99,10 @@ export class DurableServerSecretStoreBackend {
 
     return {
       ok: true,
-      value: Object.freeze({
-        providerId: input.selector.providerId,
-        secretId: input.selector.secretId,
-        scope: input.selector.scope,
-        materialKind: input.selector.materialKind,
+      value: toSecretProviderMaterialMetadata({
+        selector: input.selector,
         reference: metadata.value,
+        backendKind: SecretProviderMaterialBackendKinds.durableServerSecretStore,
       }),
     };
   }
@@ -201,12 +201,10 @@ export class DurableServerSecretStoreBackend {
       ok: true,
       value: Object.freeze({
         outcome: SecretProviderBootstrapOutcomes.created,
-        reference: Object.freeze({
-          providerId: input.selector.providerId,
-          secretId: input.selector.secretId,
-          scope: input.selector.scope,
-          materialKind: input.selector.materialKind,
+        reference: toSecretProviderMaterialMetadata({
+          selector: input.selector,
           reference: created.value.secret,
+          backendKind: SecretProviderMaterialBackendKinds.durableServerSecretStore,
         }),
       }),
     };
@@ -291,4 +289,53 @@ function normalizeInitializationError(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function toSecretProviderMaterialMetadata(input: {
+  readonly selector: ResolveSecretProviderMaterialInput["selector"];
+  readonly reference: SecretReference;
+  readonly backendKind: typeof SecretProviderMaterialBackendKinds[keyof typeof SecretProviderMaterialBackendKinds];
+}): SecretProviderMaterialMetadata {
+  return Object.freeze({
+    providerId: input.selector.providerId,
+    secretId: input.selector.secretId,
+    scope: input.selector.scope,
+    materialKind: input.selector.materialKind,
+    backend: Object.freeze({
+      backendId: input.backendKind,
+      backendKind: input.backendKind,
+    }),
+    reference: input.reference,
+    timestamps: Object.freeze({
+      updatedAt: input.reference.updatedAt,
+    }),
+    rotation: Object.freeze({
+      status: toRotationStatus(input.reference.state),
+      currentVersionId: input.reference.currentVersionId,
+    }),
+    policyFlags: Object.freeze({
+      metadataSafeForDiagnostics: true,
+      plaintextAccessRequiresDedicatedRetrievalFlow: true,
+      failFastRequiredOnStartup: input.selector.materialKind === SecretProviderMaterialKinds.providerCredential
+        || input.selector.materialKind === SecretProviderMaterialKinds.signingMaterial,
+    }),
+  });
+}
+
+function toRotationStatus(
+  state: SecretReference["state"],
+): typeof SecretProviderMaterialRotationStatuses[keyof typeof SecretProviderMaterialRotationStatuses] {
+  if (state === "active") {
+    return SecretProviderMaterialRotationStatuses.active;
+  }
+  if (state === "disabled") {
+    return SecretProviderMaterialRotationStatuses.disabled;
+  }
+  if (state === "archived") {
+    return SecretProviderMaterialRotationStatuses.archived;
+  }
+  if (state === "soft-deleted") {
+    return SecretProviderMaterialRotationStatuses.softDeleted;
+  }
+  return SecretProviderMaterialRotationStatuses.unknown;
 }

@@ -2,14 +2,16 @@ import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { SecretKinds, SecretScopes, type SecretReference, type SecretReferenceMetadata } from "@domain/security/SecretDomain";
 import {
+  SecretProviderMaterialBackendKinds,
   SecretProviderBootstrapOutcomes,
+  SecretProviderMaterialRotationStatuses,
   type ResolveSecretProviderMaterialExistenceInput,
   type ResolveSecretProviderMaterialInput,
   type ResolveSecretProviderMaterialMetadataInput,
+  type SecretProviderMaterialMetadata,
   type ResolvedSecretProviderMaterialValue,
   type SecretProviderBootstrapResult,
   type SecretProviderMaterialBootstrapInput,
-  type SecretProviderMaterialReference,
 } from "@application/security/ports/SecretProviderPorts";
 import {
   SecretServiceErrorCodes,
@@ -68,7 +70,7 @@ export class LocalUserSecureSecretStoreBackend {
 
   public async resolveUserMaterialMetadata(
     input: ResolveSecretProviderMaterialMetadataInput,
-  ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
+  ): Promise<SecretServiceResult<SecretProviderMaterialMetadata>> {
     if (input.selector.scope.scope !== SecretScopes.user) {
       return createInvalidScopeResult();
     }
@@ -81,12 +83,10 @@ export class LocalUserSecureSecretStoreBackend {
     const reference = await this.resolveReference(input.selector, material);
     return {
       ok: true,
-      value: Object.freeze({
-        providerId: input.selector.providerId,
-        secretId: input.selector.secretId,
-        scope: input.selector.scope,
-        materialKind: input.selector.materialKind,
+      value: toSecretProviderMaterialMetadata({
+        selector: input.selector,
         reference,
+        backendKind: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
       }),
     };
   }
@@ -121,12 +121,10 @@ export class LocalUserSecureSecretStoreBackend {
         ok: true,
         value: Object.freeze({
           outcome: SecretProviderBootstrapOutcomes.existing,
-          reference: Object.freeze({
-            providerId: input.selector.providerId,
-            secretId: input.selector.secretId,
-            scope: input.selector.scope,
-            materialKind: input.selector.materialKind,
+          reference: toSecretProviderMaterialMetadata({
+            selector: input.selector,
             reference,
+            backendKind: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
           }),
         }),
       };
@@ -152,11 +150,9 @@ export class LocalUserSecureSecretStoreBackend {
       ok: true,
       value: Object.freeze({
         outcome: SecretProviderBootstrapOutcomes.created,
-        reference: Object.freeze({
-          providerId: input.selector.providerId,
-          secretId: input.selector.secretId,
-          scope: input.selector.scope,
-          materialKind: input.selector.materialKind,
+        reference: toSecretProviderMaterialMetadata({
+          selector: input.selector,
+          backendKind: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
           reference: Object.freeze({
             secretId: input.selector.secretId,
             name: metadataRecord.name,
@@ -402,4 +398,51 @@ function normalizeError(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function toSecretProviderMaterialMetadata(input: {
+  readonly selector: ResolveSecretProviderMaterialInput["selector"];
+  readonly reference: SecretReference;
+  readonly backendKind: typeof SecretProviderMaterialBackendKinds[keyof typeof SecretProviderMaterialBackendKinds];
+}): SecretProviderMaterialMetadata {
+  return Object.freeze({
+    providerId: input.selector.providerId,
+    secretId: input.selector.secretId,
+    scope: input.selector.scope,
+    materialKind: input.selector.materialKind,
+    backend: Object.freeze({
+      backendId: input.backendKind,
+      backendKind: input.backendKind,
+    }),
+    reference: input.reference,
+    timestamps: Object.freeze({
+      updatedAt: input.reference.updatedAt,
+    }),
+    rotation: Object.freeze({
+      status: toRotationStatus(input.reference.state),
+      currentVersionId: input.reference.currentVersionId,
+    }),
+    policyFlags: Object.freeze({
+      metadataSafeForDiagnostics: true,
+      plaintextAccessRequiresDedicatedRetrievalFlow: true,
+    }),
+  });
+}
+
+function toRotationStatus(
+  state: SecretReference["state"],
+): typeof SecretProviderMaterialRotationStatuses[keyof typeof SecretProviderMaterialRotationStatuses] {
+  if (state === "active") {
+    return SecretProviderMaterialRotationStatuses.active;
+  }
+  if (state === "disabled") {
+    return SecretProviderMaterialRotationStatuses.disabled;
+  }
+  if (state === "archived") {
+    return SecretProviderMaterialRotationStatuses.archived;
+  }
+  if (state === "soft-deleted") {
+    return SecretProviderMaterialRotationStatuses.softDeleted;
+  }
+  return SecretProviderMaterialRotationStatuses.unknown;
 }

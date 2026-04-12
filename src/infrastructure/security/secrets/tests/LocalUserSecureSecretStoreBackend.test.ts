@@ -92,6 +92,7 @@ describe("LocalUserSecureSecretStoreBackend", () => {
     if (metadata.ok) {
       expect(metadata.value.reference.name).toBe("provider.openai.local-user-key");
       expect(metadata.value.reference.metadata.tags).toEqual(["user", "local"]);
+      expect((metadata.value as Record<string, unknown>).rawValue).toBeUndefined();
     }
     expect(resolved.ok).toBeTrue();
     if (resolved.ok) {

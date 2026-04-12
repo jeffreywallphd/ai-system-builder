@@ -8,7 +8,11 @@ import {
   type GetSecretMetadataRequest,
   type SecretServiceResult,
 } from "@application/security/use-cases/SecretManagementServiceContracts";
-import { SecretProviderMaterialKinds } from "@application/security/ports/SecretProviderPorts";
+import {
+  SecretProviderMaterialBackendKinds,
+  SecretProviderMaterialKinds,
+  SecretProviderMaterialRotationStatuses,
+} from "@application/security/ports/SecretProviderPorts";
 import { DefaultSecretProviderResolutionService } from "@infrastructure/security/DefaultSecretProviderResolutionService";
 import { LocalUserSecureSecretStoreBackend } from "@infrastructure/security/secrets/LocalUserSecureSecretStoreBackend";
 
@@ -414,6 +418,10 @@ describe("DefaultSecretProviderResolutionService", () => {
           userIdentityId: "user:alpha",
         },
         materialKind: SecretProviderMaterialKinds.providerCredential,
+        backend: {
+          backendId: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
+          backendKind: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
+        },
         reference: createReference({
           secretId: "secret:user:provider:openai",
           name: "provider.openai.local-user-key",
@@ -425,6 +433,17 @@ describe("DefaultSecretProviderResolutionService", () => {
           },
           updatedAt: "2026-04-09T00:00:00.000Z",
         }),
+        timestamps: {
+          updatedAt: "2026-04-09T00:00:00.000Z",
+        },
+        rotation: {
+          status: SecretProviderMaterialRotationStatuses.active,
+          currentVersionId: "secret:user:provider:openai:v1",
+        },
+        policyFlags: {
+          metadataSafeForDiagnostics: true,
+          plaintextAccessRequiresDedicatedRetrievalFlow: true,
+        },
       },
     };
     localBackend.bootstrapResult = {
@@ -440,6 +459,10 @@ describe("DefaultSecretProviderResolutionService", () => {
             userIdentityId: "user:alpha",
           },
           materialKind: SecretProviderMaterialKinds.providerCredential,
+          backend: {
+            backendId: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
+            backendKind: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
+          },
           reference: createReference({
             secretId: "secret:user:provider:openai",
             name: "provider.openai.local-user-key",
@@ -451,6 +474,17 @@ describe("DefaultSecretProviderResolutionService", () => {
             },
             updatedAt: "2026-04-09T00:00:00.000Z",
           }),
+          timestamps: {
+            updatedAt: "2026-04-09T00:00:00.000Z",
+          },
+          rotation: {
+            status: SecretProviderMaterialRotationStatuses.active,
+            currentVersionId: "secret:user:provider:openai:v1",
+          },
+          policyFlags: {
+            metadataSafeForDiagnostics: true,
+            plaintextAccessRequiresDedicatedRetrievalFlow: true,
+          },
         },
       },
     };
@@ -498,6 +532,9 @@ describe("DefaultSecretProviderResolutionService", () => {
       expect(resolved.value.rawValue).toBe("sk-local-user");
     }
     expect(metadata.ok).toBeTrue();
+    if (metadata.ok) {
+      expect((metadata.value as Record<string, unknown>).rawValue).toBeUndefined();
+    }
     expect(bootstrapped.ok).toBeTrue();
     expect(localBackend.resolveCalls).toHaveLength(1);
     expect(localBackend.metadataCalls).toHaveLength(1);

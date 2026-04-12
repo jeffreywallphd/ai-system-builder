@@ -1016,6 +1016,48 @@ function sanitizeSecretServiceOperationalDiagnostics(
         message: toSafeClientErrorMessage(entry.message, "Secret service diagnostic emitted."),
         secretId: normalizeOptional(entry.secretId),
       }))),
+      materialMetadata: Object.freeze(input.bootstrap.materialMetadata.map((item) => Object.freeze({
+        providerId: normalizeOptional(item.providerId) ?? "",
+        secretId: normalizeOptional(item.secretId) ?? "",
+        scope: item.scope,
+        workspaceId: normalizeOptional(item.workspaceId),
+        userIdentityId: normalizeOptional(item.userIdentityId),
+        materialKind: normalizeOptional(item.materialKind) ?? "generic",
+        backend: Object.freeze({
+          backendId: normalizeOptional(item.backend.backendId) ?? "unknown",
+          backendKind: normalizeOptional(item.backend.backendKind) ?? "unknown",
+        }),
+        reference: Object.freeze({
+          secretId: normalizeOptional(item.reference.secretId) ?? "",
+          name: normalizeOptional(item.reference.name) ?? "",
+          scope: item.reference.scope,
+          workspaceId: normalizeOptional(item.reference.workspaceId),
+          userIdentityId: normalizeOptional(item.reference.userIdentityId),
+          kind: normalizeOptional(item.reference.kind) ?? "generic",
+          state: normalizeOptional(item.reference.state) ?? "active",
+          currentVersionId: normalizeOptional(item.reference.currentVersionId),
+          metadata: Object.freeze({
+            displayName: normalizeOptional(item.reference.metadata.displayName),
+            description: normalizeOptional(item.reference.metadata.description),
+            tags: Object.freeze(item.reference.metadata.tags.map((tag) => normalizeOptional(tag)).filter(Boolean) as string[]),
+            labels: Object.freeze({ ...item.reference.metadata.labels }),
+          }),
+          updatedAt: item.reference.updatedAt,
+        }),
+        timestamps: Object.freeze({
+          createdAt: normalizeOptional(item.timestamps.createdAt),
+          updatedAt: item.timestamps.updatedAt,
+        }),
+        rotation: Object.freeze({
+          status: normalizeOptional(item.rotation.status) ?? "unknown",
+          currentVersionId: normalizeOptional(item.rotation.currentVersionId),
+        }),
+        policyFlags: Object.freeze({
+          metadataSafeForDiagnostics: true,
+          plaintextAccessRequiresDedicatedRetrievalFlow: true,
+          failFastRequiredOnStartup: item.policyFlags.failFastRequiredOnStartup,
+        }),
+      }))),
     }),
   });
 }

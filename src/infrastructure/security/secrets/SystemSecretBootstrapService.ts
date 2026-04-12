@@ -28,6 +28,7 @@ import { ServerPlatformProviderIds } from "./ServerPlatformSecretConsumers";
 import {
   SecretProviderMaterialKinds,
   type ISecretProviderMaterialResolutionPort,
+  type SecretProviderMaterialMetadata,
   type SecretProviderMaterialSelector,
 } from "@application/security/ports/SecretProviderPorts";
 import { ScopedSecretProviderMaterialRetrievalUseCase } from "@application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase";
@@ -187,6 +188,7 @@ export interface SystemSecretBootstrapResult {
   readonly state: SystemSecretBootstrapState;
   readonly requiredSecretIds: ReadonlyArray<string>;
   readonly migratedSecretIds: ReadonlyArray<string>;
+  readonly materialMetadata: ReadonlyArray<SecretProviderMaterialMetadata>;
   readonly diagnostics: ReadonlyArray<SystemSecretBootstrapDiagnostic>;
 }
 
@@ -218,12 +220,14 @@ export async function bootstrapSystemSecretsFromEnvironment(
       state: SystemSecretBootstrapStates.ready,
       requiredSecretIds,
       migratedSecretIds: Object.freeze([]),
+      materialMetadata: Object.freeze([]),
       diagnostics: Object.freeze([]),
     });
   }
 
   const diagnostics: SystemSecretBootstrapDiagnostic[] = [];
   const migratedSecretIds: string[] = [];
+  const materialMetadata: SecretProviderMaterialMetadata[] = [];
   const migrationEnabled = parseOptionalBoolean(
     input.env[SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.migrateLegacyEnvironmentValues],
   ) ?? true;
@@ -313,6 +317,8 @@ export async function bootstrapSystemSecretsFromEnvironment(
       continue;
     }
 
+    let shouldResolveMetadata = metadataExists.value.exists;
+
     if (!metadataExists.value.exists) {
       const legacyEnvironmentVariable = definition.legacyEnvironmentVariable;
       const legacyValue = legacyEnvironmentVariable
@@ -364,6 +370,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
         }
 
         migratedSecretIds.push(definition.secretId);
+        shouldResolveMetadata = true;
       } else {
         diagnostics.push(Object.freeze({
           code: failFastRequired
@@ -381,6 +388,39 @@ export async function bootstrapSystemSecretsFromEnvironment(
         }));
         continue;
       }
+    }
+
+    if (shouldResolveMetadata) {
+      const metadataResult = await scopedSecretProviderRetrievalUseCase.getServerScopedSecretProviderMaterialMetadata({
+        caller: createBootstrapScopeCheckActor(),
+        providerId: selector.providerId,
+        secretId: selector.secretId,
+        materialKind: selector.materialKind,
+        access: {
+          operationKey: `op:system-secret-bootstrap:metadata-details:${definition.secretId}:${now().getTime()}`,
+          serviceIdentity: "runtime:server:system-secret-bootstrap",
+          usage: "system-secret-bootstrap-metadata-details",
+          occurredAt: now().toISOString(),
+        },
+      });
+      if (!metadataResult.ok) {
+        diagnostics.push(Object.freeze({
+          code: failFastRequired
+            ? SystemSecretBootstrapDiagnosticCodes.requiredSecretUnusable
+            : SystemSecretBootstrapDiagnosticCodes.optionalSecretUnusable,
+          secretId: definition.secretId,
+          message: failFastRequired
+            ? `Required system secret metadata details could not be resolved (${metadataResult.error.code}).`
+            : `Optional startup secret metadata details could not be resolved (${metadataResult.error.code}).`,
+          severity: failFastRequired ? "error" : "warning",
+          startupRequirement: policy.startupRequirement,
+          durabilityClass: policy.durabilityClass,
+          fallbackPolicy: policy.fallbackPolicy,
+        }));
+        continue;
+      }
+
+      materialMetadata.push(metadataResult.value);
     }
 
     const runtimeCheck = await scopedSecretProviderRetrievalUseCase.retrieveServerScopedSecretProviderMaterial({
@@ -422,6 +462,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
     state,
     requiredSecretIds,
     migratedSecretIds: Object.freeze([...new Set(migratedSecretIds)]),
+    materialMetadata: Object.freeze(deduplicateMaterialMetadataBySecretId(materialMetadata)),
     diagnostics: Object.freeze([...diagnostics]),
   });
 }
@@ -512,4 +553,14 @@ function createSystemSecretMaterialSelector(
       ? SecretProviderMaterialKinds.providerCredential
       : SecretProviderMaterialKinds.signingMaterial,
   });
+}
+
+function deduplicateMaterialMetadataBySecretId(
+  metadata: ReadonlyArray<SecretProviderMaterialMetadata>,
+): ReadonlyArray<SecretProviderMaterialMetadata> {
+  const bySecretId = new Map<string, SecretProviderMaterialMetadata>();
+  for (const item of metadata) {
+    bySecretId.set(item.secretId, item);
+  }
+  return Object.freeze([...bySecretId.values()]);
 }
