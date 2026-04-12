@@ -158,6 +158,100 @@ describe("SystemSecretBootstrapService", () => {
     }
   });
 
+  it("creates missing identity-session signing material through bootstrap policy and reuses it across restart", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-signing-create-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "identity.sqlite");
+    const env = {
+      AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+      AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 16).toString("base64"),
+      AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+    };
+
+    const serviceOne = composeServerSecretService({
+      databasePath,
+      env,
+    });
+
+    let firstSigningKey = "";
+    try {
+      const firstResult = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:signing:identity-session",
+          AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV: "false",
+        },
+        secretService: serviceOne,
+      });
+
+      expect(firstResult.state).toBe(SystemSecretBootstrapStates.ready);
+      expect(firstResult.migratedSecretIds).toEqual([]);
+      expect(firstResult.diagnostics).toEqual([]);
+
+      const metadata = await serviceOne.getSecretMetadataUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.readMetadata],
+        },
+        secretId: "secret:server:signing:identity-session",
+      });
+      expect(metadata.ok).toBeTrue();
+      if (!metadata.ok) {
+        return;
+      }
+      expect(metadata.value.metadata.tags).toContain("bootstrap-generated");
+
+      const runtimeValue = await serviceOne.runtimeSecretConsumptionAdapters.resolveServerSigningCredential({
+        secretId: "secret:server:signing:identity-session",
+        operationKey: "op:test:system-secret-bootstrap:signing:first",
+        serviceIdentity: "runtime:test",
+        signingPurpose: "identity-session-token-signing",
+      });
+      expect(runtimeValue.ok).toBeTrue();
+      if (!runtimeValue.ok) {
+        return;
+      }
+      firstSigningKey = runtimeValue.value.credential;
+      expect(firstSigningKey).toContain("BEGIN PRIVATE KEY");
+    } finally {
+      serviceOne.dispose();
+    }
+
+    const serviceTwo = composeServerSecretService({
+      databasePath,
+      env,
+    });
+
+    try {
+      const secondResult = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:signing:identity-session",
+          AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV: "false",
+        },
+        secretService: serviceTwo,
+      });
+
+      expect(secondResult.state).toBe(SystemSecretBootstrapStates.ready);
+      expect(secondResult.migratedSecretIds).toEqual([]);
+      expect(secondResult.diagnostics).toEqual([]);
+
+      const runtimeValue = await serviceTwo.runtimeSecretConsumptionAdapters.resolveServerSigningCredential({
+        secretId: "secret:server:signing:identity-session",
+        operationKey: "op:test:system-secret-bootstrap:signing:second",
+        serviceIdentity: "runtime:test",
+        signingPurpose: "identity-session-token-signing",
+      });
+      expect(runtimeValue.ok).toBeTrue();
+      if (!runtimeValue.ok) {
+        return;
+      }
+
+      expect(runtimeValue.value.credential).toBe(firstSigningKey);
+    } finally {
+      serviceTwo.dispose();
+    }
+  });
+
   it("treats identity-session signing material as optional development-ephemeral when missing in development", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-dev-optional-"));
     createdRoots.push(root);

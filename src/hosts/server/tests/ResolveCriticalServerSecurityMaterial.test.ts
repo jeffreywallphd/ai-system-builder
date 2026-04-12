@@ -157,7 +157,7 @@ describe("ResolveCriticalServerSecurityMaterial", () => {
     expect(providerPort.resolveCalls).toBe(1);
   });
 
-  it("falls back to legacy configured material and attempts provider bootstrap when provider material is missing", async () => {
+  it("falls back to legacy configured material without mutating provider state on runtime lookup", async () => {
     const providerPort = createNotFoundProviderResolutionPort();
 
     const resolved = await resolveCriticalServerSecurityMaterial({
@@ -173,7 +173,7 @@ describe("ResolveCriticalServerSecurityMaterial", () => {
 
     expect(resolved).toBe("legacy-asset-download-grant");
     expect(providerPort.resolveCalls).toBe(1);
-    expect(providerPort.bootstrapCalls).toBe(1);
+    expect(providerPort.bootstrapCalls).toBe(0);
   });
 });
 

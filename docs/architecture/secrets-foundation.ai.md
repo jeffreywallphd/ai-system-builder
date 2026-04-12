@@ -225,3 +225,17 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
   - `src/application/security/tests/SecurityMaterialKeyHierarchyContract.test.ts`
   - updates to `src/application/security/tests/SecurityMaterialClassificationContract.test.ts`
   - updates to `src/application/security/tests/SecurityMaterialStartupValidationPipeline.test.ts`
+
+## Story 3.3.2 Key Bootstrap and Creation Policies
+
+- adds explicit bootstrap creation policy handling in:
+  - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
+- governed bootstrap creation order for identity-session signing material:
+  - migrate from legacy env when available and migration is enabled
+  - otherwise generate Ed25519 PKCS#8 private key material during bootstrap and persist through provider bootstrap port
+- bootstrap-created signing material now carries bootstrap source/policy metadata tags/labels for diagnostics and later rotation workflows
+- removes incidental runtime mutation:
+  - `src/hosts/server/composition/ResolveCriticalServerSecurityMaterial.ts` now performs read-only resolution and does not bootstrap-write provider records during lookup
+- regression coverage:
+  - updates to `src/infrastructure/security/secrets/tests/SystemSecretBootstrapService.test.ts`
+  - updates to `src/hosts/server/tests/ResolveCriticalServerSecurityMaterial.test.ts`
