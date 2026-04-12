@@ -239,7 +239,7 @@ export class IdentityAuthSessionCoordinator {
         }),
         initialCapabilityState: deriveInitialCapabilityState(actorContext.data),
       });
-      this.sessionStore.saveSession(hydratedSession);
+      this.persistHydratedSession(hydratedSession);
       this.publishProgress(options, {
         stageId: AppInitializationStageIds.ready,
       });
@@ -272,6 +272,27 @@ export class IdentityAuthSessionCoordinator {
       stageId: update.stageId,
       detail: update.detail,
     }));
+  }
+
+  private persistHydratedSession(session: IdentityAuthPersistedSession): void {
+    const startedAt = Date.now();
+    logInitDiagnostic("sessionStore.saveSession:start", Object.freeze({
+      startedAt: new Date(startedAt).toISOString(),
+    }));
+    try {
+      this.sessionStore.saveSession(session);
+      logInitDiagnostic("sessionStore.saveSession:end", Object.freeze({
+        durationMs: Date.now() - startedAt,
+        endedAt: new Date().toISOString(),
+      }));
+    } catch (error) {
+      logInitDiagnostic("sessionStore.saveSession:failure", Object.freeze({
+        durationMs: Date.now() - startedAt,
+        endedAt: new Date().toISOString(),
+        errorMessage: error instanceof Error ? error.message : String(error),
+      }));
+      throw error;
+    }
   }
 
   private async resolveSessionActorContextWithTiming(
