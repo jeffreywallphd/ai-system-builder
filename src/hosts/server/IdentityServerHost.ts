@@ -251,6 +251,9 @@ import { composeServerSecretCompositionModule } from "./composition/ServerSecret
 import { composeServerCertificateCompositionModule } from "./composition/ServerCertificateCompositionModule";
 import { composeServerNodeTrustCompositionModule } from "./composition/ServerNodeTrustCompositionModule";
 import { composeServerTlsMaterialCompositionModule } from "./composition/ServerTlsMaterialCompositionModule";
+import { composeServerStorageAssetCompositionModule } from "./composition/ServerStorageAssetCompositionModule";
+import { composeServerImageMediaCompositionModule } from "./composition/ServerImageMediaCompositionModule";
+import { composeServerGeneratedResultCompositionModule } from "./composition/ServerGeneratedResultCompositionModule";
 import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   evaluateTransportConnectionTrust,
@@ -345,12 +348,6 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const executionNodeRepository = persistentPlatformServices.executionNodeRepository;
   const nodeTrustAuditRecorder = persistentPlatformServices.nodeTrustAuditRecorder;
   const certificateAuthorityRepository = persistentPlatformServices.certificateAuthorityRepository;
-  const storageInstanceRepository = persistentPlatformServices.storageInstanceRepository;
-  const storageManagementAuditRecorder = persistentPlatformServices.storageManagementAuditRecorder;
-  const assetRepository = persistentPlatformServices.assetRepository;
-  const assetAuditRecorder = persistentPlatformServices.assetAuditRecorder;
-  const assetUploadSessionRepository = persistentPlatformServices.assetUploadSessionRepository;
-  const imageAssetRepository = new SqliteImageAssetPersistenceAdapter(databasePath);
   const env = options.env ?? process.env;
   const hostAddress = options.host ?? "127.0.0.1";
   const secureTransportConfig = resolveHostSecureTransportConfig({
@@ -370,6 +367,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   let secretService: ServerComposedSecretService | undefined;
   let identitySessionTrustedDeviceComposition:
     | ServerIdentitySessionTrustedDeviceCompositionModuleOutput
+    | undefined;
+  let imageMediaComposition:
+    | ReturnType<typeof composeServerImageMediaCompositionModule>
     | undefined;
   try {
     const auditRetentionLifecycleConfig = await runStartupStepSpan({
@@ -485,201 +485,29 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     });
     const nodeTrustBackendApi = nodeTrustComposition.nodeTrustBackendApi;
     const executionNodeManagementBackendApi = nodeTrustComposition.executionNodeManagementBackendApi;
-  const managedStorageRootPath = resolveManagedStorageRootPath(path.resolve(options.databasePath), env);
-  const localStorageBackendAdapter = new ServerManagedLocalStorageBackendAdapter({
-    managedStorageRootPath,
+  const storageAssetComposition = composeServerStorageAssetCompositionModule({
+    databasePath: options.databasePath,
+    env,
+    persistentPlatformServices,
+    authoritativeAuditRecorder,
+    encryptionObservabilityLogger: createEncryptionOperationalLogger(options.logger),
   });
-  const localStorageObjectAdapter = new ServerManagedLocalStorageObjectAdapter({
-    managedStorageRootPath,
-  });
-  const storageBackendAdapterRegistry = createStorageBackendAdapterRegistry([{
-    backendType: "managed-filesystem",
-    provisioningPort: localStorageBackendAdapter,
-    capabilityInspectionPort: localStorageBackendAdapter,
-    objectPort: localStorageObjectAdapter,
-  }]);
-  const storageProvisioningOrchestrator = new StorageBackendProvisioningOrchestrator(
-    storageBackendAdapterRegistry,
-  );
-  const storageSynchronizationAdapter = new ServerManagedStorageSynchronizationAdapter({
-    availability: resolveStorageSyncDeploymentAvailability(env),
-  });
-  const workspaceAwareStoragePolicyEvaluationAdapter = new WorkspaceAwareStoragePolicyEvaluationAdapter({
-    workspaceAuthorizationReadRepository: workspaceRepository,
-  });
-  const storageManagementService = new StorageManagementService({
-    repository: storageInstanceRepository,
-    policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
-    provisioningPort: storageProvisioningOrchestrator,
-    capabilityPort: storageProvisioningOrchestrator,
-    auditSink: new FanoutStorageManagementAuditSink([
-      storageManagementAuditRecorder,
-      new AuthoritativeStorageManagementAuditSink(authoritativeAuditRecorder),
-    ]),
-  });
-  const assetAuditSink = new FanoutAssetAuditSink([
-    assetAuditRecorder,
-    new AuthoritativeProtectedAssetAuditSink(authoritativeAuditRecorder),
-  ]);
-  const storageManagementBackendApi = new StorageManagementBackendApi({
-    storageManagementService,
-    capabilityInspectionPort: storageProvisioningOrchestrator,
-    synchronizationAdapter: storageSynchronizationAdapter,
-  });
-  const assetUploadInitiationService = new AssetUploadInitiationService({
-    repository: assetRepository,
-    uploadSessionRepository: assetUploadSessionRepository,
-    workspaceAuthorizationReadRepository: workspaceRepository,
-    storageInstanceRepository,
-    storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
-    auditSink: assetAuditSink,
-  });
-  const assetGeneratedOutputRegistrationService = new AssetGeneratedOutputRegistrationService({
-    repository: assetRepository,
-    workspaceAuthorizationReadRepository: workspaceRepository,
-    storageInstanceRepository,
-    storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
-    auditSink: assetAuditSink,
-  });
-  const storageLogicalAccessResolutionService = new StorageLogicalAccessResolutionService({
-    repository: storageInstanceRepository,
-    policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
-    objectAccessResolver: storageBackendAdapterRegistry,
-  });
-  const assetContentKeyPort = new DeterministicScopeEncryptionKeyPort({
-    encodedKey: resolveAssetContentEncryptionKey(env),
-    keyPrefix: normalizeOptional(env.AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY_PREFIX) ?? "kek:asset-content",
-  });
-  const assetEncryptionPolicyContextResolver = new WorkspaceStorageEncryptionPolicyContextResolver({
-    workspaceRepository,
-    storageInstanceRepository,
-  });
-  const encryptionObservabilityReporter = new EncryptionEnforcementObservabilityReporter({
-    logger: createEncryptionOperationalLogger(options.logger),
-  });
-  const assetEncryptionPolicyEvaluationService = new EncryptionPolicyEvaluationService({
-    encryptionAtRestPolicyContextResolverPort: assetEncryptionPolicyContextResolver,
-    observabilityPort: encryptionObservabilityReporter,
-  });
-  const assetEncryptionKeyResolutionService = new EncryptionKeyResolutionService({
-    encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
-    encryptionKeyCatalogPort: assetContentKeyPort,
-    observabilityPort: encryptionObservabilityReporter,
-  });
-  const assetContentCipherPort = new AesGcmAssetContentCipherPort({
-    keyMaterialPort: assetContentKeyPort,
-  });
-  const assetUploadIngestionService = new AssetUploadIngestionService({
-    repository: assetRepository,
-    uploadSessionRepository: assetUploadSessionRepository,
+  const storageManagementBackendApi = storageAssetComposition.storageManagementBackendApi;
+  const assetManagementBackendApi = storageAssetComposition.assetManagementBackendApi;
+  const storageLogicalAccessResolutionService = storageAssetComposition.storageLogicalAccessResolutionService;
+  const workspaceAwareStoragePolicyEvaluationAdapter = storageAssetComposition.workspaceAwareStoragePolicyEvaluationAdapter;
+  const assetEncryptionPolicyEvaluationService = storageAssetComposition.assetEncryptionPolicyEvaluationService;
+  imageMediaComposition = composeServerImageMediaCompositionModule({
+    databasePath,
+    env,
+    persistentPlatformServices,
+    authorizationDecisionEvaluator,
+    authoritativeAuditRecorder,
+    imageAssetObservabilityLogger: createImageAssetManagementOperationalLogger(options.logger),
     storageLogicalAccessResolutionService,
-    encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
-    encryptionKeyResolutionService: assetEncryptionKeyResolutionService,
-    assetContentCipherPort,
-    encryptionObservabilityPort: encryptionObservabilityReporter,
-    auditSink: assetAuditSink,
+    workspaceAwareStoragePolicyEvaluationAdapter,
   });
-  const assetDiscoveryService = new AssetDiscoveryService({
-    repository: assetRepository,
-    workspaceAuthorizationReadRepository: workspaceRepository,
-    auditSink: assetAuditSink,
-  });
-  const assetDetailService = new AssetDetailService({
-    repository: assetRepository,
-    workspaceAuthorizationReadRepository: workspaceRepository,
-    auditSink: assetAuditSink,
-  });
-  const assetDownloadGrantAdapter = new EncryptedAssetDownloadGrantAdapter({
-    secret: resolveAssetDownloadGrantSecret(env),
-  });
-  const assetDownloadService = new AssetDownloadService({
-    repository: assetRepository,
-    workspaceAuthorizationReadRepository: workspaceRepository,
-    storageLogicalAccessResolutionService,
-    downloadGrantPort: assetDownloadGrantAdapter,
-    encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
-    assetContentCipherPort,
-    encryptionObservabilityPort: encryptionObservabilityReporter,
-    auditSink: assetAuditSink,
-  });
-  const assetPreviewService = new AssetPreviewService({
-    repository: assetRepository,
-    workspaceAuthorizationReadRepository: workspaceRepository,
-    auditSink: assetAuditSink,
-  });
-  const assetLifecycleService = new AssetLifecycleService({
-    repository: assetRepository,
-    workspaceAuthorizationReadRepository: workspaceRepository,
-    auditSink: assetAuditSink,
-  });
-  const assetManagementBackendApi = new AssetManagementBackendApi({
-    uploadInitiationService: assetUploadInitiationService,
-    generatedOutputRegistrationService: assetGeneratedOutputRegistrationService,
-    uploadIngestionService: assetUploadIngestionService,
-    discoveryService: assetDiscoveryService,
-    detailService: assetDetailService,
-    downloadService: assetDownloadService,
-    previewService: assetPreviewService,
-    lifecycleService: assetLifecycleService,
-  });
-  const imageAssetStorageAdapter = new ManagedImageAssetStorageAdapter({
-    storageLogicalAccessResolutionService,
-    tokenSecret: resolveImageAssetStorageTokenSecret(env),
-  });
-  const imageAssetAuditSink = new AuthoritativeImageAssetAuditSink(authoritativeAuditRecorder);
-  const imageAssetManagementBackendApi = new ImageAssetManagementBackendApi({
-    initiateImageAssetCreationUseCase: new InitiateImageAssetCreationUseCase({
-      imageAssetRepository,
-      imageAssetStoragePort: imageAssetStorageAdapter,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      storageInstanceRepository,
-      storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
-      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
-      auditSink: imageAssetAuditSink,
-    }),
-    finalizeImageAssetUploadUseCase: new FinalizeImageAssetUploadUseCase({
-      imageAssetRepository,
-      imageAssetStoragePort: imageAssetStorageAdapter,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      auditSink: imageAssetAuditSink,
-    }),
-    getImageAssetMetadataUseCase: new GetImageAssetMetadataUseCase({
-      imageAssetRepository,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
-    }),
-    listImageAssetMetadataUseCase: new ListImageAssetMetadataUseCase({
-      imageAssetRepository,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
-    }),
-    getImageAssetOriginalContentUseCase: new GetImageAssetOriginalContentUseCase({
-      imageAssetRepository,
-      imageAssetStoragePort: imageAssetStorageAdapter,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
-      auditSink: imageAssetAuditSink,
-    }),
-    requestImageAssetPreviewContentUseCase: new RequestImageAssetPreviewContentUseCase({
-      imageAssetRepository,
-      imageAssetStoragePort: imageAssetStorageAdapter,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
-      auditSink: imageAssetAuditSink,
-    }),
-    openImageAssetPreviewContentUseCase: new OpenImageAssetPreviewContentUseCase({
-      imageAssetRepository,
-      imageAssetStoragePort: imageAssetStorageAdapter,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
-      auditSink: imageAssetAuditSink,
-    }),
-    imageAssetStoragePort: imageAssetStorageAdapter,
-    uploadSessionTokenSecret: resolveImageAssetUploadSessionTokenSecret(env),
-    observability: new ImageAssetManagementObservability({
-      logger: createImageAssetManagementOperationalLogger(options.logger),
-    }),
-  });
+  const imageAssetManagementBackendApi = imageMediaComposition.imageAssetManagementBackendApi;
   const runSubmissionAuditSink = new PlatformRunSubmissionAuditSink(
     persistentPlatformServices.platformPersistenceRepository,
   );
@@ -687,11 +515,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     runSubmissionAuditSink,
     new AuthoritativeRunSubmissionAuditSink(authoritativeAuditRecorder),
   ]);
+  const executionNodeManagementAuditSink = new AuthoritativeExecutionNodeManagementAuditSink(
+    authoritativeAuditRecorder,
+  );
   const validateRunSubmissionUseCase = new ValidateRunSubmissionUseCase({
     workspaceRepository,
     authorizationDecisionEvaluator,
-    targetResolver: new AssetBackedRunSubmissionTargetResolver(assetRepository),
-    storageInstanceRepository,
+    targetResolver: new AssetBackedRunSubmissionTargetResolver(persistentPlatformServices.assetRepository),
+    storageInstanceRepository: persistentPlatformServices.storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
     deploymentSchedulingPolicyEvaluationPort: options.deploymentPolicyBootstrap?.evaluationService,
@@ -721,7 +552,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const imageRunSubmissionReadinessValidationService = new ImageRunSubmissionReadinessValidationService({
     workflowRepository: persistentPlatformServices.imageWorkflowSystemRepository,
     systemRepository: persistentPlatformServices.imageWorkflowSystemRepository,
-    assetRepository,
+    assetRepository: persistentPlatformServices.assetRepository,
     authorizationDecisionEvaluator,
     executionReadinessUseCase: getImageManipulationExecutionReadinessUseCase,
     now: () => workspaceClock.now(),
@@ -780,65 +611,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     observability: auditLedgerObservability,
   });
-  const generatedResultPreviewAccessPort = new TokenizedGeneratedResultPreviewAccessPort(
-    resolveGeneratedResultPreviewAccessTokenSecret(env),
-  );
-  const generatedResultAuditSink = new AuthoritativeGeneratedResultAuditSink(authoritativeAuditRecorder);
-  const generatedResultPreviewGenerationUseCase = new GenerateGeneratedResultPreviewUseCase({
-    generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+  const generatedResultComposition = composeServerGeneratedResultCompositionModule({
+    env,
+    persistentPlatformServices,
+    workspaceClock,
+    authoritativeAuditRecorder,
     storageLogicalAccessResolutionService,
-    previewImageProcessorPort: new SharpGeneratedResultPreviewImageProcessor(),
-    previewAccessPort: generatedResultPreviewAccessPort,
-    auditSink: generatedResultAuditSink,
-    clock: workspaceClock,
   });
-  const generatedResultManagementBackendApi = new GeneratedResultManagementBackendApi({
-    listGeneratedResultMetadataUseCase: new ListGeneratedResultMetadataUseCase({
-      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-    }),
-    getGeneratedResultMetadataUseCase: new GetGeneratedResultMetadataUseCase({
-      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-    }),
-    getGeneratedResultOriginalContentUseCase: new GetGeneratedResultOriginalContentUseCase({
-      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      storageLogicalAccessResolutionService,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      auditSink: generatedResultAuditSink,
-      clock: workspaceClock,
-    }),
-    requestGeneratedResultPreviewContentUseCase: new RequestGeneratedResultPreviewContentUseCase({
-      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      auditSink: generatedResultAuditSink,
-      clock: workspaceClock,
-    }),
-    openGeneratedResultPreviewContentUseCase: new OpenGeneratedResultPreviewContentUseCase({
-      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      storageLogicalAccessResolutionService,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      previewAccessPort: generatedResultPreviewAccessPort,
-      auditSink: generatedResultAuditSink,
-      clock: workspaceClock,
-    }),
-    getGeneratedResultLineageSummaryUseCase: new GetGeneratedResultLineageSummaryUseCase({
-      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      clock: workspaceClock,
-    }),
-    getGeneratedResultLineageDetailUseCase: new GetGeneratedResultLineageDetailUseCase({
-      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      workspaceAuthorizationReadRepository: workspaceRepository,
-      clock: workspaceClock,
-    }),
-  });
-  const runCollectedResultPersistencePort = new SqliteRunCollectedResultPersistenceAdapter({
-    repository: persistentPlatformServices.generatedResultRepository,
-    generateGeneratedResultPreviewUseCase: generatedResultPreviewGenerationUseCase,
-    auditSink: generatedResultAuditSink,
-    now: () => workspaceClock.now(),
-  });
+  const generatedResultManagementBackendApi = generatedResultComposition.generatedResultManagementBackendApi;
+  const runCollectedResultPersistencePort = generatedResultComposition.runCollectedResultPersistencePort;
   const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
     requestAuthoritativeRunCancellationUseCase: new RequestAuthoritativeRunCancellationUseCase({
       runRepository: persistentPlatformServices.platformPersistenceRepository,
@@ -1010,7 +791,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     platformSecretConsumers,
       close: () => new Promise<void>((resolve, reject) => {
         server.close((error) => {
-          imageAssetRepository.dispose();
+          imageMediaComposition?.dispose();
           if (ownsPersistentPlatformServices) {
             persistentPlatformServices.dispose();
           }
@@ -1026,7 +807,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     });
   } catch (error) {
     startupRootSpan.fail(error);
-    imageAssetRepository.dispose();
+    imageMediaComposition?.dispose();
     if (ownsPersistentPlatformServices) {
       persistentPlatformServices.dispose();
     }
@@ -1088,115 +869,6 @@ function parseOptionalBoolean(value: string | undefined): boolean | undefined {
   return undefined;
 }
 
-function resolveStorageSyncDeploymentAvailability(
-  env: Readonly<Record<string, string | undefined>>,
-): typeof StorageSyncDeploymentAvailabilities[keyof typeof StorageSyncDeploymentAvailabilities] {
-  const configured = env.AI_LOOM_STORAGE_SYNC_DEPLOYMENT_AVAILABILITY?.trim().toLowerCase();
-  switch (configured) {
-    case StorageSyncDeploymentAvailabilities.active:
-      return StorageSyncDeploymentAvailabilities.active;
-    case StorageSyncDeploymentAvailabilities.configuredInactive:
-      return StorageSyncDeploymentAvailabilities.configuredInactive;
-    case StorageSyncDeploymentAvailabilities.unavailable:
-      return StorageSyncDeploymentAvailabilities.unavailable;
-    default:
-      return StorageSyncDeploymentAvailabilities.configuredInactive;
-  }
-}
-
-function resolveManagedStorageRootPath(
-  databasePath: string,
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_STORAGE_MANAGED_ROOT_PATH?.trim();
-  if (configured) {
-    return path.resolve(configured);
-  }
-  return path.resolve(path.dirname(databasePath), "runtime-assets", "managed-storage");
-}
-
-function resolveAssetDownloadGrantSecret(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-  return `asset-download-grant:${randomUUID()}`;
-}
-
-function resolveAssetContentEncryptionKey(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
-  if (inheritedSecretKey) {
-    return inheritedSecretKey;
-  }
-
-  return createHash("sha256")
-    .update(`asset-content:${randomUUID()}`)
-    .digest("base64");
-}
-
-function resolveImageAssetStorageTokenSecret(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
-  if (inheritedSecretKey) {
-    return inheritedSecretKey;
-  }
-
-  return createHash("sha256")
-    .update(`image-asset-storage:${randomUUID()}`)
-    .digest("base64");
-}
-
-function resolveGeneratedResultPreviewAccessTokenSecret(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
-  if (inheritedSecretKey) {
-    return inheritedSecretKey;
-  }
-
-  return createHash("sha256")
-    .update(`generated-result-preview-access:${randomUUID()}`)
-    .digest("base64");
-}
-
-function resolveImageAssetUploadSessionTokenSecret(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
-  if (inheritedSecretKey) {
-    return inheritedSecretKey;
-  }
-
-  return createHash("sha256")
-    .update(`image-asset-upload-session:${randomUUID()}`)
-    .digest("base64");
-}
-
 function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
   const explicit = parseOptionalBoolean(env.AI_LOOM_ENABLE_DEV_LOGIN);
   if (typeof explicit === "boolean") {
@@ -1205,11 +877,6 @@ function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string
 
   const nodeEnv = env.NODE_ENV?.trim().toLowerCase();
   return nodeEnv !== "production";
-}
-
-function normalizeOptional(value: string | undefined): string | undefined {
-  const normalized = value?.trim();
-  return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
 function createSecretOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
