@@ -26,6 +26,12 @@ const testClock = Object.freeze({
   now: () => new Date("2026-04-12T00:00:00.000Z"),
 });
 
+const configuredCriticalSecurityMaterial = Object.freeze({
+  AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET: "asset-download-grant-secret-value-12345",
+  AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET: "generated-result-preview-token-secret-12345",
+});
+
 describe("ServerOrchestrationRecoveryCompositionModule", () => {
   it("composes startup recovery and reconciliation behind a bounded module", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-orchestration-recovery-composition-module-"));
@@ -39,12 +45,12 @@ describe("ServerOrchestrationRecoveryCompositionModule", () => {
       });
       const storageAssetComposition = composeServerStorageAssetCompositionModule({
         databasePath,
-        env: {},
+        env: configuredCriticalSecurityMaterial,
         persistentPlatformServices: persistentServices,
         authoritativeAuditRecorder: auditDiagnostics.authoritativeAuditRecorder,
       });
       const generatedResultComposition = composeServerGeneratedResultCompositionModule({
-        env: {},
+        env: configuredCriticalSecurityMaterial,
         persistentPlatformServices: persistentServices,
         workspaceClock: testClock,
         authoritativeAuditRecorder: auditDiagnostics.authoritativeAuditRecorder,

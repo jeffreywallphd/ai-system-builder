@@ -1,4 +1,3 @@
-import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import type { AuthoritativeAuditRecordingService } from "@application/audit/use-cases/AuthoritativeAuditRecordingService";
 import { StorageManagementService } from "@application/storage/use-cases/StorageManagementService";
@@ -35,10 +34,13 @@ import { AesGcmAssetContentCipherPort } from "@infrastructure/security/encryptio
 import { DeterministicScopeEncryptionKeyPort } from "@infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
 import { WorkspaceStorageEncryptionPolicyContextResolver } from "@infrastructure/security/encryption/WorkspaceStorageEncryptionPolicyContextResolver";
 import { EncryptionEnforcementObservabilityReporter } from "@infrastructure/security/EncryptionEnforcementObservabilityReporter";
+import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
+import { resolveCriticalServerSecurityMaterial } from "./ResolveCriticalServerSecurityMaterial";
 
 export interface ServerStorageAssetCompositionModuleInput {
   readonly databasePath: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
   readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
   readonly authoritativeAuditRecorder: AuthoritativeAuditRecordingService;
   readonly encryptionObservabilityLogger?: {
@@ -113,8 +115,25 @@ export function composeServerStorageAssetCompositionModule(
     policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
     objectAccessResolver: storageBackendAdapterRegistry,
   });
+  const assetDownloadGrantSecret = resolveCriticalServerSecurityMaterial({
+    environment: input.env,
+    materialId: "material:server:asset-download-grant-secret",
+    environmentKey: "AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET",
+    startupSecurityMaterialValidation: input.startupSecurityMaterialValidation,
+    logger: input.encryptionObservabilityLogger,
+    materialFormat: "string-secret",
+  });
+  const assetContentEncryptionKey = resolveCriticalServerSecurityMaterial({
+    environment: input.env,
+    materialId: "material:server:asset-content-encryption-key",
+    environmentKey: "AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY",
+    inheritedEnvironmentKey: "AI_LOOM_SECRET_MASTER_KEY",
+    startupSecurityMaterialValidation: input.startupSecurityMaterialValidation,
+    logger: input.encryptionObservabilityLogger,
+    materialFormat: "aes256-base64",
+  });
   const assetContentKeyPort = new DeterministicScopeEncryptionKeyPort({
-    encodedKey: resolveAssetContentEncryptionKey(input.env),
+    encodedKey: assetContentEncryptionKey,
     keyPrefix: normalizeOptional(input.env.AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY_PREFIX) ?? "kek:asset-content",
   });
   const assetEncryptionPolicyContextResolver = new WorkspaceStorageEncryptionPolicyContextResolver({
@@ -178,7 +197,7 @@ export function composeServerStorageAssetCompositionModule(
       workspaceAuthorizationReadRepository: workspaceRepository,
       storageLogicalAccessResolutionService,
       downloadGrantPort: new EncryptedAssetDownloadGrantAdapter({
-        secret: resolveAssetDownloadGrantSecret(input.env),
+        secret: assetDownloadGrantSecret,
       }),
       encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
       assetContentCipherPort,
@@ -231,34 +250,6 @@ function resolveManagedStorageRootPath(
     return path.resolve(configured);
   }
   return path.resolve(path.dirname(databasePath), "runtime-assets", "managed-storage");
-}
-
-function resolveAssetDownloadGrantSecret(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-  return `asset-download-grant:${randomUUID()}`;
-}
-
-function resolveAssetContentEncryptionKey(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
-  if (inheritedSecretKey) {
-    return inheritedSecretKey;
-  }
-
-  return createHash("sha256")
-    .update(`asset-content:${randomUUID()}`)
-    .digest("base64");
 }
 
 function normalizeOptional(value: string | undefined): string | undefined {

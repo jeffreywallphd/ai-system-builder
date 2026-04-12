@@ -1,4 +1,3 @@
-import { createHash, randomUUID } from "node:crypto";
 import type { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { FinalizeImageAssetUploadUseCase } from "@application/image-assets/use-cases/FinalizeImageAssetUploadUseCase";
 import { GetImageAssetMetadataUseCase } from "@application/image-assets/use-cases/GetImageAssetMetadataUseCase";
@@ -16,10 +15,13 @@ import type { AuthoritativePersistentPlatformServices } from "@infrastructure/pe
 import { SqliteImageAssetPersistenceAdapter } from "@infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter";
 import { ManagedImageAssetStorageAdapter } from "@infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter";
 import type { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
+import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
+import { resolveCriticalServerSecurityMaterial } from "./ResolveCriticalServerSecurityMaterial";
 
 export interface ServerImageMediaCompositionModuleInput {
   readonly databasePath: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
   readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
   readonly authorizationDecisionEvaluator: AuthorizationPolicyDecisionEvaluator;
   readonly authoritativeAuditRecorder: AuthoritativeAuditRecordingService;
@@ -41,9 +43,27 @@ export function composeServerImageMediaCompositionModule(
   input: ServerImageMediaCompositionModuleInput,
 ): ServerImageMediaCompositionModuleOutput {
   const imageAssetRepository = new SqliteImageAssetPersistenceAdapter(input.databasePath);
+  const imageAssetStorageTokenSecret = resolveCriticalServerSecurityMaterial({
+    environment: input.env,
+    materialId: "material:server:image-asset-storage-token-secret",
+    environmentKey: "AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET",
+    inheritedEnvironmentKey: "AI_LOOM_SECRET_MASTER_KEY",
+    startupSecurityMaterialValidation: input.startupSecurityMaterialValidation,
+    logger: input.imageAssetObservabilityLogger,
+    materialFormat: "string-secret",
+  });
+  const imageAssetUploadSessionTokenSecret = resolveCriticalServerSecurityMaterial({
+    environment: input.env,
+    materialId: "material:server:image-upload-session-token-secret",
+    environmentKey: "AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET",
+    inheritedEnvironmentKey: "AI_LOOM_SECRET_MASTER_KEY",
+    startupSecurityMaterialValidation: input.startupSecurityMaterialValidation,
+    logger: input.imageAssetObservabilityLogger,
+    materialFormat: "string-secret",
+  });
   const imageAssetStorageAdapter = new ManagedImageAssetStorageAdapter({
     storageLogicalAccessResolutionService: input.storageLogicalAccessResolutionService,
-    tokenSecret: resolveImageAssetStorageTokenSecret(input.env),
+    tokenSecret: imageAssetStorageTokenSecret,
   });
   const imageAssetAuditSink = new AuthoritativeImageAssetAuditSink(input.authoritativeAuditRecorder);
 
@@ -95,7 +115,7 @@ export function composeServerImageMediaCompositionModule(
       auditSink: imageAssetAuditSink,
     }),
     imageAssetStoragePort: imageAssetStorageAdapter,
-    uploadSessionTokenSecret: resolveImageAssetUploadSessionTokenSecret(input.env),
+    uploadSessionTokenSecret: imageAssetUploadSessionTokenSecret,
     observability: new ImageAssetManagementObservability({
       logger: input.imageAssetObservabilityLogger,
     }),
@@ -107,40 +127,4 @@ export function composeServerImageMediaCompositionModule(
       imageAssetRepository.dispose();
     },
   });
-}
-
-function resolveImageAssetStorageTokenSecret(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
-  if (inheritedSecretKey) {
-    return inheritedSecretKey;
-  }
-
-  return createHash("sha256")
-    .update(`image-asset-storage:${randomUUID()}`)
-    .digest("base64");
-}
-
-function resolveImageAssetUploadSessionTokenSecret(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const configured = env.AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
-  if (inheritedSecretKey) {
-    return inheritedSecretKey;
-  }
-
-  return createHash("sha256")
-    .update(`image-asset-upload-session:${randomUUID()}`)
-    .digest("base64");
 }

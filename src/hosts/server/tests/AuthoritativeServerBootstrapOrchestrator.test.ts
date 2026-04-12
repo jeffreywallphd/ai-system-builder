@@ -143,6 +143,7 @@ describe("AuthoritativeServerBootstrapOrchestrator", () => {
     expect(startOptions.routeRegistrationPlan).toBe(routePlan);
     expect(startOptions.deploymentPolicyBootstrap).toBeDefined();
     expect(startOptions.persistentPlatformServices).toBeDefined();
+    expect(startOptions.startupSecurityMaterialValidation).toBeDefined();
 
     expect(result.stageStatus.stages.map((stage) => stage.stageId)).toEqual([
       "configuration-load",
