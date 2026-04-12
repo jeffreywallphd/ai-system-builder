@@ -10,6 +10,7 @@
 - Auth-minimal entrypoint: `src/hosts/server/AuthMinimalServerHostEntrypoint.ts`
 - Auth-minimal runtime host startup implementation: `src/hosts/server/AuthMinimalIdentityServerHost.ts`
 - Runtime host startup implementation: `src/hosts/server/IdentityServerHost.ts`
+- Identity/session/trusted-device bounded composition module: `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
 - Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - Auth-minimal persistence composition seam: `src/infrastructure/persistence/AuthMinimalPersistenceComposition.ts`
@@ -22,6 +23,11 @@ Story 2.1.2 adds the first bounded-control-plane composition scaffold:
 - module map: `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleMap.ts`
 - composition placement guidance: `src/hosts/server/composition/README.md`
 - contract guardrail test: `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts`
+
+Story 2.2.1 extracts identity/session/trusted-device assembly from `IdentityServerHost.ts` into:
+
+- `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
+- regression coverage: `src/hosts/server/tests/ServerIdentitySessionTrustedDeviceCompositionModule.test.ts`
 
 ## Control-plane ownership
 - Authoritative server is the single runtime with control-plane authority.

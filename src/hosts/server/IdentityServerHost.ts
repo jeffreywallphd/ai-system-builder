@@ -10,22 +10,10 @@ import {
 import { IdentityIdNamespaces, type IdentityIdNamespace } from "@application/contracts/IdentityApplicationContracts";
 import { IdentityPolicyService } from "@application/identity/services/IdentityPolicyService";
 import { LocalPasswordIdentityAuthenticator } from "@application/identity/services/LocalPasswordIdentityAuthenticator";
-import { IdentitySessionLifecycleService } from "@application/identity/services/IdentitySessionLifecycleService";
-import { IdentityAuthenticatedSessionService } from "@application/identity/services/IdentityAuthenticatedSessionService";
 import type { IIdentityClock } from "@application/identity/ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "@application/identity/ports/IIdentityIdGenerator";
 import type { IIdentityLifecycleEventPublisher } from "@application/identity/ports/IIdentityLifecycleEventPublisher";
-import { RegisterLocalAccountUseCase } from "@application/identity/use-cases/RegisterLocalAccountUseCase";
-import { LoginLocalAccountUseCase } from "@application/identity/use-cases/LoginLocalAccountUseCase";
-import { ChangeLocalPasswordCredentialUseCase } from "@application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
-import { LogoutIdentitySessionUseCase } from "@application/identity/use-cases/LogoutIdentitySessionUseCase";
-import { RevokeIdentitySessionUseCase } from "@application/identity/use-cases/RevokeIdentitySessionUseCase";
-import { ListLocalIdentityAccountsUseCase } from "@application/identity/use-cases/ListLocalIdentityAccountsUseCase";
-import { GetLocalIdentityAccountStatusUseCase } from "@application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
-import { SetLocalIdentityAccountStatusUseCase } from "@application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
 import { ScryptLocalPasswordCredentialService } from "@infrastructure/security/identity/ScryptLocalPasswordCredentialService";
-import { OpaqueIdentitySessionTokenService } from "@infrastructure/security/identity/OpaqueIdentitySessionTokenService";
-import { IdentityAuthBackendApi } from "@infrastructure/api/identity/IdentityAuthBackendApi";
 import { IdentitySessionPolicyConfig } from "@infrastructure/config/IdentitySessionPolicyConfig";
 import { IdentitySessionTrustPolicyConfig } from "@infrastructure/config/IdentitySessionTrustPolicyConfig";
 import { IdentityProviderAccountPolicyConfig } from "@infrastructure/config/IdentityProviderAccountPolicyConfig";
@@ -34,28 +22,14 @@ import {
   HostSecureTransportKinds,
   resolveHostSecureTransportConfig,
 } from "@infrastructure/config/HostSecureTransportConfig";
-import { SqliteIdentityPersistenceAdapter } from "@infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter";
-import { SqliteTrustedDevicePersistenceAdapter } from "@infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter";
 import { TrustedDeviceManagementService } from "@application/identity/services/TrustedDeviceManagementService";
-import { TrustedDevicePairingService } from "@application/identity/services/TrustedDevicePairingService";
-import { TrustedDeviceSessionTrustService } from "@application/identity/services/TrustedDeviceSessionTrustService";
-import { ListTrustedDevicesUseCase } from "@application/identity/use-cases/ListTrustedDevicesUseCase";
-import { GetTrustedDeviceUseCase } from "@application/identity/use-cases/GetTrustedDeviceUseCase";
-import { RevokeTrustedDeviceUseCase } from "@application/identity/use-cases/RevokeTrustedDeviceUseCase";
-import { UpdateTrustedDeviceDisplayNameUseCase } from "@application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
-import { InitiateTrustedDevicePairingUseCase } from "@application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
-import { ValidateTrustedDevicePairingUseCase } from "@application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
-import { CompleteTrustedDevicePairingUseCase } from "@application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
-import { SqliteIdentityLifecycleEventPublisher } from "@infrastructure/persistence/identity/SqliteIdentityLifecycleEventPublisher";
 import {
-  FanoutIdentityLifecycleEventPublisher,
   FanoutStorageManagementAuditSink,
   FanoutAssetAuditSink,
   FanoutNodeTrustAuditSink,
   FanoutRunSubmissionAuditSink,
   FanoutDeploymentPolicyGovernanceEventSink,
 } from "@infrastructure/audit/AuditFanoutPublishers";
-import { AuthoritativeIdentityLifecycleEventPublisher } from "@infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher";
 import { AuthoritativeNodeTrustAuditSink } from "@infrastructure/audit/AuthoritativeNodeTrustAuditSink";
 import { AuthoritativeExecutionNodeManagementAuditSink } from "@infrastructure/audit/AuthoritativeExecutionNodeManagementAuditSink";
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder";
@@ -267,6 +241,10 @@ import {
   HttpTransportTrustValidationAdapter,
   WebSocketTransportTrustValidationAdapter,
 } from "@infrastructure/transport/TransportTrustValidationAdapters";
+import {
+  composeServerIdentitySessionTrustedDeviceCompositionModule,
+  type ServerIdentitySessionTrustedDeviceCompositionModuleOutput,
+} from "./composition/ServerIdentitySessionTrustedDeviceCompositionModule";
 import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   evaluateTransportConnectionTrust,
@@ -433,6 +411,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
   });
   let secretService: ServerComposedSecretService | undefined;
+  let identitySessionTrustedDeviceComposition:
+    | ServerIdentitySessionTrustedDeviceCompositionModuleOutput
+    | undefined;
   try {
     const auditRetentionLifecycleConfig = await runStartupStepSpan({
       tracer: startupTracer,
@@ -510,11 +491,23 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     const sessionPolicies = options.sessionPolicies
       ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
     const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
-    const baseIdentityLifecyclePublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(databasePath);
-    const eventPublisher = new FanoutIdentityLifecycleEventPublisher([
-      baseIdentityLifecyclePublisher,
-      new AuthoritativeIdentityLifecycleEventPublisher(authoritativeAuditRecorder),
-    ]);
+    identitySessionTrustedDeviceComposition = composeServerIdentitySessionTrustedDeviceCompositionModule({
+      databasePath,
+      env,
+      identityRepository: repository,
+      trustedDeviceRepository,
+      identityPolicyService,
+      credentialAuthenticator: authenticator,
+      idGenerator,
+      clock,
+      sessionPolicies,
+      sessionTrustPolicies,
+      providerAccountPolicies,
+      authoritativeAuditRecorder,
+      eventPublisherOverride: options.eventPublisher,
+    });
+    const backendApi = identitySessionTrustedDeviceComposition.backendApi;
+    const trustedDeviceManagementService = identitySessionTrustedDeviceComposition.trustedDeviceManagementService;
     const workspaceClock = new SystemWorkspaceClock();
     const workspaceIdGenerator = new RandomWorkspaceIdGenerator();
     const workspaceAuthorizationPolicyReadAdapter = new WorkspaceAuthorizationPolicyReadAdapter({
@@ -549,127 +542,6 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       new AuthoritativeNodeTrustAuditSink(authoritativeAuditRecorder),
     ]);
     const executionNodeManagementAuditSink = new AuthoritativeExecutionNodeManagementAuditSink(authoritativeAuditRecorder);
-    const sessionTrustService = new TrustedDeviceSessionTrustService({
-      trustedDeviceRepository,
-      policies: sessionTrustPolicies,
-    });
-    const trustedDeviceAdminUserIdentityIds = parseOptionalCsvList(env.IDENTITY_TRUSTED_DEVICE_ADMIN_USER_IDS);
-    const trustedDeviceManagementService = new TrustedDeviceManagementService(
-      trustedDeviceRepository,
-      idGenerator,
-      clock,
-      eventPublisher,
-    );
-    const trustedDevicePairingService = new TrustedDevicePairingService({
-      trustedDeviceRepository,
-      pairingRepository: trustedDeviceRepository,
-      idGenerator,
-      clock,
-      eventPublisher,
-    });
-    const sessionLifecycleService = new IdentitySessionLifecycleService({
-      sessionRepository: repository,
-      clock,
-      idGenerator,
-      policies: sessionPolicies,
-    });
-    const authenticatedSessionService = new IdentityAuthenticatedSessionService({
-      lifecycleService: sessionLifecycleService,
-      sessionRepository: repository,
-      tokenMaterialRepository: repository,
-      tokenService: new OpaqueIdentitySessionTokenService(),
-      clock,
-      sessionTrustEvaluator: sessionTrustService,
-      eventPublisher,
-    });
-
-  const backendApi = new IdentityAuthBackendApi({
-    registerLocalAccountUseCase: new RegisterLocalAccountUseCase({
-      lookupRepository: repository,
-      persistenceRepository: repository,
-      credentialMaterialRepository: repository,
-      identityPolicyService,
-      credentialAuthenticator: authenticator,
-      idGenerator,
-      clock,
-      eventPublisher,
-    }),
-    loginLocalAccountUseCase: new LoginLocalAccountUseCase({
-      lookupRepository: repository,
-      credentialMaterialRepository: repository,
-      identityPolicyService,
-      credentialAuthenticator: authenticator,
-      clock,
-      eventPublisher,
-    }),
-    changeLocalPasswordCredentialUseCase: new ChangeLocalPasswordCredentialUseCase({
-      lookupRepository: repository,
-      persistenceRepository: repository,
-      credentialMaterialRepository: repository,
-      transactionManager: repository,
-      identityPolicyService,
-      credentialAuthenticator: authenticator,
-      idGenerator,
-      clock,
-      eventPublisher,
-    }),
-    logoutIdentitySessionUseCase: new LogoutIdentitySessionUseCase({
-      authenticatedSessionService,
-      eventPublisher,
-    }),
-    revokeIdentitySessionUseCase: new RevokeIdentitySessionUseCase({
-      sessionRepository: repository,
-      authenticatedSessionService,
-    }),
-    listLocalIdentityAccountsUseCase: new ListLocalIdentityAccountsUseCase({
-      lookupRepository: repository,
-      sessionRepository: repository,
-    }),
-    getLocalIdentityAccountStatusUseCase: new GetLocalIdentityAccountStatusUseCase({
-      lookupRepository: repository,
-      sessionRepository: repository,
-    }),
-    setLocalIdentityAccountStatusUseCase: new SetLocalIdentityAccountStatusUseCase({
-      lookupRepository: repository,
-      persistenceRepository: repository,
-      sessionRepository: repository,
-      authenticatedSessionService,
-      clock,
-      eventPublisher,
-    }),
-    listTrustedDevicesUseCase: new ListTrustedDevicesUseCase({
-      trustedDeviceManagementService,
-    }),
-    getTrustedDeviceUseCase: new GetTrustedDeviceUseCase({
-      trustedDeviceManagementService,
-    }),
-    revokeTrustedDeviceUseCase: new RevokeTrustedDeviceUseCase({
-      trustedDeviceManagementService,
-    }),
-    updateTrustedDeviceDisplayNameUseCase: new UpdateTrustedDeviceDisplayNameUseCase({
-      trustedDeviceManagementService,
-    }),
-    initiateTrustedDevicePairingUseCase: new InitiateTrustedDevicePairingUseCase({
-      pairingService: trustedDevicePairingService,
-    }),
-    validateTrustedDevicePairingUseCase: new ValidateTrustedDevicePairingUseCase({
-      pairingService: trustedDevicePairingService,
-    }),
-    completeTrustedDevicePairingUseCase: new CompleteTrustedDevicePairingUseCase({
-      pairingService: trustedDevicePairingService,
-    }),
-    identityLookupRepository: repository,
-    sessionRepository: repository,
-    authenticatedSessionService,
-    sessionTrustService,
-    featurePolicies: {
-      allowLocalRegistration: providerAccountPolicies.allowLocalRegistration,
-      allowLocalAdministration: providerAccountPolicies.allowLocalAdministration,
-    },
-    trustedDeviceAdministration: {
-      bootstrapAdminUserIdentityIds: trustedDeviceAdminUserIdentityIds,
-    },
-  });
 
   const resolveWorkspaceInvitationLifecycleUseCase = new ResolveWorkspaceInvitationLifecycleUseCase({
     workspaceRepository,
@@ -1617,10 +1489,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
             persistentPlatformServices.dispose();
           }
           secretService?.dispose();
-          const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
-          if (typeof disposablePublisher.dispose === "function") {
-            disposablePublisher.dispose();
-          }
+          identitySessionTrustedDeviceComposition?.dispose();
           if (error) {
             reject(error);
             return;
@@ -1636,6 +1505,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       persistentPlatformServices.dispose();
     }
     secretService?.dispose();
+    identitySessionTrustedDeviceComposition?.dispose();
     throw error;
   } finally {
     startupRootSpan.complete();
@@ -1676,20 +1546,6 @@ function normalizeNamespace(namespace: IdentityIdNamespace): string {
     default:
       return namespace;
   }
-}
-
-function parseOptionalCsvList(value: string | undefined): ReadonlyArray<string> | undefined {
-  const normalized = value?.trim();
-  if (!normalized) {
-    return undefined;
-  }
-
-  const entries = normalized
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
-  return entries.length > 0 ? Object.freeze(entries) : undefined;
 }
 
 function parseOptionalBoolean(value: string | undefined): boolean | undefined {
