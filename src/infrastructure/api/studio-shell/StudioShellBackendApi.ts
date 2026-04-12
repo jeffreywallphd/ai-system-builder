@@ -399,6 +399,14 @@ export interface IngestReferenceImageUploadReadModel {
   readonly selectedRecordId: string;
   readonly storedFilePath?: string;
   readonly configuredUploadRootPath?: string;
+  readonly persistence: {
+    readonly resolvedUploadRootPath?: string;
+    readonly resolvedUploadDirectoryPath?: string;
+    readonly directoryCreated: boolean;
+    readonly fileBytesWritten: number;
+    readonly datasetLinkageOnly: boolean;
+    readonly storedFilePathProduced: boolean;
+  };
 }
 
 export interface PersistReferenceImageOutputsRequest {
@@ -1717,14 +1725,13 @@ export class StudioShellBackendApi {
       const ingestionSource = datasetBindingId === "reference-image-dataset"
         ? "reference-image-ui-faceid-upload"
         : "reference-image-ui-upload";
-      const storedFilePath = sourceImageAssetId
-        ? undefined
-        : await this.materializeUploadedImagePayload({
-          payload,
-          fileName,
-          systemId: runtimeSystemId,
-          datasetBindingId,
-        });
+      const materializedUpload = await this.materializeUploadedImagePayload({
+        payload,
+        fileName,
+        systemId: runtimeSystemId,
+        datasetBindingId,
+      });
+      const storedFilePath = materializedUpload.storedFilePath;
       const storageReference = sourceImageAssetId ?? storedFilePath;
       if (!storageReference) {
         throw new StudioShellInvalidRequestError("Image upload could not be materialized for dataset ingestion.");
@@ -1744,7 +1751,7 @@ export class StudioShellBackendApi {
           datasetBindingId,
           uploadedFileName: fileName,
           uploadedMimeType: request.mimeType?.trim() || "unknown",
-          ...(storedFilePath ? { storedFilePath } : {}),
+          storedFilePath,
           ...(sourceImageAssetId ? { sourceImageAssetId } : {}),
         },
         provenance: {
@@ -1812,6 +1819,14 @@ export class StudioShellBackendApi {
         selectedRecordId: ingested.recordId,
         storedFilePath,
         configuredUploadRootPath,
+        persistence: Object.freeze({
+          resolvedUploadRootPath: configuredUploadRootPath,
+          resolvedUploadDirectoryPath: materializedUpload.resolvedUploadDirectoryPath,
+          directoryCreated: materializedUpload.directoryCreated,
+          fileBytesWritten: materializedUpload.fileBytesWritten,
+          datasetLinkageOnly: false,
+          storedFilePathProduced: true,
+        }),
       });
       },
     );
@@ -3874,7 +3889,12 @@ export class StudioShellBackendApi {
     readonly fileName: string;
     readonly systemId: string;
     readonly datasetBindingId: ReferenceImageDatasetBindingId;
-  }): Promise<string> {
+  }): Promise<{
+    readonly storedFilePath: string;
+    readonly resolvedUploadDirectoryPath: string;
+    readonly directoryCreated: boolean;
+    readonly fileBytesWritten: number;
+  }> {
     const nodeRuntime = await this.resolveNodeUploadRuntime();
     const safeFileName = this.sanitizeUploadFileName(input.fileName);
     const safeSystemId = input.systemId.replace(/[^a-z0-9-_.:]/gi, "_");
@@ -3897,10 +3917,29 @@ export class StudioShellBackendApi {
       throw new StudioShellInvalidRequestError("Reference image upload cache root could not be resolved.");
     }
     const root = nodeRuntime.path.join(uploadRoot, safeSystemId, safeBindingId);
+    const rootExistedBeforeCreate = await this.pathExists(nodeRuntime, root);
     await nodeRuntime.fs.mkdir(root, { recursive: true });
+    const rootExistsAfterCreate = await this.pathExists(nodeRuntime, root);
     const filePath = nodeRuntime.path.join(root, `${stamp}-${unique}-${safeFileName}`);
     await nodeRuntime.fs.writeFile(filePath, Buffer.from(input.payload));
-    return filePath;
+    return Object.freeze({
+      storedFilePath: filePath,
+      resolvedUploadDirectoryPath: root,
+      directoryCreated: !rootExistedBeforeCreate && rootExistsAfterCreate,
+      fileBytesWritten: input.payload.byteLength,
+    });
+  }
+
+  private async pathExists(
+    nodeRuntime: Awaited<ReturnType<StudioShellBackendApi["resolveNodeUploadRuntime"]>>,
+    candidatePath: string,
+  ): Promise<boolean> {
+    try {
+      await nodeRuntime.fs.access(candidatePath);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async resolveConfiguredUploadRootPath(): Promise<string | undefined> {
@@ -3935,6 +3974,7 @@ export class StudioShellBackendApi {
     readonly fs: {
       readonly mkdir: (path: string, options?: { recursive?: boolean }) => Promise<void>;
       readonly writeFile: (file: string, data: Uint8Array) => Promise<void>;
+      readonly access: (path: string) => Promise<void>;
     };
     readonly os: {
       readonly homedir: () => string;
