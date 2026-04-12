@@ -5,15 +5,15 @@ Canonical launch/return contract for one studio launching another and returning 
 
 ## Where it lives
 - Canonical contract + validation + query serializer/parser:
-  - `ui/routes/StudioHandoffContract.ts`
+  - `src/ui/routes/StudioHandoffContract.ts`
 - Shared return payload resolver:
-  - `ui/routes/StudioReturnPayloadResolution.ts`
+  - `src/ui/routes/StudioReturnPayloadResolution.ts`
 - Workflow-origin adapter (origin context generation):
-  - `ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`
+  - `src/ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`
 - Workflow return restoration adapter:
-  - `ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts`
+  - `src/ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts`
 - Integration seam that transports it in route params:
-  - `ui/routes/InlineAssetCreation.ts`
+  - `src/ui/routes/InlineAssetCreation.ts`
 
 ## Required fields
 - `launch.handoffId`
@@ -113,7 +113,7 @@ Primary call path:
   - `cancelled`: `cancelled`/`no-selection`/`abandoned` outcomes (non-destructive).
   - `recovered`: stale/invalid return ignored safely.
 - Dataset and agent selectors publish status updates using existing correlation metadata (`launchHandoffId`, selector target metadata, selector session id), preserving 5.9/5.10 multi-session safety behavior.
-- Cross-studio regression coverage now includes explicit dataset + agent launch/return/apply/resume/cancel + stale-correlation scenarios in `ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`.
+- Cross-studio regression coverage now includes explicit dataset + agent launch/return/apply/resume/cancel + stale-correlation scenarios in `src/ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`.
 
 ## Backward compatibility
 - Legacy selector launch params still parse as before.
@@ -122,7 +122,7 @@ Primary call path:
 
 
 ## Stories 5.2.1 / 5.2.2 image vertical-slice contracts and normalized identity resolution
-- Added a canonical image-slice handoff contract model in `domain/studio-handoff/ImageStudioHandoffContract.ts` that standardizes cross-studio Data Studio -> Workflow Studio -> System Studio payloads for:
+- Added a canonical image-slice handoff contract model in `src/domain/studio-handoff/ImageStudioHandoffContract.ts` that standardizes cross-studio Data Studio -> Workflow Studio -> System Studio payloads for:
   - asset references and versioned references,
   - dataset instance references,
   - workflow references and system bindings,
@@ -130,15 +130,15 @@ Primary call path:
   - event payload structures,
   - lineage/trace identifiers (`handoffId`, `traceId`),
   - persisted cross-studio relationship records.
-- Added an application-layer resolver seam in `application/studio-handoff/ImageStudioReferenceResolver.ts` so image slice flows use one normalized identity-resolution path rather than studio-specific ad hoc resolution logic.
+- Added an application-layer resolver seam in `src/application/studio-handoff/ImageStudioReferenceResolver.ts` so image slice flows use one normalized identity-resolution path rather than studio-specific ad hoc resolution logic.
 - Resolver outcomes are explicit and inspectable for broken/missing/ambiguous/incompatible reference states:
   - `missing`
   - `broken`
   - `ambiguous`
   - `incompatible`
 - Added focused contract/resolution coverage:
-  - `domain/studio-handoff/tests/ImageStudioHandoffContract.test.ts`
-  - `application/studio-handoff/tests/ImageStudioReferenceResolver.test.ts`
+  - `src/domain/studio-handoff/tests/ImageStudioHandoffContract.test.ts`
+  - `src/application/studio-handoff/tests/ImageStudioReferenceResolver.test.ts`
 
 ## Stories 5.2.3 / 5.2.4 image input/output handoff integration
 - Workflow execution context assembly now accepts canonical image handoff payloads in workflow metadata (`metadata.imageStudioHandoff`) and validates shape through `createImageCrossStudioHandoffContract` before resolving inputs.
@@ -146,3 +146,7 @@ Primary call path:
 - Assembly now emits compact runtime handoff trace metadata (`imageStudioHandoffRuntime`) that preserves `handoffId`, `traceId`, workflow binding id, and source studio identity for downstream runtime/output seams.
 - Runtime output persistence now propagates handoff trace metadata into output-binding lineage (`outputRelationship.metadata`) and returns a bounded handoff persistence summary (`handoffId`, `traceId`, persisted target instances/record ids).
 - This completes the Data Studio -> Workflow Studio -> system-owned dataset handoff path for the image slice while staying on the same 5.2.1/5.2.2 contract and identity-resolution model.
+
+## Related ADRs
+
+- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md`

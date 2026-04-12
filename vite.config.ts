@@ -2,41 +2,28 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { createBrowserDevelopmentVitePlugin } from "./infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin";
-import { AppDistributionTargets, getAppRuntimeProfile } from "./domain/runtime/AppRuntimeProfile";
+import { AppDistributionTargets, getAppRuntimeProfile } from "./src/domain/runtime/AppRuntimeProfile";
+import { createBrowserRendererAliases, createSrcAliases } from "./dev/vite/resolveViteAliases";
 
 const REPOSITORY_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const srcAliases = createSrcAliases(REPOSITORY_ROOT);
+const browserRendererAliases = createBrowserRendererAliases(REPOSITORY_ROOT);
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   const runtimeProfile = getAppRuntimeProfile(mode === "browser" ? "browser-development" : "desktop-development");
+  const plugins = [react()];
+
+  if (runtimeProfile.distributionTarget === AppDistributionTargets.viteBrowser) {
+    const { createBrowserDevelopmentVitePlugin } = await import(
+      "./src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin"
+    );
+    plugins.push(createBrowserDevelopmentVitePlugin());
+  }
 
   return {
-    plugins: runtimeProfile.distributionTarget === AppDistributionTargets.viteBrowser
-      ? [react(), createBrowserDevelopmentVitePlugin()]
-      : [react()],
+    plugins,
     resolve: {
-      alias: runtimeProfile.hostKind === "browser"
-        ? [
-            {
-              find: "./modelManagementDependencies",
-              replacement: path.resolve(
-                REPOSITORY_ROOT,
-                "ui/composition/modelManagementDependencies.browser.ts",
-              ),
-            },
-            {
-              find: "../../infrastructure/execution/createExecutionInfrastructure",
-              replacement: path.resolve(
-                REPOSITORY_ROOT,
-                "infrastructure/execution/createExecutionInfrastructure.browser.ts",
-              ),
-            },
-            {
-              find: "csv-parse/sync",
-              replacement: "csv-parse/browser/esm/sync",
-            },
-          ]
-        : [],
+      alias: runtimeProfile.hostKind === "browser" ? browserRendererAliases : srcAliases,
     },
     server: {
       host: "0.0.0.0",
@@ -45,3 +32,4 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+

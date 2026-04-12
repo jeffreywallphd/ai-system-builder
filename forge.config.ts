@@ -11,11 +11,13 @@ const config: ForgeConfig = {
     extraResource: [
       "python-runtime",
       "runtime-assets",
-      "infrastructure/runtime/service-supervisor.js",
+      "src/infrastructure/runtime/service-supervisor.js",
       "README.md",
     ],
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    onlyModules: [],
+  },
   makers: [
     new MakerSquirrel({
       name: "ai_loom_studio",

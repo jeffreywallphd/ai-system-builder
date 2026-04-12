@@ -1,101 +1,93 @@
-# AI Companion: Architecture Overview
+---
+title: "AI Companion: Architecture Documentation Router"
+doc_type: architecture-overview
+status: active
+authoritativeness: canonical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+related_code_paths:
+  - src/hosts
+  - src/composition
+---
+
+# AI Companion: Architecture Documentation Router
+
+## Audience
+- AI assistants routing architecture questions to canonical sources.
+- Engineers validating where architecture authority lives.
 
 ## Purpose
-Use this file as the shortest reliable orientation before reading the human architecture docs.
+- Route quickly into domain overviews, domain reference indexes, ADRs, and migration anchors without restating contract detail.
 
-## What the system is
-- AI Loom Studio is a desktop-first React + Electron product with a clean-architecture-inspired core.
-- Main layers:
-  - `domain/` = business entities and validation
-  - `application/` = use cases, orchestration, ports, projections
-  - `infrastructure/` = adapters, runtime integrations, repositories, execution strategies, DI
-  - `ui/` + `electron/` = presentation and desktop host
+## Active Authority Scope
+- This router is for current architecture authority and active implementation boundaries.
+- Use [Architecture Baselines Router](../baselines/architecture/README.ai.md) only for historical snapshots and prior-state migration context.
 
-## Most important composition roots
-- Renderer/manual composition: `ui/composition/createUiDependencies.ts`
-- Generic DI composition: `infrastructure/composition/ApplicationBootstrap.ts`
-- Desktop host bootstrap: `electron/main/main.ts`
-- Renderer provider bootstrapping: `ui/composition/AppProviders.tsx`
+## Belongs Here
+- Navigation into `docs/architecture/domains/*/overview.md` and `references/README.md`.
+- Cross-cutting architecture navigation contracts and ADR backlink expectations.
 
-## Most important execution path
-1. UI store/service calls application use case.
-2. Use case validates/assembles context.
-3. Executor selects a strategy.
-4. Strategy delegates to Python runtime or interpreted fallback.
-5. Result includes provenance describing what really happened.
+## Does Not Belong Here
+- Long-form design prose replacing domain/reference docs.
+- Runbook procedures, contributor workflow checklists, or baseline archives.
 
-## Architectural caveats to remember
-- The architecture is clean-architecture-flavored, not strict/academic.
-- The UI composition is manual and still duplicates some infrastructure bootstrap logic, but execution-engine assembly, MCP server-operation handler registration, and runtime dependency orchestration now share clearer outer-layer helpers across renderer/bootstrap/registry paths, and durable execution history now includes a reusable detail surface instead of list-only projections.
-- Browser fallback adapters still matter even though the product intent is desktop-first.
-- Electron preload currently exposes synchronous IPC-based bridges.
+## ADR Linking Expectations
+- Add `## Related ADRs` when architecture scope is decision-constrained.
+- Use `docs/adr/records/adr-<NNN>-<decision-slug>.ai.md` and keep reciprocal ADR `## Related Documentation` links.
 
-## Best files to cite when answering architecture questions
-- `domain/workflows/Workflow.ts`
-- `domain/services/WorkflowValidator.ts`
-- `application/workflows/ExecuteWorkflowUseCase.ts`
-- `application/tools/RunToolUseCase.ts`
-- `application/context/WorkflowContextService.ts`
-- `infrastructure/execution/TruthfulWorkflowExecutor.ts`
-- `infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy.ts`
-- `infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy.ts`
-- `ui/composition/createUiDependencies.ts`
-- `electron/main/main.ts`
+## Start Here
+- [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
+- [Domain Folder Contract](./domains/README.md)
+- [Architecture Domain Migration Inventory](./architecture-domain-migration-inventory.md)
+- [Architecture Migration Sequence and Priority Order](./architecture-migration-sequence-and-priority.md)
+- [Architecture Domainization Rollout Boundaries and Follow-On Work](./architecture-domainization-rollout-boundaries.md)
+- [Architecture Supersession and Retirement Governance](./architecture-supersession-and-retirement-governance.md)
+- [Architecture Document Scope Boundaries](./architecture-document-scope-boundaries.md)
+- [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
 
-## Direction 4 (Phase 1) foundation
-- Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
-- Agent roots now expose explicit `toolAccess` alongside policy so planner/executor consumers have a stable contract without duplicating policy semantics.
-- Agent memory configuration is explicitly asset-based (`AssetId` references + memory types + typed retrieval configuration + revision), aligned with Direction 2 lineage/versioning.
-- Agent execution now has a bounded mapping seam into the unified execution backbone (`application/agents/contracts/AgentExecutionMapping.ts`) that yields `ExecutionPlan` units plus per-unit payload correlation data, rather than introducing a second runtime model.
-- This remains a foundation slice only: no studio UI, no autonomous replanning loop, and no parallel orchestration stack.
+## Route By Domain
+- [Core Platform and Composition](./domains/core-platform-and-composition/overview.md)
+- [Runtime Host Surfaces](./domains/runtime-host-surfaces/overview.md)
+- [Identity Trust and Security](./domains/identity-trust-and-security/overview.md)
+- [Workspace Storage and Assets](./domains/workspace-storage-and-assets/overview.md)
+- [Execution Control Plane and Scheduling](./domains/execution-control-plane-and-scheduling/overview.md)
+- [Studio and System Composition](./domains/studio-and-system-composition/overview.md)
+- [API and Transport Surfaces](./domains/api-and-transport-surfaces/overview.md)
+- [Deployment Policy and Audit Governance](./domains/deployment-policy-and-audit-governance/overview.md)
 
-- Direction 4 (Phase 2, inner foundation only) now includes an execution-oriented planning contract: `domain/agents/AgentPlan.ts` (dependency-aware plan/step model + validation), `application/agents/contracts/AgentPlanningStrategy.ts` (strategy contract/descriptor seam) plus `application/agents/services/DeterministicAgentPlanningStrategy.ts` (first deterministic strategy), and bounded planning-loop evaluation contracts in `application/agents/contracts/AgentPlanningLoop.ts` without adding a parallel runtime or UI loop.
-- Direction 4 (Phase 3, memory system inner slice) now adds explicit memory retrieval/write seams and session working memory:
-  - Retrieval contract: `application/agents/contracts/AgentMemoryRetrieval.ts` + `application/agents/services/AgentMemoryRetrievalService.ts`.
-  - Session working memory model: `domain/agents/AgentWorkingMemory.ts` + `application/agents/services/AgentWorkingMemoryService.ts`.
-  - Bounded write pipeline: `application/agents/services/AgentMemoryWriteService.ts`.
-  - Explicit memory policy controls now live in `domain/agents/AgentMemory.ts` (`retrievableTypes`, `writableTypes`, `sessionOnlyTypes`, bounded retention settings).
-  - Retrieval semantics are deterministic and policy-bounded (type/tag/metadata/recency filters over asset-version-backed entries), and session-only memory types are excluded from durable retrieval.
-  - Execution read models now carry working-memory snapshots and write outcomes so planning/evaluation consumers can reuse bounded session context without a second runtime.
-  - Write policy is now enforced operationally (writable/session-only checks + bounded durable retention gating).
-- Direction 4 (Phase 4, MCP capability layer foundation) now binds agent MCP access to canonical MCP identity (`domain/mcp/McpToolIdentity.ts` + `AgentPolicy.toolAccess.allowedMcpTools`), maps MCP steps as execution-native units (`ExecutionUnitKinds.mcpToolInvocation` via `AgentExecutionMapping`), and introduces deterministic plan/execute-time MCP governance checks (`application/agents/services/AgentMcpToolGovernanceService.ts`) that reuse registry/trust services for permission/approval/sandbox/schema checks without creating a second runtime.
-- Direction 4 (Phase 4 completion + Phase 5 inner foundation) now adds a reusable planner-side tool selection seam (`AgentPlanToolSelectionService`), explicit MCP governance decision semantics (`allowed` vs `approval-required` / `denied` / `unavailable` / `incompatible`), and an inner runtime coordination service (`AgentRunnerService`) with structured progress events, bounded retry/failure classification, and optional agent execution-session persistence seams.
-- Phase 5 hardening now makes retry exhaustion and partial-execution durability explicit: per-step outcomes are persisted on execution sessions, transition-history lookup is port-level (`IAgentExecutionSessionRepository`), and terminal failure contracts now carry explicit retry-exhausted signaling.
-- Phase 5 hardening now also makes terminal truth explicit for persistence/read models: execution sessions carry bounded terminal-state summary (`reason`, `hadPartialProgress`, completed/attempted step counts), blocked-before-step runs persist as failed status with terminal reason `blocked`, and lifecycle transitions are persisted from initial `pending` through terminal status.
-- SQLite session persistence now stores structured terminal/progress columns (`terminal_reason`, `had_partial_progress`, `completed_step_count`, `attempted_step_count`, `step_outcome_count`) in addition to canonical `session_json` snapshots.
-- Phase 6 inner authoring now has real persistence/use-case seams without UI coupling:
-  - persistence ports/adapters: `IAgentRepository` -> `SqliteAgentRepository`, `IAgentExecutionSessionRepository` -> `SqliteAgentExecutionSessionRepository`
-  - application CRUD + lifecycle use cases: create/update/get/list/delete/archive
-  - CRUD failure modes now use explicit typed application errors (`agent-conflict`, `agent-not-found`, `agent-invalid-request`) so transport mapping is deterministic and does not depend on string parsing.
-  - bounded configuration use cases now use the same typed failure surface (`agent-not-found`, `agent-invalid-request`, `validation-failed`) instead of generic thrown strings.
-  - bounded configuration use cases: goals/policy/tools/memory/strategy
-  - cohesive cross-field validation seam: `AgentConfigurationValidationService` (deterministic cross-field issue codes + domain fallback validation), with SQLite agent persistence also projecting structured authoring metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`).
-  - memory authoring contracts are now hard-validated (canonical asset refs, retrieval compatibility, writable/retrievable/session-only coherence, retention/session-only contradictions).
-  - strategy configuration is now explicitly bounded to supported descriptors (`deterministic@deterministic-linear` in this slice), with unsupported combinations rejected deterministically.
-  - validation issues now carry explicit section metadata (`goals`/`tools`/`memory`/`strategy`/etc.) and are reused by CRUD/configuration/API through `AgentConfigurationValidationError`.
-  - agent read models now expose full structured memory config (`assets`, `retrieval`, `policy`, `revision`) rather than partial memory summary fields.
-  - desktop backend now includes thin agent-authoring IPC handlers (`ai-loom-desktop-agents:*`) through `AgentAuthoringBackendApi`.
-  - `AgentAuthoringBackendApi` now maps transport errors only from typed authoring/validation errors; unknown failures are `internal` (no substring-based error coercion).
+## Route By Common Contributor Task
+- Understand the core system architecture and layer boundaries:
+  [Core Platform and Composition](./domains/core-platform-and-composition/overview.md)
+- Review runtime design, startup boundaries, and host lifecycle behavior:
+  [Runtime Host Surfaces](./domains/runtime-host-surfaces/overview.md)
+- Work on studio-facing behavior and studio/system composition seams:
+  [Studio and System Composition](./domains/studio-and-system-composition/overview.md)
+- Examine security-sensitive trust, authz, and secret-handling boundaries:
+  [Identity Trust and Security](./domains/identity-trust-and-security/overview.md)
+- Inventory runtime security material before hardening/fail-fast changes:
+  [Security-Critical Runtime Material Inventory](./security-critical-runtime-material-inventory.md)
+- Define or review bounded control-plane composition module dependencies, startup staging rules, and extension workflow guardrails:
+  [Control Plane Composition Refactor Target Module Map](./control-plane-composition-refactor-target-module-map.md)
+- Need worked navigation examples for architecture review, decomposition, runtime diagnostics, security-sensitive changes, and doc refactors:
+  [Architecture Domain Navigation Worked Examples](../contributors/architecture-domain-navigation-worked-examples.ai.md)
+- Need worked examples for active-versus-historical source selection in decomposition, review, migration planning, and troubleshooting:
+  [Active vs Historical Docs Worked Examples](../contributors/active-vs-historical-docs-worked-examples.ai.md)
+- Need contributor workflow guidance for index-first discovery and metadata-based authority checks:
+  [Documentation Index Daily Usage Guide](../contributors/documentation-index-daily-usage-guide.ai.md)
+- Need repository task examples for index-assisted discovery with routing/taxonomy/status alignment:
+  [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.ai.md)
+- Need pass/fail examples for architecture docs, ADRs, routing, registry, context packs, and baseline handling under docs-quality enforcement:
+  [Documentation Quality Worked Examples](../contributors/documentation-quality-worked-examples.ai.md)
+- Need full task-to-context-pack assembly rules instead of architecture-only routing:
+  [Context Routing Router](../context/routing/README.ai.md)
 
-## TODO
-- If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.
+## Route By Document Type
+- Domain boundary intent and invariants: use the selected domain `overview.md`.
+- Domain contract surfaces: use `references/README.md` linked from [Domain Folder Contract](./domains/README.md).
+- Decision rationale and supersession: [ADR Router](../adr/README.ai.md).
+- Contributor authoring and placement standards: [Contributors Router](../contributors/README.ai.md).
 
-## Shared taxonomy foundation (alignment slice)
-- A compact shared composition taxonomy now exists in `domain/taxonomy/CompositionTaxonomy.ts` with explicit structural kind, semantic role, and behavior kind.
-- Classification seams for current entities live in `application/taxonomy/CompositionTaxonomyClassifier.ts`.
-- Workflow and agent adapters use the same taxonomy model (`application/workflows/WorkflowTaxonomy.ts`, `application/agents/contracts/AgentTaxonomy.ts`) so agents remain extensions of the shared composition model, not a separate ontology.
-- Canonical identity persistence now stores taxonomy metadata, and canonical asset query criteria supports taxonomy-aware filtering.
-- Canonical asset summary/detail reads include taxonomy via identity metadata with bounded fallback mapping.
-- See `docs/architecture/shared-composition-taxonomy.md` for the practical architecture note and current-scope boundaries.
-- Shared asset contracts now complement taxonomy (`domain/contracts/AssetContract.ts`, `application/contracts/CompositionAssetContractResolver.ts`) and are surfaced through canonical operational reads when available; see `docs/architecture/shared-asset-contracts.md`.
-- Asset selector foundation now lives in `domain/studio-shell/AssetSelectorContract.ts` and `application/studio-entry/AssetSelectorCapabilityRegistry.ts`; see `docs/architecture/asset-selector-framework.md`.
-- Canonical studio launch/return handoff contracts now live in `ui/routes/StudioHandoffContract.ts`; see `docs/architecture/studio-handoff-contract.md`.
-
-## Direction 5 update: Exchange (Epic 10) status snapshot
-
-- Exchange now has a first-class local-first publish/package/import stack across `domain/exchange/*`, `application/exchange/*`, and `infrastructure/api/exchange/*`.
-- Implemented now: bundle + manifest + dependency snapshot modeling, format compatibility/versioning, validation + deterministic serialization/deserialization, atomic/composite/system export/import services, exchange access control, publishable package lifecycle, local catalog abstraction, publish workflow, and public exchange SDK DTO mappings.
-- End-to-end coherence coverage is now present for export -> validate/deserialize -> publish/catalog -> import (including provenance/lineage, access-denial, and conflict outcomes) in `application/exchange/tests/ExchangeEndToEndLifecycle.integration.test.ts`.
-- Boundary clarity is explicit: exchange artifacts remain distinct from runtime execution state, deployment execution state, and studio-handoff artifacts.
-- Future-oriented but not implemented in this slice: distributed/LAN repository sharing and distributed packaging/execution behaviors; current abstractions keep that path open without claiming support today.
-
+## Active Flat References Pending Domain Migration
+- [Multi-Surface UI Composition Foundation](./multi-surface-ui-composition-foundation.md) (`docs/architecture/multi-surface-ui-composition-foundation.md`)
+- [Feature 17 / Epic 17.2 Story 17.2.8 Scheduling Integration](./run-orchestration-scheduling-authoritative-queue-selection-and-assignment-integration.md)
+- [Unified API Endpoint Reference](./unified-api-endpoint-reference.md)
