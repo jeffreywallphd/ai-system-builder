@@ -72,12 +72,19 @@ export class LocalUserSecureSecretStoreBackend {
     }
 
     const metadata = await this.readMetadata(input.selector);
+    const activeVersionId = resolveActiveVersionId({
+      currentVersionId: metadata?.rotation?.currentVersionId ?? metadata?.currentVersionId,
+      versions: metadata?.rotation?.versions,
+    });
+    if (!activeVersionId) {
+      return createNotFoundResult(input.selector.secretId);
+    }
     return {
       ok: true,
       value: Object.freeze({
         providerId: input.selector.providerId,
         secretId: input.selector.secretId,
-        currentVersionId: metadata?.rotation?.currentVersionId ?? metadata?.currentVersionId ?? toVersionId(input.selector.secretId, material),
+        currentVersionId: activeVersionId,
         scope: input.selector.scope,
         materialKind: input.selector.materialKind,
         rawValue: material,
@@ -215,6 +222,15 @@ export class LocalUserSecureSecretStoreBackend {
     metadata: StoredLocalSecretMetadata | undefined,
   ): Promise<SecretReference> {
     if (metadata) {
+      const activeVersionId = resolveActiveVersionId({
+        currentVersionId: metadata.rotation?.currentVersionId ?? metadata.currentVersionId,
+        versions: metadata.rotation?.versions,
+      });
+      const lifecycleStatus = toRotationStatus({
+        state: "active",
+        versions: metadata.rotation?.versions ?? Object.freeze([]),
+        currentVersionId: metadata.rotation?.currentVersionId ?? metadata.currentVersionId,
+      });
       return Object.freeze({
         secretId: selector.secretId,
         name: metadata.name,
@@ -222,8 +238,8 @@ export class LocalUserSecureSecretStoreBackend {
         workspaceId: selector.scope.workspaceId,
         userIdentityId: selector.scope.userIdentityId,
         kind: metadata.kind,
-        state: "active",
-        currentVersionId: metadata.currentVersionId,
+        state: lifecycleStatus === SecretProviderMaterialRotationStatuses.active ? "active" : "disabled",
+        currentVersionId: activeVersionId,
         metadata: metadata.metadata,
         updatedAt: metadata.updatedAt,
       });
@@ -451,17 +467,21 @@ function toSecretProviderMaterialMetadata(input: {
   readonly backendKind: typeof SecretProviderMaterialBackendKinds[keyof typeof SecretProviderMaterialBackendKinds];
   readonly rotation?: StoredLocalSecretRotationMetadata;
 }): SecretProviderMaterialMetadata {
-  const currentVersionId = input.rotation?.currentVersionId ?? input.reference.currentVersionId;
+  const preferredCurrentVersionId = input.rotation?.currentVersionId ?? input.reference.currentVersionId;
   const versions = input.rotation?.versions
-    ?? (currentVersionId
+    ?? (preferredCurrentVersionId
       ? Object.freeze([
         Object.freeze({
-          versionId: currentVersionId,
+          versionId: preferredCurrentVersionId,
           state: SecurityMaterialRotationVersionStates.active,
           effectiveFrom: input.reference.updatedAt,
         }),
       ])
       : Object.freeze([]));
+  const currentVersionId = resolveActiveVersionId({
+    currentVersionId: preferredCurrentVersionId,
+    versions,
+  });
 
   return Object.freeze({
     providerId: input.selector.providerId,
@@ -477,7 +497,11 @@ function toSecretProviderMaterialMetadata(input: {
       updatedAt: input.reference.updatedAt,
     }),
     rotation: Object.freeze({
-      status: toRotationStatus(input.reference.state),
+      status: toRotationStatus({
+        state: input.reference.state,
+        versions,
+        currentVersionId: preferredCurrentVersionId,
+      }),
       currentVersionId,
       previousVersionId: input.rotation?.previousVersionId,
       pendingVersionId: input.rotation?.pendingVersionId,
@@ -495,18 +519,40 @@ function toSecretProviderMaterialMetadata(input: {
 }
 
 function toRotationStatus(
-  state: SecretReference["state"],
+  input: {
+    readonly state: SecretReference["state"];
+    readonly versions: ReadonlyArray<SecurityMaterialRotationVersionContract>;
+    readonly currentVersionId?: string;
+  },
 ): typeof SecretProviderMaterialRotationStatuses[keyof typeof SecretProviderMaterialRotationStatuses] {
-  if (state === "active") {
+  const currentVersion = input.currentVersionId
+    ? input.versions.find((version) => version.versionId === input.currentVersionId)
+    : undefined;
+  if (currentVersion?.state === SecurityMaterialRotationVersionStates.revoked) {
+    return SecretProviderMaterialRotationStatuses.revoked;
+  }
+  if (currentVersion?.state === SecurityMaterialRotationVersionStates.retired) {
+    return SecretProviderMaterialRotationStatuses.retired;
+  }
+  if (input.versions.some((version) => version.state === SecurityMaterialRotationVersionStates.active)) {
     return SecretProviderMaterialRotationStatuses.active;
   }
-  if (state === "disabled") {
+  if (input.versions.some((version) => version.state === SecurityMaterialRotationVersionStates.revoked)) {
+    return SecretProviderMaterialRotationStatuses.revoked;
+  }
+  if (input.versions.some((version) => version.state === SecurityMaterialRotationVersionStates.retired)) {
+    return SecretProviderMaterialRotationStatuses.retired;
+  }
+  if (input.state === "active") {
+    return SecretProviderMaterialRotationStatuses.active;
+  }
+  if (input.state === "disabled") {
     return SecretProviderMaterialRotationStatuses.disabled;
   }
-  if (state === "archived") {
+  if (input.state === "archived") {
     return SecretProviderMaterialRotationStatuses.archived;
   }
-  if (state === "soft-deleted") {
+  if (input.state === "soft-deleted") {
     return SecretProviderMaterialRotationStatuses.softDeleted;
   }
   return SecretProviderMaterialRotationStatuses.unknown;
@@ -569,6 +615,29 @@ function normalizeRotationVersions(
     return Object.freeze([]);
   }
   return Object.freeze(normalized);
+}
+
+function resolveActiveVersionId(input: {
+  readonly currentVersionId?: string;
+  readonly versions?: ReadonlyArray<SecurityMaterialRotationVersionContract>;
+}): string | undefined {
+  const currentVersionId = normalizeOptional(input.currentVersionId);
+  const versions = input.versions ?? Object.freeze([]);
+  if (versions.length === 0) {
+    return currentVersionId;
+  }
+
+  if (currentVersionId) {
+    const current = versions.find((version) => version.versionId === currentVersionId);
+    if (current?.state === SecurityMaterialRotationVersionStates.active) {
+      return current.versionId;
+    }
+  }
+
+  const active = versions
+    .filter((version) => version.state === SecurityMaterialRotationVersionStates.active)
+    .sort((left, right) => Date.parse(right.effectiveFrom) - Date.parse(left.effectiveFrom))[0];
+  return active?.versionId;
 }
 
 function normalizeRotationPolicyMetadata(policy: unknown): SecurityMaterialRotationPolicyMetadata | undefined {

@@ -2,6 +2,8 @@ export const SecurityMaterialRotationVersionStates = Object.freeze({
   active: "active",
   previous: "previous",
   pending: "pending",
+  revoked: "revoked",
+  retired: "retired",
 });
 
 export type SecurityMaterialRotationVersionState =

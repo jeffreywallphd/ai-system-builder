@@ -67,6 +67,8 @@ export const SecretProviderMaterialRotationStatuses = Object.freeze({
   disabled: "disabled",
   archived: "archived",
   softDeleted: "soft-deleted",
+  revoked: "revoked",
+  retired: "retired",
   unknown: "unknown",
 });
 

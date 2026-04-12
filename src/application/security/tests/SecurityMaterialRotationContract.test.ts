@@ -49,4 +49,21 @@ describe("SecurityMaterialRotationContract", () => {
     expect(policy.maxActiveOverlapMinutes).toBe(60);
     expect(policy.nextRotationDueAt).toBe("2026-07-01T00:00:00.000Z");
   });
+
+  it("accepts revoked and retired version states for lifecycle governance timelines", () => {
+    const revoked = createSecurityMaterialRotationVersionContract({
+      versionId: "secret:server:signing:v5",
+      state: SecurityMaterialRotationVersionStates.revoked,
+      effectiveFrom: "2026-04-11T00:00:00.000Z",
+      effectiveUntil: "2026-04-11T00:01:00.000Z",
+    });
+    const retired = createSecurityMaterialRotationVersionContract({
+      versionId: "secret:server:signing:v4",
+      state: SecurityMaterialRotationVersionStates.retired,
+      effectiveFrom: "2026-04-10T00:00:00.000Z",
+    });
+
+    expect(revoked.state).toBe("revoked");
+    expect(retired.state).toBe("retired");
+  });
 });

@@ -321,3 +321,27 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
     - validates active-version write cutover
     - validates previous-version content decryptability after rollover
     - validates legacy deterministic reference compatibility behavior
+
+## Story 3.3.6 Revocation and retirement handling
+
+- introduces explicit lifecycle distinction for secret material versions:
+  - `revoked`: emergency compromise response; version is immediately ineligible for active runtime resolution
+  - `retired`: planned end-of-use lifecycle state; version is intentionally out of active service without compromise semantics
+- lifecycle contracts and domain states now model revocation and retirement explicitly:
+  - `src/domain/security/SecretDomain.ts`
+  - `src/application/security/contracts/SecurityMaterialRotationContract.ts`
+  - `src/application/security/ports/SecretProviderPorts.ts`
+- adds governed mutation use cases for version-level lifecycle operations:
+  - `src/application/security/use-cases/RevokeSecretVersionUseCase.ts`
+  - `src/application/security/use-cases/RetireSecretVersionUseCase.ts`
+- consumer resolution posture under mixed-state timelines:
+  - revoked/retired versions are never selected as active material
+  - runtime retrieval continues to resolve only active versions by default (superseded still requires explicit opt-in compatibility flow)
+  - local user secure-store metadata timelines preserve revoked/retired state visibility while resolving active version ids only
+- persistence and diagnostics posture:
+  - SQLite secret version schema now accepts `revoked` and `retired` version states
+  - provider metadata rotation envelopes and diagnostics surfaces expose revoked/retired lifecycle signals for governance visibility
+- operator expectations:
+  - use revocation for compromise events requiring immediate removal from active use
+  - use retirement for planned decommission/cutover completion where compromise is not implied
+  - if no active version remains after revocation/retirement, runtime retrieval fails closed until a replacement active version is promoted

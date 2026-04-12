@@ -12,6 +12,8 @@ import {
   createSecretScopeOwner,
   disableSecretRecord,
   evaluateSecretAccessDecision,
+  retireSecretVersionRecord,
+  revokeSecretVersionRecord,
   rotateSecretRecord,
   softDeleteSecretRecord,
 } from "../SecretDomain";
@@ -175,9 +177,26 @@ describe("SecretDomain", () => {
     expect(rotated.versions[0]?.state).toBe(SecretVersionStates.superseded);
     expect(rotated.versions[0]?.supersededByVersionId).toBe("version:2");
     expect(rotated.versions[1]?.previousVersionId).toBe("version:1");
+    const revokedSuperseded = revokeSecretVersionRecord({
+      record: rotated,
+      versionId: "version:1",
+      revokedBy: "user:owner",
+      revokedAt: "2026-05-05T12:01:00.000Z",
+    });
+    expect(revokedSuperseded.versions[0]?.state).toBe(SecretVersionStates.revoked);
+    expect(revokedSuperseded.currentVersionId).toBe("version:2");
+
+    const retiredActive = retireSecretVersionRecord({
+      record: revokedSuperseded,
+      versionId: "version:2",
+      retiredBy: "user:owner",
+      retiredAt: "2026-05-05T12:02:00.000Z",
+    });
+    expect(retiredActive.versions[1]?.state).toBe(SecretVersionStates.retired);
+    expect(retiredActive.currentVersionId).toBeUndefined();
 
     const archived = archiveSecretRecord({
-      record: rotated,
+      record: retiredActive,
       archivedBy: "user:owner",
       archivedAt: "2026-06-01T00:00:00.000Z",
     });
@@ -185,7 +204,7 @@ describe("SecretDomain", () => {
     expect(archived.archivedBy).toBe("user:owner");
 
     const disabled = disableSecretRecord({
-      record: rotated,
+      record: retiredActive,
       disabledBy: "user:owner",
       disabledAt: "2026-06-01T01:00:00.000Z",
     });
