@@ -74,6 +74,12 @@ import {
   listAuthoritativeServerBootstrapPipelineStages,
   updateAuthoritativeServerBootstrapPipelineStageState,
 } from "./composition/contracts/AuthoritativeServerBootstrapPipelineStateModel";
+import {
+  AuthoritativeServerCompositionModuleIds,
+  type AuthoritativeServerShutdownDisposalPlan,
+  type AuthoritativeServerShutdownDisposalStep,
+} from "./composition/contracts/AuthoritativeServerCompositionModuleContracts";
+import { AuthoritativeServerRuntimeDisposalModuleOrder } from "./composition/contracts/AuthoritativeServerCompositionModuleMap";
 import { HostRuntimeMetadataArtifactKey } from "../HostRuntimeMetadataCatalog";
 import {
   AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
@@ -119,6 +125,7 @@ export interface AuthoritativeServerBootstrapOrchestratorResult {
   readonly runtimeMetadata: HostRuntimeMetadata;
   readonly persistenceRuntime?: SqlitePersistenceRuntime;
   readonly persistentPlatformServices?: AuthoritativePersistentPlatformServices;
+  readonly shutdownDisposalPlan: AuthoritativeServerShutdownDisposalPlan;
   readonly stageStatus: AuthoritativeServerBootstrapOrchestratorStageStatus;
   readonly readinessReport: AuthoritativeServerBootstrapReadinessReport;
 }
@@ -334,6 +341,61 @@ function createReadinessReport(input: {
   });
 }
 
+function createAuthoritativeServerShutdownDisposalPlan(input: {
+  readonly startedHost?: IdentityServerHost;
+  readonly persistentPlatformServices?: AuthoritativePersistentPlatformServices;
+  readonly persistenceRuntime?: SqlitePersistenceRuntime;
+}): AuthoritativeServerShutdownDisposalPlan {
+  const candidateSteps: AuthoritativeServerShutdownDisposalStep[] = [];
+
+  if (input.startedHost) {
+    candidateSteps.push(Object.freeze({
+      hookId: "close-runtime-host",
+      moduleId: AuthoritativeServerCompositionModuleIds.transport,
+      description: "Close the authoritative runtime host transport before persistence disposal.",
+      dispose: async () => {
+        await input.startedHost?.close();
+      },
+    }));
+  }
+
+  if (input.persistentPlatformServices || input.persistenceRuntime) {
+    candidateSteps.push(Object.freeze({
+      hookId: "close-persistence-runtime",
+      moduleId: AuthoritativeServerCompositionModuleIds.persistenceBootstrap,
+      description: "Dispose composed persistent services and persistence runtime resources.",
+      dispose: async () => {
+        input.persistentPlatformServices?.dispose();
+        await input.persistenceRuntime?.dispose();
+      },
+    }));
+  }
+
+  const orderedSteps = AuthoritativeServerRuntimeDisposalModuleOrder.flatMap((moduleId) => (
+    candidateSteps.filter((step) => step.moduleId === moduleId)
+  ));
+
+  return Object.freeze({
+    stageId: "shutdown-preparation",
+    steps: Object.freeze(orderedSteps),
+  });
+}
+
+async function executeShutdownDisposalPlan(input: {
+  readonly plan: AuthoritativeServerShutdownDisposalPlan;
+  readonly reason: string;
+}): Promise<ReadonlyArray<unknown>> {
+  const disposalErrors: unknown[] = [];
+  for (const step of input.plan.steps) {
+    try {
+      await step.dispose(input.reason);
+    } catch (error) {
+      disposalErrors.push(error);
+    }
+  }
+  return disposalErrors;
+}
+
 export function createAuthoritativeServerBootstrapOrchestrator(input: AuthoritativeServerBootstrapOrchestratorInput): {
   execute(): Promise<AuthoritativeServerBootstrapOrchestratorResult>;
 } {
@@ -390,6 +452,10 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
       let startedHost: IdentityServerHost | undefined;
       let persistenceRuntime: SqlitePersistenceRuntime | undefined;
       let persistentPlatformServices: AuthoritativePersistentPlatformServices | undefined;
+      let shutdownDisposalPlan: AuthoritativeServerShutdownDisposalPlan = Object.freeze({
+        stageId: "shutdown-preparation",
+        steps: Object.freeze([]),
+      });
       const readinessChecks: AuthoritativeServerReadinessCheck[] = [];
       const configStage = input.bootstrap?.createConfigStage?.();
       const securityStage = input.bootstrap?.createSecurityStage?.();
@@ -829,6 +895,20 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
                 context.setArtifact(StartedHostArtifactKey, startedHost);
               },
             });
+            await runBootstrapStage({
+              stageId: AuthoritativeServerBootstrapPipelineStageIds.shutdownPreparation,
+              metadata: Object.freeze({
+                hostBootstrapStageId: HostBootstrapStageIds.featureRegistration,
+              }),
+              readinessState: deriveReadinessStateFromChecks(readinessChecks),
+              run: () => {
+                shutdownDisposalPlan = createAuthoritativeServerShutdownDisposalPlan({
+                  startedHost,
+                  persistentPlatformServices,
+                  persistenceRuntime,
+                });
+              },
+            });
           },
         };
         const stageHandlers = combineStageHandlers(defaultStageHandlers, input.bootstrap?.stageHandlers);
@@ -859,12 +939,30 @@ export function createAuthoritativeServerBootstrapOrchestrator(input: Authoritat
           runtimeMetadata,
           persistenceRuntime,
           persistentPlatformServices,
+          shutdownDisposalPlan,
           stageStatus: createStageStatusSnapshot(bootstrapState.stages),
           readinessReport: createReadinessReport({
             checks: readinessChecks,
             stageStatuses: bootstrapState.stages,
           }),
         });
+      } catch (error) {
+        const cleanupPlan = createAuthoritativeServerShutdownDisposalPlan({
+          startedHost,
+          persistentPlatformServices,
+          persistenceRuntime,
+        });
+        const cleanupErrors = await executeShutdownDisposalPlan({
+          plan: cleanupPlan,
+          reason: "authoritative-server-bootstrap-failure-cleanup",
+        });
+        if (cleanupErrors.length > 0) {
+          throw new AggregateError(
+            [error, ...cleanupErrors],
+            "Authoritative server bootstrap failed and shutdown cleanup encountered failures.",
+          );
+        }
+        throw error;
       } finally {
         startupRootSpan.complete();
       }

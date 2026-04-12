@@ -52,6 +52,18 @@ export interface AuthoritativeServerCompositionDisposable {
   dispose(reason: string): MaybePromise<void>;
 }
 
+export interface AuthoritativeServerShutdownDisposalStep {
+  readonly hookId: string;
+  readonly moduleId: AuthoritativeServerCompositionModuleId;
+  readonly description: string;
+  dispose(reason: string): MaybePromise<void>;
+}
+
+export interface AuthoritativeServerShutdownDisposalPlan {
+  readonly stageId: "shutdown-preparation";
+  readonly steps: ReadonlyArray<AuthoritativeServerShutdownDisposalStep>;
+}
+
 export interface AuthoritativeServerCompositionModuleContract<
   TModuleId extends AuthoritativeServerCompositionModuleId,
   TInput,

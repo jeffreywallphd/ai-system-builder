@@ -5,6 +5,7 @@ import {
 } from "../composition/contracts/AuthoritativeServerCompositionModuleContracts";
 import {
   AuthoritativeServerCompositionModuleMap,
+  AuthoritativeServerRuntimeDisposalModuleOrder,
   listAuthoritativeServerCompositionModules,
 } from "../composition/contracts/AuthoritativeServerCompositionModuleMap";
 
@@ -113,6 +114,13 @@ describe("AuthoritativeServerCompositionAssemblyContracts", () => {
 
     expect(persistenceModule?.disposalResponsibilities).toContain("dispose sqlite persistence runtime");
     expect(transportModule?.disposalResponsibilities).toContain("close runtime host transport");
+  });
+
+  it("defines deterministic runtime disposal module ordering", () => {
+    expect(AuthoritativeServerRuntimeDisposalModuleOrder).toEqual([
+      AuthoritativeServerCompositionModuleIds.transport,
+      AuthoritativeServerCompositionModuleIds.persistenceBootstrap,
+    ]);
   });
 
   it("exposes a stable list function aligned with the module map", () => {

@@ -195,6 +195,11 @@ export const AuthoritativeServerCompositionModuleMap = Object.freeze([
   } satisfies AuthoritativeServerCompositionModuleDescriptor),
 ]);
 
+export const AuthoritativeServerRuntimeDisposalModuleOrder = Object.freeze([
+  AuthoritativeServerCompositionModuleIds.transport,
+  AuthoritativeServerCompositionModuleIds.persistenceBootstrap,
+] as const satisfies ReadonlyArray<AuthoritativeServerCompositionModuleId>);
+
 export function listAuthoritativeServerCompositionModules(): ReadonlyArray<AuthoritativeServerCompositionModuleDescriptor> {
   return AuthoritativeServerCompositionModuleMap;
 }

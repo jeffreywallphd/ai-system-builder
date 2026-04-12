@@ -27,7 +27,7 @@ describe("AuthoritativeServerBootstrapPipelineStateModel", () => {
     expect(stages.map((stage) => stage.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(stages.every((stage) => stage.description.length > 10)).toBeTrue();
     expect(stages.every((stage) => stage.ownedModules.length > 0)).toBeTrue();
-    expect(stages[7]?.adoptionState).toBe(AuthoritativeServerBootstrapPipelineStageAdoptionStates.planned);
+    expect(stages[7]?.adoptionState).toBe(AuthoritativeServerBootstrapPipelineStageAdoptionStates.active);
   });
 
   it("creates initial pipeline state as pending and not-ready across all stages", () => {
