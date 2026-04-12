@@ -17,6 +17,7 @@ related_code_paths:
   - dev/scripts/validate-docs-category-compliance.cjs
   - docs/context/governance/documentation-quality-standard.md
   - docs/contributors/documentation-quality-enforced-standards-guide.md
+  - docs/contributors/documentation-quality-worked-examples.md
   - docs/contributors/docs-foundation-validation.md
   - docs/context/templates/README.md
   - dev/tests/DocumentationContributorQualityChecksStory733Guardrails.test.ts
@@ -135,6 +136,7 @@ Default policy blocks on `critical` only. Use `--strict-important` only for scop
 - Validator behavior and stable code list: `docs/contributors/docs-foundation-validation.md`
 - Templates for new docs and paired assets: `docs/context/templates/README.md`
 - Placement and authority boundaries: `docs/contributors/docs-placement-guide.md`
+- Passing/failing repository examples by documentation asset type: `docs/contributors/documentation-quality-worked-examples.md`
 
 ## Efficient Fix Strategy for Multi-Issue Runs
 

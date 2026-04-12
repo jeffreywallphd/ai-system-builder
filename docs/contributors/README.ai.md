@@ -29,6 +29,7 @@
 - [Documentation Foundation Validation Guide](./docs-foundation-validation.ai.md)
 - [Documentation Quality Enforced Standards Guide](./documentation-quality-enforced-standards-guide.ai.md)
 - [Documentation Quality Checks Run and Fix Guide](./documentation-quality-checks-run-and-fix-guide.ai.md)
+- [Documentation Quality Worked Examples](./documentation-quality-worked-examples.ai.md)
 - [Context Engineering System Contributor Guide](./context-engineering-system-guide.ai.md)
 - [Router and Overview Writing Standard](./router-overview-writing-standard.ai.md)
 - [Architecture Domain Overview and Reference Readability Guide](./architecture-domain-overview-reference-readability-guide.ai.md)

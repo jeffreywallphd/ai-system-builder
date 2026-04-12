@@ -32,8 +32,10 @@ related_code_paths:
   - dev/tests/DocumentationRegistryContextRoutingIntegrationStory633Guardrails.test.ts
   - dev/tests/DocumentationIndexContributorDailyUsageStory634Guardrails.test.ts
   - dev/tests/DocumentationIndexAssistedDiscoveryWorkedExamplesStory635Guardrails.test.ts
+  - dev/tests/DocumentationQualityWorkedExamplesStory734Guardrails.test.ts
   - docs/contributors/documentation-index-daily-usage-guide.ai.md
   - docs/contributors/documentation-index-assisted-discovery-worked-examples.ai.md
+  - docs/contributors/documentation-quality-worked-examples.ai.md
 ---
 
 # AI Companion: Documentation Registry Structure (Story 6.1.3)
@@ -347,6 +349,28 @@ Canonical guidance:
 - `docs/context/governance/documentation-indexing-rollout-boundaries.ai.md`
 
 Use this boundary note when triaging enhancement requests, separating current-scope fixes from follow-on deeper-search work, and keeping governance expectations explicit for contributors and AI assistants.
+
+## Documentation Quality Worked Examples Adoption Status (Story 7.3.4)
+
+Story 7.3.4 adds a repository-specific docs-quality worked-examples guide and indexes it for contributor/routing discovery.
+
+Added indexed guide:
+
+- `docs/contributors/documentation-quality-worked-examples.ai.md`
+
+Stable registry identity:
+
+- `doc-contributors-documentation-quality-worked-examples`
+
+Discovery index integration:
+
+- `discoveryIndex.byDocType.contributor-guide`
+- `discoveryIndex.byDomain.contributors`
+- `discoveryIndex.byStatus.active`
+- `discoveryIndex.byAuthoritativeness.canonical`
+- `discoveryIndex.byTaskCategory.documentation-change`
+
+This keeps pass/fail quality examples discoverable through the same registry surfaces used by contributor workflow and docs-change routing.
 
 ## Coverage Policy Contract
 

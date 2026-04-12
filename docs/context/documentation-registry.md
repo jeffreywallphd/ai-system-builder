@@ -32,8 +32,10 @@ related_code_paths:
   - dev/tests/DocumentationRegistryContextRoutingIntegrationStory633Guardrails.test.ts
   - dev/tests/DocumentationIndexContributorDailyUsageStory634Guardrails.test.ts
   - dev/tests/DocumentationIndexAssistedDiscoveryWorkedExamplesStory635Guardrails.test.ts
+  - dev/tests/DocumentationQualityWorkedExamplesStory734Guardrails.test.ts
   - docs/contributors/documentation-index-daily-usage-guide.md
   - docs/contributors/documentation-index-assisted-discovery-worked-examples.md
+  - docs/contributors/documentation-quality-worked-examples.md
 ---
 
 # Documentation Registry Structure (Story 6.1.3)
@@ -363,6 +365,23 @@ Canonical rollout-boundary guidance lives in:
 - `docs/context/governance/documentation-indexing-rollout-boundaries.md`
 
 Use this guidance when evaluating completion claims, prioritizing backlog follow-on work, and deciding whether a proposed enhancement belongs in this lightweight indexing system or in a future deeper-search initiative.
+
+## Documentation Quality Worked Examples Adoption Status (Story 7.3.4)
+
+Story 7.3.4 adds a repo-specific quality worked-examples guide and indexes it for contributor and routing discovery:
+
+- New indexed contributor guide:
+  - `docs/contributors/documentation-quality-worked-examples.md`
+- Stable registry identifier:
+  - `doc-contributors-documentation-quality-worked-examples`
+- Discovery integration:
+  - Included in `discoveryIndex.byDocType.contributor-guide`
+  - Included in `discoveryIndex.byDomain.contributors`
+  - Included in `discoveryIndex.byStatus.active`
+  - Included in `discoveryIndex.byAuthoritativeness.canonical`
+  - Included in `discoveryIndex.byTaskCategory.documentation-change`
+
+This keeps pass/fail standards examples discoverable from the same indexed surfaces used for contributor guidance and docs-workflow routing.
 
 ## Extensibility Boundaries
 

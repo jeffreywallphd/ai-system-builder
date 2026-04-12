@@ -72,6 +72,8 @@ related_code_paths:
   [Documentation Index Daily Usage Guide](../contributors/documentation-index-daily-usage-guide.md)
 - Need repository task examples showing index-assisted discovery across routing, taxonomy, and status signals:
   [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.md)
+- Need passing and failing examples for architecture docs, ADRs, routing, registry, context packs, and baseline handling under docs-quality enforcement:
+  [Documentation Quality Worked Examples](../contributors/documentation-quality-worked-examples.md)
 - Need full task-to-context-pack assembly rules instead of architecture-only routing:
   [Context Routing Router](../context/routing/README.md)
 
