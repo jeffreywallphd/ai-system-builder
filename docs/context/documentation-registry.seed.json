@@ -2027,6 +2027,45 @@
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-documentation-quality-monitoring-and-feedback-guide",
+      "path": "docs/contributors/documentation-quality-monitoring-and-feedback-guide.md",
+      "aiPath": "docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md",
+      "title": "Documentation Quality Monitoring and Feedback Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines lightweight monitoring guidance for false positives, noisy rules, rule drift, stale standards, and contributor friction so docs-quality enforcement can be tuned continuously.",
+      "keywords": [
+        "documentation quality",
+        "monitoring guidance",
+        "false positives",
+        "rule drift",
+        "contributor friction"
+      ],
+      "relatedCodePaths": [
+        "docs/context/governance/documentation-quality-standard.md",
+        "docs/contributors/documentation-quality-rule-evolution-guide.md",
+        "docs/contributors/documentation-quality-tooling-maintenance-guide.md",
+        "docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md",
+        "dev/scripts/lint-docs.cjs",
+        "dev/tests/DocumentationQualityMonitoringStory743Guardrails.test.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-tooling-maintenance-guide",
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
+      ],
+      "relatedDocs": [
+        "docs/contributors/documentation-quality-rule-evolution-guide.md",
+        "docs/contributors/documentation-quality-tooling-maintenance-guide.md",
+        "docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md",
+        "docs/context/governance/documentation-quality-standard.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
     }
   ],
   "discoveryIndex": {
@@ -2065,7 +2104,8 @@
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
-        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
       ],
       "runbook": [
         "doc-operations-node-bootstrap-identity",
@@ -2149,7 +2189,8 @@
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
-        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
       ],
       "deprecated": [],
       "superseded": [
@@ -2198,7 +2239,8 @@
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
-        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
       ],
       "operations": [
         "doc-context-pack-runtime-and-host",
@@ -2264,7 +2306,8 @@
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
-        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
       ],
       "reference": [
         "doc-architecture-document-scope-boundaries",
@@ -2360,7 +2403,8 @@
         "doc-contributors-documentation-quality-worked-examples",
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
-        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide"
+        "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
       ]
     }
   },
