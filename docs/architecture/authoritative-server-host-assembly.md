@@ -27,6 +27,7 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Storage + protected asset bounded composition module: `src/hosts/server/composition/ServerStorageAssetCompositionModule.ts`
 - Image/media bounded composition module: `src/hosts/server/composition/ServerImageMediaCompositionModule.ts`
 - Generated-result bounded composition module: `src/hosts/server/composition/ServerGeneratedResultCompositionModule.ts`
+- Audit/diagnostics/platform cross-cutting bounded composition module: `src/hosts/server/composition/ServerAuditDiagnosticsPlatformCompositionModule.ts`
 - Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
@@ -82,6 +83,12 @@ Story 2.2.4 extracts storage/asset/media/generated-result assembly from inline `
   - `src/hosts/server/tests/ServerStorageAssetCompositionModule.test.ts`
   - `src/hosts/server/tests/ServerImageMediaCompositionModule.test.ts`
   - `src/hosts/server/tests/ServerGeneratedResultCompositionModule.test.ts`
+
+Story 2.2.5 extracts audit-service assembly, diagnostics reconciliation/backends, and cross-cutting operational logging dependencies from inline `IdentityServerHost.ts` startup wiring into:
+
+- `src/hosts/server/composition/ServerAuditDiagnosticsPlatformCompositionModule.ts`
+- regression coverage:
+  - `src/hosts/server/tests/ServerAuditDiagnosticsPlatformCompositionModule.test.ts`
 
 ## Control-plane composition responsibilities
 
@@ -282,6 +289,7 @@ Host assembly coverage lives in:
 - `src/hosts/server/tests/ServerStorageAssetCompositionModule.test.ts`
 - `src/hosts/server/tests/ServerImageMediaCompositionModule.test.ts`
 - `src/hosts/server/tests/ServerGeneratedResultCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerAuditDiagnosticsPlatformCompositionModule.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
 ## Related ADRs

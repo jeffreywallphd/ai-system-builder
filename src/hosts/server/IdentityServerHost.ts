@@ -17,7 +17,6 @@ import { ScryptLocalPasswordCredentialService } from "@infrastructure/security/i
 import { IdentitySessionPolicyConfig } from "@infrastructure/config/IdentitySessionPolicyConfig";
 import { IdentitySessionTrustPolicyConfig } from "@infrastructure/config/IdentitySessionTrustPolicyConfig";
 import { IdentityProviderAccountPolicyConfig } from "@infrastructure/config/IdentityProviderAccountPolicyConfig";
-import { resolveAuditRetentionLifecycleConfig } from "@infrastructure/config/AuditRetentionLifecycleConfig";
 import {
   HostSecureTransportKinds,
   resolveHostSecureTransportConfig,
@@ -27,31 +26,23 @@ import {
   FanoutStorageManagementAuditSink,
   FanoutAssetAuditSink,
   FanoutNodeTrustAuditSink,
-  FanoutRunSubmissionAuditSink,
   FanoutDeploymentPolicyGovernanceEventSink,
 } from "@infrastructure/audit/AuditFanoutPublishers";
 import { AuthoritativeNodeTrustAuditSink } from "@infrastructure/audit/AuthoritativeNodeTrustAuditSink";
-import { AuthoritativeExecutionNodeManagementAuditSink } from "@infrastructure/audit/AuthoritativeExecutionNodeManagementAuditSink";
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder";
 import { AuthoritativeStorageManagementAuditSink } from "@infrastructure/audit/AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "@infrastructure/audit/AuthoritativeProtectedAssetAuditSink";
 import { AuthoritativeImageAssetAuditSink } from "@infrastructure/audit/AuthoritativeImageAssetAuditSink";
 import { AuthoritativeGeneratedResultAuditSink } from "@infrastructure/audit/AuthoritativeGeneratedResultAuditSink";
-import { AuthoritativeRunSubmissionAuditSink } from "@infrastructure/audit/AuthoritativeRunSubmissionAuditSink";
 import { AuthoritativeDeploymentPolicyGovernanceEventSink } from "@infrastructure/audit/AuthoritativeDeploymentPolicyGovernanceEventSink";
 import {
   composeBestEffortSecretAuditHooks,
   createAuthoritativeSecretAccessAuditHook,
 } from "@infrastructure/audit/AuthoritativeSecretAccessAuditHook";
 import { AuthoritativeAuditRecordingService } from "@application/audit/use-cases/AuthoritativeAuditRecordingService";
-import { AuditLedgerQueryService } from "@application/audit/use-cases/AuditLedgerQueryService";
-import { WorkspaceAuditLedgerReadAuthorizer } from "@application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer";
-import { ReconcileAuditLedgerStartupStateUseCase } from "@application/audit/use-cases/ReconcileAuditLedgerStartupStateUseCase";
 import { WorkspaceInvitationBackendApi } from "@infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { AuthorizationManagementBackendApi } from "@infrastructure/api/authorization/AuthorizationManagementBackendApi";
-import { AuditLedgerBackendApi } from "@infrastructure/api/audit/AuditLedgerBackendApi";
-import { AuditLedgerObservability } from "@infrastructure/api/audit/AuditLedgerObservability";
 import { NodeTrustBackendApi } from "@infrastructure/api/nodes/NodeTrustBackendApi";
 import { ExecutionNodeManagementBackendApi } from "@infrastructure/api/nodes/ExecutionNodeManagementBackendApi";
 import { CertificateOperationsBackendApi } from "@infrastructure/api/security/CertificateOperationsBackendApi";
@@ -71,9 +62,7 @@ import { DeploymentPolicyWriteBackendApi } from "@infrastructure/api/deployment/
 import { PlatformDeploymentPolicyAdministrationObservabilityPort } from "@infrastructure/api/deployment/PlatformDeploymentPolicyAdministrationObservabilityPort";
 import { PlatformDeploymentPolicyGovernanceEventSink } from "@infrastructure/api/deployment/PlatformDeploymentPolicyGovernanceEventSink";
 import { WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService } from "@infrastructure/api/deployment/WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService";
-import { RunOrchestrationObservability } from "@infrastructure/api/runs/RunOrchestrationObservability";
 import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
-import { PlatformRunSubmissionAuditSink } from "@infrastructure/api/runs/PlatformRunSubmissionAuditSink";
 import { StorageSyncDeploymentAvailabilities } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
@@ -254,6 +243,7 @@ import { composeServerTlsMaterialCompositionModule } from "./composition/ServerT
 import { composeServerStorageAssetCompositionModule } from "./composition/ServerStorageAssetCompositionModule";
 import { composeServerImageMediaCompositionModule } from "./composition/ServerImageMediaCompositionModule";
 import { composeServerGeneratedResultCompositionModule } from "./composition/ServerGeneratedResultCompositionModule";
+import { composeServerAuditDiagnosticsPlatformCompositionModule } from "./composition/ServerAuditDiagnosticsPlatformCompositionModule";
 import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   evaluateTransportConnectionTrust,
@@ -372,42 +362,28 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     | ReturnType<typeof composeServerImageMediaCompositionModule>
     | undefined;
   try {
-    const auditRetentionLifecycleConfig = await runStartupStepSpan({
+    const auditDiagnosticsPlatformComposition = await runStartupStepSpan({
       tracer: startupTracer,
       parentSpan: startupRootSpan,
       name: "config-load",
       metadata: Object.freeze({
         component: "identity-server-host",
       }),
-      run: async () => resolveAuditRetentionLifecycleConfig({
+      run: async () => composeServerAuditDiagnosticsPlatformCompositionModule({
         env,
-        deploymentProfile: options.deploymentProfile
-          ? {
-            profileId: options.deploymentProfile.profileId,
-          }
-          : undefined,
+        deploymentProfile: options.deploymentProfile,
+        persistentPlatformServices,
+        logger: options.logger,
       }),
     });
-    const auditLedgerObservability = new AuditLedgerObservability({
-      logger: createAuditLedgerOperationalLogger(options.logger),
-    });
-    const authoritativeAuditRecorder = new AuthoritativeAuditRecordingService({
-      repository: persistentPlatformServices.auditLedgerRepository,
-      observabilityPort: auditLedgerObservability,
-      retentionLifecycleDefaults: {
-        policyKey: auditRetentionLifecycleConfig.defaultPolicyKey,
-        policyVersion: auditRetentionLifecycleConfig.defaultPolicyVersion,
-        retentionAnchor: auditRetentionLifecycleConfig.defaultRetentionAnchor,
-      },
-    });
-    const legacySecretAccessAuditHook = createSecretAccessAuditHook(options.logger);
+    const authoritativeAuditRecorder = auditDiagnosticsPlatformComposition.authoritativeAuditRecorder;
     const secretComposition = await composeServerSecretCompositionModule({
       databasePath: options.databasePath,
       env,
       workspaceRepository,
       authoritativeAuditRecorder,
-      observabilityLogger: createSecretOperationalLogger(options.logger),
-      legacySecretAccessAuditHook,
+      observabilityLogger: auditDiagnosticsPlatformComposition.secretOperationalLogger,
+      legacySecretAccessAuditHook: auditDiagnosticsPlatformComposition.legacySecretAccessAuditHook,
     });
     secretService = secretComposition.secretService;
     const protectedSecretStore = secretComposition.protectedSecretStore;
@@ -490,7 +466,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     env,
     persistentPlatformServices,
     authoritativeAuditRecorder,
-    encryptionObservabilityLogger: createEncryptionOperationalLogger(options.logger),
+    encryptionObservabilityLogger: auditDiagnosticsPlatformComposition.encryptionOperationalLogger,
   });
   const storageManagementBackendApi = storageAssetComposition.storageManagementBackendApi;
   const assetManagementBackendApi = storageAssetComposition.assetManagementBackendApi;
@@ -503,21 +479,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     persistentPlatformServices,
     authorizationDecisionEvaluator,
     authoritativeAuditRecorder,
-    imageAssetObservabilityLogger: createImageAssetManagementOperationalLogger(options.logger),
+    imageAssetObservabilityLogger: auditDiagnosticsPlatformComposition.imageAssetManagementOperationalLogger,
     storageLogicalAccessResolutionService,
     workspaceAwareStoragePolicyEvaluationAdapter,
   });
   const imageAssetManagementBackendApi = imageMediaComposition.imageAssetManagementBackendApi;
-  const runSubmissionAuditSink = new PlatformRunSubmissionAuditSink(
-    persistentPlatformServices.platformPersistenceRepository,
-  );
-  const authoritativeRunSubmissionAuditSink = new FanoutRunSubmissionAuditSink([
-    runSubmissionAuditSink,
-    new AuthoritativeRunSubmissionAuditSink(authoritativeAuditRecorder),
-  ]);
-  const executionNodeManagementAuditSink = new AuthoritativeExecutionNodeManagementAuditSink(
-    authoritativeAuditRecorder,
-  );
+  const authoritativeRunSubmissionAuditSink = auditDiagnosticsPlatformComposition.runSubmissionAuditSink;
+  const executionNodeManagementAuditSink = auditDiagnosticsPlatformComposition.executionNodeManagementAuditSink;
   const validateRunSubmissionUseCase = new ValidateRunSubmissionUseCase({
     workspaceRepository,
     authorizationDecisionEvaluator,
@@ -563,9 +531,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     imageRunReadinessResolver: imageRunSubmissionReadinessValidationService,
     now: () => workspaceClock.now(),
   });
-  const runOrchestrationObservability = new RunOrchestrationObservability({
-    logger: createRunOrchestrationOperationalLogger(options.logger),
-  });
+  const runOrchestrationObservability = auditDiagnosticsPlatformComposition.runOrchestrationObservability;
   const authoritativeRunSubmissionBackendApi = new AuthoritativeRunSubmissionBackendApi({
     submitImageRunUseCase,
     observability: runOrchestrationObservability,
@@ -596,20 +562,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const deploymentPolicyComposition = composeServerDeploymentPolicyCompositionModule({
     persistentPlatformServices,
     authoritativeAuditRecorder,
-    observabilityLogger: createDeploymentPolicyAdministrationOperationalLogger(options.logger),
+    observabilityLogger: auditDiagnosticsPlatformComposition.deploymentPolicyAdministrationOperationalLogger,
     hostLogger: options.logger,
   });
   const deploymentPolicyReadBackendApi = deploymentPolicyComposition.deploymentPolicyReadBackendApi;
   const deploymentPolicyWriteBackendApi = deploymentPolicyComposition.deploymentPolicyWriteBackendApi;
-  const auditLedgerBackendApi = new AuditLedgerBackendApi({
-    auditLedgerQueryService: new AuditLedgerQueryService({
-      repository: persistentPlatformServices.auditLedgerRepository,
-      authorizer: new WorkspaceAuditLedgerReadAuthorizer({
-        workspaceAuthorizationReadRepository: persistentPlatformServices.workspaceRepository,
-        clock: workspaceClock,
-      }),
-    }),
-    observability: auditLedgerObservability,
+  const auditLedgerBackendApi = auditDiagnosticsPlatformComposition.createAuditLedgerBackendApi({
+    workspaceClock,
   });
   const generatedResultComposition = composeServerGeneratedResultCompositionModule({
     env,
@@ -692,11 +651,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       }),
     });
   }
-  const auditStartupReconciliation = await new ReconcileAuditLedgerStartupStateUseCase({
-    repository: persistentPlatformServices.auditLedgerRepository,
-    observabilityPort: auditLedgerObservability,
-    now: () => workspaceClock.now(),
-  }).execute();
+  const auditStartupReconciliation = await auditDiagnosticsPlatformComposition.reconcileAuditLedgerStartupState({
+    workspaceClock,
+  });
   if (auditStartupReconciliation.manualFollowUpCount > 0 || auditStartupReconciliation.repairedCount > 0) {
     options.logger?.warn({
       event: "audit-ledger.write-reconciliation.startup",
@@ -877,348 +834,6 @@ function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string
 
   const nodeEnv = env.NODE_ENV?.trim().toLowerCase();
   return nodeEnv !== "production";
-}
-
-function createSecretOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
-  info(event: Record<string, unknown>): void;
-  warn(event: Record<string, unknown>): void;
-  error(event: Record<string, unknown>): void;
-} | undefined {
-  if (!logger) {
-    return undefined;
-  }
-
-  return Object.freeze({
-    info: (event: Record<string, unknown>) => {
-      logger.info({
-        event: "secret.operation",
-        requestId: resolveOptionalString(event.secretId) ?? resolveOptionalString(event.actorId),
-        details: Object.freeze({
-          secret: event,
-        }),
-      });
-    },
-    warn: (event: Record<string, unknown>) => {
-      logger.warn({
-        event: "secret.operation",
-        requestId: resolveOptionalString(event.secretId) ?? resolveOptionalString(event.actorId),
-        details: Object.freeze({
-          secret: event,
-        }),
-      });
-    },
-    error: (event: Record<string, unknown>) => {
-      logger.error({
-        event: "secret.operation",
-        requestId: resolveOptionalString(event.secretId) ?? resolveOptionalString(event.actorId),
-        details: Object.freeze({
-          secret: event,
-        }),
-      });
-    },
-  });
-}
-
-function createRunOrchestrationOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
-  info(event: Record<string, unknown>): void;
-  warn(event: Record<string, unknown>): void;
-  error(event: Record<string, unknown>): void;
-} | undefined {
-  if (!logger) {
-    return undefined;
-  }
-
-  return Object.freeze({
-    info: (event: Record<string, unknown>) => {
-      logger.info({
-        event: resolveOptionalString(event.event) ?? "run.orchestration.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.runId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          orchestration: event,
-        }),
-      });
-    },
-    warn: (event: Record<string, unknown>) => {
-      logger.warn({
-        event: resolveOptionalString(event.event) ?? "run.orchestration.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.runId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          orchestration: event,
-        }),
-      });
-    },
-    error: (event: Record<string, unknown>) => {
-      logger.error({
-        event: resolveOptionalString(event.event) ?? "run.orchestration.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.runId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          orchestration: event,
-        }),
-      });
-    },
-  });
-}
-
-function createDeploymentPolicyAdministrationOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
-  info(event: Readonly<Record<string, unknown>>): void;
-  warn(event: Readonly<Record<string, unknown>>): void;
-  error(event: Readonly<Record<string, unknown>>): void;
-} | undefined {
-  if (!logger) {
-    return undefined;
-  }
-
-  return Object.freeze({
-    info: (event: Readonly<Record<string, unknown>>) => {
-      logger.info({
-        event: resolveOptionalString(event.event) ?? "deployment-policy-admin.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          deploymentPolicyAdministration: event,
-        }),
-      });
-    },
-    warn: (event: Readonly<Record<string, unknown>>) => {
-      logger.warn({
-        event: resolveOptionalString(event.event) ?? "deployment-policy-admin.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          deploymentPolicyAdministration: event,
-        }),
-      });
-    },
-    error: (event: Readonly<Record<string, unknown>>) => {
-      logger.error({
-        event: resolveOptionalString(event.event) ?? "deployment-policy-admin.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          deploymentPolicyAdministration: event,
-        }),
-      });
-    },
-  });
-}
-
-function createAuditLedgerOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
-  info(event: Record<string, unknown>): void;
-  warn(event: Record<string, unknown>): void;
-  error(event: Record<string, unknown>): void;
-} | undefined {
-  if (!logger) {
-    return undefined;
-  }
-
-  return Object.freeze({
-    info: (event: Record<string, unknown>) => {
-      logger.info({
-        event: resolveOptionalString(event.event) ?? "audit-ledger.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.eventId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          auditLedger: event,
-        }),
-      });
-    },
-    warn: (event: Record<string, unknown>) => {
-      logger.warn({
-        event: resolveOptionalString(event.event) ?? "audit-ledger.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.eventId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          auditLedger: event,
-        }),
-      });
-    },
-    error: (event: Record<string, unknown>) => {
-      logger.error({
-        event: resolveOptionalString(event.event) ?? "audit-ledger.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.eventId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          auditLedger: event,
-        }),
-      });
-    },
-  });
-}
-
-function createEncryptionOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
-  info(event: Record<string, unknown>): void;
-  warn(event: Record<string, unknown>): void;
-  error(event: Record<string, unknown>): void;
-} | undefined {
-  if (!logger) {
-    return undefined;
-  }
-
-  return Object.freeze({
-    info: (event: Record<string, unknown>) => {
-      logger.info({
-        event: "encryption.enforcement",
-        requestId: resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.workspaceId)
-          ?? resolveOptionalString(event.event),
-        details: Object.freeze({
-          encryption: event,
-        }),
-      });
-    },
-    warn: (event: Record<string, unknown>) => {
-      logger.warn({
-        event: "encryption.enforcement",
-        requestId: resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.workspaceId)
-          ?? resolveOptionalString(event.event),
-        details: Object.freeze({
-          encryption: event,
-        }),
-      });
-    },
-    error: (event: Record<string, unknown>) => {
-      logger.error({
-        event: "encryption.enforcement",
-        requestId: resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.workspaceId)
-          ?? resolveOptionalString(event.event),
-        details: Object.freeze({
-          encryption: event,
-        }),
-      });
-    },
-  });
-}
-
-function createImageAssetManagementOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
-  info(event: Record<string, unknown>): void;
-  warn(event: Record<string, unknown>): void;
-  error(event: Record<string, unknown>): void;
-} | undefined {
-  if (!logger) {
-    return undefined;
-  }
-
-  return Object.freeze({
-    info: (event: Record<string, unknown>) => {
-      logger.info({
-        event: resolveOptionalString(event.event) ?? "image-asset-management.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.assetId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          imageAssetManagement: event,
-        }),
-      });
-    },
-    warn: (event: Record<string, unknown>) => {
-      logger.warn({
-        event: resolveOptionalString(event.event) ?? "image-asset-management.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.assetId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          imageAssetManagement: event,
-        }),
-      });
-    },
-    error: (event: Record<string, unknown>) => {
-      logger.error({
-        event: resolveOptionalString(event.event) ?? "image-asset-management.operation",
-        requestId: resolveOptionalString(event.requestId)
-          ?? resolveOptionalString(event.correlationId)
-          ?? resolveOptionalString(event.operationKey)
-          ?? resolveOptionalString(event.assetId)
-          ?? resolveOptionalString(event.workspaceId),
-        details: Object.freeze({
-          imageAssetManagement: event,
-        }),
-      });
-    },
-  });
-}
-
-function createSecretAccessAuditHook(
-  logger: IdentityHttpServerLogger | undefined,
-): ((event: Record<string, unknown>) => void) | undefined {
-  if (!logger) {
-    return undefined;
-  }
-
-  return (event) => {
-    const eventKind = resolveOptionalString(event.eventKind) ?? "secret.audit";
-    const actor = (typeof event.actor === "object" && event.actor) ? event.actor as Record<string, unknown> : undefined;
-    const target = (typeof event.target === "object" && event.target) ? event.target as Record<string, unknown> : undefined;
-    const status = resolveOptionalString(event.status);
-    const decision = resolveOptionalString(event.decision);
-    const level = decision === "denied" || status === "denied" || status === "failed" ? "warn" : "info";
-    const requestId = resolveOptionalString(target?.secretId)
-      ?? resolveOptionalString(actor?.actorId)
-      ?? resolveOptionalString(event.operation)
-      ?? eventKind;
-    logger[level]({
-      event: eventKind,
-      requestId,
-      details: Object.freeze({
-        secret: Object.freeze({
-          operation: resolveOptionalString(event.operation),
-          action: resolveOptionalString(event.action),
-          status,
-          decision,
-          reasonCode: resolveOptionalString(event.reasonCode),
-          reason: resolveOptionalString(event.reason),
-          operationKey: resolveOptionalString(event.operationKey),
-          serviceIdentity: resolveOptionalString(event.serviceIdentity),
-          actorId: resolveOptionalString(actor?.actorId),
-          actorType: resolveOptionalString(actor?.actorType),
-          actorWorkspaceId: resolveOptionalString(actor?.workspaceId),
-          actorUserIdentityId: resolveOptionalString(actor?.userIdentityId),
-          secretId: resolveOptionalString(target?.secretId),
-          scope: resolveOptionalString(target?.scope),
-          targetWorkspaceId: resolveOptionalString(target?.workspaceId),
-          targetUserIdentityId: resolveOptionalString(target?.userIdentityId),
-          occurredAt: resolveOptionalString(event.occurredAt),
-        }),
-      }),
-    });
-  };
-}
-
-function resolveOptionalString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
 }
 
 async function runStartupStepSpan<TResult>(input: {
