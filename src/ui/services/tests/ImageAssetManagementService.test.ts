@@ -54,6 +54,45 @@ describe("ImageAssetManagementService", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("accepts gif uploads for source images", async () => {
+    const fetchMock = mock(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/image-assets")) {
+        return {
+          json: async () => ({
+            ok: true,
+            data: {
+              asset: { assetId: "asset:image:uploaded-gif" },
+              upload: {
+                uploadSessionId: "upload-session-gif",
+                uploadEndpoint: "/api/v1/image-assets/asset%3Aimage%3Auploaded-gif/uploads/upload-session-gif/content",
+                uploadMethod: "POST",
+              },
+            },
+          }),
+        } as Response;
+      }
+      return {
+        json: async () => ({ ok: true, data: {} }),
+      } as Response;
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const service = new ImageAssetManagementService("http://identity.local");
+    const file = new File([new Uint8Array([1, 2, 3])], "animated.gif", { type: "image/gif" });
+
+    const uploaded = await service.uploadStudioSourceImage({
+      file,
+      actorUserIdentityId: "user-1",
+      workspaceId: "workspace-1",
+      sessionToken: "token-1",
+    });
+
+    expect(uploaded.ok).toBeTrue();
+    expect(uploaded.data?.assetId).toBe("asset:image:uploaded-gif");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("lists recent uploaded image assets for the current actor", async () => {
     const fetchMock = mock(async () => ({
       json: async () => ({

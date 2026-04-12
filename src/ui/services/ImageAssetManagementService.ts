@@ -256,7 +256,7 @@ export class ImageAssetManagementService {
   }
 
   private normalizeMediaType(value: string): CreateImageAssetApiRequest["mediaType"] | undefined {
-    if (value === "image/png" || value === "image/jpeg" || value === "image/webp") {
+    if (value === "image/png" || value === "image/jpeg" || value === "image/gif" || value === "image/webp") {
       return value;
     }
     return undefined;
