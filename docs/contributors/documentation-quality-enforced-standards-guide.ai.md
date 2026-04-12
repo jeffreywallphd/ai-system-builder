@@ -15,6 +15,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md
+  - docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md
   - docs/contributors/documentation-quality-worked-examples.ai.md
   - docs/contributors/router-overview-writing-standard.ai.md
   - docs/context/templates/README.ai.md
@@ -150,6 +151,7 @@ npm run validate:ci
 - Sustainable rollout policy for new rules: `docs/contributors/documentation-quality-rule-evolution-guide.ai.md`.
 - Ongoing ownership and maintenance workflow for docs tooling: `docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md`.
 - Ongoing monitoring loop for false positives, rule drift, and contributor friction: `docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md`.
+- Current rollout boundaries, known limits, and future-enhancement envelope: `docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md`.
 - Passing/failing repository-grounded examples: `docs/contributors/documentation-quality-worked-examples.ai.md`.
 
 ## Interpreting Common Failure Categories

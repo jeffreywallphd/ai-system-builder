@@ -2066,6 +2066,49 @@
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide",
+      "path": "docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.md",
+      "aiPath": "docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md",
+      "title": "Documentation Quality Rollout Boundaries and Follow-On Opportunities Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines explicit in-scope coverage, known limits, out-of-scope boundaries, and follow-on opportunities for the initial documentation-quality enforcement rollout.",
+      "keywords": [
+        "documentation quality",
+        "rollout boundaries",
+        "enforcement scope",
+        "known limits",
+        "follow-on opportunities"
+      ],
+      "relatedCodePaths": [
+        "docs/context/governance/documentation-quality-standard.md",
+        "docs/contributors/documentation-quality-enforced-standards-guide.md",
+        "docs/contributors/documentation-quality-checks-run-and-fix-guide.md",
+        "docs/contributors/documentation-quality-rule-evolution-guide.md",
+        "docs/contributors/documentation-quality-tooling-maintenance-guide.md",
+        "docs/contributors/documentation-quality-monitoring-and-feedback-guide.md",
+        "dev/scripts/lint-docs.cjs",
+        "dev/tests/DocumentationQualityRolloutBoundariesStory744Guardrails.test.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-documentation-quality-rule-evolution-guide",
+        "doc-contributors-documentation-quality-tooling-maintenance-guide",
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
+      ],
+      "relatedDocs": [
+        "docs/context/governance/documentation-quality-standard.md",
+        "docs/contributors/documentation-quality-enforced-standards-guide.md",
+        "docs/contributors/documentation-quality-checks-run-and-fix-guide.md",
+        "docs/contributors/documentation-quality-rule-evolution-guide.md",
+        "docs/contributors/documentation-quality-tooling-maintenance-guide.md",
+        "docs/contributors/documentation-quality-monitoring-and-feedback-guide.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
     }
   ],
   "discoveryIndex": {
@@ -2105,7 +2148,8 @@
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
         "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
-        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide",
+        "doc-contributors-documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide"
       ],
       "runbook": [
         "doc-operations-node-bootstrap-identity",
@@ -2190,7 +2234,8 @@
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
         "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
-        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide",
+        "doc-contributors-documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide"
       ],
       "deprecated": [],
       "superseded": [
@@ -2240,7 +2285,8 @@
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
         "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
-        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide",
+        "doc-contributors-documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide"
       ],
       "operations": [
         "doc-context-pack-runtime-and-host",
@@ -2307,7 +2353,8 @@
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
         "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
-        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide",
+        "doc-contributors-documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide"
       ],
       "reference": [
         "doc-architecture-document-scope-boundaries",
@@ -2404,7 +2451,8 @@
         "doc-contributors-documentation-quality-rule-evolution-guide",
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
         "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
-        "doc-contributors-documentation-quality-monitoring-and-feedback-guide"
+        "doc-contributors-documentation-quality-monitoring-and-feedback-guide",
+        "doc-contributors-documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide"
       ]
     }
   },

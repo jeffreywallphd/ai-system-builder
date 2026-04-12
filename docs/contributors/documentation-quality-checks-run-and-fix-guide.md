@@ -21,6 +21,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-rule-evolution-guide.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.md
   - docs/contributors/documentation-quality-monitoring-and-feedback-guide.md
+  - docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.md
   - docs/contributors/documentation-quality-worked-examples.md
   - docs/contributors/docs-foundation-validation.md
   - docs/context/templates/README.md
@@ -140,6 +141,7 @@ Default policy blocks on `critical` only. Use `--strict-important` only for scop
 - New-rule rollout and enforcement-change policy: `docs/contributors/documentation-quality-rule-evolution-guide.md`
 - Ongoing tooling ownership and obsolete-check update workflow: `docs/contributors/documentation-quality-tooling-maintenance-guide.md`
 - Ongoing monitoring and tuning signals (false positives, noisy rules, contributor friction): `docs/contributors/documentation-quality-monitoring-and-feedback-guide.md`
+- Explicit initial rollout boundaries and future enhancement opportunities: `docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.md`
 - Validator behavior and stable code list: `docs/contributors/docs-foundation-validation.md`
 - Templates for new docs and paired assets: `docs/context/templates/README.md`
 - Placement and authority boundaries: `docs/contributors/docs-placement-guide.md`

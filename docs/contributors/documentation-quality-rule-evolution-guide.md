@@ -12,6 +12,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-exceptions-and-escape-hatches-guide.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.md
   - docs/contributors/documentation-quality-monitoring-and-feedback-guide.md
+  - docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.md
   - dev/scripts/lint-docs.cjs
   - package.json
   - dev/tests/DocumentationRuleEvolutionStory735Guardrails.test.ts
@@ -100,6 +101,12 @@ Keep communication visible in canonical docs and contributor-facing guides, not 
 - Use `docs/contributors/documentation-quality-monitoring-and-feedback-guide.md` as the recurring signal review loop.
 - Treat repeated false positives, noisy-rule patterns, and contributor-friction signals as rollout-readiness gates for promotion.
 - If monitoring shows stale standards (docs, validators, tests diverging), pause promotion and realign assets in one pull request.
+
+## Rollout Completion Boundary (Story 7.4.4)
+
+- Treat the current enforcement footprint as materially complete for this rollout phase.
+- Keep future hardening work explicit and scoped (broader automation, richer linting, deeper docs-system integration) instead of expanding default gates ad hoc.
+- Use `docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.md` as the source for what is currently in scope versus follow-on work.
 
 ## Contributor Workflow Expectations During Rule Rollout
 

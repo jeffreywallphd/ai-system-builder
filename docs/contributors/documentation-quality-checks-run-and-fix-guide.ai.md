@@ -21,6 +21,7 @@ related_code_paths:
   - docs/contributors/documentation-quality-rule-evolution-guide.ai.md
   - docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md
   - docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md
+  - docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md
   - docs/contributors/documentation-quality-worked-examples.ai.md
   - docs/contributors/docs-foundation-validation.ai.md
   - docs/context/templates/README.ai.md
@@ -140,6 +141,7 @@ Default enforcement blocks only on `critical` unless strict escalation is intent
 - New-rule rollout and enforcement-change policy: `docs/contributors/documentation-quality-rule-evolution-guide.ai.md`
 - Ongoing tooling ownership and obsolete-check update workflow: `docs/contributors/documentation-quality-tooling-maintenance-guide.ai.md`
 - Ongoing monitoring and tuning signals (false positives, noisy rules, contributor friction): `docs/contributors/documentation-quality-monitoring-and-feedback-guide.ai.md`
+- Explicit initial rollout boundaries and future enhancement opportunities: `docs/contributors/documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide.ai.md`
 - Validator behavior and stable issue-code catalog: `docs/contributors/docs-foundation-validation.ai.md`
 - Authoring templates: `docs/context/templates/README.ai.md`
 - Placement and authority routing: `docs/contributors/docs-placement-guide.ai.md`
