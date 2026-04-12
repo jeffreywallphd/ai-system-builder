@@ -98,7 +98,7 @@ describe("IdentityHttpTransportComposition", () => {
       "image-run-api",
     ]);
     expect(
-      composition.routeModuleRegistry.resolveRouteFamilyByPath("/api/v1/workspaces/invitations/invite-123")
+      composition.routeModuleRegistry.resolveRouteFamilyByPath("/api/v1/workspaces/workspace-alpha/invitations")
         ?.routeFamilyId,
     ).toBe("workspace-invitations");
     expect(

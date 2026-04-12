@@ -9,8 +9,8 @@ export const WorkspaceInvitationAuthoritativeApiRouteFamily = Object.freeze({
   domain: AuthoritativeApiRouteDomains.workspaces,
   description: "Workspace invitation and onboarding endpoints exposed through authoritative APIs.",
   routePrefixes: Object.freeze([
-    "/api/v1/workspaces/invitations",
-    "/api/v1/workspaces/onboarding",
+    "/api/v1/workspaces/{workspaceId}/invitations",
+    "/api/v1/workspaces/{workspaceId}/onboarding",
   ]),
   requiredBackendKeys: Object.freeze([
     AuthoritativeApiRouteBackendKeys.workspaceInvitation,

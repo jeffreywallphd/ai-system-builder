@@ -16,6 +16,9 @@ import type { AuthoritativeRunQueryBackendApi } from "../../../../api/runs/Autho
 import type { AuthoritativeRunMutationBackendApi } from "../../../../api/runs/AuthoritativeRunMutationBackendApi";
 import type { AuthoritativeRunExecutionUpdateBackendApi } from "../../../../api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import type { NodeTrustBackendApi } from "../../../../api/nodes/NodeTrustBackendApi";
+import type { AuthorizationManagementBackendApi } from "../../../../api/authorization/AuthorizationManagementBackendApi";
+import type { WorkspaceAdministrationBackendApi } from "../../../../api/workspaces/WorkspaceAdministrationBackendApi";
+import type { WorkspaceInvitationBackendApi } from "../../../../api/workspaces/WorkspaceInvitationBackendApi";
 
 const servers: Server[] = [];
 
@@ -158,6 +161,45 @@ class ParityBackends {
     },
   } satisfies Partial<DeploymentPolicyReadBackendApi>;
 
+  public readonly authorization = {
+    readAccessState: async (request: Readonly<Record<string, unknown>>) => {
+      this.lastAuthorizationAccessStateRequest = request;
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          accessState: "granted",
+        }),
+      });
+    },
+  } satisfies Partial<AuthorizationManagementBackendApi>;
+
+  public readonly workspaceAdministration = {
+    readWorkspaceAdministrationView: async (request: Readonly<Record<string, unknown>>) => {
+      this.lastWorkspaceAdminViewRequest = request;
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          workspace: Object.freeze({
+            workspaceId: String(request.workspaceId ?? "workspace-alpha"),
+            displayName: "Workspace Alpha",
+          }),
+        }),
+      });
+    },
+  } satisfies Partial<WorkspaceAdministrationBackendApi>;
+
+  public readonly workspaceInvitations = {
+    issueWorkspaceInvitation: async (request: Readonly<Record<string, unknown>>) => {
+      this.lastWorkspaceInvitationIssueRequest = request;
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          invitationId: "workspace-invitation:1",
+        }),
+      });
+    },
+  } satisfies Partial<WorkspaceInvitationBackendApi>;
+
   public readonly deploymentWrite = {
     updateActiveProfile: async (
       context: Readonly<Record<string, unknown>>,
@@ -267,6 +309,9 @@ class ParityBackends {
   public lastImageAssetOriginalRequest: Readonly<Record<string, unknown>> | undefined;
   public lastDeploymentReadRequest: Readonly<Record<string, unknown>> | undefined;
   public lastDeploymentWriteRequest: Readonly<Record<string, unknown>> | undefined;
+  public lastAuthorizationAccessStateRequest: Readonly<Record<string, unknown>> | undefined;
+  public lastWorkspaceAdminViewRequest: Readonly<Record<string, unknown>> | undefined;
+  public lastWorkspaceInvitationIssueRequest: Readonly<Record<string, unknown>> | undefined;
   public lastRunSubmissionRequest: Readonly<Record<string, unknown>> | undefined;
   public lastRunListRequest: Readonly<Record<string, unknown>> | undefined;
   public lastRunCancelRequest: Readonly<Record<string, unknown>> | undefined;
@@ -291,6 +336,9 @@ async function startParityFixture(): Promise<ParityFixture> {
     imageAssetManagementBackendApi: backends.imageAssets as unknown as ImageAssetManagementBackendApi,
     generatedResultManagementBackendApi: backends.generatedResults as unknown as GeneratedResultManagementBackendApi,
     auditLedgerBackendApi: backends.audit as unknown as AuditLedgerBackendApi,
+    authorizationManagementBackendApi: backends.authorization as unknown as AuthorizationManagementBackendApi,
+    workspaceAdministrationBackendApi: backends.workspaceAdministration as unknown as WorkspaceAdministrationBackendApi,
+    workspaceBackendApi: backends.workspaceInvitations as unknown as WorkspaceInvitationBackendApi,
     executionNodeManagementBackendApi: backends.executionNodeManagement as unknown as ExecutionNodeManagementBackendApi,
     deploymentPolicyReadBackendApi: backends.deploymentRead as unknown as DeploymentPolicyReadBackendApi,
     deploymentPolicyWriteBackendApi: backends.deploymentWrite as unknown as DeploymentPolicyWriteBackendApi,
@@ -353,6 +401,48 @@ type ParitySuccessCase = {
 };
 
 const parityCases: ReadonlyArray<ParitySuccessCase> = Object.freeze([
+  {
+    routeFamilyId: "identity-auth",
+    expectedPath: "/api/v1/identity/session",
+    requiresWorkspace: false,
+    makeSuccessRequest: ({ baseUrl, token }) => fetch(`${baseUrl}/api/v1/identity/session`, {
+      headers: { authorization: `Bearer ${token}` },
+    }),
+  },
+  {
+    routeFamilyId: "authorization-management",
+    expectedPath: "/api/v1/authorization/resources/workflow/system/system-1/access-state",
+    requiresWorkspace: false,
+    makeSuccessRequest: ({ baseUrl, token }) => fetch(
+      `${baseUrl}/api/v1/authorization/resources/workflow/system/system-1/access-state`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+      },
+    ),
+  },
+  {
+    routeFamilyId: "workspace-administration",
+    expectedPath: "/api/v1/workspaces/workspace-alpha/admin-view",
+    requiresWorkspace: false,
+    makeSuccessRequest: ({ baseUrl, token }) => fetch(`${baseUrl}/api/v1/workspaces/workspace-alpha/admin-view`, {
+      headers: { authorization: `Bearer ${token}` },
+    }),
+  },
+  {
+    routeFamilyId: "workspace-invitations",
+    expectedPath: "/api/v1/workspaces/workspace-alpha/invitations",
+    requiresWorkspace: false,
+    makeSuccessRequest: ({ baseUrl, token }) => fetch(`${baseUrl}/api/v1/workspaces/workspace-alpha/invitations`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        invitedEmail: "invitee@example.com",
+      }),
+    }),
+  },
   {
     routeFamilyId: "storage-management",
     expectedPath: "/api/v1/storage/instances",
@@ -566,6 +656,9 @@ describe("IdentityHttpServer migrated route-family parity regression", () => {
     expect(fixture.backends.lastImageAssetOriginalRequest?.workspaceId).toBe("workspace-alpha");
     expect(fixture.backends.lastDeploymentReadRequest?.workspaceId).toBe("workspace-alpha");
     expect(fixture.backends.lastDeploymentWriteRequest?.workspaceId).toBe("workspace-alpha");
+    expect(fixture.backends.lastAuthorizationAccessStateRequest?.resource).toBeDefined();
+    expect(fixture.backends.lastWorkspaceAdminViewRequest?.workspaceId).toBe("workspace-alpha");
+    expect(fixture.backends.lastWorkspaceInvitationIssueRequest?.workspaceId).toBe("workspace-alpha");
     expect(fixture.backends.lastRunSubmissionRequest?.workspaceId).toBe("workspace-alpha");
     expect(fixture.backends.lastRunListRequest?.workspaceId).toBe("workspace-alpha");
     expect(fixture.backends.lastRunCancelRequest?.workspaceId).toBe("workspace-alpha");
