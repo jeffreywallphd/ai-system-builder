@@ -60,6 +60,7 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Supersession registry canonical destination lists stay resolvable.
 - Superseded stub `## Redirect` sections keep resolvable local destination paths and required canonical targets.
 - Active top-level routers avoid linking to superseded paths.
+- Non-active registry docs (`archived`, `superseded`, `deprecated`) keep required metadata fields, taxonomy-aligned enums, and status/authority structural sections (`## Documentation Status` or supersession sections where required).
 - Registry validation enforces lightweight shape and metadata invariants for `docs/context/documentation-registry.seed.json`.
 - Registry validation also enforces cross-reference integrity for indexed `relatedDocs` to `relatedRecordIds` alignment.
 
@@ -129,6 +130,15 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 - `SUPERSESSION_REDIRECT_REFERENCE_INVALID`
 - `SUPERSESSION_COMPANION_MISSING`
 - `ACTIVE_PATH_REFERENCE_INVALID`
+- `NON_ACTIVE_METADATA_INVALID`
+- `NON_ACTIVE_METADATA_FIELD_MISSING`
+- `NON_ACTIVE_METADATA_ENUM_INVALID`
+- `NON_ACTIVE_METADATA_DATE_INVALID`
+- `NON_ACTIVE_REGISTRY_METADATA_MISMATCH`
+- `NON_ACTIVE_STRUCTURE_MISSING`
+- `NON_ACTIVE_STATUS_SIGNAL_MISSING`
+- `NON_ACTIVE_STATUS_SIGNAL_MISMATCH`
+- `NON_ACTIVE_SUPERSESSION_LINK_MISSING`
 - `DOCUMENTATION_INDEX_MODEL_INVALID`
 - `DOCUMENTATION_QUALITY_STANDARD_INVALID`
 - `REGISTRY_FILE_MISSING`
