@@ -3414,6 +3414,9 @@ export function ImageManipulationRuntimeEditorPanel({
                 console.log("------------------------------------------------------");
                 console.log(" ");
                 console.log("Identity not confirmed");
+                console.log(actorUserIdentityId);
+                console.log(workspaceId);
+                console.log(sessionToken);
                 console.log(" ");
                 console.log("------------------------------------------------------");
                 setStatusMessage("Sign in to upload images.");
