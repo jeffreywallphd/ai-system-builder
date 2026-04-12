@@ -364,6 +364,14 @@ import { composeAuthoritativeApiRouteRegistrationPlan } from "../AuthoritativeAp
 import { composeIdentityHttpTransport } from "./composition/IdentityHttpTransportComposition";
 import { buildIdentityHttpRouteCompositionLogDetails } from "./middleware/request-observability";
 import {
+  CORRELATION_ID_HEADER,
+  REQUEST_ID_HEADER,
+  addCorrelationIdToErrorEnvelope,
+  normalizeResponseHeaderValue,
+  resolveRequestCorrelationId,
+  setResponseCorrelationHeaders,
+} from "./middleware/request-metadata";
+import {
   buildAuthenticatedSessionActorContext,
   extractBearerSessionToken,
   normalizeSessionAssuranceLevel,
@@ -402,14 +410,18 @@ import {
   buildContentDispositionHeader as buildFileContentDispositionHeader,
   sanitizeDownloadFileName as sanitizeDownloadFileNamePrimitive,
 } from "./primitives/HttpFileResponsePrimitives";
+import {
+  mergeOptionalStringLists,
+  normalizeOptionalString,
+  parseOptionalMultiEnumList,
+  parseOptionalStringList,
+  parseSharedListPaginationFromQuery,
+} from "./primitives/HttpQueryPrimitives";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 const DefaultWebSocketTrustRevalidationIntervalMs = 30_000;
 const DEFAULT_API_CORS_ALLOWED_METHODS = Object.freeze(["GET", "POST", "OPTIONS"]);
 const DEFAULT_API_CORS_ALLOWED_HEADERS = Object.freeze(["content-type", "authorization"]);
-const REQUEST_ID_HEADER = "x-request-id";
-const CORRELATION_ID_HEADER = "x-correlation-id";
-const MAX_CORRELATION_ID_LENGTH = 128;
 const RuntimeRealtimeWebSocketSubprotocol = "ai-loom-runtime-realtime.v1";
 const RuntimeRealtimeWebSocketAuthSubprotocolPrefix = "ai-loom-auth-bearer.";
 const DEV_LOGIN_DEFAULT_PROVIDER_ID = "provider:local-password";
@@ -13282,127 +13294,6 @@ function parseOptionalEnum<TValue extends string>(
   return enumeration.includes(value as TValue) ? (value as TValue) : undefined;
 }
 
-function parseOptionalCsvEnumList<TValue extends string>(
-  value: string | null,
-  enumeration: ReadonlyArray<TValue>,
-): { readonly ok: true; readonly value?: ReadonlyArray<TValue> } | { readonly ok: false } {
-  if (!value) {
-    return { ok: true, value: undefined };
-  }
-
-  const values = value
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-
-  if (values.length < 1) {
-    return { ok: true, value: undefined };
-  }
-
-  const normalized: TValue[] = [];
-  for (const candidate of values) {
-    if (!enumeration.includes(candidate as TValue)) {
-      return { ok: false };
-    }
-    normalized.push(candidate as TValue);
-  }
-
-  return {
-    ok: true,
-    value: Object.freeze(normalized),
-  };
-}
-
-function parseOptionalMultiEnumList<TValue extends string>(
-  searchParams: URLSearchParams,
-  repeatedKey: string,
-  csvFallbackKey: string,
-  enumeration: ReadonlyArray<TValue>,
-): { readonly ok: true; readonly value?: ReadonlyArray<TValue> } | { readonly ok: false } {
-  const repeatedValues = searchParams.getAll(repeatedKey)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-  if (repeatedValues.length > 0) {
-    return parseOptionalCsvEnumList(repeatedValues.join(","), enumeration);
-  }
-
-  return parseOptionalCsvEnumList(searchParams.get(csvFallbackKey), enumeration);
-}
-
-function parseOptionalStringList(
-  searchParams: URLSearchParams,
-  repeatedKey: string,
-  csvFallbackKey: string,
-): ReadonlyArray<string> | undefined {
-  const repeatedValues = searchParams.getAll(repeatedKey)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-  const csvValues = (searchParams.get(csvFallbackKey) ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-  const merged = [...repeatedValues, ...csvValues];
-  if (merged.length < 1) {
-    return undefined;
-  }
-  return Object.freeze([...new Set(merged)]);
-}
-
-function mergeOptionalStringLists(
-  first: ReadonlyArray<string> | undefined,
-  second: ReadonlyArray<string> | undefined,
-): ReadonlyArray<string> | undefined {
-  const merged = [...(first ?? []), ...(second ?? [])];
-  if (merged.length < 1) {
-    return undefined;
-  }
-  return Object.freeze([...new Set(merged)]);
-}
-
-function normalizeOptionalString(value: string | null): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const normalized = value.trim();
-  return normalized ? normalized : undefined;
-}
-
-function parseSharedListPaginationFromQuery(
-  searchParams: URLSearchParams,
-):
-  | { readonly ok: true; readonly limit: number | undefined; readonly offset: number | undefined }
-  | { readonly ok: false; readonly issue: SharedApiQuerySchemaValidationError["issues"][number] } {
-  try {
-    const parsed = parseSharedApiListQueryConventions(searchParams);
-    return {
-      ok: true,
-      limit: parsed.pagination?.limit,
-      offset: parsed.pagination?.offset,
-    };
-  } catch (error) {
-    if (error instanceof SharedApiQuerySchemaValidationError) {
-      return {
-        ok: false,
-        issue: error.issues[0] ?? Object.freeze({
-          path: "query",
-          code: "invalid-request",
-          message: "Query validation failed.",
-        }),
-      };
-    }
-
-    return {
-      ok: false,
-      issue: Object.freeze({
-        path: "query",
-        code: "invalid-request",
-        message: "Query validation failed.",
-      }),
-    };
-  }
-}
-
 function buildRuntimeApiRequestContext(
   context: AuthenticatedWorkspaceRequestContext,
   operation: "read" | "mutation" = "read",
@@ -14034,44 +13925,6 @@ function normalizeError(error: unknown): string {
   return "Unknown error";
 }
 
-function setResponseCorrelationHeaders(response: ServerResponse, requestId: string, correlationId: string): void {
-  response.setHeader(REQUEST_ID_HEADER, requestId);
-  response.setHeader(CORRELATION_ID_HEADER, correlationId);
-}
-
-function resolveRequestCorrelationId(request: IncomingMessage, fallback: string): string {
-  const candidate = normalizeOptionalHeader(request.headers[CORRELATION_ID_HEADER])
-    ?? normalizeOptionalHeader(request.headers[REQUEST_ID_HEADER]);
-  if (!candidate) {
-    return fallback;
-  }
-
-  const normalized = candidate.trim().slice(0, MAX_CORRELATION_ID_LENGTH);
-  if (!normalized || !/^[A-Za-z0-9._:-]+$/.test(normalized)) {
-    return fallback;
-  }
-  return normalized;
-}
-
-function addCorrelationIdToErrorEnvelope(payload: unknown, correlationId: string | undefined): unknown {
-  if (!correlationId || !payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return payload;
-  }
-  const record = payload as Record<string, unknown>;
-  const error = asRecord(record.error);
-  if (!error) {
-    return payload;
-  }
-
-  return Object.freeze({
-    ...record,
-    error: Object.freeze({
-      ...error,
-      correlationId,
-    }),
-  });
-}
-
 function createObservedIdentityHttpServerLogger(
   delegate: IdentityHttpServerLogger,
   onOperationalEvent: ((event: IdentityHttpServerLogEvent) => void) | undefined,
@@ -14124,13 +13977,6 @@ function writeJson(response: ServerResponse, statusCode: number, payload: unknow
 
 function writeNoContent(response: ServerResponse, statusCode: number): void {
   writeNoContentResponse(response, statusCode);
-}
-
-function normalizeResponseHeaderValue(value: number | string | string[] | undefined): string | undefined {
-  if (typeof value === "number") {
-    return undefined;
-  }
-  return normalizeOptionalHeader(value);
 }
 
 function resolveSessionActorContextWorkspaceId(
