@@ -213,7 +213,8 @@ Incremental-adoption safety:
 
 - stage definitions are explicit and immutable;
 - each stage declares module ownership and current host/authoritative stage bindings;
-- `shutdown-preparation` is intentionally marked `planned`, allowing staged adoption without destabilizing current startup behavior.
+- `shutdown-preparation` is now active and composes the authoritative shutdown-disposal plan.
+- disposal sequencing is explicit and deterministic: `transport` module disposal runs before `persistenceBootstrap` disposal.
 - Owns startup span naming consistency, operational logger adapters, startup summary payload shaping, baseline recording/regression checks, and correlation-id propagation.
 - Produces: diagnostics hooks used by host root and modules.
 

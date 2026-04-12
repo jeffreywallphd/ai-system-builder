@@ -24,7 +24,10 @@ import {
   type IdentityServerHost,
   type IdentityServerHostOptions,
 } from "./IdentityServerHost";
-import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
+import {
+  createHostLifecycleCoordinator,
+  type HostLifecycleCleanupHook,
+} from "../lifecycle/HostLifecycleCoordinator";
 import type { SqlitePersistenceRuntime } from "@infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
 import type { AuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
@@ -48,6 +51,7 @@ import {
   createAuthoritativeServerBootstrapOrchestrator,
   type AuthoritativeServerBootstrapReadinessReport,
 } from "./AuthoritativeServerBootstrapOrchestrator";
+import type { AuthoritativeServerShutdownDisposalPlan } from "./composition/contracts/AuthoritativeServerCompositionModuleContracts";
 import {
   AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
   AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
@@ -201,6 +205,19 @@ function combineStartupLifecycleHooks(
   });
 }
 
+function createLifecycleCleanupHooksFromShutdownPlan(input: {
+  readonly plan: AuthoritativeServerShutdownDisposalPlan;
+  readonly reason: string;
+}): ReadonlyArray<{
+  readonly hookId: string;
+  readonly run: HostLifecycleCleanupHook;
+}> {
+  return input.plan.steps.map((step) => Object.freeze({
+    hookId: step.hookId,
+    run: () => step.dispose(input.reason),
+  }));
+}
+
 export function createAuthoritativeServerCompositionRoot(
   input: AuthoritativeServerCompositionRootOptions,
 ): ExecutableHostCompositionRoot<AuthoritativeServerHostRuntimeHandle> {
@@ -226,6 +243,10 @@ export function createAuthoritativeServerCompositionRoot(
       let startedHost: IdentityServerHost | undefined;
       let persistenceRuntime: SqlitePersistenceRuntime | undefined;
       let persistentPlatformServices: AuthoritativePersistentPlatformServices | undefined;
+      let shutdownDisposalPlan: AuthoritativeServerShutdownDisposalPlan = Object.freeze({
+        stageId: "shutdown-preparation",
+        steps: Object.freeze([]),
+      });
       let startupFailure: unknown | undefined;
       let authoritativeStageStatus: ReadonlyArray<{
         readonly stageId: string;
@@ -330,34 +351,24 @@ export function createAuthoritativeServerCompositionRoot(
         startedHost = bootstrapResult.startedHost;
         persistenceRuntime = bootstrapResult.persistenceRuntime;
         persistentPlatformServices = bootstrapResult.persistentPlatformServices;
+        shutdownDisposalPlan = bootstrapResult.shutdownDisposalPlan;
         authoritativeStageStatus = bootstrapResult.stageStatus.stages;
         startupReadinessReport = bootstrapResult.readinessReport;
 
         const activeHost = startedHost;
-        const activePersistenceRuntime = persistenceRuntime;
         const resolvedStartupTracer = startupTracer as StartupTracer;
         const resolvedRuntimeMetadata = runtimeMetadata as HostRuntimeMetadata;
+        const stopCleanupHooks = createLifecycleCleanupHooksFromShutdownPlan({
+          plan: shutdownDisposalPlan,
+          reason: "authoritative-server-stop-requested",
+        });
 
         const stop = async () => {
           await lifecycle.shutdown({
             shutdownRequestedReason: "authoritative-server-stop-requested",
             shutdownCompletedReason: "authoritative-server-stopped",
             shutdownFailureReason: "authoritative-server-stop-failed",
-            cleanupHooks: [
-              {
-                hookId: "close-runtime-host",
-                run: async () => {
-                  await activeHost.close();
-                },
-              },
-              {
-                hookId: "close-persistence-runtime",
-                run: async () => {
-                  persistentPlatformServices?.dispose();
-                  await activePersistenceRuntime?.dispose();
-                },
-              },
-            ],
+            cleanupHooks: stopCleanupHooks,
           });
         };
 
@@ -383,37 +394,26 @@ export function createAuthoritativeServerCompositionRoot(
         });
       } catch (error) {
         let failure: unknown = error;
-        if (startedHost) {
-          try {
-            await lifecycle.runStartupFailureCleanup({
-              cleanupReason: "authoritative-server-start-failure-cleanup",
-              cleanupFailureReason: "authoritative-server-start-failure-cleanup-failed",
-              cleanupHooks: [
-                {
-                  hookId: "close-runtime-host",
-                  run: async () => {
-                    await startedHost?.close();
-                  },
-                },
-                {
-                  hookId: "close-persistence-runtime",
-                  run: async () => {
-                    persistentPlatformServices?.dispose();
-                    await persistenceRuntime?.dispose();
-                  },
-                },
-              ],
-            });
-          } catch (cleanupError) {
-            failure = cleanupError;
-          }
-        } else {
-          try {
-            persistentPlatformServices?.dispose();
-            await persistenceRuntime?.dispose();
-          } catch (cleanupError) {
-            failure = cleanupError;
-          }
+        try {
+          const startupFailureCleanupHooks = shutdownDisposalPlan.steps.length > 0
+            ? createLifecycleCleanupHooksFromShutdownPlan({
+              plan: shutdownDisposalPlan,
+              reason: "authoritative-server-start-failure-cleanup",
+            })
+            : [{
+              hookId: "close-persistence-runtime",
+              run: async () => {
+                persistentPlatformServices?.dispose();
+                await persistenceRuntime?.dispose();
+              },
+            }];
+          await lifecycle.runStartupFailureCleanup({
+            cleanupReason: "authoritative-server-start-failure-cleanup",
+            cleanupFailureReason: "authoritative-server-start-failure-cleanup-failed",
+            cleanupHooks: startupFailureCleanupHooks,
+          });
+        } catch (cleanupError) {
+          failure = cleanupError;
         }
         await lifecycle.markStartupFailed("authoritative-server-start-failed", failure);
         startupFailure = failure;

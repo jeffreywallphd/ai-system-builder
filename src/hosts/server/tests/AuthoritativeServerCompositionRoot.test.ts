@@ -743,6 +743,92 @@ describe("AuthoritativeServerCompositionRoot", () => {
     ]);
   });
 
+  it("runs startup failure cleanup in deterministic shutdown-preparation order", async () => {
+    const calls: string[] = [];
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 0,
+        address: "",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {
+          calls.push("host-close");
+        },
+      }),
+      bootstrap: {
+        createPersistenceRuntime: () => Object.freeze({
+          configuration: Object.freeze({
+            databasePath: "test.sqlite",
+            pragmas: Object.freeze({
+              journalMode: "WAL",
+              foreignKeys: true,
+            }),
+          }),
+          start: async () => {
+            calls.push("persistence-start");
+            return Object.freeze({
+              databasePath: "test.sqlite",
+              migrationIdsApplied: Object.freeze([]),
+            });
+          },
+          getConnection: () => {
+            throw new Error("not used");
+          },
+          dispose: async () => {
+            calls.push("persistence-runtime-dispose");
+          },
+        }) satisfies SqlitePersistenceRuntime,
+        composePersistentPlatformServices: () => Object.freeze({
+          databasePath: "test.sqlite",
+          identityRepository: {} as never,
+          trustedDeviceRepository: {} as never,
+          workspaceRepository: {} as never,
+          authorizationRepository: {} as never,
+          nodeTrustRepository: {} as never,
+          executionNodeRepository: {} as never,
+          nodeTrustAuditRecorder: {} as never,
+          certificateAuthorityRepository: {} as never,
+          secretRecordRepository: {} as never,
+          storageInstanceRepository: {} as never,
+          storageManagementAuditRecorder: {} as never,
+          assetRepository: {} as never,
+          assetAuditRecorder: {} as never,
+          assetUploadSessionRepository: {} as never,
+          imageAssetRepository: {} as never,
+          imageWorkflowSystemRepository: {} as never,
+          platformPersistenceRepository: {} as never,
+          auditLedgerRepository: {} as never,
+          deploymentPolicyRepository: {} as never,
+          generatedResultRepository: {} as never,
+          dispose: () => {
+            calls.push("persistent-services-dispose");
+          },
+        }) satisfies AuthoritativePersistentPlatformServices,
+        resolveDeploymentPolicyBootstrap: async () => createDeploymentPolicyBootstrapResolutionStub(),
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-startup-failure-cleanup-order-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    await expect(root.compose(boot)).rejects.toThrow(
+      "Authoritative server startup produced an invalid transport binding.",
+    );
+    expect(calls).toEqual([
+      "persistence-start",
+      "host-close",
+      "persistent-services-dispose",
+      "persistence-runtime-dispose",
+    ]);
+  });
+
   it("composes persistent platform services during persistence stage and injects them into runtime host startup", async () => {
     const calls: string[] = [];
     let startedWithServices: AuthoritativePersistentPlatformServices | undefined;
@@ -1000,7 +1086,13 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(summary?.startupCorrelationId).toBe(summary?.traceId);
     expect(summary?.durationMs).toBeTypeOf("number");
     expect((summary?.pipeline as Record<string, unknown> | undefined)?.stageCount).toBe(6);
-    expect((summary?.authoritativeStages as Record<string, unknown> | undefined)?.stageCount).toBe(7);
+    const authoritativeStages = summary?.authoritativeStages as Record<string, unknown> | undefined;
+    expect(authoritativeStages?.stageCount).toBe(8);
+    const stageEntries = authoritativeStages?.stages as ReadonlyArray<Record<string, unknown>> | undefined;
+    expect(stageEntries?.some((stage) => (
+      stage.stageId === "shutdown-preparation"
+      && stage.state === "success"
+    ))).toBeTrue();
     const startupResult = summary?.startupResult as Record<string, unknown> | undefined;
     expect(startupResult?.outcome).toBe("succeeded");
     const readiness = startupResult?.readiness as Record<string, unknown> | undefined;

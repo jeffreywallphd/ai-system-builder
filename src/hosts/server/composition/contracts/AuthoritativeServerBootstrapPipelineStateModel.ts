@@ -177,7 +177,7 @@ export const AuthoritativeServerBootstrapPipelineStageDefinitions = Object.freez
     stageId: AuthoritativeServerBootstrapPipelineStageIds.shutdownPreparation,
     sequence: 8,
     description: "Prepare deterministic shutdown/disposal contracts so startup-owned resources have explicit cleanup boundaries.",
-    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.planned,
+    adoptionState: AuthoritativeServerBootstrapStageAdoptionStates.active,
     ownedModules: Object.freeze([
       AuthoritativeServerCompositionModuleIds.transport,
       AuthoritativeServerCompositionModuleIds.persistenceBootstrap,

@@ -109,7 +109,7 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
   5. `subsystem-composition`
   6. `readiness-verification`
   7. `transport-startup`
-  8. `shutdown-preparation` (`planned` adoption state)
+  8. `shutdown-preparation` (`active` adoption state)
 - Bootstrap stage contracts for staged decomposition live in `src/hosts/server/AuthoritativeServerBootstrapStageContracts.ts` with typed boundaries for `config`, `security`, `persistence`, `services`, and `transport`.
 - Contract-to-host-stage bindings keep runtime order unchanged while exposing logical boundaries (`services -> dependencies`, `transport -> feature-registration`).
 - Story 1.2.2 extracts initial authoritative bootstrap stage implementations into:
@@ -156,6 +156,11 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
     - startup failure (`outcome=failed`)
     - successful startup with full readiness (`outcome=succeeded`, readiness `ready`)
     - successful startup with degraded readiness (`outcome=succeeded`, readiness `degraded`)
+- Story 2.3.3 implements controlled shutdown/disposal ordering:
+  - `shutdown-preparation` now runs as an active authoritative stage.
+  - startup composes a typed shutdown-disposal plan from composed runtime artifacts.
+  - disposal order is explicit and deterministic: transport shutdown first, then persistence service/runtime disposal.
+  - both normal stop and startup-failure cleanup consume the same staged disposal plan.
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `subsystem-composition`
   - `security-material-resolution`
@@ -196,8 +201,9 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
   - `persistence` stage initializes `src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`
   - `persistence` stage composes authoritative persistent platform services (repository adapters, audit sinks, platform run/audit adapter) and stores them as startup artifacts
   - `feature-registration` stage injects startup-composed persistence services into `startIdentityServerHost(...)`
-  - startup failure cleanup disposes persistence runtime resources
-  - normal host stop disposes persistent platform services and persistence runtime resources
+  - `shutdown-preparation` stage composes disposal hooks with explicit module ownership and order
+  - startup failure cleanup disposes runtime transport first, then persistent platform services and persistence runtime resources
+  - normal host stop follows the same staged disposal order used by startup-failure cleanup
 - Repository command: `npm run start:authoritative-server`
 
 ## Authoritative API route registration

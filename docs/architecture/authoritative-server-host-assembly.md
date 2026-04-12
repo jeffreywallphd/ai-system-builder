@@ -164,9 +164,9 @@ to keep control-plane startup sequencing explicit for refactor adoption:
 3. `persistence-initialization`
 4. `migration-execution`
 5. `subsystem-composition`
-6. `readiness-verification`
-7. `transport-startup`
-8. `shutdown-preparation` (`planned` adoption state)
+  6. `readiness-verification`
+  7. `transport-startup`
+  8. `shutdown-preparation` (`active` adoption state)
 
 Bootstrap stage contracts for controlled decomposition are now defined in `src/hosts/server/AuthoritativeServerBootstrapStageContracts.ts` with typed boundaries for:
 - `config`
@@ -226,10 +226,15 @@ Story 2.3.2 adds typed readiness verification and startup result reporting:
 - security-stage output now emits typed readiness checks (transport-trust material, certificate-authority material, required-secrets validation) instead of opaque booleans.
 - readiness-verification now emits structured checks for persistence runtime readiness, migration/bootstrap availability, composition completeness (service/route coverage), orchestration-recovery prerequisites, and transport binding validity.
 - startup summary now includes `startupResult` with explicit `outcome` and structured readiness report (`state`, check list, and check-count aggregates).
-- startup now distinguishes:
+  - startup now distinguishes:
   - startup failure (`outcome=failed`)
   - successful startup with full readiness (`outcome=succeeded`, readiness `ready`)
-  - successful startup with degraded readiness (`outcome=succeeded`, readiness `degraded`)
+    - successful startup with degraded readiness (`outcome=succeeded`, readiness `degraded`)
+Story 2.3.3 implements controlled shutdown/disposal ordering:
+  - `shutdown-preparation` now runs as an active authoritative stage.
+  - startup composes a typed shutdown-disposal plan from composed runtime artifacts.
+  - disposal order is explicit and deterministic: transport shutdown first, then persistence service/runtime disposal.
+  - both normal stop and startup-failure cleanup consume the same staged disposal plan.
 
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) aligned to logical bootstrap stages plus nested diagnostics:
 - `subsystem-composition`
@@ -285,9 +290,9 @@ During host composition:
 - the bootstrap `feature-registration` stage injects startup-composed persistent platform services into `startIdentityServerHost(...)`
 - the bootstrap `feature-registration` stage injects startup-composed run execution adapter registration into `startIdentityServerHost(...)` through `IdentityServerHostOptions.runExecutionAdapters`
 - run cancellation orchestration resolves backend cancellation signaling from host-composed adapter registration rather than constructing backend adapters inside API/UI code
-- startup failure cleanup disposes persistence runtime resources
-- startup failure cleanup also disposes composed persistent platform services
-- normal host shutdown also disposes composed persistent platform services and persistence runtime resources after host transport shutdown
+- `shutdown-preparation` stage composes disposal hooks with explicit module ownership and ordering
+- startup failure cleanup disposes runtime transport first, then composed persistent platform services and persistence runtime resources
+- normal host shutdown uses the same staged disposal order as startup-failure cleanup
 
 Repository startup command:
 - `npm run start:authoritative-server`
