@@ -33,7 +33,20 @@ export interface SecretServiceOperationalDiagnosticDto {
   readonly severity: SecretServiceDiagnosticSeverity;
   readonly message: string;
   readonly secretId?: string;
+  readonly startupRequirement?: "fail-fast-required" | "optional";
+  readonly durabilityClass?: "durable" | "ephemeral";
+  readonly fallbackPolicy?: "none" | "migrate-legacy-input" | "generate-ephemeral-for-development";
 }
+
+export const SecurityMaterialDiagnosticStates = Object.freeze({
+  healthy: "healthy",
+  degraded: "degraded",
+  missing: "missing",
+  nonCompliant: "non-compliant",
+} as const);
+
+export type SecurityMaterialDiagnosticState =
+  typeof SecurityMaterialDiagnosticStates[keyof typeof SecurityMaterialDiagnosticStates];
 
 export interface SecretProviderMaterialMetadataDto {
   readonly providerId: string;
@@ -84,5 +97,53 @@ export interface SecretServiceOperationalDiagnosticsViewDto extends SecretServic
     readonly requiredSecretIds: ReadonlyArray<string>;
     readonly diagnostics: ReadonlyArray<SecretServiceOperationalDiagnosticDto>;
     readonly materialMetadata: ReadonlyArray<SecretProviderMaterialMetadataDto>;
+  };
+  readonly securityMaterial: {
+    readonly lifecycleStage: "production" | "development" | "test";
+    readonly summary: {
+      readonly total: number;
+      readonly healthy: number;
+      readonly degraded: number;
+      readonly missing: number;
+      readonly nonCompliant: number;
+    };
+    readonly entries: ReadonlyArray<{
+      readonly secretId: string;
+      readonly state: SecurityMaterialDiagnosticState;
+      readonly present: boolean;
+      readonly degraded: boolean;
+      readonly nonCompliant: boolean;
+      readonly fallbackModeActive: boolean;
+      readonly provider: {
+        readonly providerId: string;
+        readonly materialKind: "provider-credential" | "signing-material";
+      };
+      readonly classification: {
+        readonly materialId: string;
+        readonly category: "secret-credential" | "signing-material" | "encryption-key" | "certificate-material" | "transport-trust";
+        readonly scope: "server" | "workspace" | "user" | "storage-instance";
+        readonly rotationPosture: "manual" | "scheduled" | "on-demand" | "not-applicable";
+        readonly usageContexts: ReadonlyArray<
+          "startup-bootstrap" | "runtime-request" | "provider-credential" | "server-signing" | "transport-security"
+        >;
+      };
+      readonly policy: {
+        readonly startupRequirement: "fail-fast-required" | "optional";
+        readonly durabilityClass: "durable" | "ephemeral";
+        readonly fallbackPolicy: "none" | "migrate-legacy-input" | "generate-ephemeral-for-development";
+      };
+      readonly backend?: {
+        readonly backendId: string;
+        readonly backendKind: string;
+      };
+      readonly rotation: {
+        readonly status: string;
+        readonly currentVersionId?: string;
+      };
+      readonly validation: {
+        readonly failures: ReadonlyArray<SecretServiceOperationalDiagnosticDto>;
+        readonly warnings: ReadonlyArray<SecretServiceOperationalDiagnosticDto>;
+      };
+    }>;
   };
 }

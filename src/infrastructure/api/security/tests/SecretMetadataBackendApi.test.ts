@@ -322,6 +322,17 @@ describe("SecretMetadataBackendApi", () => {
             })]),
             materialMetadata: Object.freeze([]),
           }),
+          securityMaterial: Object.freeze({
+            lifecycleStage: "production",
+            summary: Object.freeze({
+              total: 1,
+              healthy: 0,
+              degraded: 0,
+              missing: 1,
+              nonCompliant: 0,
+            }),
+            entries: Object.freeze([]),
+          }),
         }),
       },
     });
@@ -402,6 +413,60 @@ describe("SecretMetadataBackendApi", () => {
               }),
             })]),
           }),
+          securityMaterial: Object.freeze({
+            lifecycleStage: "production",
+            summary: Object.freeze({
+              total: 1,
+              healthy: 0,
+              degraded: 0,
+              missing: 0,
+              nonCompliant: 1,
+            }),
+            entries: Object.freeze([Object.freeze({
+              secretId: "secret:server:provider:openai",
+              state: "non-compliant",
+              present: true,
+              degraded: true,
+              nonCompliant: true,
+              fallbackModeActive: false,
+              provider: Object.freeze({
+                providerId: "openai",
+                materialKind: "provider-credential",
+              }),
+              classification: Object.freeze({
+                materialId: "material:server:provider:openai",
+                category: "secret-credential",
+                scope: "server",
+                rotationPosture: "manual",
+                usageContexts: Object.freeze(["startup-bootstrap", "provider-credential"]),
+              }),
+              policy: Object.freeze({
+                startupRequirement: "fail-fast-required",
+                durabilityClass: "durable",
+                fallbackPolicy: "migrate-legacy-input",
+              }),
+              backend: Object.freeze({
+                backendId: "durable-server-secret-store",
+                backendKind: "durable-server-secret-store",
+              }),
+              rotation: Object.freeze({
+                status: "active",
+                currentVersionId: "secret:server:provider:openai:v1",
+              }),
+              validation: Object.freeze({
+                failures: Object.freeze([Object.freeze({
+                  code: "bootstrap-error",
+                  severity: "error",
+                  message: "secret-store:/sensitive/path leaked",
+                  secretId: "secret:server:provider:openai",
+                  startupRequirement: "fail-fast-required",
+                  durabilityClass: "durable",
+                  fallbackPolicy: "migrate-legacy-input",
+                })]),
+                warnings: Object.freeze([]),
+              }),
+            })]),
+          }),
         }),
       },
     });
@@ -420,6 +485,10 @@ describe("SecretMetadataBackendApi", () => {
     expect((response.data.diagnostics.bootstrap.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
     expect(response.data.diagnostics.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
     expect(response.data.diagnostics.bootstrap.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
+    expect(response.data.diagnostics.securityMaterial.entries[0]?.state).toBe("non-compliant");
+    expect(response.data.diagnostics.securityMaterial.entries[0]?.validation.failures[0]?.message).toBe(
+      "Secret service diagnostic emitted.",
+    );
   });
 });
 

@@ -160,6 +160,8 @@ describe("IdentityHttpServer secret metadata routes", () => {
     const diagnosticsBody = await diagnosticsResponse.json();
     expect(diagnosticsBody.ok).toBe(true);
     expect(diagnosticsBody.data.diagnostics.healthFlags.repositoryReachable).toBeTrue();
+    expect(diagnosticsBody.data.diagnostics.securityMaterial).toBeDefined();
+    expect((diagnosticsBody.data.diagnostics.securityMaterial as Record<string, unknown>).rawValue).toBeUndefined();
     expect((diagnosticsBody.data.diagnostics as Record<string, unknown>).plaintext).toBeUndefined();
   });
 
