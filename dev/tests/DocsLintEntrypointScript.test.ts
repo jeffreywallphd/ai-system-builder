@@ -90,7 +90,42 @@ describe("docs lint entrypoint script", () => {
     expect(result.status).toBe(1);
     expect(combinedOutput).toContain("Docs lint failed.");
     expect(combinedOutput).toContain("[FAIL] registry");
-    expect(combinedOutput).toContain("[REGISTRY_ENTRY_INVALID]");
+    expect(combinedOutput).toContain("Actionable findings by check:");
+    expect(combinedOutput).toContain("Severity summary:");
     expect(combinedOutput).toContain("## registry");
+    expect(combinedOutput).toContain("Description:");
+    expect(combinedOutput).toContain("Quick fix:");
+    expect(combinedOutput).toContain("Guides:");
+    expect(combinedOutput).toContain("[CRITICAL] [REGISTRY_ENTRY_INVALID]");
+    expect(combinedOutput).toContain("file: docs/context/documentation-registry.seed.json");
+    expect(combinedOutput).toContain("Raw validator output:");
+  });
+
+  it("includes file context for foundation quality-standard heading failures", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-lint-entrypoint-important-severity-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const qualityStandardPath = join(
+      fixtureRoot,
+      "docs",
+      "context",
+      "governance",
+      "documentation-quality-standard.md",
+    );
+    const qualityStandardContent = readFileSync(qualityStandardPath, "utf8").replace(
+      "## Readability and Signal-to-Noise Enforcement Boundaries",
+      "## Readability Boundaries",
+    );
+    writeFileSync(qualityStandardPath, qualityStandardContent, "utf8");
+
+    const result = spawnSync("node", [lintScriptPath, "--root", fixtureRoot, "--checks", "foundation"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CRITICAL] [DOCUMENTATION_QUALITY_STANDARD_INVALID]");
+    expect(combinedOutput).toContain("file: docs/context/governance/documentation-quality-standard.md");
   });
 });

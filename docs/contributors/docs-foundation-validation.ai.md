@@ -92,6 +92,26 @@ npm run docs:validate:category-compliance
 
 Use the same command in CI so baseline structure regressions fail fast with clear codes.
 
+## Lint Output Triage Flow
+
+`npm run docs:lint` now prints actionable failure sections in this order:
+
+1. Check status summary (`[PASS]` / `[FAIL]`).
+2. Severity summary (`critical`, `important`, `advisory` counts).
+3. Per-check triage block:
+   - check description,
+   - quick-fix guidance,
+   - canonical guide paths,
+   - issue list with severity + stable code + message,
+   - extracted `file:` reference when present,
+   - raw validator output for deep debugging.
+
+Use this order to fix issues quickly without scanning policy docs first:
+
+- Start with `critical` issues.
+- Use the `file:` line to open the failing artifact immediately.
+- Use `Guides:` links only when message context is insufficient.
+
 ## Common Failure Codes
 
 - `TOP_LEVEL_FOLDER_MISSING`
