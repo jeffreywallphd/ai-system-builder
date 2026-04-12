@@ -28,6 +28,7 @@ export const IdentitySessionBootstrapErrorCodes = Object.freeze({
   identityContextInvalid: "identity-context-invalid",
   transportUnavailable: "transport-unavailable",
   timeout: "timeout",
+  cancelled: "cancelled",
 } as const);
 
 export interface IdentitySessionBootstrapError {
@@ -60,6 +61,16 @@ const WorkspaceContextProgressNoticeDelaysMs = Object.freeze([1_500, 3_500] as c
 const BootstrapRequestRetryPolicy = Object.freeze({
   maxAttempts: 2,
 });
+const IdentityActorContextFailureKinds = Object.freeze({
+  timeout: "timeout",
+  callerCancelled: "caller-cancelled",
+  retryExhausted: "retry-exhausted",
+  transportFailure: "transport-failure",
+  authenticationFailed: "authentication-failed",
+  serviceNotReady: "service-not-ready",
+  invalidSession: "invalid-session",
+  unknown: "unknown",
+} as const);
 
 export class IdentityAuthSessionCoordinator {
   private static activeBootstrap:
@@ -189,7 +200,9 @@ export class IdentityAuthSessionCoordinator {
           stageId: AppInitializationStageIds.readyForSignIn,
           detail: isTimeoutIdentityError(actorContext.error)
             ? "Sign-in check took too long. You can sign in again."
-            : "Workspace access could not be loaded from the server.",
+            : isRequestCancelledIdentityError(actorContext.error)
+              ? "Sign-in check was interrupted before workspace context finished loading."
+              : "Workspace access could not be loaded from the server.",
         });
         return Object.freeze({
           status: IdentitySessionBootstrapStatus.unauthenticated,
@@ -291,11 +304,14 @@ export class IdentityAuthSessionCoordinator {
       const result = await this.authService.resolveSessionActorContext(request, {
         timeoutMs,
         retryPolicy: BootstrapRequestRetryPolicy,
-        signal: options?.signal,
       });
+      const failureKind = classifyActorContextFailure(result.error);
       logInitDiagnostic("resolveSessionActorContext:result", Object.freeze({
         ok: result.ok,
         errorCode: result.error?.code,
+        errorDomainCode: result.error?.domainCode,
+        retryable: result.error?.retryable,
+        failureKind,
         resolvedWorkspaceId: result.data?.workspaceContext.resolvedWorkspaceId,
         workspaceCount: result.data?.workspaceContext.workspaces.length,
         durationMs: Date.now() - startedAt,
@@ -305,7 +321,19 @@ export class IdentityAuthSessionCoordinator {
 
     IdentityAuthSessionCoordinator.activeActorContextResolutions.set(requestKey, timedResolutionPromise);
     try {
-      return await timedResolutionPromise;
+      const waitResult = await waitForResolutionUnlessCallerCancelled(timedResolutionPromise, options?.signal);
+      if (waitResult.kind === "caller-cancelled") {
+        logInitDiagnostic("resolveSessionActorContext:result", Object.freeze({
+          ok: false,
+          errorCode: IdentityAuthApiErrorCodes.internal,
+          errorDomainCode: "caller-cancelled",
+          retryable: true,
+          failureKind: IdentityActorContextFailureKinds.callerCancelled,
+          durationMs: Date.now() - startedAt,
+        }));
+        return buildCallerCancelledResponse();
+      }
+      return waitResult.result;
     } finally {
       IdentityAuthSessionCoordinator.activeActorContextResolutions.delete(requestKey);
       cancelPendingProgressNotices();
@@ -394,6 +422,13 @@ function toBootstrapError(
   message: string,
   error?: unknown,
 ): IdentitySessionBootstrapError {
+  if (isRequestCancelledIdentityError(error)) {
+    return Object.freeze({
+      code: IdentitySessionBootstrapErrorCodes.cancelled,
+      message,
+      retryable: true,
+    });
+  }
   if (errorCode === IdentityAuthApiErrorCodes.authenticationFailed) {
     return Object.freeze({
       code: IdentitySessionBootstrapErrorCodes.identityContextInvalid,
@@ -433,6 +468,88 @@ function isTimeoutIdentityError(error: unknown): boolean {
   }
   const message = readOptionalString(error, "message");
   return Boolean(message && /timed?\s*out/i.test(message));
+}
+
+function isRequestCancelledIdentityError(error: unknown): boolean {
+  if (!isRecord(error)) {
+    return false;
+  }
+  const domainCode = readOptionalString(error, "domainCode");
+  return domainCode === "request-cancelled" || domainCode === "caller-cancelled";
+}
+
+function classifyActorContextFailure(error: unknown): string {
+  if (!isRecord(error)) {
+    return IdentityActorContextFailureKinds.unknown;
+  }
+  const code = readOptionalString(error, "code");
+  const domainCode = readOptionalString(error, "domainCode");
+  if (domainCode === "request-timeout") {
+    return IdentityActorContextFailureKinds.timeout;
+  }
+  if (domainCode === "request-cancelled" || domainCode === "caller-cancelled") {
+    return IdentityActorContextFailureKinds.callerCancelled;
+  }
+  if (domainCode === "retry-attempts-exhausted") {
+    return IdentityActorContextFailureKinds.retryExhausted;
+  }
+  if (domainCode === "transport-unavailable") {
+    return IdentityActorContextFailureKinds.transportFailure;
+  }
+  if (domainCode === "service-not-ready") {
+    return IdentityActorContextFailureKinds.serviceNotReady;
+  }
+  if (code === IdentityAuthApiErrorCodes.authenticationFailed) {
+    return IdentityActorContextFailureKinds.authenticationFailed;
+  }
+  if (code === IdentityAuthApiErrorCodes.notFound || code === IdentityAuthApiErrorCodes.forbidden) {
+    return IdentityActorContextFailureKinds.invalidSession;
+  }
+  return IdentityActorContextFailureKinds.unknown;
+}
+
+function buildCallerCancelledResponse(): Awaited<ReturnType<IdentityAuthService["resolveSessionActorContext"]>> {
+  return Object.freeze({
+    ok: false,
+    error: Object.freeze({
+      code: IdentityAuthApiErrorCodes.internal,
+      message: "Session context request was cancelled by the caller.",
+      retryable: true,
+      domainCode: "caller-cancelled",
+    }),
+  });
+}
+
+async function waitForResolutionUnlessCallerCancelled<T>(
+  resolution: Promise<T>,
+  signal: AbortSignal | undefined,
+): Promise<{ readonly kind: "resolved"; readonly result: T } | { readonly kind: "caller-cancelled" }> {
+  if (!signal) {
+    return Object.freeze({
+      kind: "resolved",
+      result: await resolution,
+    });
+  }
+  if (signal.aborted) {
+    return Object.freeze({
+      kind: "caller-cancelled",
+    });
+  }
+  const cancellationPromise = new Promise<{ readonly kind: "caller-cancelled" }>((resolve) => {
+    signal.addEventListener("abort", () => {
+      resolve(Object.freeze({
+        kind: "caller-cancelled",
+      }));
+    }, { once: true });
+  });
+  const resolved = await Promise.race([
+    resolution.then((result) => Object.freeze({
+      kind: "resolved" as const,
+      result,
+    })),
+    cancellationPromise,
+  ]);
+  return resolved;
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

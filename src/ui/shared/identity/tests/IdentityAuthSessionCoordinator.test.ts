@@ -366,6 +366,65 @@ describe("IdentityAuthSessionCoordinator", () => {
     expect(resolveActorContextCalls).toBe(1);
   });
 
+  it("keeps shared actor-context request alive when the first caller aborts", async () => {
+    const storeA = createSessionStore();
+    const storeB = createSessionStore();
+    const session = createSession();
+    storeA.saveSession(session);
+    storeB.saveSession(session);
+
+    let resolveActorContext: ((value: IdentityAuthApiResponse<unknown>) => void) | undefined;
+    let resolveActorContextCalls = 0;
+    const actorContextPromise = new Promise<IdentityAuthApiResponse<unknown>>((resolve) => {
+      resolveActorContext = resolve;
+    });
+    const authService = {
+      resolveSessionActorContext: async () => {
+        resolveActorContextCalls += 1;
+        return await actorContextPromise as IdentityAuthApiResponse<never>;
+      },
+    };
+    const firstCoordinator = new IdentityAuthSessionCoordinator(storeA, authService);
+    const secondCoordinator = new IdentityAuthSessionCoordinator(storeB, authService);
+
+    const cancelledCaller = new AbortController();
+    const first = firstCoordinator.refreshIfAuthenticated({ signal: cancelledCaller.signal });
+    const second = secondCoordinator.refreshIfAuthenticated();
+
+    cancelledCaller.abort();
+    resolveActorContext?.({
+      ok: true,
+      data: {
+        actor: {
+          userIdentityId: "user-1",
+          username: "alice",
+        },
+        session: {
+          sessionId: "identity-session:1",
+          providerId: "provider:local-password",
+          accessChannel: "desktop",
+          issuedAt: "2026-04-04T20:00:00.000Z",
+          expiresAt: "2026-04-05T20:00:00.000Z",
+          assuranceLevel: "authenticated-untrusted",
+          trustState: "untrusted",
+        },
+        workspaceContext: {
+          requestedWorkspaceId: undefined,
+          resolvedWorkspaceId: undefined,
+          workspaces: [],
+        },
+      },
+    });
+
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult.status).toBe(IdentitySessionBootstrapStatus.unauthenticated);
+    if (firstResult.status === IdentitySessionBootstrapStatus.unauthenticated) {
+      expect(firstResult.error?.code).toBe("cancelled");
+    }
+    expect(secondResult.status).toBe(IdentitySessionBootstrapStatus.authenticated);
+    expect(resolveActorContextCalls).toBe(1);
+  });
+
   it("passes requested workspace context through bootstrap and refresh", async () => {
     const store = createSessionStore();
     store.saveSession(createSession());
@@ -484,6 +543,51 @@ describe("IdentityAuthSessionCoordinator", () => {
 
     expect(progressDetails.some((detail) => detail.includes("Requesting workspace context and permissions"))).toBeTrue();
     expect(progressDetails.some((detail) => detail.includes("Still waiting on identity service response"))).toBeTrue();
+  });
+
+  it("returns cancelled classification when caller aborts while awaiting actor context", async () => {
+    const store = createSessionStore();
+    store.saveSession(createSession());
+    const signalController = new AbortController();
+    const coordinator = new IdentityAuthSessionCoordinator(store, {
+      resolveSessionActorContext: async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 200);
+        });
+        return {
+          ok: true,
+          data: {
+            actor: {
+              userIdentityId: "user-1",
+              username: "alice",
+            },
+            session: {
+              sessionId: "identity-session:1",
+              providerId: "provider:local-password",
+              accessChannel: "desktop",
+              issuedAt: "2026-04-04T20:00:00.000Z",
+              expiresAt: "2026-04-05T20:00:00.000Z",
+              assuranceLevel: "authenticated-untrusted",
+              trustState: "untrusted",
+            },
+            workspaceContext: {
+              requestedWorkspaceId: undefined,
+              resolvedWorkspaceId: undefined,
+              workspaces: [],
+            },
+          },
+        };
+      },
+    });
+
+    const resultPromise = coordinator.refreshIfAuthenticated({ signal: signalController.signal });
+    signalController.abort();
+    const result = await resultPromise;
+    expect(result.status).toBe(IdentitySessionBootstrapStatus.unauthenticated);
+    if (result.status === IdentitySessionBootstrapStatus.unauthenticated) {
+      expect(result.reason).toBe(IdentitySessionUnauthenticatedReason.contextUnavailable);
+      expect(result.error?.code).toBe("cancelled");
+    }
   });
 });
 
