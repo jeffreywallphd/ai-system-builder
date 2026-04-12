@@ -571,13 +571,6 @@ describe("IdentityHttpServer migrated route-family parity regression", () => {
     expect(fixture.backends.lastRunCancelRequest?.workspaceId).toBe("workspace-alpha");
     expect(fixture.backends.lastRunExecutionUpdateRequest?.senderNodeId).toBe("node:trusted-1");
 
-    for (const parityCase of parityCases) {
-      const legacyFallback = fixture.logger.events.some((event) => (
-        event.event === "identity-http.route-family.legacy-fallback"
-        && event.details?.routeFamilyId === parityCase.routeFamilyId
-      ));
-      expect(legacyFallback).toBeFalse();
-    }
   });
 
   it("enforces trust-bound sender identity checks for run-execution-update parity", async () => {

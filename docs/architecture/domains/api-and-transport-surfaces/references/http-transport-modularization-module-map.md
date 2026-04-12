@@ -34,7 +34,7 @@ related_code_paths:
 
 Feature: 1  
 Epic: 1.4  
-Story: 1.4.4
+Story: 1.4.5
 
 ## Purpose
 
@@ -57,7 +57,7 @@ Shared transport seams:
 - DTO mappers: `identity/dto/*`
 - request/response primitives: `identity/primitives/*`
 - upgrade-boundary installer: `identity/composition/IdentityHttpUpgradeBoundary.ts`
-- HTTP entrypoint and retained inline fallback surface: `identity/IdentityHttpServer.ts`
+- HTTP entrypoint composition surface: `identity/IdentityHttpServer.ts`
 
 ## Route-Family Registry Model
 
@@ -65,7 +65,7 @@ Shared transport seams:
 2. `composeIdentityHttpTransport(...)` builds a `routeModuleRegistry`.
 3. The registry performs first-match route-prefix resolution in registration order.
 4. `IdentityHttpServer.ts` executes a modular handler when one exists for the matched `routeFamilyId`.
-5. For route families still on inline transport logic, modular dispatch intentionally falls back through the retained legacy path.
+5. When a route family has no modular handler ownership, request handling continues through the canonical route implementations in `IdentityHttpServer.ts` without migration-specific fallback markers.
 
 Current modular handler ownership (in `defaultRouteFamilyHandlers`) includes:
 - `storage-management`
@@ -81,7 +81,7 @@ Current modular handler ownership (in `defaultRouteFamilyHandlers`) includes:
 - `run-execution-update`
 - `image-run-api`
 
-Current explicit inline fallback family set (`legacyInlineRouteFamilyIds`) includes:
+Current route families that are still implemented in `IdentityHttpServer.ts` inline handlers:
 - `identity-auth`
 - `workspace-invitations`
 - `workspace-administration`
@@ -90,8 +90,6 @@ Current explicit inline fallback family set (`legacyInlineRouteFamilyIds`) inclu
 - `security-certificate-operations`
 - `security-secret-metadata`
 - `system-runtime`
-
-This hybrid posture is intentional until the remaining route families are fully extracted.
 
 ## Middleware Composition Rules
 
@@ -141,7 +139,7 @@ Keep this split:
 1. Add or update route-family metadata in `authoritative-route-families/*` (stable `routeFamilyId`, canonical prefixes, required backend keys).
 2. Wire backend-key availability in `AuthoritativeApiRouteRegistrationCatalog.ts`.
 3. Ensure module ownership entry exists in `AuthoritativeIdentityRouteFamilyModules.ts`.
-4. Add/extend modular handler in `identity/route-families/*` and register in `defaultRouteFamilyHandlers` when migrating from inline fallback.
+4. Add/extend modular handler in `identity/route-families/*` and register in `defaultRouteFamilyHandlers` when extracting inline route-family handling.
 5. Keep middleware order unchanged and use shared auth/trust gates.
 6. Add/extend DTO mapper seams in `identity/dto/*`; do not push transport mapping into application/domain.
 7. If startup requires this family, update required family coverage in `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`.

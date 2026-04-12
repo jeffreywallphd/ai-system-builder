@@ -109,10 +109,10 @@
   - `src/infrastructure/transport/http-server/authoritative-route-families/*`
 - Startup behavior:
   - `dependencies` stage composes route registration artifact
-  - top-level transport composition (`createIdentityHttpServer`) consumes the route registration plan via the route-module registry and allows per-route-family modular dispatch with explicit legacy fallback
+  - top-level transport composition (`createIdentityHttpServer`) consumes the route registration plan via the route-module registry and allows per-route-family modular dispatch
   - top-level websocket upgrade entry wiring is isolated in `src/infrastructure/transport/http-server/identity/composition/IdentityHttpUpgradeBoundary.ts`, separating upgrade dispatch from standard HTTP route handling
   - modular handler coverage now includes storage, asset, image-asset, deployment-policy, audit-ledger, execution-node-management, run-submission, run-read, run-mutation, and run-execution-update route families
-  - hybrid dispatch still keeps monolithic fallback active for route families that are not yet modularized (or that explicitly decline handling)
+  - route families without modular handler ownership continue through canonical inline route implementations in `IdentityHttpServer.ts`
   - `dependencies` stage also composes optional ComfyUI execution adapter infrastructure artifact when Comfy adapter config is enabled
   - `dependencies` stage composes authoritative run-execution adapter registration (`src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`) that resolves:
     - run dispatch port registration
