@@ -121,3 +121,21 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
 - Extension posture:
   - callers continue to depend on `ISecretProviderMaterialResolutionPort`
   - backend injection seam in `DefaultSecretProviderResolutionService` preserves compatibility with future external secret-store adapters.
+
+## Story 3.2.3 Optional local secure storage for user/device secrets
+
+- Adds optional local user secure-store backend and keytar adapter seam in:
+  - `src/infrastructure/security/secrets/LocalUserSecureSecretStoreBackend.ts`
+- Extends provider-resolution routing while preserving existing authority boundaries:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+- Scope boundaries are explicit:
+  - server scope remains authoritative via `DurableServerSecretStoreBackend`
+  - workspace scope remains resolved through managed runtime secret adapters
+  - optional local secure storage is user scope only and rejects server/workspace selectors
+- Build/runtime posture:
+  - `keytar` is dynamically loaded only when available
+  - keytar is not required for baseline runtime and test execution
+  - when keytar is unavailable, user-scope resolution falls back to managed secret-service adapters
+- Architectural effect:
+  - callers stay on `ISecretProviderMaterialResolutionPort`
+  - local secure storage remains an adapter concern rather than a caller-level branching concern

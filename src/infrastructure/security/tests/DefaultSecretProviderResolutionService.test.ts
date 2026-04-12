@@ -10,6 +10,7 @@ import {
 } from "@application/security/use-cases/SecretManagementServiceContracts";
 import { SecretProviderMaterialKinds } from "@application/security/ports/SecretProviderPorts";
 import { DefaultSecretProviderResolutionService } from "@infrastructure/security/DefaultSecretProviderResolutionService";
+import { LocalUserSecureSecretStoreBackend } from "@infrastructure/security/secrets/LocalUserSecureSecretStoreBackend";
 
 class StubRuntimeSecretConsumptionAdapters {
   public readonly serverRequests: Array<Record<string, unknown>> = [];
@@ -129,6 +130,61 @@ class StubProviderSecretRepository {
 
   public seed(reference: SecretReference): void {
     this.references.set(reference.secretId, reference);
+  }
+}
+
+class StubLocalUserSecureSecretStoreBackend {
+  public readonly resolveCalls: Array<Record<string, unknown>> = [];
+  public readonly metadataCalls: Array<Record<string, unknown>> = [];
+  public readonly bootstrapCalls: Array<Record<string, unknown>> = [];
+
+  public resolveResult:
+    | Awaited<ReturnType<LocalUserSecureSecretStoreBackend["resolveUserMaterial"]>>
+    | undefined;
+  public metadataResult:
+    | Awaited<ReturnType<LocalUserSecureSecretStoreBackend["resolveUserMaterialMetadata"]>>
+    | undefined;
+  public bootstrapResult:
+    | Awaited<ReturnType<LocalUserSecureSecretStoreBackend["bootstrapUserMaterial"]>>
+    | undefined;
+
+  public async resolveUserMaterial(
+    input: Parameters<LocalUserSecureSecretStoreBackend["resolveUserMaterial"]>[0],
+  ): Promise<Awaited<ReturnType<LocalUserSecureSecretStoreBackend["resolveUserMaterial"]>>> {
+    this.resolveCalls.push(input as unknown as Record<string, unknown>);
+    return this.resolveResult ?? {
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: "not found",
+      },
+    };
+  }
+
+  public async resolveUserMaterialMetadata(
+    input: Parameters<LocalUserSecureSecretStoreBackend["resolveUserMaterialMetadata"]>[0],
+  ): Promise<Awaited<ReturnType<LocalUserSecureSecretStoreBackend["resolveUserMaterialMetadata"]>>> {
+    this.metadataCalls.push(input as unknown as Record<string, unknown>);
+    return this.metadataResult ?? {
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: "not found",
+      },
+    };
+  }
+
+  public async bootstrapUserMaterial(
+    input: Parameters<LocalUserSecureSecretStoreBackend["bootstrapUserMaterial"]>[0],
+  ): Promise<Awaited<ReturnType<LocalUserSecureSecretStoreBackend["bootstrapUserMaterial"]>>> {
+    this.bootstrapCalls.push(input as unknown as Record<string, unknown>);
+    return this.bootstrapResult ?? {
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: "not found",
+      },
+    };
   }
 }
 
@@ -326,6 +382,164 @@ describe("DefaultSecretProviderResolutionService", () => {
       expect(existing.value.outcome).toBe("existing");
     }
     expect(repository.createCalls).toHaveLength(1);
+  });
+
+  it("prefers optional local user secure store backend for user-scoped provider resolution", async () => {
+    const runtimeAdapters = new StubRuntimeSecretConsumptionAdapters();
+    const repository = new StubProviderSecretRepository();
+    const localBackend = new StubLocalUserSecureSecretStoreBackend();
+    localBackend.resolveResult = {
+      ok: true,
+      value: {
+        providerId: "openai",
+        secretId: "secret:user:provider:openai",
+        currentVersionId: "secret:user:provider:openai:local-v1",
+        scope: {
+          scope: SecretScopes.user,
+          workspaceId: "workspace:alpha",
+          userIdentityId: "user:alpha",
+        },
+        materialKind: SecretProviderMaterialKinds.providerCredential,
+        rawValue: "sk-local-user",
+      },
+    };
+    localBackend.metadataResult = {
+      ok: true,
+      value: {
+        providerId: "openai",
+        secretId: "secret:user:provider:openai",
+        scope: {
+          scope: SecretScopes.user,
+          workspaceId: "workspace:alpha",
+          userIdentityId: "user:alpha",
+        },
+        materialKind: SecretProviderMaterialKinds.providerCredential,
+        reference: createReference({
+          secretId: "secret:user:provider:openai",
+          name: "provider.openai.local-user-key",
+          kind: SecretKinds.apiKey,
+          owner: {
+            scope: SecretScopes.user,
+            workspaceId: "workspace:alpha",
+            userIdentityId: "user:alpha",
+          },
+          updatedAt: "2026-04-09T00:00:00.000Z",
+        }),
+      },
+    };
+    localBackend.bootstrapResult = {
+      ok: true,
+      value: {
+        outcome: "created",
+        reference: {
+          providerId: "openai",
+          secretId: "secret:user:provider:openai",
+          scope: {
+            scope: SecretScopes.user,
+            workspaceId: "workspace:alpha",
+            userIdentityId: "user:alpha",
+          },
+          materialKind: SecretProviderMaterialKinds.providerCredential,
+          reference: createReference({
+            secretId: "secret:user:provider:openai",
+            name: "provider.openai.local-user-key",
+            kind: SecretKinds.apiKey,
+            owner: {
+              scope: SecretScopes.user,
+              workspaceId: "workspace:alpha",
+              userIdentityId: "user:alpha",
+            },
+            updatedAt: "2026-04-09T00:00:00.000Z",
+          }),
+        },
+      },
+    };
+    const service = new DefaultSecretProviderResolutionService({
+      runtimeSecretConsumptionAdapters: runtimeAdapters as unknown as SecretRuntimeConsumptionAdapters,
+      getSecretMetadata: (request) => repository.getSecretMetadata(request),
+      createSecret: (request) => repository.createSecret(request),
+      localUserSecureSecretStoreBackend: localBackend as unknown as LocalUserSecureSecretStoreBackend,
+    });
+
+    const selector = {
+      providerId: "openai",
+      secretId: "secret:user:provider:openai",
+      scope: {
+        scope: SecretScopes.user,
+        workspaceId: "workspace:alpha",
+        userIdentityId: "user:alpha",
+      },
+      materialKind: SecretProviderMaterialKinds.providerCredential,
+    } as const;
+    const access = {
+      operationKey: "op:test:user:local-store",
+      serviceIdentity: "runtime:user:test",
+      usage: "provider-runtime",
+    } as const;
+
+    const resolved = await service.resolveSecretProviderMaterial({
+      selector,
+      access,
+    });
+    const metadata = await service.resolveSecretProviderMaterialMetadata({
+      selector,
+      access,
+    });
+    const bootstrapped = await service.bootstrapSecretProviderMaterial({
+      selector,
+      access,
+      name: "provider.openai.local-user-key",
+      kind: SecretKinds.apiKey,
+      plaintext: "sk-local-user",
+    });
+
+    expect(resolved.ok).toBeTrue();
+    if (resolved.ok) {
+      expect(resolved.value.rawValue).toBe("sk-local-user");
+    }
+    expect(metadata.ok).toBeTrue();
+    expect(bootstrapped.ok).toBeTrue();
+    expect(localBackend.resolveCalls).toHaveLength(1);
+    expect(localBackend.metadataCalls).toHaveLength(1);
+    expect(localBackend.bootstrapCalls).toHaveLength(1);
+    expect(runtimeAdapters.userRequests).toHaveLength(0);
+  });
+
+  it("falls back to managed user secret resolution when local backend is configured but missing material", async () => {
+    const runtimeAdapters = new StubRuntimeSecretConsumptionAdapters();
+    const repository = new StubProviderSecretRepository();
+    const localBackend = new StubLocalUserSecureSecretStoreBackend();
+    const service = new DefaultSecretProviderResolutionService({
+      runtimeSecretConsumptionAdapters: runtimeAdapters as unknown as SecretRuntimeConsumptionAdapters,
+      getSecretMetadata: (request) => repository.getSecretMetadata(request),
+      createSecret: (request) => repository.createSecret(request),
+      localUserSecureSecretStoreBackend: localBackend as unknown as LocalUserSecureSecretStoreBackend,
+    });
+
+    const resolved = await service.resolveSecretProviderMaterial({
+      selector: {
+        providerId: "openai",
+        secretId: "secret:user:provider:openai",
+        scope: {
+          scope: SecretScopes.user,
+          workspaceId: "workspace:alpha",
+          userIdentityId: "user:alpha",
+        },
+        materialKind: SecretProviderMaterialKinds.providerCredential,
+      },
+      access: {
+        operationKey: "op:test:user:fallback",
+        serviceIdentity: "runtime:user:test",
+        usage: "provider-runtime",
+      },
+    });
+
+    expect(resolved.ok).toBeTrue();
+    if (resolved.ok) {
+      expect(resolved.value.rawValue).toBe("user-value");
+    }
+    expect(localBackend.resolveCalls).toHaveLength(1);
+    expect(runtimeAdapters.userRequests).toHaveLength(1);
   });
 });
 
