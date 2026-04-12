@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { CommandPaletteService, GlobalCommandTrigger } from "../CommandPalette";
 import { ROUTE_PATHS } from "../RouteConfig";
+import { UiSurfaceKeys } from "../../shared/navigation/SurfaceNavigationMetadata";
 
 describe("CommandPaletteService", () => {
   it("registers only the bounded top-level command buttons", () => {
@@ -35,6 +36,23 @@ describe("CommandPaletteService", () => {
     const identityAdminEntry = model.entries.find((entry) => entry.label === "Identity admin");
 
     expect(identityAdminEntry?.action.launchPath).toBe(ROUTE_PATHS.identityAdmin);
+  });
+
+  it("hides administrative shortcuts when strict capabilities are not available", () => {
+    const service = new CommandPaletteService();
+    const model = service.resolveDefaultModel(
+      { pathname: ROUTE_PATHS.build, search: "" },
+      {
+        surface: UiSurfaceKeys.adminLite,
+        strict: true,
+        roleKeys: Object.freeze(["member"]),
+        capabilityKeys: Object.freeze(["workflow.share", "node-trust.read", "system.read"]),
+        hasWorkspaceContext: true,
+      },
+    );
+
+    expect(model.entries.map((entry) => entry.label)).not.toContain("Identity admin");
+    expect(model.entries.map((entry) => entry.label)).not.toContain("Manage");
   });
 });
 

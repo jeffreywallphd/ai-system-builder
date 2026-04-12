@@ -156,3 +156,7 @@ Provisioning rejections that are not unsupported backend capabilities map to `st
 - unsupported backend operation responses
 - provisioning rejection failure behavior without unintended persistence
 - storage mutation audit coverage including policy-update event emission and high-value metadata details
+
+## Related ADRs
+
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`

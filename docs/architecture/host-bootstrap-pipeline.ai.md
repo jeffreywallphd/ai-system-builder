@@ -43,6 +43,24 @@
 - Stage execution: `executeHostBootstrapPipeline(...)`
 - Execution history is deterministic (`sequence`, stage id, status, timestamps).
 
+## Startup span tracer utility (story 1.1.1)
+- Implemented in `src/hosts/bootstrap/startupTracer.ts`.
+- Provides reusable startup tracing with:
+  - nested spans and explicit hierarchy metadata
+  - start/stop timing and duration capture
+  - metadata capture and merge semantics
+  - failure/error tagging for failed spans
+  - sensitive field/value redaction safeguards for metadata and error payloads
+- Uses pino structured logging through `createStartupSpanPinoLogger(...)`.
+- Emits startup span events:
+  - `startup.span.completed`
+  - `startup.span.failed`
+  - `startup.span.slow` (warning-level event for spans exceeding warning threshold)
+- Slow warning thresholds are configurable with:
+  - `slowSpanThresholdMs` (baseline slow-tag threshold)
+  - `slowSpanWarnings.defaultThresholdMs` (default warning threshold)
+  - `slowSpanWarnings.thresholdsBySpanName` (per-span warning threshold overrides)
+
 ## Host customization boundary
 - Hosts extend startup by:
   - overriding canonical stage handlers, and/or
@@ -52,6 +70,10 @@
 ## Authoritative server adoption
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now composes startup through the shared pipeline.
 - Startup context is built from boot + deployment profile + environment.
+- Initial staged bootstrap extraction now lives in:
+  - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
+  - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+- Logical authoritative stages are now executed through `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts` so stage sequencing stays centralized and startup spans align to stage ids (`services`, `security`, `persistence`, `transport`).
 - Bootstrap `dependencies` now composes host-aware service registration plans and `feature-registration` enforces authoritative service coverage before runtime host start.
 - Identity server runtime start happens in `feature-registration` stage.
 - Existing lifecycle transition semantics are preserved (`composing -> starting -> ready -> stopping -> stopped`) with fail-safe failure transition handling.
@@ -101,6 +123,7 @@
 
 ## Test coverage
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
+- `src/hosts/bootstrap/tests/startupTracer.test.ts`
 - `src/hosts/lifecycle/tests/HostLifecycleCoordinator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`

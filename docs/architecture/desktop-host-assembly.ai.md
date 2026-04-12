@@ -12,6 +12,7 @@
 ## Desktop boundary posture
 - Desktop host remains a control-plane client runtime (`host:desktop:app-shell`), not an authoritative control-plane runtime.
 - Desktop-specific startup, IPC/bridge registrations, local persistence bootstrap, and workstation runtime bootstrapping are composed through host-owned adapters.
+- Desktop offline local-mode boundaries are explicit: offline cache/read models, local draft state, queued sync envelopes, and local-ephemeral runtime state stay separated by authority and resync behavior.
 - Desktop service coverage is asserted before feature registration so dependency composition remains explicit and controlled.
 
 ## Startup expectations

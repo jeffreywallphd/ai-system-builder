@@ -1,53 +1,24 @@
-# AI Companion: Feature 4 Final Authorization Baseline
+---
+title: "AI Companion: Feature 4 Final Baseline (Legacy Path Stub)"
+doc_type: architecture-reference
+status: superseded
+authoritativeness: historical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+superseded_by: docs/baselines/architecture/authorization/authorization-feature-4-final-baseline.ai.md
+related_code_paths:
+  - docs/baselines/architecture/authorization/authorization-feature-4-final-baseline.ai.md
+  - docs/architecture/domains/identity-trust-and-security/overview.md
+---
 
-## Purpose
+# AI Companion: Feature 4 Final Baseline
 
-Provide a durable implementation-truth handoff for the production authorization, visibility, and sharing subsystem.
+## Supersession Notice
 
-## Feature scope completed
+This file is a `migrated-link-stub` and is not authoritative for current architecture guidance.
 
-- Workspace-aware RBAC foundations with canonical role and permission catalogs.
-- Visibility and explicit-sharing domain contracts with invariant validation.
-- Deterministic policy evaluation for resource-instance and workspace-capability targets.
-- Centralized authorization administration use cases for role/share/visibility mutation and access inspection.
-- HTTP/WebSocket/IPC enforcement seams and runtime integration.
-- Sharing management + access review + reporting API and UI surfaces.
-- High-risk mutation safeguards and administrative continuity guardrails.
+Effective date: 2026-04-11.
+Reason: baseline history moved into the baselines archive tree.
+Canonical source: `docs/baselines/architecture/authorization/authorization-feature-4-final-baseline.ai.md`.
 
-## Canonical seams
-
-- Domain/contracts: `src/domain/authorization/*`, `src/shared/contracts/authorization/*`, `src/shared/schemas/authorization/*`
-- Application: `src/application/authorization/use-cases/*`
-- Persistence: `src/infrastructure/persistence/authorization/*`
-- Transport/API: `src/infrastructure/transport/authorization/*`, `src/infrastructure/api/authorization/*`, `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- UI: `src/ui/components/authorization/*`, `src/ui/pages/AuthorizationSharingManagementPage.tsx`, `src/ui/pages/AuthorizationSharingThinClientPage.tsx`, `src/ui/pages/AuthorizationReportingPage.tsx`
-
-## Operationally important contracts
-
-- Management endpoints:
-  - `PATCH .../visibility`
-  - `POST .../sharing-grants`
-  - `DELETE .../sharing-grants/:grantId`
-  - `GET .../access-state`
-  - `POST /api/v1/authorization/sharing-grants/workspace-role/bulk-upsert`
-  - `GET /api/v1/authorization/reporting/workspaces/:workspaceId`
-- UI routes:
-  - `/settings/sharing`
-  - `/settings/sharing/thin`
-  - `/settings/sharing/reporting`
-- Safeguard confirmation metadata:
-  - `metadata.authorizationHighRiskConfirmation.confirmedRiskCodes`
-
-## Extension rules to preserve
-
-1. Keep precedence and decision composition centralized; do not duplicate policy logic in handlers/pages.
-2. Keep protected-resource tuple contracts stable (`resourceFamily`, `resourceType`, `resourceId`).
-3. Extend resource families/roles through catalog + schema + UI + tests together.
-4. Preserve non-leaky deny behavior and partial-access redaction patterns.
-5. Keep workspace reporting policy-gated (`system.manage` capability checks).
-
-## Primary references
-
-- `docs/architecture/authorization-feature-4-final-baseline.md`
-- `docs/architecture/authorization-enforcement-integration-patterns.md`
-- `docs/authorization-sharing-management-and-access-review.md`
+Retention/removal trigger: retain this stub only until inbound links are updated.

@@ -22,6 +22,7 @@ Desktop host composition explicitly wires:
 - desktop shell startup and renderer window creation
 - preload/IPC transport registration
 - local cache/persistence bootstrapping
+- offline local-mode boundaries (cache vs local draft vs queued sync intent vs local-ephemeral runtime state)
 - runtime supervisor/bootstrap dependencies for workstation execution
 - authoring and administration bridge surfaces as control-plane client behavior
 
@@ -52,6 +53,8 @@ Electron main now executes through the desktop host assembly and supplies host-o
 - renderer content security policy installation
 - initial window creation
 - graceful host stop and local runtime resource disposal
+
+Renderer CSP now pre-authorizes loopback deferred-runtime endpoints (`http://127.0.0.1:8790` service supervisor and `http://127.0.0.1:8100` python runtime) for desktop host modes so post-login runtime warmup calls are not blocked by pre-login document policy while still remaining loopback-scoped.
 
 ## Testing
 

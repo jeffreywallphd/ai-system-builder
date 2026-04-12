@@ -8,6 +8,12 @@ import type { IStudioShellRepository } from "@application/ports/interfaces/IStud
 import { DefaultStudioShellApplicationService } from "@application/studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "@application/workflow-studio/WorkflowStudioApplicationService";
 import {
+  createInitialSupportedImageWorkflowTemplateRegistry,
+  type InitialImageWorkflowTemplateFamilyId,
+  type InitialImageWorkflowTemplateDefinition,
+} from "@application/image-workflows/InitialSupportedImageWorkflowTemplateRegistry";
+import type { IImageSystemDefinitionRepository } from "@application/image-workflows";
+import {
   buildStudioShellValidationIssues,
   tryReadTaxonomyFromVersionMetadata,
   type StudioShellValidationIssue,
@@ -133,11 +139,34 @@ import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authori
 import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
+  StudioShellObservability,
+  type StudioShellObservabilityAction,
+  type StudioShellObservabilityLogger,
+} from "./StudioShellObservability";
+import {
   AuthorizationResponseAccessLevels,
   deriveAuthorizationResponseAccessLevel,
   shapeAuthorizationAwareResponse,
   type AuthorizationResponseAccessLevel,
 } from "@application/authorization/use-cases/AuthorizationResponseRedaction";
+import {
+  ImageWorkflowParameterSensitivityLevels,
+  ImageWorkflowParameterUiControlKinds,
+  normalizeImageWorkflowParameterSpecification,
+  type ImageWorkflowParameterSpecification,
+} from "@domain/image-workflows/ImageWorkflowParameterSpecification";
+import {
+  createStudioImageSystemDefinitionUseCases,
+  resolveStudioTemplateWorkflowDefinitionById,
+  toSystemIdFromDraft,
+  toSystemUpdateRequest,
+  toSystemUpsertRequest,
+  type GetImageSystemDefinitionRequest,
+  type ImageSystemDefinitionDetailResult,
+  type ListImageSystemDefinitionsRequest,
+  type ListImageSystemDefinitionsResult,
+  type StudioImageSystemDefinitionUseCases,
+} from "./StudioImageSystemDefinitionSupport";
 
 export interface StudioShellApiError {
   readonly code:
@@ -186,6 +215,131 @@ export interface StudioShellSnapshotReadModel {
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
 }
 
+export interface ListStudioImageWorkflowDefinitionsRequest {
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly operationKinds?: ReadonlyArray<string>;
+  readonly search?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface GetStudioImageWorkflowDefinitionRequest {
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly workflowId: string;
+}
+
+export interface StudioImageWorkflowDefinitionSummaryReadModel {
+  readonly workflowId: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly operationKind: string;
+  readonly version: {
+    readonly lineageId: string;
+    readonly versionTag: string;
+    readonly revision: number;
+  };
+  readonly updatedAt: string;
+}
+
+export interface StudioImageWorkflowDefinitionReadModel extends StudioImageWorkflowDefinitionSummaryReadModel {
+  readonly rationale: string;
+  readonly parameterSpecifications: ReadonlyArray<ImageWorkflowParameterSpecification>;
+  readonly parameterDefaults: Readonly<Record<string, unknown>>;
+  readonly minimumRequirements: {
+    readonly inputKinds: ReadonlyArray<string>;
+    readonly outputKinds: ReadonlyArray<string>;
+    readonly requiredParameterIds: ReadonlyArray<string>;
+  };
+}
+
+export interface StudioImageWorkflowDefinitionListingReadModel {
+  readonly items: ReadonlyArray<StudioImageWorkflowDefinitionSummaryReadModel>;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+  };
+}
+
+export interface SaveStudioImageSystemDefinitionRequest {
+  readonly studioId: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly existingSystemId?: string;
+  readonly saveAsNew?: boolean;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly tags?: ReadonlyArray<string>;
+}
+
+export interface ListStudioImageSystemDefinitionsRequest {
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly workflowIds?: ReadonlyArray<string>;
+  readonly search?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface GetStudioImageSystemDefinitionRequest {
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly systemId: string;
+}
+
+export interface StudioImageSystemDefinitionSummaryReadModel {
+  readonly systemId: string;
+  readonly title: string;
+  readonly summary?: string;
+  readonly lifecycleState: string;
+  readonly runtimeStatus: string;
+  readonly workflowId: string;
+  readonly workflowVersionTag: string;
+  readonly readinessState: string;
+  readonly readinessSummary: string;
+  readonly readiness: StudioImageSystemReadinessReadModel;
+  readonly updatedAt: string;
+}
+
+export interface StudioImageSystemDefinitionReadModel extends StudioImageSystemDefinitionSummaryReadModel {
+  readonly parameterBaseline: Readonly<Record<string, unknown>>;
+  readonly outputTargetBindings: ReadonlyArray<{
+    readonly outputId: string;
+    readonly targetReference: string;
+  }>;
+}
+
+export interface StudioImageSystemReadinessIssueReadModel {
+  readonly code: string;
+  readonly path?: string;
+  readonly message: string;
+  readonly severity: "blocking" | "advisory";
+}
+
+export interface StudioImageSystemReadinessReadModel {
+  readonly state: string;
+  readonly summary: string;
+  readonly blockingIssueCount: number;
+  readonly advisoryIssueCount: number;
+  readonly blockingIssues: ReadonlyArray<StudioImageSystemReadinessIssueReadModel>;
+  readonly advisoryIssues: ReadonlyArray<StudioImageSystemReadinessIssueReadModel>;
+}
+
+export interface StudioImageSystemDefinitionListingReadModel {
+  readonly items: ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel>;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+  };
+}
+
 export interface ValidateStudioShellDraftRequest {
   readonly studioId: string;
   readonly draftId: string;
@@ -222,6 +376,7 @@ export interface IngestReferenceImageUploadRequest {
   readonly fileName: string;
   readonly mimeType?: string;
   readonly payloadBase64: string;
+  readonly sourceImageAssetId?: string;
   readonly targetDatasetBindingId?: ReferenceImageDatasetBindingId;
 }
 
@@ -242,6 +397,8 @@ export interface IngestReferenceImageUploadReadModel {
     readonly format: string;
   };
   readonly selectedRecordId: string;
+  readonly storedFilePath?: string;
+  readonly configuredUploadRootPath?: string;
 }
 
 export interface PersistReferenceImageOutputsRequest {
@@ -842,6 +999,13 @@ export class StudioShellBackendApi {
   private readonly referenceImageProtectedResourceType: string;
   private readonly referenceImageRunProtectedResourceType: string;
   private readonly workflowRunProtectedResourceType: string;
+  private readonly imageWorkflowTemplateRegistry = createInitialSupportedImageWorkflowTemplateRegistry();
+  private readonly createImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["createSystemDefinition"];
+  private readonly updateImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["updateSystemDefinition"];
+  private readonly getImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["getSystemDefinition"];
+  private readonly listImageSystemDefinitionsUseCase: StudioImageSystemDefinitionUseCases["listSystemDefinitions"];
+  private readonly observability: StudioShellObservability;
+  private readonly configuredReferenceImageUploadRootPath?: string;
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -854,10 +1018,13 @@ export class StudioShellBackendApi {
       readonly storageInstanceMetadataRepository?: StorageInstanceMetadataRepository;
       readonly workflowOutputArtifactStorage?: WorkflowOutputArtifactStorage;
       readonly storageLifecycleInfrastructure?: StorageInstanceLifecycleInfrastructure;
+      readonly imageSystemDefinitionRepository?: IImageSystemDefinitionRepository;
       readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
       readonly referenceImageProtectedResourceType?: string;
       readonly referenceImageRunProtectedResourceType?: string;
       readonly workflowRunProtectedResourceType?: string;
+      readonly observabilityLogger?: StudioShellObservabilityLogger;
+      readonly referenceImageUploadRootPath?: string;
     },
   ) {
     this.now = now;
@@ -914,6 +1081,15 @@ export class StudioShellBackendApi {
       || "reference-image-run";
     this.workflowRunProtectedResourceType = options?.workflowRunProtectedResourceType?.trim()
       || "workflow-run";
+    this.observability = new StudioShellObservability(options?.observabilityLogger);
+    this.configuredReferenceImageUploadRootPath = options?.referenceImageUploadRootPath?.trim() || undefined;
+    const imageSystemUseCases = createStudioImageSystemDefinitionUseCases({
+      systemRepository: options?.imageSystemDefinitionRepository,
+    });
+    this.createImageSystemDefinitionUseCase = imageSystemUseCases.createSystemDefinition;
+    this.updateImageSystemDefinitionUseCase = imageSystemUseCases.updateSystemDefinition;
+    this.getImageSystemDefinitionUseCase = imageSystemUseCases.getSystemDefinition;
+    this.listImageSystemDefinitionsUseCase = imageSystemUseCases.listSystemDefinitions;
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
       undefined,
@@ -1006,6 +1182,199 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
       }
       return snapshot.validationIssues;
+    });
+  }
+
+  public async listImageWorkflowDefinitions(
+    request: ListStudioImageWorkflowDefinitionsRequest = {},
+  ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionListingReadModel>> {
+    return this.wrap(async () => {
+      if (typeof request.workspaceId === "string" && request.workspaceId.trim().length === 0) {
+        throw new StudioShellInvalidRequestError("workspaceId cannot be empty when provided.");
+      }
+      if (typeof request.actorUserId === "string" && request.actorUserId.trim().length === 0) {
+        throw new StudioShellInvalidRequestError("actorUserId cannot be empty when provided.");
+      }
+      const operationKinds = request.operationKinds
+        ?.map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+      const search = request.search?.trim().toLowerCase();
+      const limit = Math.max(1, Math.min(100, request.limit ?? 50));
+      const offset = Math.max(0, request.offset ?? 0);
+      const updatedAt = this.now().toISOString();
+
+      const filtered = this.imageWorkflowTemplateRegistry
+        .list()
+        .filter((template) => {
+          if (operationKinds && operationKinds.length > 0 && !operationKinds.includes(template.operationKind)) {
+            return false;
+          }
+          if (!search) {
+            return true;
+          }
+          const haystack = `${template.templateFamilyId} ${template.display.title} ${template.display.summary} ${template.operationKind}`
+            .toLowerCase();
+          return haystack.includes(search);
+        });
+      const paged = filtered.slice(offset, offset + limit);
+
+      return Object.freeze({
+        items: Object.freeze(paged.map((template) => this.toImageWorkflowSummaryReadModel(template, updatedAt))),
+        pagination: Object.freeze({
+          limit,
+          offset,
+          returned: paged.length,
+          hasMore: filtered.length > (offset + limit),
+        }),
+      });
+    });
+  }
+
+  public async getImageWorkflowDefinition(
+    request: GetStudioImageWorkflowDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>> {
+    return this.wrap(async () => {
+      if (typeof request.workspaceId === "string" && request.workspaceId.trim().length === 0) {
+        throw new StudioShellInvalidRequestError("workspaceId cannot be empty when provided.");
+      }
+      if (typeof request.actorUserId === "string" && request.actorUserId.trim().length === 0) {
+        throw new StudioShellInvalidRequestError("actorUserId cannot be empty when provided.");
+      }
+      const workflowId = request.workflowId.trim();
+      if (!workflowId) {
+        throw new StudioShellInvalidRequestError("workflowId is required.");
+      }
+      const template = this.imageWorkflowTemplateRegistry.getByTemplateFamilyId(
+        workflowId as InitialImageWorkflowTemplateFamilyId,
+      );
+      if (!template) {
+        throw new Error(`not-found:Image workflow '${workflowId}' is not available.`);
+      }
+      return this.toImageWorkflowDefinitionReadModel(template, this.now().toISOString());
+    });
+  }
+
+  public async listImageSystemDefinitions(
+    request: ListStudioImageSystemDefinitionsRequest = {},
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionListingReadModel>> {
+    return this.wrap(async () => {
+      const workspaceId = request.workspaceId?.trim() || "workspace:studio-shell";
+      const actorUserId = request.actorUserId?.trim() || "user:studio-shell";
+      const response = await this.listImageSystemDefinitionsUseCase.execute({
+        workspaceId,
+        actorUserId,
+        workflowIds: request.workflowIds,
+        search: request.search,
+        limit: request.limit,
+        offset: request.offset,
+      } satisfies ListImageSystemDefinitionsRequest);
+      return this.toImageSystemDefinitionListingReadModel(response);
+    });
+  }
+
+  public async getImageSystemDefinition(
+    request: GetStudioImageSystemDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>> {
+    return this.wrap(async () => {
+      const workspaceId = request.workspaceId?.trim() || "workspace:studio-shell";
+      const actorUserId = request.actorUserId?.trim() || "user:studio-shell";
+      const systemId = request.systemId?.trim();
+      if (!systemId) {
+        throw new StudioShellInvalidRequestError("systemId is required.");
+      }
+      const detail = await this.getImageSystemDefinitionUseCase.execute({
+        workspaceId,
+        actorUserId,
+        systemId,
+      } satisfies GetImageSystemDefinitionRequest);
+      return this.toImageSystemDefinitionReadModel(detail);
+    });
+  }
+
+  public async saveImageSystemDefinition(
+    request: SaveStudioImageSystemDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>> {
+    return this.wrap(async () => {
+      const studioId = request.studioId.trim();
+      const draftId = request.draftId.trim();
+      const sessionId = request.sessionId.trim();
+      if (!studioId || !draftId || !sessionId) {
+        throw new StudioShellInvalidRequestError("studioId, sessionId, and draftId are required.");
+      }
+      const snapshot = await this.requireSnapshot(studioId);
+      if (snapshot.draft?.draftId !== draftId) {
+        throw new StudioShellInvalidRequestError(`Draft '${draftId}' is not active in studio '${studioId}'.`);
+      }
+      const draft = snapshot.draft;
+      if (!draft) {
+        throw new StudioShellInvalidRequestError("A draft is required to save an image system definition.");
+      }
+
+      const extracted = this.readStudioImageSystemDraftState(draft.content);
+      if (!extracted.workflowAssetId) {
+        throw new StudioShellInvalidRequestError("Select a workflow operation before saving a system definition.");
+      }
+      const workspaceId = request.workspaceId?.trim() || "workspace:studio-shell";
+      const actorUserId = request.actorUserId?.trim() || "user:studio-shell";
+      const operationKey = `image-system.save:${draftId}:${this.now().toISOString()}`;
+
+      const workflow = resolveStudioTemplateWorkflowDefinitionById(extracted.workflowAssetId, workspaceId);
+      if (!workflow) {
+        throw new StudioShellInvalidRequestError(`Selected workflow '${extracted.workflowAssetId}' is not supported.`);
+      }
+
+      const existingSystemId = request.saveAsNew ? undefined : (request.existingSystemId?.trim() || extracted.imageSystemDefinitionId);
+      const provisionalSystemId = existingSystemId || toSystemIdFromDraft(studioId, draftId, this.now());
+      const createRequest = toSystemUpsertRequest({
+        workspaceId,
+        actorUserId,
+        systemId: provisionalSystemId,
+        title: request.title?.trim() || draft.metadata.title || "Image system",
+        summary: request.summary?.trim() || draft.metadata.summary,
+        tags: request.tags ?? draft.metadata.tags,
+        workflow,
+        workflowParameterValues: extracted.workflowParameterValuesByWorkflowId?.[workflow.workflowId] ?? {},
+        datasetInstanceId: extracted.datasetInstanceId,
+        operationKey,
+        occurredAt: this.now().toISOString(),
+      });
+
+      const saved = existingSystemId
+        ? await this.updateImageSystemDefinitionUseCase.execute(toSystemUpdateRequest({
+          existing: (await this.getImageSystemDefinitionUseCase.execute({
+            workspaceId,
+            actorUserId,
+            systemId: existingSystemId,
+            includeArchived: true,
+          })).system,
+          actorUserId,
+          occurredAt: this.now().toISOString(),
+          operationKey,
+          createRequest,
+        }))
+        : await this.createImageSystemDefinitionUseCase.execute(createRequest);
+
+      const nextContent = this.writeStudioImageSystemDraftState(draft.content, {
+        imageSystemDefinitionId: saved.system.systemId,
+        workflowParameterValuesByWorkflowId: {
+          ...(extracted.workflowParameterValuesByWorkflowId ?? {}),
+          [saved.system.workflowBinding.workflowId]: saved.system.parameterBaseline.values,
+        },
+        workflowAssetId: saved.system.workflowBinding.workflowId,
+        workflowVersionTag: saved.system.workflowBinding.workflowVersionTag,
+      });
+      await this.service.updateAssetDraft({
+        studioId,
+        sessionId,
+        draftId,
+        content: nextContent,
+      });
+      return this.toImageSystemDefinitionReadModel({
+        system: saved.system,
+        readiness: saved.readiness,
+        validation: saved.validation,
+        compatibility: saved.compatibility,
+      });
     });
   }
 
@@ -1301,7 +1670,13 @@ export class StudioShellBackendApi {
   public async ingestReferenceImageUpload(
     request: IngestReferenceImageUploadRequest,
   ): Promise<StudioShellApiResponse<IngestReferenceImageUploadReadModel>> {
-    return this.wrap(async () => {
+    return this.executeReferenceImageOperationWithObservability(
+      "ingest-reference-image-upload",
+      {
+        ...request,
+        targetDatasetBindingId: request.targetDatasetBindingId ?? "input-image-dataset",
+      },
+      async () => {
       const snapshot = await this.requireSnapshot(request.studioId);
       const draft = snapshot.draft;
       if (!draft) {
@@ -1319,7 +1694,16 @@ export class StudioShellBackendApi {
       if (!fileName) {
         throw new StudioShellInvalidRequestError("Uploaded file name is required.");
       }
+      const sourceImageAssetId = request.sourceImageAssetId?.trim() || undefined;
+      if (
+        sourceImageAssetId
+        && !sourceImageAssetId.startsWith("asset:")
+        && !sourceImageAssetId.startsWith("image-asset:")
+      ) {
+        throw new StudioShellInvalidRequestError("sourceImageAssetId must be a logical asset identifier.");
+      }
       const payload = this.decodeBase64Payload(request.payloadBase64);
+      const configuredUploadRootPath = await this.resolveConfiguredUploadRootPath();
       const datasetBindingId = request.targetDatasetBindingId ?? "input-image-dataset";
       const includeOptionalReferenceDatasets = datasetBindingId === "reference-image-dataset";
       const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId, {
@@ -1333,24 +1717,61 @@ export class StudioShellBackendApi {
       const ingestionSource = datasetBindingId === "reference-image-dataset"
         ? "reference-image-ui-faceid-upload"
         : "reference-image-ui-upload";
+      const storedFilePath = sourceImageAssetId
+        ? undefined
+        : await this.materializeUploadedImagePayload({
+          payload,
+          fileName,
+          systemId: runtimeSystemId,
+          datasetBindingId,
+        });
+      const storageReference = sourceImageAssetId ?? storedFilePath;
+      if (!storageReference) {
+        throw new StudioShellInvalidRequestError("Image upload could not be materialized for dataset ingestion.");
+      }
+      const storageProvider = sourceImageAssetId
+        ? "image-asset-management"
+        : "studio-shell-upload-cache";
 
       const ingested = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
         systemId: runtimeSystemId,
         instanceId: targetDataset.instanceId,
+        storageReference,
+        storageProvider,
         storageBindingArea,
         metadata: {
           ingestionSource,
           datasetBindingId,
           uploadedFileName: fileName,
           uploadedMimeType: request.mimeType?.trim() || "unknown",
+          ...(storedFilePath ? { storedFilePath } : {}),
+          ...(sourceImageAssetId ? { sourceImageAssetId } : {}),
         },
         provenance: {
           sourceType: "upload",
-          sourceReference: `upload:${datasetBindingId}:${draft.draftId}:${fileName}`,
+          sourceReference: sourceImageAssetId
+            ? sourceImageAssetId
+            : `upload:${datasetBindingId}:${draft.draftId}:${fileName}`,
           sourceSystemId: runtimeSystemId,
           ingestedBy: "studio-shell-ui",
         },
         record: {
+          ...(sourceImageAssetId
+            ? {
+              assetRef: {
+                kind: "canonical-asset",
+                assetId: sourceImageAssetId,
+                stableId: `canonical-asset:${sourceImageAssetId}`,
+                sourceSystem: "image-asset-management",
+                sourceContext: {
+                  sourceKind: "studio-upload",
+                  datasetBindingId,
+                },
+                mimeTypeHint: request.mimeType?.trim(),
+                formatHint: this.deriveFileFormat(fileName, request.mimeType),
+              },
+            }
+            : {}),
           title: fileName,
           format: this.deriveFileFormat(fileName, request.mimeType),
           tags: datasetBindingId === "reference-image-dataset"
@@ -1389,14 +1810,17 @@ export class StudioShellBackendApi {
           format: ingested.image.format,
         }),
         selectedRecordId: ingested.recordId,
+        storedFilePath,
+        configuredUploadRootPath,
       });
-    });
+      },
+    );
   }
 
   public async persistReferenceImageOutputs(
     request: PersistReferenceImageOutputsRequest,
   ): Promise<StudioShellApiResponse<PersistReferenceImageOutputsReadModel>> {
-    return this.wrap(async () => {
+    return this.executeReferenceImageOperationWithObservability("persist-reference-image-outputs", request, async () => {
       const snapshot = await this.requireSnapshot(request.studioId);
       const draft = snapshot.draft;
       if (!draft) {
@@ -3445,6 +3869,125 @@ export class StudioShellBackendApi {
     }
   }
 
+  private async materializeUploadedImagePayload(input: {
+    readonly payload: Uint8Array;
+    readonly fileName: string;
+    readonly systemId: string;
+    readonly datasetBindingId: ReferenceImageDatasetBindingId;
+  }): Promise<string> {
+    const nodeRuntime = await this.resolveNodeUploadRuntime();
+    const safeFileName = this.sanitizeUploadFileName(input.fileName);
+    const safeSystemId = input.systemId.replace(/[^a-z0-9-_.:]/gi, "_");
+    const safeBindingId = input.datasetBindingId.replace(/[^a-z0-9-_.:]/gi, "_");
+    const now = this.now();
+    const stamp = [
+      now.getUTCFullYear().toString().padStart(4, "0"),
+      (now.getUTCMonth() + 1).toString().padStart(2, "0"),
+      now.getUTCDate().toString().padStart(2, "0"),
+      "-",
+      now.getUTCHours().toString().padStart(2, "0"),
+      now.getUTCMinutes().toString().padStart(2, "0"),
+      now.getUTCSeconds().toString().padStart(2, "0"),
+      "-",
+      now.getUTCMilliseconds().toString().padStart(3, "0"),
+    ].join("");
+    const unique = Math.random().toString(36).slice(2, 10);
+    const uploadRoot = await this.resolveConfiguredUploadRootPath();
+    if (!uploadRoot) {
+      throw new StudioShellInvalidRequestError("Reference image upload cache root could not be resolved.");
+    }
+    const root = nodeRuntime.path.join(uploadRoot, safeSystemId, safeBindingId);
+    await nodeRuntime.fs.mkdir(root, { recursive: true });
+    const filePath = nodeRuntime.path.join(root, `${stamp}-${unique}-${safeFileName}`);
+    await nodeRuntime.fs.writeFile(filePath, Buffer.from(input.payload));
+    return filePath;
+  }
+
+  private async resolveConfiguredUploadRootPath(): Promise<string | undefined> {
+    if (this.configuredReferenceImageUploadRootPath) {
+      return this.configuredReferenceImageUploadRootPath;
+    }
+    try {
+      const nodeRuntime = await this.resolveNodeUploadRuntime();
+      return nodeRuntime.path.join(
+        nodeRuntime.os.homedir(),
+        ".ai-loom-studio",
+        "reference-image-uploads",
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  private sanitizeUploadFileName(fileName: string): string {
+    const trimmed = fileName.trim();
+    if (!trimmed) {
+      return "upload.bin";
+    }
+    const baseName = (trimmed
+      .split(/[\\/]/)
+      .pop()
+      ?.replace(/[^a-z0-9-_.]/gi, "_")) ?? "";
+    return baseName.length > 0 ? baseName : "upload.bin";
+  }
+
+  private async resolveNodeUploadRuntime(): Promise<{
+    readonly fs: {
+      readonly mkdir: (path: string, options?: { recursive?: boolean }) => Promise<void>;
+      readonly writeFile: (file: string, data: Uint8Array) => Promise<void>;
+    };
+    readonly os: {
+      readonly homedir: () => string;
+      readonly tmpdir: () => string;
+    };
+    readonly path: { readonly join: (...parts: ReadonlyArray<string>) => string };
+  }> {
+    try {
+      const [fsModule, osModule, pathModule] = await Promise.all([
+        import("node:fs"),
+        import("node:os"),
+        import("node:path"),
+      ]);
+      if (!fsModule.promises?.mkdir || !fsModule.promises?.writeFile) {
+        throw new Error("Node fs.promises APIs are unavailable.");
+      }
+      return Object.freeze({
+        fs: fsModule.promises,
+        os: osModule.default,
+        path: pathModule.default,
+      });
+    } catch (error) {
+      throw new StudioShellInvalidRequestError(
+        `Image upload caching requires a Node.js filesystem runtime (${error instanceof Error ? error.message : String(error)}).`,
+      );
+    }
+  }
+
+  private async executeReferenceImageOperationWithObservability<T>(
+    action: StudioShellObservabilityAction,
+    request: {
+      readonly studioId?: string;
+      readonly draftId?: string;
+      readonly executionId?: string;
+      readonly targetDatasetBindingId?: string;
+    },
+    operation: () => Promise<T>,
+  ): Promise<StudioShellApiResponse<T>> {
+    const response = await this.wrap(operation);
+    this.observability.recordApiOutcome({
+      action,
+      response,
+      request: {
+        studioId: request.studioId,
+        draftId: request.draftId,
+        executionId: request.executionId,
+        datasetBindingId: request.targetDatasetBindingId,
+      },
+      occurredAt: this.now().toISOString(),
+    });
+    return response;
+  }
+
   private extractComfyResultFromRuntimeResult(
     runtimeOutput: unknown,
   ): {
@@ -3681,6 +4224,379 @@ export class StudioShellBackendApi {
     return "png";
   }
 
+  private toImageWorkflowSummaryReadModel(
+    template: InitialImageWorkflowTemplateDefinition,
+    updatedAt: string,
+  ): StudioImageWorkflowDefinitionSummaryReadModel {
+    const versionTag = template.templateFamilyId.split(":").at(-1) ?? "v1";
+    const lineageId = template.templateFamilyId.replace(/:v\d+$/i, "");
+    return Object.freeze({
+      workflowId: template.templateFamilyId,
+      title: template.display.title,
+      summary: template.display.summary,
+      operationKind: template.operationKind,
+      version: Object.freeze({
+        lineageId,
+        versionTag,
+        revision: 1,
+      }),
+      updatedAt,
+    });
+  }
+
+  private toImageWorkflowDefinitionReadModel(
+    template: InitialImageWorkflowTemplateDefinition,
+    updatedAt: string,
+  ): StudioImageWorkflowDefinitionReadModel {
+    const parameterSpecifications = Object.freeze(this.toImageWorkflowParameterSpecifications(template));
+    const requiredParameterIds = template.minimumRequirements.parameterSpecifications
+      .filter((entry) => entry.required)
+      .map((entry) => entry.parameterId);
+    const summary = this.toImageWorkflowSummaryReadModel(template, updatedAt);
+    return Object.freeze({
+      ...summary,
+      rationale: template.display.rationale,
+      parameterSpecifications,
+      parameterDefaults: Object.freeze({ ...template.configuration.defaults.parameterValues }),
+      minimumRequirements: Object.freeze({
+        inputKinds: Object.freeze([...new Set(template.minimumRequirements.inputSlots
+          .filter((entry) => entry.required)
+          .map((entry) => entry.kind))]),
+        outputKinds: Object.freeze([...new Set(template.minimumRequirements.outputExpectations
+          .filter((entry) => entry.required)
+          .map((entry) => entry.kind))]),
+        requiredParameterIds: Object.freeze(requiredParameterIds),
+      }),
+    });
+  }
+
+  private toImageWorkflowParameterSpecifications(
+    template: InitialImageWorkflowTemplateDefinition,
+  ): ReadonlyArray<ImageWorkflowParameterSpecification> {
+    const guidanceByParameterId = new Map(
+      template.configuration.parameterGuidance.map((entry) => [entry.parameterId, entry] as const),
+    );
+    const defaults = template.configuration.defaults.parameterValues;
+
+    return template.minimumRequirements.parameterSpecifications.map((parameter, index) => {
+      const guidance = guidanceByParameterId.get(parameter.parameterId);
+      const isNumeric = parameter.valueKind === "integer" || parameter.valueKind === "float";
+      const validation = Object.freeze({
+        minimum: isNumeric
+          ? guidance?.guardrails?.minimum ?? guidance?.recommendedRange?.minimum
+          : undefined,
+        maximum: isNumeric
+          ? guidance?.guardrails?.maximum ?? guidance?.recommendedRange?.maximum
+          : undefined,
+        step: isNumeric
+          ? guidance?.recommendedRange?.step
+          : undefined,
+        minLength: parameter.valueKind === "text"
+          ? guidance?.guardrails?.minLength ?? guidance?.recommendedRange?.minLength
+          : undefined,
+        maxLength: parameter.valueKind === "text"
+          ? guidance?.guardrails?.maxLength ?? guidance?.recommendedRange?.maxLength
+          : undefined,
+        options: parameter.valueKind === "select"
+          ? Object.freeze(
+            (guidance?.guardrails?.allowedValues ?? guidance?.recommendedRange?.suggestedValues ?? [])
+              .map((entry) => (typeof entry === "string" ? entry : undefined))
+              .filter((entry): entry is string => Boolean(entry))
+              .map((entry) => Object.freeze({ value: entry, label: entry })),
+          )
+          : undefined,
+        acceptedAssetKinds: undefined,
+      });
+      const control = parameter.valueKind === "boolean"
+        ? ImageWorkflowParameterUiControlKinds.switch
+        : parameter.valueKind === "text"
+          ? parameter.semanticMeaning === "prompt"
+            ? ImageWorkflowParameterUiControlKinds.textArea
+            : ImageWorkflowParameterUiControlKinds.textInput
+          : parameter.valueKind === "integer" || parameter.valueKind === "float"
+            ? guidance?.recommendedRange?.minimum !== undefined || guidance?.recommendedRange?.maximum !== undefined
+              ? ImageWorkflowParameterUiControlKinds.slider
+              : ImageWorkflowParameterUiControlKinds.numberInput
+            : parameter.valueKind === "select"
+              ? ImageWorkflowParameterUiControlKinds.select
+              : parameter.valueKind === "mask-asset-reference"
+                ? ImageWorkflowParameterUiControlKinds.maskSlot
+                : parameter.valueKind === "reference-asset-reference"
+                  ? ImageWorkflowParameterUiControlKinds.referenceSlot
+                  : ImageWorkflowParameterUiControlKinds.assetPicker;
+
+      return normalizeImageWorkflowParameterSpecification({
+        parameterId: parameter.parameterId,
+        label: guidance?.label ?? parameter.parameterId,
+        description: guidance?.helperText,
+        valueKind: parameter.valueKind,
+        semanticMeaning: parameter.semanticMeaning,
+        required: parameter.required,
+        defaultValue: defaults[parameter.parameterId],
+        sensitivity: ImageWorkflowParameterSensitivityLevels.normal,
+        validation,
+        ui: {
+          control,
+          placeholder: parameter.valueKind === "text" && typeof defaults[parameter.parameterId] === "string"
+            ? String(defaults[parameter.parameterId])
+            : undefined,
+          order: index,
+          helpText: guidance?.helperText,
+          advanced: false,
+        },
+      });
+    });
+  }
+
+  private toImageSystemDefinitionListingReadModel(
+    result: ListImageSystemDefinitionsResult,
+  ): StudioImageSystemDefinitionListingReadModel {
+    return Object.freeze({
+      items: Object.freeze(result.items.map((entry) => {
+        const readiness = this.toImageSystemReadinessReadModel(entry.readiness);
+        return Object.freeze({
+          systemId: entry.systemId,
+          title: entry.title,
+          summary: entry.summary,
+          lifecycleState: entry.lifecycleState,
+          runtimeStatus: entry.runtimeStatus,
+          workflowId: entry.workflowBinding.workflowId,
+          workflowVersionTag: entry.workflowBinding.workflowVersionTag,
+          readinessState: entry.readiness.state,
+          readinessSummary: entry.readiness.summary,
+          readiness,
+          updatedAt: entry.updatedAt,
+        });
+      })),
+      pagination: Object.freeze({
+        ...result.pagination,
+      }),
+    });
+  }
+
+  private toImageSystemDefinitionReadModel(
+    result: ImageSystemDefinitionDetailResult | {
+      readonly system: ImageSystemDefinitionDetailResult["system"];
+      readonly readiness: ImageSystemDefinitionDetailResult["readiness"];
+      readonly validation?: {
+        readonly issues: ReadonlyArray<{
+          readonly code: string;
+          readonly path: string;
+          readonly message: string;
+          readonly severity: "error" | "warning" | "info";
+        }>;
+      };
+      readonly compatibility?: {
+        readonly issues: ReadonlyArray<{
+          readonly code: string;
+          readonly path: string;
+          readonly message: string;
+          readonly severity: "error" | "warning" | "info";
+        }>;
+      };
+    },
+  ): StudioImageSystemDefinitionReadModel {
+    const readiness = this.toImageSystemReadinessReadModel(result.readiness, {
+      validationIssues: result.validation?.issues,
+      compatibilityIssues: result.compatibility?.issues,
+    });
+
+    return Object.freeze({
+      systemId: result.system.systemId,
+      title: result.system.display.title,
+      summary: result.system.display.summary,
+      lifecycleState: result.system.lifecycleState,
+      runtimeStatus: result.system.runtimeStatus,
+      workflowId: result.system.workflowBinding.workflowId,
+      workflowVersionTag: result.system.workflowBinding.workflowVersionTag,
+      readinessState: result.readiness.state,
+      readinessSummary: result.readiness.summary,
+      readiness,
+      updatedAt: result.system.updatedAt,
+      parameterBaseline: Object.freeze({ ...result.system.parameterBaseline.values }),
+      outputTargetBindings: Object.freeze(result.system.outputTargetBindings.map((entry) => Object.freeze({
+        outputId: entry.outputId,
+        targetReference: entry.targetReference,
+      }))),
+    });
+  }
+
+  private toImageSystemReadinessReadModel(
+    readiness: {
+      readonly state: string;
+      readonly summary: string;
+      readonly runnable?: boolean;
+      readonly issues: ReadonlyArray<{
+        readonly code: string;
+        readonly path?: string;
+        readonly message: string;
+      }>;
+    },
+    input: {
+      readonly validationIssues?: ReadonlyArray<{
+        readonly code: string;
+        readonly path: string;
+        readonly message: string;
+        readonly severity: "error" | "warning" | "info";
+      }>;
+      readonly compatibilityIssues?: ReadonlyArray<{
+        readonly code: string;
+        readonly path: string;
+        readonly message: string;
+        readonly severity: "error" | "warning" | "info";
+      }>;
+    } = {},
+  ): StudioImageSystemReadinessReadModel {
+    const blockingIssues = readiness.state === "configuration-incomplete"
+      ? readiness.issues.map((issue) => Object.freeze({
+        code: issue.code,
+        path: issue.path,
+        message: issue.message,
+        severity: "blocking" as const,
+      }))
+      : [];
+
+    const advisoryIssues = [
+      ...this.toAdvisoryIssuesFromValidation(input.validationIssues),
+      ...this.toAdvisoryIssuesFromValidation(input.compatibilityIssues),
+      ...(readiness.state === "configuration-ready" && readiness.runnable !== true
+        ? [Object.freeze({
+          code: "system-ready-not-runnable-yet",
+          path: "runtimeStatus",
+          message: "This setup is complete, but it still needs runtime enablement before launch.",
+          severity: "advisory" as const,
+        })]
+        : []),
+    ];
+
+    return Object.freeze({
+      state: readiness.state,
+      summary: readiness.summary,
+      blockingIssueCount: blockingIssues.length,
+      advisoryIssueCount: advisoryIssues.length,
+      blockingIssues: Object.freeze(blockingIssues),
+      advisoryIssues: Object.freeze(advisoryIssues),
+    });
+  }
+
+  private toAdvisoryIssuesFromValidation(
+    issues: ReadonlyArray<{
+      readonly code: string;
+      readonly path: string;
+      readonly message: string;
+      readonly severity: "error" | "warning" | "info";
+    }> | undefined,
+  ): ReadonlyArray<StudioImageSystemReadinessIssueReadModel> {
+    if (!issues || issues.length < 1) {
+      return Object.freeze([]);
+    }
+    return Object.freeze(issues
+      .filter((issue) => issue.severity !== "error")
+      .map((issue) => Object.freeze({
+        code: issue.code,
+        path: issue.path,
+        message: issue.message,
+        severity: "advisory" as const,
+      })));
+  }
+
+  private readStudioImageSystemDraftState(content: string): {
+    readonly imageSystemDefinitionId?: string;
+    readonly workflowAssetId?: string;
+    readonly workflowVersionTag?: string;
+    readonly datasetInstanceId?: string;
+    readonly workflowParameterValuesByWorkflowId?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  } {
+    try {
+      const parsed = JSON.parse(content) as {
+        readonly systemSpec?: {
+          readonly serialization?: {
+            readonly runtime?: {
+              readonly workflowBindings?: ReadonlyArray<{
+                readonly workflowAssetId?: string;
+                readonly workflowVersionId?: string;
+              }>;
+              readonly datasetInstances?: ReadonlyArray<{
+                readonly instanceId?: string;
+              }>;
+              readonly state?: {
+                readonly imageWorkflowParameterValuesByWorkflowId?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+                readonly imageSystemDefinitionId?: string;
+              };
+            };
+          };
+        };
+      };
+      const firstWorkflowBinding = parsed.systemSpec?.serialization?.runtime?.workflowBindings?.[0];
+      const firstDatasetInstance = parsed.systemSpec?.serialization?.runtime?.datasetInstances?.[0];
+      return Object.freeze({
+        imageSystemDefinitionId: parsed.systemSpec?.serialization?.runtime?.state?.imageSystemDefinitionId,
+        workflowAssetId: firstWorkflowBinding?.workflowAssetId?.trim(),
+        workflowVersionTag: firstWorkflowBinding?.workflowVersionId?.trim(),
+        datasetInstanceId: firstDatasetInstance?.instanceId?.trim(),
+        workflowParameterValuesByWorkflowId: parsed.systemSpec?.serialization?.runtime?.state?.imageWorkflowParameterValuesByWorkflowId,
+      });
+    } catch {
+      return Object.freeze({});
+    }
+  }
+
+  private writeStudioImageSystemDraftState(
+    content: string,
+    patch: {
+      readonly imageSystemDefinitionId: string;
+      readonly workflowAssetId: string;
+      readonly workflowVersionTag?: string;
+      readonly workflowParameterValuesByWorkflowId: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+    },
+  ): string {
+    const root = content.trim()
+      ? (JSON.parse(content) as Record<string, unknown>)
+      : {};
+    const systemSpec = (
+      root.systemSpec
+      && typeof root.systemSpec === "object"
+      && !Array.isArray(root.systemSpec)
+    )
+      ? { ...(root.systemSpec as Record<string, unknown>) }
+      : {};
+    const serialization = (
+      systemSpec.serialization
+      && typeof systemSpec.serialization === "object"
+      && !Array.isArray(systemSpec.serialization)
+    )
+      ? { ...(systemSpec.serialization as Record<string, unknown>) }
+      : {};
+    const runtime = (
+      serialization.runtime
+      && typeof serialization.runtime === "object"
+      && !Array.isArray(serialization.runtime)
+    )
+      ? { ...(serialization.runtime as Record<string, unknown>) }
+      : {};
+    const state = (
+      runtime.state
+      && typeof runtime.state === "object"
+      && !Array.isArray(runtime.state)
+    )
+      ? { ...(runtime.state as Record<string, unknown>) }
+      : {};
+
+    runtime.workflowBindings = Object.freeze([Object.freeze({
+      bindingId: "component:primary",
+      workflowAssetId: patch.workflowAssetId,
+      workflowVersionId: patch.workflowVersionTag,
+    })]);
+    state.imageSystemDefinitionId = patch.imageSystemDefinitionId;
+    state.imageWorkflowParameterValuesByWorkflowId = patch.workflowParameterValuesByWorkflowId;
+    runtime.state = state;
+    serialization.runtime = runtime;
+    systemSpec.serialization = serialization;
+    root.systemSpec = systemSpec;
+
+    return JSON.stringify(root, null, 2);
+  }
+
   private async synchronizeWorkflowPersistenceFromStudioDraft(
     studioId: string,
     explicitDraftId?: string,
@@ -3837,4 +4753,3 @@ export class StudioShellBackendApi {
     });
   }
 }
-

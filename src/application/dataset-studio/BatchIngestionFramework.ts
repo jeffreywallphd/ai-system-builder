@@ -1,4 +1,5 @@
 ﻿/// <reference types="node" />
+import path from "node:path";
 import { z } from "zod";
 import { AssetContractShapeKinds } from "@domain/contracts/AssetContract";
 import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
@@ -60,6 +61,7 @@ import {
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
 import {
+  UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionSourceKinds,
   type IUnifiedIngestionRouter,
   type IUnifiedIngestionSourceTypeDetector,
@@ -903,7 +905,11 @@ export class BatchIngestionFramework {
       });
     }
 
-    if ((ingestor === BatchIngestorKinds.csv || ingestor === BatchIngestorKinds.json) && !isTextLikeForCsvJson(descriptor.extension)) {
+    if (
+      (ingestor === BatchIngestorKinds.csv || ingestor === BatchIngestorKinds.json)
+      && descriptor.extension
+      && !isTextLikeForCsvJson(descriptor.extension)
+    ) {
       const unsupportedByIngestorIssue = createIngestionIssue({
         code: BatchIngestionItemErrorCodes.unsupportedBatchItem,
         message: `Ingestor '${ingestor}' does not support source '${descriptor.displayName}'.`,
@@ -1154,12 +1160,15 @@ export class BatchIngestionFramework {
     descriptor: SourceDescriptor,
     payload: string | Uint8Array,
   ): Promise<BatchIngestorKind | undefined> {
+    const detectionDisplayName = descriptor.displayName.includes(".")
+      ? descriptor.displayName
+      : path.basename(descriptor.normalizedReference);
     const detection = await this.sourceTypeDetector.detect({
       source: {
         sourceId: descriptor.sourceId,
         referenceKind: descriptor.kind === SourceDescriptorKinds.localFile ? "local-path" : "remote-url",
         reference: descriptor.normalizedReference,
-        displayName: descriptor.displayName,
+        displayName: detectionDisplayName,
         extension: descriptor.extension,
         mimeType: descriptor.mediaType,
         sizeInBytes: descriptor.sizeInBytes,
@@ -1175,10 +1184,10 @@ export class BatchIngestionFramework {
       configuration: Object.freeze({
         mode: "simple",
         outputTarget: detection.detectedKind === UnifiedIngestionSourceKinds.document
-          ? "canonical-text-items"
+          ? UnifiedIngestionOutputTargetKinds.textItems
           : detection.detectedKind === UnifiedIngestionSourceKinds.image
-            ? "canonical-image-metadata-records"
-            : "canonical-records",
+            ? UnifiedIngestionOutputTargetKinds.imageMetadataRecords
+            : UnifiedIngestionOutputTargetKinds.records,
       }),
     });
 
@@ -1307,4 +1316,3 @@ export function createBatchIngestionDataAsset(
     },
   });
 }
-

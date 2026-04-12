@@ -1,26 +1,45 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
   NodeRevocationReasons,
-  NodeRevocationStates,
   NodeRoleCapabilities,
-  NodeTrustStates,
-  type NodeRevocationReason,
   NodeTypes,
+  type NodeRevocationReason,
 } from "@domain/nodes/NodeTrustDomain";
 import {
   NodeInventoryOperationalStates,
   NodeInventoryPresenceStates,
-  type NodeCapabilityProfileDto,
   type NodeInventoryDetailDto,
   type NodeInventorySummaryDto,
 } from "@shared/contracts/nodes/NodeTrustApiContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { NodeInventoryService } from "../services/NodeInventoryService";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
-import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
+import type {
+  IdentityAuthPersistedSession,
+  IdentityAuthSessionStore as IdentityAuthSessionStoreContract,
+} from "@shared/identity/IdentityAuthSessionStore";
+import {
+  SurfaceStatePanel,
+  SurfaceStateBoundary,
+  createEmptyState,
+  createLoadingState,
+  toDisconnectedState,
+  toSurfacePresentationStateFromApiError,
+  type SurfacePresentationState,
+} from "../shared/components/presentation-state";
+import {
+  SurfaceActionButtonStrip,
+  createSurfaceActionContext,
+  type SurfaceActionDescriptor,
+} from "../shared/actions";
+import {
+  NodeInventoryDetailPanel,
+  NodeInventoryListPanel,
+  type NodeAdministrationSurface,
+} from "@ui/shared/nodes/NodeTrustAdministrationPanels";
 
 interface NodeInventoryPageProps {
   readonly service?: NodeInventoryService;
@@ -52,56 +71,77 @@ const defaultFilters: InventoryFilterState = Object.freeze({
 });
 
 export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): JSX.Element {
+  const navigate = useNavigate();
   const service = useMemo(() => props.service ?? new NodeInventoryService(), [props.service]);
   const sessionStore = useMemo(() => props.sessionStore ?? new IdentityAuthSessionStore(), [props.sessionStore]);
   const [session] = useState(() => sessionStore.getSession());
   const sessionToken = session?.sessionToken;
+
+  const surface = useMemo<NodeAdministrationSurface>(
+    () => (session?.sessionAccessChannel === "desktop" ? "desktop" : "thin-client"),
+    [session?.sessionAccessChannel],
+  );
+  const allowTrustRevocation = surface === "desktop";
 
   const [filters, setFilters] = useState<InventoryFilterState>(defaultFilters);
   const [nodes, setNodes] = useState<ReadonlyArray<NodeInventorySummaryDto>>(Object.freeze([]));
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedNodeDetail, setSelectedNodeDetail] = useState<NodeInventoryDetailDto>();
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [inventoryState, setInventoryState] = useState<SurfacePresentationState | undefined>(
+    createLoadingState("Loading node inventory", "Loading trusted node inventory from the authoritative API."),
+  );
+  const [detailState, setDetailState] = useState<SurfacePresentationState | undefined>(
+    createEmptyState("Select a node", "Select a node to inspect detailed trust and capability data."),
+  );
   const [errorMessage, setErrorMessage] = useState<string>();
   const [statusMessage, setStatusMessage] = useState<string>();
   const [revocationReason, setRevocationReason] = useState<NodeRevocationReason>(NodeRevocationReasons.operatorAction);
   const [revocationNote, setRevocationNote] = useState("");
   const [revocationConfirmationNodeId, setRevocationConfirmationNodeId] = useState("");
 
-  const selectedNode = nodes.find((node) => node.nodeId === selectedNodeId);
+  const actorPermissionIds = useMemo(() => {
+    const permissions = ["node.inventory.view", "node.inventory.refresh"];
+    if (isNodeTrustAdminSession(session)) {
+      permissions.push("node.trust.revoke", "node.enrollment.review");
+    }
+    return Object.freeze(permissions);
+  }, [session]);
 
-  const loadDetail = async (nodeId: string): Promise<void> => {
+  const loadDetail = useCallback(async (nodeId: string): Promise<void> => {
     if (!sessionToken) {
       return;
     }
-    setIsLoadingDetail(true);
+    setDetailState(createLoadingState("Loading node detail", "Loading node trust detail."));
     try {
       const detailResponse = await service.getNodeInventoryDetail({ nodeId }, sessionToken);
       if (!detailResponse.ok || !detailResponse.data) {
         setSelectedNodeDetail(undefined);
-        setErrorMessage(detailResponse.error?.message ?? "Unable to load node detail.");
+        setDetailState(toSurfacePresentationStateFromApiError(detailResponse.error, {
+          fallbackTitle: "Unable to load node detail",
+          fallbackMessage: "Node detail is currently unavailable.",
+        }));
         return;
       }
       setSelectedNodeDetail(detailResponse.data.node);
+      setDetailState(undefined);
     } catch {
       setSelectedNodeDetail(undefined);
-      setErrorMessage("Node inventory detail request failed.");
-    } finally {
-      setIsLoadingDetail(false);
+      setDetailState(toDisconnectedState("Node detail unavailable", "Unable to reach the node inventory service."));
     }
-  };
+  }, [service, sessionToken]);
 
-  const refresh = async (
-    preferredNodeId?: string,
-    nextFilters: InventoryFilterState = filters,
-  ): Promise<void> => {
+  const refresh = useCallback(async (preferredNodeId?: string, nextFilters: InventoryFilterState = filters): Promise<void> => {
     if (!sessionToken) {
       return;
     }
     setIsLoadingInventory(true);
     setErrorMessage(undefined);
+    if (nodes.length < 1) {
+      setInventoryState(createLoadingState("Loading node inventory", "Loading trusted node inventory from the authoritative API."));
+    }
+
     try {
       const response = await service.listNodeInventory({
         nodeTypes: toOptionalSingleValueArray(nextFilters.nodeType),
@@ -120,20 +160,27 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
         setNodes(Object.freeze([]));
         setSelectedNodeId(undefined);
         setSelectedNodeDetail(undefined);
-        setErrorMessage(response.error?.message ?? "Unable to load node inventory.");
+        setInventoryState(toSurfacePresentationStateFromApiError(response.error, {
+          fallbackTitle: "Unable to load node inventory",
+          fallbackMessage: "Node inventory is currently unavailable.",
+        }));
+        setDetailState(createEmptyState("Select a node", "Select a node to inspect detailed trust and capability data."));
         return;
       }
 
       setNodes(response.data.nodes);
+      setInventoryState(response.data.nodes.length < 1
+        ? createEmptyState("No nodes found", "No nodes matched the current inventory filters.")
+        : undefined);
+
       const nextNodeId = preferredNodeId
-        ?? (
-          selectedNodeId && response.data.nodes.some((node) => node.nodeId === selectedNodeId)
-            ? selectedNodeId
-            : response.data.nodes[0]?.nodeId
-        );
+        ?? (selectedNodeId && response.data.nodes.some((node) => node.nodeId === selectedNodeId)
+          ? selectedNodeId
+          : response.data.nodes[0]?.nodeId);
       setSelectedNodeId(nextNodeId);
       if (!nextNodeId) {
         setSelectedNodeDetail(undefined);
+        setDetailState(createEmptyState("Select a node", "Select a node to inspect detailed trust and capability data."));
         return;
       }
       await loadDetail(nextNodeId);
@@ -141,18 +188,91 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       setNodes(Object.freeze([]));
       setSelectedNodeId(undefined);
       setSelectedNodeDetail(undefined);
-      setErrorMessage("Node inventory request failed.");
+      setInventoryState(toDisconnectedState("Node inventory unavailable", "Unable to reach the node inventory service."));
+      setDetailState(createEmptyState("Select a node", "Select a node to inspect detailed trust and capability data."));
     } finally {
       setIsLoadingInventory(false);
     }
-  };
+  }, [filters, loadDetail, nodes.length, selectedNodeId, service, sessionToken]);
+
+  const executeNodeRevocation = useCallback(async (node: NodeInventoryDetailDto): Promise<void> => {
+    if (!sessionToken) {
+      return;
+    }
+    if (revocationConfirmationNodeId.trim() !== node.nodeId) {
+      setErrorMessage("Type the exact node id to confirm revocation.");
+      return;
+    }
+
+    setIsRevoking(true);
+    setErrorMessage(undefined);
+    setStatusMessage(undefined);
+    try {
+      const response = await service.revokeNodeTrust({
+        nodeId: node.nodeId,
+        reason: revocationReason,
+        note: revocationNote.trim() || undefined,
+      }, sessionToken);
+      if (!response.ok || !response.data) {
+        setErrorMessage(response.error?.message ?? "Unable to revoke node trust.");
+        return;
+      }
+      setStatusMessage(`Disabled \"${response.data.node.displayName}\" at ${formatTimestamp(response.data.node.revocation.revokedAt) ?? "current time"}.`);
+      await refresh(node.nodeId);
+    } catch {
+      setErrorMessage("Node trust revocation request failed.");
+    } finally {
+      setIsRevoking(false);
+    }
+  }, [refresh, revocationConfirmationNodeId, revocationNote, revocationReason, service, sessionToken]);
+
+  const pageActions = useMemo<ReadonlyArray<SurfaceActionDescriptor>>(
+    () => Object.freeze([
+      {
+        id: "node-inventory-back-to-settings",
+        label: "Back to settings",
+        scope: "page",
+        tone: "secondary",
+        priority: 10,
+        onInvoke: () => {
+          navigate(ROUTE_PATHS.settings);
+        },
+      },
+      {
+        id: "node-inventory-refresh",
+        label: isLoadingInventory ? "Refreshing..." : "Refresh",
+        scope: "page",
+        tone: "secondary",
+        requiredPermissions: Object.freeze(["node.inventory.refresh"]),
+        priority: 20,
+        availability: () => (isLoadingInventory
+          ? Object.freeze({ disabled: true, disabledReason: "Inventory refresh is already in progress." })
+          : Object.freeze({})),
+        onInvoke: async () => {
+          await refresh();
+        },
+      },
+    ]),
+    [isLoadingInventory, navigate, refresh],
+  );
+
+  const pageActionContext = useMemo(
+    () => createSurfaceActionContext({
+      actorPermissionIds,
+      surface,
+      surfaceCapabilities: Object.freeze(["inline-actions", "menu-actions", "confirmations"]),
+      selection: Object.freeze({ selectedNodeId }),
+      meta: Object.freeze({ isLoadingInventory }),
+    }),
+    [actorPermissionIds, isLoadingInventory, selectedNodeId, surface],
+  );
 
   useEffect(() => {
     if (!sessionToken) {
       return;
     }
     void refresh();
-  }, [sessionToken]);
+  }, [refresh, sessionToken]);
 
   useEffect(() => {
     setRevocationReason(NodeRevocationReasons.operatorAction);
@@ -163,17 +283,14 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-node-inventory-page">
-        <div className="ui-card">
-          <div className="ui-card__header">
-            <h1 className="ui-card__title">Trusted node inventory</h1>
-            <p className="ui-card__subtitle">
-              Sign in with an authenticated admin account before inspecting trusted node inventory and presence status.
-            </p>
-          </div>
-          <div className="ui-card__body">
-            <Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>
-          </div>
-        </div>
+        <SurfaceStatePanel
+          state={Object.freeze({
+            kind: "permission-denied",
+            title: "Trusted node inventory",
+            message: "Sign in with an authenticated admin account before inspecting trusted node inventory and presence status.",
+          })}
+          action={<Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>}
+        />
       </section>
     );
   }
@@ -185,22 +302,10 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
           <h1 className="ui-page__title">Trusted node inventory</h1>
           <p className="ui-page__subtitle">
             Browse enrolled nodes by approval, activation, and presence state. Inspect capability profiles and
-            trust metadata before scheduling, revocation, or certificate lifecycle actions.
+            trust metadata before scheduling and policy-driven node disable operations.
           </p>
         </div>
-        <div className="ui-page__actions">
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.settings}>Back to settings</Link>
-          <button
-            type="button"
-            className="ui-button ui-button--secondary ui-button--sm"
-            disabled={isLoadingInventory}
-            onClick={() => {
-              void refresh();
-            }}
-          >
-            Refresh
-          </button>
-        </div>
+        <SurfaceActionButtonStrip actions={pageActions} context={pageActionContext} scope="page" className="ui-page__actions" />
       </div>
 
       {errorMessage ? <p className="ui-node-inventory-page__alert ui-node-inventory-page__alert--error" role="alert">{errorMessage}</p> : null}
@@ -215,11 +320,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
           <div className="ui-node-inventory-page__filters-grid">
             <label className="ui-field">
               <span className="ui-field__label">Operational state</span>
-              <select
-                className="ui-select"
-                value={filters.operationalState}
-                onChange={(event) => setFilters((current) => ({ ...current, operationalState: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.operationalState} onChange={(event) => setFilters((current) => ({ ...current, operationalState: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeInventoryOperationalStates.active}>active</option>
                 <option value={NodeInventoryOperationalStates.pending}>pending</option>
@@ -230,11 +331,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Presence state</span>
-              <select
-                className="ui-select"
-                value={filters.presenceState}
-                onChange={(event) => setFilters((current) => ({ ...current, presenceState: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.presenceState} onChange={(event) => setFilters((current) => ({ ...current, presenceState: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeInventoryPresenceStates.online}>online</option>
                 <option value={NodeInventoryPresenceStates.degraded}>degraded</option>
@@ -244,11 +341,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Approval status</span>
-              <select
-                className="ui-select"
-                value={filters.approvalStatus}
-                onChange={(event) => setFilters((current) => ({ ...current, approvalStatus: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.approvalStatus} onChange={(event) => setFilters((current) => ({ ...current, approvalStatus: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeApprovalStatuses.pending}>pending</option>
                 <option value={NodeApprovalStatuses.approved}>approved</option>
@@ -258,11 +351,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Enrollment status</span>
-              <select
-                className="ui-select"
-                value={filters.enrollmentStatus}
-                onChange={(event) => setFilters((current) => ({ ...current, enrollmentStatus: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.enrollmentStatus} onChange={(event) => setFilters((current) => ({ ...current, enrollmentStatus: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeEnrollmentRequestStatuses.submitted}>submitted</option>
                 <option value={NodeEnrollmentRequestStatuses.underReview}>under-review</option>
@@ -274,11 +363,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Node type</span>
-              <select
-                className="ui-select"
-                value={filters.nodeType}
-                onChange={(event) => setFilters((current) => ({ ...current, nodeType: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.nodeType} onChange={(event) => setFilters((current) => ({ ...current, nodeType: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeTypes.compute}>compute</option>
                 <option value={NodeTypes.hybrid}>hybrid</option>
@@ -287,11 +372,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Capability</span>
-              <select
-                className="ui-select"
-                value={filters.capability}
-                onChange={(event) => setFilters((current) => ({ ...current, capability: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.capability} onChange={(event) => setFilters((current) => ({ ...current, capability: event.target.value }))}>
                 <option value="">Any</option>
                 <option value={NodeRoleCapabilities.api}>api</option>
                 <option value={NodeRoleCapabilities.executor}>executor</option>
@@ -303,53 +384,27 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Deployment tags</span>
-              <input
-                className="ui-input"
-                value={filters.deploymentTagCsv}
-                onChange={(event) => setFilters((current) => ({ ...current, deploymentTagCsv: event.target.value }))}
-                placeholder="prod, us-east"
-              />
+              <input className="ui-input" value={filters.deploymentTagCsv} onChange={(event) => setFilters((current) => ({ ...current, deploymentTagCsv: event.target.value }))} placeholder="prod, us-east" />
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Last seen after</span>
-              <input
-                className="ui-input"
-                type="datetime-local"
-                value={filters.lastSeenAfter}
-                onChange={(event) => setFilters((current) => ({ ...current, lastSeenAfter: event.target.value }))}
-              />
+              <input className="ui-input" type="datetime-local" value={filters.lastSeenAfter} onChange={(event) => setFilters((current) => ({ ...current, lastSeenAfter: event.target.value }))} />
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Last seen before</span>
-              <input
-                className="ui-input"
-                type="datetime-local"
-                value={filters.lastSeenBefore}
-                onChange={(event) => setFilters((current) => ({ ...current, lastSeenBefore: event.target.value }))}
-              />
+              <input className="ui-input" type="datetime-local" value={filters.lastSeenBefore} onChange={(event) => setFilters((current) => ({ ...current, lastSeenBefore: event.target.value }))} />
             </label>
           </div>
           <div className="ui-page__actions">
-            <button
-              type="button"
-              className="ui-button ui-button--primary ui-button--sm"
-              disabled={isLoadingInventory}
-              onClick={() => {
-                void refresh();
-              }}
-            >
-              {isLoadingInventory ? "Loading..." : "Apply filters"}
+            <button type="button" className="ui-button ui-button--primary ui-button--sm" disabled={isLoadingInventory} onClick={() => { void refresh(); }}>
+              {isLoadingInventory ? "Applying..." : "Apply filters"}
             </button>
-            <button
-              type="button"
-              className="ui-button ui-button--secondary ui-button--sm"
-              disabled={isLoadingInventory}
-              onClick={() => {
-                setFilters(defaultFilters);
-                void refresh(undefined, defaultFilters);
-              }}
-            >
-              Clear
+            <button type="button" className="ui-button ui-button--secondary ui-button--sm" disabled={isLoadingInventory} onClick={() => {
+              const cleared = defaultFilters;
+              setFilters(cleared);
+              void refresh(undefined, cleared);
+            }}>
+              Reset
             </button>
           </div>
         </div>
@@ -359,283 +414,69 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
         <section className="ui-card">
           <div className="ui-card__header">
             <h2 className="ui-card__title">Inventory</h2>
-            <p className="ui-card__subtitle">Pending, active, offline, and revoked nodes from the live trust inventory.</p>
+            <p className="ui-card__subtitle">Operational state, capabilities, and recent heartbeat telemetry.</p>
           </div>
           <div className="ui-card__body">
-            {isLoadingInventory && nodes.length === 0 ? <p className="ui-text-secondary">Loading node inventory...</p> : null}
-            {!isLoadingInventory && nodes.length === 0 ? <p className="ui-text-secondary">No nodes matched the current inventory filters.</p> : null}
-            {nodes.length > 0 ? (
-              <div className="ui-table-wrapper">
-                <table className="ui-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Node</th>
-                      <th scope="col">Operational</th>
-                      <th scope="col">Presence</th>
-                      <th scope="col">Approval</th>
-                      <th scope="col">Capabilities</th>
-                      <th scope="col">Last seen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {nodes.map((node) => (
-                      <tr
-                        key={node.nodeId}
-                        className={node.nodeId === selectedNodeId ? "ui-node-inventory-page__table-row--selected" : undefined}
-                      >
-                        <td>
-                          <button
-                            type="button"
-                            className="ui-button ui-button--ghost ui-button--sm ui-node-inventory-page__select-button"
-                            onClick={() => {
-                              setSelectedNodeId(node.nodeId);
-                              setErrorMessage(undefined);
-                              void loadDetail(node.nodeId);
-                            }}
-                          >
-                            {node.displayName}
-                          </button>
-                          <div className="ui-text-secondary ui-text-small">{node.nodeId}</div>
-                        </td>
-                        <td><span className={`ui-badge ${operationalStateBadgeClass(node.operationalState)}`}>{node.operationalState}</span></td>
-                        <td><span className={`ui-badge ${presenceStateBadgeClass(node.presenceState)}`}>{node.presenceState}</span></td>
-                        <td><span className={`ui-badge ${approvalStatusBadgeClass(node.approvalStatus)}`}>{node.approvalStatus}</span></td>
-                        <td>{formatCapabilities(node.capabilityProfile)}</td>
-                        <td>{formatTimestamp(node.lastSeen?.lastSeenAt) ?? "Never"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
+            <SurfaceStateBoundary state={inventoryState}>
+              <NodeInventoryListPanel
+                surface={surface}
+                nodes={nodes}
+                selectedNodeId={selectedNodeId}
+                isLoadingInventory={isLoadingInventory}
+                actorPermissionIds={actorPermissionIds}
+                onSelectNode={async (nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setErrorMessage(undefined);
+                  await loadDetail(nodeId);
+                }}
+              />
+            </SurfaceStateBoundary>
           </div>
         </section>
 
         <section className="ui-card">
           <div className="ui-card__header">
             <h2 className="ui-card__title">Node detail</h2>
-            <p className="ui-card__subtitle">Identity, trust state, enrollment context, capability profile, and revocation metadata.</p>
+            <p className="ui-card__subtitle">Identity, trust state, enrollment context, capability profile, and disable actions.</p>
           </div>
           <div className="ui-card__body ui-stack ui-stack--md">
-            {!selectedNode ? <p className="ui-text-secondary">Select a node to inspect detailed trust and capability data.</p> : null}
-            {isLoadingDetail ? <p className="ui-text-secondary">Loading node detail...</p> : null}
-            {selectedNodeDetail ? (
-              <>
-                <div className="ui-node-inventory-page__detail-grid">
-                  <div>
-                    <strong>Display name</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.displayName}</div>
-                  </div>
-                  <div>
-                    <strong>Node id</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.nodeId}</div>
-                  </div>
-                  <div>
-                    <strong>Node type</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.nodeType}</div>
-                  </div>
-                  <div>
-                    <strong>Operational state</strong>
-                    <div className="ui-text-secondary">
-                      <span className={`ui-badge ${operationalStateBadgeClass(selectedNodeDetail.operationalState)}`}>
-                        {selectedNodeDetail.operationalState}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <strong>Presence state</strong>
-                    <div className="ui-text-secondary">
-                      <span className={`ui-badge ${presenceStateBadgeClass(selectedNodeDetail.presenceState)}`}>
-                        {selectedNodeDetail.presenceState}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <strong>Approval status</strong>
-                    <div className="ui-text-secondary">
-                      <span className={`ui-badge ${approvalStatusBadgeClass(selectedNodeDetail.approvalStatus)}`}>
-                        {selectedNodeDetail.approvalStatus}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <strong>Trust state</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.trustState}</div>
-                  </div>
-                  <div>
-                    <strong>Enrollment status</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.enrollmentStatus ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Last seen</strong>
-                    <div className="ui-text-secondary">{formatTimestamp(selectedNodeDetail.lastSeen?.lastSeenAt) ?? "Never"}</div>
-                  </div>
-                  <div>
-                    <strong>Heartbeat</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.lastSeen?.heartbeatStatus ?? "unknown"}</div>
-                  </div>
-                  <div>
-                    <strong>Observed by</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.lastSeen?.observedBy ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Certificate ref</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.certificateRef ?? "not assigned"}</div>
-                  </div>
-                  <div>
-                    <strong>Enrolled</strong>
-                    <div className="ui-text-secondary">{formatTimestamp(selectedNodeDetail.enrolledAt) ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Approved</strong>
-                    <div className="ui-text-secondary">{formatTimestamp(selectedNodeDetail.approvedAt) ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Revoked</strong>
-                    <div className="ui-text-secondary">{formatTimestamp(selectedNodeDetail.revokedAt) ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Pending request id</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.pendingEnrollmentRequestId ?? "n/a"}</div>
-                  </div>
-                </div>
-
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>Capabilities</strong>
-                  <div className="ui-text-secondary">{formatCapabilities(selectedNodeDetail.capabilityProfile)}</div>
-                  <div className="ui-text-secondary ui-text-small">
-                    Remote scheduling: {selectedNodeDetail.capabilityProfile.supportsRemoteScheduling ? "enabled" : "disabled"}.
-                    {selectedNodeDetail.capabilityProfile.maxConcurrentWorkloads
-                      ? ` Max concurrent workloads: ${selectedNodeDetail.capabilityProfile.maxConcurrentWorkloads}.`
-                      : ""}
-                  </div>
-                </div>
-
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>Deployment tags</strong>
-                  <div className="ui-text-secondary">{selectedNodeDetail.deploymentTags.length > 0 ? selectedNodeDetail.deploymentTags.join(", ") : "none"}</div>
-                </div>
-
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>Revocation</strong>
-                  <div className="ui-text-secondary">State: {selectedNodeDetail.revocation.state}</div>
-                  <div className="ui-text-secondary">Reason: {selectedNodeDetail.revocation.reason ?? "n/a"}</div>
-                  <div className="ui-text-secondary">Note: {selectedNodeDetail.revocation.note ?? "n/a"}</div>
-                  <div className="ui-text-secondary">Revoked at: {formatTimestamp(selectedNodeDetail.revocation.revokedAt) ?? "n/a"}</div>
-                </div>
-
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>Trust actions</strong>
-                  {selectedNodeDetail.revocation.state === NodeRevocationStates.revoked || selectedNodeDetail.trustState === NodeTrustStates.revoked
-                    ? (
-                      <p className="ui-text-secondary">
-                        This node is already revoked and no longer treated as active.
-                      </p>
-                    )
-                    : (
-                      <>
-                        <label className="ui-field">
-                          <span className="ui-field__label">Revocation reason</span>
-                          <select
-                            className="ui-select"
-                            value={revocationReason}
-                            onChange={(event) => setRevocationReason(event.target.value as NodeRevocationReason)}
-                            disabled={isRevoking}
-                          >
-                            <option value={NodeRevocationReasons.operatorAction}>operator-action</option>
-                            <option value={NodeRevocationReasons.ownerRequest}>owner-request</option>
-                            <option value={NodeRevocationReasons.policyViolation}>policy-violation</option>
-                            <option value={NodeRevocationReasons.certificateCompromise}>certificate-compromise</option>
-                            <option value={NodeRevocationReasons.decommissioned}>decommissioned</option>
-                          </select>
-                        </label>
-                        <label className="ui-field">
-                          <span className="ui-field__label">Administrative note (optional)</span>
-                          <textarea
-                            className="ui-textarea ui-node-inventory-page__revocation-note"
-                            value={revocationNote}
-                            maxLength={2000}
-                            onChange={(event) => setRevocationNote(event.target.value)}
-                            placeholder="Include ticket id, incident, or operator context"
-                            disabled={isRevoking}
-                          />
-                        </label>
-                        <label className="ui-field">
-                          <span className="ui-field__label">Confirmation</span>
-                          <input
-                            className="ui-input"
-                            value={revocationConfirmationNodeId}
-                            onChange={(event) => setRevocationConfirmationNodeId(event.target.value)}
-                            placeholder={`Type ${selectedNodeDetail.nodeId} to confirm`}
-                            disabled={isRevoking}
-                          />
-                        </label>
-                        <div className="ui-page__actions">
-                          <button
-                            type="button"
-                            className="ui-button ui-button--danger ui-button--sm"
-                            disabled={isRevoking || revocationConfirmationNodeId.trim() !== selectedNodeDetail.nodeId}
-                            onClick={() => {
-                              if (!sessionToken) {
-                                return;
-                              }
-                              if (revocationConfirmationNodeId.trim() !== selectedNodeDetail.nodeId) {
-                                setErrorMessage("Type the exact node id to confirm revocation.");
-                                return;
-                              }
-                              setIsRevoking(true);
-                              setErrorMessage(undefined);
-                              setStatusMessage(undefined);
-                              void (async () => {
-                                try {
-                                  const response = await service.revokeNodeTrust({
-                                    nodeId: selectedNodeDetail.nodeId,
-                                    reason: revocationReason,
-                                    note: revocationNote.trim() || undefined,
-                                  }, sessionToken);
-                                  if (!response.ok || !response.data) {
-                                    setErrorMessage(response.error?.message ?? "Unable to revoke node trust.");
-                                    return;
-                                  }
-                                  setStatusMessage(
-                                    `Revoked "${response.data.node.displayName}" at ${formatTimestamp(response.data.node.revocation.revokedAt) ?? "current time"}.`,
-                                  );
-                                  await refresh(selectedNodeDetail.nodeId);
-                                } catch {
-                                  setErrorMessage("Node trust revocation request failed.");
-                                } finally {
-                                  setIsRevoking(false);
-                                }
-                              })();
-                            }}
-                          >
-                            {isRevoking ? "Revoking..." : "Revoke node trust"}
-                          </button>
-                        </div>
-                        <p className="ui-text-secondary ui-text-small">
-                          Revoked nodes remain visible in inventory and are blocked from active trusted participation.
-                        </p>
-                      </>
-                    )}
-                </div>
-
-                {selectedNodeDetail.pendingEnrollment ? (
-                  <div className="ui-stack ui-stack--2xs">
-                    <strong>Pending enrollment</strong>
-                    <div className="ui-text-secondary">Request: {selectedNodeDetail.pendingEnrollment.requestId}</div>
-                    <div className="ui-text-secondary">Status: {selectedNodeDetail.pendingEnrollment.status}</div>
-                    <div className="ui-text-secondary">Requested: {formatTimestamp(selectedNodeDetail.pendingEnrollment.requestedAt) ?? selectedNodeDetail.pendingEnrollment.requestedAt}</div>
-                    <div className="ui-text-secondary">Reviewed: {formatTimestamp(selectedNodeDetail.pendingEnrollment.reviewedAt) ?? "n/a"}</div>
-                    <div className="ui-text-secondary">Decision note: {selectedNodeDetail.pendingEnrollment.decisionNote ?? "n/a"}</div>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
+            <SurfaceStateBoundary state={detailState}>
+              {selectedNodeDetail ? (
+                <NodeInventoryDetailPanel
+                  surface={surface}
+                  actorPermissionIds={actorPermissionIds}
+                  node={selectedNodeDetail}
+                  selectedNodeId={selectedNodeId}
+                  allowTrustRevocation={allowTrustRevocation}
+                  isRevoking={isRevoking}
+                  revocationReason={revocationReason}
+                  revocationNote={revocationNote}
+                  revocationConfirmationNodeId={revocationConfirmationNodeId}
+                  onRevocationReasonChange={setRevocationReason}
+                  onRevocationNoteChange={setRevocationNote}
+                  onRevocationConfirmationNodeIdChange={setRevocationConfirmationNodeId}
+                  onRevokeNodeTrust={executeNodeRevocation}
+                  onOpenEnrollmentReview={() => {
+                    navigate(ROUTE_PATHS.nodeEnrollmentReview);
+                  }}
+                />
+              ) : null}
+            </SurfaceStateBoundary>
           </div>
         </section>
       </div>
     </section>
   );
+}
+
+function isNodeTrustAdminSession(session?: IdentityAuthPersistedSession): boolean {
+  const workspaceId = session?.workspaceContext?.resolvedWorkspaceId ?? session?.workspaceContext?.requestedWorkspaceId;
+  const workspaceRoles = workspaceId
+    ? session?.workspaceContext?.workspaces.find((workspace) => workspace.workspaceId === workspaceId)?.effectiveRoles
+    : undefined;
+  const fallbackRoles = session?.initialCapabilityState?.effectiveRoles ?? Object.freeze([]);
+  const roles = workspaceRoles ?? fallbackRoles;
+  return roles.includes("owner") || roles.includes("admin");
 }
 
 function toOptionalSingleValueArray<TValue extends string>(value: string): ReadonlyArray<TValue> | undefined {
@@ -647,12 +488,7 @@ function toOptionalSingleValueArray<TValue extends string>(value: string): Reado
 }
 
 function parseCsv(value: string): ReadonlyArray<string> | undefined {
-  const values = [...new Set(
-    value
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0),
-  )];
+  const values = [...new Set(value.split(",").map((item) => item.trim()).filter((item) => item.length > 0))];
   return values.length > 0 ? Object.freeze(values) : undefined;
 }
 
@@ -668,13 +504,6 @@ function toIsoTimestamp(value: string): string | undefined {
   return new Date(parsed).toISOString();
 }
 
-function formatCapabilities(profile: NodeCapabilityProfileDto): string {
-  if (profile.enabledCapabilities.length === 0) {
-    return "none";
-  }
-  return profile.enabledCapabilities.join(", ");
-}
-
 function formatTimestamp(value?: string): string | undefined {
   if (!value) {
     return undefined;
@@ -685,46 +514,3 @@ function formatTimestamp(value?: string): string | undefined {
   }
   return new Date(parsed).toLocaleString();
 }
-
-function operationalStateBadgeClass(state: NodeInventorySummaryDto["operationalState"]): string {
-  switch (state) {
-    case NodeInventoryOperationalStates.active:
-      return "ui-badge--success";
-    case NodeInventoryOperationalStates.pending:
-    case NodeInventoryOperationalStates.offline:
-      return "ui-badge--warning";
-    case NodeInventoryOperationalStates.rejected:
-    case NodeInventoryOperationalStates.revoked:
-      return "ui-badge--danger";
-    default:
-      return "ui-badge--neutral";
-  }
-}
-
-function presenceStateBadgeClass(state: NodeInventorySummaryDto["presenceState"]): string {
-  switch (state) {
-    case NodeInventoryPresenceStates.online:
-      return "ui-badge--success";
-    case NodeInventoryPresenceStates.degraded:
-      return "ui-badge--warning";
-    case NodeInventoryPresenceStates.offline:
-      return "ui-badge--danger";
-    default:
-      return "ui-badge--neutral";
-  }
-}
-
-function approvalStatusBadgeClass(status: NodeInventorySummaryDto["approvalStatus"]): string {
-  switch (status) {
-    case NodeApprovalStatuses.approved:
-      return "ui-badge--success";
-    case NodeApprovalStatuses.pending:
-    case NodeApprovalStatuses.suspended:
-      return "ui-badge--warning";
-    case NodeApprovalStatuses.rejected:
-      return "ui-badge--danger";
-    default:
-      return "ui-badge--neutral";
-  }
-}
-

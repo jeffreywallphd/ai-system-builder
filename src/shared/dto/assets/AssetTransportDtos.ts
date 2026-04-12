@@ -90,8 +90,6 @@ export interface BeginAssetUploadResponseDto {
     readonly uploadSessionId: string;
     readonly assetId: string;
     readonly workspaceId: string;
-    readonly storageInstanceId: string;
-    readonly objectKey: string;
     readonly area: Asset["versions"][number]["location"]["area"];
     readonly uploadEndpoint: string;
     readonly uploadMethod: "POST";

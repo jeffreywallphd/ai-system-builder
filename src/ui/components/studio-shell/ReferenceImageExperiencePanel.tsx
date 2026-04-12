@@ -27,14 +27,14 @@ import { ReferenceImageCrossStudioSyncService } from "../../runtime/ReferenceIma
 import { buildReferenceImageStartRequest } from "../../runtime/ReferenceImageExecutionRequestBuilder";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
-  acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
-  acceptedMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/webp"]),
+  acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "gif", "webp"]),
+  acceptedMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/gif", "image/webp"]),
   maxFileSizeBytes: 15 * 1024 * 1024,
   conversion: {
     mode: "forbidden",
     allowedOutputFormats: Object.freeze([]),
-    passThroughExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
-    passThroughMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/webp"]),
+    passThroughExtensions: Object.freeze(["png", "jpg", "jpeg", "gif", "webp"]),
+    passThroughMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/gif", "image/webp"]),
   },
 });
 
@@ -312,7 +312,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     <section className="ui-stack ui-stack--sm">
       <ImageUploadPanel
         title="Choose an image"
-        acceptedMimeTypes={["image/png", "image/jpeg", "image/webp"]}
+        acceptedMimeTypes={["image/png", "image/jpeg", "image/gif", "image/webp"]}
         maxUploadCount={1}
         ingestionAdapter={uploadAdapter}
         targetContext={{
@@ -703,4 +703,3 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     </section>
   );
 }
-

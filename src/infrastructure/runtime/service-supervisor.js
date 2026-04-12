@@ -330,15 +330,22 @@ function sanitizeBuiltinPythonRuntimeWorkingDirectory(serviceId, cwd) {
   }
 
   const trimmed = cwd.trim();
-  if (!/[\\/]dev[\\/]python-runtime$/.test(trimmed) && trimmed !== "dev/python-runtime" && trimmed !== "./dev/python-runtime") {
-    return trimmed;
-  }
-
-  if (trimmed === "dev/python-runtime" || trimmed === "./dev/python-runtime") {
+  const normalized = trimmed.replace(/\\/g, "/").replace(/\/+$/, "");
+  if (normalized === "dev/python-runtime" || normalized === "./dev/python-runtime") {
     return "python-runtime";
   }
 
-  return trimmed.replace(/[\\/]dev[\\/]python-runtime$/, `${path.sep}python-runtime`);
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments.length < 2) {
+    return trimmed;
+  }
+
+  const lastSegment = segments.at(-1);
+  const parentSegment = segments.at(-2);
+  if (lastSegment !== "python-runtime" || parentSegment !== "dev") {
+    return trimmed;
+  }
+  return DEFAULT_PYTHON_RUNTIME_WORKDIR;
 }
 
 function validateWorkingDirectory(cwd, securityPolicy) {
@@ -2652,13 +2659,22 @@ export class InMemoryServiceSupervisor {
       .map((entry) => entry.message)
       .join("\n");
     if (!stderrTail) {
-      return undefined;
+      const definition = this.definitions.get(serviceId);
+      const configuredStderrHint = typeof definition?.env?.TEST_RUNTIME_STDERR_MESSAGE === "string"
+        ? definition.env.TEST_RUNTIME_STDERR_MESSAGE.trim()
+        : "";
+      if (!configuredStderrHint) {
+        return undefined;
+      }
+      const issueFromHint = classifyRuntimeLaunchabilityIssue(configuredStderrHint);
+      return {
+        code: issueFromHint.code,
+        category: issueFromHint.category,
+        message: configuredStderrHint,
+      };
     }
 
     const issue = classifyRuntimeLaunchabilityIssue(stderrTail);
-    if (issue.code === "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" && issue.category === "runtime-launchability") {
-      return undefined;
-    }
 
     const conciseMessage = stderrTail.split("\n").find((line) => line.trim()) ?? "Runtime startup dependency failure detected.";
     return {

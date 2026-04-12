@@ -40,6 +40,13 @@ function normalizeMimeType(mimeType: string | undefined): string | undefined {
   return mimeType?.split(";")[0]?.trim().toLowerCase() || undefined;
 }
 
+function normalizePolicyExtensions(extensions: ReadonlyArray<string>): ReadonlyArray<string> {
+  return extensions
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => value.length > 0)
+    .map((value) => (value.startsWith(".") ? value : `.${value}`));
+}
+
 function normalizeTextContent(content: string | Uint8Array): string {
   if (typeof content === "string") {
     return content.replace(/\r\n/g, "\n");
@@ -111,6 +118,10 @@ export class FileIngestionPolicyService {
     const normalizedRequest = this.normalizeRequest(request);
     const descriptor = normalizedRequest.file;
     const warnings: FileIngestionWarning[] = [];
+    const acceptedExtensions = normalizePolicyExtensions(policy.acceptedExtensions);
+    const passThroughExtensions = normalizePolicyExtensions(policy.conversion.passThroughExtensions);
+    const acceptedMimeTypes = policy.acceptedMimeTypes.map((value) => value.toLowerCase());
+    const passThroughMimeTypes = policy.conversion.passThroughMimeTypes.map((value) => value.toLowerCase());
 
     if (descriptor.sizeInBytes > policy.maxFileSizeBytes) {
       throw new FileTooLargeError(`File '${descriptor.name}' exceeds the maximum allowed size.`, {
@@ -119,7 +130,7 @@ export class FileIngestionPolicyService {
       });
     }
 
-    if (!descriptor.extension || !policy.acceptedExtensions.map((value) => value.toLowerCase()).includes(descriptor.extension)) {
+    if (!descriptor.extension || !acceptedExtensions.includes(descriptor.extension)) {
       throw new UnsupportedFileTypeError(`File '${descriptor.name}' is not an accepted file type.`, {
         extension: descriptor.extension,
         acceptedExtensions: policy.acceptedExtensions,
@@ -137,7 +148,7 @@ export class FileIngestionPolicyService {
         code: "missing_content_type",
         message: `File '${descriptor.name}' did not declare a MIME type; policy evaluation used the extension.`,
       });
-    } else if (policy.acceptedMimeTypes.length > 0 && !policy.acceptedMimeTypes.map((value) => value.toLowerCase()).includes(descriptor.mimeType)) {
+    } else if (acceptedMimeTypes.length > 0 && !acceptedMimeTypes.includes(descriptor.mimeType)) {
       throw new DisallowedMimeTypeError(`File '${descriptor.name}' declared a disallowed MIME type.`, {
         mimeType: descriptor.mimeType,
         acceptedMimeTypes: policy.acceptedMimeTypes,
@@ -160,8 +171,6 @@ export class FileIngestionPolicyService {
     }
 
     const sourceFormat = determineSourceFormat(descriptor.extension, descriptor.mimeType);
-    const passThroughExtensions = policy.conversion.passThroughExtensions.map((value) => value.toLowerCase());
-    const passThroughMimeTypes = policy.conversion.passThroughMimeTypes.map((value) => value.toLowerCase());
     const isPassThrough = Boolean(
       (descriptor.extension && passThroughExtensions.includes(descriptor.extension)) ||
       (descriptor.mimeType && passThroughMimeTypes.includes(descriptor.mimeType))

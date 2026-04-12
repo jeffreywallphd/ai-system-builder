@@ -42,6 +42,7 @@ import {
 import {
   PlatformAuditEventKinds,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import { createCanonicalAuditEvent, AuditEventCategories, AuditActorKinds, AuditScopeKinds } from "@domain/audit/AuditDomain";
 import {
   createAuthoritativePersistentPlatformServices,
 } from "../AuthoritativePersistenceComposition";
@@ -290,6 +291,54 @@ describe("PersistentPlatformServices integration", () => {
       });
       expect(completedRun.record.status).toBe("completed");
 
+      const persistedGeneratedResult = await services.generatedResultRepository.saveResult({
+        resultAssetId: "gr-story-13-4-3-001",
+        workspaceId: workspace.id,
+        ownerUserId: user.id,
+        runId: "run:story-13.4.3",
+        systemId: "system:story-13.4.3",
+        workflowId: "workflow:story-13.4.3",
+        workflowTemplateId: "template:story-13.4.3",
+        executionNodeId: "node:story-13.4.3:worker",
+        outputSlot: "primary",
+        inputAssetIds: Object.freeze(["input-asset:story-13.4.3:001"]),
+        workflowTemplateVersionId: "template-version:story-13.4.3",
+        workflowTemplateVersionTag: "1.0.0",
+        systemSnapshotId: "system-snapshot:story-13.4.3",
+        systemVersionTag: "1.0.0",
+        parameterSnapshotId: "params:story-13.4.3",
+        selectedNodeId: "node:story-13.4.3:worker",
+        executionAdapterKind: "comfyui",
+        executionBackendFamily: "comfyui",
+        visibility: "workspace",
+        storageInstanceId: "storage:story-13.4.3",
+        storageBindingReference: "storage-instance://storage:story-13.4.3/generated-results",
+        mediaType: "image/png",
+        status: "available",
+        pendingSince: "2026-04-06T12:07:50.000Z",
+        logicalAssetVersionId: "logical-version:story-13.4.3:001",
+        persistedAt: "2026-04-06T12:08:00.000Z",
+        persistedBy: "system:orchestrator",
+        tenancy: Object.freeze({
+          scope: "workspace",
+          workspaceId: workspace.id,
+        }),
+        createdAt: "2026-04-06T12:08:00.000Z",
+        createdBy: "system:orchestrator",
+        lastModifiedAt: "2026-04-06T12:08:00.000Z",
+        lastModifiedBy: "system:orchestrator",
+        revision: 1,
+        schemaVersion: 1,
+      }, {
+        operationKey: "op:story-13.4.3:generated-result:save",
+        context: {
+          actorUserId: "system:orchestrator",
+          occurredAt: "2026-04-06T12:08:00.000Z",
+          correlationId: "corr:story-13.4.3:run",
+        },
+      });
+      expect(persistedGeneratedResult.record.resultAssetId).toBe("gr-story-13-4-3-001");
+
       const appendedAudit = await services.platformPersistenceRepository.appendAuditEvent({
         eventId: "audit:story-13.4.3",
         eventKind: PlatformAuditEventKinds.runs,
@@ -312,6 +361,50 @@ describe("PersistentPlatformServices integration", () => {
         correlationId: "corr:story-13.4.3:run",
       });
       expect(appendedAudit.changed).toBeTrue();
+
+      const canonicalAudit = createCanonicalAuditEvent({
+        eventId: "audit:canonical:story-13.4.3",
+        eventType: "run-submission-accepted",
+        category: AuditEventCategories.orchestration,
+        action: "run.submission.accepted",
+        outcome: "succeeded",
+        occurredAt: "2026-04-06T12:08:02.000Z",
+        actor: {
+          actorId: "system:orchestrator",
+          actorKind: AuditActorKinds.service,
+          actorServiceId: "system:orchestrator",
+        },
+        scope: {
+          kind: AuditScopeKinds.workspace,
+          workspaceId: workspace.id,
+        },
+        protectedResource: {
+          resourceType: "run",
+          resourceId: "run:story-13.4.3",
+          resourceRef: "run:story-13.4.3",
+          sensitivityClass: "sensitive",
+          workspaceId: workspace.id,
+        },
+        payload: {
+          userSafeDetails: {
+            runId: "run:story-13.4.3",
+          },
+          hasProtectedData: false,
+          redactionReasons: [],
+        },
+        integrity: {
+          schemaVersion: "1.0",
+          hashAlgorithm: "sha-256",
+        },
+      });
+      const appendCanonicalAudit = await services.auditLedgerRepository.appendAuditEvent(canonicalAudit, {
+        operationKey: "op:story-13.4.3:audit:canonical:append",
+        actorId: "system:orchestrator",
+        occurredAt: "2026-04-06T12:08:02.000Z",
+        correlationId: "corr:story-13.4.3:run",
+      });
+      expect(appendCanonicalAudit.changed).toBeTrue();
+      expect(appendCanonicalAudit.sequence).toBe(1);
     } finally {
       services.dispose();
     }
@@ -348,6 +441,21 @@ describe("PersistentPlatformServices integration", () => {
       });
       expect(auditEvents).toHaveLength(1);
       expect(auditEvents[0]?.eventId).toBe("audit:story-13.4.3");
+
+      const canonicalAuditEvents = await reloadedServices.auditLedgerRepository.listAuditEvents({
+        category: AuditEventCategories.orchestration,
+        workspaceId: "workspace:story-13.4.3",
+      });
+      expect(canonicalAuditEvents).toHaveLength(1);
+      expect(canonicalAuditEvents[0]?.eventId).toBe("audit:canonical:story-13.4.3");
+
+      const generatedResults = await reloadedServices.generatedResultRepository.listResults({
+        workspaceId: "workspace:story-13.4.3",
+        runId: "run:story-13.4.3",
+        includeArchived: true,
+      });
+      expect(generatedResults).toHaveLength(1);
+      expect(generatedResults[0]?.resultAssetId).toBe("gr-story-13-4-3-001");
     } finally {
       reloadedServices.dispose();
     }

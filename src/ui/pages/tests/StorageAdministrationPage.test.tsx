@@ -15,6 +15,7 @@ describe("StorageAdministrationPage", () => {
     expect(html).toContain("Managed storage administration");
     expect(html).toContain("Sign in with an authenticated admin account");
     expect(html).toContain("Go to sign in");
+    expect(html).toContain("ui-shell-empty-state");
   });
 
   it("renders list and detail layout for authenticated sessions", () => {
@@ -53,6 +54,7 @@ describe("StorageAdministrationPage", () => {
     expect(html).toContain("Operational status");
     expect(html).toContain("Synchronization posture");
     expect(html).toContain("No storage instances matched the current query.");
+    expect(html).toContain("ui-shell-empty-state");
   });
 });
 

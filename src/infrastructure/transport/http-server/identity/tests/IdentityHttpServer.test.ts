@@ -8,6 +8,11 @@ import {
   type IdentityHttpServerLogEvent,
   type IdentityHttpServerLogger,
 } from "../IdentityHttpServer";
+import {
+  AuthoritativeApiRouteBackendKeys,
+  type AuthoritativeApiRouteRegistrationPlan,
+} from "../../AuthoritativeApiRouteRegistration";
+import { composeAuthoritativeApiRouteRegistrationPlan } from "../../AuthoritativeApiRouteRegistrationCatalog";
 
 class CapturingLogger implements IdentityHttpServerLogger {
   public readonly events: IdentityHttpServerLogEvent[] = [];
@@ -69,6 +74,355 @@ async function startServer(
 }
 
 describe("IdentityHttpServer", () => {
+  it("composes and logs authoritative route family registration at startup", async () => {
+    const logger = new CapturingLogger();
+    await startServer(logger);
+
+    const event = logger.events.find((entry) => entry.event === "identity-http.route-families.composed");
+    expect(event).toBeDefined();
+    const details = event?.details as { routeFamilyIds?: unknown } | undefined;
+    expect(Array.isArray(details?.routeFamilyIds)).toBeTrue();
+    expect(details?.routeFamilyIds).toEqual(["identity-auth"]);
+  });
+
+  it("keeps modular route handling active while inline identity auth routes stay operational", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      routeFamilyHandlers: Object.freeze({
+        "identity-auth": ({ path, method, response }) => {
+          if (method !== "GET" || path !== "/api/v1/identity/session") {
+            return Object.freeze({ handled: false });
+          }
+
+          response.statusCode = 200;
+          response.setHeader("content-type", "application/json; charset=utf-8");
+          response.end(JSON.stringify({
+            ok: true,
+            data: {
+              delegated: true,
+            },
+          }));
+          return Object.freeze({ handled: true });
+        },
+      }),
+    });
+
+    const legacyRouteResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "inline.route.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(legacyRouteResponse.status).toBe(200);
+    const legacyRouteBody = await legacyRouteResponse.json();
+    expect(legacyRouteBody.ok).toBe(true);
+
+    const modularRouteResponse = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+    });
+    expect(modularRouteResponse.status).toBe(200);
+    const modularRouteBody = await modularRouteResponse.json();
+    expect(modularRouteBody.ok).toBe(true);
+    expect(modularRouteBody.data.delegated).toBe(true);
+
+    const requestReceivedEvent = logger.events.find((entry) => (
+      entry.event === "identity-http.request.received"
+      && entry.path === "/api/v1/identity/register"
+    ));
+    expect(requestReceivedEvent).toBeDefined();
+
+    const modularEvent = logger.events.find((entry) => (
+      entry.event === "identity-http.route-family.modular-handled"
+      && entry.path === "/api/v1/identity/session"
+    ));
+    expect(modularEvent).toBeDefined();
+  });
+
+  it("modularly handles representative audit, execution-node, and run submission routes", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      auditLedgerBackendApi: {
+        async listAuditEvents() {
+          return Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              query: Object.freeze({ totalCount: 0, hasMore: false }),
+              events: Object.freeze([]),
+              facets: Object.freeze([]),
+            }),
+          });
+        },
+        async listGovernanceAuditEvents() { return Object.freeze({ ok: true, data: Object.freeze({ query: Object.freeze({ totalCount: 0, hasMore: false }), events: Object.freeze([]), facets: Object.freeze([]) }) }); },
+        async getAuditEventDetail() { return Object.freeze({ ok: false, error: Object.freeze({ code: "not-found", message: "not-found" }) }); },
+        async getGovernanceAuditEventDetail() { return Object.freeze({ ok: false, error: Object.freeze({ code: "not-found", message: "not-found" }) }); },
+      } as any,
+      executionNodeManagementBackendApi: {
+        async listNodes() { return Object.freeze({ ok: true, data: Object.freeze({ contractVersion: "execution-node-management-api/v1", items: Object.freeze([]), totalCount: 0, asOf: "2026-04-08T00:00:00.000Z" }) }); },
+        async checkReadiness() { return Object.freeze({ ok: true, data: Object.freeze({ contractVersion: "execution-node-management-api/v1", checkedAt: "2026-04-08T00:00:00.000Z", readyForExecution: true, readiness: "ready", nodeResults: Object.freeze([]), issues: Object.freeze([]) }) }); },
+        async checkEligibility() { return Object.freeze({ ok: true, data: Object.freeze({ contractVersion: "execution-node-management-api/v1", checkedAt: "2026-04-08T00:00:00.000Z", evaluations: Object.freeze([]) }) }); },
+        async listBackendAvailability() { return Object.freeze({ ok: true, data: Object.freeze({ contractVersion: "execution-node-management-api/v1", asOf: "2026-04-08T00:00:00.000Z", backends: Object.freeze([]) }) }); },
+        async setAvailabilityOverride() { return Object.freeze({ ok: false, error: Object.freeze({ code: "not-found", message: "not-found" }) }); },
+        async getNode() { return Object.freeze({ ok: false, error: Object.freeze({ code: "not-found", message: "not-found" }) }); },
+      } as any,
+      authoritativeRunSubmissionBackendApi: {
+        async submitRun() {
+          return Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              run: Object.freeze({
+                contractVersion: "run-orchestration-transport/v1",
+                runId: "run:modular:1",
+                workflowId: "workflow:modular",
+                workspaceId: "workspace-alpha",
+                source: "api",
+                state: "submitted",
+                assignmentStatus: "unassigned",
+                executionOutcome: "none",
+                submittedAt: "2026-04-08T00:00:00.000Z",
+                updatedAt: "2026-04-08T00:00:00.000Z",
+                submission: Object.freeze({}),
+                assignment: Object.freeze({ status: "unassigned" }),
+                execution: Object.freeze({ outcome: "none" }),
+                retry: Object.freeze({ attempt: 1, maxAttempts: 1 }),
+              }),
+              mutation: Object.freeze({
+                changed: true,
+                mutationId: "mutation:modular:1",
+                occurredAt: "2026-04-08T00:00:00.000Z",
+              }),
+            }),
+          });
+        },
+      } as any,
+    });
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: "modular.route.user",
+        credential: { candidate: "StrongPass!2026" },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerSubject: "modular.route.user",
+        credential: { candidate: "StrongPass!2026" },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+    const token = loginBody.data.sessionToken as string;
+
+    const audit = await fetch(`${baseUrl}/api/v1/audit/events?workspaceId=workspace-alpha`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(audit.status).toBe(200);
+
+    const nodes = await fetch(`${baseUrl}/api/v1/execution-nodes?limit=10`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(nodes.status).toBe(200);
+
+    const run = await fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        runtimeTarget: {
+          systemId: "system-modular",
+          versionId: "version-1",
+          async: true,
+        },
+      }),
+    });
+    expect(run.status).toBe(200);
+
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.modular-handled" && entry.path === "/api/v1/audit/events")).toBeTrue();
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.modular-handled" && entry.path === "/api/v1/execution-nodes")).toBeTrue();
+    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.modular-handled" && entry.path === "/api/v1/runtime/runs/start")).toBeTrue();
+
+    expect(logger.events.some((entry) => entry.event === "identity-http.request.received" && entry.path === "/api/v1/audit/events")).toBeTrue();
+    expect(logger.events.some((entry) => entry.event === "identity-http.request.received" && entry.path === "/api/v1/execution-nodes")).toBeTrue();
+    expect(logger.events.some((entry) => entry.event === "identity-http.request.received" && entry.path === "/api/v1/runtime/runs/start")).toBeTrue();
+  });
+
+  it("returns not-found when a modular route family handler declines handling", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      authoritativeRunSubmissionBackendApi: {
+        async submitRun() {
+          return Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              run: Object.freeze({
+                contractVersion: "run-orchestration-transport/v1",
+                runId: "run:should-not-execute",
+                workflowId: "workflow:should-not-execute",
+                workspaceId: "workspace-alpha",
+                source: "api",
+                state: "submitted",
+                assignmentStatus: "unassigned",
+                executionOutcome: "none",
+                submittedAt: "2026-04-08T00:00:00.000Z",
+                updatedAt: "2026-04-08T00:00:00.000Z",
+                submission: Object.freeze({}),
+                assignment: Object.freeze({ status: "unassigned" }),
+                execution: Object.freeze({ outcome: "none" }),
+                retry: Object.freeze({ attempt: 1, maxAttempts: 1 }),
+              }),
+              mutation: Object.freeze({
+                changed: true,
+                mutationId: "mutation:should-not-execute",
+                occurredAt: "2026-04-08T00:00:00.000Z",
+              }),
+            }),
+          });
+        },
+      } as any,
+      routeFamilyHandlers: Object.freeze({
+        "run-submission": async () => Object.freeze({ handled: false }),
+      }),
+    });
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: "no.modular.handler.user",
+        credential: { candidate: "StrongPass!2026" },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerSubject: "no.modular.handler.user",
+        credential: { candidate: "StrongPass!2026" },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+    const token = loginBody.data.sessionToken as string;
+
+    const runResponse = await fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        runtimeTarget: {
+          systemId: "system-modular",
+          versionId: "version-1",
+          async: true,
+        },
+      }),
+    });
+    expect(runResponse.status).toBe(404);
+
+    expect(logger.events.some((entry) => (
+      entry.event === "identity-http.route-family.modular-handled"
+      && entry.path === "/api/v1/runtime/runs/start"
+    ))).toBeFalse();
+  });
+
+  it("starts with explicit modular route registration plans in deterministic order", async () => {
+    const logger = new CapturingLogger();
+    const routeRegistrationPlan = composeAuthoritativeApiRouteRegistrationPlan({
+      backendAvailability: Object.freeze({
+        [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: true,
+        [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
+        [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
+        [AuthoritativeApiRouteBackendKeys.executionNodeManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
+        [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
+        [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
+        [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
+        [AuthoritativeApiRouteBackendKeys.runRead]: true,
+        [AuthoritativeApiRouteBackendKeys.runMutation]: true,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: false,
+      }),
+    });
+
+    await startServer(logger, {}, {
+      routeRegistrationPlan,
+    });
+
+    const event = logger.events.find((entry) => entry.event === "identity-http.route-families.composed");
+    const details = event?.details as { routeFamilyIds?: unknown } | undefined;
+    expect(details?.routeFamilyIds).toEqual([
+      "identity-auth",
+      "workspace-invitations",
+      "workspace-administration",
+      "run-submission",
+      "run-read",
+      "run-mutation",
+      "image-run-api",
+    ]);
+  });
+
+  it("fails startup when an explicit modular route registration plan includes duplicate route families", async () => {
+    const harness = await createIdentityAuthTestHarness();
+    const basePlan = composeAuthoritativeApiRouteRegistrationPlan({
+      backendAvailability: Object.freeze({
+        [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: false,
+        [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: false,
+        [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
+        [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
+        [AuthoritativeApiRouteBackendKeys.executionNodeManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
+        [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
+        [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
+        [AuthoritativeApiRouteBackendKeys.runSubmission]: false,
+        [AuthoritativeApiRouteBackendKeys.runRead]: false,
+        [AuthoritativeApiRouteBackendKeys.runMutation]: false,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: false,
+      }),
+    });
+    const duplicatePlan: AuthoritativeApiRouteRegistrationPlan = Object.freeze({
+      ...basePlan,
+      registeredRouteFamilies: Object.freeze([
+        basePlan.registeredRouteFamilies[0]!,
+        basePlan.registeredRouteFamilies[0]!,
+      ]),
+    });
+
+    expect(() => createIdentityHttpServer({
+      backendApi: harness.backendApi,
+      routeRegistrationPlan: duplicatePlan,
+    })).toThrow("duplicate route family");
+  });
+
   it("supports development login route when explicitly enabled", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger, {}, {
@@ -90,6 +444,31 @@ describe("IdentityHttpServer", () => {
     expect(devLoginBody.ok).toBe(true);
     expect(devLoginBody.data.username).toBe("dev.local.user");
     expect(devLoginBody.data.sessionToken).toBeDefined();
+    expect(devLoginBody.data.sessionAccessChannel).toBe("thin-client");
+  });
+
+  it("honors dev-login access-channel hints when provided", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      development: {
+        enableDevLoginRoute: true,
+      },
+    });
+
+    const devLoginResponse = await fetch(`${baseUrl}/api/v1/identity/dev-login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        accessChannel: "desktop",
+      }),
+    });
+
+    expect(devLoginResponse.status).toBe(200);
+    const devLoginBody = await devLoginResponse.json();
+    expect(devLoginBody.ok).toBe(true);
+    expect(devLoginBody.data.sessionAccessChannel).toBe("desktop");
   });
 
   it("does not expose development login route when disabled", async () => {
@@ -240,6 +619,10 @@ describe("IdentityHttpServer", () => {
     const invalidBody = await invalidResponse.json();
     expect(invalidBody.ok).toBe(false);
     expect(invalidBody.error.code).toBe("invalid-request");
+    expect(invalidBody.error.sharedCode).toBe("invalid-request");
+    expect(invalidBody.error.domainCode).toBe("invalid-request");
+    expect(invalidBody.error.retryable).toBe(false);
+    expect(typeof invalidBody.error.userMessage).toBe("string");
     expect(Array.isArray(invalidBody.error.validationErrors)).toBe(true);
 
     const failedLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
@@ -259,6 +642,153 @@ describe("IdentityHttpServer", () => {
     const failedLoginBody = await failedLoginResponse.json();
     expect(failedLoginBody.ok).toBe(false);
     expect(failedLoginBody.error.code).toBe("authentication-failed");
+    expect(failedLoginBody.error.sharedCode).toBe("authentication-failed");
+    expect(failedLoginBody.error.retryable).toBe(false);
+    expect(typeof failedLoginBody.error.userMessage).toBe("string");
+  });
+
+  it("propagates request/correlation identifiers in headers, error envelopes, and observability hooks", async () => {
+    const logger = new CapturingLogger();
+    const observedEvents: IdentityHttpServerLogEvent[] = [];
+    const { baseUrl } = await startServer(
+      logger,
+      {},
+      {
+        observability: {
+          onOperationalEvent: (event) => {
+            observedEvents.push(event);
+          },
+        },
+      },
+    );
+
+    const correlationId = "ui-debug-correlation-42";
+    const invalidResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-correlation-id": correlationId,
+      },
+      body: JSON.stringify({
+        username: "",
+        credential: {
+          candidate: "",
+        },
+      }),
+    });
+
+    expect(invalidResponse.status).toBe(400);
+    const requestIdHeader = invalidResponse.headers.get("x-request-id");
+    const correlationHeader = invalidResponse.headers.get("x-correlation-id");
+    expect(typeof requestIdHeader).toBe("string");
+    expect((requestIdHeader ?? "").length).toBeGreaterThan(10);
+    expect(correlationHeader).toBe(correlationId);
+
+    const invalidBody = await invalidResponse.json();
+    expect(invalidBody.ok).toBe(false);
+    expect(invalidBody.error.correlationId).toBe(correlationId);
+
+    expect(observedEvents.length).toBeGreaterThan(0);
+    const completedEvent = observedEvents.find((entry) => entry.event === "identity-http.request.completed");
+    expect(completedEvent).toBeDefined();
+    expect(completedEvent?.correlationId).toBe(correlationId);
+  });
+
+  it("returns standardized not-found semantics for unknown routes", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const response = await fetch(`${baseUrl}/api/v1/identity/unknown-route`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("not-found");
+    expect(body.error.sharedCode).toBe("not-found");
+    expect(body.error.retryable).toBe(false);
+    expect(typeof body.error.userMessage).toBe("string");
+  });
+
+  it("serves a root readiness route for local desktop transport probes", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const response = await fetch(`${baseUrl}/`, {
+      method: "GET",
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.service).toBe("identity-http");
+    expect(body.data.status).toBe("ready");
+  });
+
+  it("logs root readiness confirmation once and suppresses per-request lifecycle noise", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const firstResponse = await fetch(`${baseUrl}/?probe=desktop-startup`, {
+      method: "GET",
+    });
+    const secondResponse = await fetch(`${baseUrl}/?probe=desktop-startup`, {
+      method: "GET",
+    });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    const readinessEvents = logger.events.filter((entry) => entry.event === "identity-http.readiness.confirmed");
+    const readinessReceivedEvents = logger.events.filter(
+      (entry) => entry.event === "identity-http.request.received" && entry.path === "/",
+    );
+    const readinessCompletedEvents = logger.events.filter(
+      (entry) => entry.event === "identity-http.request.completed" && entry.path === "/",
+    );
+    expect(readinessEvents.length).toBe(1);
+    expect(readinessEvents[0]?.path).toBe("/");
+    expect(readinessReceivedEvents.length).toBe(0);
+    expect(readinessCompletedEvents.length).toBe(0);
+  });
+
+  it("sanitizes unhandled internal errors before sending responses", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(
+      logger,
+      {},
+      {
+        backendApi: {
+          registerLocalAccount: async () => {
+            throw new Error("sqlite failure at C:\\private\\secrets\\identity.db with token abc");
+          },
+        } as never,
+      },
+    );
+
+    const response = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "internal.error.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("internal");
+    expect(body.error.sharedCode).toBe("internal");
+    expect(body.error.retryable).toBe(false);
+    expect(typeof body.error.userMessage).toBe("string");
+    expect(String(body.error.message).toLowerCase()).not.toContain("sqlite");
+    expect(String(body.error.message).toLowerCase()).not.toContain("secret");
+    expect(String(body.error.message).toLowerCase()).not.toContain("token");
   });
 
   it("returns specific registration policy error details for weak credential input", async () => {
@@ -470,6 +1000,140 @@ describe("IdentityHttpServer", () => {
     const expiredBody = await expiredResponse.json();
     expect(expiredBody.ok).toBe(false);
     expect(expiredBody.error.code).toBe("authentication-failed");
+  });
+
+  it("returns unified session actor-context bootstrap payload with safe trusted-device and workspace projections", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl, harness } = await startServer(
+      logger,
+      {},
+      {
+        workspaceAdministrationBackendApi: {
+          listWorkspaces: async () => Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              workspaces: Object.freeze([
+                Object.freeze({
+                  workspaceId: "workspace:alpha",
+                  slug: "alpha",
+                  displayName: "Workspace Alpha",
+                  status: "active",
+                  visibility: "team",
+                  actorAccess: Object.freeze({
+                    membershipStatus: "active",
+                    effectiveRoles: Object.freeze(["member"]),
+                    canAdministrate: false,
+                    isWorkspaceOwner: false,
+                    capabilities: Object.freeze({
+                      canManageWorkspaceSettings: false,
+                      canManageMembers: false,
+                      canManageInvitations: false,
+                      canManageRoles: false,
+                    }),
+                  }),
+                }),
+                Object.freeze({
+                  workspaceId: "workspace:beta",
+                  slug: "beta",
+                  displayName: "Workspace Beta",
+                  status: "active",
+                  visibility: "private",
+                  actorAccess: Object.freeze({
+                    membershipStatus: "active",
+                    effectiveRoles: Object.freeze(["owner"]),
+                    canAdministrate: true,
+                    isWorkspaceOwner: true,
+                    capabilities: Object.freeze({
+                      canManageWorkspaceSettings: true,
+                      canManageMembers: true,
+                      canManageInvitations: true,
+                      canManageRoles: true,
+                    }),
+                  }),
+                }),
+              ]),
+              pagination: Object.freeze({
+                limit: 200,
+                offset: 0,
+                returned: 2,
+                hasMore: false,
+              }),
+            }),
+          }),
+        } as never,
+      },
+    );
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "context.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+    const registerBody = await registerResponse.json();
+
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:context",
+      userIdentityId: registerBody.data.userIdentityId,
+      trustStatus: "trusted",
+    });
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "context.user",
+        sessionTrustRequirement: "require-trusted",
+        client: {
+          trustedDeviceBindingId: "trusted-device:context",
+          trustMarker: "marker:private-material",
+        },
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+
+    const unauthenticatedResponse = await fetch(`${baseUrl}/api/v1/identity/session/context`, {
+      method: "GET",
+    });
+    expect(unauthenticatedResponse.status).toBe(401);
+
+    const contextResponse = await fetch(
+      `${baseUrl}/api/v1/identity/session/context?workspaceId=${encodeURIComponent("workspace:beta")}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${loginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(contextResponse.status).toBe(200);
+    const contextBody = await contextResponse.json();
+    expect(contextBody.ok).toBe(true);
+    expect(contextBody.data.actor.userIdentityId).toBe(registerBody.data.userIdentityId);
+    expect(contextBody.data.session.sessionId).toBe(loginBody.data.sessionId);
+    expect(contextBody.data.session.trustedDeviceId).toBe("trusted-device:context");
+    expect(contextBody.data.workspaceContext.requestedWorkspaceId).toBe("workspace:beta");
+    expect(contextBody.data.workspaceContext.resolvedWorkspaceId).toBe("workspace:beta");
+    expect(contextBody.data.workspaceContext.workspaces.length).toBe(2);
+    expect(contextBody.data.trustedDevice.trustedDeviceId).toBe("trusted-device:context");
+
+    const serialized = JSON.stringify(contextBody);
+    expect(serialized.includes("trustMarker")).toBeFalse();
+    expect(serialized.includes("trustedDeviceBindingId")).toBeFalse();
+    expect(serialized.includes("trustMaterialRef")).toBeFalse();
   });
 
   it("supports bearer-authenticated logout and targeted session revocation", async () => {
@@ -799,6 +1463,73 @@ describe("IdentityHttpServer", () => {
     expect(sessionAfterDisable.status).toBe(401);
   });
 
+  it("lists active sessions for the authenticated account with status/access-channel filters", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "session.list.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const desktopLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "session.list.user",
+        accessChannel: "desktop",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(desktopLoginResponse.status).toBe(200);
+
+    const thinLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "session.list.user",
+        accessChannel: "thin-client",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(thinLoginResponse.status).toBe(200);
+    const thinLoginBody = await thinLoginResponse.json();
+
+    const sessionsResponse = await fetch(
+      `${baseUrl}/api/v1/identity/sessions?status=active&accessChannel=desktop`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${thinLoginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(sessionsResponse.status).toBe(200);
+    const sessionsBody = await sessionsResponse.json();
+    expect(sessionsBody.ok).toBe(true);
+    expect(Array.isArray(sessionsBody.data.sessions)).toBeTrue();
+    expect(sessionsBody.data.sessions.length).toBe(1);
+    expect(sessionsBody.data.sessions[0].accessChannel).toBe("desktop");
+    expect(sessionsBody.data.sessions[0].status).toBe("active");
+  });
+
   it("enforces admin authorization for trusted-device oversight endpoints", async () => {
     const logger = new CapturingLogger();
     const { baseUrl, harness } = await startServer(logger, {
@@ -925,6 +1656,128 @@ describe("IdentityHttpServer", () => {
     const adminRevokeBody = await adminRevokeResponse.json();
     expect(adminRevokeBody.ok).toBe(true);
     expect(adminRevokeBody.data.revoked).toBe(true);
+  });
+
+  it("supports admin session oversight listing and admin revocation", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {
+      trustedDeviceAdministration: {
+        bootstrapAdminUserIdentityIds: ["user-identity:1"],
+      },
+    });
+
+    const adminRegisterResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "session.admin.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(adminRegisterResponse.status).toBe(200);
+    const adminRegisterBody = await adminRegisterResponse.json();
+
+    const memberRegisterResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "session.member.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(memberRegisterResponse.status).toBe(200);
+    const memberRegisterBody = await memberRegisterResponse.json();
+
+    const memberLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "session.member.user",
+        accessChannel: "thin-client",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(memberLoginResponse.status).toBe(200);
+    const memberLoginBody = await memberLoginResponse.json();
+
+    const forbiddenResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/sessions?userIdentityId=${encodeURIComponent(adminRegisterBody.data.userIdentityId)}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${memberLoginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(forbiddenResponse.status).toBe(403);
+
+    const adminLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "session.admin.user",
+        accessChannel: "desktop",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(adminLoginResponse.status).toBe(200);
+    const adminLoginBody = await adminLoginResponse.json();
+
+    const listResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/sessions?userIdentityId=${encodeURIComponent(memberRegisterBody.data.userIdentityId)}&status=active`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${adminLoginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(listResponse.status).toBe(200);
+    const listBody = await listResponse.json();
+    expect(listBody.ok).toBe(true);
+    expect(listBody.data.sessions.some((session: { sessionId: string }) => session.sessionId === memberLoginBody.data.sessionId)).toBeTrue();
+
+    const revokeResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/sessions/${encodeURIComponent(memberLoginBody.data.sessionId)}/revoke`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${adminLoginBody.data.sessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          reason: "admin",
+        }),
+      },
+    );
+    expect(revokeResponse.status).toBe(200);
+    const revokeBody = await revokeResponse.json();
+    expect(revokeBody.ok).toBe(true);
+    expect(revokeBody.data.revocationReason).toBe("admin");
+
+    const invalidAfterAdminRevoke = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${memberLoginBody.data.sessionToken}`,
+      },
+    });
+    expect(invalidAfterAdminRevoke.status).toBe(401);
   });
 
   it("hardens the full local identity lifecycle journey across endpoints", async () => {
@@ -1219,4 +2072,3 @@ describe("IdentityHttpServer", () => {
     expect(revokeBody.data.revoked).toBe(true);
   });
 });
-

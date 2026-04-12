@@ -13,6 +13,7 @@ import {
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
 } from "@domain/taxonomy/CompositionTaxonomy";
+import { buildSharedApiListQueryKey } from "@shared/contracts/api/SharedApiQueryConventions";
 import type { RegistryService } from "../../services/RegistryService";
 import type { AssetSelectorDataProvider, AssetSelectorQueryResponse } from "./AssetSelectorDataProvider";
 
@@ -105,12 +106,18 @@ export class AgentAssistantAssetSelectorAdapter implements AssetSelectorDataProv
     readonly searchTerm: string;
   }): Promise<AssetSelectorQueryResponse> {
     const keyword = input.searchTerm.trim();
-    const cacheKey = [
-      input.request.requestId,
-      input.request.assetType,
-      input.request.context.usageContext ?? "",
-      keyword.toLowerCase(),
-    ].join("::");
+    const cacheKey = buildSharedApiListQueryKey({
+      domain: "asset-selector",
+      operation: "agent-assistant-query",
+      context: {
+        search: keyword.toLowerCase(),
+      },
+      filters: {
+        requestId: input.request.requestId,
+        assetType: input.request.assetType,
+        usageContext: input.request.context.usageContext ?? null,
+      },
+    });
     const now = Date.now();
     const cached = this.queryCache.get(cacheKey);
     if (cached && (now - cached.createdAt) <= this.cacheTtlMs) {

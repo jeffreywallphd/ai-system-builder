@@ -1,4 +1,4 @@
-export const SECRET_RECORD_PERSISTENCE_SCHEMA_VERSION = 2;
+export const SECRET_RECORD_PERSISTENCE_SCHEMA_VERSION = 3;
 
 export const SECRET_RECORD_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -126,5 +126,89 @@ export const SECRET_RECORD_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [numbe
 
     CREATE INDEX IF NOT EXISTS secret_reencryption_operations_status_idx
       ON secret_reencryption_operations(status, updated_at DESC);
+  `],
+  [3, `
+    PRAGMA foreign_keys = OFF;
+
+    ALTER TABLE secret_version_material RENAME TO secret_version_material_legacy;
+    ALTER TABLE secret_versions RENAME TO secret_versions_legacy;
+
+    CREATE TABLE secret_versions (
+      version_id TEXT PRIMARY KEY,
+      secret_id TEXT NOT NULL,
+      version_number INTEGER NOT NULL CHECK (version_number >= 1),
+      state TEXT NOT NULL CHECK (state IN ('active', 'superseded', 'revoked', 'retired')),
+      created_at TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      previous_version_id TEXT,
+      superseded_by_version_id TEXT,
+      UNIQUE (secret_id, version_number),
+      FOREIGN KEY (secret_id) REFERENCES secret_records(secret_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE secret_version_material (
+      version_id TEXT PRIMARY KEY,
+      encrypted_payload_ref TEXT NOT NULL,
+      encrypted_payload_blob BLOB,
+      payload_digest_sha256 TEXT NOT NULL,
+      payload_byte_length INTEGER NOT NULL CHECK (payload_byte_length >= 0),
+      key_encryption_context_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (version_id) REFERENCES secret_versions(version_id) ON DELETE CASCADE
+    );
+
+    INSERT INTO secret_versions (
+      version_id,
+      secret_id,
+      version_number,
+      state,
+      created_at,
+      created_by,
+      previous_version_id,
+      superseded_by_version_id
+    )
+    SELECT
+      version_id,
+      secret_id,
+      version_number,
+      state,
+      created_at,
+      created_by,
+      previous_version_id,
+      superseded_by_version_id
+    FROM secret_versions_legacy;
+
+    INSERT INTO secret_version_material (
+      version_id,
+      encrypted_payload_ref,
+      encrypted_payload_blob,
+      payload_digest_sha256,
+      payload_byte_length,
+      key_encryption_context_json,
+      created_at
+    )
+    SELECT
+      version_id,
+      encrypted_payload_ref,
+      encrypted_payload_blob,
+      payload_digest_sha256,
+      payload_byte_length,
+      key_encryption_context_json,
+      created_at
+    FROM secret_version_material_legacy;
+
+    DROP TABLE secret_version_material_legacy;
+    DROP TABLE secret_versions_legacy;
+
+    CREATE INDEX IF NOT EXISTS secret_versions_secret_version_idx
+      ON secret_versions(secret_id, version_number ASC);
+    CREATE INDEX IF NOT EXISTS secret_versions_state_idx
+      ON secret_versions(state, created_at DESC);
+    CREATE INDEX IF NOT EXISTS secret_version_material_payload_ref_idx
+      ON secret_version_material(encrypted_payload_ref);
+    CREATE INDEX IF NOT EXISTS secret_version_material_digest_idx
+      ON secret_version_material(payload_digest_sha256);
+
+    PRAGMA foreign_keys = ON;
   `],
 ]);

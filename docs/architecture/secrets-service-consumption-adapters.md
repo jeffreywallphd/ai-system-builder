@@ -5,10 +5,14 @@ This note documents Story 8.2.5 (Feature 8 / Epic 8.2) and Story 8.3.4 (Feature 
 ## Canonical files
 
 - `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`
+- `src/application/security/ports/SecretProviderPorts.ts`
 - `src/infrastructure/security/secrets/ServerPlatformSecretConsumers.ts`
+- `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
 - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
 - `src/infrastructure/security/secrets/tests/ServerPlatformSecretConsumers.test.ts`
+- `src/infrastructure/security/tests/DefaultSecretProviderResolutionService.test.ts`
 - `src/application/security/tests/SecretRuntimeConsumptionAdapters.test.ts`
+- `src/application/security/tests/SecretProviderPorts.test.ts`
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 - `src/hosts/server/tests/IdentityServerHost.test.ts`
 
@@ -28,6 +32,11 @@ All methods call `retrieveSecretPlaintextForRuntime(...)` through `SecretRuntime
 - `resolveIdentitySessionSigningMaterial(...)`
 
 This service depends only on `runtimeSecretConsumptionAdapters`, giving host/runtime modules a formal seam for protected provider credentials and server signing material.
+
+Story 3.2.1 adds a provider-resolution seam for broader provider workflows:
+
+- `src/application/security/ports/SecretProviderPorts.ts`
+- `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
 
 ## Runtime secret dependency pattern
 
@@ -62,11 +71,12 @@ This keeps authorization and audit behavior in the existing secret retrieval use
 
 `composeServerSecretService(...)` now publishes `runtimeSecretConsumptionAdapters` alongside existing secret use cases. Host-level and infrastructure services can adopt this seam incrementally without changing storage or crypto internals.
 
-Story 8.3.4 integration adopts this seam in `SystemSecretBootstrapService` runtime validation:
+Story 8.3.4 and Story 3.2.1 integration adopt this seam in `SystemSecretBootstrapService`:
 
-- required server provider credentials (`openai`, `huggingface`) are validated through `ServerPlatformSecretConsumers.resolveServerProviderCredential(...)`
-- required identity-session signing material is validated through `ServerPlatformSecretConsumers.resolveIdentitySessionSigningMaterial(...)`
-- runtime validation no longer uses ad hoc direct retrieval wiring in bootstrap logic
+- metadata lookup and existence checks use `ISecretProviderMaterialResolutionPort`
+- bootstrap create/write of missing provider material uses `bootstrapSecretProviderMaterial(...)`
+- runtime credential/signing validation uses `resolveSecretProviderMaterial(...)`
+- startup bootstrap no longer manually composes metadata/create/runtime flows in service-local helpers
 
 ## Tests
 
@@ -77,3 +87,4 @@ Added/updated tests verify:
 - composed server host exposes adapters and can retrieve a server-scoped credential through the adapter surface
 - platform consumer methods route through runtime adapter semantics and preserve error passthrough behavior
 - host startup bootstrap migration can immediately resolve migrated provider credentials through `platformSecretConsumers`
+- provider resolution service validates scope-aware server/workspace/user reads plus metadata/existence/bootstrap operations

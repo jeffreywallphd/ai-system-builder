@@ -2,7 +2,11 @@
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { createIdentityHttpServer } from "../IdentityHttpServer";
+import {
+  createIdentityHttpServer,
+  type IdentityHttpServerLogEvent,
+  type IdentityHttpServerLogger,
+} from "../IdentityHttpServer";
 import { AssetManagementBackendApi } from "../../../../api/assets/AssetManagementBackendApi";
 import { AssetUploadInitiationService } from "@application/assets/use-cases/AssetUploadInitiationService";
 import { AssetUploadIngestionService } from "@application/assets/use-cases/AssetUploadIngestionService";
@@ -25,6 +29,19 @@ import {
 } from "@domain/assets/AssetDomain";
 
 const servers: Server[] = [];
+
+class CapturingLogger implements IdentityHttpServerLogger {
+  public readonly events: IdentityHttpServerLogEvent[] = [];
+  public info(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public warn(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public error(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+}
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => {
@@ -387,6 +404,7 @@ async function startServer(
   generatedOutputService = new StubAssetGeneratedOutputRegistrationService(),
   previewService = new StubAssetPreviewService(),
   lifecycleService = new StubAssetLifecycleService(),
+  logger?: CapturingLogger,
 ): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const assetManagementBackendApi = new AssetManagementBackendApi({
@@ -403,6 +421,7 @@ async function startServer(
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
     assetManagementBackendApi,
+    logger,
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -445,6 +464,29 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 }
 
 describe("IdentityHttpServer asset management routes", () => {
+  it("enforces shared auth and workspace guard semantics for converged asset routes", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.guard.1");
+
+    const unauthenticatedResponse = await fetch(`${baseUrl}/api/v1/assets`);
+    expect(unauthenticatedResponse.status).toBe(401);
+    const unauthenticatedBody = await unauthenticatedResponse.json();
+    expect(unauthenticatedBody.ok).toBe(false);
+    expect(unauthenticatedBody.error.code).toBe("authentication-failed");
+
+    const missingWorkspaceResponse = await fetch(`${baseUrl}/api/v1/assets`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(missingWorkspaceResponse.status).toBe(400);
+    const missingWorkspaceBody = await missingWorkspaceResponse.json();
+    expect(missingWorkspaceBody.ok).toBe(false);
+    expect(missingWorkspaceBody.error.code).toBe("invalid-request");
+  });
+
   it("serves authenticated register and upload initiation flows", async () => {
     const service = new StubAssetUploadInitiationService();
     const baseUrl = await startServer(service);
@@ -501,6 +543,8 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(initiateBody.ok).toBe(true);
     expect(initiateBody.data.upload.uploadMethod).toBe("POST");
     expect(initiateBody.data.upload.uploadEndpoint).toContain("/api/v1/assets/upload-sessions/");
+    expect(initiateBody.data.upload.storageInstanceId).toBeUndefined();
+    expect(initiateBody.data.upload.objectKey).toBeUndefined();
 
     const ingestResponse = await fetch(`${baseUrl}/api/v1/assets/upload-sessions/asset-upload-session%3Atest-001/content?workspaceId=workspace-alpha`, {
       method: "POST",
@@ -616,7 +660,16 @@ describe("IdentityHttpServer asset management routes", () => {
 
   it("supports authenticated scoped asset listing", async () => {
     const service = new StubAssetUploadInitiationService();
-    const baseUrl = await startServer(service);
+    const logger = new CapturingLogger();
+    const baseUrl = await startServer(
+      service,
+      new StubAssetUploadIngestionService(),
+      new StubAssetDownloadService(),
+      new StubAssetGeneratedOutputRegistrationService(),
+      new StubAssetPreviewService(),
+      new StubAssetLifecycleService(),
+      logger,
+    );
     const token = await registerAndLogin(baseUrl, "asset.http.owner.4");
 
     const response = await fetch(
@@ -635,6 +688,30 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(body.data.items).toHaveLength(1);
     expect(body.data.items[0]?.assetId).toBe("asset-upload-001");
     expect(body.data.pagination.returned).toBe(1);
+    expect(
+      logger.events.some((event) => event.event === "identity-http.route-family.modular-handled" && event.path === "/api/v1/assets"),
+    ).toBeTrue();
+  });
+
+  it("accepts canonical repeated filter parameter names for asset list retrieval", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.4b");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets?workspaceId=workspace-alpha&assetKind=uploaded-file&visibility=private&lifecycleState=active&limit=10&offset=0`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.items).toHaveLength(1);
   });
 
   it("supports authenticated asset detail retrieval", async () => {
@@ -813,6 +890,8 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(body.ok).toBe(true);
     expect(body.data.preview.previewAssetId).toBe("preview-asset-upload-001-main");
     expect(body.data.preview.previewMimeType).toBe("image/webp");
+    expect(body.data.preview.previewStorageInstanceId).toBeUndefined();
+    expect(body.data.preview.previewObjectKey).toBeUndefined();
   });
 
   it("maps missing preview resolution to not-found", async () => {

@@ -4,16 +4,16 @@ import { readSource } from "../../tests/testUtils";
 describe("ui/routes contract adherence", () => {
   it("keeps route modules implemented as non-placeholder files", () => {
     const sources = [
-      readSource("ui/routes/AppRouter.tsx"),
-      readSource("ui/routes/ProtectedRoute.tsx"),
-      readSource("ui/routes/RouteConfig.ts"),
+      readSource("src/ui/routes/AppRouter.tsx"),
+      readSource("src/ui/routes/ProtectedRoute.tsx"),
+      readSource("src/ui/routes/RouteConfig.ts"),
     ];
 
     expect(sources.every((source) => source.trim().length > 0)).toBeTrue();
   });
 
   it("ensures canonical path contract is consistent", () => {
-    const source = readSource("ui/routes/RouteConfig.ts");
+    const source = readSource("src/ui/routes/RouteConfig.ts");
 
     expect(source).toContain('home: "/"');
     expect(source).toContain('login: "/auth/login"');
@@ -35,15 +35,21 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('systemStudio: "/studio-shell/system"');
     expect(source).toContain('schemaStudio: "/studio-shell/schema"');
     expect(source).toContain('settings: "/settings"');
+    expect(source).toContain('adminShell: "/settings/admin"');
+    expect(source).toContain('adminLiteShell: "/settings/admin-lite"');
     expect(source).toContain('authorizationSharing: "/settings/sharing"');
     expect(source).toContain('authorizationSharingThin: "/settings/sharing/thin"');
     expect(source).toContain('authorizationReporting: "/settings/sharing/reporting"');
+    expect(source).toContain('securityPolicy: "/settings/security-policy"');
     expect(source).toContain('storageAdmin: "/settings/storage"');
     expect(source).toContain('workspaceAdmin: "/settings/workspaces"');
     expect(source).toContain('nodeEnrollmentReview: "/settings/node-enrollments"');
     expect(source).toContain('nodeInventory: "/settings/node-inventory"');
     expect(source).toContain('identityAdmin: "/settings/identity-admin"');
     expect(source).toContain('secretsAdmin: "/settings/secrets"');
+    expect(source).toContain('governanceReview: "/settings/governance-review"');
+    expect(source).toContain('governanceReviewThin: "/settings/governance-review/thin"');
+    expect(source).toContain('deploymentPolicyAdmin: "/settings/deployment-policy"');
     expect(source).toContain('notFound: "*"');
   });
 });

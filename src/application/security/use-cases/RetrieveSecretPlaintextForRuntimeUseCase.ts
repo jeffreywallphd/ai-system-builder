@@ -288,6 +288,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         return notFound(secretId);
       }
 
+      const requestedVersionId = normalizeRequired(request.runtimeContext.versionId);
+      const allowSupersededVersion = request.runtimeContext.allowSupersededVersion === true;
       const currentVersion = record.versions.find((version) => version.versionId === record.currentVersionId);
       if (!currentVersion) {
         await this.emitOperation("failed", {
@@ -312,9 +314,51 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         };
       }
 
+      const resolvedVersion = requestedVersionId
+        ? record.versions.find((version) => version.versionId === requestedVersionId)
+        : currentVersion;
+      if (!resolvedVersion) {
+        await this.emitOperation("missing", {
+          occurredAt,
+          actorId,
+          secretId: record.secretId,
+          scope: record.owner.scope,
+          workspaceId: record.owner.workspaceId,
+          userIdentityId: record.owner.userIdentityId,
+          operationKey,
+          serviceIdentity,
+          details: Object.freeze({
+            reason: "secret-version-not-found",
+          }),
+        });
+        return notFound(secretId);
+      }
+
+      if (
+        resolvedVersion.state !== "active"
+        && !(allowSupersededVersion && resolvedVersion.state === "superseded")
+      ) {
+        await this.emitOperation("denied", {
+          occurredAt,
+          actorId,
+          secretId: record.secretId,
+          scope: record.owner.scope,
+          workspaceId: record.owner.workspaceId,
+          userIdentityId: record.owner.userIdentityId,
+          operationKey,
+          serviceIdentity,
+          details: Object.freeze({
+            reason: "secret-version-state-not-allowed",
+            requestedVersionId: resolvedVersion.versionId,
+            requestedVersionState: resolvedVersion.state,
+          }),
+        });
+        return notFound(secretId);
+      }
+
       const decrypted = await this.dependencies.secretEncryptionPort.decryptSecretPlaintext({
         secretId: record.secretId,
-        version: currentVersion,
+        version: resolvedVersion,
       });
 
       await this.emitOperation("succeeded", {

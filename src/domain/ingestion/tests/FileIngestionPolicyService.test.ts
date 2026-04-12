@@ -76,6 +76,27 @@ describe("FileIngestionPolicyService", () => {
     expect(evaluation.warnings.some((warning) => warning.code === "filename_extension_mismatch")).toBe(true);
   });
 
+  it("accepts policies that declare extensions without a leading dot", () => {
+    const evaluation = service.evaluateRequest({
+      file: { name: "photo.jpg", sizeInBytes: 40, mimeType: "image/jpeg" },
+      content: new Uint8Array([1, 2, 3]),
+      provenance: { source: "test", capturedAt: new Date() },
+    }, {
+      acceptedExtensions: ["jpg", "png"],
+      acceptedMimeTypes: ["image/jpeg", "image/png"],
+      maxFileSizeBytes: 1024,
+      conversion: {
+        mode: "forbidden",
+        allowedOutputFormats: [],
+        passThroughExtensions: ["jpg", "png"],
+        passThroughMimeTypes: ["image/jpeg", "image/png"],
+      },
+    });
+
+    expect(evaluation.requiresConversion).toBe(false);
+    expect(evaluation.descriptor.extension).toBe(".jpg");
+  });
+
   it("builds normalized pass-through output", () => {
     const document = service.buildPassThroughDocument({
       descriptor: { name: "notes.txt", extension: ".txt", mimeType: "text/plain", sizeInBytes: 5 },

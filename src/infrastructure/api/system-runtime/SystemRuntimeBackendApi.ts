@@ -59,6 +59,27 @@ import {
   type ExecutionUpdateSubscription,
 } from "./ExecutionUpdateStream";
 import {
+  type RuntimeRealtimeQueueMovementPayload,
+  type RuntimeRealtimeRunStatusPayload,
+  RuntimeRealtimeSubscriptionModes,
+  type RuntimeRealtimeAdminChangePayload,
+  type RuntimeRealtimeAuditGovernancePayload,
+  type RuntimeRealtimeConnectivityStatePayload,
+  type RuntimeRealtimeEventEnvelope,
+  type RuntimeRealtimeEventSubscription,
+  type RuntimeRealtimeSubscriptionRequest,
+} from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import {
+  type RuntimeCancelRunResponse,
+  type RuntimeDequeueResponse,
+  RuntimeQueueItemStatuses,
+  type RuntimeQueueItem,
+  type RuntimeQueueItemStatus,
+  type RuntimeQueueListResponse,
+} from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import type { SharedApiMutationResult } from "@shared/contracts/api/SharedApiContractPrimitives";
+import { AuthoritativeRuntimeEventStream } from "./AuthoritativeRuntimeEventStream";
+import {
   HttpExecutionCallbackDispatcher,
   type ExecutionCallbackDispatcher,
   type ExecutionCallbackPayload,
@@ -79,6 +100,7 @@ import {
   shapeAuthorizationAwareResponse,
   type AuthorizationResponseAccessLevel,
 } from "@application/authorization/use-cases/AuthorizationResponseRedaction";
+import { SystemRuntimeObservability, type SystemRuntimeObservabilityLogger } from "./SystemRuntimeObservability";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -159,6 +181,31 @@ export interface RuntimeApiRequestContext {
   readonly retryAttempt?: RetryAttemptRecord;
 }
 
+export interface ListRuntimeQueueItemsRequest {
+  readonly workspaceId: string;
+  readonly systemId?: string;
+  readonly statuses?: ReadonlyArray<RuntimeQueueItemStatus>;
+  readonly limit?: number;
+  readonly offset?: number;
+  readonly requestContext?: RuntimeApiRequestContext;
+}
+
+export interface CancelRuntimeExecutionRequest {
+  readonly executionId: string;
+  readonly reason?: string;
+  readonly cancelledAt?: string;
+  readonly idempotencyKey?: string;
+  readonly requestContext?: RuntimeApiRequestContext;
+}
+
+export interface DequeueRuntimeQueueItemRequest {
+  readonly queueItemId: string;
+  readonly reason?: string;
+  readonly dequeuedAt?: string;
+  readonly idempotencyKey?: string;
+  readonly requestContext?: RuntimeApiRequestContext;
+}
+
 export interface ExecutionCallbackRegistrationRequest {
   readonly callbackId?: string;
   readonly targetUrl: string;
@@ -175,6 +222,24 @@ export interface SystemRuntimeAuthorizationOptions {
   readonly queueProtectedResourceType?: string;
   readonly logProtectedResourceType?: string;
   readonly now?: () => Date;
+  readonly observabilityLogger?: SystemRuntimeObservabilityLogger;
+}
+
+function mapExecutionStatusToQueueItemStatus(status: RuntimeExecutionStatusReadModel["status"]): RuntimeQueueItemStatus | undefined {
+  switch (status) {
+    case "pending":
+      return RuntimeQueueItemStatuses.queued;
+    case "running":
+      return RuntimeQueueItemStatuses.running;
+    case "succeeded":
+      return RuntimeQueueItemStatuses.completed;
+    case "failed":
+      return RuntimeQueueItemStatuses.failed;
+    case "cancelled":
+      return RuntimeQueueItemStatuses.cancelled;
+    default:
+      return undefined;
+  }
 }
 
 const RuntimeExecutionTracePartialRedactionRules = Object.freeze([
@@ -192,6 +257,7 @@ const RuntimeExecutionResultPartialRedactionRules = Object.freeze([
 export class SystemRuntimeBackendApi {
   private static readonly EXTERNAL_POLL_RESPONSE_CACHE_TTL_MS = 75;
   private static readonly EXTERNAL_STATUS_RESPONSE_CACHE_TTL_MS = 75;
+  private static readonly MUTATION_IDEMPOTENCY_TTL_MS = 5 * 60 * 1000;
   private static readonly STREAM_EMIT_MIN_INTERVAL_MS = 50;
   private static readonly MAX_IN_FLIGHT_ASYNC_RUNS = 500;
   private static readonly MAX_CALLBACK_REGISTRATIONS_PER_SESSION = 20;
@@ -206,6 +272,7 @@ export class SystemRuntimeBackendApi {
     state: ExecutionPollResponse["acceptedState"];
   }>();
   private readonly updateStream = new ExecutionUpdateStream();
+  private readonly realtimeEventStream = new AuthoritativeRuntimeEventStream();
   private readonly emittedTraceCountsByExecutionId = new Map<string, number>();
   private readonly lastStreamEmitByExecutionId = new Map<string, number>();
   private readonly cachedExternalPollsByKey = new Map<string, {
@@ -216,6 +283,10 @@ export class SystemRuntimeBackendApi {
     readonly expiresAtMs: number;
     readonly response: RuntimeExecutionStatusReadModel;
   }>();
+  private readonly cachedMutationResponsesByKey = new Map<string, {
+    readonly expiresAtMs: number;
+    readonly response: SystemRuntimeApiResponse<unknown>;
+  }>();
   private readonly tenantIsolationPolicy = new TenantExecutionIsolationPolicy();
   private readonly auditTrailService: ExecutionAuditTrailService;
   private readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
@@ -223,6 +294,7 @@ export class SystemRuntimeBackendApi {
   private readonly queueProtectedResourceType: string;
   private readonly logProtectedResourceType: string;
   private readonly now: () => Date;
+  private readonly observability: SystemRuntimeObservability;
 
   public constructor(
     repository: IStudioShellRepository,
@@ -243,6 +315,7 @@ export class SystemRuntimeBackendApi {
     this.queueProtectedResourceType = authorizationOptions?.queueProtectedResourceType?.trim() || "runtime-queue";
     this.logProtectedResourceType = authorizationOptions?.logProtectedResourceType?.trim() || "runtime-log";
     this.now = authorizationOptions?.now ?? (() => new Date());
+    this.observability = new SystemRuntimeObservability(authorizationOptions?.observabilityLogger);
   }
 
   public async startExecution(request: StartSystemRuntimeExecutionRequest & {
@@ -253,7 +326,7 @@ export class SystemRuntimeBackendApi {
     readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
     readonly tenantId?: string;
   }): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>> {
-    return this.wrap(async () => {
+    const response = await this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
       const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
       const requestSource = this.resolveRequestSource(request.requestContext);
@@ -369,6 +442,19 @@ export class SystemRuntimeBackendApi {
         nestedExecutionLineage: this.service.getExecutionStatus(started.execution.executionId).nestedExecutionLineage,
       });
     });
+    this.observability.recordApiOutcome({
+      action: "start-execution",
+      response,
+      request: {
+        studioId: request.studioId,
+        draftId: request.draftId,
+        versionId: request.versionId,
+        systemId: request.systemId,
+        tenantId: request.tenantId,
+        callerId: request.requestContext?.accessContext?.callerId,
+      },
+    });
+    return response;
   }
 
   public async startExecutionAsync(request: StartSystemRuntimeExecutionRequest & {
@@ -380,7 +466,7 @@ export class SystemRuntimeBackendApi {
     readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
     readonly tenantId?: string;
   }): Promise<SystemRuntimeApiResponse<AsyncExecutionStartResponse>> {
-    return this.wrap(async () => {
+    const response = await this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
       const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
       const requestSource = this.resolveRequestSource(request.requestContext);
@@ -430,6 +516,29 @@ export class SystemRuntimeBackendApi {
         sessionId,
         kind: ExecutionUpdateEventKinds.executionAccepted,
         status: "pending",
+      });
+      this.realtimeEventStream.publishQueueMovementEvent({
+        actorUserIdentityId: session.context?.callerId,
+        workspaceId: this.resolveExecutionWorkspaceId({ executionId, sessionId }),
+        payload: Object.freeze({
+          queueItemId: `runtime-queue:${executionId}`,
+          executionId,
+          status: "queued",
+          sessionId,
+          changedAt: new Date().toISOString(),
+        }),
+      });
+      this.realtimeEventStream.publishRunStatusEvent({
+        actorUserIdentityId: session.context?.callerId,
+        workspaceId: this.resolveExecutionWorkspaceId({ executionId, sessionId }),
+        payload: Object.freeze({
+          executionId,
+          sessionId,
+          status: "pending",
+          rootAssetId: request.systemId ?? this.deriveSystemIdFromVersionId(request.versionId),
+          rootVersionId: request.versionId,
+          changedAt: new Date().toISOString(),
+        }),
       });
       this.recordAudit({
         eventKind: ExecutionAuditEventKinds.requested,
@@ -565,6 +674,19 @@ export class SystemRuntimeBackendApi {
         nestedExecutionLineage: Object.freeze([]),
       });
     });
+    this.observability.recordApiOutcome({
+      action: "start-execution-async",
+      response,
+      request: {
+        studioId: request.studioId,
+        draftId: request.draftId,
+        versionId: request.versionId,
+        systemId: request.systemId,
+        tenantId: request.tenantId,
+        callerId: request.requestContext?.accessContext?.callerId,
+      },
+    });
+    return response;
   }
 
   public async getExecutionStatus(
@@ -644,6 +766,240 @@ export class SystemRuntimeBackendApi {
       });
       return shaped.value ?? projected;
     });
+  }
+
+  public async listQueueItems(input: ListRuntimeQueueItemsRequest): Promise<SystemRuntimeApiResponse<RuntimeQueueListResponse>> {
+    return this.wrap(async () => {
+      const workspaceId = input.workspaceId.trim();
+      if (!workspaceId) {
+        throw new Error("invalid-request:workspaceId is required.");
+      }
+      this.assertWorkspaceScopeAccess({
+        workspaceId,
+        requestContext: input.requestContext,
+      });
+
+      const normalizedSystemId = input.systemId?.trim() || undefined;
+      const limit = this.normalizeOptionalBoundedInteger(input.limit, 1, 200, "limit");
+      const offset = this.normalizeOptionalBoundedInteger(input.offset, 0, 50_000, "offset") ?? 0;
+      const statusFilter = input.statuses && input.statuses.length > 0
+        ? new Set(input.statuses)
+        : undefined;
+      const executionIds = new Set<string>();
+      for (const session of this.executionSessionRepository.list()) {
+        for (const executionId of session.executionIds) {
+          executionIds.add(executionId);
+        }
+      }
+
+      const items: RuntimeQueueItem[] = [];
+      for (const executionId of executionIds) {
+        const normalizedExecutionId = executionId.trim();
+        if (!normalizedExecutionId) {
+          continue;
+        }
+        const executionWorkspaceId = this.resolveExecutionWorkspaceId({ executionId: normalizedExecutionId });
+        if (!executionWorkspaceId || executionWorkspaceId !== workspaceId) {
+          continue;
+        }
+
+        let status: RuntimeExecutionStatusReadModel;
+        try {
+          status = this.service.getExecutionStatus(normalizedExecutionId);
+        } catch {
+          continue;
+        }
+        if (normalizedSystemId && status.rootAssetId !== normalizedSystemId) {
+          continue;
+        }
+        const queueStatus = mapExecutionStatusToQueueItemStatus(status.status);
+        if (!queueStatus) {
+          continue;
+        }
+        if (statusFilter && !statusFilter.has(queueStatus)) {
+          continue;
+        }
+
+        const queueResourceId = this.createQueueResourceId(status.rootAssetId, status.rootVersionId);
+        if (!await this.isOperationalResourceAllowed({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "queue.read",
+          resourceFamily: AuthorizationResourceFamilies.queue,
+          resourceType: this.queueProtectedResourceType,
+          resourceId: queueResourceId,
+        })) {
+          continue;
+        }
+        if (!await this.isOperationalResourceAllowed({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "run.read",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: normalizedExecutionId,
+        })) {
+          continue;
+        }
+
+        items.push(Object.freeze({
+          queueItemId: `runtime-queue:${normalizedExecutionId}`,
+          executionId: normalizedExecutionId,
+          systemId: status.rootAssetId,
+          status: queueStatus,
+          enqueuedAt: status.startedAt,
+          startedAt: queueStatus === RuntimeQueueItemStatuses.running || queueStatus === RuntimeQueueItemStatuses.completed || queueStatus === RuntimeQueueItemStatuses.failed || queueStatus === RuntimeQueueItemStatuses.cancelled
+            ? status.startedAt
+            : undefined,
+          completedAt: status.completedAt,
+        }));
+      }
+
+      items.sort((left, right) => right.enqueuedAt.localeCompare(left.enqueuedAt));
+      const sliced = limit !== undefined
+        ? items.slice(offset, offset + limit)
+        : items.slice(offset);
+      return Object.freeze({
+        items: Object.freeze(sliced),
+        totalCount: items.length,
+      });
+    });
+  }
+
+  public async cancelExecution(input: CancelRuntimeExecutionRequest): Promise<SystemRuntimeApiResponse<RuntimeCancelRunResponse>> {
+    return this.withMutationIdempotency(
+      "runtime-cancel",
+      input.executionId,
+      input.idempotencyKey,
+      () => this.wrap(async () => {
+        const executionId = input.executionId.trim();
+        if (!executionId) {
+          throw new Error("invalid-request:executionId is required.");
+        }
+        this.assertExecutionWorkspaceScope({
+          executionId,
+          requestContext: input.requestContext,
+        });
+        const callerContext = this.resolveCallerContext({ requestContext: input.requestContext });
+        const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext });
+        this.assertExternalRateLimit({
+          requestContext: input.requestContext,
+          callerContext,
+          tenantId: tenantContext?.tenantId,
+          operation: "cancel-execution",
+        });
+        const status = this.service.getExecutionStatus(executionId);
+        this.assertExecutionAccess({
+          accessContext: callerContext,
+          systemId: status.rootAssetId,
+          versionId: status.rootVersionId,
+        });
+        this.assertTenantIsolation({
+          access: { caller: callerContext, tenant: tenantContext },
+          resourceTenantId: this.readExecutionTenantId(executionId),
+        });
+        await this.assertOperationalResourceAuthorized({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "run.cancel",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: executionId,
+        });
+
+        const operationTimestamp = this.resolveMutationTimestamp(input.cancelledAt, "cancelledAt");
+        const cancelledStatus = this.service.cancelExecution({
+          executionId,
+          cancelledAt: operationTimestamp,
+        });
+        const changed = cancelledStatus.status === RuntimeQueueItemStatuses.cancelled && status.status !== RuntimeQueueItemStatuses.cancelled;
+        const mutation = this.createMutationResult({
+          operation: "runtime-cancel",
+          targetId: executionId,
+          changed,
+          occurredAt: operationTimestamp,
+          idempotencyKey: input.idempotencyKey,
+        });
+        this.emitExecutionUpdateFromSnapshot({ executionId });
+        return Object.freeze({
+          executionId,
+          status: cancelledStatus.status,
+          mutation,
+        });
+      }),
+    );
+  }
+
+  public async dequeueQueueItem(input: DequeueRuntimeQueueItemRequest): Promise<SystemRuntimeApiResponse<RuntimeDequeueResponse>> {
+    return this.withMutationIdempotency(
+      "runtime-dequeue",
+      input.queueItemId,
+      input.idempotencyKey,
+      () => this.wrap(async () => {
+        const queueItemId = input.queueItemId.trim();
+        if (!queueItemId) {
+          throw new Error("invalid-request:queueItemId is required.");
+        }
+        const executionId = this.resolveExecutionIdFromQueueItemId(queueItemId);
+        this.assertExecutionWorkspaceScope({
+          executionId,
+          requestContext: input.requestContext,
+        });
+        const callerContext = this.resolveCallerContext({ requestContext: input.requestContext });
+        const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext });
+        this.assertExternalRateLimit({
+          requestContext: input.requestContext,
+          callerContext,
+          tenantId: tenantContext?.tenantId,
+          operation: "dequeue-execution",
+        });
+        const priorStatus = this.service.getExecutionStatus(executionId);
+        this.assertExecutionAccess({
+          accessContext: callerContext,
+          systemId: priorStatus.rootAssetId,
+          versionId: priorStatus.rootVersionId,
+        });
+        this.assertTenantIsolation({
+          access: { caller: callerContext, tenant: tenantContext },
+          resourceTenantId: this.readExecutionTenantId(executionId),
+        });
+        const queueResourceId = this.createQueueResourceId(priorStatus.rootAssetId, priorStatus.rootVersionId);
+        await this.assertOperationalResourceAuthorized({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "queue.dequeue",
+          resourceFamily: AuthorizationResourceFamilies.queue,
+          resourceType: this.queueProtectedResourceType,
+          resourceId: queueResourceId,
+        });
+        await this.assertOperationalResourceAuthorized({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "run.cancel",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: executionId,
+        });
+
+        const operationTimestamp = this.resolveMutationTimestamp(input.dequeuedAt, "dequeuedAt");
+        const cancelledStatus = this.service.cancelExecution({
+          executionId,
+          cancelledAt: operationTimestamp,
+        });
+        const changed = cancelledStatus.status === RuntimeQueueItemStatuses.cancelled
+          && priorStatus.status !== RuntimeQueueItemStatuses.cancelled;
+        const queueStatus = mapExecutionStatusToQueueItemStatus(cancelledStatus.status) ?? RuntimeQueueItemStatuses.cancelled;
+        const mutation = this.createMutationResult({
+          operation: "runtime-dequeue",
+          targetId: queueItemId,
+          changed,
+          occurredAt: operationTimestamp,
+          idempotencyKey: input.idempotencyKey,
+        });
+        this.emitExecutionUpdateFromSnapshot({ executionId });
+        return Object.freeze({
+          queueItemId,
+          executionId,
+          status: queueStatus,
+          mutation,
+        });
+      }),
+    );
   }
 
   public async listRecentExecutionsForSystem(input: {
@@ -885,6 +1241,124 @@ export class SystemRuntimeBackendApi {
         error: this.toApiError(error),
       });
     }
+  }
+
+  public subscribeToRealtimeEvents(input: {
+    readonly request: RuntimeRealtimeSubscriptionRequest;
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly listener: (event: RuntimeRealtimeEventEnvelope) => void;
+  }): SystemRuntimeApiResponse<RuntimeRealtimeEventSubscription> {
+    try {
+      const caller = this.resolveCallerContext({ requestContext: input.requestContext });
+      const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: caller });
+      this.assertExternalRateLimit({
+        requestContext: input.requestContext,
+        callerContext: caller,
+        tenantId: tenantContext?.tenantId,
+        operation: "subscribe-realtime-events",
+      });
+      const request = Object.freeze({
+        ...input.request,
+        mode: input.request.mode ?? RuntimeRealtimeSubscriptionModes.liveOnly,
+      });
+
+      if (!input.requestContext?.trustedInternal && caller?.callerKind === "user") {
+        const callerId = caller.callerId?.trim();
+        const actorUserIdentityId = request.actor.actorUserIdentityId.trim();
+        if (callerId && callerId !== actorUserIdentityId) {
+          throw new Error("forbidden:Realtime subscription actor must match authenticated caller identity.");
+        }
+      }
+
+      if (!input.requestContext?.trustedInternal) {
+        const workspaceMetadata = caller?.metadata as { readonly workspaceId?: unknown; readonly activeWorkspaceId?: unknown } | undefined;
+        const callerWorkspaceId = typeof workspaceMetadata?.activeWorkspaceId === "string"
+          ? workspaceMetadata.activeWorkspaceId.trim()
+          : typeof workspaceMetadata?.workspaceId === "string"
+            ? workspaceMetadata.workspaceId.trim()
+            : "";
+        const actorWorkspaceId = request.actor.workspaceId?.trim() ?? "";
+        if (callerWorkspaceId && actorWorkspaceId && callerWorkspaceId !== actorWorkspaceId) {
+          throw new Error("forbidden:Realtime subscription workspace scope must match authenticated caller workspace.");
+        }
+      }
+
+      const subscription = this.realtimeEventStream.subscribe({
+        request,
+        listener: input.listener,
+      });
+      return Object.freeze({
+        ok: true,
+        data: subscription,
+      });
+    } catch (error) {
+      return Object.freeze({
+        ok: false,
+        error: this.toApiError(error),
+      });
+    }
+  }
+
+  public publishRuntimeConnectivityState(input: {
+    readonly payload: RuntimeRealtimeConnectivityStatePayload;
+    readonly workspaceId?: string;
+    readonly sessionId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishConnectivityStateEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      payload: input.payload,
+    });
+  }
+
+  public publishRuntimeRunStatus(input: {
+    readonly payload: RuntimeRealtimeRunStatusPayload;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishRunStatusEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      payload: input.payload,
+    });
+  }
+
+  public publishRuntimeQueueMovement(input: {
+    readonly payload: RuntimeRealtimeQueueMovementPayload;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishQueueMovementEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      payload: input.payload,
+    });
+  }
+
+  public publishRuntimeAdminChange(input: {
+    readonly payload: RuntimeRealtimeAdminChangePayload;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishAdminChangeEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      payload: input.payload,
+    });
+  }
+
+  public publishRuntimeAuditGovernance(input: {
+    readonly payload: RuntimeRealtimeAuditGovernancePayload;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishAuditGovernanceEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      payload: input.payload,
+    });
   }
 
 
@@ -1137,6 +1611,24 @@ export class SystemRuntimeBackendApi {
         status: status.status,
         progress: status.progress,
       });
+      this.realtimeEventStream.publishRunStatusEvent({
+        actorUserIdentityId: this.resolveExecutionActorUserIdentityId(input.executionId, input.sessionId),
+        workspaceId: this.resolveExecutionWorkspaceId({ executionId: input.executionId, sessionId: input.sessionId }),
+        payload: Object.freeze({
+          executionId: input.executionId,
+          sessionId: input.sessionId,
+          status: status.status,
+          rootAssetId: status.rootAssetId,
+          rootVersionId: status.rootVersionId,
+          progress: status.progress,
+          changedAt: new Date().toISOString(),
+        }),
+      });
+      this.publishQueueStateFromExecutionStatus({
+        executionId: input.executionId,
+        sessionId: input.sessionId,
+        status: status.status,
+      });
       for (const traceEvent of nextEvents.slice(0, 20)) {
         this.updateStream.emit({
           executionId: input.executionId,
@@ -1180,6 +1672,69 @@ export class SystemRuntimeBackendApi {
     return index > 0 ? normalized.slice(0, index) : normalized;
   }
 
+  private publishQueueStateFromExecutionStatus(input: {
+    readonly executionId: string;
+    readonly sessionId?: string;
+    readonly status: RuntimeExecutionStatusReadModel["status"];
+  }): void {
+    const queueStatus = (() => {
+      switch (input.status) {
+        case "pending":
+          return "queued" as const;
+        case "running":
+          return "running" as const;
+        case "succeeded":
+          return "completed" as const;
+        case "failed":
+          return "failed" as const;
+        case "cancelled":
+          return "cancelled" as const;
+        default:
+          return undefined;
+      }
+    })();
+    if (!queueStatus) {
+      return;
+    }
+
+    this.realtimeEventStream.publishQueueMovementEvent({
+      actorUserIdentityId: this.resolveExecutionActorUserIdentityId(input.executionId, input.sessionId),
+      workspaceId: this.resolveExecutionWorkspaceId({ executionId: input.executionId, sessionId: input.sessionId }),
+      payload: Object.freeze({
+        queueItemId: `runtime-queue:${input.executionId}`,
+        executionId: input.executionId,
+        status: queueStatus,
+        sessionId: input.sessionId,
+        changedAt: new Date().toISOString(),
+      }),
+    });
+  }
+
+  private resolveExecutionWorkspaceId(input: {
+    readonly executionId: string;
+    readonly sessionId?: string;
+  }): string | undefined {
+    const session = input.sessionId
+      ? this.executionSessionRepository.getById(input.sessionId)
+      : this.executionSessionRepository.getByExecutionId(input.executionId);
+    const metadata = session?.context?.metadata as { readonly workspaceId?: unknown; readonly activeWorkspaceId?: unknown } | undefined;
+    const workspaceId = typeof metadata?.activeWorkspaceId === "string"
+      ? metadata.activeWorkspaceId
+      : typeof metadata?.workspaceId === "string"
+        ? metadata.workspaceId
+        : undefined;
+    const normalized = workspaceId?.trim();
+    return normalized ? normalized : undefined;
+  }
+
+  private resolveExecutionActorUserIdentityId(executionId: string, sessionId?: string): string | undefined {
+    const session = sessionId
+      ? this.executionSessionRepository.getById(sessionId)
+      : this.executionSessionRepository.getByExecutionId(executionId);
+    const actorUserIdentityId = session?.context?.callerId?.trim();
+    return actorUserIdentityId ? actorUserIdentityId : undefined;
+  }
+
   private async getExecutionStatusAuthorized(
     executionId: string,
     requestContext?: RuntimeApiRequestContext,
@@ -1192,6 +1747,10 @@ export class SystemRuntimeBackendApi {
       return cached;
     }
     const status = await this.service.getExecutionStatus(executionId);
+    this.assertExecutionWorkspaceScope({
+      executionId,
+      requestContext,
+    });
     this.assertExternalRateLimit({ requestContext, callerContext, tenantId: tenantContext?.tenantId, operation: "get-execution-status" });
     this.assertExecutionAccess({
       accessContext: callerContext,
@@ -1215,6 +1774,48 @@ export class SystemRuntimeBackendApi {
     return status;
   }
 
+  private assertWorkspaceScopeAccess(input: {
+    readonly workspaceId: string;
+    readonly requestContext?: RuntimeApiRequestContext;
+  }): void {
+    if (input.requestContext?.trustedInternal) {
+      return;
+    }
+    const callerWorkspaceId = this.readRequestedWorkspaceId(input.requestContext);
+    if (callerWorkspaceId && callerWorkspaceId !== input.workspaceId) {
+      throw new Error("forbidden:Runtime workspace scope does not match authenticated caller workspace.");
+    }
+  }
+
+  private assertExecutionWorkspaceScope(input: {
+    readonly executionId: string;
+    readonly requestContext?: RuntimeApiRequestContext;
+  }): void {
+    const requestedWorkspaceId = this.readRequestedWorkspaceId(input.requestContext);
+    if (!requestedWorkspaceId) {
+      return;
+    }
+    const executionWorkspaceId = this.resolveExecutionWorkspaceId({ executionId: input.executionId });
+    if (executionWorkspaceId && executionWorkspaceId !== requestedWorkspaceId) {
+      throw new Error("not-found:Execution was not found.");
+    }
+  }
+
+  private readRequestedWorkspaceId(requestContext?: RuntimeApiRequestContext): string | undefined {
+    const callerContext = this.resolveCallerContext({ requestContext });
+    const metadata = callerContext?.metadata as {
+      readonly workspaceId?: unknown;
+      readonly activeWorkspaceId?: unknown;
+    } | undefined;
+    const workspaceId = typeof metadata?.activeWorkspaceId === "string"
+      ? metadata.activeWorkspaceId
+      : typeof metadata?.workspaceId === "string"
+        ? metadata.workspaceId
+        : undefined;
+    const normalized = workspaceId?.trim();
+    return normalized || undefined;
+  }
+
   private createQueueResourceId(assetId: string, versionId?: string): string {
     const normalizedAssetId = assetId.trim();
     const normalizedVersionId = versionId?.trim();
@@ -1225,7 +1826,7 @@ export class SystemRuntimeBackendApi {
 
   private async assertOperationalResourceAuthorized(input: {
     readonly requestContext?: RuntimeApiRequestContext;
-    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly requiredPermissionKey: "run.read" | "run.cancel" | "queue.read" | "queue.dequeue" | "log.read";
     readonly resourceFamily:
       | typeof AuthorizationResourceFamilies.run
       | typeof AuthorizationResourceFamilies.queue
@@ -1240,7 +1841,7 @@ export class SystemRuntimeBackendApi {
 
   private async isOperationalResourceAllowed(input: {
     readonly requestContext?: RuntimeApiRequestContext;
-    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly requiredPermissionKey: "run.read" | "run.cancel" | "queue.read" | "queue.dequeue" | "log.read";
     readonly resourceFamily:
       | typeof AuthorizationResourceFamilies.run
       | typeof AuthorizationResourceFamilies.queue
@@ -1254,7 +1855,7 @@ export class SystemRuntimeBackendApi {
 
   private async resolveOperationalResourceAccessLevel(input: {
     readonly requestContext?: RuntimeApiRequestContext;
-    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly requiredPermissionKey: "run.read" | "run.cancel" | "queue.read" | "queue.dequeue" | "log.read";
     readonly resourceFamily:
       | typeof AuthorizationResourceFamilies.run
       | typeof AuthorizationResourceFamilies.queue
@@ -1467,6 +2068,97 @@ export class SystemRuntimeBackendApi {
     }));
   }
 
+  private async withMutationIdempotency<T>(
+    operation: string,
+    targetId: string,
+    idempotencyKey: string | undefined,
+    action: () => Promise<SystemRuntimeApiResponse<T>>,
+  ): Promise<SystemRuntimeApiResponse<T>> {
+    const normalizedIdempotencyKey = idempotencyKey?.trim();
+    if (!normalizedIdempotencyKey) {
+      return action();
+    }
+    const cacheKey = `${operation.trim()}:${targetId.trim()}:${normalizedIdempotencyKey}`;
+    const cached = this.readMutationCache(cacheKey);
+    if (cached) {
+      return cached as SystemRuntimeApiResponse<T>;
+    }
+    const response = await action();
+    if (response.ok) {
+      this.rememberMutationCache(cacheKey, response as SystemRuntimeApiResponse<unknown>);
+    }
+    return response;
+  }
+
+  private resolveMutationTimestamp(value: string | undefined, label: string): string {
+    if (!value) {
+      return this.now().toISOString();
+    }
+    const normalized = value.trim();
+    if (!normalized) {
+      return this.now().toISOString();
+    }
+    const parsed = Date.parse(normalized);
+    if (!Number.isFinite(parsed)) {
+      throw new Error(`invalid-request:${label} must be an ISO-8601 timestamp with offset.`);
+    }
+    return new Date(parsed).toISOString();
+  }
+
+  private createMutationResult(input: {
+    readonly operation: string;
+    readonly targetId: string;
+    readonly changed: boolean;
+    readonly occurredAt: string;
+    readonly idempotencyKey?: string;
+  }): SharedApiMutationResult {
+    const operation = input.operation.trim() || "runtime-mutation";
+    const targetId = input.targetId.trim() || "unknown-target";
+    const normalizedIdempotencyKey = input.idempotencyKey?.trim();
+    return Object.freeze({
+      changed: input.changed,
+      mutationId: normalizedIdempotencyKey
+        ? `${operation}:${targetId}:${normalizedIdempotencyKey}`
+        : `${operation}:${targetId}:${input.occurredAt}`,
+      occurredAt: input.occurredAt,
+    });
+  }
+
+  private resolveExecutionIdFromQueueItemId(queueItemId: string): string {
+    const normalized = queueItemId.trim();
+    if (!normalized) {
+      throw new Error("invalid-request:queueItemId is required.");
+    }
+    const prefix = "runtime-queue:";
+    const executionId = normalized.startsWith(prefix)
+      ? normalized.slice(prefix.length)
+      : normalized;
+    const trimmedExecutionId = executionId.trim();
+    if (!trimmedExecutionId) {
+      throw new Error("invalid-request:queueItemId is invalid.");
+    }
+    return trimmedExecutionId;
+  }
+
+  private readMutationCache(cacheKey: string): SystemRuntimeApiResponse<unknown> | undefined {
+    const cached = this.cachedMutationResponsesByKey.get(cacheKey);
+    if (!cached) {
+      return undefined;
+    }
+    if (Date.now() > cached.expiresAtMs) {
+      this.cachedMutationResponsesByKey.delete(cacheKey);
+      return undefined;
+    }
+    return cached.response;
+  }
+
+  private rememberMutationCache(cacheKey: string, response: SystemRuntimeApiResponse<unknown>): void {
+    this.cachedMutationResponsesByKey.set(cacheKey, Object.freeze({
+      expiresAtMs: Date.now() + SystemRuntimeBackendApi.MUTATION_IDEMPOTENCY_TTL_MS,
+      response,
+    }));
+  }
+
   private async wrap<T>(action: () => Promise<T>): Promise<SystemRuntimeApiResponse<T>> {
     try {
       return Object.freeze({ ok: true, data: await action() });
@@ -1590,4 +2282,3 @@ export class SystemRuntimeBackendApi {
     return Object.freeze({ code: "internal", message });
   }
 }
-

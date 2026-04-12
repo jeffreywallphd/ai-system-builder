@@ -8,6 +8,7 @@
   - `POST /api/v1/identity/dev-login` (development-only fallback login route)
 - Authenticated session validation endpoint and guard:
   - `GET /api/v1/identity/session` with `Authorization: Bearer <session-token>`
+  - `GET /api/v1/identity/session/context` with `Authorization: Bearer <session-token>`
 - Authenticated session termination and revocation endpoints:
   - `POST /api/v1/identity/logout`
   - `POST /api/v1/identity/session/revoke`
@@ -34,6 +35,21 @@
 - Authenticated asset upload initiation endpoints:
   - `POST /api/v1/assets/register`
   - `POST /api/v1/assets/:assetId/uploads/initiate`
+- Authenticated runtime mutation + read/list endpoints:
+  - `POST /api/v1/runtime/runs/start`
+  - `GET /api/v1/runtime/execution/readiness`
+  - `POST /api/v1/runtime/runs/:executionId/cancel`
+  - `GET /api/v1/runtime/runs/:executionId/status`
+  - `GET /api/v1/runtime/runs/:executionId/result`
+  - `GET /api/v1/runtime/runs/:executionId/trace`
+  - `GET /api/v1/runtime/queue`
+  - `POST /api/v1/runtime/queue/:queueItemId/dequeue`
+- Authoritative run submission now resolves through canonical run orchestration validation + creation flow instead of local-only runtime launch shims:
+  - authenticated actor/workspace context is enforced at transport boundary
+  - canonical run identifiers and mutation metadata are returned from authoritative backend composition
+  - stable shared failure semantics are preserved (`invalid-request`, `forbidden`, `not-found`, `conflict`, etc.)
+- Authenticated authoritative runtime realtime websocket endpoint:
+  - `GET /ws` websocket upgrade (bearer-authenticated)
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -44,6 +60,7 @@
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+- `src/infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi.ts`
 - `src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 
@@ -119,6 +136,10 @@ Trusted-device response serialization is now similarly allowlist-mapped and inte
 - pairing token hash material
 - internal trust-material persistence references
 
+Session actor-context bootstrap responses are allowlist-projected and intentionally exclude:
+- trusted-device trust-material refs and secret locators
+- legacy trust marker and trusted-device binding marker fields
+
 Certificate operations transport responses are metadata/action projected and intentionally exclude:
 - private key payloads and certificate PEM payloads
 - trust-material storage locators and protected secret references
@@ -141,6 +162,7 @@ Persisted session records now intentionally exclude:
   - `accessChannel` (`desktop` or `thin-client`; default `thin-client`)
   - `sessionTrustRequirement` (`allow-untrusted` | `allow-pairing` | `require-trusted`)
   - optional `client` context (`userAgent`, `ipAddress`, `deviceId`, `trustedDeviceBindingId`, `trustMarker`)
+- Development login (`POST /api/v1/identity/dev-login`) now accepts the same optional session-context fields (`accessChannel`, `sessionTrustRequirement`, and `client`) and forwards them into issuance for the fixed dev account bootstrap flow.
 - Login success now includes issued-session fields:
   - `sessionId`
   - `sessionToken`
@@ -192,6 +214,64 @@ Persisted session records now intentionally exclude:
 - Protected route `GET /api/v1/identity/session` now returns that context for authenticated clients.
 - Missing, invalid, expired, and revoked sessions are consistently rejected as `401` + `authentication-failed`.
 
+## Authoritative session-aware middleware and route guards (story 14.1.4)
+
+- `IdentityHttpServer` now composes a reusable `requireAuthenticatedWorkspaceSession(...)` guard for converged workspace-scoped routes.
+- The guard enforces a shared sequence: resolve authenticated session -> resolve workspace scope -> execute route handler.
+- Shared guard context now carries actor metadata (`actor.userIdentityId`, `actor.username`) and workspace metadata (`workspace.workspaceId`) so downstream transport handlers avoid repeated parsing logic.
+- Storage and asset converged routes now use this shared pipeline and preserve shared failure semantics:
+- Runtime run-control, queue-control, and run-read routes now also use this shared pipeline and preserve shared failure semantics:
+  - unauthenticated requests return `401` + `authentication-failed`
+  - authenticated requests missing required workspace scope return `400` + `invalid-request`
+- Runtime queue route follows shared list query conventions:
+  - required `workspaceId`
+  - optional `limit`/`offset`
+  - repeatable `status` filters (`queued`, `running`, `completed`, `failed`, `cancelled`)
+- Runtime execution-readiness route is now part of the same authoritative run-read surface:
+  - `GET /api/v1/runtime/execution/readiness`
+  - intended for desktop/thin clients and later studio/admin readiness UX
+  - response is normalized (`readiness`, `readyForExecution`, `capabilities`, `issues`) and adapter-backed
+
+## Runtime realtime websocket delivery (story 14.2.6)
+
+- Transport endpoint: `GET /ws` with websocket upgrade headers.
+- Authentication for websocket upgrade accepts:
+  - `Authorization: Bearer <session-token>` header (canonical),
+  - runtime auth subprotocol token on `Sec-WebSocket-Protocol` (`ai-loom-auth-bearer.<base64url(session-token)>`) with runtime protocol `ai-loom-runtime-realtime.v1`.
+- Runtime realtime subscribe action is message-driven after upgrade:
+  - client masked text frame:
+    - `action: "runtime-realtime.subscribe"`
+    - `request.topics[]` with shared topic contracts (`runtime.run.status`, `runtime.queue`, `runtime.connectivity`, `runtime.admin`)
+    - optional `mode` (`live-only` | `resume-from-cursor`)
+    - optional reconnect cursor (`reconnect.afterCursor`)
+- Server frame contracts:
+  - `runtime-realtime.subscription-ack`
+  - `runtime-realtime.event` (canonical shared envelope from `SystemRuntimeRealtimeEventContracts`)
+  - `runtime-realtime.error` (`invalid-request` | `forbidden` | `internal`)
+- Session-aware enforcement:
+  - actor identity is derived from authenticated session context, not accepted from client payload
+  - websocket `workspaceId` and topic `workspaceId` must align when scoped
+  - purpose/topic gating is enforced:
+    - `status` -> connectivity
+    - `queue-monitoring` -> queue/run-status/connectivity
+    - `run-monitoring` -> run-status/queue/connectivity
+    - `stream-control` -> admin/connectivity
+- Reconnect and initial-state posture:
+  - bounded replay is supported with `resume-from-cursor` + cursor
+  - initial queue/run snapshots are not auto-streamed on subscribe; clients should call authoritative HTTP read APIs first, then subscribe for live deltas
+
+## Converged session + actor-context bootstrap endpoint (story 14.2.2)
+
+- Added authenticated bootstrap endpoint: `GET /api/v1/identity/session/context`.
+- Optional query: `workspaceId` to request preferred workspace resolution.
+- Endpoint returns a unified bootstrap payload for desktop and thin clients:
+  - actor profile (`userIdentityId`, `username`, optional display/email)
+  - current session context (`sessionId`, provider/channel/device timing, assurance level)
+  - safe trusted-device projection for the current session when available
+  - workspace context projection (`requestedWorkspaceId`, `resolvedWorkspaceId`, and actor-visible workspace summaries)
+- Workspace context is resolved through the authoritative workspace administration backend API seam when composed in host runtime.
+- Endpoint is guarded by the same bearer-session validation pipeline as `GET /api/v1/identity/session`, so trust-invalid/revoked sessions are denied with the same authenticated failure semantics.
+
 ## Secure transport adapter setup (story 7.2.1)
 
 - `IdentityHttpServer` now supports explicit secure transport adapter configuration:
@@ -214,6 +294,8 @@ Persisted session records now intentionally exclude:
 - `src/infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerRuntimeRealtimeWebSocket.test.ts`
 - trusted-device transport lifecycle coverage in backend + HTTP integration tests (list/detail/revoke/rename + pairing initiate/validate/complete)
 - `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `src/ui/pages/tests/IdentityAdminPage.test.tsx`
@@ -222,3 +304,15 @@ Persisted session records now intentionally exclude:
 ## Related docs
 
 - `docs/architecture/identity-session-architecture.md` (session subsystem baseline)
+
+## Converged protected asset transfer seam update (story 14.2.5)
+
+- Converged asset transfer routes for upload/download/preview remain authoritative server routes under `/api/v1/assets/*`.
+- Upload-content ingestion remains server-mediated through upload session endpoints:
+  - `POST /api/v1/assets/upload-sessions/:uploadSessionId/content`
+- Download and preview content retrieval remain policy-gated through tokenized routes:
+  - `POST /api/v1/assets/:assetId/downloads/authorize`
+  - `GET /api/v1/assets/:assetId/downloads/content`
+- Transport response posture was tightened for converged clients:
+  - upload-initiation responses no longer expose `storageInstanceId`/`objectKey`
+  - preview-resolution responses no longer expose `previewStorageInstanceId`/`previewObjectKey`

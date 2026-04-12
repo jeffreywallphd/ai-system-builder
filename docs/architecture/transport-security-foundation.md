@@ -82,6 +82,23 @@ Transport and identity posture:
 - when transport trust enforcement is enabled, both routes require node mTLS validation (`ValidateTransportConnectionTrustUseCase` + node certificate identity resolution);
 - transport-authenticated node identity remains authoritative, so payload-claimed node/actor identifiers are not trusted as identity sources.
 
+## Story 1.2.4 shared node route authentication utilities for HTTP transport modularization
+
+Story 1.2.4 extracts node-route authentication and trust-context shaping into shared HTTP transport middleware utilities so node-originated route handlers stop carrying low-level node auth/trust checks inline.
+
+### Canonical files
+
+- `src/infrastructure/transport/http-server/identity/middleware/node-route-authentication.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/tests/NodeRouteAuthenticationMiddleware.test.ts`
+
+### Modularized route-auth behavior
+
+- required node-id validation for node-originated route scopes is centralized (`resolveRequiredNodeRouteNodeId(...)`);
+- session-backed node principal authorization is centralized and reusable (`authorizeSessionNodeRoutePrincipal(...)`);
+- mTLS node trust result mapping into normalized route context is centralized (`resolveMutualTlsNodeRouteTransportContext(...)`);
+- route handlers continue to use `requireAuthenticatedNodeTransport(...)`, while low-level node auth/trust derivation now lives in dedicated shared middleware utilities.
+
 ## Story 7.3.3 policy-gated node-to-node secure communication seam
 
 Story 7.3.3 introduces the explicit node-peer transport seam so direct node-to-node communication is not ad hoc and is denied unless explicitly policy-enabled for a constrained operation class.
@@ -461,4 +478,9 @@ Story 7.2.4 formalizes thin-client browser/mobile channel behavior so thin-clien
   - covers no trust-bypass for thin-client loopback sessions, desktop-only bypass continuity, desktop/thin-client scenario routing, and authenticated transport channel-context logging.
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
   - covers thin-client websocket origin rejection and accepted thin-client websocket routing with valid origin.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md`
 

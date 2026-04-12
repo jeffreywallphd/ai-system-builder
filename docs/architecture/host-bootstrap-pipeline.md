@@ -50,6 +50,28 @@ Canonical stage ids are fixed and shared across hosts:
 
 The framework composes those stages through `composeHostBootstrapPipeline(...)` and executes them through `executeHostBootstrapPipeline(...)` with deterministic stage history (`sequence`, `stageId`, `status`, timestamps).
 
+### Startup span tracer utility (story 1.1.1)
+
+`src/hosts/bootstrap/startupTracer.ts` adds a reusable startup tracing utility for stage-level observability:
+
+- nested startup spans with explicit parent/child hierarchy
+- start/stop timing with structured duration metadata (`durationMs`, `startedAt`, `endedAt`)
+- metadata capture and merge on span completion/failure
+- failure tagging with structured error payloads
+- sensitive-value protection through metadata/error redaction and pino redaction paths
+
+The tracer emits structured events:
+
+- `startup.span.completed`
+- `startup.span.failed`
+- `startup.span.slow` (warning-level event emitted when a span exceeds configured warning threshold)
+
+Slow-span warning thresholds are configurable through tracer options:
+
+- `slowSpanThresholdMs`: baseline slow-tag threshold (`slow: true`) on completion/failure events
+- `slowSpanWarnings.defaultThresholdMs`: default warning threshold for `startup.span.slow` emission
+- `slowSpanWarnings.thresholdsBySpanName`: per-span warning threshold overrides (by span name)
+
 ### Host-specific customization seam
 
 Hosts can customize startup without duplicating shared stages by:
@@ -64,6 +86,10 @@ This keeps the common startup sequence stable while preserving host-level extens
 `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now uses the shared bootstrap pipeline:
 
 - builds a startup context from boot configuration + deployment profile + environment
+- resolves authoritative `config` and `security` stage implementations through:
+  - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
+  - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+- routes logical authoritative startup stages through `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts` so startup stage execution remains sequential with stage-aligned spans (`services`, `security`, `persistence`, `transport`)
 - composes canonical stages and optional host-specific customization stages
 - starts the production identity server during `feature-registration`
 - records host lifecycle transitions around pipeline execution (`composing -> starting -> ready`)
@@ -134,6 +160,7 @@ When extending host startup:
 ## Tests
 
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
+- `src/hosts/bootstrap/tests/startupTracer.test.ts`
 - `src/hosts/lifecycle/tests/HostLifecycleCoordinator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`

@@ -36,6 +36,10 @@ describe("HostSecureTransportConfig", () => {
       env: {
         AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED: "true",
         AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID: "server:authoritative",
+        AI_LOOM_INTERNAL_CA_SERVER_TLS_ACTOR_USER_IDENTITY_ID: "system:tls-material-resolver",
+        AI_LOOM_INTERNAL_CA_SERVER_TLS_WORKSPACE_ID: "workspace-alpha",
+        AI_LOOM_INTERNAL_CA_SERVER_TLS_CERTIFICATE_AUTHORITY_ID: "ca:internal:root:v1",
+        AI_LOOM_INTERNAL_CA_SERVER_TLS_SERIAL_NUMBER: "AA11BB22",
         AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF: "trust:server:key:v1",
       },
     });
@@ -44,6 +48,10 @@ describe("HostSecureTransportConfig", () => {
     expect(config.requireSecureHttp).toBe(true);
     expect(config.requireSecureWebSocket).toBe(true);
     expect(config.trustMaterial.serverReferenceId).toBe("server:authoritative");
+    expect(config.trustMaterial.actorUserIdentityId).toBe("system:tls-material-resolver");
+    expect(config.trustMaterial.workspaceId).toBe("workspace-alpha");
+    expect(config.trustMaterial.certificateAuthorityId).toBe("ca:internal:root:v1");
+    expect(config.trustMaterial.serialNumber).toBe("AA11BB22");
     expect(config.trustMaterial.privateKeyMaterialRef).toBe("trust:server:key:v1");
   });
 

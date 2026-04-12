@@ -97,4 +97,55 @@ describe("IdentityAuthSessionStore", () => {
     expect(store.hasActiveSession(new Date("2026-04-04T20:15:00.000Z"))).toBeTrue();
     expect(store.hasActiveSession(new Date("2026-04-04T20:30:00.000Z"))).toBeFalse();
   });
+
+  it("persists and restores authoritative session context and capability state", () => {
+    const backing = new Map<string, string>();
+    (globalThis as typeof globalThis & { window?: Window }).window = {
+      localStorage: {
+        getItem: (key: string) => backing.get(key) ?? null,
+        setItem: (key: string, value: string) => { backing.set(key, value); },
+        removeItem: (key: string) => { backing.delete(key); },
+      },
+    } as unknown as Window;
+
+    const store = new IdentityAuthSessionStore();
+    store.saveSession({
+      userIdentityId: "user-1",
+      username: "alice",
+      providerId: "provider:local-password",
+      sessionId: "identity-session:1",
+      sessionToken: "token-1",
+      sessionTokenType: "Bearer",
+      sessionIssuedAt: "2026-04-04T20:00:00.000Z",
+      sessionExpiresAt: "2026-04-05T20:00:00.000Z",
+      sessionAssuranceLevel: "authenticated-trusted",
+      sessionTrustState: "trusted",
+      workspaceContext: {
+        requestedWorkspaceId: "workspace:alpha",
+        resolvedWorkspaceId: "workspace:alpha",
+        workspaces: [{
+          workspaceId: "workspace:alpha",
+          slug: "alpha",
+          displayName: "Workspace Alpha",
+          status: "active",
+          visibility: "private",
+          membershipStatus: "active",
+          effectiveRoles: ["owner"],
+          canAdministrate: true,
+          isWorkspaceOwner: true,
+        }],
+      },
+      initialCapabilityState: {
+        workspaceId: "workspace:alpha",
+        effectiveRoles: ["owner"],
+        canAdministrate: true,
+        isWorkspaceOwner: true,
+      },
+    });
+
+    const restored = store.getSession();
+    expect(restored?.sessionAssuranceLevel).toBe("authenticated-trusted");
+    expect(restored?.workspaceContext?.resolvedWorkspaceId).toBe("workspace:alpha");
+    expect(restored?.initialCapabilityState?.canAdministrate).toBeTrue();
+  });
 });

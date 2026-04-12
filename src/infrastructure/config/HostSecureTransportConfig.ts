@@ -21,6 +21,10 @@ export interface HostSecureTransportConfig {
   readonly trustMaterial: {
     readonly managedServerTlsEnabled: boolean;
     readonly serverReferenceId?: string;
+    readonly actorUserIdentityId?: string;
+    readonly workspaceId?: string;
+    readonly certificateAuthorityId?: string;
+    readonly serialNumber?: string;
     readonly privateKeyMaterialRef?: string;
   };
 }
@@ -34,6 +38,10 @@ export interface ResolveHostSecureTransportConfigInput {
 const MANAGED_TLS_KEYS = Object.freeze({
   enabled: "AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED",
   serverReferenceId: "AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID",
+  actorUserIdentityId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_ACTOR_USER_IDENTITY_ID",
+  workspaceId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_WORKSPACE_ID",
+  certificateAuthorityId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_CERTIFICATE_AUTHORITY_ID",
+  serialNumber: "AI_LOOM_INTERNAL_CA_SERVER_TLS_SERIAL_NUMBER",
   privateKeyMaterialRef: "AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF",
 });
 
@@ -67,6 +75,10 @@ export function resolveHostSecureTransportConfig(
     trustMaterial: Object.freeze({
       managedServerTlsEnabled,
       serverReferenceId: normalizeOptional(env[MANAGED_TLS_KEYS.serverReferenceId]),
+      actorUserIdentityId: normalizeOptional(env[MANAGED_TLS_KEYS.actorUserIdentityId]),
+      workspaceId: normalizeOptional(env[MANAGED_TLS_KEYS.workspaceId]),
+      certificateAuthorityId: normalizeOptional(env[MANAGED_TLS_KEYS.certificateAuthorityId]),
+      serialNumber: normalizeOptional(env[MANAGED_TLS_KEYS.serialNumber]),
       privateKeyMaterialRef: normalizeOptional(env[MANAGED_TLS_KEYS.privateKeyMaterialRef]),
     }),
   });

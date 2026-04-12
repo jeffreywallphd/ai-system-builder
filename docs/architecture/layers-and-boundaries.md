@@ -176,7 +176,7 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - tool authoring updates are now canonical-first through `AgentPolicy.toolAccess` (no parallel tool-config surface), including strict tool-id normalization, MCP binding consistency checks against allowed ids, and scope-constraint integrity checks before persistence.
   - any new agent-facing artifacts/read models must reuse shared composition seams (`CompositionTaxonomyClassifier` classification or `CompositionAssetContractResolver` projection) instead of introducing agent-only presentation semantics.
   - persistence remains outer-layer through `IAgentRepository`/`IAgentExecutionSessionRepository` with concrete SQLite adapters (`SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`).
-  - `SqliteAgentRepository` now opens SQLite through a small compatibility seam (`src/infrastructure/filesystem/sqlite/SqliteCompat.ts`) so the same repository contract runs with `better-sqlite3` (Node/Electron host) and `bun:sqlite` (Bun test/runtime environments) without changing src/application/domain ports.
+  - `SqliteAgentRepository` now opens SQLite through a small compatibility seam (`src/infrastructure/filesystem/sqlite/SqliteCompat.ts`) so the same repository contract runs with `better-sqlite3` (Node/Electron host), ESM-default wrapped `better-sqlite3` module exports (bundled Electron builds), Node's `node:sqlite` fallback, and `bun:sqlite` (Bun test/runtime environments) without changing src/application/domain ports.
   - `SqliteAgentRepository` now rehydrates persisted JSON snapshots through domain normalization on reads (rather than raw cast-only deserialization), so full aggregate round-trip stays truthy for memory asset refs, goal/policy/tool config, and planning/execution config.
   - malformed persisted agent snapshots now fail fast with explicit field-level errors (for example missing policy/planning/execution objects) instead of yielding partial aggregates.
   - memory authoring contracts are now fully structured/validated at the inner layer (asset-backed refs, retrieval config, writable/retrievable/session-only type coherence, retention/session-only contradictions, canonical asset/id format checks).
@@ -295,3 +295,9 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Service composition now classifies application ports, infrastructure adapters, and platform services explicitly, with boundary-layer validation and dependency-cycle prevention.
 - Host-safe gating now enforces capability/role requirements and exposure boundaries (`ui`, `transport`, `execution`, `persistence`) during composition.
 - Authoritative server composition now resolves service registration plans in the host bootstrap `dependencies` stage and enforces required control-plane service coverage before runtime startup in `feature-registration`.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md`

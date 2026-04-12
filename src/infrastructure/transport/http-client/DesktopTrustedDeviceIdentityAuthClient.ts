@@ -4,6 +4,7 @@
   type ChangeLocalPasswordCredentialApiResponse,
   type CompleteTrustedDevicePairingApiRequest,
   type CompleteTrustedDevicePairingApiResponse,
+  type DevelopmentLoginIdentityApiRequest,
   type GetIdentityAdminAccountStatusApiRequest,
   type GetIdentityAdminAccountStatusApiResponse,
   type GetTrustedDeviceApiRequest,
@@ -13,8 +14,12 @@
   type InitiateTrustedDevicePairingApiResponse,
   type ListIdentityAdminAccountsApiRequest,
   type ListIdentityAdminAccountsApiResponse,
+  type ListIdentityAdminSessionsApiRequest,
+  type ListIdentityAdminSessionsApiResponse,
   type ListIdentityAdminTrustedDevicesApiRequest,
   type ListIdentityAdminTrustedDevicesApiResponse,
+  type ListIdentitySessionsApiRequest,
+  type ListIdentitySessionsApiResponse,
   type ListTrustedDevicesApiRequest,
   type ListTrustedDevicesApiResponse,
   type LoginLocalIdentityApiRequest,
@@ -25,6 +30,8 @@
   type ResolveAuthenticatedSessionApiResponse,
   type RevokeIdentityAdminTrustedDeviceApiRequest,
   type RevokeIdentityAdminTrustedDeviceApiResponse,
+  type RevokeIdentityAdminSessionApiRequest,
+  type RevokeIdentityAdminSessionApiResponse,
   type RevokeIdentitySessionApiRequest,
   type RevokeIdentitySessionApiResponse,
   type RevokeTrustedDeviceApiRequest,
@@ -41,7 +48,11 @@ import {
   resolveDesktopTrustedDeviceTransportBootstrap,
   type DesktopTrustedDeviceTransportBootstrapState,
 } from "../../security/DesktopTrustedDeviceTransportBootstrap";
-import type { IdentityAuthClient } from "@ui/shared/identity/IdentityAuthClient";
+import type {
+  ResolveSessionActorContextApiRequest,
+  ResolveSessionActorContextApiResponse,
+} from "@shared/contracts/identity/IdentityTransportContracts";
+import type { IdentityAuthClient, IdentityAuthRequestOptions } from "@ui/shared/identity/IdentityAuthClient";
 
 export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClient {
   public constructor(
@@ -55,8 +66,10 @@ export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClien
     return this.innerClient.registerLocalAccount(request);
   }
 
-  public loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
-    return this.innerClient.loginDevelopmentAccount();
+  public loginDevelopmentAccount(
+    request?: DevelopmentLoginIdentityApiRequest,
+  ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.innerClient.loginDevelopmentAccount(request);
   }
 
   public async loginLocalAccount(
@@ -98,8 +111,23 @@ export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClien
 
   public resolveAuthenticatedSession(
     sessionToken: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
-    return this.innerClient.resolveAuthenticatedSession(sessionToken);
+    return this.innerClient.resolveAuthenticatedSession(sessionToken, options);
+  }
+
+  public listIdentitySessions(
+    request: ListIdentitySessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>> {
+    return this.innerClient.listIdentitySessions(request, sessionToken);
+  }
+
+  public resolveSessionActorContext(
+    request: ResolveSessionActorContextApiRequest,
+    options?: IdentityAuthRequestOptions,
+  ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
+    return this.innerClient.resolveSessionActorContext(request, options);
   }
 
   public logoutAuthenticatedSession(
@@ -134,6 +162,20 @@ export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClien
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
     return this.innerClient.setIdentityAdminAccountStatus(request, sessionToken);
+  }
+
+  public listIdentityAdminSessions(
+    request: ListIdentityAdminSessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>> {
+    return this.innerClient.listIdentityAdminSessions(request, sessionToken);
+  }
+
+  public revokeIdentityAdminSession(
+    request: RevokeIdentityAdminSessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>> {
+    return this.innerClient.revokeIdentityAdminSession(request, sessionToken);
   }
 
   public listIdentityAdminTrustedDevices(

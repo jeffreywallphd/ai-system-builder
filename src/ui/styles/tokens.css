@@ -93,6 +93,15 @@
   --control-height-sm: 2rem;
   --control-height-md: 2.5rem;
   --control-height-lg: 3rem;
+  --touch-target-min: 2.75rem;
+  --touch-target-comfortable: 3rem;
+
+  /* Responsive surface tokens */
+  --breakpoint-mobile-max: 767px;
+  --breakpoint-tablet-max: 1023px;
+  --breakpoint-desktop-compact-max: 1279px;
+  --space-density-compact: 0.625rem;
+  --space-density-comfortable: 1rem;
 
   /* Layout */
   --container-width: 1200px;

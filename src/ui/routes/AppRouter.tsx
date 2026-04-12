@@ -1,4 +1,4 @@
-﻿import { useMemo } from "react";
+﻿import { lazy, Suspense, useMemo } from "react";
 import {
   createBrowserRouter,
   Navigate,
@@ -6,56 +6,64 @@ import {
   type RouteObject,
 } from "react-router-dom";
 import AppLayout from "../layout/AppLayout";
-import HomePage from "../pages/HomePage";
-import NotFoundPage from "../pages/NotFoundPage";
-import LegacyWorkflowEditorRedirectPage from "../pages/LegacyWorkflowEditorRedirectPage";
-import WorkflowConversationPage from "../pages/WorkflowConversationPage";
-import ContextWorkbenchPage from "../pages/ContextWorkbenchPage";
-import ToolRunPage from "../pages/ToolRunPage";
-import SettingsPage from "../pages/SettingsPage";
-import AuthorizationSharingManagementPage from "../pages/AuthorizationSharingManagementPage";
-import AuthorizationSharingThinClientPage from "../pages/AuthorizationSharingThinClientPage";
-import AuthorizationReportingPage from "../pages/AuthorizationReportingPage";
-import StorageAdministrationPage from "../pages/StorageAdministrationPage";
-import WorkflowStudioPage from "../pages/WorkflowStudioPage";
-import ContextBundleStudioPage from "../pages/ContextBundleStudioPage";
-import DatasetPipelineStudioPage from "../pages/DatasetPipelineStudioPage";
-import TrainingRecipeStudioPage from "../pages/TrainingRecipeStudioPage";
-import ToolChainStudioPage from "../pages/ToolChainStudioPage";
-import SystemStudioPage from "../pages/SystemStudioPage";
-import ModelStudioPage from "../pages/ModelStudioPage";
-import DatasetStudioPage from "../pages/DatasetStudioPage";
-import SchemaStudioPage from "../pages/SchemaStudioPage";
-import ToolStudioPage from "../pages/ToolStudioPage";
-import PromptTemplateStudioPage from "../pages/PromptTemplateStudioPage";
-import EmbeddingIndexStudioPage from "../pages/EmbeddingIndexStudioPage";
-import ConfigProfileStudioPage from "../pages/ConfigProfileStudioPage";
-import BuildPage from "../pages/BuildPage";
-import BuildAutomatePage from "../pages/BuildAutomatePage";
-import RegistryPage from "../pages/RegistryPage";
-import AssetDetailPage from "../pages/AssetDetailPage";
-import RunPage from "../pages/RunPage";
-import AssetsPage from "../pages/AssetsPage";
-import LoginPage from "../pages/LoginPage";
-import RegisterPage from "../pages/RegisterPage";
-import IdentityAdminPage from "../pages/IdentityAdminPage";
-import TrustedDevicesPage from "../pages/TrustedDevicesPage";
-import WorkspaceAdministrationPage from "../pages/WorkspaceAdministrationPage";
-import NodeEnrollmentReviewPage from "../pages/NodeEnrollmentReviewPage";
-import NodeInventoryPage from "../pages/NodeInventoryPage";
-import WorkspaceMembershipThinClientPage from "../pages/WorkspaceMembershipThinClientPage";
-import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboardingPage";
-import SecretMetadataManagementPage from "../pages/SecretMetadataManagementPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
+import { isRoutePathAccessibleForSession } from "./SurfaceRouteAccessPolicy";
 import type { LoginLocalIdentityApiResponse } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { DevLoginFeatureFlag } from "../features/DevLoginFeatureFlag";
 
+const HomePage = lazy(async () => await import("../pages/HomePage"));
+const NotFoundPage = lazy(async () => await import("../pages/NotFoundPage"));
+const LegacyWorkflowEditorRedirectPage = lazy(async () => await import("../pages/LegacyWorkflowEditorRedirectPage"));
+const WorkflowConversationPage = lazy(async () => await import("../pages/WorkflowConversationPage"));
+const ContextWorkbenchPage = lazy(async () => await import("../pages/ContextWorkbenchPage"));
+const ToolRunPage = lazy(async () => await import("../pages/ToolRunPage"));
+const SettingsPage = lazy(async () => await import("../pages/SettingsPage"));
+const AuthorizationSharingManagementPage = lazy(async () => await import("../pages/AuthorizationSharingManagementPage"));
+const AuthorizationSharingThinClientPage = lazy(async () => await import("../pages/AuthorizationSharingThinClientPage"));
+const AuthorizationReportingPage = lazy(async () => await import("../pages/AuthorizationReportingPage"));
+const SecurityPolicyConfigurationPage = lazy(async () => await import("../pages/SecurityPolicyConfigurationPage"));
+const StorageAdministrationPage = lazy(async () => await import("../pages/StorageAdministrationPage"));
+const WorkflowStudioPage = lazy(async () => await import("../pages/WorkflowStudioPage"));
+const ContextBundleStudioPage = lazy(async () => await import("../pages/ContextBundleStudioPage"));
+const DatasetPipelineStudioPage = lazy(async () => await import("../pages/DatasetPipelineStudioPage"));
+const TrainingRecipeStudioPage = lazy(async () => await import("../pages/TrainingRecipeStudioPage"));
+const ToolChainStudioPage = lazy(async () => await import("../pages/ToolChainStudioPage"));
+const SystemStudioPage = lazy(async () => await import("../pages/SystemStudioPage"));
+const ModelStudioPage = lazy(async () => await import("../pages/ModelStudioPage"));
+const DatasetStudioPage = lazy(async () => await import("../pages/DatasetStudioPage"));
+const SchemaStudioPage = lazy(async () => await import("../pages/SchemaStudioPage"));
+const ToolStudioPage = lazy(async () => await import("../pages/ToolStudioPage"));
+const PromptTemplateStudioPage = lazy(async () => await import("../pages/PromptTemplateStudioPage"));
+const EmbeddingIndexStudioPage = lazy(async () => await import("../pages/EmbeddingIndexStudioPage"));
+const ConfigProfileStudioPage = lazy(async () => await import("../pages/ConfigProfileStudioPage"));
+const BuildPage = lazy(async () => await import("../pages/BuildPage"));
+const BuildAutomatePage = lazy(async () => await import("../pages/BuildAutomatePage"));
+const RegistryPage = lazy(async () => await import("../pages/RegistryPage"));
+const AssetDetailPage = lazy(async () => await import("../pages/AssetDetailPage"));
+const RunPage = lazy(async () => await import("../pages/RunPage"));
+const AssetsPage = lazy(async () => await import("../pages/AssetsPage"));
+const LoginPage = lazy(async () => await import("../pages/LoginPage"));
+const RegisterPage = lazy(async () => await import("../pages/RegisterPage"));
+const IdentityAdminPage = lazy(async () => await import("../pages/IdentityAdminPage"));
+const TrustedDevicesPage = lazy(async () => await import("../pages/TrustedDevicesPage"));
+const WorkspaceAdministrationPage = lazy(async () => await import("../pages/WorkspaceAdministrationPage"));
+const NodeEnrollmentReviewPage = lazy(async () => await import("../pages/NodeEnrollmentReviewPage"));
+const NodeInventoryPage = lazy(async () => await import("../pages/NodeInventoryPage"));
+const WorkspaceMembershipThinClientPage = lazy(async () => await import("../pages/WorkspaceMembershipThinClientPage"));
+const WorkspaceInvitationOnboardingPage = lazy(async () => await import("../pages/WorkspaceInvitationOnboardingPage"));
+const SecretMetadataManagementPage = lazy(async () => await import("../pages/SecretMetadataManagementPage"));
+const GovernanceAuditReviewPage = lazy(async () => await import("../pages/GovernanceAuditReviewPage"));
+const DeploymentPolicyAdministrationPage = lazy(async () => await import("../pages/DeploymentPolicyAdministrationPage"));
+const DesktopAdministrationShellPage = lazy(async () => await import("../pages/DesktopAdministrationShellPage"));
+const AdminLiteEntryPage = lazy(async () => await import("../pages/AdminLiteEntryPage"));
+
 export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
-  readonly onAuthenticated?: (session: LoginLocalIdentityApiResponse) => void;
+  readonly onAuthenticated?: (session: LoginLocalIdentityApiResponse) => boolean | Promise<boolean>;
   readonly onLogout?: () => Promise<void> | void;
-  readonly authNotice?: "session-expired" | "session-invalid";
+  readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable" | "session-bootstrap-timeout";
 }
 
 export default function AppRouter({
@@ -64,7 +72,7 @@ export default function AppRouter({
   onLogout,
   authNotice,
 }: AppRouterProps): JSX.Element {
-  const handleAuthenticated = onAuthenticated ?? (() => undefined);
+  const handleAuthenticated = onAuthenticated ?? (() => true);
   const handleLogout = onLogout ?? (() => undefined);
   const devLoginEnabled = useMemo(() => new DevLoginFeatureFlag().isEnabled(), []);
   const routes = useMemo<ReadonlyArray<RouteObject>>(
@@ -140,18 +148,150 @@ export default function AppRouter({
           { path: ROUTE_PATHS.promptTemplateStudio, element: <PromptTemplateStudioPage /> },
           { path: ROUTE_PATHS.embeddingIndexStudio, element: <EmbeddingIndexStudioPage /> },
           { path: ROUTE_PATHS.configProfileStudio, element: <ConfigProfileStudioPage /> },
-          { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
-          { path: ROUTE_PATHS.authorizationSharing, element: <AuthorizationSharingManagementPage /> },
-          { path: ROUTE_PATHS.authorizationSharingThin, element: <AuthorizationSharingThinClientPage /> },
-          { path: ROUTE_PATHS.authorizationReporting, element: <AuthorizationReportingPage /> },
-          { path: ROUTE_PATHS.storageAdmin, element: <StorageAdministrationPage /> },
-          { path: ROUTE_PATHS.workspaceAdmin, element: <WorkspaceAdministrationPage /> },
-          { path: ROUTE_PATHS.nodeEnrollmentReview, element: <NodeEnrollmentReviewPage /> },
-          { path: ROUTE_PATHS.nodeInventory, element: <NodeInventoryPage /> },
-          { path: ROUTE_PATHS.workspaceThinMembership, element: <WorkspaceMembershipThinClientPage /> },
-          { path: ROUTE_PATHS.identityAdmin, element: <IdentityAdminPage /> },
-          { path: ROUTE_PATHS.trustedDevices, element: <TrustedDevicesPage /> },
-          { path: ROUTE_PATHS.secretsAdmin, element: <SecretMetadataManagementPage /> },
+          {
+            path: ROUTE_PATHS.settings,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.settings}>
+                <SettingsPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.adminShell,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.adminShell}>
+                <DesktopAdministrationShellPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.adminLiteShell,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.adminLiteShell}>
+                <AdminLiteEntryPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.authorizationSharing,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.authorizationSharing}>
+                <AuthorizationSharingManagementPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.authorizationSharingThin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.authorizationSharingThin}>
+                <AuthorizationSharingThinClientPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.authorizationReporting,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.authorizationReporting}>
+                <AuthorizationReportingPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.securityPolicy,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.securityPolicy}>
+                <SecurityPolicyConfigurationPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.storageAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.storageAdmin}>
+                <StorageAdministrationPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.workspaceAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.workspaceAdmin}>
+                <WorkspaceAdministrationPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.nodeEnrollmentReview,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.nodeEnrollmentReview}>
+                <NodeEnrollmentReviewPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.nodeInventory,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.nodeInventory}>
+                <NodeInventoryPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.workspaceThinMembership,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.workspaceThinMembership}>
+                <WorkspaceMembershipThinClientPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.identityAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.identityAdmin}>
+                <IdentityAdminPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.trustedDevices,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.trustedDevices}>
+                <TrustedDevicesPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.secretsAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.secretsAdmin}>
+                <SecretMetadataManagementPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.governanceReview,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.governanceReview}>
+                <GovernanceAuditReviewPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.governanceReviewThin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.governanceReviewThin}>
+                <GovernanceAuditReviewPage thin />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.deploymentPolicyAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.deploymentPolicyAdmin}>
+                <DeploymentPolicyAdministrationPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
         ],
       },
       {
@@ -165,7 +305,36 @@ export default function AppRouter({
   const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 
   return (
-    <RouterProvider router={router} />
+    <Suspense fallback={<AppRouterLoadingFallback />}>
+      <RouterProvider router={router} />
+    </Suspense>
   );
 }
 
+interface SurfaceProtectedRouteProps {
+  readonly path: string;
+  readonly children: JSX.Element;
+}
+
+function SurfaceProtectedRoute({ path, children }: SurfaceProtectedRouteProps): JSX.Element {
+  const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+  const session = sessionStore.getSession();
+  const isAllowed = useMemo(
+    () => isRoutePathAccessibleForSession(path, session, { strict: true }),
+    [path, session],
+  );
+
+  if (!isAllowed) {
+    return <Navigate to={ROUTE_PATHS.home} replace />;
+  }
+
+  return children;
+}
+
+function AppRouterLoadingFallback(): JSX.Element {
+  return (
+    <div className="app-shell-loading" role="status" aria-live="polite" aria-busy>
+      Loading page…
+    </div>
+  );
+}

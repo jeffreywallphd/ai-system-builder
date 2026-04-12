@@ -58,3 +58,8 @@ These actions are represented in domain constants (`StorageManagedActions`), app
 - Access summaries are representation contracts, not enforcement engines.
 - Authorization remains delegated to `IStoragePolicyEvaluationPort` and future authorization adapters.
 - Transport contracts are suitable for authoritative API/admin responses without exposing internal authorization implementation details.
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`

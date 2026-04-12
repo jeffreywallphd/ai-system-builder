@@ -3,17 +3,17 @@ import { readSource } from "../../tests/testUtils";
 
 describe("ui/routes interactions", () => {
   it("connects AppRouter with RouteConfig and ProtectedRoute", () => {
-    const appRouterSource = readSource("ui/routes/AppRouter.tsx");
+    const appRouterSource = readSource("src/ui/routes/AppRouter.tsx");
 
     expect(appRouterSource).toContain('import ProtectedRoute from "./ProtectedRoute"');
     expect(appRouterSource).toContain('import { ROUTE_PATHS } from "./RouteConfig"');
     expect(appRouterSource).toContain("redirectTo={ROUTE_PATHS.login}");
-    expect(appRouterSource).toContain('import LoginPage from "../pages/LoginPage"');
-    expect(appRouterSource).toContain('import RegisterPage from "../pages/RegisterPage"');
+    expect(appRouterSource).toContain('const LoginPage = lazy(async () => await import("../pages/LoginPage"));');
+    expect(appRouterSource).toContain('const RegisterPage = lazy(async () => await import("../pages/RegisterPage"));');
   });
 
   it("keeps navigation and 404 route interactions intact", () => {
-    const appRouterSource = readSource("ui/routes/AppRouter.tsx");
+    const appRouterSource = readSource("src/ui/routes/AppRouter.tsx");
 
     expect(appRouterSource).toContain("element: <NotFoundPage />");
     expect(appRouterSource).toContain("to={isAuthenticated ? ROUTE_PATHS.home : ROUTE_PATHS.login}");
@@ -23,11 +23,22 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("path: ROUTE_PATHS.buildAutomate, element: <BuildAutomatePage />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.workflowConversation");
     expect(appRouterSource).toContain("<BuildPage />");
-    expect(appRouterSource).toContain("element: <SettingsPage />");
-    expect(appRouterSource).toContain("element: <WorkspaceAdministrationPage />");
-    expect(appRouterSource).toContain("element: <IdentityAdminPage />");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.settings}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.securityPolicy}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.workspaceAdmin}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.identityAdmin}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.governanceReview}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.governanceReviewThin}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.deploymentPolicyAdmin}>");
+    expect(appRouterSource).toContain("<DesktopAdministrationShellPage />");
+    expect(appRouterSource).toContain("<AdminLiteEntryPage />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.workspaceAdmin");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.identityAdmin");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.governanceReview");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.governanceReviewThin");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.deploymentPolicyAdmin");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.adminShell");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.adminLiteShell");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.agentStudio, element: <Navigate to={ROUTE_PATHS.build} replace />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.studioShell, element: <Navigate to={ROUTE_PATHS.build} replace />");
     expect(appRouterSource).toContain("element: <RegistryPage />");

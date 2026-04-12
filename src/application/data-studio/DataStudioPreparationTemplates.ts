@@ -358,7 +358,12 @@ const DefaultTemplates: ReadonlyArray<DataStudioPreparationTemplateDefinition> =
       }),
       stageDefault({ stageId: PipelineStageIds.UnifiedIngestion, options: Object.freeze({ strategy: "document", outputTarget: "text-items" }) }),
       stageDefault({ stageId: PipelineStageIds.Extraction, activation: Object.freeze({ mode: UnifiedPreparationStageActivationModes.always }) }),
-      stageDefault({ stageId: PipelineStageIds.Chunking, activation: Object.freeze({ mode: UnifiedPreparationStageActivationModes.always }), options: Object.freeze({ chunkSize: 500, chunkOverlap: 50 }) }),
+      stageDefault({
+        stageId: PipelineStageIds.Chunking,
+        visibility: "simple",
+        activation: Object.freeze({ mode: UnifiedPreparationStageActivationModes.always }),
+        options: Object.freeze({ chunkSize: 500, chunkOverlap: 50 }),
+      }),
       stageDefault({
         stageId: PipelineStageIds.Labeling,
         visibility: "advanced",
@@ -641,4 +646,3 @@ export class DataStudioPreparationTemplateRegistry {
 export function createDefaultDataStudioPreparationTemplateRegistry(): DataStudioPreparationTemplateRegistry {
   return new DataStudioPreparationTemplateRegistry();
 }
-

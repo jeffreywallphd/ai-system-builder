@@ -1,3 +1,6 @@
+/**
+ * Electron main-process entrypoint that initializes startup contracts, registers IPC surfaces, and composes deferred desktop runtimes.
+ */
 import started from "electron-squirrel-startup";
 import fs from "node:fs";
 import path from "node:path";
@@ -5,105 +8,51 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
 import { InitializeProductionStorageUseCase } from "../../src/application/runtime/InitializeProductionStorageUseCase";
-import { GetExecutionRunUseCase } from "../../src/application/execution/GetExecutionRunUseCase";
+import { ProductionStorageInitializationScopes } from "../../src/application/runtime/interfaces/IProductionStorageInitializer";
 import { resolveDesktopStoragePaths } from "../../src/infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../src/infrastructure/desktop/DesktopStorageDatabase";
-import { DesktopWorkflowPersistence } from "../../src/infrastructure/desktop/DesktopWorkflowPersistence";
-import { SqliteExecutionRunRepository } from "../../src/infrastructure/filesystem/execution/SqliteExecutionRunRepository";
-import {
-  createExecutionHistoryInfrastructure,
-  createExecutionRunRepository,
-} from "../../src/infrastructure/execution/createExecutionInfrastructure";
-import { resolveDesktopPythonRuntime } from "../../src/infrastructure/desktop/DesktopPythonRuntimeResolver";
-import { AppRuntimeConfig } from "../../src/infrastructure/config/AppRuntimeConfig";
+import { AppRuntimeConfig, type AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 import {
   HostSecureTransportKinds,
   assertSecureTransportEndpoint,
   resolveHostSecureTransportConfig,
 } from "../../src/infrastructure/config/HostSecureTransportConfig";
-import { RendererDeliveryModes } from "../../src/domain/runtime/AppRuntimeProfile";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type {
-  DesktopBootstrapContext,
-  DesktopIdentityTransportTrustBootstrap,
+  DesktopAuthBootstrapContext,
+  DesktopAuthBootstrapRuntimeConfig,
+  DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
-import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
-import { InMemoryAssetLineageGraphProjectionSink } from "../../src/infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
-import { ExplainCanonicalVersionExistenceUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase } from "../../src/application/assets-system/CanonicalAssetReadUseCases";
-import { GetAssetVersionHistoryUseCase } from "../../src/application/assets-system/GetAssetVersionHistoryUseCase";
-import { GetCanonicalDependencyStateUseCase } from "../../src/application/assets-system/CanonicalDependencyStateUseCase";
-import { GetAssetDependencyHealthUseCase } from "../../src/application/assets-system/GetAssetDependencyHealthUseCase";
-import { GetAssetImpactAnalysisUseCase } from "../../src/application/assets-system/GetAssetImpactAnalysisUseCase";
-import { GetCanonicalProvenanceSummaryUseCase } from "../../src/application/assets-system/CanonicalAssetReadUseCases";
-import { ReconcileCanonicalIdentityMappingsUseCase, ReplayScopedAssetGraphProjectionUseCase } from "../../src/application/assets-system/ReconciliationUseCases";
-import { ReplayAssetGraphProjectionUseCase } from "../../src/application/assets-system/ReplayAssetGraphProjectionUseCase";
-import { VerifyAssetGraphProjectionUseCase } from "../../src/application/assets-system/VerifyAssetGraphProjectionUseCase";
-import { ProjectionRebuildOrchestrationUseCase } from "../../src/application/assets-system/ProjectionRebuildOrchestrationUseCase";
-import { LoadCanonicalAssetManagementSnapshotUseCase } from "../../src/application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase";
-import { ProjectionTrustReadModelService } from "../../src/application/assets-system/ProjectionTrustReadModelService";
-import { SqliteAgentRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentRepository";
-import { SqliteAgentExecutionSessionRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentExecutionSessionRepository";
-import { AgentStudioBackendApi } from "../../src/infrastructure/api/agents/AgentStudioBackendApi";
-import { AgentRunnerService } from "../../src/application/agents/services/AgentRunnerService";
-import { DeterministicAgentPlanningService } from "../../src/application/agents/services/AgentPlanningInterface";
-import { ExecuteAgentToolsUseCase } from "../../src/application/agents/ExecuteAgentToolsUseCase";
-import { DefaultAgentMemoryRetrievalService } from "../../src/application/agents/services/AgentMemoryRetrievalService";
-import { AgentMemoryWriteService } from "../../src/application/agents/services/AgentMemoryWriteService";
-import { AssetBackedAgentMemoryStore } from "../../src/application/agents/services/AssetBackedAgentMemoryStore";
-import { CompositeToolCapabilityCatalog } from "../../src/infrastructure/tools/CompositeToolCapabilityCatalog";
-import { StaticLocalToolCapabilityCatalog } from "../../src/infrastructure/tools/StaticLocalToolCapabilityCatalog";
-import { McpToolCapabilityCatalog } from "../../src/infrastructure/tools/McpToolCapabilityCatalog";
-import { CompositeToolCapabilityExecutor } from "../../src/infrastructure/tools/CompositeToolCapabilityExecutor";
-import { StaticLocalToolCapabilityExecutor } from "../../src/infrastructure/tools/StaticLocalToolCapabilityExecutor";
-import { McpToolCapabilityExecutor } from "../../src/infrastructure/tools/McpToolCapabilityExecutor";
-import { DeterministicToolCapabilityAgentOrchestrator } from "../../src/infrastructure/agents/DeterministicToolCapabilityAgentOrchestrator";
-import { PythonRuntimeConfig } from "../../src/infrastructure/config/PythonRuntimeConfig";
-import { createMcpRuntimeIntegration } from "../../src/infrastructure/python/mcp/createMcpRuntimeIntegration";
-import { SqliteAssetSystemAgentMemoryCatalog } from "../../src/infrastructure/filesystem/agents/SqliteAssetSystemAgentMemoryCatalog";
-import type { CreateAgentRequest } from "../../src/application/agents/CreateAgentUseCase";
-import type { UpdateAgentRequest } from "../../src/application/agents/UpdateAgentUseCase";
-import type { ConfigureAgentGoalsRequest } from "../../src/application/agents/ConfigureAgentGoalsUseCase";
-import type { AgentPolicy, AgentToolAccessPolicy } from "../../src/domain/agents/AgentPolicy";
-import type { AgentMemoryConfiguration } from "../../src/domain/agents/AgentMemory";
-import type { AgentPlanningStrategy } from "../../src/domain/agents/Agent";
-import type { AgentConfigurationValidationInput } from "../../src/application/agents/services/AgentConfigurationValidationService";
-import type { AgentRunControlRequest, AgentRunRequest } from "../../src/application/agents/contracts/AgentRunContracts";
-import type { TriggerAgentLaunchRequest } from "../../src/application/agents/TriggerAgentLaunchUseCase";
-import { StudioShellBackendApi } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
-import { RegistryBackendApi } from "../../src/infrastructure/api/registry/RegistryBackendApi";
-import { ListPersistedWorkflowsUseCase } from "../../src/application/workflow-persistence/ListPersistedWorkflowsUseCase";
-import { ListWorkflowRunSummariesUseCase } from "../../src/application/workflow-run-history/ListWorkflowRunSummariesUseCase";
-import { SqliteStudioShellRepository } from "../../src/infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
-import { SqliteWorkflowPersistenceRepository } from "../../src/infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
-import { SqliteWorkflowRunSummaryRepository } from "../../src/infrastructure/filesystem/SqliteWorkflowRunSummaryRepository";
-import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../src/application/studio-shell/contracts";
-import { RegistryQueryService } from "../../src/application/asset-registry/RegistryQueryService";
-import { CrossStudioRegistryQueryService } from "../../src/application/asset-registry/CrossStudioRegistryQueryService";
-import { RegistryDependencyGraphService } from "../../src/application/asset-registry/RegistryDependencyGraphService";
-import { RegistryCacheLayer } from "../../src/application/asset-registry/RegistryCacheLayer";
-import { CompositionAssetContractResolver } from "../../src/application/contracts/CompositionAssetContractResolver";
-import { SystemStudioBackendApi } from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
-import { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
-import { SqliteSystemRuntimeExecutionStore } from "../../src/infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
-import { SqliteExecutionAuditRepository } from "../../src/infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
-import { SqliteImageRunHistoryRepository } from "../../src/infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository";
-import { LocalStorageInstanceProvisioner } from "../../src/infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner";
-import { LocalSystemOutputArtifactStorage } from "../../src/infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage";
-import { LocalStorageInstanceLifecycleInfrastructure } from "../../src/infrastructure/filesystem/system-runtime/LocalStorageInstanceLifecycleInfrastructure";
-import {
-  parseSystemRuntimeWindowLaunchContract,
-  SystemRuntimeWindowLaunchQueryParam,
-  type LaunchSystemRuntimeWindowReadModel,
-} from "../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
-import { createRendererContentSecurityPolicy } from "./RendererContentSecurityPolicy";
-import { resolveModelFileAbsolutePath, toLogicalModelPath } from "./ModelFilePathPolicy";
+import { createRendererContentSecurityPolicyResolver } from "./RendererContentSecurityPolicy";
+import { logInitializationCheckpoint, logInitializationEnd, logInitializationMemory, logInitializationStart } from "./InitializationLogging";
+import { createDesktopConnectivityProbePort, normalizeHttpOrigin, resolveDesktopIdentityTransportTrustBootstrap } from "./DesktopTrustBootstrap";
+import { registerAuthBootstrapIpc } from "./AuthBootstrapIpcRegistration";
+import { DesktopStartupPhases, validateDesktopStartupContract } from "./DesktopStartupContract";
 import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../src/hosts/desktop/DesktopHostEntrypoint";
 import {
-  startAuthoritativeServerHostAssembly,
-  type AuthoritativeServerHostRuntimeHandle,
-} from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
+  DesktopConnectivityStateService,
+} from "../../src/hosts/desktop/DesktopConnectivityStateService";
+import { createDesktopPostLoginRuntimeStatusStore } from "./DesktopPostLoginRuntimeStatusStore";
+import { createDesktopConnectivityRuntimeController } from "./DesktopConnectivityRuntimeController";
+import type { DeferredDesktopFeatureRuntime } from "./DeferredDesktopFeatureRuntime";
+import {
+  startAuthMinimalServerHostAssembly,
+  type AuthMinimalServerHostRuntimeHandle,
+} from "../../src/hosts/server/AuthMinimalServerHostEntrypoint";
+import { createDesktopWindowManager } from "./DesktopWindowManager";
+import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
+import type { DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
+import type { CanonicalRegistryRuntimeProvider } from "./runtime/CanonicalRegistryRuntimeProvider";
+import { createPostLoginRuntimeBootstrapper, type AuthShellBootstrapResult } from "./runtime/PostLoginRuntimeBootstrapper";
+import { createDesktopRuntimeDisposalCoordinator } from "./runtime/DesktopRuntimeDisposalCoordinator";
+import {
+  createDesktopOperationalEventLogger,
+  type DesktopOperationalEventLogger,
+} from "./DesktopOperationalEventLogger";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Provide ESM-safe CommonJS path globals for runtime compatibility with CJS dependencies.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 if (started) {
   app.quit();
 }
@@ -111,7 +60,22 @@ const repoRoot = path.resolve(__dirname, "../..");
 const isPackaged = app.isPackaged;
 const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5174";
 const preloadScriptPath = resolvePreloadScriptPath();
+validateDesktopStartupContract();
+const consoleGreen = "\u001b[32m";
+const consoleReset = "\u001b[0m";
 
+function logDevelopmentUserDataPath(userDataPath: string): void {
+  if (isPackaged) {
+    return;
+  }
+  const headerRule = "----------------------------------------------------------------";
+  const formattedPathBlock = `${consoleGreen}${headerRule}\n\n${userDataPath}\n\n${headerRule}${consoleReset}`;
+  console.info(`[ai-loom][startup] Development user data path:\n${formattedPathBlock}`);
+}
+
+/**
+ * Resolves the preload bundle path by probing packaged and development output locations in priority order.
+ */
 function resolvePreloadScriptPath(): string {
   const preloadCandidates = [
     path.join(__dirname, "preload.cjs"),
@@ -126,1194 +90,439 @@ function resolvePreloadScriptPath(): string {
   return resolvedPath;
 }
 
+/**
+ * Installs response-header middleware that injects the renderer Content Security Policy for every main-session response.
+ */
 function installRendererContentSecurityPolicy(): void {
-  const policy = createRendererContentSecurityPolicy({
+  const resolvePolicy = createRendererContentSecurityPolicyResolver({
     rendererDevUrl,
-    runtimeConfig: bootstrapContext?.runtimeConfig,
+    getRuntimeConfig: () => rendererContentSecurityPolicyRuntimeConfig,
   });
+  // Intercepts renderer responses to attach the latest CSP header resolved from current runtime config.
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = details.responseHeaders ? { ...details.responseHeaders } : {};
-    responseHeaders["Content-Security-Policy"] = [policy];
+    responseHeaders["Content-Security-Policy"] = [resolvePolicy()];
     callback({ responseHeaders });
   });
 }
 
-let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
-let workflowPersistence: DesktopWorkflowPersistence | undefined;
-let executionRunRepository: SqliteExecutionRunRepository | undefined;
-let getExecutionRunUseCase: GetExecutionRunUseCase | undefined;
-let listExecutionRunsUseCase: ReturnType<typeof createExecutionHistoryInfrastructure>["listExecutionRunsUseCase"] | undefined;
-let workflowRunSummaryRepository: SqliteWorkflowRunSummaryRepository | undefined;
-let listWorkflowRunSummariesUseCase: ListWorkflowRunSummariesUseCase | undefined;
-let canonicalAssetSystemRepository: SqliteAssetSystemRepository | undefined;
-let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined;
-let agentRepository: SqliteAgentRepository | undefined;
-let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
-let authoritativeServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
-let studioShellRepository: SqliteStudioShellRepository | undefined;
-let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
-let bootstrapContext: DesktopBootstrapContext | undefined;
+let authMinimalServerRuntime: AuthMinimalServerHostRuntimeHandle | undefined;
+let bootstrapContext: DesktopAuthBootstrapContext | undefined;
+let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
-const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
-
-const DESKTOP_TRUST_STORAGE_KEYS = Object.freeze({
-  trustedDeviceBindingId: "identity.desktop.transport.trusted-device-binding-id",
-  trustMarker: "identity.desktop.transport.trust-marker",
-  materialKind: "identity.desktop.transport.material-kind",
-  pinReference: "identity.desktop.transport.pin-reference",
-  publicKeyFingerprint: "identity.desktop.transport.public-key-fingerprint",
-  issuedAt: "identity.desktop.transport.issued-at",
-  expiresAt: "identity.desktop.transport.expires-at",
+let deferredFeatureRuntime: DeferredDesktopFeatureRuntime | undefined;
+let agentRuntimeProvider: DesktopAgentRuntimeProvider | undefined;
+let canonicalRegistryRuntimeProvider: CanonicalRegistryRuntimeProvider | undefined;
+let desktopOperationalEventLogger: DesktopOperationalEventLogger | undefined;
+let authIpcRegistered = false;
+let deferredFeatureIpcRegistered = false;
+let deferredFeatureIpcReady = false;
+let postLoginBootstrapPromise: Promise<void> | undefined;
+let postLoginWarmupStarted = false;
+let isDesktopRuntimeDisposing = false;
+let authShellBootstrapResult: AuthShellBootstrapResult | undefined;
+const postLoginRuntimeStatusStore = createDesktopPostLoginRuntimeStatusStore();
+const connectivityRuntimeController = createDesktopConnectivityRuntimeController({
+  createConnectivityStateService: () => new DesktopConnectivityStateService(),
+  createConnectivityProbePort: createDesktopConnectivityProbePort,
+  lookupToken: (key) => storageDatabase?.getItem(key) ?? null,
 });
 
-const DESKTOP_TRUST_ENV_KEYS = Object.freeze({
-  enforcement: "AI_LOOM_DESKTOP_TRUST_BOOTSTRAP_ENFORCEMENT",
-  trustedDeviceBindingId: "AI_LOOM_DESKTOP_TRUSTED_DEVICE_BINDING_ID",
-  trustMarker: "AI_LOOM_DESKTOP_TRUST_MARKER",
-  materialKind: "AI_LOOM_DESKTOP_TRUST_MATERIAL_KIND",
-  pinReference: "AI_LOOM_DESKTOP_TRUST_PIN_REFERENCE",
-  publicKeyFingerprint: "AI_LOOM_DESKTOP_TRUST_PUBLIC_KEY_FINGERPRINT",
-  issuedAt: "AI_LOOM_DESKTOP_TRUST_ISSUED_AT",
-  expiresAt: "AI_LOOM_DESKTOP_TRUST_EXPIRES_AT",
+const windowManager = createDesktopWindowManager({
+  BrowserWindow,
+  preloadScriptPath,
+  rendererDevUrl,
+  isPackaged,
+  mainProcessDir: __dirname,
+  getRuntimeConfig: () => bootstrapContext?.runtimeConfig,
 });
 
-function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (!value) {
-      continue;
-    }
-    search.set(key, value);
-  }
-  const serialized = search.toString();
-  return serialized ? `?${serialized}` : undefined;
-}
-
-function toFileEntry(modelsRootPath: string, filePath: string) {
-  const stats = fs.statSync(filePath);
-  return {
-    path: toLogicalModelPath(modelsRootPath, filePath),
-    kind: stats.isDirectory() ? "directory" as const : "file" as const,
-    size: stats.isFile() ? stats.size : undefined,
-    modifiedAt: stats.mtime.toISOString(),
-  };
-}
-
-function listEntries(modelsRootPath: string, rootPath: string, recursive = false): ReadonlyArray<ReturnType<typeof toFileEntry>> {
-  if (!fs.existsSync(rootPath)) {
-    return [];
-  }
-
-  const results: ReturnType<typeof toFileEntry>[] = [];
-  const walk = (currentPath: string) => {
-    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
-      const entryPath = path.join(currentPath, entry.name);
-      results.push(toFileEntry(modelsRootPath, entryPath));
-      if (recursive && entry.isDirectory()) {
-        walk(entryPath);
-      }
-    }
-  };
-  walk(rootPath);
-  return results;
-}
-
-function resolveDesktopIdentityTransportTrustBootstrap(): DesktopIdentityTransportTrustBootstrap | undefined {
-  const enforcement = normalizeTrustBootstrapEnforcement(process.env[DESKTOP_TRUST_ENV_KEYS.enforcement]);
-  const trustedDeviceBindingId = readDesktopTrustValue({
-    storageKey: DESKTOP_TRUST_STORAGE_KEYS.trustedDeviceBindingId,
-    envKey: DESKTOP_TRUST_ENV_KEYS.trustedDeviceBindingId,
-  });
-  const pinReference = readDesktopTrustSecretValue({
-    storageKey: DESKTOP_TRUST_STORAGE_KEYS.pinReference,
-    envKey: DESKTOP_TRUST_ENV_KEYS.pinReference,
-  });
-
-  const trustConfigured = Boolean(trustedDeviceBindingId || pinReference);
-  const effectiveEnforcement = enforcement ?? (trustConfigured ? "required" : "optional");
-  if (!trustConfigured && effectiveEnforcement !== "required") {
-    return undefined;
-  }
-
-  const materialKind = normalizeMaterialKind(
-    readDesktopTrustValue({
-      storageKey: DESKTOP_TRUST_STORAGE_KEYS.materialKind,
-      envKey: DESKTOP_TRUST_ENV_KEYS.materialKind,
-    }),
-  ) ?? "opaque-marker";
-
-  return Object.freeze({
-    enforcement: effectiveEnforcement,
-    registeredDevice: trustedDeviceBindingId
-      ? Object.freeze({
-          trustedDeviceBindingId,
-          trustMarker: readDesktopTrustSecretValue({
-            storageKey: DESKTOP_TRUST_STORAGE_KEYS.trustMarker,
-            envKey: DESKTOP_TRUST_ENV_KEYS.trustMarker,
-          }),
-        })
-      : undefined,
-    pinnedTrustMaterial: pinReference
-      ? Object.freeze({
-          pinReference,
-          materialKind,
-          publicKeyFingerprint: readDesktopTrustValue({
-            storageKey: DESKTOP_TRUST_STORAGE_KEYS.publicKeyFingerprint,
-            envKey: DESKTOP_TRUST_ENV_KEYS.publicKeyFingerprint,
-          }),
-          issuedAt: readDesktopTrustValue({
-            storageKey: DESKTOP_TRUST_STORAGE_KEYS.issuedAt,
-            envKey: DESKTOP_TRUST_ENV_KEYS.issuedAt,
-          }),
-          expiresAt: readDesktopTrustValue({
-            storageKey: DESKTOP_TRUST_STORAGE_KEYS.expiresAt,
-            envKey: DESKTOP_TRUST_ENV_KEYS.expiresAt,
-          }),
-        })
-      : undefined,
-  });
-}
-
-function readDesktopTrustValue(input: {
-  readonly storageKey: string;
-  readonly envKey: string;
-}): string | undefined {
-  const fromStorage = normalizeOptional(storageDatabase?.getItem(input.storageKey) ?? undefined);
-  if (fromStorage) {
-    return fromStorage;
-  }
-  return normalizeOptional(process.env[input.envKey]);
-}
-
-function readDesktopTrustSecretValue(input: {
-  readonly storageKey: string;
-  readonly envKey: string;
-}): string | undefined {
-  const encoded = storageDatabase?.getItem(`secure:${input.storageKey}`);
-  if (encoded) {
-    try {
-      const decrypted = safeStorage.decryptString(Buffer.from(encoded, "base64"));
-      const normalized = normalizeOptional(decrypted);
-      if (normalized) {
-        return normalized;
-      }
-    } catch {
-      // fall through to non-secret and env fallback
-    }
-  }
-  return readDesktopTrustValue(input);
-}
-
-function normalizeMaterialKind(
-  value: string | undefined,
-): "session-signing-key" | "attestation-key" | "opaque-marker" | undefined {
-  if (value === "session-signing-key" || value === "attestation-key" || value === "opaque-marker") {
-    return value;
-  }
-  return undefined;
-}
-
-function normalizeTrustBootstrapEnforcement(value: string | undefined): "required" | "optional" | undefined {
-  const normalized = normalizeOptional(value)?.toLowerCase();
-  if (normalized === "required" || normalized === "optional") {
-    return normalized;
-  }
-  return undefined;
-}
-
-function normalizeOptional(value: string | undefined): string | undefined {
-  const normalized = value?.trim();
-  return normalized ? normalized : undefined;
-}
-
-function normalizeHttpOrigin(value: string): string | undefined {
-  try {
-    const origin = new URL(value).origin;
-    return origin === "null" ? undefined : origin;
-  } catch {
-    return undefined;
-  }
-}
-
-function createDesktopAgentRunner(params: {
-  readonly assetSystemRepository: SqliteAssetSystemRepository;
-  readonly sessionRepository: SqliteAgentExecutionSessionRepository;
-}): AgentRunnerService {
-  const pythonConfig = PythonRuntimeConfig.fromEnv(process.env);
-  const mcpIntegration = createMcpRuntimeIntegration(pythonConfig);
-  const toolCatalog = new CompositeToolCapabilityCatalog([
-    new StaticLocalToolCapabilityCatalog([]),
-    new McpToolCapabilityCatalog(mcpIntegration.toolCatalog),
-  ]);
-  const toolExecutor = new CompositeToolCapabilityExecutor([
-    {
-      providerKind: "local",
-      providerId: "local-runtime",
-      executor: new StaticLocalToolCapabilityExecutor({}),
+async function openMainDesktopWindow(): Promise<void> {
+  const mainWindowCreateStartedAt = logInitializationStart(DesktopStartupPhases.mainWindowCreation);
+  await windowManager.createMainWindow({
+    onReadyToShow: () => {
+      logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show", mainWindowCreateStartedAt);
+      logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show");
     },
-    {
-      providerKind: "mcp",
-      providerId: "python-mcp-runtime",
-      executor: new McpToolCapabilityExecutor(mcpIntegration.toolExecutor),
+    onRendererLoaded: () => {
+      logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "renderer-content-loaded", mainWindowCreateStartedAt);
+      logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "renderer-content-loaded");
     },
-  ]);
-  const memoryStore = new AssetBackedAgentMemoryStore(
-    new SqliteAssetSystemAgentMemoryCatalog(params.assetSystemRepository),
-    params.assetSystemRepository,
-  );
-  return new AgentRunnerService(
-    new DeterministicAgentPlanningService(toolCatalog, memoryStore),
-    new ExecuteAgentToolsUseCase(toolCatalog, new DeterministicToolCapabilityAgentOrchestrator(toolExecutor)),
-    new DefaultAgentMemoryRetrievalService(memoryStore),
-    new AgentMemoryWriteService(memoryStore),
-    undefined,
-    undefined,
-    params.sessionRepository,
-  );
-}
-
-async function createMainWindow(): Promise<void> {
-  const window = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    show: false,
-    backgroundColor: "#111827",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: preloadScriptPath,
+    onComplete: () => {
+      logInitializationEnd(DesktopStartupPhases.mainWindowCreation, mainWindowCreateStartedAt);
+      logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "ready");
     },
   });
-
-  mainWindow = window;
-  window.once("ready-to-show", () => window.show());
-
-  await loadRendererRoot(window);
 }
 
-async function loadRendererRoot(window: BrowserWindow, search?: string): Promise<void> {
-  const runtimeConfig = bootstrapContext?.runtimeConfig;
-  if (runtimeConfig?.rendererDeliveryMode === RendererDeliveryModes.packagedAssets) {
-    await window.loadFile(path.join(__dirname, "../../dist/index.html"), {
-      search,
-    });
-  } else {
-    const url = new URL(rendererDevUrl);
-    url.pathname = "/";
-    if (search) {
-      url.search = search.startsWith("?") ? search.slice(1) : search;
-    }
-    await window.loadURL(url.toString());
-    if (window === mainWindow) {
-      window.webContents.openDevTools({ mode: "detach" });
-    }
-  }
-}
-
-async function launchRuntimeWindowFromContract(
-  launchContractJson: string,
-): Promise<LaunchSystemRuntimeWindowReadModel> {
-  const contract = parseSystemRuntimeWindowLaunchContract(launchContractJson);
-  if (!contract) {
-    throw new Error("invalid-request:Runtime window launch contract is missing or invalid.");
-  }
-
-  const reuseWindowKey = contract.windowIntent.reuseWindowKey?.trim();
-  if (reuseWindowKey) {
-    const existing = runtimeWindowByReuseKey.get(reuseWindowKey);
-    if (existing && !existing.isDestroyed()) {
-      const search = createRendererSearch({
-        [SystemRuntimeWindowLaunchQueryParam]: launchContractJson,
-      });
-      await loadRendererRoot(existing, search);
-      if (contract.windowIntent.focus === "foreground") {
-        existing.focus();
-      }
-      return Object.freeze({
-        launchId: contract.launchId,
-        launchedAt: new Date().toISOString(),
-        targetKind: contract.launchTarget.targetKind,
-        systemAssetId: contract.launchTarget.systemAssetId,
-        pageBindingId: contract.launchTarget.pageBindingId,
-        routePath: "/",
-      });
-    }
-  }
-
-  const runtimeWindow = new BrowserWindow({
-    width: contract.windowIntent.dimensions?.width ?? 1440,
-    height: contract.windowIntent.dimensions?.height ?? 960,
-    show: false,
-    backgroundColor: "#111827",
-    title: contract.windowIntent.titleHint ?? "AI Loom Runtime",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: preloadScriptPath,
-    },
-  });
-
-  runtimeWindow.once("ready-to-show", () => runtimeWindow.show());
-  const search = createRendererSearch({
-    [SystemRuntimeWindowLaunchQueryParam]: launchContractJson,
-  });
-  await loadRendererRoot(runtimeWindow, search);
-
-  if (contract.windowIntent.focus === "foreground") {
-    runtimeWindow.focus();
-  }
-
-  if (reuseWindowKey) {
-    runtimeWindowByReuseKey.set(reuseWindowKey, runtimeWindow);
-    runtimeWindow.on("closed", () => {
-      runtimeWindowByReuseKey.delete(reuseWindowKey);
-    });
-  }
-
-  return Object.freeze({
-    launchId: contract.launchId,
-    launchedAt: new Date().toISOString(),
-    targetKind: contract.launchTarget.targetKind,
-    systemAssetId: contract.launchTarget.systemAssetId,
-    pageBindingId: contract.launchTarget.pageBindingId,
-    routePath: "/",
-  });
-}
-
-async function bootstrapDesktopRuntime(): Promise<void> {
-  const storagePaths = resolveDesktopStoragePaths({
-    userDataPath: app.getPath("userData"),
-    logsPath: app.getPath("logs"),
-  });
-
-  storageDatabase = new DesktopStorageDatabase({ paths: storagePaths });
-  await new InitializeProductionStorageUseCase(storageDatabase).execute();
-
-  const pythonRuntime = resolveDesktopPythonRuntime({
-    isPackaged,
-    repoRoot,
-    resourcesPath: process.resourcesPath,
-    storagePaths,
-  });
-
-  serviceSupervisor = new DesktopServiceSupervisor({
-    repoRoot,
-    isPackaged,
-    resourcesPath: process.resourcesPath,
-    storagePaths,
-    pythonRuntime,
-  });
-  await serviceSupervisor.start();
-
-  const baseRuntimeConfig = isPackaged
-    ? AppRuntimeConfig.forDesktopProduction({
-        storage: storagePaths,
-        pythonRuntime,
-        serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
-        serviceSupervisorPort: 8790,
-      })
-    : AppRuntimeConfig.forDesktopDevelopment({
-        storage: storagePaths,
-        pythonRuntime,
-        serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
-        serviceSupervisorPort: 8790,
-      });
-  const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
-  authoritativeServerRuntime = await startAuthoritativeServerHostAssembly({
-    hostOptions: {
-      databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
-      cors: {
-        allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
-        allowLoopbackOrigins: true,
-        allowNullOrigin: isPackaged,
-      },
-      env: process.env,
-    },
-    boot: {
-      startupReason: "electron-main-authoritative-server-host-startup",
-      environment: process.env,
-    },
-  });
-  const identityApiBaseUrl = assertSecureTransportEndpoint(
-    `http://${authoritativeServerRuntime.address}`,
-    resolveHostSecureTransportConfig({
-      hostKind: HostSecureTransportKinds.desktop,
-      hostAddress: "127.0.0.1",
-    }),
-  );
-  const runtimeConfig = AppRuntimeConfig.fromValues({
-    ...baseRuntimeConfig.toValues(),
-    identityApiBaseUrl,
-  });
-
+/**
+ * Builds immutable auth bootstrap context shared with renderer preload surfaces and auth IPC handlers.
+ */
+function buildBootstrapContext(params: {
+  readonly runtimeConfig: AppRuntimeConfig;
+  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
+}): void {
+  const runtimeConfigValues = params.runtimeConfig.toValues();
+  rendererContentSecurityPolicyRuntimeConfig = runtimeConfigValues;
   bootstrapContext = Object.freeze({
-    runtimeConfig: runtimeConfig.toValues(),
-    storage: storagePaths,
-    serviceSupervisor: {
-      baseUrl: serviceSupervisor.baseUrl,
-      port: 8790,
+    runtimeConfig: projectDesktopAuthBootstrapRuntimeConfig(runtimeConfigValues),
+    storage: {
+      appDataDirectory: params.storagePaths.appDataDirectory,
     },
-    pythonRuntime,
-    identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap(),
+    environment: {
+      isPackaged,
+    },
+    identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap((key) => storageDatabase?.getItem(key) ?? null),
   });
+}
 
-  ipcMain.on("ai-loom-desktop:get-bootstrap-sync", (event) => {
-    event.returnValue = bootstrapContext;
+/**
+ * Projects full runtime config values to the reduced auth-bootstrap runtime contract exposed before post-login warmup.
+ */
+function projectDesktopAuthBootstrapRuntimeConfig(values: AppRuntimeConfigValues): DesktopAuthBootstrapRuntimeConfig {
+  return Object.freeze({
+    runtimeMode: values.runtimeMode,
+    hostKind: values.hostKind,
+    lifecycleStage: values.lifecycleStage,
+    distributionTarget: values.distributionTarget,
+    rendererDeliveryMode: values.rendererDeliveryMode,
+    workflowRepositoryMode: values.workflowRepositoryMode,
+    workflowExecutorMode: values.workflowExecutorMode,
+    nodeCatalogMode: values.nodeCatalogMode,
+    uiSettingsPersistenceMode: values.uiSettingsPersistenceMode,
+    installedModelCatalogMode: values.installedModelCatalogMode,
+    seedStarterNode: values.seedStarterNode,
+    isProductionMode: values.isProductionMode,
+    devSyncBaseUrl: values.devSyncBaseUrl,
+    devSyncToken: values.devSyncToken,
+    identityApiBaseUrl: values.identityApiBaseUrl,
+    modelInstallDirectory: values.modelInstallDirectory,
   });
-  ipcMain.on("ai-loom-desktop-storage:getItem", (event, key: string) => {
-    event.returnValue = storageDatabase?.getItem(key) ?? null;
-  });
-  ipcMain.on("ai-loom-desktop-storage:setItem", (_event, key: string, value: string) => {
-    storageDatabase?.setItem(key, value);
-  });
-  ipcMain.on("ai-loom-desktop-storage:removeItem", (_event, key: string) => {
-    storageDatabase?.removeItem(key);
-  });
-  ipcMain.on("ai-loom-desktop-secrets:is-available", (event) => {
-    event.returnValue = safeStorage.isEncryptionAvailable();
-  });
-  ipcMain.on("ai-loom-desktop-secrets:get", (event, key: string) => {
-    const encoded = storageDatabase?.getItem(`secure:${key}`) ?? null;
-    if (!encoded) {
-      event.returnValue = null;
-      return;
-    }
-    try {
-      const decrypted = safeStorage.decryptString(Buffer.from(encoded, "base64"));
-      event.returnValue = decrypted;
-    } catch {
-      event.returnValue = null;
-    }
-  });
-  ipcMain.on("ai-loom-desktop-secrets:set", (_event, key: string, value: string) => {
-    if (!safeStorage.isEncryptionAvailable()) {
-      return;
-    }
-    const encrypted = safeStorage.encryptString(value).toString("base64");
-    storageDatabase?.setItem(`secure:${key}`, encrypted);
-  });
-  ipcMain.on("ai-loom-desktop-secrets:remove", (_event, key: string) => {
-    storageDatabase?.removeItem(`secure:${key}`);
-  });
-  const workflowsDirectory = runtimeConfig.workflowStorageDirectory
-    ? path.resolve(repoRoot, runtimeConfig.workflowStorageDirectory)
-    : path.resolve(repoRoot, "dev/workflow-data/workflows");
-  const workflowIndexDatabasePath = runtimeConfig.workflowIndexDatabasePath
-    ? path.resolve(repoRoot, runtimeConfig.workflowIndexDatabasePath)
-    : path.resolve(repoRoot, "dev/workflow-data/workflows/workflow-index.sqlite");
-  workflowPersistence = new DesktopWorkflowPersistence({
-    workflowsDirectory,
-    indexDatabasePath: workflowIndexDatabasePath,
-  });
-  executionRunRepository = createExecutionRunRepository({
-    sqliteDatabasePath: storagePaths.databasePath,
-  }) as SqliteExecutionRunRepository;
-  workflowRunSummaryRepository = new SqliteWorkflowRunSummaryRepository(storagePaths.databasePath);
-  listWorkflowRunSummariesUseCase = new ListWorkflowRunSummariesUseCase(workflowRunSummaryRepository);
-  agentRepository = new SqliteAgentRepository(path.join(storagePaths.storageDirectory, "agents", "agents.sqlite"));
-  agentSessionRepository = new SqliteAgentExecutionSessionRepository(path.join(storagePaths.storageDirectory, "agents", "agent-sessions.sqlite"));
-  const agentRunnerAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
-  const agentRunner = createDesktopAgentRunner({
-    assetSystemRepository: agentRunnerAssetSystemRepository,
-    sessionRepository: agentSessionRepository,
-  });
-  const agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
-  studioShellRepository = new SqliteStudioShellRepository(path.join(storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"));
-  workflowPersistenceRepository = new SqliteWorkflowPersistenceRepository(
-    path.join(storagePaths.storageDirectory, "workflow-studio", "workflow-persistence.sqlite"),
-  );
-  const studioShellBackendApi = new StudioShellBackendApi(
-    studioShellRepository,
-    workflowPersistenceRepository,
-    workflowRunSummaryRepository,
-    undefined,
-    new SqliteImageRunHistoryRepository(path.join(storagePaths.assetsDirectory, "system-image-run-history.sqlite")),
-    {
-      storageInstanceProvisioner: new LocalStorageInstanceProvisioner({
-        storageRootDirectory: path.join(storagePaths.storageDirectory, "storage"),
-      }),
-      workflowOutputArtifactStorage: new LocalSystemOutputArtifactStorage(
-        path.join(storagePaths.storageDirectory, "storage"),
-      ),
-      storageLifecycleInfrastructure: new LocalStorageInstanceLifecycleInfrastructure(
-        path.join(storagePaths.storageDirectory, "storage"),
-      ),
+}
+
+/**
+ * Registers pre-login auth bootstrap IPC channels once and wires storage, secrets, connectivity, and warmup hooks.
+ */
+function registerAuthIpc(): void {
+  if (authIpcRegistered) {
+    return;
+  }
+  authIpcRegistered = true;
+  registerAuthBootstrapIpc({
+    ipcMain,
+    // Supplies immutable bootstrap context required by auth preload APIs.
+    getBootstrapContext: () => bootstrapContext,
+    storage: {
+      // Reads persisted bootstrap storage values used by auth-shell workflows.
+      getItem: (key: string) => storageDatabase?.getItem(key) ?? null,
+      // Persists bootstrap storage values from renderer auth operations.
+      setItem: (key: string, value: string) => {
+        storageDatabase?.setItem(key, value);
+      },
+      // Removes bootstrap storage keys requested by renderer auth operations.
+      removeItem: (key: string) => {
+        storageDatabase?.removeItem(key);
+      },
     },
-  );
-  const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
-  const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
-  const runtimeExecutionAuditRepository = new SqliteExecutionAuditRepository(path.join(storagePaths.assetsDirectory, "system-runtime-audit.sqlite"));
-  const systemRuntimeBackendApi = new SystemRuntimeBackendApi(studioShellRepository, runtimeExecutionStore, undefined, undefined, undefined, undefined, undefined, runtimeExecutionAuditRepository);
-  const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
-  getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
-  listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
-  ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
-    workflowPersistence?.saveWorkflowRecord(recordJson);
-  });
-  ipcMain.on("ai-loom-desktop-workflows:load-record", (event, id: string) => {
-    event.returnValue = workflowPersistence?.loadWorkflowRecord(id) ?? null;
-  });
-  ipcMain.on("ai-loom-desktop-workflows:list-summaries", (event) => {
-    event.returnValue = workflowPersistence?.listWorkflowSummaries() ?? [];
-  });
-  ipcMain.on("ai-loom-desktop-workflows:delete-record", (_event, id: string) => {
-    workflowPersistence?.deleteWorkflowRecord(id);
-  });
-  ipcMain.on("ai-loom-desktop-workflows:exists", (event, id: string) => {
-    event.returnValue = workflowPersistence?.workflowExists(id) ?? false;
-  });
-  ipcMain.on("ai-loom-desktop-workflows:status", (event) => {
-    event.returnValue = workflowPersistence?.getWorkflowPersistenceStatus() ?? {
-      provider: "desktop-filesystem-indexed",
-      workflowsDirectory,
-      indexDatabasePath: workflowIndexDatabasePath,
-      degraded: true,
-      detail: "Desktop workflow persistence service is unavailable.",
-    };
-  });
-  ipcMain.handle("ai-loom-desktop-execution-runs:save", async (_event, runJson: string) => {
-    if (!executionRunRepository) {
-      return;
-    }
-    await executionRunRepository.saveRun(JSON.parse(runJson));
-  });
-  ipcMain.handle("ai-loom-desktop-execution-runs:load", async (_event, runId: string) => {
-    const run = await getExecutionRunUseCase?.execute(runId);
-    return run ? JSON.stringify(run) : null;
-  });
-  ipcMain.handle("ai-loom-desktop-execution-runs:list", async (_event, criteriaJson?: string) => {
-    const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
-    const runs = await listExecutionRunsUseCase?.execute(criteria);
-    return (runs ?? []).map((run) => JSON.stringify(run));
-  });
-  ipcMain.handle("ai-loom-desktop-workflow-runs:save", async (_event, summaryJson: string) => {
-    if (!workflowRunSummaryRepository) {
-      return;
-    }
-    await workflowRunSummaryRepository.upsert(JSON.parse(summaryJson));
-  });
-  ipcMain.handle("ai-loom-desktop-workflow-runs:load", async (_event, runId: string) => {
-    const summary = await workflowRunSummaryRepository?.getByRunId(runId);
-    return summary ? JSON.stringify(summary) : null;
-  });
-  ipcMain.handle("ai-loom-desktop-workflow-runs:save-detail", async (_event, detailJson: string) => {
-    if (!workflowRunSummaryRepository) {
-      return;
-    }
-    await workflowRunSummaryRepository.upsertDetail(JSON.parse(detailJson));
-  });
-  ipcMain.handle("ai-loom-desktop-workflow-runs:load-detail", async (_event, runId: string) => {
-    const detail = await workflowRunSummaryRepository?.getDetailByRunId(runId);
-    return detail ? JSON.stringify(detail) : null;
-  });
-  ipcMain.handle("ai-loom-desktop-workflow-runs:list", async (_event, queryJson?: string) => {
-    const query = queryJson ? JSON.parse(queryJson) : undefined;
-    const summaries = await listWorkflowRunSummariesUseCase?.execute(query);
-    return (summaries ?? []).map((summary) => JSON.stringify(summary));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:create", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as CreateAgentRequest;
-    return JSON.stringify(await agentStudioBackendApi.createAgent(request));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:update", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as UpdateAgentRequest;
-    return JSON.stringify(await agentStudioBackendApi.updateAgent(request));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:get", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.getAgent(agentId));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:list", async (_event, includeArchived = true) => {
-    return JSON.stringify(await agentStudioBackendApi.listAgents(includeArchived));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:delete", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.deleteAgent(agentId));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:archive", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.archiveAgent(agentId));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:configure-goals", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as ConfigureAgentGoalsRequest;
-    return JSON.stringify(await agentStudioBackendApi.configureGoals(request));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:configure-policy", async (_event, agentId: string, policyJson: string) => {
-    const policy = JSON.parse(policyJson) as AgentPolicy;
-    return JSON.stringify(await agentStudioBackendApi.configurePolicy(agentId, policy));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:configure-tools", async (_event, agentId: string, toolAccessJson: string) => {
-    const toolAccess = JSON.parse(toolAccessJson) as AgentToolAccessPolicy;
-    return JSON.stringify(await agentStudioBackendApi.configureTools(agentId, toolAccess));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:configure-memory", async (_event, agentId: string, memoryJson: string) => {
-    const memory = JSON.parse(memoryJson) as AgentMemoryConfiguration;
-    return JSON.stringify(await agentStudioBackendApi.configureMemory(agentId, memory));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:configure-strategy", async (_event, agentId: string, planningStrategyJson: string) => {
-    const planningStrategy = JSON.parse(planningStrategyJson) as AgentPlanningStrategy;
-    return JSON.stringify(await agentStudioBackendApi.configureStrategy(agentId, planningStrategy));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:validate", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as AgentConfigurationValidationInput;
-    return JSON.stringify(await agentStudioBackendApi.validateConfiguration(request));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:launch", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as AgentRunRequest;
-    return JSON.stringify(await agentStudioBackendApi.launchAgent(request));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:trigger-launch", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as TriggerAgentLaunchRequest;
-    return JSON.stringify(await agentStudioBackendApi.triggerLaunch(request));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:list-sessions", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.listSessions(agentId));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:get-session", async (_event, sessionId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.getSessionDetail(sessionId));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:control-run", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as AgentRunControlRequest;
-    return JSON.stringify(await agentStudioBackendApi.controlRun(request));
-  });
-  ipcMain.handle("ai-loom-desktop-agents:studio-snapshot", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.getStudioSnapshot(agentId));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:initialize", async (_event, studioId: string, name: string) => {
-    return JSON.stringify(await studioShellBackendApi.initializeStudio(studioId, name));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:snapshot", async (_event, studioId: string) => {
-    return JSON.stringify(await studioShellBackendApi.loadSnapshot(studioId));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:start-session", async (_event, studioId: string) => {
-    return JSON.stringify(await studioShellBackendApi.startSession(studioId));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:create-draft", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as CreateAssetDraftCommand;
-    return JSON.stringify(await studioShellBackendApi.createDraft(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:update-draft", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as UpdateAssetDraftCommand;
-    return JSON.stringify(await studioShellBackendApi.updateDraft(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:update-dependencies", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as UpdateAssetDraftDependenciesCommand;
-    return JSON.stringify(await studioShellBackendApi.updateDependencies(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:transition-lifecycle", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as TransitionAssetDraftLifecycleCommand;
-    return JSON.stringify(await studioShellBackendApi.transitionLifecycle(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:publish-version", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as PublishAssetDraftVersionCommand;
-    return JSON.stringify(await studioShellBackendApi.publishVersion(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:validate-draft", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as { studioId: string; draftId: string };
-    return JSON.stringify(await studioShellBackendApi.validateDraft(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:get-persisted-workflow", async (_event, workflowId: string) => {
-    return JSON.stringify(await studioShellBackendApi.getPersistedWorkflow(workflowId));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:duplicate-persisted-workflow", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["duplicatePersistedWorkflow"]>[0];
-    return JSON.stringify(await studioShellBackendApi.duplicatePersistedWorkflow(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-execution-readiness", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["assessWorkflowExecutionReadiness"]>[0];
-    return JSON.stringify(await studioShellBackendApi.assessWorkflowExecutionReadiness(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:run-workflow-draft", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["runWorkflowDraft"]>[0];
-    return JSON.stringify(await studioShellBackendApi.runWorkflowDraft(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:data-execution-readiness", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["assessDataStudioExecutionReadiness"]>[0];
-    return JSON.stringify(await studioShellBackendApi.assessDataStudioExecutionReadiness(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:run-data-pipeline", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["runDataStudioPipeline"]>[0];
-    return JSON.stringify(await studioShellBackendApi.runDataStudioPipeline(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:data-pipelines:list", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listDataStudioPipelines"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listDataStudioPipelines(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:data-pipelines:load", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["loadDataStudioPipeline"]>[0];
-    return JSON.stringify(await studioShellBackendApi.loadDataStudioPipeline(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:list", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listWorkflowRuns"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listWorkflowRuns(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:get-detail", async (_event, runId: string) => {
-    return JSON.stringify(await studioShellBackendApi.getWorkflowRunDetail(runId));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:start-rerun", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["startWorkflowRunRerun"]>[0];
-    return JSON.stringify(await studioShellBackendApi.startWorkflowRunRerun(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:list", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["listChildComponents"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.listChildComponents(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:add", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["addChildComponent"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.addChildComponent(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:remove", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["removeChildComponent"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.removeChildComponent(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:reorder", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["reorderChildComponent"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.reorderChildComponent(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-interfaces:update", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateInterfaces"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.updateInterfaces(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-parameters:update", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateParameters"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.updateParameters(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-execution-metadata:update", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateExecutionMetadata"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.updateExecutionMetadata(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:save", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["saveSystemDefinition"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.saveSystemDefinition(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:load", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["loadSystemDefinition"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.loadSystemDefinition(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:duplicate", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["duplicateSystemDefinition"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.duplicateSystemDefinition(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:modify", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["modifySystemDefinition"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.modifySystemDefinition(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-compatibility:insights", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["getCompatibilityInsights"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.getCompatibilityInsights(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:start", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemRuntimeBackendApi["startExecution"]>[0];
-    return JSON.stringify(await systemRuntimeBackendApi.startExecution(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:status", async (_event, executionId: string) => {
-    return JSON.stringify(await systemRuntimeBackendApi.getExecutionStatus(executionId));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:trace", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<SystemRuntimeBackendApi["getExecutionTrace"]>[0];
-    return JSON.stringify(await systemRuntimeBackendApi.getExecutionTrace(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:result", async (_event, executionId: string) => {
-    return JSON.stringify(await systemRuntimeBackendApi.getExecutionResult(executionId));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:upload", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["ingestReferenceImageUpload"]>[0];
-    return JSON.stringify(await studioShellBackendApi.ingestReferenceImageUpload(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:persist-outputs", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["persistReferenceImageOutputs"]>[0];
-    return JSON.stringify(await studioShellBackendApi.persistReferenceImageOutputs(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-outputs", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageOutputs"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listReferenceImageOutputs(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:get-output", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getReferenceImageOutput"]>[0];
-    return JSON.stringify(await studioShellBackendApi.getReferenceImageOutput(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-dataset-items", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageDatasetItems"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listReferenceImageDatasetItems(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:get-dataset-item", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getReferenceImageDatasetItem"]>[0];
-    return JSON.stringify(await studioShellBackendApi.getReferenceImageDatasetItem(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-run-history", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageRunHistory"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listReferenceImageRunHistory(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:chain-to-input", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["chainReferenceImageDatasetItemToInput"]>[0];
-    return JSON.stringify(await studioShellBackendApi.chainReferenceImageDatasetItemToInput(request));
-  });
-  ipcMain.handle("ai-loom-desktop-studio-shell:runtime-window:launch", async (_event, requestJson: string) => {
-    try {
-      const request = JSON.parse(requestJson) as { readonly launchContract?: unknown };
-      if (!request.launchContract) {
-        throw new Error("invalid-request:launchContract is required.");
-      }
-      const launchContractJson = JSON.stringify(request.launchContract);
-      const launched = await launchRuntimeWindowFromContract(launchContractJson);
-      return JSON.stringify({
-        ok: true,
-        data: launched,
+    // Reports deferred-feature IPC readiness to control renderer feature gating.
+    isDeferredFeatureIpcReady: () => deferredFeatureIpcReady,
+    // Returns lifecycle status of post-login runtime warmup.
+    getPostLoginRuntimeStatus: () => postLoginRuntimeStatusStore.getStatus(),
+    // Handles explicit renderer requests to start post-login warmup.
+    startPostLoginWarmup: async (request: DesktopPostLoginWarmupRequest) => {
+      await ensurePostLoginWarmupStarted(request);
+    },
+    connectivity: {
+      // Returns current serialized connectivity state for auth surfaces.
+      getState: () => connectivityRuntimeController.getConnectivityStateForAuthBootstrapIpc(),
+      // Applies deliberate offline-mode transitions for auth surfaces.
+      setOfflineMode: (requestJson: string) => connectivityRuntimeController.setConnectivityOfflineModeForAuthBootstrapIpc(requestJson),
+    },
+    secrets: {
+      // Indicates whether OS-backed encryption services are currently available.
+      isAvailable: () => safeStorage.isEncryptionAvailable(),
+      // Decrypts and returns a secret value from storage if available.
+      getSecret: (key: string) => {
+        const encoded = storageDatabase?.getItem(`secure:${key}`) ?? null;
+        if (!encoded) {
+          return null;
+        }
+        try {
+          return safeStorage.decryptString(Buffer.from(encoded, "base64"));
+        } catch {
+          return null;
+        }
+      },
+      // Encrypts and stores a secret value when platform encryption is available.
+      setSecret: (key: string, value: string) => {
+        if (!safeStorage.isEncryptionAvailable()) {
+          return;
+        }
+        const encrypted = safeStorage.encryptString(value).toString("base64");
+        storageDatabase?.setItem(`secure:${key}`, encrypted);
+      },
+      // Removes a previously stored encrypted secret value.
+      removeSecret: (key: string) => {
+        storageDatabase?.removeItem(`secure:${key}`);
+      },
+    },
+  });
+}
+
+/**
+ * Bootstraps pre-login runtime infrastructure, including storage, identity host, runtime config, and auth IPC.
+ */
+async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
+  const authShellStartedAt = logInitializationStart(DesktopStartupPhases.preLoginAuthShellBootstrap);
+  logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "start");
+  try {
+    const storageInitializationStartedAt = logInitializationStart("desktop-startup.pre-login-storage-initialize");
+    const storagePaths = resolveDesktopStoragePaths({
+      userDataPath: app.getPath("userData"),
+      logsPath: app.getPath("logs"),
+    });
+    desktopOperationalEventLogger = createDesktopOperationalEventLogger({
+      logsDirectory: storagePaths.logsDirectory,
+    });
+    logDevelopmentUserDataPath(storagePaths.appDataDirectory);
+    storageDatabase = new DesktopStorageDatabase({ paths: storagePaths });
+    await new InitializeProductionStorageUseCase(storageDatabase).execute({
+      scope: ProductionStorageInitializationScopes.authShellPreLogin,
+    });
+    logInitializationEnd("desktop-startup.pre-login-storage-initialize", storageInitializationStartedAt);
+    logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "storage-ready", authShellStartedAt);
+    logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "storage-ready");
+
+    const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
+    const authMinimalHostStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
+    logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "start");
+    console.info("[ai-loom][startup] Starting auth-minimal identity host for pre-login bootstrap.");
+    authMinimalServerRuntime = await startAuthMinimalServerHostAssembly({
+      hostOptions: {
+        databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
+        cors: {
+          allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
+          allowLoopbackOrigins: true,
+          allowNullOrigin: isPackaged,
+        },
+        env: process.env,
+        logger: desktopOperationalEventLogger,
+      },
+      boot: {
+        startupReason: "electron-main-auth-minimal-server-host-startup",
+        environment: process.env,
+      },
+    });
+    logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, authMinimalHostStartAt);
+    console.info(`[ai-loom][startup] Auth-minimal identity host ready at ${authMinimalServerRuntime.address}.`);
+    logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "ready");
+    logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready", authShellStartedAt);
+    logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready");
+    const identityApiBaseUrl = assertSecureTransportEndpoint(
+      `http://${authMinimalServerRuntime.address}`,
+      resolveHostSecureTransportConfig({
+        hostKind: HostSecureTransportKinds.desktop,
+        hostAddress: "127.0.0.1",
+      }),
+    );
+    const runtimeConfig = isPackaged
+      ? AppRuntimeConfig.forDesktopProductionAuthShell({
+        storage: storagePaths,
+        identityApiBaseUrl,
+      })
+      : AppRuntimeConfig.forDesktopDevelopmentAuthShell({
+        storage: storagePaths,
+        identityApiBaseUrl,
       });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Runtime window launch failed.";
-      const isInvalid = message.startsWith("invalid-request:");
-      return JSON.stringify({
-        ok: false,
-        error: {
-          code: isInvalid ? "invalid-request" : "internal",
-          message: isInvalid ? message.slice("invalid-request:".length) : message,
+    buildBootstrapContext({
+      runtimeConfig,
+      storagePaths,
+    });
+    registerAuthIpc();
+    logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "auth-bootstrap-ipc-ready", authShellStartedAt);
+    logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "auth-bootstrap-ipc-ready");
+    return Object.freeze({
+      storagePaths,
+      identityApiBaseUrl,
+    });
+  } finally {
+    logInitializationEnd(DesktopStartupPhases.preLoginAuthShellBootstrap, authShellStartedAt);
+    logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "complete");
+  }
+}
+
+const postLoginRuntimeBootstrapper = createPostLoginRuntimeBootstrapper({
+  ipcMain,
+  isPackaged,
+  repoRoot,
+  getStorageDatabase: () => storageDatabase,
+  setServiceSupervisor: (supervisor) => {
+    serviceSupervisor = supervisor;
+  },
+  setDeferredFeatureRuntime: (runtime) => {
+    deferredFeatureRuntime = runtime;
+  },
+  getDeferredFeatureRuntime: () => deferredFeatureRuntime,
+  setAgentRuntimeProvider: (provider) => {
+    agentRuntimeProvider = provider;
+  },
+  setCanonicalRegistryRuntimeProvider: (provider) => {
+    canonicalRegistryRuntimeProvider = provider;
+  },
+  markDeferredFeatureIpcReady: () => {
+    deferredFeatureIpcReady = true;
+  },
+  isDeferredFeatureIpcRegistered: () => deferredFeatureIpcRegistered,
+  markDeferredFeatureIpcRegistered: () => {
+    deferredFeatureIpcRegistered = true;
+  },
+  postLoginRuntimeStatusStore,
+  buildBootstrapContext,
+  launchRuntimeWindowFromContract: (launchContractJson) => windowManager.launchRuntimeWindowFromContract(launchContractJson),
+  getOperationalLogger: () => desktopOperationalEventLogger,
+});
+
+const runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({
+  getPostLoginBootstrapPromise: () => postLoginBootstrapPromise,
+  setPostLoginBootstrapPromise: (promise) => {
+    postLoginBootstrapPromise = promise;
+  },
+  getAuthMinimalServerRuntime: () => authMinimalServerRuntime,
+  setAuthMinimalServerRuntime: (runtime) => {
+    authMinimalServerRuntime = runtime;
+  },
+  getServiceSupervisor: () => serviceSupervisor,
+  setServiceSupervisor: (supervisor) => {
+    serviceSupervisor = supervisor;
+  },
+  getStorageDatabase: () => storageDatabase,
+  getDeferredFeatureRuntime: () => deferredFeatureRuntime,
+  setDeferredFeatureRuntime: (runtime) => {
+    deferredFeatureRuntime = runtime;
+  },
+  getAgentRuntimeProvider: () => agentRuntimeProvider,
+  setAgentRuntimeProvider: (provider) => {
+    agentRuntimeProvider = provider;
+  },
+  getCanonicalRegistryRuntimeProvider: () => canonicalRegistryRuntimeProvider,
+  setCanonicalRegistryRuntimeProvider: (provider) => {
+    canonicalRegistryRuntimeProvider = provider;
+  },
+  clearBootstrapContext: () => {
+    bootstrapContext = undefined;
+    rendererContentSecurityPolicyRuntimeConfig = undefined;
+  },
+  resetDeferredFeatureIpcReadiness: () => {
+    deferredFeatureIpcReady = false;
+  },
+  resetWarmupStarted: () => {
+    postLoginWarmupStarted = false;
+  },
+  clearAuthShellBootstrapResult: () => {
+    authShellBootstrapResult = undefined;
+  },
+  clearDeferredRuntimeFactoryCache: () => {
+    postLoginRuntimeBootstrapper.clearCachedFactory();
+  },
+  connectivityRuntimeController,
+  postLoginRuntimeStatusStore,
+  setIsDisposing: (value) => {
+    isDesktopRuntimeDisposing = value;
+  },
+});
+
+/**
+ * Formats a compact post-login warmup request string for startup diagnostics logging.
+ */
+function formatPostLoginWarmupRequestLog(request: DesktopPostLoginWarmupRequest): string {
+  return `source=${request.triggerSource}${request.requestedAt ? ` requestedAt=${request.requestedAt}` : ""}`;
+}
+
+/**
+ * Starts post-login warmup once, deduplicates concurrent requests, and handles failure shutdown semantics.
+ */
+async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupRequest): Promise<void> {
+  console.info(`[ai-loom] Post-login warmup requested (${formatPostLoginWarmupRequestLog(request)}).`);
+  if (postLoginBootstrapPromise) {
+    console.info("[ai-loom] Post-login warmup request joined in-flight warmup.");
+    await postLoginBootstrapPromise;
+    return;
+  }
+  if (postLoginWarmupStarted) {
+    console.info("[ai-loom] Post-login warmup request ignored because warmup was already started.");
+    return;
+  }
+  const authShell = authShellBootstrapResult;
+  if (!authShell) {
+    throw new Error("Auth-shell bootstrap context is unavailable for post-login warmup.");
+  }
+
+  postLoginWarmupStarted = true;
+  postLoginRuntimeStatusStore.markWarming(request);
+  connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl);
+  console.info("[ai-loom] Starting post-login desktop runtime warmup.");
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
+  postLoginBootstrapPromise = postLoginRuntimeBootstrapper.bootstrap(authShell);
+  try {
+    await postLoginBootstrapPromise;
+    console.info("[ai-loom] Post-login desktop runtime warmup completed.");
+  } catch (error) {
+    postLoginBootstrapPromise = undefined;
+    postLoginRuntimeStatusStore.markFailed(request, error);
+    if (!isDesktopRuntimeDisposing) {
+      console.error("Post-login desktop runtime bootstrap failed", error);
+      await runtimeDisposalCoordinator.disposeDesktopRuntimeResources();
+      app.exit(1);
+    }
+    postLoginWarmupStarted = false;
+    throw error;
+  }
+}
+
+registerDesktopAppLifecycle({
+  app,
+  hasOpenWindows: () => windowManager.hasOpenWindows(),
+  createMainWindow: openMainDesktopWindow,
+  bootstrapDesktopHost: async () => {
+    const desktopHostStartupAt = logInitializationStart(DesktopStartupPhases.hostBootstrap);
+    try {
+      desktopHostRuntime = await startDesktopHostAssembly({
+        startHost: async () => {
+          try {
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-start", desktopHostStartupAt);
+            const authShell = await bootstrapAuthShell();
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-starting", desktopHostStartupAt);
+            authShellBootstrapResult = authShell;
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-csp-install-start", desktopHostStartupAt);
+            installRendererContentSecurityPolicy();
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready", desktopHostStartupAt);
+            logInitializationMemory(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready");
+            await openMainDesktopWindow();
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "renderer-first-window-ready", desktopHostStartupAt);
+            logInitializationMemory(DesktopStartupPhases.hostBootstrap, "renderer-first-window-ready");
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "main-window-ready", desktopHostStartupAt);
+            logInitializationMemory(DesktopStartupPhases.hostBootstrap, "main-window-ready");
+            return Object.freeze({
+              close: runtimeDisposalCoordinator.disposeDesktopRuntimeResources,
+            });
+          } catch (error) {
+            await runtimeDisposalCoordinator.disposeDesktopRuntimeResources();
+            throw error;
+          }
+        },
+        boot: {
+          startupReason: "electron-main-desktop-host-startup",
+          environment: process.env,
         },
       });
+    } finally {
+      logInitializationEnd(DesktopStartupPhases.hostBootstrap, desktopHostStartupAt);
     }
-  });
-  ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
-    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
-    event.returnValue = fs.existsSync(absolutePath);
-  });
-  ipcMain.on("ai-loom-desktop-model-files:stat", (event, targetPath: string) => {
-    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
-    event.returnValue = toFileEntry(storagePaths.modelsDirectory, absolutePath);
-  });
-  ipcMain.on("ai-loom-desktop-model-files:read", (event, targetPath: string) => {
-    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
-    event.returnValue = new Uint8Array(fs.readFileSync(absolutePath));
-  });
-  ipcMain.on("ai-loom-desktop-model-files:write", (_event, request: { path: string; content: Uint8Array; overwrite?: boolean; createDirectories?: boolean }) => {
-    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.path);
-    if (!request.overwrite && fs.existsSync(absolutePath)) {
-      throw new Error(`File '${request.path}' already exists.`);
-    }
-    if (request.createDirectories) {
-      fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-    }
-    fs.writeFileSync(absolutePath, Buffer.from(request.content));
-  });
-  ipcMain.on("ai-loom-desktop-model-files:delete", (_event, targetPath: string) => {
-    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
-    if (fs.existsSync(absolutePath)) {
-      fs.rmSync(absolutePath, { recursive: true, force: true });
-    }
-  });
-  ipcMain.on("ai-loom-desktop-model-files:list", (event, targetPath: string, options?: { recursive?: boolean }) => {
-    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
-    event.returnValue = listEntries(storagePaths.modelsDirectory, absolutePath, options?.recursive === true);
-  });
-  ipcMain.on("ai-loom-desktop-model-files:move", (_event, request: { from: string; to: string; overwrite?: boolean }) => {
-    const absoluteSourcePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.from);
-    const absoluteTargetPath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.to);
-    if (!request.overwrite && fs.existsSync(absoluteTargetPath)) {
-      throw new Error(`File '${request.to}' already exists.`);
-    }
-    fs.mkdirSync(path.dirname(absoluteTargetPath), { recursive: true });
-    fs.renameSync(absoluteSourcePath, absoluteTargetPath);
-  });
-  ipcMain.on("ai-loom-desktop-model-files:copy", (_event, request: { from: string; to: string; overwrite?: boolean }) => {
-    const absoluteSourcePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.from);
-    const absoluteTargetPath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.to);
-    if (!request.overwrite && fs.existsSync(absoluteTargetPath)) {
-      throw new Error(`File '${request.to}' already exists.`);
-    }
-    fs.mkdirSync(path.dirname(absoluteTargetPath), { recursive: true });
-    fs.copyFileSync(absoluteSourcePath, absoluteTargetPath);
-  });
-
-  canonicalAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
-  canonicalProjectionSink = new InMemoryAssetLineageGraphProjectionSink();
-  const listCanonicalAssetsUseCase = new ListCanonicalAssetsUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository);
-  const loadCanonicalAssetDetailUseCase = new LoadCanonicalAssetDetailUseCase(
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-  );
-  const getVersionHistoryUseCase = new GetAssetVersionHistoryUseCase(canonicalAssetSystemRepository);
-  const explainVersionExistenceUseCase = new ExplainCanonicalVersionExistenceUseCase(
-    new GetCanonicalProvenanceSummaryUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
-    canonicalAssetSystemRepository,
-  );
-  const dependencyStateUseCase = new GetCanonicalDependencyStateUseCase(
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    new GetAssetDependencyHealthUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
-    new GetAssetImpactAnalysisUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
-    new GetCanonicalProvenanceSummaryUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
-    canonicalAssetSystemRepository,
-  );
-  const replayProjectionUseCase = new ReplayAssetGraphProjectionUseCase(canonicalAssetSystemRepository, canonicalProjectionSink);
-  const replayScopedProjectionUseCase = new ReplayScopedAssetGraphProjectionUseCase(canonicalAssetSystemRepository, replayProjectionUseCase);
-  const verifyProjectionUseCase = new VerifyAssetGraphProjectionUseCase(canonicalAssetSystemRepository, canonicalProjectionSink);
-  const projectionTrustReadModelService = new ProjectionTrustReadModelService();
-  const rebuildProjectionOrchestrationUseCase = new ProjectionRebuildOrchestrationUseCase(
-    replayScopedProjectionUseCase,
-    replayProjectionUseCase,
-    verifyProjectionUseCase,
-  );
-  const loadManagementSnapshotUseCase = new LoadCanonicalAssetManagementSnapshotUseCase(
-    loadCanonicalAssetDetailUseCase,
-    getVersionHistoryUseCase,
-    dependencyStateUseCase,
-    explainVersionExistenceUseCase,
-    verifyProjectionUseCase,
-  );
-  const registryCacheLayer = new RegistryCacheLayer({ maxEntriesPerNamespace: 300 });
-  const registryQueryService = new RegistryQueryService(
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    new CompositionAssetContractResolver(),
-    canonicalAssetSystemRepository,
-    undefined,
-    registryCacheLayer,
-    canonicalAssetSystemRepository,
-    {
-      async listRecentExecutionsForSystem(input) {
-        const response = await systemRuntimeBackendApi.listRecentExecutionsForSystem(input);
-        return response.ok && response.data ? response.data : [];
-      },
-    },
-  );
-  const registryBackendApi = new RegistryBackendApi(
-    new CrossStudioRegistryQueryService(registryQueryService),
-    new RegistryDependencyGraphService(registryQueryService, canonicalAssetSystemRepository, canonicalAssetSystemRepository, registryCacheLayer),
-    workflowPersistenceRepository ? new ListPersistedWorkflowsUseCase(workflowPersistenceRepository) : undefined,
-  );
-
-  ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return [];
-    }
-    const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
-    const assets = await listCanonicalAssetsUseCase.execute(criteria);
-    const details = await Promise.all(assets.map((asset) => loadCanonicalAssetDetailUseCase.execute(asset.id)));
-    return details
-      .filter((entry): entry is NonNullable<typeof entry> => !!entry)
-      .map((entry) => JSON.stringify({
-        assetId: entry.assetId,
-        name: entry.name,
-        kind: entry.kind,
-        status: entry.status,
-        latestVersionId: entry.latestVersion?.versionId,
-        versionCount: entry.versionCount,
-        transformationCount: entry.transformationCount,
-        lineageEdgeCount: entry.lineageEdgeCount,
-      }));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:assets", async (_event, limit?: number) => {
-    return JSON.stringify(await registryBackendApi.listAssets(limit));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:assets-filter", async (_event, filtersJson: string) => {
-    const filters = JSON.parse(filtersJson) as Parameters<RegistryBackendApi["filterAssets"]>[0];
-    return JSON.stringify(await registryBackendApi.filterAssets(filters));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:search", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["searchAssets"]>[0];
-    return JSON.stringify(await registryBackendApi.searchAssets(query));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:explore-assets", async (_event, limit?: number) => {
-    return JSON.stringify(await registryBackendApi.listExploreAssets(limit));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:explore-search", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["searchExploreAssets"]>[0];
-    return JSON.stringify(await registryBackendApi.searchExploreAssets(query));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:asset-detail", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getAssetDetail"]>[0];
-    return JSON.stringify(await registryBackendApi.getAssetDetail(query));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:dependencies", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getDependencies"]>[0];
-    return JSON.stringify(await registryBackendApi.getDependencies(query));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:dependents", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getDependents"]>[0];
-    return JSON.stringify(await registryBackendApi.getDependents(query));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:traverse-upstream", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["traverseDependencies"]>[0];
-    return JSON.stringify(await registryBackendApi.traverseDependencies(query));
-  });
-  ipcMain.handle("ai-loom-desktop-registry:traverse-downstream", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["traverseDependents"]>[0];
-    return JSON.stringify(await registryBackendApi.traverseDependents(query));
-  });
-  ipcMain.handle("ai-loom-desktop-canonical-assets:detail", async (_event, assetId: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return null;
-    }
-    const detail = await loadCanonicalAssetDetailUseCase.execute(assetId);
-    if (!detail) return null;
-    return JSON.stringify({
-      assetId: detail.assetId,
-      name: detail.name,
-      kind: detail.kind,
-      status: detail.status,
-      latestVersionId: detail.latestVersion?.versionId,
-      versionCount: detail.versionCount,
-      transformationCount: detail.transformationCount,
-      lineageEdgeCount: detail.lineageEdgeCount,
-    });
-  });
-  ipcMain.handle("ai-loom-desktop-canonical-assets:version-chain", async (_event, assetId: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return [];
-    }
-    const chain = await getVersionHistoryUseCase.execute(assetId);
-    const withState = await Promise.all(chain.map(async (version) => {
-      const dependencyState = await dependencyStateUseCase.execute({
-        versionId: version.versionId,
-        preferPersistedIfFreshMs: 300_000,
-      }).catch(() => undefined);
-      return JSON.stringify({
-        versionId: version.versionId,
-        parentVersionId: version.parentVersionId,
-        createdAt: version.createdAt.toISOString(),
-        label: version.versionLabel,
-        dependencyState: dependencyState
-          ? {
-            state: dependencyState.state,
-            reasons: dependencyState.reasons,
-            nextActions: dependencyState.nextActions,
-          }
-          : undefined,
-      });
-    }));
-    return withState;
-  });
-  ipcMain.handle("ai-loom-desktop-canonical-assets:dependency-state", async (_event, versionId: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return null;
-    }
-    const summary = await dependencyStateUseCase.execute({
-      versionId,
-      preferPersistedIfFreshMs: 300_000,
-    });
-    return JSON.stringify({
-      versionId: summary.versionId,
-      state: summary.state,
-      lineageConfidence: summary.lineageConfidence,
-      lifecycle: {
-        source: summary.lifecycle.source,
-        computedAt: summary.lifecycle.computedAt.toISOString(),
-        reason: summary.lifecycle.reason,
-      },
-      reasons: summary.reasons,
-      nextActions: summary.nextActions,
-    });
-  });
-  ipcMain.handle("ai-loom-desktop-canonical-assets:reconcile-identity", async (_event, entityType: string, entityId: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return null;
-    }
-    const reconciled = await new ReconcileCanonicalIdentityMappingsUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository).execute({
-      entityType: entityType as any,
-      entityId,
-    });
-    return JSON.stringify(reconciled);
-  });
-  ipcMain.handle("ai-loom-desktop-canonical-assets:replay-scope", async (_event, entityType: string, entityId: string, versionId?: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return JSON.stringify({ replayed: false, reason: "Canonical asset system is unavailable." });
-    }
-    const replay = await replayScopedProjectionUseCase.execute({ entityType: entityType as any, entityId, versionId });
-    return JSON.stringify(replay);
-  });
-  ipcMain.handle("ai-loom-desktop-canonical-assets:verify-projection", async (_event, assetId: string, versionIdsInScope?: ReadonlyArray<string>) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return null;
-    }
-    const verification = await verifyProjectionUseCase.execute({ assetId, versionIdsInScope });
-    return JSON.stringify(projectionTrustReadModelService.summarize(verification));
-  });
-  ipcMain.handle("ai-loom-desktop-canonical-assets:rebuild-scopes", async (_event, requestJson: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return JSON.stringify({ totalScopes: 0, replayedScopes: 0, verifiedScopes: 0, results: [] });
-    }
-    const request = JSON.parse(requestJson) as Parameters<ProjectionRebuildOrchestrationUseCase["execute"]>[0];
-    const result = await rebuildProjectionOrchestrationUseCase.execute(request);
-    return JSON.stringify(result);
-  });
-  ipcMain.handle("ai-loom-desktop-canonical-assets:management-snapshot", async (_event, assetId: string, includeProjectionHealth = true, versionIdsInProjectionScope?: ReadonlyArray<string>) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
-      return null;
-    }
-    const snapshot = await loadManagementSnapshotUseCase.execute({
-      assetId,
-      includeProjectionHealth,
-      versionIdsInProjectionScope,
-    });
-    if (!snapshot) {
-      return null;
-    }
-    return JSON.stringify({
-      ...snapshot,
-      versions: snapshot.versions.map((entry) => ({
-        ...entry,
-        createdAt: entry.createdAt.toISOString(),
-      })),
-    });
-  });
-
-  if (runtimeConfig.isPackagedDesktopHost && !pythonRuntime.isAvailable) {
-    console.warn(
-      `[ai-loom] Packaged private Python runtime was not found at '${pythonRuntime.executablePath ?? pythonRuntime.runtimeRoot}'.`,
-    );
-  }
-}
-
-async function disposeDesktopRuntimeResources(): Promise<void> {
-  await authoritativeServerRuntime?.stop();
-  await serviceSupervisor?.stop();
-  storageDatabase?.dispose();
-  executionRunRepository?.dispose();
-  workflowRunSummaryRepository?.dispose();
-  agentRepository?.dispose();
-  studioShellRepository?.dispose();
-  workflowPersistenceRepository?.dispose();
-}
-
-app.whenReady().then(async () => {
-  desktopHostRuntime = await startDesktopHostAssembly({
-    startHost: async () => {
-      await bootstrapDesktopRuntime();
-      try {
-        installRendererContentSecurityPolicy();
-        await createMainWindow();
-      } catch (error) {
-        await disposeDesktopRuntimeResources();
-        throw error;
-      }
-      return Object.freeze({
-        close: disposeDesktopRuntimeResources,
-      });
-    },
-    boot: {
-      startupReason: "electron-main-desktop-host-startup",
-      environment: process.env,
-    },
-  });
-
-  app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      await createMainWindow();
-    }
-  });
-}).catch((error) => {
-  console.error("Failed to bootstrap desktop host", error);
-  app.exit(1);
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
-
-app.on("before-quit", async () => {
-  await desktopHostRuntime?.stop();
+  },
+  stopDesktopHost: async () => {
+    await desktopHostRuntime?.stop();
+  },
+  isMacOS: process.platform === "darwin",
 });

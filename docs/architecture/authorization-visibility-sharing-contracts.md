@@ -79,3 +79,7 @@ For resources that do not yet expose all canonical fields:
 4. Backfill explicit `workspaceId` and sharing policy data before moving resources to `workspace`, `shared`, or `published`.
 
 This keeps enforcement seams consistent immediately while allowing gradual field adoption by each resource family.
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`

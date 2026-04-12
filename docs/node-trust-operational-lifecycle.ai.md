@@ -18,6 +18,7 @@ Story 5.4.5 operational baseline for the full node trust lifecycle with hardened
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
 - `src/ui/pages/NodeEnrollmentReviewPage.tsx`
 - `src/ui/pages/NodeInventoryPage.tsx`
+- `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx`
 
 ## Lifecycle sequence
 
@@ -28,6 +29,7 @@ Story 5.4.5 operational baseline for the full node trust lifecycle with hardened
 5. Activation: approved node with certificate transitions to `trusted`.
 6. Heartbeat: only trusted, non-revoked, certificate-backed nodes can write presence.
 7. Inventory: admin sees pending/active/offline/rejected/revoked states.
+   - Desktop and thin-client/admin-lite now reuse one node administration panel seam with surface-appropriate density.
 8. Revocation: node becomes `revoked` with durable reason metadata.
 
 ## Managed trust material provisioning

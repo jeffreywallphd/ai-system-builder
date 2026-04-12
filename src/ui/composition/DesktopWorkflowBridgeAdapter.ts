@@ -5,5 +5,5 @@ export function resolveDesktopWorkflowBridge(): DesktopWorkflowBridge | undefine
     return undefined;
   }
 
-  return window.aiLoomDesktop?.workflows;
+  return window.aiLoomDesktop?.features?.workflows ?? window.aiLoomDesktop?.workflows;
 }

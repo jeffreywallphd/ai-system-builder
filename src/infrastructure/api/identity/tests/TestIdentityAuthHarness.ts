@@ -704,6 +704,7 @@ export async function createIdentityAuthTestHarness(
       pairingService: trustedDevicePairingService,
     }),
     identityLookupRepository: adapter,
+    sessionRepository: adapter,
     authenticatedSessionService,
     sessionTrustService,
     observability: options.observability,

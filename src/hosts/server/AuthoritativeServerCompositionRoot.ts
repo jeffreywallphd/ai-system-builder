@@ -1,51 +1,93 @@
-﻿import {
+import {
   HostLifecyclePhases,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
   assertHostCanRunAsControlPlane,
   type ExecutableHostCompositionRoot,
   type HostBootConfiguration,
   type HostLifecycleTransition,
+  type HostRuntimeMetadata,
   type HostRuntimeHandle,
 } from "@application/common/HostCompositionContracts";
 import { AuthoritativeServerHostRuntime } from "../HostRuntimeCatalog";
 import {
   HostBootstrapStageIds,
-  createHostStartupContext,
-  composeHostBootstrapPipeline,
-  executeHostBootstrapPipeline,
-  type HostBootstrapStageId,
   type HostBootstrapReusableStageHandlers,
+  type HostDeploymentProfile,
   type HostSpecificBootstrapStage,
   type HostStartupLifecycleHooks,
 } from "../bootstrap/HostBootstrapPipeline";
+import type { StartupTracer } from "../bootstrap/startupTracer";
 import type { HostCapabilityFlag } from "@domain/hosts/HostRuntimeDomain";
-import {
-  assertAuthoritativeControlPlaneServiceCoverage,
-  composeHostServiceRegistrationPlan,
-} from "@infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
-import { resolveHostStartupConfiguration } from "@infrastructure/config/HostStartupConfiguration";
 import {
   startIdentityServerHost,
   type IdentityServerHost,
   type IdentityServerHostOptions,
 } from "./IdentityServerHost";
-import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
-import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 import {
-  createSqlitePersistenceRuntime,
-  resolveSqlitePersistenceRuntimeConfiguration,
-  type SqlitePersistenceRuntime,
-} from "@infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
+  createHostLifecycleCoordinator,
+} from "../lifecycle/HostLifecycleCoordinator";
+import type { SqlitePersistenceRuntime } from "@infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
+import type { AuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
+import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
+import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
+import type {
+  ComfyUiExecutionAdapterInfrastructure,
+} from "@infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition";
+import type {
+  AuthoritativeRunExecutionAdapterRegistration,
+} from "@infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration";
 import {
-  createAuthoritativePersistenceMigrationHooks,
-  createAuthoritativePersistentPlatformServices,
-  type AuthoritativePersistentPlatformServices,
-} from "@infrastructure/persistence/AuthoritativePersistenceComposition";
+  createAuthoritativeServerConfigBootstrapStage,
+  type AuthoritativeServerConfigBootstrapStage,
+} from "./AuthoritativeServerConfigBootstrapStage";
+import {
+  createAuthoritativeServerSecurityBootstrapStage,
+  type AuthoritativeServerSecurityBootstrapStage,
+} from "./AuthoritativeServerSecurityBootstrapStage";
+import {
+  createAuthoritativeServerBootstrapOrchestrator,
+  type AuthoritativeServerBootstrapReadinessReport,
+} from "./AuthoritativeServerBootstrapOrchestrator";
+import type { AuthoritativeServerShutdownDisposalPlan } from "./composition/contracts/AuthoritativeServerCompositionModuleContracts";
+import {
+  AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
+  AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
+  AuthoritativeServerPersistenceRuntimeArtifactKey,
+  AuthoritativeServerPersistentPlatformServicesArtifactKey,
+  AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+  AuthoritativeServerSecurityBootstrapArtifactKey,
+  AuthoritativeServerServiceRegistrationPlanArtifactKey,
+} from "./AuthoritativeServerBootstrapArtifactKeys";
+import {
+  combineStartupLifecycleHooks,
+  createLifecycleCleanupHooksFromShutdownPlan,
+} from "./AuthoritativeServerLifecycleComposition";
+import {
+  attachStartupCorrelationIdToError,
+  emitAuthoritativeServerStartupTelemetry,
+  summarizeStartupError,
+  type AuthoritativeServerPipelineStageSummary,
+  type AuthoritativeServerRecordStartupBaseline,
+} from "./AuthoritativeServerStartupTelemetry";
+
+interface BootstrapFailureDiagnosticsCarrier {
+  readonly bootstrapStageStatus?: {
+    readonly stages: ReadonlyArray<{
+      readonly stageId: string;
+      readonly sequence: number;
+      readonly state: string;
+      readonly durationMs?: number;
+      readonly failure?: Readonly<Record<string, string>>;
+    }>;
+  };
+  readonly bootstrapReadinessReport?: AuthoritativeServerBootstrapReadinessReport;
+}
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
   readonly address: string;
+  readonly startupCorrelationId?: string;
   readonly transitionHistory: ReadonlyArray<HostLifecycleTransition>;
 }
 
@@ -76,58 +118,45 @@ export interface AuthoritativeServerCompositionRootOptions {
       readonly hostConfiguration: IdentityServerHostOptions;
       readonly environment: Readonly<Record<string, string | undefined>>;
     }) => AuthoritativePersistentPlatformServices;
+    readonly composeApiRouteRegistrationPlan?: () => AuthoritativeApiRouteRegistrationPlan;
+    readonly assertApiRouteRegistrationCoverage?: (plan: AuthoritativeApiRouteRegistrationPlan) => void;
+    readonly executionInfrastructureEnabled?: boolean;
+    readonly composeComfyUiExecutionAdapter?: (input: {
+      readonly hostConfiguration: IdentityServerHostOptions;
+      readonly environment: Readonly<Record<string, string | undefined>>;
+      readonly deploymentProfile: HostDeploymentProfile;
+    }) => ComfyUiExecutionAdapterInfrastructure | undefined;
+    readonly composeRunExecutionAdapterRegistration?: (input: {
+      readonly hostConfiguration: IdentityServerHostOptions;
+      readonly environment: Readonly<Record<string, string | undefined>>;
+      readonly deploymentProfile: HostDeploymentProfile;
+      readonly comfyUiExecutionAdapter?: ComfyUiExecutionAdapterInfrastructure;
+    }) => AuthoritativeRunExecutionAdapterRegistration | undefined;
+    readonly resolveDeploymentPolicyBootstrap?: (input: {
+      readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
+      readonly hostConfiguration: IdentityServerHostOptions;
+      readonly deploymentProfile: HostDeploymentProfile;
+      readonly environment: Readonly<Record<string, string | undefined>>;
+    }) => Promise<DeploymentPolicyBootstrapResolutionResult>;
+    readonly createStartupTracer?: (input: {
+      readonly boot: HostBootConfiguration;
+      readonly hostConfiguration: IdentityServerHostOptions;
+    }) => StartupTracer;
+    readonly createConfigStage?: () => AuthoritativeServerConfigBootstrapStage;
+    readonly createSecurityStage?: () => AuthoritativeServerSecurityBootstrapStage;
+    readonly recordStartupBaseline?: AuthoritativeServerRecordStartupBaseline;
   };
 }
 
-const StartedHostArtifactKey = "artifact:host:server:authoritative:runtime";
-export const AuthoritativeServerServiceRegistrationPlanArtifactKey =
-  "artifact:host:server:authoritative:service-registration-plan";
-export const AuthoritativeServerPersistenceRuntimeArtifactKey = "artifact:host:server:authoritative:persistence-runtime";
-export const AuthoritativeServerPersistentPlatformServicesArtifactKey =
-  "artifact:host:server:authoritative:persistent-platform-services";
-
-function combineStartupLifecycleHooks(
-  primary: HostStartupLifecycleHooks | undefined,
-  secondary: HostStartupLifecycleHooks | undefined,
-): HostStartupLifecycleHooks {
-  return Object.freeze({
-    onStageStarting: async (event) => {
-      await primary?.onStageStarting?.(event);
-      await secondary?.onStageStarting?.(event);
-    },
-    onStageCompleted: async (event) => {
-      await primary?.onStageCompleted?.(event);
-      await secondary?.onStageCompleted?.(event);
-    },
-    onStageFailed: async (event) => {
-      await primary?.onStageFailed?.(event);
-      await secondary?.onStageFailed?.(event);
-    },
-    onPipelineCompleted: async (event) => {
-      await primary?.onPipelineCompleted?.(event);
-      await secondary?.onPipelineCompleted?.(event);
-    },
-  });
-}
-
-function combineStageHandlers(
-  base: HostBootstrapReusableStageHandlers,
-  overrides: HostBootstrapReusableStageHandlers | undefined,
-): HostBootstrapReusableStageHandlers {
-  const combined: HostBootstrapReusableStageHandlers = {};
-  for (const stageId of Object.values(HostBootstrapStageIds) as ReadonlyArray<HostBootstrapStageId>) {
-    const baseHandler = base[stageId];
-    const overrideHandler = overrides?.[stageId];
-    if (!baseHandler && !overrideHandler) {
-      continue;
-    }
-    combined[stageId] = async (context) => {
-      await baseHandler?.(context);
-      await overrideHandler?.(context);
-    };
-  }
-  return Object.freeze(combined);
-}
+export {
+  AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
+  AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
+  AuthoritativeServerPersistenceRuntimeArtifactKey,
+  AuthoritativeServerPersistentPlatformServicesArtifactKey,
+  AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+  AuthoritativeServerSecurityBootstrapArtifactKey,
+  AuthoritativeServerServiceRegistrationPlanArtifactKey,
+};
 
 export function createAuthoritativeServerCompositionRoot(
   input: AuthoritativeServerCompositionRootOptions,
@@ -147,109 +176,97 @@ export function createAuthoritativeServerCompositionRoot(
       }, boot);
 
       const lifecycle = createHostLifecycleCoordinator({ boot });
-      const runtimeMetadata = advertiseHostRuntimeMetadata({
-        host: boot.host,
-        metadata: Object.freeze({
-          compositionRootId: "composition-root:host:server:authoritative",
-          startupReason: boot.startupReason,
-          controlPlaneSource: "local-authoritative-server",
-          transportHost: input.hostOptions.host,
-          transportPort: input.hostOptions.port !== undefined ? String(input.hostOptions.port) : undefined,
-        }),
-      });
+      const startupStartedAtMs = Date.now();
+      const startupStartedAt = new Date(startupStartedAtMs).toISOString();
+      let startupTracer: StartupTracer | undefined;
+      let runtimeMetadata: HostRuntimeMetadata | undefined;
       let startedHost: IdentityServerHost | undefined;
       let persistenceRuntime: SqlitePersistenceRuntime | undefined;
       let persistentPlatformServices: AuthoritativePersistentPlatformServices | undefined;
+      let shutdownDisposalPlan: AuthoritativeServerShutdownDisposalPlan = Object.freeze({
+        stageId: "shutdown-preparation",
+        steps: Object.freeze([]),
+      });
+      let startupFailure: unknown | undefined;
+      let authoritativeStageStatus: ReadonlyArray<{
+        readonly stageId: string;
+        readonly sequence: number;
+        readonly state: string;
+        readonly durationMs?: number;
+        readonly failure?: Readonly<Record<string, string>>;
+      }> = [];
+      let startupReadinessReport: AuthoritativeServerBootstrapReadinessReport = Object.freeze({
+        state: "not-ready",
+        checks: Object.freeze([]),
+        securityMaterial: Object.freeze({
+          state: "degraded",
+          blocking: false,
+          lifecycleStage: "unknown",
+          productionCapable: false,
+          issueCount: 0,
+          fatalIssueCount: 0,
+          warningIssueCount: 0,
+          summary: Object.freeze({
+            total: 0,
+            healthy: 0,
+            degraded: 0,
+            missing: 0,
+            nonCompliant: 0,
+          }),
+          issues: Object.freeze([]),
+          entries: Object.freeze([]),
+          governanceAssertions: Object.freeze({
+            total: 0,
+            warning: 0,
+            blocked: 0,
+            entries: Object.freeze([]),
+          }),
+        }),
+        totalCheckCount: 0,
+        readyCheckCount: 0,
+        degradedCheckCount: 0,
+        failedCheckCount: 0,
+        blockingFailureCount: 0,
+      });
+      const pipelineStageSummaries: AuthoritativeServerPipelineStageSummary[] = [];
+
       await lifecycle.markComposing("compose-authoritative-server-host");
 
       try {
-        const startupConfiguration = resolveHostStartupConfiguration({
-          boot,
-          startup: {
-            deploymentProfile: input.bootstrap?.deploymentProfile,
-            environment: input.bootstrap?.environment ?? input.hostOptions.env ?? process.env,
-            enabledCapabilities: input.bootstrap?.enabledCapabilities,
-          },
-        });
-
-        const defaultStageHandlers: HostBootstrapReusableStageHandlers = {
-          [HostBootstrapStageIds.configuration]: (context) => {
-            context.setArtifact(
-              "artifact:host:server:authoritative:host-options",
-              context.hostConfiguration as IdentityServerHostOptions,
-            );
-            context.setArtifact(HostRuntimeMetadataArtifactKey, runtimeMetadata);
-          },
-          [HostBootstrapStageIds.dependencies]: (context) => {
-            const composePlan = input.bootstrap?.composeServiceRegistrationPlan
-              ?? ((composedBoot: HostBootConfiguration) => composeHostServiceRegistrationPlan({
-                host: composedBoot.host,
-                requiredStartupDependencyIds: composedBoot.requiredDependencyIds,
-              }));
-            const plan = composePlan(context.boot);
-            context.setArtifact(AuthoritativeServerServiceRegistrationPlanArtifactKey, plan);
-          },
-          [HostBootstrapStageIds.persistence]: async (context) => {
-            persistenceRuntime = (
-              input.bootstrap?.createPersistenceRuntime
-              ?? ((runtimeInput) => createSqlitePersistenceRuntime({
-                configuration: resolveSqlitePersistenceRuntimeConfiguration({
-                  databasePath: runtimeInput.hostConfiguration.databasePath,
-                  environment: runtimeInput.environment,
-                }),
-                migrationHooks: createAuthoritativePersistenceMigrationHooks(),
-              }))
-            )({
-              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
-              environment: context.environment,
-            });
-            await persistenceRuntime.start();
-            persistentPlatformServices = (
-              input.bootstrap?.composePersistentPlatformServices
-              ?? ((servicesInput) => createAuthoritativePersistentPlatformServices({
-                databasePath: servicesInput.persistenceRuntime.configuration.databasePath,
-              }))
-            )({
-              persistenceRuntime,
-              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
-              environment: context.environment,
-            });
-            context.setArtifact(AuthoritativeServerPersistenceRuntimeArtifactKey, persistenceRuntime);
-            context.setArtifact(
-              AuthoritativeServerPersistentPlatformServicesArtifactKey,
-              persistentPlatformServices,
-            );
-          },
-          [HostBootstrapStageIds.featureRegistration]: async (context) => {
-            const plan = context.getArtifact<HostServiceRegistrationPlan>(
-              AuthoritativeServerServiceRegistrationPlanArtifactKey,
-            );
-            if (!plan) {
-              throw new Error("Authoritative server startup requires a composed host service registration plan.");
-            }
-            const composedPersistentServices = context.getArtifact<AuthoritativePersistentPlatformServices>(
-              AuthoritativeServerPersistentPlatformServicesArtifactKey,
-            );
-            if (!composedPersistentServices) {
-              throw new Error(
-                "Authoritative server startup requires composed persistent platform services before runtime feature registration.",
-              );
-            }
-            (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
-            const composedHost = await startHost({
-              ...(context.hostConfiguration as IdentityServerHostOptions),
-              persistentPlatformServices: composedPersistentServices,
-            });
-            context.setArtifact(StartedHostArtifactKey, composedHost);
-          },
-        };
-        const stageHandlers = combineStageHandlers(defaultStageHandlers, input.bootstrap?.stageHandlers);
-
         const lifecycleHooks = combineStartupLifecycleHooks({
           onStageStarting: async (event) => {
             if (event.stageId === HostBootstrapStageIds.featureRegistration && lifecycle.phase === HostLifecyclePhases.composing) {
               await lifecycle.markStarting("start-authoritative-server-host");
             }
+          },
+          onStageCompleted: async (event) => {
+            const startedAtMs = Date.parse(event.startedAt);
+            const completedAtMs = Date.parse(event.completedAt);
+            pipelineStageSummaries.push(Object.freeze({
+              stageId: event.stageId,
+              sequence: event.sequence,
+              status: "completed",
+              startedAt: event.startedAt,
+              endedAt: event.completedAt,
+              durationMs: Number.isNaN(startedAtMs) || Number.isNaN(completedAtMs)
+                ? 0
+                : Math.max(0, completedAtMs - startedAtMs),
+            }));
+          },
+          onStageFailed: async (event) => {
+            const startedAtMs = Date.parse(event.startedAt);
+            const failedAtMs = Date.parse(event.failedAt);
+            pipelineStageSummaries.push(Object.freeze({
+              stageId: event.stageId,
+              sequence: event.sequence,
+              status: "failed",
+              startedAt: event.startedAt,
+              endedAt: event.failedAt,
+              durationMs: Number.isNaN(startedAtMs) || Number.isNaN(failedAtMs)
+                ? 0
+                : Math.max(0, failedAtMs - startedAtMs),
+              failure: summarizeStartupError(event.error),
+            }));
           },
           onPipelineCompleted: async (event) => {
             if (lifecycle.phase === HostLifecyclePhases.starting) {
@@ -266,60 +283,68 @@ export function createAuthoritativeServerCompositionRoot(
           },
         }, input.bootstrap?.lifecycleHooks);
 
-        const context = createHostStartupContext({
+        const configStageFactory = (
+          input.bootstrap?.createConfigStage
+          ?? (() => createAuthoritativeServerConfigBootstrapStage({
+            startup: {
+              deploymentProfile: input.bootstrap?.deploymentProfile,
+              enabledCapabilities: input.bootstrap?.enabledCapabilities,
+            },
+            createStartupTracer: input.bootstrap?.createStartupTracer,
+          }))
+        );
+        const securityStageFactory = (
+          input.bootstrap?.createSecurityStage
+          ?? (() => createAuthoritativeServerSecurityBootstrapStage())
+        );
+
+        const bootstrapOrchestrator = createAuthoritativeServerBootstrapOrchestrator({
           boot,
-          deploymentProfile: startupConfiguration.deploymentProfile,
-          environment: startupConfiguration.environment,
-          enabledCapabilities: startupConfiguration.enabledCapabilities,
-          hostConfiguration: input.hostOptions,
-          lifecycleHooks,
+          hostOptions: input.hostOptions,
+          startHost,
+          bootstrap: {
+            ...input.bootstrap,
+            lifecycleHooks,
+            createConfigStage: configStageFactory,
+            createSecurityStage: securityStageFactory,
+          },
         });
-        const stages = composeHostBootstrapPipeline({
-          reusableStageHandlers: stageHandlers,
-          hostSpecificStages: input.bootstrap?.hostSpecificStages,
-        });
-        await executeHostBootstrapPipeline({
-          context,
-          stages,
-        });
-        startedHost = context.getArtifact<IdentityServerHost>(StartedHostArtifactKey);
-        if (!startedHost) {
-          throw new Error("Authoritative server bootstrap did not produce a runtime host artifact.");
-        }
+        const bootstrapResult = await bootstrapOrchestrator.execute();
+        startupTracer = bootstrapResult.startupTracer;
+        runtimeMetadata = bootstrapResult.runtimeMetadata;
+        startedHost = bootstrapResult.startedHost;
+        persistenceRuntime = bootstrapResult.persistenceRuntime;
+        persistentPlatformServices = bootstrapResult.persistentPlatformServices;
+        shutdownDisposalPlan = bootstrapResult.shutdownDisposalPlan;
+        authoritativeStageStatus = bootstrapResult.stageStatus.stages;
+        startupReadinessReport = bootstrapResult.readinessReport;
+
         const activeHost = startedHost;
-        const activePersistenceRuntime = persistenceRuntime;
+        const resolvedStartupTracer = startupTracer as StartupTracer;
+        const resolvedRuntimeMetadata = runtimeMetadata as HostRuntimeMetadata;
+        const stopCleanupHooks = createLifecycleCleanupHooksFromShutdownPlan({
+          plan: shutdownDisposalPlan,
+          reason: "authoritative-server-stop-requested",
+        });
 
         const stop = async () => {
           await lifecycle.shutdown({
             shutdownRequestedReason: "authoritative-server-stop-requested",
             shutdownCompletedReason: "authoritative-server-stopped",
             shutdownFailureReason: "authoritative-server-stop-failed",
-            cleanupHooks: [
-              {
-                hookId: "close-runtime-host",
-                run: async () => {
-                  await activeHost.close();
-                },
-              },
-              {
-                hookId: "close-persistence-runtime",
-                run: async () => {
-                  persistentPlatformServices?.dispose();
-                  await activePersistenceRuntime?.dispose();
-                },
-              },
-            ],
+            cleanupHooks: stopCleanupHooks,
           });
         };
 
         return Object.freeze({
           host: boot.host,
-          runtimeMetadata,
+          runtimeMetadata: resolvedRuntimeMetadata,
           get phase() {
             return lifecycle.phase;
           },
           port: activeHost.port,
           address: activeHost.address,
+          startupCorrelationId: resolvedStartupTracer.startupCorrelationId,
           get readiness() {
             return lifecycle.readiness;
           },
@@ -332,43 +357,53 @@ export function createAuthoritativeServerCompositionRoot(
           stop,
         });
       } catch (error) {
+        const diagnostics = error as BootstrapFailureDiagnosticsCarrier;
+        if (diagnostics.bootstrapStageStatus?.stages) {
+          authoritativeStageStatus = diagnostics.bootstrapStageStatus.stages;
+        }
+        if (diagnostics.bootstrapReadinessReport) {
+          startupReadinessReport = diagnostics.bootstrapReadinessReport;
+        }
         let failure: unknown = error;
-        if (startedHost) {
-          try {
-            await lifecycle.runStartupFailureCleanup({
-              cleanupReason: "authoritative-server-start-failure-cleanup",
-              cleanupFailureReason: "authoritative-server-start-failure-cleanup-failed",
-              cleanupHooks: [
-                {
-                  hookId: "close-runtime-host",
-                  run: async () => {
-                    await startedHost?.close();
-                  },
-                },
-                {
-                  hookId: "close-persistence-runtime",
-                  run: async () => {
-                    persistentPlatformServices?.dispose();
-                    await persistenceRuntime?.dispose();
-                  },
-                },
-              ],
-            });
-          } catch (cleanupError) {
-            failure = cleanupError;
-          }
-        } else {
-          try {
-            persistentPlatformServices?.dispose();
-            await persistenceRuntime?.dispose();
-          } catch (cleanupError) {
-            failure = cleanupError;
-          }
+        try {
+          const startupFailureCleanupHooks = shutdownDisposalPlan.steps.length > 0
+            ? createLifecycleCleanupHooksFromShutdownPlan({
+              plan: shutdownDisposalPlan,
+              reason: "authoritative-server-start-failure-cleanup",
+            })
+            : [{
+              hookId: "close-persistence-runtime",
+              run: async () => {
+                persistentPlatformServices?.dispose();
+                await persistenceRuntime?.dispose();
+              },
+            }];
+          await lifecycle.runStartupFailureCleanup({
+            cleanupReason: "authoritative-server-start-failure-cleanup",
+            cleanupFailureReason: "authoritative-server-start-failure-cleanup-failed",
+            cleanupHooks: startupFailureCleanupHooks,
+          });
+        } catch (cleanupError) {
+          failure = cleanupError;
         }
         await lifecycle.markStartupFailed("authoritative-server-start-failed", failure);
+        startupFailure = failure;
+        attachStartupCorrelationIdToError(failure, startupTracer?.startupCorrelationId);
         throw failure;
+      } finally {
+        await emitAuthoritativeServerStartupTelemetry({
+          boot,
+          startupTracer,
+          startupStartedAtMs,
+          startupStartedAt,
+          startupFailure,
+          pipelineStageSummaries,
+          authoritativeStageStatus,
+          startupReadinessReport,
+          logger: input.hostOptions.logger,
+          recordStartupBaseline: input.bootstrap?.recordStartupBaseline,
+        });
       }
     },
   });
 }
-

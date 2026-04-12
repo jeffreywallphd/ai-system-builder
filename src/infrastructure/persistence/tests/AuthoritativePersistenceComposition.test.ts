@@ -20,10 +20,19 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(ids).toContain("workspaces:v1");
     expect(ids).toContain("authorization:v1");
     expect(ids).toContain("nodes:v1");
+    expect(ids).toContain("execution-nodes:v1");
     expect(ids).toContain("storage:v1");
     expect(ids).toContain("assets:v1");
     expect(ids).toContain("asset-upload-sessions:v1");
+    expect(ids).toContain("image-assets:v1");
+    expect(ids).toContain("image-workflow-system:v1");
     expect(ids).toContain("platform:v1");
+    expect(ids).toContain("platform:v2");
+    expect(ids).toContain("platform:v3");
+    expect(ids).toContain("platform:v4");
+    expect(ids).toContain("deployment-policy:v1");
+    expect(ids).toContain("generated-results:v1");
+    expect(ids).toContain("audit-ledger:v1");
     expect(ids).toContain("certificate-authority:v1");
     expect(ids).toContain("secret-records:v1");
   });
@@ -36,7 +45,13 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(services.databasePath.endsWith("authoritative-composition-test.sqlite")).toBeTrue();
     expect(services.identityRepository).toBeDefined();
     expect(services.workspaceRepository).toBeDefined();
+    expect(services.executionNodeRepository).toBeDefined();
+    expect(services.imageAssetRepository).toBeDefined();
+    expect(services.imageWorkflowSystemRepository).toBeDefined();
     expect(services.platformPersistenceRepository).toBeDefined();
+    expect(services.auditLedgerRepository).toBeDefined();
+    expect(services.deploymentPolicyRepository).toBeDefined();
+    expect(services.generatedResultRepository).toBeDefined();
 
     expect(() => services.dispose()).not.toThrow();
   });
@@ -87,6 +102,34 @@ describe("AuthoritativePersistenceComposition", () => {
         FROM workspace_repository_migrations
       `).get() as { version?: number };
       expect(version.version).toBe(3);
+    } finally {
+      database.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("applies trigger-based migrations without splitting trigger bodies into invalid fragments", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-authoritative-audit-trigger-migration-"));
+    const databasePath = path.join(root, "audit-trigger-migration.sqlite");
+    const database = openSqliteCompatDatabase(databasePath);
+
+    try {
+      const hooks = createAuthoritativePersistenceMigrationHooks();
+      const v1 = hooks.find((migration) => migration.migrationId === "audit-ledger:v1");
+      const v2 = hooks.find((migration) => migration.migrationId === "audit-ledger:v2");
+      expect(v1).toBeDefined();
+      expect(v2).toBeDefined();
+
+      expect(() => v1?.apply(database)).not.toThrow();
+      expect(() => v2?.apply(database)).not.toThrow();
+
+      const trigger = database.prepare(`
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'trigger'
+          AND name = 'authoritative_audit_ledger_events_hash_chain_digest_required'
+      `).get() as { name?: string } | undefined;
+      expect(trigger?.name).toBe("authoritative_audit_ledger_events_hash_chain_digest_required");
     } finally {
       database.close();
       rmSync(root, { recursive: true, force: true });

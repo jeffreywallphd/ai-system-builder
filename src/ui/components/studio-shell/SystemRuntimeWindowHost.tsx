@@ -174,12 +174,6 @@ export default function SystemRuntimeWindowHost(): JSX.Element {
 
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="system-runtime-window-host">
-      <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-        <strong>Runtime window</strong>
-        <span className="ui-text-small ui-text-secondary">
-          Launch {launchContract.launchId} | target {launchContract.launchTarget.targetKind}
-        </span>
-      </div>
       {restoreIssues.length > 0 ? (
         <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
           <strong>Runtime restore</strong>
@@ -206,4 +200,3 @@ export default function SystemRuntimeWindowHost(): JSX.Element {
     </section>
   );
 }
-

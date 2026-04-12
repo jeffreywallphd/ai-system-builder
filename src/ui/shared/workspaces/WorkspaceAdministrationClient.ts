@@ -1,9 +1,11 @@
-﻿import type {
+import type {
   AddWorkspaceAdministrationMemberApiResponse,
+  AcceptWorkspaceInvitationOnboardingApiResponse,
   AssignWorkspaceAdministrationRoleApiResponse,
   CancelWorkspaceAdministrationInvitationApiResponse,
   ChangeWorkspaceAdministrationMemberStatusApiResponse,
   CreateWorkspaceAdministrationApiResponse,
+  IssueWorkspaceInvitationApiResponse,
   ListWorkspaceAdministrationInvitationsApiResponse,
   ListWorkspaceAdministrationMembershipsApiResponse,
   ListWorkspaceAdministrationRoleAssignmentsApiResponse,
@@ -15,13 +17,20 @@
   TransitionWorkspaceAdministrationLifecycleApiResponse,
   UpdateWorkspaceAdministrationApiResponse,
   WorkspaceAdministrationApiResponse,
-} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
-import type {
-  AcceptWorkspaceInvitationOnboardingApiResponse,
-  IssueWorkspaceInvitationApiResponse,
   WorkspaceInvitationApiResponse,
-} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
+} from "@shared/contracts/workspaces/WorkspaceTransportContracts";
+import {
+  appendSharedApiListQueryConventions,
+  appendSharedApiQueryBoolean,
+  appendSharedApiQueryList,
+  appendSharedApiQueryValue,
+  toSharedApiQuerySuffix,
+} from "@shared/contracts/api/SharedApiQueryConventions";
+import { SharedApiClient } from "@ui/shared/api/SharedApiClient";
 
+/* MIGRATION NOTE: request DTOs in this client still include inline compatibility shapes.
+ * New features should consume request/response contracts directly from src/shared/contracts/workspaces.
+ */
 export interface WorkspaceAdministrationClient {
   listWorkspaces(
     request: {
@@ -193,11 +202,16 @@ export interface WorkspaceAdministrationClient {
 }
 
 export class HttpWorkspaceAdministrationClient implements WorkspaceAdministrationClient {
-  private readonly baseUrl: string;
+  private readonly apiClient: SharedApiClient;
 
-  public constructor(baseUrl: string) {
-    const normalized = baseUrl.trim();
-    this.baseUrl = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+  public constructor(
+    baseUrl: string,
+    options: Omit<ConstructorParameters<typeof SharedApiClient>[0], "baseUrl"> = {},
+  ) {
+    this.apiClient = new SharedApiClient({
+      baseUrl,
+      ...options,
+    });
   }
 
   public async listWorkspaces(
@@ -212,22 +226,17 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     sessionToken: string,
   ): Promise<WorkspaceAdministrationApiResponse<ListWorkspaceAdministrationWorkspacesApiResponse>> {
     const query = new URLSearchParams();
-    if (request.ownerUserIdentityId) {
-      query.set("ownerUserIdentityId", request.ownerUserIdentityId);
-    }
-    if (request.statuses) {
-      for (const status of request.statuses) {
-        query.append("status", status);
-      }
-    }
-    if (request.visibility) {
-      query.set("visibility", request.visibility);
-    }
-    if (request.slugPrefix) {
-      query.set("slugPrefix", request.slugPrefix);
-    }
-    appendPagination(query, request.limit, request.offset);
-    return this.get(`/api/v1/workspaces${toQuerySuffix(query)}`, sessionToken);
+    appendSharedApiQueryValue(query, "ownerUserIdentityId", request.ownerUserIdentityId);
+    appendSharedApiQueryList(query, "status", request.statuses);
+    appendSharedApiQueryValue(query, "visibility", request.visibility);
+    appendSharedApiQueryValue(query, "slugPrefix", request.slugPrefix);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    return this.get(`/api/v1/workspaces${toSharedApiQuerySuffix(query)}`, sessionToken);
   }
 
   public async createWorkspace(
@@ -251,11 +260,9 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     sessionToken: string,
   ): Promise<WorkspaceAdministrationApiResponse<ReadWorkspaceAdministrationViewApiResponse>> {
     const query = new URLSearchParams();
-    if (request.asOf) {
-      query.set("asOf", request.asOf);
-    }
+    appendSharedApiQueryValue(query, "asOf", request.asOf);
     return this.get(
-      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/admin-view${toQuerySuffix(query)}`,
+      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/admin-view${toSharedApiQuerySuffix(query)}`,
       sessionToken,
     );
   }
@@ -307,23 +314,18 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     sessionToken: string,
   ): Promise<WorkspaceAdministrationApiResponse<ListWorkspaceAdministrationMembershipsApiResponse>> {
     const query = new URLSearchParams();
-    if (request.userIdentityId) {
-      query.set("userIdentityId", request.userIdentityId);
-    }
-    if (request.statuses) {
-      for (const status of request.statuses) {
-        query.append("status", status);
-      }
-    }
-    if (request.invitationId) {
-      query.set("invitationId", request.invitationId);
-    }
-    if (request.invitedByUserIdentityId) {
-      query.set("invitedByUserIdentityId", request.invitedByUserIdentityId);
-    }
-    appendPagination(query, request.limit, request.offset);
+    appendSharedApiQueryValue(query, "userIdentityId", request.userIdentityId);
+    appendSharedApiQueryList(query, "status", request.statuses);
+    appendSharedApiQueryValue(query, "invitationId", request.invitationId);
+    appendSharedApiQueryValue(query, "invitedByUserIdentityId", request.invitedByUserIdentityId);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
     return this.get(
-      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/members${toQuerySuffix(query)}`,
+      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/members${toSharedApiQuerySuffix(query)}`,
       sessionToken,
     );
   }
@@ -392,32 +394,21 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     sessionToken: string,
   ): Promise<WorkspaceAdministrationApiResponse<ListWorkspaceAdministrationInvitationsApiResponse>> {
     const query = new URLSearchParams();
-    if (request.invitedEmail) {
-      query.set("invitedEmail", request.invitedEmail);
-    }
-    if (request.invitedByUserIdentityId) {
-      query.set("invitedByUserIdentityId", request.invitedByUserIdentityId);
-    }
-    if (request.statuses) {
-      for (const status of request.statuses) {
-        query.append("status", status);
-      }
-    }
-    if (typeof request.activeOnly === "boolean") {
-      query.set("activeOnly", request.activeOnly ? "true" : "false");
-    }
-    if (request.expiresBefore) {
-      query.set("expiresBefore", request.expiresBefore);
-    }
-    if (request.expiresAfter) {
-      query.set("expiresAfter", request.expiresAfter);
-    }
-    if (request.asOf) {
-      query.set("asOf", request.asOf);
-    }
-    appendPagination(query, request.limit, request.offset);
+    appendSharedApiQueryValue(query, "invitedEmail", request.invitedEmail);
+    appendSharedApiQueryValue(query, "invitedByUserIdentityId", request.invitedByUserIdentityId);
+    appendSharedApiQueryList(query, "status", request.statuses);
+    appendSharedApiQueryBoolean(query, "activeOnly", request.activeOnly);
+    appendSharedApiQueryValue(query, "expiresBefore", request.expiresBefore);
+    appendSharedApiQueryValue(query, "expiresAfter", request.expiresAfter);
+    appendSharedApiQueryValue(query, "asOf", request.asOf);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
     return this.get(
-      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/invitations${toQuerySuffix(query)}`,
+      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/invitations${toSharedApiQuerySuffix(query)}`,
       sessionToken,
     );
   }
@@ -491,22 +482,17 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     sessionToken: string,
   ): Promise<WorkspaceAdministrationApiResponse<ListWorkspaceAdministrationRoleAssignmentsApiResponse>> {
     const query = new URLSearchParams();
-    if (request.userIdentityId) {
-      query.set("userIdentityId", request.userIdentityId);
-    }
-    if (request.roles) {
-      for (const role of request.roles) {
-        query.append("role", role);
-      }
-    }
-    if (request.statuses) {
-      for (const status of request.statuses) {
-        query.append("status", status);
-      }
-    }
-    appendPagination(query, request.limit, request.offset);
+    appendSharedApiQueryValue(query, "userIdentityId", request.userIdentityId);
+    appendSharedApiQueryList(query, "role", request.roles);
+    appendSharedApiQueryList(query, "status", request.statuses);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
     return this.get(
-      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/roles${toQuerySuffix(query)}`,
+      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/roles${toSharedApiQuerySuffix(query)}`,
       sessionToken,
     );
   }
@@ -585,11 +571,11 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     );
   }
 
-  private async get<TResponse>(path: string, sessionToken: string): Promise<TResponse> {
+  private async get<TResponse extends { readonly ok: boolean }>(path: string, sessionToken: string): Promise<TResponse> {
     return this.request<TResponse>("GET", path, sessionToken);
   }
 
-  private async post<TResponse>(
+  private async post<TResponse extends { readonly ok: boolean }>(
     path: string,
     body: Readonly<Record<string, unknown>>,
     sessionToken: string,
@@ -597,7 +583,7 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     return this.request<TResponse>("POST", path, sessionToken, body);
   }
 
-  private async patch<TResponse>(
+  private async patch<TResponse extends { readonly ok: boolean }>(
     path: string,
     body: Readonly<Record<string, unknown>>,
     sessionToken: string,
@@ -605,39 +591,23 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     return this.request<TResponse>("PATCH", path, sessionToken, body);
   }
 
-  private async delete<TResponse>(path: string, sessionToken: string): Promise<TResponse> {
+  private async delete<TResponse extends { readonly ok: boolean }>(path: string, sessionToken: string): Promise<TResponse> {
     return this.request<TResponse>("DELETE", path, sessionToken);
   }
 
-  private async request<TResponse>(
+  private async request<TResponse extends { readonly ok: boolean }>(
     method: "GET" | "POST" | "PATCH" | "DELETE",
     path: string,
     sessionToken: string,
     body?: Readonly<Record<string, unknown>>,
   ): Promise<TResponse> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    return await this.apiClient.requestJson<TResponse>({
       method,
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${sessionToken}`,
-      },
-      body: body ? JSON.stringify(body) : undefined,
+      path,
+      sessionToken,
+      body,
     });
-    return await response.json() as TResponse;
   }
 }
 
-function appendPagination(query: URLSearchParams, limit?: number, offset?: number): void {
-  if (typeof limit === "number") {
-    query.set("limit", String(limit));
-  }
-  if (typeof offset === "number") {
-    query.set("offset", String(offset));
-  }
-}
-
-function toQuerySuffix(query: URLSearchParams): string {
-  const queryString = query.toString();
-  return queryString ? `?${queryString}` : "";
-}
 

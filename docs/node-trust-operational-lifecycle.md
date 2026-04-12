@@ -24,6 +24,7 @@ This operational guide consolidates Story 5.4.5 (Feature 5 / Epic 5.4): bootstra
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
 - `src/ui/pages/NodeEnrollmentReviewPage.tsx`
 - `src/ui/pages/NodeInventoryPage.tsx`
+- `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx`
 
 ## End-to-end lifecycle
 
@@ -60,6 +61,7 @@ This operational guide consolidates Story 5.4.5 (Feature 5 / Epic 5.4): bootstra
 - Admin inventory includes pending, active, offline, rejected, and revoked states.
 - Pending-only nodes remain visible through enrollment-backed inventory entries.
 - UI trust-label mapping now matches lifecycle terms (`withdrawn`, `expired`).
+- Desktop and thin-client/admin-lite surfaces now share node list/detail/status/action panels while preserving surface-specific density (desktop table/menu vs thin card/list).
 
 8. Revocation
 - Revocation is explicit, reasoned, and durable.

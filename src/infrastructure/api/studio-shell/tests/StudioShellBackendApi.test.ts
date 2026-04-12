@@ -26,8 +26,164 @@ import {
 } from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import type { StorageInstanceProvisioningContract } from "@application/system-runtime/StorageInstanceProvisioningContract";
 import { createStorageInstanceProvisioningResult } from "@application/system-runtime/StorageInstanceProvisioningContract";
+import type { StudioShellObservabilityEvent } from "../StudioShellObservability";
 
 describe("StudioShellBackendApi", () => {
+  class CapturingStudioShellObservabilityLogger {
+    public readonly infoEvents: StudioShellObservabilityEvent[] = [];
+    public readonly warnEvents: StudioShellObservabilityEvent[] = [];
+    public readonly errorEvents: StudioShellObservabilityEvent[] = [];
+
+    public info(event: StudioShellObservabilityEvent): void {
+      this.infoEvents.push(event);
+    }
+
+    public warn(event: StudioShellObservabilityEvent): void {
+      this.warnEvents.push(event);
+    }
+
+    public error(event: StudioShellObservabilityEvent): void {
+      this.errorEvents.push(event);
+    }
+  }
+
+  it("saves, updates, and reopens authoritative image system definitions from system studio drafts", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const initialized = await api.initializeStudio("studio-system", "System Studio");
+    const sessionId = initialized.data?.activeSessionId;
+    expect(sessionId).toBeDefined();
+
+    const workflowId = "image-template:enhance-upscale:v1";
+    const created = await api.createDraft({
+      studioId: "studio-system",
+      sessionId: sessionId!,
+      assetId: "asset:system:image-editing",
+      content: JSON.stringify({
+        systemSpec: {
+          serialization: {
+            runtime: {
+              workflowBindings: [{
+                bindingId: "component:primary",
+                workflowAssetId: workflowId,
+                workflowVersionId: "1.0.0",
+              }],
+              datasetInstances: [{
+                instanceId: "dataset-instance:output-images",
+              }],
+              state: {
+                imageWorkflowParameterValuesByWorkflowId: {
+                  [workflowId]: {
+                    scaleFactor: 2,
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      metadata: {
+        title: "Upscale System",
+        tags: ["system", "image"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const draftId = created.data?.draft?.draftId;
+    expect(draftId).toBeDefined();
+
+    const savedNew = await api.saveImageSystemDefinition({
+      studioId: "studio-system",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      saveAsNew: true,
+    });
+    expect(savedNew.ok).toBeTrue();
+    expect(savedNew.data?.workflowId).toBe(workflowId);
+    expect(savedNew.data?.parameterBaseline).toEqual({
+      scaleFactor: 2,
+    });
+    expect(savedNew.data?.readiness).toBeDefined();
+    expect(savedNew.data?.readiness.advisoryIssueCount).toBeGreaterThanOrEqual(0);
+    const systemId = savedNew.data?.systemId;
+    expect(systemId).toBeDefined();
+
+    const listed = await api.listImageSystemDefinitions({});
+    expect(listed.ok).toBeTrue();
+    expect(listed.data?.items.some((entry) => entry.systemId === systemId)).toBeTrue();
+    expect(typeof listed.data?.items[0]?.readiness.blockingIssueCount).toBe("number");
+    expect(typeof listed.data?.items[0]?.readiness.advisoryIssueCount).toBe("number");
+
+    const detailAfterCreate = await api.getImageSystemDefinition({
+      systemId: systemId!,
+    });
+    expect(detailAfterCreate.ok).toBeTrue();
+    expect(detailAfterCreate.data?.workflowId).toBe(workflowId);
+    expect(detailAfterCreate.data?.parameterBaseline).toEqual({
+      scaleFactor: 2,
+    });
+    expect(detailAfterCreate.data?.readiness).toBeDefined();
+
+    const updatedDraftContent = JSON.stringify({
+      systemSpec: {
+        serialization: {
+          runtime: {
+            workflowBindings: [{
+              bindingId: "component:primary",
+              workflowAssetId: workflowId,
+              workflowVersionId: "1.0.0",
+            }],
+            datasetInstances: [{
+              instanceId: "dataset-instance:output-images",
+            }],
+            state: {
+              imageSystemDefinitionId: systemId,
+              imageWorkflowParameterValuesByWorkflowId: {
+                [workflowId]: {
+                  scaleFactor: 3,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const updatedDraft = await api.updateDraft({
+      studioId: "studio-system",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      content: updatedDraftContent,
+    });
+    expect(updatedDraft.ok).toBeTrue();
+
+    const savedUpdate = await api.saveImageSystemDefinition({
+      studioId: "studio-system",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      existingSystemId: systemId!,
+      saveAsNew: false,
+    });
+    expect(savedUpdate.ok).toBeTrue();
+    expect(savedUpdate.data?.systemId).toBe(systemId);
+    expect(savedUpdate.data?.parameterBaseline).toEqual({
+      scaleFactor: 3,
+    });
+
+    const detailAfterUpdate = await api.getImageSystemDefinition({
+      systemId: systemId!,
+    });
+    expect(detailAfterUpdate.ok).toBeTrue();
+    expect(detailAfterUpdate.data?.workflowId).toBe(workflowId);
+    expect(detailAfterUpdate.data?.workflowVersionTag).toBe("1.0.0");
+    expect(detailAfterUpdate.data?.parameterBaseline).toEqual({
+      scaleFactor: 3,
+    });
+    expect(detailAfterUpdate.data?.readiness).toBeDefined();
+  });
+
   it("lists workflow run summaries and projects structured run detail for workflow studio observability", async () => {
     const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
     const summary = createWorkflowRunSummaryRecord({
@@ -313,7 +469,17 @@ describe("StudioShellBackendApi", () => {
   });
 
   it("ignores caller-provided upload path hints and ingests through dataset storage bindings", async () => {
-    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const logger = new CapturingStudioShellObservabilityLogger();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        observabilityLogger: logger,
+      },
+    );
     const initialized = await api.initializeStudio("studio-system", "System Studio");
     const sessionId = initialized.data!.activeSessionId!;
     const created = await api.createDraft({
@@ -342,8 +508,16 @@ describe("StudioShellBackendApi", () => {
     } as unknown as Parameters<StudioShellBackendApi["ingestReferenceImageUpload"]>[0]);
 
     expect(upload.ok).toBeTrue();
-    expect(upload.data?.image.assetId).toContain("generated-output:storage-instance://");
+    expect(upload.data?.image.assetId).toContain("generated-output:");
+    expect(upload.data?.image.assetId).toContain("reference-image-uploads");
     expect(upload.data?.image.assetId).not.toContain("file://user/controlled/path.png");
+    expect(upload.data?.storedFilePath).toContain("reference-image-uploads");
+    expect(upload.data?.configuredUploadRootPath).toContain("reference-image-uploads");
+    const observedEvent = logger.infoEvents.find((event) => event.action === "ingest-reference-image-upload");
+    expect(observedEvent?.outcome).toBe("success");
+    expect(observedEvent?.studioId).toBe("studio-system");
+    expect(observedEvent?.draftId).toBe(created.data!.draft!.draftId);
+    expect(observedEvent?.datasetBindingId).toBe("input-image-dataset");
   });
 
   it("starts rerun from historical execution context and persists run lineage metadata", async () => {
@@ -1719,4 +1893,3 @@ describe("StudioShellBackendApi", () => {
   });
 
 });
-

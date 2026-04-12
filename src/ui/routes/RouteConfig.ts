@@ -54,9 +54,12 @@ export const ROUTE_PATHS = Object.freeze({
   embeddingIndexStudio: "/studio-shell/embedding-index",
   configProfileStudio: "/studio-shell/config-profile",
   settings: "/settings",
+  adminShell: "/settings/admin",
+  adminLiteShell: "/settings/admin-lite",
   authorizationSharing: "/settings/sharing",
   authorizationSharingThin: "/settings/sharing/thin",
   authorizationReporting: "/settings/sharing/reporting",
+  securityPolicy: "/settings/security-policy",
   storageAdmin: "/settings/storage",
   workspaceAdmin: "/settings/workspaces",
   nodeEnrollmentReview: "/settings/node-enrollments",
@@ -66,6 +69,9 @@ export const ROUTE_PATHS = Object.freeze({
   identityAdmin: "/settings/identity-admin",
   trustedDevices: "/settings/trusted-devices",
   secretsAdmin: "/settings/secrets",
+  governanceReview: "/settings/governance-review",
+  governanceReviewThin: "/settings/governance-review/thin",
+  deploymentPolicyAdmin: "/settings/deployment-policy",
   notFound: "*",
 });
 
@@ -323,6 +329,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     showInNavigation: true,
   }),
   Object.freeze({
+    key: "admin-shell",
+    path: ROUTE_PATHS.adminShell,
+    title: "Administration",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "admin-lite-shell",
+    path: ROUTE_PATHS.adminLiteShell,
+    title: "Admin lite",
+    showInNavigation: false,
+  }),
+  Object.freeze({
     key: "authorization-sharing",
     path: ROUTE_PATHS.authorizationSharing,
     title: "Resource sharing and visibility",
@@ -338,6 +356,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "authorization-reporting",
     path: ROUTE_PATHS.authorizationReporting,
     title: "Authorization reporting",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "security-policy",
+    path: ROUTE_PATHS.securityPolicy,
+    title: "Security and policy",
     showInNavigation: false,
   }),
   Object.freeze({
@@ -392,6 +416,24 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "secrets-admin",
     path: ROUTE_PATHS.secretsAdmin,
     title: "Secret metadata management",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "governance-review",
+    path: ROUTE_PATHS.governanceReview,
+    title: "Governance review",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "governance-review-thin",
+    path: ROUTE_PATHS.governanceReviewThin,
+    title: "Governance review (thin)",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "deployment-policy-admin",
+    path: ROUTE_PATHS.deploymentPolicyAdmin,
+    title: "Deployment profile policy",
     showInNavigation: false,
   }),
 ]);

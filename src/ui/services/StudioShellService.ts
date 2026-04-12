@@ -21,6 +21,15 @@ import type {
   DataStudioPersistedPipelineReadModel,
   DataStudioPipelineVersionReadModel,
   RunDataStudioPipelineReadModel,
+  StudioImageWorkflowDefinitionListingReadModel,
+  StudioImageWorkflowDefinitionReadModel,
+  ListStudioImageWorkflowDefinitionsRequest,
+  GetStudioImageWorkflowDefinitionRequest,
+  GetStudioImageSystemDefinitionRequest,
+  ListStudioImageSystemDefinitionsRequest,
+  SaveStudioImageSystemDefinitionRequest,
+  StudioImageSystemDefinitionListingReadModel,
+  StudioImageSystemDefinitionReadModel,
   AssessDataStudioExecutionReadinessRequest,
   DataStudioExecutionReadinessReadModel,
   WorkflowRunDetailReadModel,
@@ -122,6 +131,41 @@ export class StudioShellService {
   public async validateDraft(studioId: string, draftId: string): Promise<StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>> {
     const raw = await this.requireBridge().validateDraft(JSON.stringify({ studioId, draftId }));
     return JSON.parse(raw) as StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>;
+  }
+
+  public async listImageWorkflowDefinitions(
+    request: ListStudioImageWorkflowDefinitionsRequest = {},
+  ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionListingReadModel>> {
+    const raw = await this.requireBridge().listImageWorkflowDefinitions(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageWorkflowDefinitionListingReadModel>;
+  }
+
+  public async getImageWorkflowDefinition(
+    request: GetStudioImageWorkflowDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>> {
+    const raw = await this.requireBridge().getImageWorkflowDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>;
+  }
+
+  public async listImageSystemDefinitions(
+    request: ListStudioImageSystemDefinitionsRequest = {},
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionListingReadModel>> {
+    const raw = await this.requireBridge().listImageSystemDefinitions(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageSystemDefinitionListingReadModel>;
+  }
+
+  public async getImageSystemDefinition(
+    request: GetStudioImageSystemDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>> {
+    const raw = await this.requireBridge().getImageSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageSystemDefinitionReadModel>;
+  }
+
+  public async saveImageSystemDefinition(
+    request: SaveStudioImageSystemDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>> {
+    const raw = await this.requireBridge().saveImageSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageSystemDefinitionReadModel>;
   }
 
   public async getPersistedWorkflow(workflowId: string): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {

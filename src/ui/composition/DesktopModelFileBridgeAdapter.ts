@@ -5,5 +5,5 @@ export function resolveDesktopModelFileBridge(): DesktopModelFileBridge | undefi
     return undefined;
   }
 
-  return window.aiLoomDesktop?.modelFiles;
+  return window.aiLoomDesktop?.features?.modelFiles ?? window.aiLoomDesktop?.modelFiles;
 }

@@ -72,6 +72,8 @@ export class SecretAuthorizationPolicyEvaluator implements ISecretAccessPolicyPo
   private isAdministrativeMutation(action: string): boolean {
     return action === SecretAccessActions.create
       || action === SecretAccessActions.rotate
+      || action === SecretAccessActions.revokeVersion
+      || action === SecretAccessActions.retireVersion
       || action === SecretAccessActions.disable
       || action === SecretAccessActions.delete;
   }

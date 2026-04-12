@@ -3,6 +3,7 @@
   ChangeLocalPasswordCredentialApiResponse,
   CompleteTrustedDevicePairingApiRequest,
   CompleteTrustedDevicePairingApiResponse,
+  DevelopmentLoginIdentityApiRequest,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
   GetTrustedDeviceApiRequest,
@@ -12,8 +13,12 @@
   InitiateTrustedDevicePairingApiResponse,
   ListIdentityAdminAccountsApiRequest,
   ListIdentityAdminAccountsApiResponse,
+  ListIdentityAdminSessionsApiRequest,
+  ListIdentityAdminSessionsApiResponse,
   ListIdentityAdminTrustedDevicesApiRequest,
   ListIdentityAdminTrustedDevicesApiResponse,
+  ListIdentitySessionsApiRequest,
+  ListIdentitySessionsApiResponse,
   ListTrustedDevicesApiRequest,
   ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
@@ -24,6 +29,8 @@
   RevokeTrustedDeviceApiResponse,
   RevokeIdentityAdminTrustedDeviceApiRequest,
   RevokeIdentityAdminTrustedDeviceApiResponse,
+  RevokeIdentityAdminSessionApiRequest,
+  RevokeIdentityAdminSessionApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiRequest,
@@ -39,8 +46,15 @@
 } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { DesktopTrustedDeviceIdentityAuthClient } from "@infrastructure/transport/http-client/DesktopTrustedDeviceIdentityAuthClient";
 import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
-import { HttpIdentityAuthClient, type IdentityAuthClient } from "@shared/identity/IdentityAuthClient";
+import type {
+  ResolveSessionActorContextApiRequest,
+  ResolveSessionActorContextApiResponse,
+} from "@shared/contracts/identity/IdentityTransportContracts";
+import { HttpIdentityAuthClient, type IdentityAuthClient, type IdentityAuthRequestOptions } from "@shared/identity/IdentityAuthClient";
+import type { SharedApiClientDiagnosticEvent } from "@shared/api/SharedApiClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
+
+const DefaultIdentityApiTimeoutMs = 10_000;
 
 export class IdentityAuthService {
   private readonly client: IdentityAuthClient;
@@ -61,14 +75,31 @@ export class IdentityAuthService {
     return this.client.loginLocalAccount(request);
   }
 
-  public loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
-    return this.client.loginDevelopmentAccount();
+  public loginDevelopmentAccount(
+    request?: DevelopmentLoginIdentityApiRequest,
+  ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.client.loginDevelopmentAccount(request);
   }
 
   public resolveAuthenticatedSession(
     request: ResolveAuthenticatedSessionApiRequest,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
-    return this.client.resolveAuthenticatedSession(request.sessionToken);
+    return this.client.resolveAuthenticatedSession(request.sessionToken, options);
+  }
+
+  public listIdentitySessions(
+    request: ListIdentitySessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>> {
+    return this.client.listIdentitySessions(request, sessionToken);
+  }
+
+  public resolveSessionActorContext(
+    request: ResolveSessionActorContextApiRequest,
+    options?: IdentityAuthRequestOptions,
+  ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
+    return this.client.resolveSessionActorContext(request, options);
   }
 
   public logoutAuthenticatedSession(
@@ -103,6 +134,20 @@ export class IdentityAuthService {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
     return this.client.setIdentityAdminAccountStatus(request, sessionToken);
+  }
+
+  public listIdentityAdminSessions(
+    request: ListIdentityAdminSessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>> {
+    return this.client.listIdentityAdminSessions(request, sessionToken);
+  }
+
+  public revokeIdentityAdminSession(
+    request: RevokeIdentityAdminSessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>> {
+    return this.client.revokeIdentityAdminSession(request, sessionToken);
   }
 
   public listIdentityAdminTrustedDevices(
@@ -180,7 +225,33 @@ function createDefaultIdentityAuthClient(): IdentityAuthClient {
   const desktopBaseUrl = resolveDesktopIdentityApiBaseUrl();
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new DesktopTrustedDeviceIdentityAuthClient(
-    new HttpIdentityAuthClient(baseUrl),
+    new HttpIdentityAuthClient(baseUrl, {
+      defaultTimeoutMs: DefaultIdentityApiTimeoutMs,
+      onDiagnosticEvent: (event) => logIdentityApiDiagnostic(event),
+    }),
   );
 }
 
+function logIdentityApiDiagnostic(event: SharedApiClientDiagnosticEvent): void {
+  const message = [
+    "[ai-loom][identity-api]",
+    event.stage,
+    `method=${event.method}`,
+    `url=${event.url}`,
+    `attempt=${event.attempt}/${event.maxAttempts}`,
+    event.status !== undefined ? `status=${event.status}` : undefined,
+    event.sharedCode ? `sharedCode=${event.sharedCode}` : undefined,
+    event.retryable !== undefined ? `retryable=${event.retryable}` : undefined,
+    event.delayMs !== undefined ? `delayMs=${event.delayMs}` : undefined,
+    event.errorName ? `error=${event.errorName}` : undefined,
+    event.errorMessage ? `message=${event.errorMessage}` : undefined,
+  ]
+    .filter((entry): entry is string => Boolean(entry))
+    .join(" ");
+
+  if (event.severity === "error" || event.severity === "warn") {
+    console.warn(message);
+    return;
+  }
+  console.info(message);
+}

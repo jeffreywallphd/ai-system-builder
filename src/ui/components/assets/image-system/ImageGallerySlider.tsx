@@ -9,6 +9,8 @@ export interface ImageGallerySliderProps {
   readonly items: ReadonlyArray<ImageUiViewModel>;
   readonly selectedImageId?: string;
   readonly loading?: boolean;
+  readonly loadingTitle?: string;
+  readonly loadingMessage?: string;
   readonly errorMessage?: string;
   readonly emptyMessage?: string;
   readonly className?: string;
@@ -30,6 +32,8 @@ export function ImageGallerySlider({
   items,
   selectedImageId,
   loading = false,
+  loadingTitle,
+  loadingMessage = "Getting images ready.",
   errorMessage,
   emptyMessage = "No images are ready yet.",
   className,
@@ -40,8 +44,9 @@ export function ImageGallerySlider({
     return (
       <section className={["ui-image-surface", className ?? ""].filter(Boolean).join(" ")}>
         <ImageStatusNotice
-          title={`${title} is loading`}
-          message="Getting images ready."
+          title={loadingTitle ?? `${title} is loading`}
+          message={loadingMessage}
+          loading
         />
       </section>
     );

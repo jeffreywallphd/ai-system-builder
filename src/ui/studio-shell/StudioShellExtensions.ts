@@ -1,7 +1,20 @@
 ﻿import type { ReactNode } from "react";
 import type { AssetDraftDependencyReference, AssetMetadataPatch } from "@domain/studio-shell/StudioShellDomain";
 import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
-import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
+import type {
+  GetStudioImageWorkflowDefinitionRequest,
+  GetStudioImageSystemDefinitionRequest,
+  ListStudioImageSystemDefinitionsRequest,
+  ListStudioImageWorkflowDefinitionsRequest,
+  SaveStudioImageSystemDefinitionRequest,
+  StudioImageSystemDefinitionListingReadModel,
+  StudioImageSystemDefinitionReadModel,
+  StudioImageWorkflowDefinitionListingReadModel,
+  StudioImageWorkflowDefinitionReadModel,
+  StudioShellApiResponse,
+  StudioShellSnapshotReadModel,
+  StudioShellValidationIssue,
+} from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { WorkflowStudioModeState } from "./workflow/WorkflowStudioModeStateStore";
 import { isWorkflowStudioModeId, type WorkflowStudioModeId } from "./workflow/WorkflowStudioModes";
 import type {
@@ -47,6 +60,11 @@ export interface StudioShellExtensionOperations {
   getSystemExecutionStatus?(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionStatusReadModel>>;
   getSystemExecutionTrace?(request: { readonly executionId: string; readonly eventLimit?: number; readonly logLimit?: number }): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>>;
   getSystemExecutionResult?(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>>;
+  listImageWorkflowDefinitions?(request?: ListStudioImageWorkflowDefinitionsRequest): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionListingReadModel>>;
+  getImageWorkflowDefinition?(request: GetStudioImageWorkflowDefinitionRequest): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>>;
+  listImageSystemDefinitions?(request?: ListStudioImageSystemDefinitionsRequest): Promise<StudioShellApiResponse<StudioImageSystemDefinitionListingReadModel>>;
+  getImageSystemDefinition?(request: GetStudioImageSystemDefinitionRequest): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>>;
+  saveImageSystemDefinition?(request: SaveStudioImageSystemDefinitionRequest): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>>;
   saveSystemChildComponent?(request: AddSystemChildComponentRequest): Promise<boolean>;
   removeSystemChildComponent?(request: RemoveSystemChildComponentRequest): Promise<boolean>;
   reorderSystemChildComponent?(request: ReorderSystemChildComponentRequest): Promise<boolean>;

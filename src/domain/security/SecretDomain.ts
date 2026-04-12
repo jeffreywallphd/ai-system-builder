@@ -38,6 +38,8 @@ export type SecretRecordState = typeof SecretRecordStates[keyof typeof SecretRec
 export const SecretVersionStates = Object.freeze({
   active: "active",
   superseded: "superseded",
+  revoked: "revoked",
+  retired: "retired",
 });
 
 export type SecretVersionState = typeof SecretVersionStates[keyof typeof SecretVersionStates];
@@ -127,6 +129,8 @@ export const SecretAccessActions = Object.freeze({
   readMetadata: "read-metadata",
   retrievePlaintext: "retrieve-plaintext",
   rotate: "rotate",
+  revokeVersion: "revoke-version",
+  retireVersion: "retire-version",
   reEncrypt: "re-encrypt",
   disable: "disable",
   delete: "delete",
@@ -521,12 +525,14 @@ export function rotateSecretRecord(input: {
   }
 
   const nextVersionNumber = input.record.versions.length + 1;
+  const priorVersionId = input.record.currentVersionId
+    ?? input.record.versions[input.record.versions.length - 1]?.versionId;
   const nextVersion = createSecretVersion({
     ...input.nextVersion,
     secretId: input.record.secretId,
     version: nextVersionNumber,
     owner: input.record.owner,
-    previousVersionId: input.record.currentVersionId,
+    previousVersionId: priorVersionId,
   });
 
   const rotatedAt = normalizeTimestamp(input.rotatedAt ?? new Date(), "Secret rotation rotatedAt");
@@ -557,6 +563,36 @@ export function rotateSecretRecord(input: {
       currentVersionId: nextVersion.versionId,
       updatedAt: rotatedAt,
     }),
+  });
+}
+
+export function revokeSecretVersionRecord(input: {
+  readonly record: SecretRecord;
+  readonly versionId: string;
+  readonly revokedBy: string;
+  readonly revokedAt?: string | Date;
+}): SecretRecord {
+  return updateSecretVersionState({
+    record: input.record,
+    versionId: input.versionId,
+    nextState: SecretVersionStates.revoked,
+    changedBy: input.revokedBy,
+    changedAt: input.revokedAt,
+  });
+}
+
+export function retireSecretVersionRecord(input: {
+  readonly record: SecretRecord;
+  readonly versionId: string;
+  readonly retiredBy: string;
+  readonly retiredAt?: string | Date;
+}): SecretRecord {
+  return updateSecretVersionState({
+    record: input.record,
+    versionId: input.versionId,
+    nextState: SecretVersionStates.retired,
+    changedBy: input.retiredBy,
+    changedAt: input.retiredAt,
   });
 }
 
@@ -658,6 +694,68 @@ function canActorAccessScope(actor: SecretAccessActor, owner: SecretScopeOwner):
   }
 
   return actor.workspaceId === owner.workspaceId;
+}
+
+function updateSecretVersionState(input: {
+  readonly record: SecretRecord;
+  readonly versionId: string;
+  readonly nextState: SecretVersionState;
+  readonly changedBy: string;
+  readonly changedAt?: string | Date;
+}): SecretRecord {
+  if (input.record.state === SecretRecordStates.softDeleted) {
+    throw new SecretDomainError("Soft-deleted secrets cannot update version lifecycle state.");
+  }
+
+  const versionId = normalizeRequired(input.versionId, "Secret version lifecycle versionId");
+  const targetVersion = input.record.versions.find((version) => version.versionId === versionId);
+  if (!targetVersion) {
+    throw new SecretDomainError(`Secret version '${versionId}' was not found.`);
+  }
+
+  if (targetVersion.state === input.nextState) {
+    return input.record;
+  }
+
+  const changedAt = normalizeTimestamp(input.changedAt ?? new Date(), "Secret version lifecycle changedAt");
+  const changedBy = normalizeRequired(input.changedBy, "Secret version lifecycle changedBy");
+  const versions = Object.freeze(input.record.versions.map((version) => {
+    if (version.versionId !== versionId) {
+      return version;
+    }
+
+    return Object.freeze({
+      ...version,
+      state: input.nextState,
+    });
+  }));
+  assertVersionLineage(versions);
+
+  const currentVersionId = input.record.currentVersionId === versionId
+    ? resolveCurrentVersionIdAfterLifecycleChange(versions)
+    : input.record.currentVersionId;
+
+  return Object.freeze({
+    ...input.record,
+    versions,
+    currentVersionId,
+    lastModifiedAt: changedAt,
+    lastModifiedBy: changedBy,
+    reference: Object.freeze({
+      ...input.record.reference,
+      currentVersionId,
+      updatedAt: changedAt,
+    }),
+  });
+}
+
+function resolveCurrentVersionIdAfterLifecycleChange(
+  versions: ReadonlyArray<SecretVersion>,
+): string | undefined {
+  const candidate = [...versions]
+    .sort((left, right) => right.version - left.version)
+    .find((version) => version.state === SecretVersionStates.active);
+  return candidate?.versionId;
 }
 
 export function evaluateSecretAccessDecision(input: {

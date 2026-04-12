@@ -24,6 +24,8 @@ describe("ImagePreviewPanel", () => {
     const loadingHtml = renderToStaticMarkup(React.createElement(ImagePreviewPanel, {
       title: "Preview",
       loading: true,
+      loadingTitle: "Loading source preview",
+      loadingMessage: "Loading source preview from the selected dataset record.",
     }));
     const errorHtml = renderToStaticMarkup(React.createElement(ImagePreviewPanel, {
       title: "Preview",
@@ -31,7 +33,8 @@ describe("ImagePreviewPanel", () => {
     }));
 
     expect(emptyHtml).toContain("No image selected");
-    expect(loadingHtml).toContain("Loading preview");
+    expect(loadingHtml).toContain("Loading source preview");
+    expect(loadingHtml).toContain("selected dataset record");
     expect(errorHtml).toContain("Could not load preview");
   });
 

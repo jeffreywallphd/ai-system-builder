@@ -186,6 +186,7 @@ export interface SecretAccessDecisionAuditEvent {
   readonly actor: SecretAuditEventActor;
   readonly target: SecretAuditEventTarget;
   readonly occurredAt: string;
+  readonly details?: Readonly<Record<string, unknown>>;
 }
 
 export interface SecretOperationAuditEvent {
@@ -198,6 +199,7 @@ export interface SecretOperationAuditEvent {
   readonly actor: SecretAuditEventActor;
   readonly target: SecretAuditEventTarget;
   readonly occurredAt: string;
+  readonly details?: Readonly<Record<string, unknown>>;
 }
 
 export type SecretAccessAuditEvent = SecretAccessDecisionAuditEvent | SecretOperationAuditEvent;

@@ -20,6 +20,7 @@ import type {
   PlatformAuditEventRecord,
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import type { AuthoritativeRunStatusHistoryRecord } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import {
   createPersistenceTenancyMetadataFromLookup,
   normalizePersistenceLookup,
@@ -71,6 +72,25 @@ export interface PlatformMutationReplayRow {
   readonly correlation_id: string | null;
   readonly occurred_at: string;
   readonly created_at: string;
+}
+
+export interface PlatformRunStatusHistoryRow {
+  readonly history_entry_id: string;
+  readonly run_id: string;
+  readonly workspace_id: string | null;
+  readonly lifecycle_state: string;
+  readonly platform_status: PlatformRunStatus;
+  readonly run_revision: number;
+  readonly changed_at: string;
+  readonly changed_by_actor_id: string;
+  readonly reason: string | null;
+  readonly dispatch_attempt_id: string | null;
+  readonly dispatch_id: string | null;
+  readonly backend_kind: string | null;
+  readonly backend_run_id: string | null;
+  readonly safe_failure_code: string | null;
+  readonly safe_failure_message: string | null;
+  readonly snapshot_json: string | null;
 }
 
 export function normalizePlatformLookup(value: string): string | undefined {
@@ -176,6 +196,38 @@ export function parsePlatformAuditMutationReplayRecord(row: PlatformMutationRepl
     row.record_snapshot_json,
     (payload) => toApplicationAuditRecord(parsePlatformAuditEventPersistenceRecord(payload)),
   );
+}
+
+export function mapPlatformRunStatusHistoryRowToRecord(
+  row: PlatformRunStatusHistoryRow,
+): AuthoritativeRunStatusHistoryRecord {
+  return Object.freeze({
+    historyEntryId: row.history_entry_id,
+    runId: row.run_id,
+    workspaceId: normalizePlatformLookup(row.workspace_id ?? ""),
+    lifecycleState: row.lifecycle_state as AuthoritativeRunStatusHistoryRecord["lifecycleState"],
+    platformStatus: assertPlatformRunStatus(row.platform_status),
+    runRevision: row.run_revision,
+    changedAt: row.changed_at,
+    changedByActorId: row.changed_by_actor_id,
+    reason: normalizePlatformLookup(row.reason ?? ""),
+    dispatchAttemptId: normalizePlatformLookup(row.dispatch_attempt_id ?? ""),
+    dispatchId: normalizePlatformLookup(row.dispatch_id ?? ""),
+    backendKind: normalizePlatformLookup(row.backend_kind ?? ""),
+    backendRunId: normalizePlatformLookup(row.backend_run_id ?? ""),
+    safeFailureCode: normalizePlatformLookup(row.safe_failure_code ?? ""),
+    safeFailureMessage: normalizePlatformLookup(row.safe_failure_message ?? ""),
+    snapshot: parseOptionalPersistenceObjectJson(row.snapshot_json, "platform-status-history"),
+  });
+}
+
+export function mapRunStatusHistorySnapshotToJson(
+  snapshot: Readonly<Record<string, unknown>> | undefined,
+): string | undefined {
+  if (!snapshot) {
+    return undefined;
+  }
+  return JSON.stringify(snapshot);
 }
 
 export function toPlatformRunReplaySnapshot(

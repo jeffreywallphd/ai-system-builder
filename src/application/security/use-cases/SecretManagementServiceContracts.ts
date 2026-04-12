@@ -63,6 +63,8 @@ export interface RetrieveSecretPlaintextRequest {
     readonly serviceIdentity: string;
     readonly scope: SecretScopeOwner;
     readonly justification: string;
+    readonly versionId?: string;
+    readonly allowSupersededVersion?: boolean;
   };
   readonly occurredAt?: string;
 }
@@ -86,6 +88,34 @@ export interface RotateSecretRequest {
 export interface RotateSecretResult {
   readonly secret: SecretReference;
   readonly currentVersionId: string;
+}
+
+export interface RevokeSecretVersionRequest {
+  readonly actor: SecretAccessActor;
+  readonly operationKey: string;
+  readonly secretId: string;
+  readonly versionId: string;
+  readonly reason?: string;
+  readonly revokedAt?: string;
+}
+
+export interface RevokeSecretVersionResult {
+  readonly secret: SecretReference;
+  readonly currentVersionId?: string;
+}
+
+export interface RetireSecretVersionRequest {
+  readonly actor: SecretAccessActor;
+  readonly operationKey: string;
+  readonly secretId: string;
+  readonly versionId: string;
+  readonly reason?: string;
+  readonly retiredAt?: string;
+}
+
+export interface RetireSecretVersionResult {
+  readonly secret: SecretReference;
+  readonly currentVersionId?: string;
 }
 
 export const SecretReEncryptionOperationStatuses = Object.freeze({
@@ -170,6 +200,8 @@ export interface ISecretManagementService {
     request: RetrieveSecretPlaintextRequest,
   ): Promise<SecretServiceResult<RetrieveSecretPlaintextResult>>;
   rotateSecret(request: RotateSecretRequest): Promise<SecretServiceResult<RotateSecretResult>>;
+  revokeSecretVersion(request: RevokeSecretVersionRequest): Promise<SecretServiceResult<RevokeSecretVersionResult>>;
+  retireSecretVersion(request: RetireSecretVersionRequest): Promise<SecretServiceResult<RetireSecretVersionResult>>;
   reEncryptSecrets(request: ReEncryptSecretsRequest): Promise<SecretServiceResult<ReEncryptSecretsResult>>;
   getSecretReEncryptionStatus(
     request: GetSecretReEncryptionStatusRequest,
@@ -187,6 +219,8 @@ export interface SecretLookupUseCaseContracts {
 export interface SecretMutationUseCaseContracts {
   createSecret(request: CreateSecretRequest): Promise<SecretServiceResult<CreateSecretResult>>;
   rotateSecret(request: RotateSecretRequest): Promise<SecretServiceResult<RotateSecretResult>>;
+  revokeSecretVersion(request: RevokeSecretVersionRequest): Promise<SecretServiceResult<RevokeSecretVersionResult>>;
+  retireSecretVersion(request: RetireSecretVersionRequest): Promise<SecretServiceResult<RetireSecretVersionResult>>;
   reEncryptSecrets(request: ReEncryptSecretsRequest): Promise<SecretServiceResult<ReEncryptSecretsResult>>;
   disableSecret(request: DisableSecretRequest): Promise<SecretServiceResult<SecretReference>>;
   deleteSecret(request: DeleteSecretRequest): Promise<SecretServiceResult<{ readonly secretId: string }>>;

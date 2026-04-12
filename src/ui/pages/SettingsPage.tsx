@@ -1,18 +1,33 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useUiDependencies } from "../composition/AppProviders";
 import { WorkspaceDataMode, type UiSettings } from "../settings/UiSettings";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { McpStoreState } from "../state/McpStore";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import McpRuntimeStatusPanel from "../components/execution/McpRuntimeStatusPanel";
+import DesktopOfflineStatusSurface from "../shared/connectivity/DesktopOfflineStatusSurface";
+import { DesktopConnectivityService } from "../shared/connectivity/DesktopConnectivityService";
+import { listSettingsShortcutRouteMetadata } from "../routes/SurfaceRouteMetadataCatalog";
+import { UiSurfaceKeys } from "../shared/navigation/SurfaceNavigationMetadata";
+import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { resolveNavigationAvailabilityContextForSession } from "../routes/SurfaceRouteAccessPolicy";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import type { OfflineSynchronizationStateSnapshotDto } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
 
 export default function SettingsPage(): JSX.Element {
   const { settingsStore, mcpStore, runtimeConsoleStore } = useUiDependencies();
+  const desktopConnectivityService = useMemo(() => new DesktopConnectivityService(), []);
+  const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+  const navigate = useNavigate();
+  const [session] = useState(() => sessionStore.getSession());
   const [state, setState] = useState<UiSettingsState>(() => settingsStore.getState());
   const [mcpState, setMcpState] = useState<McpStoreState>(() => mcpStore.getState());
   const [runtimeState, setRuntimeState] = useState<RuntimeConsoleState>(() => runtimeConsoleStore.getState());
+  const [offlineSnapshot, setOfflineSnapshot] = useState<OfflineSynchronizationStateSnapshotDto | undefined>(undefined);
+  const [offlineStatusError, setOfflineStatusError] = useState<string | undefined>(undefined);
+  const [isOfflineStatusLoading, setOfflineStatusLoading] = useState<boolean>(false);
+  const [isOfflineModeTogglePending, setOfflineModeTogglePending] = useState<boolean>(false);
   const [expandedAdvancedSections, setExpandedAdvancedSections] = useState<ReadonlyArray<string>>(
     Object.freeze(["runtime", "development"])
   );
@@ -20,6 +35,28 @@ export default function SettingsPage(): JSX.Element {
   useEffect(() => settingsStore.subscribe(setState), [settingsStore]);
   useEffect(() => mcpStore.subscribe(setMcpState), [mcpStore]);
   useEffect(() => runtimeConsoleStore.subscribe(setRuntimeState), [runtimeConsoleStore]);
+  useEffect(() => {
+    const refreshOfflineStatus = async (): Promise<void> => {
+      setOfflineStatusLoading(true);
+      try {
+        const next = await desktopConnectivityService.getSynchronizationStateSnapshot();
+        setOfflineSnapshot(next);
+        setOfflineStatusError(undefined);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to refresh offline/local mode status.";
+        setOfflineStatusError(message);
+      } finally {
+        setOfflineStatusLoading(false);
+      }
+    };
+    void refreshOfflineStatus();
+    const interval = window.setInterval(() => {
+      void refreshOfflineStatus();
+    }, 15_000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [desktopConnectivityService]);
 
   const saveStatus = useMemo(() => {
     if (state.saveError) {
@@ -38,6 +75,18 @@ export default function SettingsPage(): JSX.Element {
   }, [state.isAutoSaving, state.lastSavedAt, state.saveError]);
 
   const isAdvancedExpanded = (sectionId: string): boolean => expandedAdvancedSections.includes(sectionId);
+  const settingsShortcutRoutes = useMemo(
+    () => listSettingsShortcutRouteMetadata(
+      resolveNavigationAvailabilityContextForSession(session, {
+        preferredSurface: session?.sessionAccessChannel === "desktop"
+          ? UiSurfaceKeys.desktopAdmin
+          : UiSurfaceKeys.adminLite,
+        fallbackSurface: UiSurfaceKeys.desktopAdmin,
+        strict: true,
+      }),
+    ),
+    [session],
+  );
 
   const toggleAdvancedSection = (sectionId: string): void => {
     setExpandedAdvancedSections((current) => (
@@ -45,6 +94,35 @@ export default function SettingsPage(): JSX.Element {
         ? current.filter((item) => item !== sectionId)
         : [...current, sectionId]
     ));
+  };
+  const refreshOfflineStatus = async (): Promise<void> => {
+    setOfflineStatusLoading(true);
+    try {
+      const next = await desktopConnectivityService.getSynchronizationStateSnapshot();
+      setOfflineSnapshot(next);
+      setOfflineStatusError(undefined);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to refresh offline/local mode status.";
+      setOfflineStatusError(message);
+    } finally {
+      setOfflineStatusLoading(false);
+    }
+  };
+
+  const toggleOfflineMode = async (active: boolean): Promise<void> => {
+    setOfflineModeTogglePending(true);
+    try {
+      await desktopConnectivityService.setOfflineMode({
+        active,
+        detail: active ? "desktop-shell-toggle" : "desktop-shell-resume",
+      });
+      await refreshOfflineStatus();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to update offline mode.";
+      setOfflineStatusError(message);
+    } finally {
+      setOfflineModeTogglePending(false);
+    }
   };
 
   return (
@@ -58,39 +136,11 @@ export default function SettingsPage(): JSX.Element {
           </p>
         </div>
         <div className="ui-page__actions">
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationSharing}>
-            Sharing and visibility
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationSharingThin}>
-            Sharing access review
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationReporting}>
-            Authorization reporting
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.storageAdmin}>
-            Managed storage
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceAdmin}>
-            Workspace administration
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.nodeEnrollmentReview}>
-            Node enrollment review
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.nodeInventory}>
-            Trusted node inventory
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceThinMembership}>
-            Workspace memberships
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.trustedDevices}>
-            Trusted devices
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.identityAdmin}>
-            Identity administration
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.secretsAdmin}>
-            Secret metadata management
-          </Link>
+          {settingsShortcutRoutes.map((route) => (
+            <Link key={route.key} className="ui-button ui-button--secondary ui-button--sm" to={route.path}>
+              {route.title}
+            </Link>
+          ))}
         </div>
       </div>
 
@@ -420,6 +470,28 @@ export default function SettingsPage(): JSX.Element {
             </div>
           </AdvancedSection>
         </SettingsSection>
+
+        <DesktopOfflineStatusSurface
+          snapshot={offlineSnapshot}
+          isLoading={isOfflineStatusLoading}
+          isTogglingOfflineMode={isOfflineModeTogglePending}
+          errorMessage={offlineStatusError}
+          onRefresh={() => {
+            void refreshOfflineStatus();
+          }}
+          onToggleOfflineMode={(active) => {
+            void toggleOfflineMode(active);
+          }}
+          onOpenPreservedDrafts={() => {
+            void navigate(ROUTE_PATHS.workflowStudio);
+          }}
+          onOpenSyncConflicts={() => {
+            void navigate(ROUTE_PATHS.workflowStudioRuns);
+          }}
+          onOpenReplayOutcomes={() => {
+            void navigate(ROUTE_PATHS.run);
+          }}
+        />
       </div>
     </section>
   );

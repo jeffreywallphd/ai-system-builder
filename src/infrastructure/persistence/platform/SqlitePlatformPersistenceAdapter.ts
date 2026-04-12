@@ -1,5 +1,6 @@
 ﻿import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import type {
   IPlatformAuditEventRepository,
   IPlatformRunRecordRepository,
@@ -10,12 +11,15 @@ import type {
   PlatformRunMutationResult,
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import type { IPlatformTransactionManager } from "@application/common/ports/PlatformTransactionPorts";
 import { normalizePlatformPersistenceOperationKey } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   mapPlatformAuditEventRecordToRowValues,
   mapPlatformAuditEventRowToRecord,
   mapPlatformRunRecordToRowValues,
+  mapPlatformRunStatusHistoryRowToRecord,
+  mapRunStatusHistorySnapshotToJson,
   mapPlatformRunRowToRecord,
   normalizePlatformLookup,
   parsePlatformAuditMutationReplayRecord,
@@ -24,6 +28,7 @@ import {
   toPlatformRunReplaySnapshot,
   type PlatformAuditEventRow,
   type PlatformMutationReplayRow,
+  type PlatformRunStatusHistoryRow,
   type PlatformRunRow,
 } from "./PlatformPersistenceMapper";
 import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
@@ -35,17 +40,99 @@ import {
   PLATFORM_PERSISTENCE_MIGRATIONS,
   PLATFORM_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqlitePlatformPersistenceMigrations";
+import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
+import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type {
+  AuthoritativeRunStatusHistoryListQuery,
+  AuthoritativeRunStatusHistoryRecord,
+  AuthoritativeRunNodePlacementHoldRecord,
+  AuthoritativeRunNodePlacementHoldResult,
+  AuthoritativeRunDispatchAttemptResult,
+  AuthoritativeRunDispatchAttemptRecord,
+  AuthoritativeRunQueueEntryRecord,
+  AuthoritativeRunStaleQueueReservationRecord,
+  AuthoritativeRunQueueMutationResult,
+  AuthoritativeRunNodeClaimResult,
+  IRunNodePlacementHoldRepository,
+  IRunOrchestrationQueuePersistenceRepository,
+  RunQueueEligibilityMarker,
+} from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import { RunLifecycleStates, type RunLifecycleState } from "@domain/runs/RunDomain";
+import { RunNodePlacementHoldConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 
 type PlatformMutationKind = "create-run" | "save-run" | "append-audit-event";
 
+interface PlatformRunQueueRow {
+  readonly run_id: string;
+  readonly queue_id: string;
+  readonly workspace_id: string | null;
+  readonly lifecycle_state: string;
+  readonly entered_at: string;
+  readonly order_key: string;
+  readonly eligibility_marker: RunQueueEligibilityMarker;
+  readonly eligible_at: string;
+  readonly claim_token: string | null;
+  readonly claimed_by: string | null;
+  readonly claimed_at: string | null;
+  readonly claim_expires_at: string | null;
+  readonly assignment_node_id: string | null;
+  readonly assignment_claimed_at: string | null;
+  readonly dispatch_prepared_at: string | null;
+  readonly last_dispatch_attempt_id: string | null;
+  readonly dequeued_at: string | null;
+  readonly defer_count: number;
+  readonly last_no_placement_category: string | null;
+  readonly last_no_placement_reason_codes_json: string | null;
+  readonly last_no_placement_reason_message: string | null;
+  readonly last_no_placement_decision_id: string | null;
+  readonly last_no_placement_recorded_at: string | null;
+  readonly last_no_placement_admin_attention: number;
+  readonly updated_at: string;
+  readonly revision: number;
+}
+
+interface PlatformRunDispatchAttemptRow {
+  readonly attempt_id: string;
+  readonly run_id: string;
+  readonly queue_id: string;
+  readonly workspace_id: string | null;
+  readonly node_id: string;
+  readonly reservation_owner: string;
+  readonly claim_token: string;
+  readonly prepared_at: string;
+  readonly dispatch_metadata_json: string;
+  readonly dispatch_result_json: string | null;
+}
+
+interface PlatformRunNodePlacementHoldRow {
+  readonly node_id: string;
+  readonly hold_token: string;
+  readonly run_id: string;
+  readonly queue_id: string;
+  readonly reservation_owner: string;
+  readonly claim_token: string;
+  readonly decision_id: string | null;
+  readonly held_at: string;
+  readonly expires_at: string;
+  readonly updated_at: string;
+  readonly created_at: string;
+}
+
 export class SqlitePlatformPersistenceAdapter
   extends SafeSqliteRepositoryBase
-  implements IPlatformRunRecordRepository, IPlatformAuditEventRepository {
+  implements
+    IPlatformRunRecordRepository,
+    IPlatformAuditEventRepository,
+    IPlatformTransactionManager,
+    IRunNodePlacementHoldRepository,
+    IRunOrchestrationQueuePersistenceRepository {
   private database?: SqliteCompatDatabase;
   private initialized = false;
+  private readonly transactionCoordinator: SqliteTransactionCoordinator;
 
   public constructor(private readonly databasePath: string) {
     super("Platform");
+    this.transactionCoordinator = new SqliteTransactionCoordinator(() => this.getDatabase());
   }
 
   public async findRunById(runId: string): Promise<PlatformRunRecord | undefined> {
@@ -126,6 +213,54 @@ export class SqlitePlatformPersistenceAdapter
     return Object.freeze(rows.map((row) => mapPlatformRunRowToRecord(row)));
   }
 
+  public async listRunStatusHistory(
+    query: AuthoritativeRunStatusHistoryListQuery,
+  ): Promise<ReadonlyArray<AuthoritativeRunStatusHistoryRecord>> {
+    const runId = normalizePlatformLookup(query.runId);
+    if (!runId) {
+      return Object.freeze([]);
+    }
+
+    const whereBuilder = createSqliteWhereBuilder();
+    whereBuilder.add("run_id = ?", runId);
+    whereBuilder.addEquals("workspace_id", normalizePlatformLookup(query.workspaceId ?? ""));
+    whereBuilder.addIn("lifecycle_state", query.lifecycleStates);
+    if (query.changedAfter) {
+      whereBuilder.add("changed_at >= ?", query.changedAfter.trim());
+    }
+    if (query.changedBefore) {
+      whereBuilder.add("changed_at <= ?", query.changedBefore.trim());
+    }
+    const where = whereBuilder.build();
+    const paging = this.buildPagingClause(query.limit, query.offset);
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        history_entry_id,
+        run_id,
+        workspace_id,
+        lifecycle_state,
+        platform_status,
+        run_revision,
+        changed_at,
+        changed_by_actor_id,
+        reason,
+        dispatch_attempt_id,
+        dispatch_id,
+        backend_kind,
+        backend_run_id,
+        safe_failure_code,
+        safe_failure_message,
+        snapshot_json
+      FROM platform_run_status_history
+      ${where.sql}
+      ORDER BY changed_at DESC, history_entry_id DESC
+      ${paging.sql}
+    `).all(...where.params, ...paging.params) as PlatformRunStatusHistoryRow[];
+
+    return Object.freeze(rows.map(mapPlatformRunStatusHistoryRowToRecord));
+  }
+
   public async createRun(
     record: PlatformRunRecord,
     mutation: PlatformPersistenceMutationContext,
@@ -140,6 +275,1205 @@ export class SqlitePlatformPersistenceAdapter
     },
   ): Promise<PlatformRunMutationResult> {
     return this.persistRunMutation("save-run", record, mutation, false, mutation.expectedRevision);
+  }
+
+  public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
+    const normalizedRunId = normalizePlatformLookup(runId);
+    if (!normalizedRunId) {
+      return undefined;
+    }
+
+    const row = this.getQueueRowByRunId(normalizedRunId);
+    return row ? this.mapQueueRowToRecord(row) : undefined;
+  }
+
+  public async listQueueEntries(query: {
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly lifecycleStates?: ReadonlyArray<RunLifecycleState>;
+    readonly includeDequeued?: boolean;
+    readonly limit?: number;
+    readonly offset?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    const whereBuilder = createSqliteWhereBuilder();
+    whereBuilder.addEquals("workspace_id", normalizePlatformLookup(query.workspaceId ?? ""));
+    whereBuilder.addEquals("queue_id", normalizePlatformLookup(query.queueId ?? ""));
+    whereBuilder.addIn("lifecycle_state", query.lifecycleStates);
+    if (!query.includeDequeued) {
+      whereBuilder.add("dequeued_at IS NULL");
+    }
+    const where = whereBuilder.build();
+    const paging = this.buildPagingClause(query.limit, query.offset);
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
+        dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      ${where.sql}
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+      ${paging.sql}
+    `).all(...where.params, ...paging.params) as PlatformRunQueueRow[];
+
+    return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
+  }
+
+  public async listStaleQueueReservations(query: {
+    readonly asOf: string;
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly limit?: number;
+    readonly offset?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunStaleQueueReservationRecord>> {
+    const asOf = query.asOf.trim();
+    if (!asOf || Number.isNaN(Date.parse(asOf))) {
+      return Object.freeze([]);
+    }
+    const workspaceId = normalizePlatformLookup(query.workspaceId ?? "");
+    const queueId = normalizePlatformLookup(query.queueId ?? "");
+    const paging = this.buildPagingClause(query.limit, query.offset);
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at
+      FROM platform_run_orchestration_queue
+      WHERE dequeued_at IS NULL
+        AND claim_token IS NOT NULL
+        AND claimed_by IS NOT NULL
+        AND claimed_at IS NOT NULL
+        AND claim_expires_at IS NOT NULL
+        AND claim_expires_at <= ?
+        AND (? IS NULL OR workspace_id = ?)
+        AND (? IS NULL OR queue_id = ?)
+      ORDER BY claim_expires_at ASC, claimed_at ASC, run_id ASC
+      ${paging.sql}
+    `).all(
+      asOf,
+      workspaceId ?? null,
+      workspaceId ?? null,
+      queueId ?? null,
+      queueId ?? null,
+      ...paging.params,
+    ) as Array<{
+      readonly run_id: string;
+      readonly queue_id: string;
+      readonly workspace_id: string | null;
+      readonly claim_token: string | null;
+      readonly claimed_by: string | null;
+      readonly claimed_at: string | null;
+      readonly claim_expires_at: string | null;
+    }>;
+
+    return Object.freeze(rows
+      .map((row) => {
+        const claimToken = normalizePlatformLookup(row.claim_token ?? "");
+        const claimedBy = normalizePlatformLookup(row.claimed_by ?? "");
+        const claimedAt = normalizePlatformLookup(row.claimed_at ?? "");
+        const claimExpiresAt = normalizePlatformLookup(row.claim_expires_at ?? "");
+        if (!claimToken || !claimedBy || !claimedAt || !claimExpiresAt) {
+          return undefined;
+        }
+        return Object.freeze({
+          runId: row.run_id,
+          queueId: row.queue_id,
+          workspaceId: normalizePlatformLookup(row.workspace_id ?? ""),
+          claimToken,
+          claimedBy,
+          claimedAt,
+          claimExpiresAt,
+        });
+      })
+      .filter((entry): entry is AuthoritativeRunStaleQueueReservationRecord => Boolean(entry)));
+  }
+
+  public async enqueueRunForAssignment(
+    record: Omit<
+      AuthoritativeRunQueueEntryRecord,
+      "claimToken" | "claimedBy" | "claimedAt" | "claimExpiresAt" | "dequeuedAt" | "revision"
+    >,
+    _mutation: PlatformPersistenceMutationContext,
+  ): Promise<AuthoritativeRunQueueMutationResult> {
+    const runId = normalizePlatformLookup(record.runId);
+    if (!runId) {
+      throw new Error("Run queue persistence requires runId.");
+    }
+
+    const existing = this.getQueueRowByRunId(runId);
+    if (existing) {
+      return Object.freeze({
+        changed: false,
+        record: this.mapQueueRowToRecord(existing),
+      });
+    }
+
+    const persistedRow: PlatformRunQueueRow = Object.freeze({
+      run_id: runId,
+      queue_id: record.queueId.trim(),
+      workspace_id: normalizePlatformLookup(record.workspaceId ?? "") ?? null,
+      lifecycle_state: record.lifecycleState,
+      entered_at: record.enteredAt.trim(),
+      order_key: record.orderKey.trim(),
+      eligibility_marker: record.eligibilityMarker,
+      eligible_at: record.eligibleAt.trim(),
+      claim_token: null,
+      claimed_by: null,
+      claimed_at: null,
+      claim_expires_at: null,
+      assignment_node_id: null,
+      assignment_claimed_at: null,
+      dispatch_prepared_at: null,
+      last_dispatch_attempt_id: null,
+      dequeued_at: null,
+      defer_count: 0,
+      last_no_placement_category: null,
+      last_no_placement_reason_codes_json: null,
+      last_no_placement_reason_message: null,
+      last_no_placement_decision_id: null,
+      last_no_placement_recorded_at: null,
+      last_no_placement_admin_attention: 0,
+      updated_at: record.updatedAt.trim(),
+      revision: 1,
+    });
+
+    this.executeMutation("enqueue run for assignment", () => this.getDatabase().prepare(`
+        INSERT INTO platform_run_orchestration_queue (
+          run_id,
+          queue_id,
+          workspace_id,
+          lifecycle_state,
+          entered_at,
+          order_key,
+          eligibility_marker,
+          eligible_at,
+          claim_token,
+          claimed_by,
+          claimed_at,
+          claim_expires_at,
+          assignment_node_id,
+          assignment_claimed_at,
+          dispatch_prepared_at,
+          last_dispatch_attempt_id,
+          dequeued_at,
+          defer_count,
+          last_no_placement_category,
+          last_no_placement_reason_codes_json,
+          last_no_placement_reason_message,
+          last_no_placement_decision_id,
+          last_no_placement_recorded_at,
+          last_no_placement_admin_attention,
+          updated_at,
+          revision
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+      persistedRow.run_id,
+      persistedRow.queue_id,
+      persistedRow.workspace_id,
+      persistedRow.lifecycle_state,
+      persistedRow.entered_at,
+      persistedRow.order_key,
+      persistedRow.eligibility_marker,
+      persistedRow.eligible_at,
+      persistedRow.claim_token,
+      persistedRow.claimed_by,
+      persistedRow.claimed_at,
+      persistedRow.claim_expires_at,
+      persistedRow.assignment_node_id,
+      persistedRow.assignment_claimed_at,
+      persistedRow.dispatch_prepared_at,
+      persistedRow.last_dispatch_attempt_id,
+      persistedRow.dequeued_at,
+      persistedRow.defer_count,
+      persistedRow.last_no_placement_category,
+      persistedRow.last_no_placement_reason_codes_json,
+      persistedRow.last_no_placement_reason_message,
+      persistedRow.last_no_placement_decision_id,
+      persistedRow.last_no_placement_recorded_at,
+      persistedRow.last_no_placement_admin_attention,
+      persistedRow.updated_at,
+      persistedRow.revision,
+    ));
+
+    return Object.freeze({
+      changed: true,
+      record: this.mapQueueRowToRecord(persistedRow),
+    });
+  }
+
+  public async listAssignmentReadyRuns(query: {
+    readonly asOf: string;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    const asOf = query.asOf.trim();
+    const limit = Number.isInteger(query.limit) && (query.limit ?? 0) > 0
+      ? query.limit as number
+      : 10;
+    const queueId = normalizePlatformLookup(query.queueId ?? "");
+    const workspaceId = normalizePlatformLookup(query.workspaceId ?? "");
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
+        dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      WHERE dequeued_at IS NULL
+        AND eligibility_marker IN ('ready', 'deferred')
+        AND eligible_at <= ?
+        AND (? IS NULL OR queue_id = ?)
+        AND (? IS NULL OR workspace_id = ?)
+        AND (claim_token IS NULL OR claim_expires_at <= ?)
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+      LIMIT ?
+    `).all(
+      asOf,
+      queueId ?? null,
+      queueId ?? null,
+      workspaceId ?? null,
+      workspaceId ?? null,
+      asOf,
+      limit,
+    ) as PlatformRunQueueRow[];
+
+    return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
+  }
+
+  public async claimAssignmentReadyRuns(input: {
+    readonly asOf: string;
+    readonly reservationOwner: string;
+    readonly reservationTtlSeconds: number;
+    readonly limit: number;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    const asOf = input.asOf.trim();
+    const limit = Math.max(1, input.limit);
+    const reservationOwner = input.reservationOwner.trim();
+    if (!reservationOwner) {
+      return Object.freeze([]);
+    }
+    const reservationTtlSeconds = Math.max(1, input.reservationTtlSeconds);
+    const queueId = normalizePlatformLookup(input.queueId ?? "");
+    const workspaceId = normalizePlatformLookup(input.workspaceId ?? "");
+    const claimExpiresAt = new Date(Date.parse(asOf) + (reservationTtlSeconds * 1000)).toISOString();
+
+    const claimedRunIds = this.getDatabase().transaction(() => {
+      const candidateRows = this.getDatabase().prepare(`
+        SELECT run_id
+        FROM platform_run_orchestration_queue
+        WHERE dequeued_at IS NULL
+          AND eligibility_marker IN ('ready', 'deferred')
+          AND eligible_at <= ?
+          AND (? IS NULL OR queue_id = ?)
+          AND (? IS NULL OR workspace_id = ?)
+          AND (claim_token IS NULL OR claim_expires_at <= ?)
+        ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+        LIMIT ?
+      `).all(
+        asOf,
+        queueId ?? null,
+        queueId ?? null,
+        workspaceId ?? null,
+        workspaceId ?? null,
+        asOf,
+        limit,
+      ) as Array<{ run_id: string }>;
+
+      const runIds: string[] = [];
+      for (const candidateRow of candidateRows) {
+        const claimToken = `queue-claim:${randomUUID()}`;
+        const mutationResult = this.getDatabase().prepare(`
+          UPDATE platform_run_orchestration_queue
+          SET
+            claim_token = ?,
+            claimed_by = ?,
+            claimed_at = ?,
+            claim_expires_at = ?,
+            updated_at = ?,
+            revision = revision + 1
+          WHERE run_id = ?
+            AND dequeued_at IS NULL
+            AND eligibility_marker IN ('ready', 'deferred')
+            AND eligible_at <= ?
+            AND (claim_token IS NULL OR claim_expires_at <= ?)
+        `).run(
+          claimToken,
+          reservationOwner,
+          asOf,
+          claimExpiresAt,
+          asOf,
+          candidateRow.run_id,
+          asOf,
+          asOf,
+        );
+        if (mutationResult.changes === 1) {
+          runIds.push(candidateRow.run_id);
+        }
+      }
+
+      return runIds;
+    })();
+
+    if (claimedRunIds.length === 0) {
+      return Object.freeze([]);
+    }
+
+    const placeholders = claimedRunIds.map(() => "?").join(", ");
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
+        dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      WHERE run_id IN (${placeholders})
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+    `).all(...claimedRunIds) as PlatformRunQueueRow[];
+
+    return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
+  }
+
+  public async releaseRunClaim(input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean> {
+    const runId = normalizePlatformLookup(input.runId);
+    const claimToken = normalizePlatformLookup(input.claimToken);
+    if (!runId || !claimToken) {
+      return false;
+    }
+
+    const releasedAt = input.releasedAt.trim();
+    const mutationResult = this.executeMutation("release run claim", () => this.getDatabase().prepare(`
+        UPDATE platform_run_orchestration_queue
+        SET
+          claim_token = NULL,
+          claimed_by = NULL,
+          claimed_at = NULL,
+          claim_expires_at = NULL,
+          updated_at = ?,
+          revision = revision + 1
+        WHERE run_id = ?
+          AND claim_token = ?
+          AND dequeued_at IS NULL
+      `).run(
+      releasedAt,
+      runId,
+      claimToken,
+    ));
+
+    return mutationResult.changes === 1;
+  }
+
+  public async reconsiderDeferredRunsForScheduling(input: {
+    readonly asOf: string;
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly runIds?: ReadonlyArray<string>;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    const asOf = input.asOf.trim();
+    if (!asOf || Number.isNaN(Date.parse(asOf))) {
+      return Object.freeze([]);
+    }
+    const workspaceId = normalizePlatformLookup(input.workspaceId ?? "");
+    const queueId = normalizePlatformLookup(input.queueId ?? "");
+    const normalizedRunIds = (input.runIds ?? [])
+      .map((runId) => normalizePlatformLookup(runId))
+      .filter((runId): runId is string => Boolean(runId));
+    const dedupedRunIds = [...new Set(normalizedRunIds)];
+    const limit = Math.max(1, input.limit ?? 100);
+
+    const targetRunIds = this.getDatabase().prepare(`
+      SELECT run_id
+      FROM platform_run_orchestration_queue
+      WHERE dequeued_at IS NULL
+        AND eligibility_marker = 'deferred'
+        AND (? IS NULL OR workspace_id = ?)
+        AND (? IS NULL OR queue_id = ?)
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+      LIMIT ?
+    `).all(
+      workspaceId ?? null,
+      workspaceId ?? null,
+      queueId ?? null,
+      queueId ?? null,
+      limit,
+    ) as Array<{ readonly run_id: string }>;
+
+    const selectedRunIds = dedupedRunIds.length > 0
+      ? targetRunIds
+        .map((row) => row.run_id)
+        .filter((runId) => dedupedRunIds.includes(runId))
+      : targetRunIds.map((row) => row.run_id);
+    if (selectedRunIds.length === 0) {
+      return Object.freeze([]);
+    }
+
+    const updatedRunIds = this.getDatabase().transaction(() => {
+      const updated: string[] = [];
+      for (const runId of selectedRunIds) {
+        const result = this.getDatabase().prepare(`
+          UPDATE platform_run_orchestration_queue
+          SET
+            eligibility_marker = 'ready',
+            eligible_at = ?,
+            claim_token = NULL,
+            claimed_by = NULL,
+            claimed_at = NULL,
+            claim_expires_at = NULL,
+            updated_at = ?,
+            revision = revision + 1
+          WHERE run_id = ?
+            AND dequeued_at IS NULL
+            AND eligibility_marker = 'deferred'
+        `).run(
+          asOf,
+          asOf,
+          runId,
+        );
+        if (result.changes === 1) {
+          updated.push(runId);
+        }
+      }
+      return updated;
+    })();
+    if (updatedRunIds.length === 0) {
+      return Object.freeze([]);
+    }
+
+    const placeholders = updatedRunIds.map(() => "?").join(", ");
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
+        dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      WHERE run_id IN (${placeholders})
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+    `).all(...updatedRunIds) as PlatformRunQueueRow[];
+
+    return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
+  }
+
+  public async deferRunClaimForNoPlacement(input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly deferredAt: string;
+    readonly reasonCategory: string;
+    readonly reasonCodes: ReadonlyArray<string>;
+    readonly reasonMessage: string;
+    readonly decisionId?: string;
+    readonly requiresAdministrativeAttention?: boolean;
+    readonly initialDelaySeconds?: number;
+    readonly maxDelaySeconds?: number;
+    readonly multiplier?: number;
+  }): Promise<AuthoritativeRunQueueMutationResult | undefined> {
+    const runId = normalizePlatformLookup(input.runId);
+    const claimToken = normalizePlatformLookup(input.claimToken);
+    if (!runId || !claimToken) {
+      return undefined;
+    }
+
+    const deferredAt = input.deferredAt.trim();
+    if (!deferredAt || Number.isNaN(Date.parse(deferredAt))) {
+      return undefined;
+    }
+    const existing = this.getQueueRowByRunId(runId);
+    if (!existing || existing.claim_token !== claimToken || existing.dequeued_at) {
+      return undefined;
+    }
+
+    const nextDeferCount = Math.max(0, existing.defer_count) + 1;
+    const initialDelaySeconds = Math.max(1, Math.floor(input.initialDelaySeconds ?? 15));
+    const multiplier = Math.max(1, input.multiplier ?? 2);
+    const maxDelaySeconds = Math.max(initialDelaySeconds, Math.floor(input.maxDelaySeconds ?? 600));
+    const rawDelaySeconds = initialDelaySeconds * Math.pow(multiplier, Math.max(0, nextDeferCount - 1));
+    const delaySeconds = Math.max(1, Math.min(maxDelaySeconds, Math.floor(rawDelaySeconds)));
+    const nextEligibleAt = new Date(Date.parse(deferredAt) + (delaySeconds * 1000)).toISOString();
+
+    const reasonCategory = (normalizePlatformLookup(input.reasonCategory) ?? "policy-deferred");
+    const reasonCodes = [...new Set(
+      input.reasonCodes
+        .map((code) => code.trim())
+        .filter((code) => code.length > 0),
+    )];
+    const reasonCodesJson = reasonCodes.length > 0
+      ? JSON.stringify(reasonCodes)
+      : JSON.stringify(["unspecified-no-placement"]);
+    const reasonMessage = input.reasonMessage.trim().slice(0, 512);
+    const decisionId = normalizePlatformLookup(input.decisionId ?? "") ?? null;
+    const adminAttention = input.requiresAdministrativeAttention ? 1 : 0;
+
+    const mutationResult = this.executeMutation("defer run claim for no placement", () => this.getDatabase().prepare(`
+        UPDATE platform_run_orchestration_queue
+        SET
+          eligibility_marker = 'deferred',
+          eligible_at = ?,
+          claim_token = NULL,
+          claimed_by = NULL,
+          claimed_at = NULL,
+          claim_expires_at = NULL,
+          defer_count = ?,
+          last_no_placement_category = ?,
+          last_no_placement_reason_codes_json = ?,
+          last_no_placement_reason_message = ?,
+          last_no_placement_decision_id = ?,
+          last_no_placement_recorded_at = ?,
+          last_no_placement_admin_attention = ?,
+          updated_at = ?,
+          revision = revision + 1
+        WHERE run_id = ?
+          AND claim_token = ?
+          AND dequeued_at IS NULL
+      `).run(
+      nextEligibleAt,
+      nextDeferCount,
+      reasonCategory,
+      reasonCodesJson,
+      reasonMessage || "Run could not be placed and was deferred for re-evaluation.",
+      decisionId,
+      deferredAt,
+      adminAttention,
+      deferredAt,
+      runId,
+      claimToken,
+    ));
+    if (mutationResult.changes !== 1) {
+      return undefined;
+    }
+
+    const nextRow = this.getQueueRowByRunId(runId);
+    if (!nextRow) {
+      return undefined;
+    }
+    return Object.freeze({
+      changed: true,
+      record: this.mapQueueRowToRecord(nextRow),
+    });
+  }
+
+  public async acquireNodePlacementHold(input: {
+    readonly holdToken: string;
+    readonly runId: string;
+    readonly queueId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly decisionId?: string;
+    readonly heldAt: string;
+    readonly expiresAt: string;
+  }): Promise<AuthoritativeRunNodePlacementHoldResult> {
+    const holdToken = normalizePlatformLookup(input.holdToken);
+    const runId = normalizePlatformLookup(input.runId);
+    const queueId = normalizePlatformLookup(input.queueId);
+    const nodeId = normalizePlatformLookup(input.nodeId);
+    const reservationOwner = normalizePlatformLookup(input.reservationOwner);
+    const claimToken = normalizePlatformLookup(input.claimToken);
+    const decisionId = normalizePlatformLookup(input.decisionId ?? "") ?? null;
+    if (!holdToken || !runId || !queueId || !nodeId || !reservationOwner || !claimToken) {
+      throw new Error(
+        "Node placement hold acquisition requires holdToken, runId, queueId, nodeId, reservationOwner, and claimToken.",
+      );
+    }
+
+    const heldAt = input.heldAt.trim();
+    const expiresAt = input.expiresAt.trim();
+    if (!heldAt || Number.isNaN(Date.parse(heldAt)) || !expiresAt || Number.isNaN(Date.parse(expiresAt))) {
+      throw new Error("Node placement hold timestamps must be valid ISO strings.");
+    }
+    if (Date.parse(expiresAt) <= Date.parse(heldAt)) {
+      throw new Error("Node placement hold expiresAt must be after heldAt.");
+    }
+
+    const acquireResult = this.getDatabase().transaction(() => {
+      this.getDatabase().prepare(`
+        DELETE FROM platform_run_node_placement_holds
+        WHERE node_id = ?
+          AND expires_at <= ?
+      `).run(nodeId, heldAt);
+
+      const existing = this.getNodePlacementHoldRowByNodeId(nodeId);
+      if (existing && existing.expires_at > heldAt && existing.hold_token !== holdToken) {
+        return Object.freeze({
+          outcome: "conflict" as const,
+          currentHold: this.mapNodePlacementHoldRowToRecord(existing),
+        });
+      }
+
+      this.getDatabase().prepare(`
+        INSERT INTO platform_run_node_placement_holds (
+          node_id,
+          hold_token,
+          run_id,
+          queue_id,
+          reservation_owner,
+          claim_token,
+          decision_id,
+          held_at,
+          expires_at,
+          updated_at,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(node_id) DO UPDATE SET
+          hold_token = excluded.hold_token,
+          run_id = excluded.run_id,
+          queue_id = excluded.queue_id,
+          reservation_owner = excluded.reservation_owner,
+          claim_token = excluded.claim_token,
+          decision_id = excluded.decision_id,
+          held_at = excluded.held_at,
+          expires_at = excluded.expires_at,
+          updated_at = excluded.updated_at
+      `).run(
+        nodeId,
+        holdToken,
+        runId,
+        queueId,
+        reservationOwner,
+        claimToken,
+        decisionId,
+        heldAt,
+        expiresAt,
+        heldAt,
+        heldAt,
+      );
+
+      const acquired = this.getNodePlacementHoldRowByNodeId(nodeId);
+      if (!acquired) {
+        throw new Error(`Failed to acquire node placement hold for node '${nodeId}'.`);
+      }
+      return Object.freeze({
+        outcome: "acquired" as const,
+        hold: this.mapNodePlacementHoldRowToRecord(acquired),
+      });
+    })();
+
+    if (acquireResult.outcome === "conflict") {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodePlacementHoldConflictReasons.heldByAnotherOwner,
+          nodeId,
+          message: `Node '${nodeId}' already has an active placement hold.`,
+          currentHold: acquireResult.currentHold,
+        }),
+      });
+    }
+
+    return Object.freeze({
+      outcome: "acquired",
+      hold: acquireResult.hold,
+    });
+  }
+
+  public async releaseNodePlacementHold(input: {
+    readonly nodeId: string;
+    readonly holdToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean> {
+    const nodeId = normalizePlatformLookup(input.nodeId);
+    const holdToken = normalizePlatformLookup(input.holdToken);
+    if (!nodeId || !holdToken) {
+      return false;
+    }
+
+    const releasedAt = input.releasedAt.trim();
+    const mutationResult = this.executeMutation("release node placement hold", () => this.getDatabase().prepare(`
+        DELETE FROM platform_run_node_placement_holds
+        WHERE node_id = ?
+          AND hold_token = ?
+      `).run(
+      nodeId,
+      holdToken,
+    ));
+    if (mutationResult.changes === 0) {
+      return false;
+    }
+
+    this.executeMutation("cleanup expired node placement holds", () => this.getDatabase().prepare(`
+        DELETE FROM platform_run_node_placement_holds
+        WHERE expires_at <= ?
+      `).run(releasedAt));
+
+    return true;
+  }
+
+  public async releaseExpiredNodePlacementHolds(input: {
+    readonly asOf: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunNodePlacementHoldRecord>> {
+    const asOf = input.asOf.trim();
+    if (!asOf || Number.isNaN(Date.parse(asOf))) {
+      return Object.freeze([]);
+    }
+    const limit = Math.max(1, Math.min(1000, input.limit ?? 200));
+
+    const releasedRows = this.getDatabase().transaction(() => {
+      const rows = this.getDatabase().prepare(`
+        SELECT
+          node_id,
+          hold_token,
+          run_id,
+          queue_id,
+          reservation_owner,
+          claim_token,
+          decision_id,
+          held_at,
+          expires_at,
+          updated_at,
+          created_at
+        FROM platform_run_node_placement_holds
+        WHERE expires_at <= ?
+        ORDER BY expires_at ASC, node_id ASC
+        LIMIT ?
+      `).all(asOf, limit) as PlatformRunNodePlacementHoldRow[];
+      if (rows.length === 0) {
+        return Object.freeze([] as ReadonlyArray<PlatformRunNodePlacementHoldRow>);
+      }
+
+      const deleteStatement = this.getDatabase().prepare(`
+        DELETE FROM platform_run_node_placement_holds
+        WHERE node_id = ?
+          AND hold_token = ?
+      `);
+      const released: PlatformRunNodePlacementHoldRow[] = [];
+      for (const row of rows) {
+        const result = deleteStatement.run(row.node_id, row.hold_token);
+        if (result.changes === 1) {
+          released.push(row);
+        }
+      }
+      return Object.freeze(released);
+    })();
+
+    return Object.freeze(releasedRows.map((row) => this.mapNodePlacementHoldRowToRecord(row)));
+  }
+
+  public async claimQueuedRunForNodeDispatch(input: {
+    readonly runId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly dispatchAttemptId: string;
+    readonly preparedAt: string;
+    readonly dispatchMetadata: Readonly<Record<string, unknown>>;
+  }): Promise<AuthoritativeRunNodeClaimResult> {
+    const runId = normalizePlatformLookup(input.runId);
+    const nodeId = normalizePlatformLookup(input.nodeId);
+    const reservationOwner = normalizePlatformLookup(input.reservationOwner);
+    const claimToken = normalizePlatformLookup(input.claimToken);
+    const dispatchAttemptId = normalizePlatformLookup(input.dispatchAttemptId);
+    if (!runId || !nodeId || !reservationOwner || !claimToken || !dispatchAttemptId) {
+      throw new Error("Node dispatch claim requires runId, nodeId, reservationOwner, claimToken, and dispatchAttemptId.");
+    }
+
+    const preparedAt = input.preparedAt.trim();
+    const existing = this.getQueueRowByRunId(runId);
+    if (!existing) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.notFound,
+          runId,
+          nodeId,
+          message: `Queued run '${runId}' was not found for node claim.`,
+        }),
+      });
+    }
+
+    if (existing.assignment_node_id) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.alreadyAssigned,
+          runId,
+          nodeId,
+          message: `Run '${runId}' is already claimed by node '${existing.assignment_node_id}'.`,
+          currentEntry: this.mapQueueRowToRecord(existing),
+        }),
+      });
+    }
+
+    if (
+      existing.dequeued_at
+      || (existing.lifecycle_state !== "queued" && existing.lifecycle_state !== "assignment-pending")
+    ) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.queueStateConflict,
+          runId,
+          nodeId,
+          message: `Run '${runId}' is not claimable from queue lifecycle state '${existing.lifecycle_state}'.`,
+          currentEntry: this.mapQueueRowToRecord(existing),
+        }),
+      });
+    }
+
+    if (
+      existing.claim_token !== claimToken
+      || existing.claimed_by !== reservationOwner
+      || !existing.claim_expires_at
+      || existing.claim_expires_at < preparedAt
+    ) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.reservationConflict,
+          runId,
+          nodeId,
+          message: `Run '${runId}' reservation claim no longer matches the provided claim token and owner.`,
+          currentEntry: this.mapQueueRowToRecord(existing),
+        }),
+      });
+    }
+
+    const claimed = this.getDatabase().transaction(() => {
+      const updateResult = this.getDatabase().prepare(`
+          UPDATE platform_run_orchestration_queue
+          SET
+            lifecycle_state = 'assigned',
+            assignment_node_id = ?,
+            assignment_claimed_at = ?,
+          dispatch_prepared_at = ?,
+          last_dispatch_attempt_id = ?,
+          dequeued_at = ?,
+          defer_count = 0,
+          last_no_placement_category = NULL,
+          last_no_placement_reason_codes_json = NULL,
+          last_no_placement_reason_message = NULL,
+          last_no_placement_decision_id = NULL,
+          last_no_placement_recorded_at = NULL,
+          last_no_placement_admin_attention = 0,
+          updated_at = ?,
+          revision = revision + 1
+          WHERE run_id = ?
+            AND claim_token = ?
+            AND claimed_by = ?
+            AND claim_expires_at IS NOT NULL
+            AND claim_expires_at >= ?
+            AND assignment_node_id IS NULL
+            AND dequeued_at IS NULL
+            AND lifecycle_state IN ('queued', 'assignment-pending')
+        `).run(
+        nodeId,
+        preparedAt,
+        preparedAt,
+        dispatchAttemptId,
+        preparedAt,
+        preparedAt,
+        runId,
+        claimToken,
+        reservationOwner,
+        preparedAt,
+      );
+      if (updateResult.changes !== 1) {
+        return false;
+      }
+
+      this.getDatabase().prepare(`
+          INSERT INTO platform_run_dispatch_attempts (
+            attempt_id,
+            run_id,
+            queue_id,
+            workspace_id,
+            node_id,
+            reservation_owner,
+            claim_token,
+            prepared_at,
+            dispatch_metadata_json,
+            dispatch_result_json,
+            created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+        dispatchAttemptId,
+        runId,
+        existing.queue_id,
+        existing.workspace_id,
+        nodeId,
+        reservationOwner,
+        claimToken,
+        preparedAt,
+        JSON.stringify(input.dispatchMetadata),
+        null,
+        preparedAt,
+      );
+      return true;
+    })();
+
+    if (!claimed) {
+      const conflicted = this.getQueueRowByRunId(runId);
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.queueStateConflict,
+          runId,
+          nodeId,
+          message: `Run '${runId}' could not be claimed due to a concurrent queue state change.`,
+          currentEntry: conflicted ? this.mapQueueRowToRecord(conflicted) : undefined,
+        }),
+      });
+    }
+
+    const claimedRow = this.getQueueRowByRunId(runId);
+    if (!claimedRow) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.notFound,
+          runId,
+          nodeId,
+          message: `Run '${runId}' disappeared after claim update.`,
+        }),
+      });
+    }
+
+    return Object.freeze({
+      outcome: "claimed",
+      queueEntry: this.mapQueueRowToRecord(claimedRow),
+      dispatchAttempt: Object.freeze({
+        attemptId: dispatchAttemptId,
+        runId,
+        queueId: existing.queue_id,
+        workspaceId: normalizePlatformLookup(existing.workspace_id ?? ""),
+        nodeId,
+        reservationOwner,
+        claimToken,
+        preparedAt,
+        dispatchMetadata: Object.freeze({ ...input.dispatchMetadata }),
+      }),
+    });
+  }
+
+  public async requeueAssignedRunForRecovery(input: {
+    readonly runId: string;
+    readonly requeuedAt: string;
+    readonly eligibilityMarker?: RunQueueEligibilityMarker;
+  }): Promise<boolean> {
+    const runId = normalizePlatformLookup(input.runId);
+    if (!runId) {
+      return false;
+    }
+
+    const requeuedAt = input.requeuedAt.trim();
+    const eligibilityMarker = input.eligibilityMarker ?? "ready";
+    const mutationResult = this.executeMutation("requeue assigned run for recovery", () => this.getDatabase().prepare(`
+        UPDATE platform_run_orchestration_queue
+        SET
+          lifecycle_state = 'queued',
+          eligibility_marker = ?,
+          claim_token = NULL,
+          claimed_by = NULL,
+          claimed_at = NULL,
+          claim_expires_at = NULL,
+          assignment_node_id = NULL,
+          assignment_claimed_at = NULL,
+          dispatch_prepared_at = NULL,
+          last_dispatch_attempt_id = NULL,
+          dequeued_at = NULL,
+          defer_count = 0,
+          last_no_placement_category = NULL,
+          last_no_placement_reason_codes_json = NULL,
+          last_no_placement_reason_message = NULL,
+          last_no_placement_decision_id = NULL,
+          last_no_placement_recorded_at = NULL,
+          last_no_placement_admin_attention = 0,
+          updated_at = ?,
+          revision = revision + 1
+        WHERE run_id = ?
+          AND lifecycle_state = 'assigned'
+      `).run(
+      eligibilityMarker,
+      requeuedAt,
+      runId,
+    ));
+
+    return mutationResult.changes === 1;
+  }
+
+  public async recordDispatchAttemptResult(input: {
+    readonly runId: string;
+    readonly attemptId: string;
+    readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    const runId = normalizePlatformLookup(input.runId);
+    const attemptId = normalizePlatformLookup(input.attemptId);
+    if (!runId || !attemptId) {
+      return false;
+    }
+
+    const mutationResult = this.executeMutation("record dispatch attempt result", () => this.getDatabase().prepare(`
+        UPDATE platform_run_dispatch_attempts
+        SET dispatch_result_json = ?
+        WHERE attempt_id = ?
+          AND run_id = ?
+      `).run(
+      JSON.stringify(input.result),
+      attemptId,
+      runId,
+    ));
+
+    return mutationResult.changes === 1;
+  }
+
+  public async finalizeRunQueueEntry(input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: RunLifecycleState;
+  }): Promise<boolean> {
+    const runId = normalizePlatformLookup(input.runId);
+    if (!runId) {
+      return false;
+    }
+
+    const finalizedAt = input.finalizedAt.trim();
+    const mutationResult = this.executeMutation("finalize run queue entry", () => this.getDatabase().prepare(`
+        UPDATE platform_run_orchestration_queue
+        SET
+          lifecycle_state = ?,
+          claim_token = NULL,
+          claimed_by = NULL,
+          claimed_at = NULL,
+          claim_expires_at = NULL,
+          dequeued_at = COALESCE(dequeued_at, ?),
+          updated_at = ?,
+          revision = revision + 1
+        WHERE run_id = ?
+      `).run(
+      input.lifecycleState,
+      finalizedAt,
+      finalizedAt,
+      runId,
+    ));
+
+    return mutationResult.changes === 1;
+  }
+
+  public async listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
+    const normalizedRunId = normalizePlatformLookup(runId);
+    if (!normalizedRunId) {
+      return Object.freeze([]);
+    }
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        attempt_id,
+        run_id,
+        queue_id,
+        workspace_id,
+        node_id,
+        reservation_owner,
+        claim_token,
+        prepared_at,
+        dispatch_metadata_json,
+        dispatch_result_json
+      FROM platform_run_dispatch_attempts
+      WHERE run_id = ?
+      ORDER BY prepared_at DESC, attempt_id ASC
+    `).all(normalizedRunId) as PlatformRunDispatchAttemptRow[];
+
+    return Object.freeze(rows.map((row) => this.mapDispatchAttemptRowToRecord(row)));
   }
 
   public async appendAuditEvent(
@@ -268,6 +1602,10 @@ export class SqlitePlatformPersistenceAdapter
     this.initialized = false;
   }
 
+  public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
+    return this.transactionCoordinator.runInTransaction(operation);
+  }
+
   private persistRunMutation(
     mutationKind: "create-run" | "save-run",
     record: PlatformRunRecord,
@@ -357,6 +1695,23 @@ export class SqlitePlatformPersistenceAdapter
           `Platform run persistence conflict while saving run '${record.runId}': a newer record already exists.`,
         );
       }
+    }
+
+    const nextLifecycleState = this.resolveLifecycleStateForStatusHistory(persistedRecord);
+    const previousLifecycleState = existing
+      ? this.resolveLifecycleStateForStatusHistory(existing)
+      : undefined;
+    const shouldAppendStatusHistory = !existing
+      || existing.status !== persistedRecord.status
+      || previousLifecycleState !== nextLifecycleState;
+    if (shouldAppendStatusHistory) {
+      this.appendRunStatusHistoryEntry({
+        record: persistedRecord,
+        lifecycleState: nextLifecycleState,
+        changedAt,
+        changedByActorId: mutation.actorId,
+        correlationId: mutation.correlationId,
+      });
     }
 
     this.persistMutationReplayRecord(
@@ -539,6 +1894,271 @@ export class SqlitePlatformPersistenceAdapter
     ));
   }
 
+  private getQueueRowByRunId(runId: string): PlatformRunQueueRow | undefined {
+    return this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
+        dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      WHERE run_id = ?
+      LIMIT 1
+    `).get(runId) as PlatformRunQueueRow | undefined;
+  }
+
+  private getNodePlacementHoldRowByNodeId(nodeId: string): PlatformRunNodePlacementHoldRow | undefined {
+    return this.getDatabase().prepare(`
+      SELECT
+        node_id,
+        hold_token,
+        run_id,
+        queue_id,
+        reservation_owner,
+        claim_token,
+        decision_id,
+        held_at,
+        expires_at,
+        updated_at,
+        created_at
+      FROM platform_run_node_placement_holds
+      WHERE node_id = ?
+      LIMIT 1
+    `).get(nodeId) as PlatformRunNodePlacementHoldRow | undefined;
+  }
+
+  private mapQueueRowToRecord(row: PlatformRunQueueRow): AuthoritativeRunQueueEntryRecord {
+    return Object.freeze({
+      runId: row.run_id,
+      queueId: row.queue_id,
+      workspaceId: normalizePlatformLookup(row.workspace_id ?? ""),
+      lifecycleState: row.lifecycle_state as RunLifecycleState,
+      enteredAt: row.entered_at,
+      orderKey: row.order_key,
+      eligibilityMarker: row.eligibility_marker,
+      eligibleAt: row.eligible_at,
+      claimToken: normalizePlatformLookup(row.claim_token ?? ""),
+      claimedBy: normalizePlatformLookup(row.claimed_by ?? ""),
+      claimedAt: normalizePlatformLookup(row.claimed_at ?? ""),
+      claimExpiresAt: normalizePlatformLookup(row.claim_expires_at ?? ""),
+      assignmentNodeId: normalizePlatformLookup(row.assignment_node_id ?? ""),
+      assignmentClaimedAt: normalizePlatformLookup(row.assignment_claimed_at ?? ""),
+      dispatchPreparedAt: normalizePlatformLookup(row.dispatch_prepared_at ?? ""),
+      lastDispatchAttemptId: normalizePlatformLookup(row.last_dispatch_attempt_id ?? ""),
+      dequeuedAt: normalizePlatformLookup(row.dequeued_at ?? ""),
+      deferCount: row.defer_count,
+      lastNoPlacementCategory: normalizePlatformLookup(row.last_no_placement_category ?? ""),
+      lastNoPlacementReasonCodes: parseStringArrayJson(row.last_no_placement_reason_codes_json),
+      lastNoPlacementReasonMessage: normalizePlatformLookup(row.last_no_placement_reason_message ?? ""),
+      lastNoPlacementDecisionId: normalizePlatformLookup(row.last_no_placement_decision_id ?? ""),
+      lastNoPlacementRecordedAt: normalizePlatformLookup(row.last_no_placement_recorded_at ?? ""),
+      lastNoPlacementRequiresAdministrativeAttention: row.last_no_placement_admin_attention === 1,
+      updatedAt: row.updated_at,
+      revision: row.revision,
+    });
+  }
+
+  private mapDispatchAttemptRowToRecord(row: PlatformRunDispatchAttemptRow): AuthoritativeRunDispatchAttemptRecord {
+    return Object.freeze({
+      attemptId: row.attempt_id,
+      runId: row.run_id,
+      queueId: row.queue_id,
+      workspaceId: normalizePlatformLookup(row.workspace_id ?? ""),
+      nodeId: row.node_id,
+      reservationOwner: row.reservation_owner,
+      claimToken: row.claim_token,
+      preparedAt: row.prepared_at,
+      dispatchMetadata: Object.freeze(JSON.parse(row.dispatch_metadata_json) as Record<string, unknown>),
+      dispatchResult: row.dispatch_result_json
+        ? Object.freeze(JSON.parse(row.dispatch_result_json) as AuthoritativeRunDispatchAttemptResult)
+        : undefined,
+    });
+  }
+
+  private mapNodePlacementHoldRowToRecord(row: PlatformRunNodePlacementHoldRow): AuthoritativeRunNodePlacementHoldRecord {
+    return Object.freeze({
+      holdToken: row.hold_token,
+      runId: row.run_id,
+      queueId: row.queue_id,
+      nodeId: row.node_id,
+      reservationOwner: row.reservation_owner,
+      claimToken: row.claim_token,
+      decisionId: normalizePlatformLookup(row.decision_id ?? ""),
+      heldAt: row.held_at,
+      expiresAt: row.expires_at,
+    });
+  }
+
+  private resolveLifecycleStateForStatusHistory(record: PlatformRunRecord): RunLifecycleState {
+    const metadata = toOptionalRecord(record.metadata);
+    const canonicalRun = toOptionalRecord(metadata?.canonicalRun);
+    const state = normalizePlatformLookup(
+      typeof canonicalRun?.state === "string" ? canonicalRun.state : "",
+    );
+    if (state) {
+      return state as RunLifecycleState;
+    }
+
+    switch (record.status) {
+      case "running":
+        return RunLifecycleStates.running;
+      case "completed":
+        return RunLifecycleStates.completed;
+      case "failed":
+        return RunLifecycleStates.failed;
+      case "cancelled":
+        return RunLifecycleStates.cancelled;
+      case "blocked":
+      case "pending":
+      default:
+        return RunLifecycleStates.submitted;
+    }
+  }
+
+  private appendRunStatusHistoryEntry(input: {
+    readonly record: PlatformRunRecord;
+    readonly lifecycleState: RunLifecycleState;
+    readonly changedAt: string;
+    readonly changedByActorId: string;
+    readonly correlationId?: string;
+  }): void {
+    const metadata = toOptionalRecord(input.record.metadata);
+    const canonicalRun = toOptionalRecord(metadata?.canonicalRun);
+    const canonicalExecution = toOptionalRecord(canonicalRun?.execution);
+    const dispatch = toOptionalRecord(metadata?.dispatch);
+    const snapshot = this.createRunStatusHistorySnapshot(input.record, input.lifecycleState, input.correlationId);
+    const changedAt = normalizePlatformLookup(
+      typeof canonicalRun?.updatedAt === "string" ? canonicalRun.updatedAt : "",
+    ) ?? input.changedAt;
+    const safeFailureCode = normalizePlatformLookup(
+      typeof canonicalExecution?.errorCode === "string" ? canonicalExecution.errorCode : "",
+    );
+    const safeFailureMessage = normalizePlatformLookup(
+      typeof canonicalExecution?.errorMessage === "string" ? canonicalExecution.errorMessage : "",
+    ) ?? normalizePlatformLookup(input.record.terminalReason ?? "");
+
+    this.executeMutation("append platform run status history", () => this.getDatabase().prepare(`
+        INSERT INTO platform_run_status_history (
+          history_entry_id,
+          run_id,
+          workspace_id,
+          lifecycle_state,
+          platform_status,
+          run_revision,
+          changed_at,
+          changed_by_actor_id,
+          reason,
+          dispatch_attempt_id,
+          dispatch_id,
+          backend_kind,
+          backend_run_id,
+          safe_failure_code,
+          safe_failure_message,
+          snapshot_json,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(run_id, run_revision) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          lifecycle_state = excluded.lifecycle_state,
+          platform_status = excluded.platform_status,
+          changed_at = excluded.changed_at,
+          changed_by_actor_id = excluded.changed_by_actor_id,
+          reason = excluded.reason,
+          dispatch_attempt_id = excluded.dispatch_attempt_id,
+          dispatch_id = excluded.dispatch_id,
+          backend_kind = excluded.backend_kind,
+          backend_run_id = excluded.backend_run_id,
+          safe_failure_code = excluded.safe_failure_code,
+          safe_failure_message = excluded.safe_failure_message,
+          snapshot_json = excluded.snapshot_json
+      `).run(
+      `run-status:${input.record.runId}:r${input.record.revision}`,
+      input.record.runId,
+      input.record.workspaceId ?? null,
+      input.lifecycleState,
+      input.record.status,
+      input.record.revision,
+      changedAt,
+      input.changedByActorId,
+      normalizePlatformLookup(input.record.terminalReason ?? "") ?? null,
+      normalizePlatformLookup(
+        typeof dispatch?.attemptId === "string" ? dispatch.attemptId : "",
+      ) ?? null,
+      normalizePlatformLookup(
+        typeof dispatch?.dispatchId === "string" ? dispatch.dispatchId : "",
+      ) ?? null,
+      normalizePlatformLookup(
+        typeof canonicalExecution?.adapterKind === "string" ? canonicalExecution.adapterKind : "",
+      ) ?? null,
+      normalizePlatformLookup(
+        typeof canonicalExecution?.adapterRunId === "string" ? canonicalExecution.adapterRunId : "",
+      ) ?? null,
+      safeFailureCode ?? null,
+      safeFailureMessage ?? null,
+      mapRunStatusHistorySnapshotToJson(snapshot) ?? null,
+      new Date().toISOString(),
+    ));
+  }
+
+  private createRunStatusHistorySnapshot(
+    record: PlatformRunRecord,
+    lifecycleState: RunLifecycleState,
+    correlationId?: string,
+  ): Readonly<Record<string, unknown>> {
+    const metadata = toOptionalRecord(record.metadata);
+    const canonicalRun = toOptionalRecord(metadata?.canonicalRun);
+    const canonicalExecution = toOptionalRecord(canonicalRun?.execution);
+    const canonicalQueue = toOptionalRecord(canonicalRun?.queue);
+    const canonicalAssignment = toOptionalRecord(canonicalRun?.assignment);
+
+    return Object.freeze({
+      runId: record.runId,
+      revision: record.revision,
+      lifecycleState,
+      platformStatus: record.status,
+      correlationId: normalizePlatformLookup(correlationId ?? ""),
+      queueId: normalizePlatformLookup(typeof canonicalQueue?.queueId === "string" ? canonicalQueue.queueId : ""),
+      assignedNodeId: normalizePlatformLookup(
+        typeof canonicalAssignment?.assignedNodeId === "string" ? canonicalAssignment.assignedNodeId : "",
+      ),
+      dispatchId: normalizePlatformLookup(typeof metadata?.dispatchId === "string" ? metadata.dispatchId : ""),
+      execution: Object.freeze({
+        adapterKind: normalizePlatformLookup(
+          typeof canonicalExecution?.adapterKind === "string" ? canonicalExecution.adapterKind : "",
+        ),
+        adapterRunId: normalizePlatformLookup(
+          typeof canonicalExecution?.adapterRunId === "string" ? canonicalExecution.adapterRunId : "",
+        ),
+        outcome: normalizePlatformLookup(
+          typeof canonicalExecution?.outcome === "string" ? canonicalExecution.outcome : "",
+        ),
+        progress: toOptionalRecord(canonicalExecution?.progress) ?? undefined,
+      }),
+    });
+  }
+
   private assertExpectedRevision(
     expectedRevision: number | undefined,
     persistedRevision: number | undefined,
@@ -556,5 +2176,31 @@ export class SqlitePlatformPersistenceAdapter
     }
   }
 
+}
+
+function parseStringArrayJson(payload: string | null): ReadonlyArray<string> | undefined {
+  const normalized = normalizePlatformLookup(payload ?? "");
+  if (!normalized) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(normalized);
+    if (!Array.isArray(parsed)) {
+      return undefined;
+    }
+    const values = parsed
+      .map((value) => typeof value === "string" ? value.trim() : "")
+      .filter((value) => value.length > 0);
+    return values.length > 0 ? Object.freeze(values) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function toOptionalRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Readonly<Record<string, unknown>>;
 }
 

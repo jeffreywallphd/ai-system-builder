@@ -1,37 +1,33 @@
+---
+title: "AI Companion: Development and Test Startup Host Migration (Legacy Path Stub)"
+doc_type: architecture-reference
+status: superseded
+authoritativeness: historical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+superseded_by: docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.ai.md
+related_code_paths:
+  - docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.ai.md
+  - docs/architecture/domains/runtime-host-surfaces/overview.md
+---
+
 # AI Companion: Development and Test Startup Host Migration (Story 12.4.2)
 
-## Scope completed
-- Align local development scripts and test harness startup with host entrypoint assemblies.
+## Supersession Notice
 
-## Development startup updates
-- Added explicit host-based local dev aliases in `package.json`:
-  - `dev:host:authoritative-server`
-  - `dev:host:hybrid`
-  - `dev:host:web`
-  - `dev:host:worker`
-  - `dev:host:control-plane-worker`
-- These aliases delegate to executable host entrypoints:
-  - `start:authoritative-server`
-  - `start:hybrid-host`
-  - `start:web-host`
-  - `start:worker-host`
-- Combined control-plane + worker local mode now runs both host assemblies concurrently.
-- Desktop dev startup now routes preflight and Electron Forge CLI through Node symlink-preservation flags:
-  - `dev:desktop:prepare` -> `node --preserve-symlinks-main dev/prepare-electron-forge-dev.cjs`
-  - `dev:desktop:start` -> `node --preserve-symlinks --preserve-symlinks-main node_modules/@electron-forge/cli/dist/electron-forge.js start`
-  - `dev:desktop` chains `prepare` then `start`.
+This file is a `migrated-link-stub` and is no longer authoritative for active startup architecture guidance.
 
-## Test harness updates
-- Server integration harness in `src/hosts/server/tests/IdentityServerHost.test.ts` now boots through `startAuthoritativeServerHostAssembly(...)`.
-- Added a host-entrypoint-backed test helper (`startAuthoritativeServerHostForTest(...)`) so tests keep existing host assertions while startup path is host-based.
+Effective date: 2026-04-11.
+Reason: migration-era startup material moved to architecture baselines for historical isolation.
+Canonical source: `docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.ai.md`.
 
-## Startup script guardrails
-- Added `dev/tests/HostDevelopmentStartupScripts.test.ts` to enforce:
-  - default dev path remains `dev:desktop`
-  - desktop startup scripts keep symlink-preservation Node flags in place for Windows-safe script resolution
-  - host startup scripts target host entrypoint assemblies
-  - host aliases and combined mode are present
-  - no package script defaults to direct `IdentityServerHost.ts` startup
+## Redirect
 
-## Developer documentation updates
-- Updated `README.md` with a host-based local startup modes section and command list for individual and combined host runs.
+- Historical baseline snapshot:
+  `docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.ai.md`
+- Current startup/runtime-host authority:
+  - `docs/architecture/domains/runtime-host-surfaces/overview.md`
+  - `docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md`
+  - `docs/architecture/host-bootstrap-pipeline.ai.md`
+
+Retention/removal trigger: keep this stub only until inbound links migrate.

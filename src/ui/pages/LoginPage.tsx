@@ -8,10 +8,13 @@ import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
 import { resolveIdentityAccessChannel, resolveIdentityClientContext } from "@shared/identity/IdentityAuthEnvironment";
 import { validateLoginForm } from "@shared/identity/IdentityAuthValidation";
+import { guardAuthenticationInitialization } from "../shared/identity/AuthenticationInitializationGuard";
+
+const LoginRequestTimeoutMs = 10_000;
 
 export interface LoginPageProps {
-  readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => void;
-  readonly authNotice?: "session-expired" | "session-invalid";
+  readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => boolean | Promise<boolean>;
+  readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable" | "session-bootstrap-timeout";
   readonly devLoginEnabled?: boolean;
 }
 
@@ -44,23 +47,34 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
 
     setIsSubmitting(true);
     try {
-      const response = await authService.loginLocalAccount({
-        providerId: providerId.trim() || undefined,
-        providerSubject: providerSubject.trim(),
-        accessChannel: resolveIdentityAccessChannel(),
-        client: resolveIdentityClientContext(),
-        credential: { candidate: password },
-      });
+      const response = await withTimeout(
+        authService.loginLocalAccount({
+          providerId: providerId.trim() || undefined,
+          providerSubject: providerSubject.trim(),
+          accessChannel: resolveIdentityAccessChannel(),
+          client: resolveIdentityClientContext(),
+          credential: { candidate: password },
+        }),
+        LoginRequestTimeoutMs,
+      );
 
       if (!response.ok || !response.data) {
         setErrorMessage(renderApiError(response.error));
         return;
       }
 
-      onAuthenticated(response.data);
+      const initialization = await guardAuthenticationInitialization(onAuthenticated, response.data);
+      if (!initialization.initialized) {
+        setErrorMessage(initialization.timedOut
+          ? "Sign-in finished but session initialization took too long. Please try again."
+          : "Sign-in finished but session setup could not be completed. Please try again.");
+        return;
+      }
       navigate(fromPath, { replace: true });
-    } catch {
-      setErrorMessage("Login request failed. Verify the identity API is reachable and try again.");
+    } catch (error) {
+      setErrorMessage(isTimeoutError(error)
+        ? "Login request timed out. Verify the identity API is reachable and try again."
+        : "Login request failed. Verify the identity API is reachable and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -70,16 +84,30 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
     setErrorMessage(undefined);
     setIsSubmitting(true);
     try {
-      const response = await authService.loginDevelopmentAccount();
+      const response = await withTimeout(
+        authService.loginDevelopmentAccount({
+          accessChannel: resolveIdentityAccessChannel(),
+          client: resolveIdentityClientContext(),
+        }),
+        LoginRequestTimeoutMs,
+      );
       if (!response.ok || !response.data) {
         setErrorMessage(renderApiError(response.error));
         return;
       }
 
-      onAuthenticated(response.data);
+      const initialization = await guardAuthenticationInitialization(onAuthenticated, response.data);
+      if (!initialization.initialized) {
+        setErrorMessage(initialization.timedOut
+          ? "Dev sign-in finished but session initialization took too long. Please try again."
+          : "Dev sign-in finished but session setup could not be completed. Please try again.");
+        return;
+      }
       navigate(fromPath, { replace: true });
-    } catch {
-      setErrorMessage("Dev login request failed. Verify the identity API is reachable and try again.");
+    } catch (error) {
+      setErrorMessage(isTimeoutError(error)
+        ? "Dev login request timed out. Verify the identity API is reachable and try again."
+        : "Dev login request failed. Verify the identity API is reachable and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -139,6 +167,12 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
           {authNotice === "session-invalid" ? (
             <p className="ui-auth-page__error" role="status">Your session was revoked or is no longer valid. Sign in again.</p>
           ) : null}
+          {authNotice === "session-context-unavailable" ? (
+            <p className="ui-auth-page__error" role="status">Session context could not be initialized from the server. Verify API connectivity and sign in again.</p>
+          ) : null}
+          {authNotice === "session-bootstrap-timeout" ? (
+            <p className="ui-auth-page__error" role="status">Previous session verification took too long. Sign in again to continue.</p>
+          ) : null}
 
           <div className="ui-page__actions">
             <button className="ui-button ui-button--primary" type="submit" disabled={isSubmitting}>
@@ -179,3 +213,26 @@ function renderApiError(error: IdentityAuthApiError | undefined): string {
   return `${error?.message || "Login failed."} ${details}`;
 }
 
+function withTimeout<TValue>(promise: Promise<TValue>, timeoutMs: number): Promise<TValue> {
+  const normalizedTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : LoginRequestTimeoutMs;
+  return new Promise<TValue>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error("request-timeout"));
+    }, normalizedTimeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutHandle);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timeoutHandle);
+        reject(error);
+      },
+    );
+  });
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && error.message === "request-timeout";
+}

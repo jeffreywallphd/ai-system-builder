@@ -14,6 +14,7 @@ describe("NodeInventoryPage", () => {
     expect(html).toContain("Trusted node inventory");
     expect(html).toContain("Sign in with an authenticated admin account");
     expect(html).toContain("Go to sign in");
+    expect(html).toContain("ui-shell-empty-state");
   });
 
   it("renders inventory layout for authenticated sessions", () => {
@@ -40,10 +41,13 @@ describe("NodeInventoryPage", () => {
     );
 
     expect(html).toContain("Trusted node inventory");
+    expect(html).toContain("Back to settings");
+    expect(html).toContain("Refresh");
     expect(html).toContain("Filters");
     expect(html).toContain("Inventory");
     expect(html).toContain("Node detail");
     expect(html).toContain("No nodes matched the current inventory filters.");
+    expect(html).toContain("ui-shell-empty-state");
   });
 });
 

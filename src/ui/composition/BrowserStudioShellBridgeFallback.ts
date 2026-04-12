@@ -3,10 +3,10 @@ import { StudioShellBackendApi } from "@infrastructure/api/studio-shell/StudioSh
 import { SystemStudioBackendApi } from "@infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import {
-  resolveBrowserStudioShellRepository,
-  resolveBrowserWorkflowPersistenceRepository,
-  resolveBrowserWorkflowRunSummaryRepository,
-} from "./BrowserFallbackRepositories";
+  resolveLegacyBrowserStudioShellRepository,
+  resolveLegacyBrowserWorkflowPersistenceRepository,
+  resolveLegacyBrowserWorkflowRunSummaryRepository,
+} from "./legacy/LegacyBrowserFallbackRepositories";
 
 let fallbackBridge: DesktopStudioShellBridge | undefined;
 
@@ -15,9 +15,9 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     return fallbackBridge;
   }
 
-  const repository = resolveBrowserStudioShellRepository();
-  const workflowPersistenceRepository = resolveBrowserWorkflowPersistenceRepository();
-  const workflowRunSummaryRepository = resolveBrowserWorkflowRunSummaryRepository();
+  const repository = resolveLegacyBrowserStudioShellRepository();
+  const workflowPersistenceRepository = resolveLegacyBrowserWorkflowPersistenceRepository();
+  const workflowRunSummaryRepository = resolveLegacyBrowserWorkflowRunSummaryRepository();
   const studioApi = new StudioShellBackendApi(repository, workflowPersistenceRepository, workflowRunSummaryRepository);
   const systemApi = new SystemStudioBackendApi(repository);
   const runtimeApi = new SystemRuntimeBackendApi(repository);
@@ -32,6 +32,11 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     transitionLifecycle: (requestJson) => studioApi.transitionLifecycle(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     publishVersion: (requestJson) => studioApi.publishVersion(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     validateDraft: (requestJson) => studioApi.validateDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    listImageWorkflowDefinitions: (requestJson) => studioApi.listImageWorkflowDefinitions(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    getImageWorkflowDefinition: (requestJson) => studioApi.getImageWorkflowDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    listImageSystemDefinitions: (requestJson) => studioApi.listImageSystemDefinitions(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    getImageSystemDefinition: (requestJson) => studioApi.getImageSystemDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    saveImageSystemDefinition: (requestJson) => studioApi.saveImageSystemDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     getPersistedWorkflow: (workflowId) => studioApi.getPersistedWorkflow(workflowId).then((response) => JSON.stringify(response)),
     duplicatePersistedWorkflow: (requestJson) => studioApi.duplicatePersistedWorkflow(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     assessWorkflowExecutionReadiness: (requestJson) => studioApi.assessWorkflowExecutionReadiness(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),

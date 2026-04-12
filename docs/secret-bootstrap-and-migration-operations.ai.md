@@ -1,47 +1,35 @@
 # AI Companion: System Secret Bootstrap and Migration Operations
 
+Primary reference: `docs/secret-bootstrap-and-migration-operations.md`
+
 ## Purpose
 
-Story 8.3.3 baseline for Feature 8 / Epic 8.3: add host startup bootstrap checks for required system secrets and provide a migration path for legacy environment-based secret values into the formal secret service.
+Keep operator/admin bootstrap guidance aligned to hardened startup behavior for required system secrets.
 
-## Canonical files
+## Hardened Behavior Summary
 
-- `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
-- `src/hosts/server/IdentityServerHost.ts`
-- `src/infrastructure/security/secrets/tests/SystemSecretBootstrapService.test.ts`
-- `src/hosts/server/tests/IdentityServerHost.test.ts`
-- `.env.example`
+- Startup composes secret service, then enforces `assertSystemSecretBootstrapSafe(...)`.
+- Required secret IDs are declared via `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`.
+- For each required id: metadata existence -> migration/bootstrap creation when allowed -> runtime retrieval validation.
+- Any required-secret `error` diagnostic yields invalid bootstrap state and fails startup.
 
-## Behavior summary
+## Key Configuration Inputs
 
-- Host startup now calls `assertSystemSecretBootstrapSafe(...)` after secret service composition.
-- Required system secret IDs are configured via `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`.
-- Bootstrap verifies required secrets are present and runtime-retrievable through formal secret retrieval paths.
-- Missing required secrets can be auto-migrated from supported legacy env values when migration is enabled.
-- Startup fails closed when required system secret validation or migration fails.
+- `AI_LOOM_SECRET_MASTER_KEY_ID`
+- `AI_LOOM_SECRET_MASTER_KEY`
+- `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`
+- `AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV`
+- legacy migration inputs (temporary): `OPENAI_API_KEY`, `HUGGINGFACE_API_TOKEN`, `AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY`
 
-## Supported required secret IDs
+## Development Profile Notes
 
-- `secret:server:provider:openai`
-- `secret:server:provider:huggingface`
-- `secret:server:signing:identity-session`
+- policy can allow optional/development handling for selected signing material
+- bootstrap generation is policy-governed and persisted durably
+- provider credentials remain fail-fast required by default policy
+- development-only allowances are surfaced as explicit governance assertions (`warning` or `blocked`) in startup/diagnostics outputs
 
-## Supported legacy env migration sources
+## Extension Expectations
 
-- `OPENAI_API_KEY`
-- `HUGGINGFACE_API_TOKEN`
-- `AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY`
-
-Migration toggle:
-
-- `AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV` (default `true`)
-
-## Test posture
-
-Coverage verifies:
-
-- successful migration from legacy env into required system secret records,
-- invalid startup state when required secrets are missing,
-- invalid migration state when encryption is unavailable,
-- authoritative host fail-closed startup on missing required system secret,
-- authoritative host successful startup when required secret is migrated during bootstrap.
+- add new required system secret definitions with classification + hierarchy + creation policy
+- add migration/generation behavior only when explicitly justified
+- update bootstrap tests and diagnostics docs with new material IDs/codes

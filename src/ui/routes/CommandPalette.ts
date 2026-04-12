@@ -1,4 +1,5 @@
-import { ROUTE_PATHS } from "./RouteConfig";
+import { listCommandPaletteRouteEntries } from "./SurfaceRouteMetadataCatalog";
+import { UiSurfaceKeys, type SurfaceAvailabilityContext } from "../shared/navigation/SurfaceNavigationMetadata";
 
 export const CommandPaletteActionKinds = Object.freeze({
   navigate: "navigate",
@@ -60,73 +61,42 @@ function toScoredEntries(entries: ReadonlyArray<CommandPaletteEntry>, searchText
 }
 
 export class CommandPaletteEntryResolver {
-  public resolveEntries(): ReadonlyArray<CommandPaletteEntry> {
-    return Object.freeze([
-      Object.freeze({
-        id: "nav:build",
-        label: "Build",
-        description: "Open Build.",
-        keywords: Object.freeze(["go", "open", "build"]),
+  public resolveEntries(
+    availabilityContext: SurfaceAvailabilityContext = { surface: UiSurfaceKeys.desktopOperational },
+  ): ReadonlyArray<CommandPaletteEntry> {
+    return Object.freeze(
+      listCommandPaletteRouteEntries(availabilityContext).map((entry) => Object.freeze({
+        id: entry.id,
+        label: entry.label,
+        description: entry.description,
+        keywords: entry.keywords,
         category: "navigation",
-        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.build }),
-      }),
-      Object.freeze({
-        id: "nav:run",
-        label: "Run",
-        description: "Open Run.",
-        keywords: Object.freeze(["go", "open", "run", "test"]),
-        category: "navigation",
-        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.run }),
-      }),
-      Object.freeze({
-        id: "nav:explore",
-        label: "Explore",
-        description: "Open Explore.",
-        keywords: Object.freeze(["go", "open", "explore", "library"]),
-        category: "navigation",
-        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.explore }),
-      }),
-      Object.freeze({
-        id: "nav:data",
-        label: "Data",
-        description: "Open Data Studio.",
-        keywords: Object.freeze(["go", "open", "data", "dataset", "dataset studio"]),
-        category: "navigation",
-        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.datasetStudio }),
-      }),
-      Object.freeze({
-        id: "nav:manage",
-        label: "Manage",
-        description: "Open Manage.",
-        keywords: Object.freeze(["go", "open", "manage", "settings"]),
-        category: "navigation",
-        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.settings }),
-      }),
-      Object.freeze({
-        id: "nav:identity-admin",
-        label: "Identity admin",
-        description: "Open Identity administration.",
-        keywords: Object.freeze(["go", "open", "identity", "admin", "accounts"]),
-        category: "navigation",
-        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.identityAdmin }),
-      }),
-    ]);
+        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: entry.launchPath }),
+      })),
+    );
   }
 }
 
 export class CommandPaletteService {
   private readonly resolver = new CommandPaletteEntryResolver();
 
-  public resolveModel(_context: CommandPaletteContext, query: CommandPaletteQuery): CommandPaletteModel {
-    const entries = this.resolver.resolveEntries();
+  public resolveModel(
+    _context: CommandPaletteContext,
+    query: CommandPaletteQuery,
+    availabilityContext: SurfaceAvailabilityContext = { surface: UiSurfaceKeys.desktopOperational },
+  ): CommandPaletteModel {
+    const entries = this.resolver.resolveEntries(availabilityContext);
     return Object.freeze({
       placeholder: "Jump to Build, Run, Explore, Data, Manage, or Identity admin",
       entries: toScoredEntries(entries, query.searchText),
     });
   }
 
-  public resolveDefaultModel(context: CommandPaletteContext): CommandPaletteModel {
-    return this.resolveModel(context, { searchText: "" });
+  public resolveDefaultModel(
+    context: CommandPaletteContext,
+    availabilityContext: SurfaceAvailabilityContext = { surface: UiSurfaceKeys.desktopOperational },
+  ): CommandPaletteModel {
+    return this.resolveModel(context, { searchText: "" }, availabilityContext);
   }
 }
 

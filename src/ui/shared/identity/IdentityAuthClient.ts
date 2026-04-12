@@ -1,8 +1,9 @@
-﻿import type {
+import type {
   ChangeLocalPasswordCredentialApiRequest,
   ChangeLocalPasswordCredentialApiResponse,
   CompleteTrustedDevicePairingApiRequest,
   CompleteTrustedDevicePairingApiResponse,
+  DevelopmentLoginIdentityApiRequest,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
   GetTrustedDeviceApiRequest,
@@ -12,8 +13,12 @@
   InitiateTrustedDevicePairingApiResponse,
   ListIdentityAdminAccountsApiRequest,
   ListIdentityAdminAccountsApiResponse,
+  ListIdentityAdminSessionsApiRequest,
+  ListIdentityAdminSessionsApiResponse,
   ListIdentityAdminTrustedDevicesApiRequest,
   ListIdentityAdminTrustedDevicesApiResponse,
+  ListIdentitySessionsApiRequest,
+  ListIdentitySessionsApiResponse,
   ListTrustedDevicesApiRequest,
   ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
@@ -23,9 +28,13 @@
   RevokeTrustedDeviceApiResponse,
   RevokeIdentityAdminTrustedDeviceApiRequest,
   RevokeIdentityAdminTrustedDeviceApiResponse,
+  RevokeIdentityAdminSessionApiRequest,
+  RevokeIdentityAdminSessionApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiResponse,
+  ResolveSessionActorContextApiRequest,
+  ResolveSessionActorContextApiResponse,
   RegisterLocalIdentityApiRequest,
   RegisterLocalIdentityApiResponse,
   SetIdentityAdminAccountStatusApiRequest,
@@ -34,19 +43,43 @@
   UpdateTrustedDeviceDisplayNameApiResponse,
   ValidateTrustedDevicePairingApiRequest,
   ValidateTrustedDevicePairingApiResponse,
-} from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "@shared/contracts/identity/IdentityTransportContracts";
+import {
+  appendSharedApiListQueryConventions,
+  appendSharedApiQueryList,
+  appendSharedApiQueryValue,
+  toSharedApiQuerySuffix,
+} from "@shared/contracts/api/SharedApiQueryConventions";
+import { SharedApiClient, type SharedApiRetryPolicy } from "../api/SharedApiClient";
+
+export interface IdentityAuthRequestOptions {
+  readonly timeoutMs?: number;
+  readonly retryPolicy?: SharedApiRetryPolicy;
+  readonly signal?: AbortSignal;
+}
 
 export interface IdentityAuthClient {
   registerLocalAccount(
     request: RegisterLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<RegisterLocalIdentityApiResponse>>;
-  loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
+  loginDevelopmentAccount(
+    request?: DevelopmentLoginIdentityApiRequest,
+  ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
   loginLocalAccount(
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
   resolveAuthenticatedSession(
     sessionToken: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>>;
+  listIdentitySessions(
+    request: ListIdentitySessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>>;
+  resolveSessionActorContext(
+    request: ResolveSessionActorContextApiRequest,
+    options?: IdentityAuthRequestOptions,
+  ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>>;
   logoutAuthenticatedSession(
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>>;
@@ -66,6 +99,14 @@ export interface IdentityAuthClient {
     request: SetIdentityAdminAccountStatusApiRequest,
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>>;
+  listIdentityAdminSessions(
+    request: ListIdentityAdminSessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>>;
+  revokeIdentityAdminSession(
+    request: RevokeIdentityAdminSessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>>;
   listIdentityAdminTrustedDevices(
     request: ListIdentityAdminTrustedDevicesApiRequest,
     sessionToken: string,
@@ -109,11 +150,16 @@ export interface IdentityAuthClient {
 }
 
 export class HttpIdentityAuthClient implements IdentityAuthClient {
-  private readonly baseUrl: string;
+  private readonly apiClient: SharedApiClient;
 
-  public constructor(baseUrl: string) {
-    const normalized = baseUrl.trim();
-    this.baseUrl = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+  public constructor(
+    baseUrl: string,
+    options: Omit<ConstructorParameters<typeof SharedApiClient>[0], "baseUrl"> = {},
+  ) {
+    this.apiClient = new SharedApiClient({
+      baseUrl,
+      ...options,
+    });
   }
 
   public async registerLocalAccount(
@@ -122,8 +168,10 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.post("/api/v1/identity/register", request);
   }
 
-  public async loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
-    return this.post("/api/v1/identity/dev-login", {});
+  public async loginDevelopmentAccount(
+    request: DevelopmentLoginIdentityApiRequest = {},
+  ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.post("/api/v1/identity/dev-login", request);
   }
 
   public async loginLocalAccount(
@@ -134,27 +182,49 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
 
   public async resolveAuthenticatedSession(
     sessionToken: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
-    return this.get("/api/v1/identity/session", {
-      authorization: `Bearer ${sessionToken}`,
+    return this.get("/api/v1/identity/session", sessionToken, options);
+  }
+
+  public async listIdentitySessions(
+    request: ListIdentitySessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>> {
+    const query = new URLSearchParams();
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiQueryList(query, "accessChannel", request.includeAccessChannels);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
     });
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/sessions${suffix}`, sessionToken);
+  }
+
+  public async resolveSessionActorContext(
+    request: ResolveSessionActorContextApiRequest,
+    options?: IdentityAuthRequestOptions,
+  ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
+    const query = new URLSearchParams();
+    appendSharedApiQueryValue(query, "workspaceId", request.workspaceId);
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/session/context${suffix}`, request.sessionToken, options);
   }
 
   public async logoutAuthenticatedSession(
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>> {
-    return this.post("/api/v1/identity/logout", {}, {
-      authorization: `Bearer ${sessionToken}`,
-    });
+    return this.post("/api/v1/identity/logout", {}, sessionToken);
   }
 
   public async revokeIdentitySession(
     request: RevokeIdentitySessionApiRequest,
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<RevokeIdentitySessionApiResponse>> {
-    return this.post("/api/v1/identity/session/revoke", request, {
-      authorization: `Bearer ${sessionToken}`,
-    });
+    return this.post("/api/v1/identity/session/revoke", request, sessionToken);
   }
 
   public async listIdentityAdminAccounts(
@@ -162,25 +232,16 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ListIdentityAdminAccountsApiResponse>> {
     const query = new URLSearchParams();
-    if (request.providerId) {
-      query.set("providerId", request.providerId);
-    }
-    if (request.includeStatuses) {
-      for (const status of request.includeStatuses) {
-        query.append("status", status);
-      }
-    }
-    if (typeof request.limit === "number") {
-      query.set("limit", String(request.limit));
-    }
-    if (typeof request.offset === "number") {
-      query.set("offset", String(request.offset));
-    }
-    const queryString = query.toString();
-    const suffix = queryString ? `?${queryString}` : "";
-    return this.get(`/api/v1/identity/admin/accounts${suffix}`, {
-      authorization: `Bearer ${sessionToken}`,
+    appendSharedApiQueryValue(query, "providerId", request.providerId);
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
     });
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/admin/accounts${suffix}`, sessionToken);
   }
 
   public async getIdentityAdminAccountStatus(
@@ -188,14 +249,9 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<GetIdentityAdminAccountStatusApiResponse>> {
     const query = new URLSearchParams();
-    if (request.providerId) {
-      query.set("providerId", request.providerId);
-    }
-    const queryString = query.toString();
-    const suffix = queryString ? `?${queryString}` : "";
-    return this.get(`/api/v1/identity/admin/accounts/${encodeURIComponent(request.userIdentityId)}${suffix}`, {
-      authorization: `Bearer ${sessionToken}`,
-    });
+    appendSharedApiQueryValue(query, "providerId", request.providerId);
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/admin/accounts/${encodeURIComponent(request.userIdentityId)}${suffix}`, sessionToken);
   }
 
   public async setIdentityAdminAccountStatus(
@@ -208,9 +264,38 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
         action: request.action,
         providerId: request.providerId,
       },
-      {
-        authorization: `Bearer ${sessionToken}`,
+      sessionToken,
+    );
+  }
+
+  public async listIdentityAdminSessions(
+    request: ListIdentityAdminSessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>> {
+    const query = new URLSearchParams();
+    query.set("userIdentityId", request.userIdentityId);
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiQueryList(query, "accessChannel", request.includeAccessChannels);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
       },
+    });
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/admin/sessions${suffix}`, sessionToken);
+  }
+
+  public async revokeIdentityAdminSession(
+    request: RevokeIdentityAdminSessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>> {
+    return this.post(
+      `/api/v1/identity/admin/sessions/${encodeURIComponent(request.sessionId)}/revoke`,
+      {
+        reason: request.reason,
+      },
+      sessionToken,
     );
   }
 
@@ -220,25 +305,18 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
   ): Promise<IdentityAuthApiResponse<ListIdentityAdminTrustedDevicesApiResponse>> {
     const query = new URLSearchParams();
     query.set("userIdentityId", request.userIdentityId);
-    if (request.workspaceId) {
-      query.set("workspaceId", request.workspaceId);
-    }
-    if (request.includeStatuses) {
-      for (const status of request.includeStatuses) {
-        query.append("status", status);
-      }
-    }
-    if (typeof request.limit === "number") {
-      query.set("limit", String(request.limit));
-    }
-    if (typeof request.offset === "number") {
-      query.set("offset", String(request.offset));
-    }
-    const queryString = query.toString();
-    const suffix = queryString ? `?${queryString}` : "";
-    return this.get(`/api/v1/identity/admin/trusted-devices${suffix}`, {
-      authorization: `Bearer ${sessionToken}`,
+    appendSharedApiListQueryConventions(query, {
+      workspaceId: request.workspaceId,
     });
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/admin/trusted-devices${suffix}`, sessionToken);
   }
 
   public async revokeIdentityAdminTrustedDevice(
@@ -252,9 +330,7 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
         note: request.note,
         revokedAt: request.revokedAt,
       },
-      {
-        authorization: `Bearer ${sessionToken}`,
-      },
+      sessionToken,
     );
   }
 
@@ -265,9 +341,7 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.post(
       "/api/v1/identity/credential/change",
       request,
-      {
-        authorization: `Bearer ${sessionToken}`,
-      },
+      sessionToken,
     );
   }
 
@@ -276,34 +350,25 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ListTrustedDevicesApiResponse>> {
     const query = new URLSearchParams();
-    if (request.workspaceId) {
-      query.set("workspaceId", request.workspaceId);
-    }
-    if (request.includeStatuses) {
-      for (const status of request.includeStatuses) {
-        query.append("status", status);
-      }
-    }
-    if (typeof request.limit === "number") {
-      query.set("limit", String(request.limit));
-    }
-    if (typeof request.offset === "number") {
-      query.set("offset", String(request.offset));
-    }
-    const queryString = query.toString();
-    const suffix = queryString ? `?${queryString}` : "";
-    return this.get(`/api/v1/identity/trusted-devices${suffix}`, {
-      authorization: `Bearer ${sessionToken}`,
+    appendSharedApiListQueryConventions(query, {
+      workspaceId: request.workspaceId,
     });
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/trusted-devices${suffix}`, sessionToken);
   }
 
   public async getTrustedDevice(
     request: GetTrustedDeviceApiRequest,
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<GetTrustedDeviceApiResponse>> {
-    return this.get(`/api/v1/identity/trusted-devices/${encodeURIComponent(request.trustedDeviceId)}`, {
-      authorization: `Bearer ${sessionToken}`,
-    });
+    return this.get(`/api/v1/identity/trusted-devices/${encodeURIComponent(request.trustedDeviceId)}`, sessionToken);
   }
 
   public async revokeTrustedDevice(
@@ -317,9 +382,7 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
         note: request.note,
         revokedAt: request.revokedAt,
       },
-      {
-        authorization: `Bearer ${sessionToken}`,
-      },
+      sessionToken,
     );
   }
 
@@ -333,9 +396,7 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
         displayName: request.displayName,
         updatedAt: request.updatedAt,
       },
-      {
-        authorization: `Bearer ${sessionToken}`,
-      },
+      sessionToken,
     );
   }
 
@@ -346,9 +407,7 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.post(
       "/api/v1/identity/trusted-devices/pairing/initiate",
       request,
-      {
-        authorization: `Bearer ${sessionToken}`,
-      },
+      sessionToken,
     );
   }
 
@@ -359,9 +418,7 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.post(
       "/api/v1/identity/trusted-devices/pairing/validate",
       request,
-      {
-        authorization: `Bearer ${sessionToken}`,
-      },
+      sessionToken,
     );
   }
 
@@ -372,41 +429,40 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.post(
       "/api/v1/identity/trusted-devices/pairing/complete",
       request,
-      {
-        authorization: `Bearer ${sessionToken}`,
-      },
+      sessionToken,
     );
   }
 
   private async post<TResponse>(
     path: string,
     body: Readonly<Record<string, unknown>>,
-    headers: Readonly<Record<string, string>> = {},
+    sessionToken?: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<TResponse>> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    return await this.apiClient.requestJson<IdentityAuthApiResponse<TResponse>>({
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...headers,
-      },
-      body: JSON.stringify(body),
+      path,
+      body,
+      sessionToken,
+      signal: options?.signal,
+      timeoutMs: options?.timeoutMs,
+      retryPolicy: options?.retryPolicy,
     });
-
-    const payload = await response.json() as IdentityAuthApiResponse<TResponse>;
-    return payload;
   }
 
   private async get<TResponse>(
     path: string,
-    headers: Readonly<Record<string, string>> = {},
+    sessionToken?: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<TResponse>> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    return await this.apiClient.requestJson<IdentityAuthApiResponse<TResponse>>({
       method: "GET",
-      headers,
+      path,
+      sessionToken,
+      signal: options?.signal,
+      timeoutMs: options?.timeoutMs,
+      retryPolicy: options?.retryPolicy,
     });
-
-    const payload = await response.json() as IdentityAuthApiResponse<TResponse>;
-    return payload;
   }
 }
 

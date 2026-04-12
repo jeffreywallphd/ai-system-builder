@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import type {
   WorkspaceAdminListItemApiRecord,
   WorkspaceInvitationApiRecord,
@@ -7,26 +7,49 @@ import type {
 } from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { presentWorkspaceAdministrationCapabilities } from "../presenters/WorkspaceAdministrationCapabilitiesPresenter";
+import { IdentityAuthService } from "../services/IdentityAuthService";
 import { WorkspaceAdministrationService } from "../services/WorkspaceAdministrationService";
+import {
+  IdentityAuthSessionCoordinator,
+  IdentitySessionBootstrapStatus,
+} from "@shared/identity/IdentityAuthSessionCoordinator";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
+import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
 import { buildWorkspaceInvitationAcceptPath } from "../web/workspaces/WorkspaceThinClientRoutes";
+import { SurfaceStatePanel } from "../shared/components/presentation-state";
+import {
+  WorkspaceListPanel,
+  WorkspaceMembershipAdministrationPanel,
+  WorkspaceOperationalContextPanel,
+  workspaceAssignableRoleOptions,
+  type WorkspaceAssignableRole,
+} from "@ui/shared/workspaces/WorkspaceAdministrationPanels";
 
-const invitationRoleOptions = Object.freeze(["admin", "member", "viewer"] as const);
-const membershipStatusOptions = Object.freeze(["pending", "active", "suspended", "removed"] as const);
+interface WorkspaceMembershipThinClientPageProps {
+  readonly service?: WorkspaceAdministrationService;
+  readonly authService?: IdentityAuthService;
+  readonly sessionStore?: IdentityAuthSessionStoreContract;
+}
 
-export default function WorkspaceMembershipThinClientPage(): JSX.Element {
-  const service = useMemo(() => new WorkspaceAdministrationService(), []);
-  const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
-  const [session] = useState(() => sessionStore.getSession());
+export default function WorkspaceMembershipThinClientPage(props: WorkspaceMembershipThinClientPageProps = {}): JSX.Element {
+  const service = useMemo(() => props.service ?? new WorkspaceAdministrationService(), [props.service]);
+  const authService = useMemo(() => props.authService ?? new IdentityAuthService(), [props.authService]);
+  const sessionStore = useMemo(() => props.sessionStore ?? new IdentityAuthSessionStore(), [props.sessionStore]);
+  const sessionCoordinator = useMemo(
+    () => new IdentityAuthSessionCoordinator(sessionStore, authService),
+    [authService, sessionStore],
+  );
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedWorkspaceId = searchParams.get("workspaceId")?.trim() || undefined;
+  const [session, setSession] = useState(() => sessionStore.getSession());
   const sessionToken = session?.sessionToken;
 
   const [workspaces, setWorkspaces] = useState<ReadonlyArray<WorkspaceAdminListItemApiRecord>>(Object.freeze([]));
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>();
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>(() => requestedWorkspaceId ?? session?.workspaceContext?.resolvedWorkspaceId);
   const [memberships, setMemberships] = useState<ReadonlyArray<WorkspaceMembershipApiRecord>>(Object.freeze([]));
   const [invitations, setInvitations] = useState<ReadonlyArray<WorkspaceInvitationApiRecord>>(Object.freeze([]));
-  const [membershipDrafts, setMembershipDrafts] = useState<Readonly<Record<string, WorkspaceMembershipApiRecord["status"]>>>(Object.freeze({}));
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<(typeof invitationRoleOptions)[number]>("member");
+  const [inviteRole, setInviteRole] = useState<WorkspaceAssignableRole>("member");
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -48,7 +71,6 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
     if (!presentWorkspaceAdministrationCapabilities(workspace).canAdministrate) {
       setMemberships(Object.freeze([]));
       setInvitations(Object.freeze([]));
-      setMembershipDrafts(Object.freeze({}));
       return;
     }
 
@@ -68,14 +90,6 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
 
     setMemberships(membersResponse.data.memberships);
     setInvitations(invitationsResponse.data.invitations);
-    setMembershipDrafts(
-      Object.freeze(
-        membersResponse.data.memberships.reduce<Record<string, WorkspaceMembershipApiRecord["status"]>>((current, membership) => {
-          current[membership.userIdentityId] = membership.status;
-          return current;
-        }, {}),
-      ),
-    );
   };
 
   const refresh = async (preferredWorkspaceId?: string): Promise<void> => {
@@ -97,13 +111,14 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
       const workspaceId = preferredWorkspaceId
         ?? (selectedWorkspaceId && fetchedWorkspaces.some((entry) => entry.workspaceId === selectedWorkspaceId)
           ? selectedWorkspaceId
-          : fetchedWorkspaces[0]?.workspaceId);
+          : requestedWorkspaceId && fetchedWorkspaces.some((entry) => entry.workspaceId === requestedWorkspaceId)
+            ? requestedWorkspaceId
+            : fetchedWorkspaces[0]?.workspaceId);
       setSelectedWorkspaceId(workspaceId);
 
       if (!workspaceId) {
         setMemberships(Object.freeze([]));
         setInvitations(Object.freeze([]));
-        setMembershipDrafts(Object.freeze({}));
         return;
       }
 
@@ -115,12 +130,59 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
     }
   };
 
+  const selectWorkspace = (nextWorkspaceId: string): void => {
+    const normalizedWorkspaceId = nextWorkspaceId.trim();
+    if (!normalizedWorkspaceId) {
+      return;
+    }
+
+    setSelectedWorkspaceId(normalizedWorkspaceId);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("workspaceId", normalizedWorkspaceId);
+      return next;
+    }, { replace: true });
+
+    void sessionCoordinator.refreshIfAuthenticated({ workspaceId: normalizedWorkspaceId }).then((result) => {
+      if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+        setSession(result.session);
+      }
+    });
+    void refreshWorkspaceDetails(normalizedWorkspaceId);
+  };
+
   useEffect(() => {
     if (!sessionToken) {
       return;
     }
     void refresh();
-  }, [sessionToken]);
+  }, [requestedWorkspaceId, sessionToken]);
+
+  useEffect(() => {
+    if (!sessionToken) {
+      return;
+    }
+
+    let cancelled = false;
+    const syncSessionContext = async (): Promise<void> => {
+      const result = await sessionCoordinator.bootstrap({ workspaceId: requestedWorkspaceId });
+      if (cancelled) {
+        return;
+      }
+      if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+        setSession(result.session);
+        const resolvedWorkspaceId = result.session.workspaceContext?.resolvedWorkspaceId;
+        if (resolvedWorkspaceId && !selectedWorkspaceId) {
+          setSelectedWorkspaceId(resolvedWorkspaceId);
+        }
+      }
+    };
+
+    void syncSessionContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedWorkspaceId, selectedWorkspaceId, sessionCoordinator, sessionToken]);
 
   const runMutation = async (action: () => Promise<void>): Promise<void> => {
     setIsMutating(true);
@@ -137,17 +199,14 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-workspace-thin-page">
-        <div className="ui-card">
-          <div className="ui-card__header">
-            <h1 className="ui-card__title">Workspace memberships</h1>
-            <p className="ui-card__subtitle">
-              Sign in with an authenticated account before managing workspace memberships and invitations.
-            </p>
-          </div>
-          <div className="ui-card__body">
-            <Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>
-          </div>
-        </div>
+        <SurfaceStatePanel
+          state={Object.freeze({
+            kind: "permission-denied",
+            title: "Workspace memberships",
+            message: "Sign in with an authenticated account before managing workspace memberships and invitations.",
+          })}
+          action={<Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>}
+        />
       </section>
     );
   }
@@ -158,7 +217,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Workspace memberships</h1>
           <p className="ui-page__subtitle">
-            Lightweight workspace member and invitation operations for web and mobile surfaces.
+            Lightweight workspace member, role, and invitation operations for web and mobile-responsive admin-lite surfaces.
           </p>
         </div>
         <div className="ui-page__actions">
@@ -182,140 +241,122 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
           <h2 className="ui-card__title">Workspace</h2>
         </div>
         <div className="ui-card__body ui-stack ui-stack--sm">
-          <label className="ui-field">
-            <span className="ui-field__label">Selected workspace</span>
-            <select
-              className="ui-select"
-              value={selectedWorkspaceId}
-              onChange={(event) => {
-                const nextWorkspaceId = event.target.value || undefined;
-                setSelectedWorkspaceId(nextWorkspaceId);
-                if (nextWorkspaceId) {
-                  void refreshWorkspaceDetails(nextWorkspaceId);
-                } else {
-                  setMemberships(Object.freeze([]));
-                  setInvitations(Object.freeze([]));
-                  setMembershipDrafts(Object.freeze({}));
-                }
-              }}
-            >
-              {workspaces.length === 0 ? <option value="">No workspaces available</option> : null}
-              {workspaces.map((workspace) => (
-                <option key={workspace.workspaceId} value={workspace.workspaceId}>
-                  {workspace.displayName} ({workspace.slug})
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {selectedWorkspace ? (
-            <div className="ui-workspace-thin-page__summary-grid">
-              <div className="ui-card ui-workspace-thin-page__summary-card">
-                <strong>{selectedWorkspace.membershipSummary.total}</strong>
-                <span>members</span>
-              </div>
-              <div className="ui-card ui-workspace-thin-page__summary-card">
-                <strong>{selectedWorkspace.invitationSummary.pending}</strong>
-                <span>pending invites</span>
-              </div>
-              <div className="ui-card ui-workspace-thin-page__summary-card">
-                <strong>{selectedWorkspace.roleSummary.activeAssignments}</strong>
-                <span>active roles</span>
-              </div>
-            </div>
-          ) : null}
-
-          {!workspaceCapabilities.canAdministrate && selectedWorkspace ? (
-            <p className="ui-text-secondary">
-              You have read access only in this workspace. Member and invitation updates require owner/admin role access.
-            </p>
-          ) : null}
+          <WorkspaceListPanel
+            surface="thin-client"
+            workspaces={workspaces}
+            selectedWorkspaceId={selectedWorkspaceId}
+            isLoading={isLoading}
+            onSelectWorkspace={selectWorkspace}
+          />
+          <WorkspaceOperationalContextPanel workspace={selectedWorkspace} capabilities={workspaceCapabilities} />
         </div>
       </section>
 
       <div className="ui-workspace-thin-page__grid">
         <section className="ui-card">
           <div className="ui-card__header">
-            <h2 className="ui-card__title">Membership review</h2>
+            <h2 className="ui-card__title">Membership management</h2>
           </div>
           <div className="ui-card__body ui-stack ui-stack--sm">
-            {memberships.length === 0 ? <p className="ui-text-secondary">No memberships to review.</p> : null}
-            {memberships.map((membership) => (
-              <article key={membership.membershipId} className="ui-workspace-thin-page__list-card">
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>{membership.userIdentityId}</strong>
-                  <span className="ui-text-secondary ui-text-small">
-                    status: {membership.status} | roles: {membership.activeRoles.join(", ") || "none"}
-                  </span>
-                </div>
-                <div className="ui-workspace-thin-page__list-card-actions">
-                  <select
-                    className="ui-select ui-select--sm"
-                    value={membershipDrafts[membership.userIdentityId] ?? membership.status}
-                    disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageMembers || isMutating}
-                    onChange={(event) => {
-                      const nextStatus = event.target.value as WorkspaceMembershipApiRecord["status"];
-                      setMembershipDrafts((current) => Object.freeze({
-                        ...current,
-                        [membership.userIdentityId]: nextStatus,
-                      }));
-                    }}
-                  >
-                    {membershipStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
-                  <button
-                    type="button"
-                    className="ui-button ui-button--secondary ui-button--sm"
-                    disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageMembers || isMutating}
-                    onClick={() => {
-                      if (!selectedWorkspaceId) {
-                        return;
-                      }
-                      const nextStatus = membershipDrafts[membership.userIdentityId] ?? membership.status;
-                      void runMutation(async () => {
-                        const response = await service.changeWorkspaceMembershipStatus({
-                          workspaceId: selectedWorkspaceId,
-                          targetUserIdentityId: membership.userIdentityId,
-                          status: nextStatus,
-                        }, sessionToken);
-                        if (!response.ok || !response.data) {
-                          setErrorMessage(response.error?.message ?? "Unable to update membership status.");
-                          return;
-                        }
-                        setStatusMessage(`Updated ${membership.userIdentityId} to ${nextStatus}.`);
-                        await refreshWorkspaceDetails(selectedWorkspaceId);
-                      });
-                    }}
-                  >
-                    Save status
-                  </button>
-                  <button
-                    type="button"
-                    className="ui-button ui-button--danger ui-button--sm"
-                    disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageMembers || isMutating}
-                    onClick={() => {
-                      if (!selectedWorkspaceId) {
-                        return;
-                      }
-                      void runMutation(async () => {
-                        const response = await service.removeWorkspaceMember({
-                          workspaceId: selectedWorkspaceId,
-                          targetUserIdentityId: membership.userIdentityId,
-                        }, sessionToken);
-                        if (!response.ok || !response.data) {
-                          setErrorMessage(response.error?.message ?? "Unable to remove workspace member.");
-                          return;
-                        }
-                        setStatusMessage(`Removed ${membership.userIdentityId} from workspace.`);
-                        await refreshWorkspaceDetails(selectedWorkspaceId);
-                      });
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </article>
-            ))}
+            <WorkspaceMembershipAdministrationPanel
+              surface="thin-client"
+              actionProfile="admin-lite"
+              selectedWorkspaceId={selectedWorkspaceId}
+              memberships={memberships}
+              capabilities={workspaceCapabilities}
+              isMutating={isMutating}
+              onClientValidationError={setErrorMessage}
+              onAddMember={async (input) => {
+                if (!selectedWorkspaceId) {
+                  return;
+                }
+                await runMutation(async () => {
+                  const response = await service.addWorkspaceMember({
+                    workspaceId: selectedWorkspaceId,
+                    targetUserIdentityId: input.targetUserIdentityId,
+                    initialStatus: "active",
+                    roles: input.roles,
+                  }, sessionToken);
+                  if (!response.ok || !response.data) {
+                    setErrorMessage(response.error?.message ?? "Unable to add workspace member.");
+                    return;
+                  }
+                  setStatusMessage(`Added member ${input.targetUserIdentityId}.`);
+                  await refreshWorkspaceDetails(selectedWorkspaceId);
+                });
+              }}
+              onSaveMembershipStatus={async (input) => {
+                if (!selectedWorkspaceId) {
+                  return;
+                }
+                await runMutation(async () => {
+                  const response = await service.changeWorkspaceMembershipStatus({
+                    workspaceId: selectedWorkspaceId,
+                    targetUserIdentityId: input.targetUserIdentityId,
+                    status: input.status,
+                  }, sessionToken);
+                  if (!response.ok || !response.data) {
+                    setErrorMessage(response.error?.message ?? "Unable to update membership status.");
+                    return;
+                  }
+                  setStatusMessage(`Updated ${input.targetUserIdentityId} to ${input.status}.`);
+                  await refreshWorkspaceDetails(selectedWorkspaceId);
+                });
+              }}
+              onRemoveMember={async (targetUserIdentityId) => {
+                if (!selectedWorkspaceId) {
+                  return;
+                }
+                await runMutation(async () => {
+                  const response = await service.removeWorkspaceMember({
+                    workspaceId: selectedWorkspaceId,
+                    targetUserIdentityId,
+                  }, sessionToken);
+                  if (!response.ok || !response.data) {
+                    setErrorMessage(response.error?.message ?? "Unable to remove workspace member.");
+                    return;
+                  }
+                  setStatusMessage(`Removed ${targetUserIdentityId} from workspace.`);
+                  await refreshWorkspaceDetails(selectedWorkspaceId);
+                });
+              }}
+              onAssignRole={async (input) => {
+                if (!selectedWorkspaceId) {
+                  return;
+                }
+                await runMutation(async () => {
+                  const response = await service.assignWorkspaceRole({
+                    workspaceId: selectedWorkspaceId,
+                    targetUserIdentityId: input.targetUserIdentityId,
+                    role: input.role,
+                  }, sessionToken);
+                  if (!response.ok || !response.data) {
+                    setErrorMessage(response.error?.message ?? "Unable to assign role.");
+                    return;
+                  }
+                  setStatusMessage(`Assigned ${input.role} role to ${input.targetUserIdentityId}.`);
+                  await refreshWorkspaceDetails(selectedWorkspaceId);
+                });
+              }}
+              onRevokeRole={async (input) => {
+                if (!selectedWorkspaceId) {
+                  return;
+                }
+                await runMutation(async () => {
+                  const response = await service.revokeWorkspaceRole({
+                    workspaceId: selectedWorkspaceId,
+                    targetUserIdentityId: input.targetUserIdentityId,
+                    role: input.role,
+                  }, sessionToken);
+                  if (!response.ok || !response.data) {
+                    setErrorMessage(response.error?.message ?? "Unable to revoke role.");
+                    return;
+                  }
+                  setStatusMessage(`Revoked ${input.role} role from ${input.targetUserIdentityId}.`);
+                  await refreshWorkspaceDetails(selectedWorkspaceId);
+                });
+              }}
+            />
           </div>
         </section>
 
@@ -340,10 +381,10 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
                 <select
                   className="ui-select"
                   value={inviteRole}
-                  onChange={(event) => setInviteRole(event.target.value as (typeof invitationRoleOptions)[number])}
+                  onChange={(event) => setInviteRole(event.target.value as WorkspaceAssignableRole)}
                   disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageInvitations || isMutating}
                 >
-                  {invitationRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+                  {workspaceAssignableRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
                 </select>
               </label>
               <button
@@ -435,4 +476,3 @@ function formatCompactDateTime(value: string): string {
   }
   return new Date(parsed).toLocaleString();
 }
-

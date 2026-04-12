@@ -1,3 +1,4 @@
+/* MIGRATION NOTE: prefer importing shared transport contracts from src/shared/contracts/* for new work. This SDK contract remains for compatibility during convergence. */
 export const IdentityAuthApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
   conflict: "conflict",
@@ -21,6 +22,9 @@ export interface IdentityAuthApiValidationError {
 export interface IdentityAuthApiError {
   readonly code: IdentityAuthApiErrorCode;
   readonly message: string;
+  readonly sharedCode?: string;
+  readonly domainCode?: string;
+  readonly retryable?: boolean;
   readonly validationErrors?: ReadonlyArray<IdentityAuthApiValidationError>;
   readonly trustFailure?: {
     readonly reason?: string;
@@ -74,6 +78,12 @@ export interface LoginLocalIdentityApiRequest {
   readonly credential: {
     readonly candidate: string;
   };
+}
+
+export interface DevelopmentLoginIdentityApiRequest {
+  readonly accessChannel?: "desktop" | "thin-client";
+  readonly sessionTrustRequirement?: "allow-untrusted" | "allow-pairing" | "require-trusted";
+  readonly client?: LoginLocalIdentityApiRequest["client"];
 }
 
 export type IdentitySessionAssuranceLevel =
@@ -155,6 +165,67 @@ export interface RevokeIdentitySessionApiRequest {
 }
 
 export interface RevokeIdentitySessionApiResponse {
+  readonly sessionId: string;
+  readonly userIdentityId: string;
+  readonly revokedAt: string;
+  readonly revocationReason: IdentitySessionRevocationReason;
+}
+
+export interface IdentitySessionSummaryApiResponse {
+  readonly sessionId: string;
+  readonly userIdentityId: string;
+  readonly providerId: string;
+  readonly providerSubject: string;
+  readonly status: "active" | "rotated" | "expired" | "revoked";
+  readonly issuedAt: string;
+  readonly expiresAt: string;
+  readonly accessChannel?: "desktop" | "thin-client";
+  readonly deviceId?: string;
+  readonly trust?: {
+    readonly trustedDeviceId?: string;
+    readonly sessionAssuranceLevel?: IdentitySessionAssuranceLevel;
+    readonly trustState?: IdentitySessionDeviceTrustState;
+    readonly trustEvaluatedAt?: string;
+    readonly issuedOnTrustedDevice?: boolean;
+    readonly invalidationReasons?: ReadonlyArray<IdentitySessionTrustInvalidationReason>;
+  };
+  readonly revocation?: {
+    readonly reason: IdentitySessionRevocationReason;
+    readonly revokedAt: string;
+  };
+}
+
+export interface ListIdentitySessionsApiRequest {
+  readonly includeStatuses?: ReadonlyArray<IdentitySessionSummaryApiResponse["status"]>;
+  readonly includeAccessChannels?: ReadonlyArray<"desktop" | "thin-client">;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListIdentitySessionsApiResponse {
+  readonly sessions: ReadonlyArray<IdentitySessionSummaryApiResponse>;
+}
+
+export interface ListIdentityAdminSessionsApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly userIdentityId: string;
+  readonly includeStatuses?: ReadonlyArray<IdentitySessionSummaryApiResponse["status"]>;
+  readonly includeAccessChannels?: ReadonlyArray<"desktop" | "thin-client">;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListIdentityAdminSessionsApiResponse {
+  readonly sessions: ReadonlyArray<IdentitySessionSummaryApiResponse>;
+}
+
+export interface RevokeIdentityAdminSessionApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly sessionId: string;
+  readonly reason?: IdentitySessionRevocationReason;
+}
+
+export interface RevokeIdentityAdminSessionApiResponse {
   readonly sessionId: string;
   readonly userIdentityId: string;
   readonly revokedAt: string;

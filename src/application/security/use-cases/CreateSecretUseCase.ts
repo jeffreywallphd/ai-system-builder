@@ -333,6 +333,10 @@ export class CreateSecretUseCase {
         userIdentityId: owner.userIdentityId,
         details: Object.freeze({
           owner: toSecretOwnerDiagnosticDto(owner),
+          kind: request.kind,
+          metadataTagCount: request.metadata?.tags?.length ?? 0,
+          bootstrapSource: normalizeRequired(request.metadata?.labels?.bootstrapSource),
+          bootstrapPolicy: normalizeRequired(request.metadata?.labels?.bootstrapPolicy),
         }),
       });
 
@@ -410,6 +414,7 @@ export class CreateSecretUseCase {
           userIdentityId: input.userIdentityId,
         }),
         occurredAt: input.occurredAt,
+        details: input.details,
       }));
     } catch {
       // Audit failures are intentionally non-fatal.

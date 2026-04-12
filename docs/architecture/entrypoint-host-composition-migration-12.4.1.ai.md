@@ -1,25 +1,33 @@
+---
+title: "AI Companion: Entrypoint Host Composition Migration (Legacy Path Stub)"
+doc_type: architecture-reference
+status: superseded
+authoritativeness: historical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+superseded_by: docs/baselines/architecture/runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.ai.md
+related_code_paths:
+  - docs/baselines/architecture/runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.ai.md
+  - docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md
+---
+
 # AI Companion: Entrypoint Host Composition Migration (Story 12.4.1)
 
-## Scope completed
-- Migrate real runtime entrypoints that still bypassed host assemblies onto explicit composition-root entrypoints.
+## Supersession Notice
 
-## Entrypoints migrated
-- `electron/main/main.ts`
-  - replaced direct `startIdentityServerHost(...)` startup with `startAuthoritativeServerHostAssembly(...)`
-  - local identity API endpoint derivation now uses authoritative runtime handle address
-  - runtime shutdown now stops authoritative host runtime through host assembly lifecycle
-- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
-  - replaced direct `startIdentityServerHost(...)` startup with `startAuthoritativeServerHostAssembly(...)`
-  - added `createBrowserDevelopmentAuthoritativeServerHostOptions(...)` as a thin entrypoint bridge
-  - shutdown now stops authoritative host runtime handle
+This file is a `migrated-link-stub` and is not authoritative for current runtime-host architecture guidance.
 
-## Compatibility notes
-- Existing local control-plane behavior for desktop/browser development is preserved.
-- Existing host/port/CORS behavior is preserved.
-- Startup reason is now explicit for migrated paths:
-  - `electron-main-authoritative-server-host-startup`
-  - `browser-development-vite-authoritative-host-startup`
+Effective date: 2026-04-11.
+Reason: migration history moved to architecture baselines to isolate historical context from active authority.
+Canonical source: `docs/baselines/architecture/runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.ai.md`.
 
-## Validation
-- Added focused test coverage for browser-development entrypoint option bridging:
-  - `src/infrastructure/runtime/tests/BrowserDevelopmentHostEntrypointBridge.test.ts`
+## Redirect
+
+- Historical baseline snapshot:
+  `docs/baselines/architecture/runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.ai.md`
+- Current runtime-host authority:
+  - `docs/architecture/domains/runtime-host-surfaces/overview.md`
+  - `docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md`
+  - `docs/architecture/authoritative-server-host-assembly.ai.md`
+
+Retention/removal trigger: keep this stub only until inbound legacy links are migrated.

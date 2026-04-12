@@ -9,7 +9,11 @@ import {
   type AppLifecycleStage,
   type RendererDeliveryMode,
 } from "@domain/runtime/AppRuntimeProfile";
-import type { DesktopPythonRuntimeInfo, DesktopStoragePaths } from "../../../electron/shared/DesktopContracts";
+import type {
+  DesktopAuthBootstrapRuntimeConfig,
+  DesktopPythonRuntimeInfo,
+  DesktopStoragePaths,
+} from "../../../electron/shared/DesktopContracts";
 
 export type WorkflowRepositoryMode = "browser-storage" | "filesystem-indexed" | "memory";
 export type WorkflowExecutorMode = "scaffold" | "strategy";
@@ -36,6 +40,7 @@ export interface AppRuntimeConfigValues {
   readonly modelInstallDirectory: string;
   readonly serviceSupervisorBaseUrl?: string;
   readonly serviceSupervisorPort?: number;
+  readonly pythonRuntimeBaseUrl?: string;
   readonly workflowStorageDirectory?: string;
   readonly workflowIndexDatabasePath?: string;
   readonly desktopStorage?: DesktopStoragePaths;
@@ -47,6 +52,12 @@ interface DesktopConfigOptions {
   readonly pythonRuntime: DesktopPythonRuntimeInfo;
   readonly serviceSupervisorBaseUrl: string;
   readonly serviceSupervisorPort: number;
+  readonly pythonRuntimeBaseUrl?: string;
+}
+
+interface DesktopAuthShellConfigOptions {
+  readonly storage: DesktopStoragePaths;
+  readonly identityApiBaseUrl?: string;
 }
 
 export class AppRuntimeConfig {
@@ -68,6 +79,7 @@ export class AppRuntimeConfig {
   public readonly modelInstallDirectory: string;
   public readonly serviceSupervisorBaseUrl?: string;
   public readonly serviceSupervisorPort?: number;
+  public readonly pythonRuntimeBaseUrl?: string;
   public readonly workflowStorageDirectory?: string;
   public readonly workflowIndexDatabasePath?: string;
   public readonly desktopStorage?: DesktopStoragePaths;
@@ -92,6 +104,7 @@ export class AppRuntimeConfig {
     this.modelInstallDirectory = values.modelInstallDirectory.trim();
     this.serviceSupervisorBaseUrl = values.serviceSupervisorBaseUrl?.trim() || undefined;
     this.serviceSupervisorPort = values.serviceSupervisorPort;
+    this.pythonRuntimeBaseUrl = values.pythonRuntimeBaseUrl?.trim() || undefined;
     this.workflowStorageDirectory = values.workflowStorageDirectory?.trim() || undefined;
     this.workflowIndexDatabasePath = values.workflowIndexDatabasePath?.trim() || undefined;
     this.desktopStorage = values.desktopStorage;
@@ -130,6 +143,7 @@ export class AppRuntimeConfig {
       modelInstallDirectory: this.modelInstallDirectory,
       serviceSupervisorBaseUrl: this.serviceSupervisorBaseUrl,
       serviceSupervisorPort: this.serviceSupervisorPort,
+      pythonRuntimeBaseUrl: this.pythonRuntimeBaseUrl,
       workflowStorageDirectory: this.workflowStorageDirectory,
       workflowIndexDatabasePath: this.workflowIndexDatabasePath,
       desktopStorage: this.desktopStorage,
@@ -190,6 +204,7 @@ export class AppRuntimeConfig {
       modelInstallDirectory: values.modelInstallDirectory,
       serviceSupervisorBaseUrl: values.serviceSupervisorBaseUrl,
       serviceSupervisorPort: values.serviceSupervisorPort,
+      pythonRuntimeBaseUrl: values.pythonRuntimeBaseUrl,
       workflowStorageDirectory: values.workflowStorageDirectory,
       workflowIndexDatabasePath: values.workflowIndexDatabasePath,
       desktopStorage: values.desktopStorage,
@@ -208,8 +223,8 @@ export class AppRuntimeConfig {
     const modelInstallDirectory =
       AppRuntimeConfig.readEnvVariable("VITE_MODEL_INSTALL_DIRECTORY") ||
       "dev/models";
-    const identityApiBaseUrl =
-      AppRuntimeConfig.readEnvVariable("VITE_IDENTITY_API_BASE_URL");
+    const identityApiBaseUrl = AppRuntimeConfig.readEnvVariable("VITE_IDENTITY_API_BASE_URL")
+      || `http://${AppRuntimeConfig.readEnvVariable("AI_LOOM_BROWSER_IDENTITY_HOST") || "127.0.0.1"}:${AppRuntimeConfig.readEnvVariable("AI_LOOM_BROWSER_IDENTITY_PORT") || "8788"}`;
 
     return new AppRuntimeConfig(AppRuntimeConfig.createValues(runtimeMode, {
       workflowRepositoryMode: profile.supportsLocalWorkspaceFilesystem ? "filesystem-indexed" : "browser-storage",
@@ -241,10 +256,25 @@ export class AppRuntimeConfig {
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
+      pythonRuntimeBaseUrl: options.pythonRuntimeBaseUrl,
       workflowStorageDirectory: "dev/workflow-data/workflows",
       workflowIndexDatabasePath: "dev/workflow-data/workflows/workflow-index.sqlite",
       desktopStorage: options.storage,
       desktopPythonRuntime: options.pythonRuntime,
+    }));
+  }
+
+  public static forDesktopDevelopmentAuthShell(options: DesktopAuthShellConfigOptions): AppRuntimeConfig {
+    return new AppRuntimeConfig(AppRuntimeConfig.createValues("desktop-development", {
+      workflowRepositoryMode: "filesystem-indexed",
+      workflowExecutorMode: "strategy",
+      nodeCatalogMode: "registered",
+      uiSettingsPersistenceMode: "local-storage",
+      installedModelCatalogMode: "browser-local-storage",
+      seedStarterNode: true,
+      identityApiBaseUrl: options.identityApiBaseUrl,
+      modelInstallDirectory: options.storage.modelsDirectory,
+      desktopStorage: options.storage,
     }));
   }
 
@@ -260,10 +290,25 @@ export class AppRuntimeConfig {
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
+      pythonRuntimeBaseUrl: options.pythonRuntimeBaseUrl,
       workflowStorageDirectory: `${options.storage.appDataDirectory}/workflow-data/workflows`,
       workflowIndexDatabasePath: `${options.storage.storageDirectory}/workflow-index.sqlite`,
       desktopStorage: options.storage,
       desktopPythonRuntime: options.pythonRuntime,
+    }));
+  }
+
+  public static forDesktopProductionAuthShell(options: DesktopAuthShellConfigOptions): AppRuntimeConfig {
+    return new AppRuntimeConfig(AppRuntimeConfig.createValues("desktop-production", {
+      workflowRepositoryMode: "filesystem-indexed",
+      workflowExecutorMode: "strategy",
+      nodeCatalogMode: "registered",
+      uiSettingsPersistenceMode: "desktop-sqlite",
+      installedModelCatalogMode: "desktop-sqlite",
+      seedStarterNode: false,
+      identityApiBaseUrl: options.identityApiBaseUrl,
+      modelInstallDirectory: options.storage.modelsDirectory,
+      desktopStorage: options.storage,
     }));
   }
 
@@ -272,19 +317,58 @@ export class AppRuntimeConfig {
   }
 
   public static resolveDefault(): AppRuntimeConfig {
-    const desktopBootstrap = (globalThis as typeof globalThis & {
-      aiLoomDesktop?: { bootstrap?: { runtimeConfig: AppRuntimeConfigValues } };
-    }).aiLoomDesktop?.bootstrap;
+    const desktopBridge = (globalThis as typeof globalThis & {
+      aiLoomDesktop?: {
+        auth?: {
+          bootstrap?: {
+            runtimeConfig: AppRuntimeConfigValues | DesktopAuthBootstrapRuntimeConfig;
+          };
+        };
+        bootstrap?: {
+          runtimeConfig: AppRuntimeConfigValues | DesktopAuthBootstrapRuntimeConfig;
+        };
+      };
+    }).aiLoomDesktop;
+    const desktopBootstrap = desktopBridge?.auth?.bootstrap ?? desktopBridge?.bootstrap;
 
     if (desktopBootstrap?.runtimeConfig) {
-      return new AppRuntimeConfig(desktopBootstrap.runtimeConfig);
+      return new AppRuntimeConfig(expandDesktopBootstrapRuntimeConfig(desktopBootstrap.runtimeConfig));
     }
 
     return AppRuntimeConfig.forDevelopment();
   }
 }
 
+function expandDesktopBootstrapRuntimeConfig(
+  values: AppRuntimeConfigValues | DesktopAuthBootstrapRuntimeConfig,
+): AppRuntimeConfigValues {
+  return Object.freeze({
+    runtimeMode: values.runtimeMode,
+    hostKind: values.hostKind,
+    lifecycleStage: values.lifecycleStage,
+    distributionTarget: values.distributionTarget,
+    rendererDeliveryMode: values.rendererDeliveryMode,
+    workflowRepositoryMode: values.workflowRepositoryMode,
+    workflowExecutorMode: values.workflowExecutorMode,
+    nodeCatalogMode: values.nodeCatalogMode,
+    uiSettingsPersistenceMode: values.uiSettingsPersistenceMode,
+    installedModelCatalogMode: values.installedModelCatalogMode,
+    seedStarterNode: values.seedStarterNode,
+    isProductionMode: values.isProductionMode,
+    devSyncBaseUrl: values.devSyncBaseUrl,
+    devSyncToken: values.devSyncToken,
+    identityApiBaseUrl: values.identityApiBaseUrl,
+    modelInstallDirectory: values.modelInstallDirectory,
+    serviceSupervisorBaseUrl: "serviceSupervisorBaseUrl" in values ? values.serviceSupervisorBaseUrl : undefined,
+    serviceSupervisorPort: "serviceSupervisorPort" in values ? values.serviceSupervisorPort : undefined,
+    pythonRuntimeBaseUrl: "pythonRuntimeBaseUrl" in values ? values.pythonRuntimeBaseUrl : undefined,
+    workflowStorageDirectory: "workflowStorageDirectory" in values ? values.workflowStorageDirectory : undefined,
+    workflowIndexDatabasePath: "workflowIndexDatabasePath" in values ? values.workflowIndexDatabasePath : undefined,
+    desktopStorage: "desktopStorage" in values ? values.desktopStorage : undefined,
+    desktopPythonRuntime: "desktopPythonRuntime" in values ? values.desktopPythonRuntime : undefined,
+  });
+}
+
 export function isDesktopProductionConfig(config: AppRuntimeConfig): boolean {
   return isProductionRuntimeMode(config.runtimeMode);
 }
-

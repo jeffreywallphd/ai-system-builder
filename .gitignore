@@ -211,3 +211,6 @@ vite.config.ts.timestamp-*
 /runtime-assets/python/*/
 !/runtime-assets/python/README.md
 !/runtime-assets/python/manifest.template.json
+
+# Local authoritative startup performance baseline
+/runtime-assets/server/authoritative-server-startup-baseline.json

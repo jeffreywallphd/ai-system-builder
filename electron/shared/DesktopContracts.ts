@@ -1,3 +1,6 @@
+/**
+ * Shared desktop contract types and runtime validators used across main, preload, and renderer boundaries.
+ */
 import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 import type { CanonicalEntityType } from "../../src/application/ports/interfaces/ICanonicalAssetIdentityRepository";
 
@@ -40,7 +43,30 @@ export interface DesktopIdentityTransportTrustBootstrap {
   readonly pinnedTrustMaterial?: DesktopPinnedTrustMaterialBootstrap;
 }
 
-export interface DesktopBootstrapContext {
+export type DesktopAuthBootstrapRuntimeConfig =
+  Omit<
+    AppRuntimeConfigValues,
+    "serviceSupervisorBaseUrl"
+    | "serviceSupervisorPort"
+    | "pythonRuntimeBaseUrl"
+    | "workflowStorageDirectory"
+    | "workflowIndexDatabasePath"
+    | "desktopStorage"
+    | "desktopPythonRuntime"
+  >;
+
+export interface DesktopAuthBootstrapContext {
+  readonly runtimeConfig: DesktopAuthBootstrapRuntimeConfig;
+  readonly storage?: Pick<DesktopStoragePaths, "appDataDirectory">;
+  readonly environment?: {
+    readonly isPackaged: boolean;
+  };
+  readonly identityTransportTrust?: DesktopIdentityTransportTrustBootstrap;
+}
+
+export type DesktopBootstrapContext = DesktopAuthBootstrapContext;
+
+export interface DesktopPostLoginRuntimeContext {
   readonly runtimeConfig: AppRuntimeConfigValues;
   readonly storage: DesktopStoragePaths;
   readonly serviceSupervisor: {
@@ -143,6 +169,11 @@ export interface DesktopStudioShellBridge {
   transitionLifecycle(requestJson: string): Promise<string>;
   publishVersion(requestJson: string): Promise<string>;
   validateDraft(requestJson: string): Promise<string>;
+  listImageWorkflowDefinitions(requestJson: string): Promise<string>;
+  getImageWorkflowDefinition(requestJson: string): Promise<string>;
+  listImageSystemDefinitions(requestJson: string): Promise<string>;
+  getImageSystemDefinition(requestJson: string): Promise<string>;
+  saveImageSystemDefinition(requestJson: string): Promise<string>;
   getPersistedWorkflow(workflowId: string): Promise<string>;
   duplicatePersistedWorkflow(requestJson: string): Promise<string>;
   assessWorkflowExecutionReadiness(requestJson: string): Promise<string>;
@@ -201,16 +232,109 @@ export interface DesktopMcpSecretBridge {
   removeSecret(key: string): void;
 }
 
-export interface DesktopBridge {
+export interface DesktopConnectivityBridge {
+  getConnectivityState(): Promise<string>;
+  setOfflineMode(requestJson: string): Promise<string>;
+}
+
+export const DesktopPostLoginWarmupTriggerSources = Object.freeze({
+  explicitLogin: "explicit-login",
+  sessionRestore: "session-restore",
+  sessionRefresh: "session-refresh",
+  featureDemand: "feature-demand",
+  unknown: "unknown",
+});
+
+export type DesktopPostLoginWarmupTriggerSource =
+  typeof DesktopPostLoginWarmupTriggerSources[keyof typeof DesktopPostLoginWarmupTriggerSources];
+
+export interface DesktopPostLoginWarmupRequest {
+  readonly triggerSource: DesktopPostLoginWarmupTriggerSource;
+  readonly requestedAt?: string;
+}
+
+export const DesktopPostLoginRuntimeActivationModes = Object.freeze({
+  authSuccessWarmup: "auth-success-warmup",
+  lazyFeatureDemand: "lazy-feature-demand",
+});
+
+export type DesktopPostLoginRuntimeActivationMode =
+  typeof DesktopPostLoginRuntimeActivationModes[keyof typeof DesktopPostLoginRuntimeActivationModes];
+
+export const DesktopPostLoginRuntimeStates = Object.freeze({
+  unavailable: "unavailable",
+  warming: "warming",
+  ready: "ready",
+  failed: "failed",
+});
+
+export type DesktopPostLoginRuntimeState =
+  typeof DesktopPostLoginRuntimeStates[keyof typeof DesktopPostLoginRuntimeStates];
+
+export const DesktopPostLoginRuntimeUnavailableReasons = Object.freeze({
+  preLogin: "pre-login",
+  loggedOut: "logged-out",
+  shuttingDown: "shutting-down",
+});
+
+export type DesktopPostLoginRuntimeUnavailableReason =
+  typeof DesktopPostLoginRuntimeUnavailableReasons[keyof typeof DesktopPostLoginRuntimeUnavailableReasons];
+
+export interface DesktopPostLoginRuntimeStatus {
+  readonly state: DesktopPostLoginRuntimeState;
+  readonly updatedAt: string;
+  readonly activationMode?: DesktopPostLoginRuntimeActivationMode;
+  readonly triggerSource?: DesktopPostLoginWarmupTriggerSource;
+  readonly requestedAt?: string;
+  readonly unavailableReason?: DesktopPostLoginRuntimeUnavailableReason;
+  readonly failure?: {
+    readonly message: string;
+    readonly failedAt: string;
+    readonly retryable: boolean;
+  };
+}
+
+export interface DesktopRuntimeBootstrapBridge {
+  isDeferredFeatureApiReady(): boolean;
+  getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus;
+  startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest): Promise<void>;
+}
+
+export interface DesktopAuthBootstrapBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
   readonly secrets?: DesktopMcpSecretBridge;
-  readonly workflows: DesktopWorkflowBridge;
-  readonly executionRuns: DesktopExecutionRunBridge;
+  readonly runtime?: DesktopRuntimeBootstrapBridge;
+  readonly connectivity?: DesktopConnectivityBridge;
+}
+
+export interface DesktopDeferredFeatureBridge {
+  readonly workflows?: DesktopWorkflowBridge;
+  readonly executionRuns?: DesktopExecutionRunBridge;
   readonly workflowRunSummaries?: DesktopWorkflowRunSummaryBridge;
-  readonly modelFiles: DesktopModelFileBridge;
-  readonly canonicalAssets: DesktopCanonicalAssetBridge;
+  readonly modelFiles?: DesktopModelFileBridge;
+  readonly canonicalAssets?: DesktopCanonicalAssetBridge;
   readonly agents?: DesktopAgentAuthoringBridge;
   readonly studioShell?: DesktopStudioShellBridge;
   readonly registry?: DesktopRegistryBridge;
+}
+
+export interface DesktopBridge {
+  readonly auth: DesktopAuthBootstrapBridge;
+  readonly features: DesktopDeferredFeatureBridge;
+
+  // Legacy root aliases kept for compatibility while renderer code adopts auth/features split.
+  readonly bootstrap: DesktopBootstrapContext;
+  readonly storage: DesktopKeyValueStorageBridge;
+  readonly secrets?: DesktopMcpSecretBridge;
+  readonly runtime?: DesktopRuntimeBootstrapBridge;
+  readonly workflows?: DesktopWorkflowBridge;
+  readonly executionRuns?: DesktopExecutionRunBridge;
+  readonly workflowRunSummaries?: DesktopWorkflowRunSummaryBridge;
+  readonly modelFiles?: DesktopModelFileBridge;
+  readonly canonicalAssets?: DesktopCanonicalAssetBridge;
+  readonly agents?: DesktopAgentAuthoringBridge;
+  readonly studioShell?: DesktopStudioShellBridge;
+  readonly registry?: DesktopRegistryBridge;
+  readonly connectivity?: DesktopConnectivityBridge;
 }

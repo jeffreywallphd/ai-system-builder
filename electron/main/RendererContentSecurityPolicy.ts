@@ -1,3 +1,6 @@
+/**
+ * Generates renderer content security policy directives from desktop runtime configuration and hardening defaults.
+ */
 import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 
 const SELF_SOURCE = "'self'";
@@ -6,6 +9,11 @@ const UNSAFE_INLINE_SOURCE = "'unsafe-inline'";
 interface RendererContentSecurityPolicyOptions {
   readonly rendererDevUrl: string;
   readonly runtimeConfig?: AppRuntimeConfigValues;
+}
+
+interface RendererContentSecurityPolicyResolverOptions {
+  readonly rendererDevUrl: string;
+  readonly getRuntimeConfig: () => AppRuntimeConfigValues | undefined;
 }
 
 function normalizeOrigin(input: string | undefined): string | undefined {
@@ -61,6 +69,15 @@ function resolveHttpOrigins(options: RendererContentSecurityPolicyOptions): Read
   const serviceSupervisorOrigin = normalizeOrigin(runtimeConfig.serviceSupervisorBaseUrl);
   if (serviceSupervisorOrigin) {
     origins.add(serviceSupervisorOrigin);
+  } else if (runtimeConfig.hostKind === "desktop") {
+    origins.add("http://127.0.0.1:8790");
+  }
+
+  const pythonRuntimeOrigin = normalizeOrigin(runtimeConfig.pythonRuntimeBaseUrl);
+  if (pythonRuntimeOrigin) {
+    origins.add(pythonRuntimeOrigin);
+  } else if (runtimeConfig.hostKind === "desktop") {
+    origins.add("http://127.0.0.1:8100");
   }
 
   return [...origins];
@@ -97,4 +114,13 @@ export function createRendererContentSecurityPolicy(options: RendererContentSecu
     `base-uri ${SELF_SOURCE}`,
     "frame-ancestors 'none'",
   ].join("; ");
+}
+
+export function createRendererContentSecurityPolicyResolver(
+  options: RendererContentSecurityPolicyResolverOptions,
+): () => string {
+  return () => createRendererContentSecurityPolicy({
+    rendererDevUrl: options.rendererDevUrl,
+    runtimeConfig: options.getRuntimeConfig(),
+  });
 }

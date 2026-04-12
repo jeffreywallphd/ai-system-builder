@@ -5,5 +5,5 @@ export function resolveDesktopWorkflowRunSummaryBridge(): DesktopWorkflowRunSumm
     return undefined;
   }
 
-  return window.aiLoomDesktop?.workflowRunSummaries;
+  return window.aiLoomDesktop?.features?.workflowRunSummaries ?? window.aiLoomDesktop?.workflowRunSummaries;
 }

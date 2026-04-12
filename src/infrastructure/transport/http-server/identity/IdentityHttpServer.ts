@@ -1,4 +1,4 @@
-﻿import {
+import {
   createServer as createHttpServer,
   type IncomingMessage,
   type RequestListener,
@@ -12,18 +12,28 @@ import { URL } from "node:url";
 import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
 import type { AuthorizationManagementBackendApi } from "../../../api/authorization/AuthorizationManagementBackendApi";
+import type { AuditLedgerBackendApi } from "../../../api/audit/AuditLedgerBackendApi";
 import type { NodeTrustBackendApi } from "../../../api/nodes/NodeTrustBackendApi";
+import type { ExecutionNodeManagementBackendApi } from "../../../api/nodes/ExecutionNodeManagementBackendApi";
 import type { CertificateOperationsBackendApi } from "../../../api/security/CertificateOperationsBackendApi";
 import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetadataBackendApi";
 import type { StorageManagementBackendApi } from "../../../api/storage/StorageManagementBackendApi";
 import type { AssetManagementBackendApi } from "../../../api/assets/AssetManagementBackendApi";
+import type { ImageAssetManagementBackendApi } from "../../../api/image-assets/ImageAssetManagementBackendApi";
+import type { GeneratedResultManagementBackendApi } from "../../../api/generated-results/GeneratedResultManagementBackendApi";
+import type { DeploymentPolicyReadBackendApi } from "../../../api/deployment/DeploymentPolicyReadBackendApi";
+import type { DeploymentPolicyWriteBackendApi } from "../../../api/deployment/DeploymentPolicyWriteBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
+import type { SystemRuntimeBackendApi } from "../../../api/system-runtime/SystemRuntimeBackendApi";
+import type { AuthoritativeRunSubmissionBackendApi } from "../../../api/runs/AuthoritativeRunSubmissionBackendApi";
+import type { AuthoritativeRunQueryBackendApi } from "../../../api/runs/AuthoritativeRunQueryBackendApi";
+import type { AuthoritativeRunMutationBackendApi } from "../../../api/runs/AuthoritativeRunMutationBackendApi";
+import type { AuthoritativeRunExecutionUpdateBackendApi } from "../../../api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import {
   ChangeLocalPasswordCredentialVerificationModes,
   IdentityAuthApiErrorCodes,
   type ChangeLocalPasswordCredentialApiRequest,
-  type AuthenticatedIdentityPrincipalApiResponse,
   type GetIdentityAdminAccountStatusApiRequest,
   type GetIdentityAdminAccountStatusApiResponse,
   type ListTrustedDevicesApiRequest,
@@ -57,6 +67,10 @@ import {
   type AuthorizationManagementApiResponse,
 } from "../../../api/authorization/sdk/PublicAuthorizationManagementApiContract";
 import {
+  AuditLedgerApiErrorCodes,
+  type AuditLedgerApiResponse,
+} from "../../../api/audit/sdk/PublicAuditLedgerApiContract";
+import {
   WorkspaceInvitationApiErrorCodes,
   type AcceptWorkspaceInvitationOnboardingApiRequest,
   type IssueWorkspaceInvitationApiRequest,
@@ -80,6 +94,16 @@ import {
   type RejectNodeEnrollmentApiRequest,
   type RevokeNodeTrustApiRequest,
 } from "../../../api/nodes/sdk/PublicNodeTrustApiContract";
+import {
+  ExecutionNodeManagementApiErrorCodes,
+  type ExecutionNodeBackendAvailabilityReadApiRequest,
+  type ExecutionNodeManagementApiResponse,
+  type ExecutionNodeEligibilityCheckApiRequest,
+  type ExecutionNodeGetApiRequest,
+  type ExecutionNodeListApiRequest,
+  type ExecutionNodeReadinessCheckApiRequest,
+  type ExecutionNodeSetAvailabilityOverrideApiRequest,
+} from "../../../api/nodes/sdk/PublicExecutionNodeManagementApiContract";
 import {
   CertificateOperationsApiErrorCodes,
   type CertificateOperationsApiResponse,
@@ -113,6 +137,50 @@ import {
   type RegisterGeneratedOutputApiRequest,
   type ResolveAssetPreviewApiRequest,
 } from "../../../api/assets/sdk/PublicAssetManagementApiContract";
+import {
+  ImageAssetManagementApiErrorCodes,
+  type CompleteImageAssetUploadApiRequest,
+  type CreateImageAssetApiRequest,
+  type GetImageAssetMetadataApiRequest,
+  type ImageAssetManagementApiResponse,
+  type IngestImageAssetUploadContentApiRequest,
+  type ListImageAssetMetadataApiRequest,
+  type OpenImageAssetPreviewContentStreamApiRequest,
+  type OpenImageAssetOriginalContentStreamApiRequest,
+  type RequestImageAssetPreviewApiRequest,
+} from "../../../api/image-assets/sdk/PublicImageAssetManagementApiContract";
+import {
+  GeneratedResultManagementApiErrorCodes,
+  type GeneratedResultManagementApiResponse,
+  type GetGeneratedResultLineageDetailApiRequest,
+  type GetGeneratedResultLineageSummaryApiRequest,
+  type GetGeneratedResultApiRequest,
+  type ListGeneratedResultsApiRequest,
+  type ListGeneratedResultsByRunApiRequest,
+  type OpenGeneratedResultPreviewContentStreamApiRequest,
+  type OpenGeneratedResultOriginalContentStreamApiRequest,
+  type RequestGeneratedResultPreviewApiRequest,
+} from "../../../api/generated-results/sdk/PublicGeneratedResultManagementApiContract";
+import {
+  RuntimeQueueItemStatuses,
+  SystemRuntimeTransportRoutes,
+} from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import { DeploymentPolicyReadTransportRoutes } from "@shared/contracts/deployment/DeploymentPolicyReadContracts";
+import { DeploymentPolicyWriteTransportRoutes } from "@shared/contracts/deployment/DeploymentPolicyWriteContracts";
+import {
+  RunOrchestrationTransportRoutes,
+  resolveRunLifecycleState,
+  resolveRunSubmissionSource,
+} from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import { ImageRunApiRoutes } from "@shared/contracts/image-workflows/ImageRunApiContracts";
+import {
+  RuntimeRealtimeSubscriptionModes,
+  RuntimeRealtimeTopics,
+  RuntimeRealtimeWebSocketActions,
+  RuntimeRealtimeWebSocketMessageTypes,
+  type RuntimeRealtimeSubscriptionRequest,
+  type RuntimeRealtimeSubscriptionTopic,
+} from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
 import {
   StorageManagementApiErrorCodes,
   type ActivateStorageInstanceApiRequest,
@@ -159,6 +227,16 @@ import {
   type RejectNodeEnrollmentActionRequestDtoPayload,
   type RevokeNodeTrustActionRequestDtoPayload,
 } from "@shared/schemas/nodes/NodeTrustApiSchemaContracts";
+import { ExecutionNodeManagementTransportRoutes } from "@shared/contracts/nodes/ExecutionNodeManagementApiContracts";
+import {
+  ExecutionNodeManagementApiSchemaValidationError,
+  parseExecutionNodeBackendAvailabilityReadRequestDto,
+  parseExecutionNodeEligibilityCheckRequestDto,
+  parseExecutionNodeListRequestDto,
+  parseExecutionNodeReadinessCheckRequestDto,
+  parseExecutionNodeSetAvailabilityOverrideRequestDto,
+  type ExecutionNodeSetAvailabilityOverrideRequestDtoPayload,
+} from "@shared/schemas/nodes/ExecutionNodeManagementApiSchemaContracts";
 import {
   CreateSecretMetadataCommandSchema,
   DisableSecretMetadataCommandSchema,
@@ -177,6 +255,44 @@ import {
   type CreateStorageInstanceRequestDtoPayload,
   type UpdateStorageInstanceRequestDtoPayload,
 } from "@shared/schemas/storage/StorageTransportSchemaContracts";
+import { DeploymentPolicyPersistenceScopeKinds } from "@shared/dto/deployment/DeploymentPolicyAdministrationPersistenceDtos";
+import { parseReadDeploymentPolicyStateRequest } from "@shared/schemas/deployment/DeploymentPolicyReadSchemaContracts";
+import {
+  parseApplyDeploymentPolicyOverrideOperationsRequest,
+  parseUpdateDeploymentPolicyActiveProfileRequest,
+} from "@shared/schemas/deployment/DeploymentPolicyWriteSchemaContracts";
+import {
+  SharedApiQuerySchemaValidationError,
+  parseSharedApiListQueryConventions,
+} from "@shared/schemas/api/SharedApiQuerySchemaContracts";
+import {
+  AuditEventSchemaValidationError,
+  parseAuditEventListQueryFromSearchParams,
+} from "@shared/schemas/audit/AuditEventSchemaContracts";
+import {
+  SystemRuntimeTransportSchemaValidationError,
+  parseRuntimeCancelRunRequest,
+  parseRuntimeDequeueRequest,
+  parseRuntimeStartRunRequest,
+} from "@shared/schemas/runtime/SystemRuntimeTransportSchemaContracts";
+import {
+  RunOrchestrationTransportSchemaValidationError,
+  parseSchedulingAdminListStaleReservationsRequest,
+  parseSchedulingAdminReleaseStaleReservationRequest,
+  parseSchedulingAdminReevaluateDeferredRunsRequest,
+  parseRunCancellationRequest,
+  parseExecutionReadinessReadRequest,
+  parseRunLifecycleUpdateRequest,
+  parseRunListReadRequest,
+  parseRunQueueStatusReadRequest,
+  parseRunRetryRequest,
+  parseRunSubmissionRequest,
+} from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
+import {
+  RuntimeRealtimeSchemaValidationError,
+  parseRuntimeRealtimeWebSocketSubscribeMessage,
+  parseRuntimeRealtimeWebSocketSubscriptionAckMessage,
+} from "@shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts";
 import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
 import { TransportConnectionDirections } from "@application/security/ports/TransportTrustValidationPorts";
 import {
@@ -216,12 +332,114 @@ import {
   evaluateThinClientWebSocketOriginPolicy,
   type ThinClientSessionChannelContextDto,
 } from "@shared/contracts/security/ThinClientTransportContracts";
+import {
+  mapAssetManagementApiStatusCode as mapAssetManagementStatusCode,
+  mapAuditLedgerApiStatusCode as mapAuditLedgerStatusCode,
+  mapAuthorizationManagementApiStatusCode as mapAuthorizationManagementStatusCode,
+  mapCertificateOperationsApiStatusCode as mapCertificateOperationsStatusCode,
+  mapExecutionNodeManagementApiStatusCode as mapExecutionNodeManagementStatusCode,
+  mapGeneratedResultManagementApiStatusCode as mapGeneratedResultManagementStatusCode,
+  mapIdentityAuthApiStatusCode as mapStatusCode,
+  mapImageAssetManagementApiStatusCode as mapImageAssetManagementStatusCode,
+  mapNodeTrustApiStatusCode as mapNodeTrustStatusCode,
+  mapRunSubmissionApiStatusCode as mapRunSubmissionStatusCode,
+  mapSecretMetadataApiStatusCode as mapSecretMetadataStatusCode,
+  mapStorageManagementApiStatusCode as mapStorageManagementStatusCode,
+  mapSystemRuntimeApiStatusCode as mapSystemRuntimeStatusCode,
+  mapWorkspaceAdministrationApiStatusCode as mapWorkspaceAdministrationStatusCode,
+  mapWorkspaceInvitationApiStatusCode as mapWorkspaceStatusCode,
+  normalizeSharedApiErrorEnvelope,
+} from "./IdentityHttpServerErrorTranslation";
+import type {
+  ResolveSessionActorContextApiResponse,
+  ResolveSessionActorWorkspaceContextApiRecord,
+} from "@shared/contracts/identity/IdentityTransportContracts";
+import {
+  AuthoritativeApiRouteBackendKeys,
+  type AuthoritativeApiRouteBackendKey,
+  type AuthoritativeApiRouteFamilyRegistration,
+  type AuthoritativeApiRouteRegistrationPlan,
+} from "../AuthoritativeApiRouteRegistration";
+import { composeAuthoritativeApiRouteRegistrationPlan } from "../AuthoritativeApiRouteRegistrationCatalog";
+import { composeIdentityHttpTransport } from "./composition/IdentityHttpTransportComposition";
+import { installIdentityHttpUpgradeBoundary } from "./composition/IdentityHttpUpgradeBoundary";
+import { createAuditLedgerRouteFamilyHandler } from "./route-families/AuditRouteFamilyHandler";
+import { createAuthorizationRouteFamilyHandler } from "./route-families/AuthorizationRouteFamilyHandler";
+import { createExecutionNodeManagementRouteFamilyHandler } from "./route-families/ExecutionNodeManagementRouteFamilyHandler";
+import { createIdentityAndTrustedDeviceRouteFamilyHandler } from "./route-families/IdentityAndTrustedDeviceRouteFamilyHandler";
+import { createDeploymentPolicyRouteFamilyHandler } from "./route-families/DeploymentPolicyRouteFamilyHandler";
+import { createSecretMetadataRouteFamilyHandler } from "./route-families/SecretMetadataRouteFamilyHandler";
+import { createCertificateOperationsRouteFamilyHandler } from "./route-families/CertificateOperationsRouteFamilyHandler";
+import { createNodeTrustRouteFamilyHandler } from "./route-families/NodeTrustRouteFamilyHandler";
+import {
+  createRunExecutionUpdateRouteFamilyHandler,
+  createRunMutationRouteFamilyHandler,
+  createRunReadRouteFamilyHandler,
+  createRunSubmissionRouteFamilyHandler,
+} from "./route-families/RunRouteFamilyHandlers";
+import { createWorkspaceRouteFamilyHandler } from "./route-families/WorkspaceRouteFamilyHandler";
+import { buildIdentityHttpRouteCompositionLogDetails } from "./middleware/request-observability";
+import {
+  CORRELATION_ID_HEADER,
+  REQUEST_ID_HEADER,
+  addCorrelationIdToErrorEnvelope,
+  normalizeResponseHeaderValue,
+  resolveRequestCorrelationId,
+  setResponseCorrelationHeaders,
+} from "./middleware/request-metadata";
+import {
+  buildAuthenticatedSessionActorContext,
+  extractBearerSessionToken,
+  normalizeSessionAssuranceLevel,
+  resolveAuthenticatedSessionFromRequest,
+  type AuthenticatedSessionActorContext,
+} from "./middleware/session-authentication";
+import {
+  authorizeSessionNodeRoutePrincipal,
+  buildSessionNodeRouteTransportContext,
+  resolveMutualTlsNodeRouteTransportContext,
+  resolveRequiredNodeRouteNodeId,
+} from "./middleware/node-route-authentication";
+import {
+  enforceTrustedSessionAssurance,
+  type SessionAssuranceRequirement,
+} from "./middleware/trusted-session-assurance";
+import {
+  resolveWorkspaceContextFromRequest,
+  type ResolveWorkspaceContextOptions,
+  type ResolvedWorkspaceRequestContext,
+} from "./middleware/workspace-context";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
+import {
+  normalizeRequestContentType,
+  parseJsonBody as parseJsonRequestBody,
+  resolveRequestSearchParams,
+  resolveRequestUrl,
+  toRequestBodyStream as toRequestBodyByteStream,
+} from "./primitives/HttpRequestPrimitives";
+import {
+  writeJsonResponse,
+  writeNoContentResponse,
+  writeResponseStream,
+} from "./primitives/HttpResponsePrimitives";
+import {
+  buildContentDispositionHeader as buildFileContentDispositionHeader,
+  sanitizeDownloadFileName as sanitizeDownloadFileNamePrimitive,
+} from "./primitives/HttpFileResponsePrimitives";
+import {
+  mergeOptionalStringLists,
+  normalizeOptionalString,
+  parseOptionalMultiEnumList,
+  parseOptionalStringList,
+  parseSharedListPaginationFromQuery,
+} from "./primitives/HttpQueryPrimitives";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 const DefaultWebSocketTrustRevalidationIntervalMs = 30_000;
 const DEFAULT_API_CORS_ALLOWED_METHODS = Object.freeze(["GET", "POST", "OPTIONS"]);
 const DEFAULT_API_CORS_ALLOWED_HEADERS = Object.freeze(["content-type", "authorization"]);
+const RuntimeRealtimeWebSocketSubprotocol = "ai-loom-runtime-realtime.v1";
+const RuntimeRealtimeWebSocketAuthSubprotocolPrefix = "ai-loom-auth-bearer.";
 const DEV_LOGIN_DEFAULT_PROVIDER_ID = "provider:local-password";
 const DEV_LOGIN_DEFAULT_USERNAME = "dev.local.user";
 const DEV_LOGIN_DEFAULT_PASSWORD = "DevOnlyPass!2026";
@@ -283,8 +501,18 @@ const LoginRequestSchema: z.ZodType<LoginLocalIdentityApiRequest> = z.object({
   }).strict(),
 }).strict();
 
+const DevLoginRequestSchema = z.object({
+  accessChannel: z.enum(["desktop", "thin-client"]).optional(),
+  sessionTrustRequirement: z.enum(["allow-untrusted", "allow-pairing", "require-trusted"]).optional(),
+  client: LoginRequestSchema.shape.client,
+}).strict();
+
 const RevokeSessionRequestSchema: z.ZodType<Pick<RevokeIdentitySessionApiRequest, "sessionId" | "reason">> = z.object({
   sessionId: z.string().min(1),
+  reason: z.enum(["logout", "security", "rotation", "admin"]).optional(),
+}).strict();
+
+const RevokeSessionByPathRequestSchema: z.ZodType<Pick<RevokeIdentitySessionApiRequest, "reason">> = z.object({
   reason: z.enum(["logout", "security", "rotation", "admin"]).optional(),
 }).strict();
 
@@ -294,6 +522,16 @@ const AdminAccountStatusValues = z.enum([
   "suspended",
   "locked",
   "deactivated",
+]);
+const IdentitySessionStatusValues = z.enum([
+  "active",
+  "rotated",
+  "expired",
+  "revoked",
+]);
+const IdentitySessionAccessChannelValues = z.enum([
+  "desktop",
+  "thin-client",
 ]);
 
 const SetAdminAccountStatusRequestSchema: z.ZodType<Pick<SetIdentityAdminAccountStatusApiRequest, "action" | "providerId">> = z.object({
@@ -733,6 +971,7 @@ const AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema = z.object({
 export interface IdentityHttpServerLogEvent {
   readonly event: string;
   readonly requestId: string;
+  readonly correlationId?: string;
   readonly method?: string;
   readonly path?: string;
   readonly statusCode?: number;
@@ -804,10 +1043,22 @@ export interface IdentityHttpServerOptions {
   readonly secretMetadataBackendApi?: SecretMetadataBackendApi;
   readonly storageManagementBackendApi?: StorageManagementBackendApi;
   readonly assetManagementBackendApi?: AssetManagementBackendApi;
+  readonly imageAssetManagementBackendApi?: ImageAssetManagementBackendApi;
+  readonly generatedResultManagementBackendApi?: GeneratedResultManagementBackendApi;
+  readonly auditLedgerBackendApi?: AuditLedgerBackendApi;
+  readonly systemRuntimeBackendApi?: SystemRuntimeBackendApi;
+  readonly authoritativeRunSubmissionBackendApi?: AuthoritativeRunSubmissionBackendApi;
+  readonly authoritativeRunQueryBackendApi?: AuthoritativeRunQueryBackendApi;
+  readonly authoritativeRunMutationBackendApi?: AuthoritativeRunMutationBackendApi;
+  readonly authoritativeRunExecutionUpdateBackendApi?: AuthoritativeRunExecutionUpdateBackendApi;
+  readonly deploymentPolicyReadBackendApi?: DeploymentPolicyReadBackendApi;
+  readonly deploymentPolicyWriteBackendApi?: DeploymentPolicyWriteBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
+  readonly executionNodeManagementBackendApi?: ExecutionNodeManagementBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
   readonly workspaceAdministrationBackendApi?: WorkspaceAdministrationBackendApi;
+  readonly sessionContextWorkspaceApi?: Pick<WorkspaceAdministrationBackendApi, "listWorkspaces">;
   readonly logger?: IdentityHttpServerLogger;
   readonly maxBodyBytes?: number;
   readonly serverFactory?: IdentityHttpServerFactory;
@@ -815,10 +1066,34 @@ export interface IdentityHttpServerOptions {
   readonly cors?: IdentityHttpServerCorsOptions;
   readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
   readonly webSocket?: IdentityHttpServerWebSocketOptions;
+  readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
+  readonly routeFamilyHandlers?: Readonly<Partial<Record<string, IdentityHttpRouteFamilyHandler>>>;
+  readonly observability?: {
+    onOperationalEvent?(event: IdentityHttpServerLogEvent): void;
+  };
   readonly development?: {
     readonly enableDevLoginRoute?: boolean;
   };
 }
+
+export interface IdentityHttpRouteFamilyHandlerContext {
+  readonly request: IncomingMessage;
+  readonly response: ServerResponse;
+  readonly requestId: string;
+  readonly correlationId: string;
+  readonly path: string;
+  readonly method: string | undefined;
+  readonly logger: IdentityHttpServerLogger;
+  readonly routeFamily: AuthoritativeApiRouteFamilyRegistration;
+}
+
+export interface IdentityHttpRouteFamilyHandlerResult {
+  readonly handled: boolean;
+}
+
+export type IdentityHttpRouteFamilyHandler = (
+  context: IdentityHttpRouteFamilyHandlerContext,
+) => IdentityHttpRouteFamilyHandlerResult | Promise<IdentityHttpRouteFamilyHandlerResult> | void | Promise<void>;
 
 export type IdentityHttpServerInstance = Server | HttpsServer;
 export type IdentityHttpServerFactory = (requestListener: RequestListener) => IdentityHttpServerInstance;
@@ -836,26 +1111,33 @@ interface InboundHttpTransportConnectionState {
   readonly loopbackRequest: boolean;
 }
 
-interface AuthenticatedRequestContext {
-  readonly principal: AuthenticatedIdentityPrincipalApiResponse;
-  readonly session: ResolveAuthenticatedSessionApiResponse["session"];
-  readonly sessionToken: string;
-  readonly sessionTrust: {
-    readonly assuranceLevel: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
-    readonly isTrusted: boolean;
-  };
-  readonly transport: {
-    readonly connection: InboundHttpTransportConnectionState;
-    readonly channel: {
-      readonly accessChannel: "desktop" | "thin-client";
-      readonly thinClient?: ThinClientSessionChannelContextDto;
-    };
-    readonly trustValidation: {
-      readonly enforced: boolean;
-      readonly scenario: TransportSecurityScenario;
-      readonly actorType: TransportConnectionActorType;
-      readonly remotePeerType: TransportPeerType;
-    };
+interface AuthenticatedRequestContext extends AuthenticatedSessionActorContext<
+  InboundHttpTransportConnectionState,
+  {
+    readonly accessChannel: "desktop" | "thin-client";
+    readonly thinClient?: ThinClientSessionChannelContextDto;
+  },
+  {
+    readonly enforced: boolean;
+    readonly scenario: TransportSecurityScenario;
+    readonly actorType: TransportConnectionActorType;
+    readonly remotePeerType: TransportPeerType;
+  }
+> {
+  readonly workspace?: ResolvedWorkspaceRequestContext;
+}
+
+interface AuthenticatedWorkspaceRequestContext extends AuthenticatedRequestContext {
+  readonly workspace: ResolvedWorkspaceRequestContext;
+}
+
+interface RequireAuthenticatedWorkspaceSessionOptions extends ResolveWorkspaceContextOptions {
+  readonly sessionOptions?: {
+    readonly sessionAssuranceRequirement?: SessionAssuranceRequirement;
+    readonly transportScenario?: TransportSecurityScenario;
+    readonly transportActorType?: TransportConnectionActorType;
+    readonly transportRemotePeerType?: TransportPeerType;
+    readonly nodeId?: string;
   };
 }
 
@@ -886,22 +1168,1973 @@ interface WebSocketUpgradeDeniedReason {
 }
 
 export function createIdentityHttpServer(options: IdentityHttpServerOptions): IdentityHttpServerInstance {
-  const logger = options.logger ?? new ConsoleIdentityHttpServerLogger();
+  const logger = createObservedIdentityHttpServerLogger(
+    options.logger ?? new ConsoleIdentityHttpServerLogger(),
+    options.observability?.onOperationalEvent,
+  );
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const serverFactory = options.serverFactory ?? ((requestListener: RequestListener) => createHttpServer(requestListener));
   const channelRegistry = options.webSocket?.channelRegistry ?? new InMemoryWebSocketChannelRegistry();
   const corsPolicy = resolveApiCorsPolicy(options.cors);
+  const routeRegistrationPlan = options.routeRegistrationPlan ?? composeAuthoritativeApiRouteRegistrationPlan({
+    backendAvailability: resolveRouteBackendAvailability(options),
+  });
+  const transportComposition = composeIdentityHttpTransport({
+    routeRegistrationPlan,
+    serverFactory,
+  });
+  const routeCompositionLogDetails = buildIdentityHttpRouteCompositionLogDetails(
+    transportComposition.routeModuleRegistry.toSnapshot(),
+  );
+  const handleStorageManagementRouteFamily = async ({
+    request,
+    response,
+    requestId,
+    logger,
+    path,
+    method,
+  }: IdentityHttpRouteFamilyHandlerContext): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+    if (!options.storageManagementBackendApi) {
+      return Object.freeze({ handled: false });
+    }
 
-  const server = serverFactory(async (request, response) => {
+    const searchParams = resolveRequestSearchParams(request.url);
+
+    if (method === "POST" && path === "/api/v1/storage/instances") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = await parseAndValidateStorageCreateRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const apiResponse = await options.storageManagementBackendApi!.createStorageInstance(parsedRequest.data);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path === "/api/v1/storage/instances") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parseArrayEnum = <TValue extends string>(
+            key: string,
+            values: ReadonlyArray<string>,
+            schema: z.ZodType<ReadonlyArray<TValue>>,
+          ): { readonly ok: true; readonly data: ReadonlyArray<TValue> } | { readonly ok: false } => {
+            const validation = schema.safeParse(values);
+            if (validation.success) {
+              return { ok: true, data: validation.data };
+            }
+            const invalid = buildStorageManagementQueryValidationError(key, `${key} values are invalid.`);
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return { ok: false };
+          };
+
+          const backendTypesValidation = parseArrayEnum("backendType", searchParams.getAll("backendType"), z.array(StorageBackendTypeValues));
+          if (!backendTypesValidation.ok) {
+            return;
+          }
+          const lifecycleStatesValidation = parseArrayEnum("lifecycleState", searchParams.getAll("lifecycleState"), z.array(StorageLifecycleStateValues));
+          if (!lifecycleStatesValidation.ok) {
+            return;
+          }
+          const accessModesValidation = parseArrayEnum("accessMode", searchParams.getAll("accessMode"), z.array(StorageAccessModeValues));
+          if (!accessModesValidation.ok) {
+            return;
+          }
+          const accessScopesValidation = parseArrayEnum("accessScope", searchParams.getAll("accessScope"), z.array(StorageAccessScopeValues));
+          if (!accessScopesValidation.ok) {
+            return;
+          }
+
+          const listRequestDto = {
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            backendTypes: backendTypesValidation.data.length > 0 ? backendTypesValidation.data : undefined,
+            lifecycleStates: lifecycleStatesValidation.data.length > 0 ? lifecycleStatesValidation.data : undefined,
+            accessModes: accessModesValidation.data.length > 0 ? accessModesValidation.data : undefined,
+            accessScopes: accessScopesValidation.data.length > 0 ? accessScopesValidation.data : undefined,
+            limit: parseOptionalInteger(searchParams.get("limit")),
+            offset: parseOptionalInteger(searchParams.get("offset")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          };
+
+          try {
+            parseListStorageInstancesRequestDto(listRequestDto);
+          } catch (error) {
+            if (error instanceof StorageTransportSchemaValidationError) {
+              const invalid = buildStorageManagementValidationErrors(error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({ query: Object.fromEntries(searchParams.entries()) }), invalid);
+              return;
+            }
+            throw error;
+          }
+
+          const listRequest: ListStorageInstancesApiRequest = Object.freeze({
+            ...listRequestDto,
+            includeCapabilities: parseOptionalBoolean(searchParams.get("includeCapabilities")),
+          });
+          const apiResponse = await options.storageManagementBackendApi!.listStorageInstances(listRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            query: Object.fromEntries(searchParams.entries()),
+          }), apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/storage/instances/") && path.endsWith("/health")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/health");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const healthRequest: GetStorageInstanceHealthApiRequest = {
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            storageInstanceId,
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          };
+          try {
+            parseGetStorageInstanceDetailRequestDto(healthRequest);
+          } catch (error) {
+            if (error instanceof StorageTransportSchemaValidationError) {
+              const invalid = buildStorageManagementValidationErrors(error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, healthRequest, invalid);
+              return;
+            }
+            throw error;
+          }
+
+          const apiResponse = await options.storageManagementBackendApi!.getStorageInstanceHealth(healthRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, healthRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "PATCH" && path.startsWith("/api/v1/storage/instances/") && path.endsWith("/metadata")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/metadata");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const parsedRequest = await parseAndValidateStorageMetadataUpdateRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            storageInstanceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const apiResponse = await options.storageManagementBackendApi!.updateStorageMetadata(parsedRequest.data);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/storage/instances/") && path.endsWith("/activate")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/activate");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const parsedRequest = await parseAndValidateStorageLifecycleRequest(
+            request,
+            ActivateStorageInstanceRequestSchema,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const activateRequest: ActivateStorageInstanceApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            storageInstanceId,
+            ...parsedRequest.data,
+          });
+          const apiResponse = await options.storageManagementBackendApi!.activateStorageInstance(activateRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, activateRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/storage/instances/") && path.endsWith("/deactivate")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/deactivate");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const parsedRequest = await parseAndValidateStorageLifecycleRequest(
+            request,
+            DeactivateStorageInstanceRequestSchema,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const deactivateRequest: DeactivateStorageInstanceApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            storageInstanceId,
+            ...parsedRequest.data,
+          });
+          const apiResponse = await options.storageManagementBackendApi!.deactivateStorageInstance(deactivateRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, deactivateRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/storage/instances/")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+          buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/");
+          if (!storageInstanceId) {
+            const invalid = buildStorageManagementInvalidRequestResponse(
+              "workspaceId and storageInstanceId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const detailRequestDto = {
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            storageInstanceId,
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          };
+          try {
+            parseGetStorageInstanceDetailRequestDto(detailRequestDto);
+          } catch (error) {
+            if (error instanceof StorageTransportSchemaValidationError) {
+              const invalid = buildStorageManagementValidationErrors(error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, detailRequestDto, invalid);
+              return;
+            }
+            throw error;
+          }
+
+          const detailRequest: GetStorageInstanceDetailApiRequest = Object.freeze({
+            ...detailRequestDto,
+            includeCapabilities: parseOptionalBoolean(searchParams.get("includeCapabilities")),
+          });
+          const apiResponse = await options.storageManagementBackendApi!.getStorageInstanceDetail(detailRequest);
+          const statusCode = mapStorageManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    return Object.freeze({ handled: false });
+  };
+  const handleGeneratedResultRouteFamily = async ({
+    request,
+    response,
+    requestId,
+    logger,
+    path,
+    method,
+  }: IdentityHttpRouteFamilyHandlerContext): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+    if (!options.generatedResultManagementBackendApi) {
+      return Object.freeze({ handled: false });
+    }
+
+    const searchParams = resolveRequestSearchParams(request.url);
+
+    if (method === "GET" && path.startsWith("/api/v1/image-runs/") && path.endsWith("/generated-results")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and runId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const runId = decodePathTail(path, "/api/v1/image-runs/", "/generated-results");
+          if (!runId || runId.includes("/")) {
+            const invalid = buildGeneratedResultManagementInvalidRequestResponse("workspaceId and runId are required.");
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+          const listRequest: ListGeneratedResultsByRunApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            runId,
+            limit: parseOptionalInteger(searchParams.get("limit")),
+            offset: parseOptionalInteger(searchParams.get("offset")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.listGeneratedResultsByRun(listRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path === "/api/v1/generated-results") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const listRequest: ListGeneratedResultsApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            ownerUserIds: parseOptionalMultiStringList(searchParams, "ownerUserId", "ownerUserIds"),
+            runId: normalizeOptionalString(searchParams.get("runId")),
+            systemId: normalizeOptionalString(searchParams.get("systemId")),
+            workflowId: normalizeOptionalString(searchParams.get("workflowId")),
+            workflowTemplateId: normalizeOptionalString(searchParams.get("workflowTemplateId")),
+            executionNodeId: normalizeOptionalString(searchParams.get("executionNodeId")),
+            statuses: parseOptionalMultiStringList(searchParams, "status", "statuses"),
+            visibilities: parseOptionalMultiStringList(searchParams, "visibility", "visibilities"),
+            mediaTypes: parseOptionalMultiStringList(searchParams, "mediaType", "mediaTypes"),
+            createdAfter: normalizeOptionalString(searchParams.get("createdAfter")),
+            createdBefore: normalizeOptionalString(searchParams.get("createdBefore")),
+            updatedAfter: normalizeOptionalString(searchParams.get("updatedAfter")),
+            updatedBefore: normalizeOptionalString(searchParams.get("updatedBefore")),
+            previewStates: parseOptionalMultiStringList(searchParams, "previewState", "previewStates"),
+            hasPreview: parseOptionalBoolean(searchParams.get("hasPreview")),
+            lineageInputAssetIds: parseOptionalMultiStringList(searchParams, "lineageInputAssetId", "lineageInputAssetIds"),
+            requiredInputPurposes: parseOptionalMultiStringList(searchParams, "requiredInputPurpose", "requiredInputPurposes"),
+            requiredAssetClasses: parseOptionalMultiStringList(searchParams, "requiredAssetClass", "requiredAssetClasses"),
+            requiredMediaClasses: parseOptionalMultiStringList(searchParams, "requiredMediaClass", "requiredMediaClasses"),
+            reuseReadyOnly: parseOptionalBoolean(searchParams.get("reuseReadyOnly")),
+            includeArchived: parseOptionalBoolean(searchParams.get("includeArchived")),
+            limit: parseOptionalInteger(searchParams.get("limit")),
+            offset: parseOptionalInteger(searchParams.get("offset")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+
+          const apiResponse = await options.generatedResultManagementBackendApi!.listGeneratedResults(listRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/preview/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, resultAssetId, and previewToken are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/preview/content");
+          const previewToken = normalizeOptionalString(searchParams.get("previewToken"));
+          if (!resultAssetId || resultAssetId.includes("/") || !previewToken) {
+            const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+              "workspaceId, resultAssetId, and previewToken are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+
+          const streamRequest: OpenGeneratedResultPreviewContentStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            previewToken,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.openGeneratedResultPreviewContentStream(
+            streamRequest,
+          );
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
+            return;
+          }
+
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/original")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/original");
+          if (!resultAssetId || resultAssetId.includes("/")) {
+            const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+              "workspaceId and resultAssetId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+          const streamRequest: OpenGeneratedResultOriginalContentStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.openGeneratedResultOriginalContentStream(
+            streamRequest,
+          );
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
+            return;
+          }
+
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/preview")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/preview");
+          if (!resultAssetId || resultAssetId.includes("/")) {
+            const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+              "workspaceId and resultAssetId are required.",
+            );
+            writeJson(response, 400, invalid);
+            logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+            return;
+          }
+          const previewRequest: RequestGeneratedResultPreviewApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            preferredPreviewKind: normalizeOptionalString(searchParams.get("preferredPreviewKind")),
+            preferredMediaType: normalizeOptionalString(searchParams.get("preferredMediaType")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.requestGeneratedResultPreview(previewRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, previewRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/lineage/summary")) {
+      const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/lineage/summary");
+      if (!resultAssetId || resultAssetId.includes("/")) {
+        return Object.freeze({ handled: false });
+      }
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const summaryRequest: GetGeneratedResultLineageSummaryApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.getGeneratedResultLineageSummary(summaryRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, summaryRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/generated-results/") && path.endsWith("/lineage")) {
+      const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/lineage");
+      if (!resultAssetId || resultAssetId.includes("/")) {
+        return Object.freeze({ handled: false });
+      }
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const detailRequest: GetGeneratedResultLineageDetailApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.getGeneratedResultLineageDetail(detailRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (
+      method === "GET"
+      && path.startsWith("/api/v1/generated-results/")
+      && !path.endsWith("/lineage/summary")
+      && !path.endsWith("/lineage")
+      && !path.endsWith("/preview/content")
+      && !path.endsWith("/preview")
+      && !path.endsWith("/original")
+    ) {
+      const resultAssetId = decodePathTail(path, "/api/v1/generated-results/");
+      if (!resultAssetId || resultAssetId.includes("/")) {
+        return Object.freeze({ handled: false });
+      }
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+          buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const getRequest: GetGeneratedResultApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            resultAssetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.generatedResultManagementBackendApi!.getGeneratedResult(getRequest);
+          const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, getRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    return Object.freeze({ handled: false });
+  };
+  const handleAssetRouteFamily = async ({
+    request,
+    response,
+    requestId,
+    logger,
+    path,
+    method,
+  }: IdentityHttpRouteFamilyHandlerContext): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+    if (!options.assetManagementBackendApi) {
+      return Object.freeze({ handled: false });
+    }
+    const searchParams = resolveRequestSearchParams(request.url);
+
+    if (method === "GET" && path === "/api/v1/assets") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = parseAndValidateAssetListRequest(
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            searchParams,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.listAssets(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path === "/api/v1/assets/register") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = await parseAndValidateAssetRegisterRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.registerAsset(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path === "/api/v1/assets/generated-outputs/register") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = await parseAndValidateGeneratedOutputRegisterRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.registerGeneratedOutput(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/") && path.endsWith("/uploads/initiate")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/uploads/initiate");
+          if (!assetId) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = await parseAndValidateAssetUploadInitiationRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            assetId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.initiateAssetUpload(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/upload-sessions/") && path.endsWith("/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and uploadSessionId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const uploadSessionId = decodePathTail(path, "/api/v1/assets/upload-sessions/", "/content");
+          if (!uploadSessionId) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and uploadSessionId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = parseAssetUploadContentRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            uploadSessionId,
+          );
+          const apiResponse = await options.assetManagementBackendApi!.ingestAssetUploadContent(parsedRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/") && path.endsWith("/downloads/authorize")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/downloads/authorize");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = await parseAndValidateAssetDownloadAuthorizationRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            assetId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.authorizeAssetDownload(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/assets/") && path.endsWith("/downloads/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, assetId, and contentToken are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/downloads/content");
+          const contentToken = normalizeOptionalString(searchParams.get("contentToken"));
+          if (!assetId || assetId.includes("/") || !contentToken) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId, assetId, and contentToken are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const streamRequest: OpenAuthorizedAssetDownloadStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            contentToken,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.assetManagementBackendApi!.openAuthorizedAssetDownloadStream(streamRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            return;
+          }
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/assets/") && path.endsWith("/preview")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/preview");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = parseAndValidateAssetPreviewRequest(
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            assetId,
+            searchParams,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.assetManagementBackendApi!.resolveAssetPreview(parsedRequest.data);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/assets/")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const detailRequest: GetAssetDetailApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+          });
+          const apiResponse = await options.assetManagementBackendApi!.getAssetDetail(detailRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/") && path.endsWith("/archive")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/archive");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const archiveRequest: ArchiveAssetApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            operationKey: normalizeOptionalString(searchParams.get("operationKey")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.assetManagementBackendApi!.archiveAsset(archiveRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, archiveRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/assets/") && path.endsWith("/delete")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/assets/", "/delete");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const deleteRequest: DeleteAssetApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            operationKey: normalizeOptionalString(searchParams.get("operationKey")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.assetManagementBackendApi!.deleteAsset(deleteRequest);
+          const statusCode = mapAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, deleteRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    return Object.freeze({ handled: false });
+  };
+  const handleImageAssetRouteFamily = async ({
+    request,
+    response,
+    requestId,
+    logger,
+    path,
+    method,
+  }: IdentityHttpRouteFamilyHandlerContext): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+    if (!options.imageAssetManagementBackendApi) {
+      return Object.freeze({ handled: false });
+    }
+
+    const searchParams = resolveRequestSearchParams(request.url);
+
+    if (method === "POST" && path === "/api/v1/image-assets") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const parsedRequest = await parseAndValidateImageAssetCreateRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.imageAssetManagementBackendApi!.createImageAsset(parsedRequest.data);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path === "/api/v1/image-assets") {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId is required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const listRequest: ListImageAssetMetadataApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            ownerUserIds: mergeOptionalStringLists(
+              parseOptionalMultiStringList(searchParams, "ownerUserId", "ownerUserIds"),
+              parseOptionalMultiStringList(searchParams, "ownerUserIds", "ownerUserIds"),
+            ),
+            originKinds: parseOptionalMultiStringList(searchParams, "originKind", "originKinds"),
+            statuses: parseOptionalMultiStringList(searchParams, "status", "statuses"),
+            visibilities: parseOptionalMultiStringList(searchParams, "visibility", "visibilities"),
+            mediaTypes: parseOptionalMultiStringList(searchParams, "mediaType", "mediaTypes"),
+            storageInstanceIds: parseOptionalMultiStringList(searchParams, "storageInstanceId", "storageInstanceIds"),
+            includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+            limit: parseOptionalInteger(searchParams.get("limit")),
+            offset: parseOptionalInteger(searchParams.get("offset")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.listImageAssetMetadata(listRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, assetId, and uploadSessionId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const decoded = decodeImageAssetUploadSessionPath(path, "/content");
+          if (!decoded) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId, assetId, and uploadSessionId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const ingestRequest: IngestImageAssetUploadContentApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId: decoded.assetId,
+            uploadSessionId: decoded.uploadSessionId,
+            contentType: typeof request.headers["content-type"] === "string" ? request.headers["content-type"] : undefined,
+            content: toRequestBodyStream(request),
+            expectedSizeBytes: parseOptionalInteger(searchParams.get("expectedSizeBytes")),
+            expectedChecksumSha256: normalizeOptionalString(searchParams.get("expectedChecksumSha256")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.ingestImageAssetUploadContent(ingestRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, ingestRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "POST" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/complete")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, assetId, and uploadSessionId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const decoded = decodeImageAssetUploadSessionPath(path, "/complete");
+          if (!decoded) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId, assetId, and uploadSessionId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+
+          const parsedRequest = await parseAndValidateImageAssetCompleteRequest(
+            request,
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            decoded.assetId,
+            decoded.uploadSessionId,
+            requestId,
+            logger,
+            maxBodyBytes,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+
+          const apiResponse = await options.imageAssetManagementBackendApi!.completeImageAssetUpload(parsedRequest.data);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/preview/content")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId, assetId, and previewToken are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/image-assets/", "/preview/content");
+          const previewToken = normalizeOptionalString(searchParams.get("previewToken"));
+          if (!assetId || assetId.includes("/") || !previewToken) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId, assetId, and previewToken are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const streamRequest: OpenImageAssetPreviewContentStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            previewToken,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.openImageAssetPreviewContentStream(streamRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            return;
+          }
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/preview")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/image-assets/", "/preview");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const parsedRequest = parseAndValidateImageAssetPreviewRequest(
+            context.actor.userIdentityId,
+            context.workspace.workspaceId,
+            assetId,
+            searchParams,
+          );
+          if (!parsedRequest.ok) {
+            writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            return;
+          }
+          const apiResponse = await options.imageAssetManagementBackendApi!.requestImageAssetPreview(parsedRequest.data);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/image-assets/") && path.endsWith("/original")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/image-assets/", "/original");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const streamRequest: OpenImageAssetOriginalContentStreamApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.openImageAssetOriginalContentStream(streamRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          if (!apiResponse.ok || !apiResponse.data) {
+            writeJson(response, statusCode, apiResponse);
+            return;
+          }
+          const contentDisposition = buildContentDispositionHeader(
+            apiResponse.data.contentDisposition,
+            apiResponse.data.contentDispositionFileName,
+          );
+          response.statusCode = 200;
+          response.setHeader("content-type", apiResponse.data.mimeType);
+          response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+          response.setHeader("content-disposition", contentDisposition);
+          response.setHeader("x-content-type-options", "nosniff");
+          response.setHeader("cache-control", "private, no-store");
+          await writeResponseStream(response, apiResponse.data.stream);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    if (method === "GET" && path.startsWith("/api/v1/image-assets/")) {
+      await requireAuthenticatedWorkspaceSession(
+        request,
+        response,
+        requestId,
+        options.backendApi,
+        logger,
+        options.transportTrust,
+        {
+          missingWorkspaceMessage: "workspaceId and assetId are required.",
+          buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+        },
+        async (context) => {
+          const assetId = decodePathTail(path, "/api/v1/image-assets/");
+          if (!assetId || assetId.includes("/")) {
+            const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+            writeJson(response, 400, invalid);
+            return;
+          }
+          const detailRequest: GetImageAssetMetadataApiRequest = Object.freeze({
+            actorUserIdentityId: context.actor.userIdentityId,
+            workspaceId: context.workspace.workspaceId,
+            assetId,
+            includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+            correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+            occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+          });
+          const apiResponse = await options.imageAssetManagementBackendApi!.getImageAssetMetadata(detailRequest);
+          const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+          writeJson(response, statusCode, apiResponse);
+          logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+        },
+      );
+      return Object.freeze({ handled: true });
+    }
+
+    return Object.freeze({ handled: false });
+  };
+  const handleIdentityAndTrustedDeviceRouteFamily = createIdentityAndTrustedDeviceRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    handleRegister,
+    handleLogin,
+    handleDevLogin,
+    requireAuthenticatedSession,
+    writeJson,
+    logResponse,
+    normalizeOptionalString,
+    mapStatusCode,
+    parseAndValidateRequest,
+    RevokeSessionRequestSchema,
+    parseSharedListPaginationFromQuery,
+    buildQueryValidationError,
+    IdentitySessionStatusValues,
+    IdentitySessionAccessChannelValues,
+    ChangeCredentialRequestSchema,
+    AdminAccountStatusValues,
+    buildAdminContext,
+    SetAdminAccountStatusRequestSchema,
+    RevokeSessionByPathRequestSchema,
+    TrustedDeviceStatusValues,
+    RevokeIdentityAdminTrustedDeviceRequestSchema,
+    decodePathTail,
+    buildInvalidRequestResponse,
+    buildForbiddenResponse,
+    RevokeTrustedDeviceRequestSchema,
+    UpdateTrustedDeviceDisplayNameRequestSchema,
+    InitiateTrustedDevicePairingRequestSchema,
+    ValidateTrustedDevicePairingRequestSchema,
+    CompleteTrustedDevicePairingRequestSchema,
+    resolveRequestSearchParams,
+    resolveSessionActorContextWorkspaceId,
+    normalizeSessionAssuranceLevel,
+  });
+  const handleAuthorizationRouteFamily = createAuthorizationRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    requireAuthenticatedSession,
+    decodeAuthorizationResourcePath,
+    buildAuthorizationManagementInvalidRequestResponse,
+    writeJson,
+    logResponse,
+    parseAndValidateAuthorizationManagementRequest,
+    AuthorizationUpdateVisibilityRequestSchema,
+    mapAuthorizationManagementStatusCode,
+    AuthorizationGrantSharingRequestSchema,
+    decodeAuthorizationResourceAndGrantPath,
+    AuthorizationRevokeSharingRequestSchema,
+    AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema,
+    parseOptionalBoolean,
+    normalizeOptionalString,
+    decodeAuthorizationWorkspaceReportingPath,
+    parseOptionalInteger,
+  });
+  const handleWorkspaceRouteFamily = createWorkspaceRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    requireAuthenticatedSession,
+    parseSharedListPaginationFromQuery,
+    parseOptionalBoolean,
+    buildWorkspaceAdministrationQueryValidationError,
+    writeJson,
+    logResponse,
+    normalizeOptionalString,
+    WorkspaceStatusValues,
+    parseOptionalEnum,
+    WorkspaceVisibilityValues,
+    mapWorkspaceAdministrationStatusCode,
+    parseAndValidateWorkspaceAdministrationRequest,
+    CreateWorkspaceRequestSchema,
+    decodePathTail,
+    buildWorkspaceAdministrationInvalidRequestResponse,
+    UpdateWorkspaceRequestSchema,
+    TransitionWorkspaceLifecycleRequestSchema,
+    WorkspaceMembershipStatusValues,
+    AddWorkspaceMemberRequestSchema,
+    decodeWorkspaceUserScopedPath,
+    ChangeWorkspaceMembershipStatusRequestSchema,
+    WorkspaceInvitationStatusValues,
+    decodeWorkspaceEntityPath,
+    WorkspaceRoleValues,
+    WorkspaceRoleAssignmentStatusValues,
+    AssignWorkspaceRoleRequestSchema,
+    ReassignWorkspaceRoleRequestSchema,
+    RevokeWorkspaceRoleRequestSchema,
+    buildWorkspaceInvalidRequestResponse,
+    parseAndValidateWorkspaceRequest,
+    IssueWorkspaceInvitationRequestSchema,
+    mapWorkspaceStatusCode,
+    AcceptWorkspaceInvitationOnboardingRequestSchema,
+  });
+  const handleAuditLedgerRouteFamily = createAuditLedgerRouteFamilyHandler({
+    options,
+    requireAuthenticatedWorkspaceSession,
+    parseAndValidateAuditLedgerListQuery,
+    resolveRequestSearchParams,
+    decodePathTail,
+    buildAuditLedgerInvalidRequestResponse,
+    mapAuditLedgerStatusCode,
+    writeJson,
+    logResponse,
+  });
+  const handleExecutionNodeManagementRouteFamily = createExecutionNodeManagementRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    resolveRequestSearchParams,
+    parseOptionalStringList,
+    parseOptionalBoolean,
+    parseOptionalInteger,
+    normalizeOptionalString,
+    requireAuthenticatedSession,
+    parseExecutionNodeListRequestDto,
+    parseExecutionNodeReadinessCheckRequestDto,
+    parseExecutionNodeEligibilityCheckRequestDto,
+    parseExecutionNodeBackendAvailabilityReadRequestDto,
+    parseAndValidateExecutionNodeSetAvailabilityOverrideRequest,
+    buildExecutionNodeManagementValidationErrorResponse,
+    buildExecutionNodeManagementInvalidRequestResponse,
+    mapExecutionNodeManagementStatusCode,
+    decodePathTail,
+    writeJson,
+    logResponse,
+    executionNodeRoutes: ExecutionNodeManagementTransportRoutes,
+  });
+  const handleDeploymentPolicyRouteFamily = createDeploymentPolicyRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    DeploymentPolicyReadTransportRoutes,
+    DeploymentPolicyWriteTransportRoutes,
+    resolveCanonicalRequestPath,
+    resolveRequestSearchParams,
+    requireAuthenticatedWorkspaceSession,
+    buildRuntimeInvalidRequestResponse,
+    parseAndValidateDeploymentPolicyStateReadRequest,
+    resolveRequestCorrelationId,
+    mapRunSubmissionStatusCode,
+    writeJson,
+    logResponse,
+    parseAndValidateRuntimeMutationBody,
+    parseAndValidateDeploymentPolicyActiveProfileWriteRequest,
+    parseAndValidateDeploymentPolicyOverrideWriteRequest,
+  });
+  const handleSecretMetadataRouteFamily = createSecretMetadataRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    requireAuthenticatedSession,
+    parseJsonBody,
+    buildSecretMetadataInvalidRequestResponse,
+    buildSecretMetadataValidationErrors,
+    ReEncryptSecretsCommandSchema,
+    decodePathTail,
+    normalizeOptionalString,
+    resolveRequestSearchParams,
+    GetSecretReEncryptionStatusQuerySchema,
+    parseAndValidateSecretMetadataRequest,
+    CreateSecretMetadataCommandSchema,
+    parseOptionalBoolean,
+    parseOptionalInteger,
+    ListSecretMetadataQuerySchema,
+    GetSecretMetadataQuerySchema,
+    RotateSecretMetadataCommandSchema,
+    DisableSecretMetadataCommandSchema,
+    mapSecretMetadataStatusCode,
+    writeJson,
+    logResponse,
+  });
+  const handleCertificateOperationsRouteFamily = createCertificateOperationsRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    requireAuthenticatedSession,
+    parseOptionalInteger,
+    parseOptionalBoolean,
+    normalizeOptionalString,
+    buildCertificateOperationsQueryValidationError,
+    buildCertificateOperationsInvalidRequestResponse,
+    mapCertificateOperationsStatusCode,
+    CertificateStatusValues,
+    CertificateSubjectReferenceKindValues,
+    CertificateUsageValues,
+    CertificateTrustStatusValues,
+    decodePathTail,
+    parseAndValidateRequest,
+    RevokeIssuedCertificateRequestSchema,
+    RenewIssuedCertificateRequestSchema,
+    resolveRequestSearchParams,
+    writeJson,
+    logResponse,
+  });
+  const handleNodeTrustRouteFamily = createNodeTrustRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    parseAndValidateNodeEnrollmentSubmissionRequest,
+    writeJson,
+    mapNodeTrustStatusCode,
+    logResponse,
+    requireAuthenticatedSession,
+    normalizeOptionalString,
+    parseOptionalInteger,
+    parseOptionalBoolean,
+    buildNodeTrustQueryValidationError,
+    NodePendingEnrollmentStatusValues,
+    NodeTypeValues,
+    NodeCapabilityValues,
+    NodeApprovalStatusValues,
+    NodeInventoryOperationalStateValues,
+    NodeInventoryPresenceStateValues,
+    NodeEnrollmentRequestStatusValues,
+    buildNodeTrustInvalidRequestResponse,
+    decodePathTail,
+    parseAndValidateRevokeNodeTrustRequest,
+    requireAuthenticatedNodeTransport,
+    resolveRequestSearchParams,
+    parseResolveNodeRuntimeTrustMaterialRequestDto,
+    NodeTrustApiSchemaValidationError,
+    NodeTrustApiErrorCodes,
+    parseAndValidateNodeHeartbeatRequest,
+    parseAndValidateNodeOperationalUpdateRequest,
+    parseAndValidateApproveNodeEnrollmentRequest,
+    parseAndValidateRejectNodeEnrollmentRequest,
+  });
+  const handleRunSubmissionRouteFamily = createRunSubmissionRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    resolveRequestSearchParams,
+    requireAuthenticatedWorkspaceSession,
+    requireAuthenticatedNodeTransport,
+    parseAndValidateRuntimeMutationBody,
+    parseAndValidateAuthoritativeRunSubmissionMutationRequest,
+    parseAndValidateAuthoritativeRunListReadRequest,
+    parseAndValidateExecutionReadinessReadRequest,
+    parseAndValidateAuthoritativeRunCancellationMutationRequest,
+    parseAndValidateAuthoritativeRunRetryMutationRequest,
+    parseAndValidateAuthoritativeRunExecutionUpdateMutationRequest,
+    parseAndValidateAuthoritativeRunQueueStatusReadRequest,
+    parseAndValidateSchedulingAdminStaleReservationsReadRequest,
+    parseAndValidateSchedulingAdminReleaseStaleReservationMutationRequest,
+    parseAndValidateSchedulingAdminReevaluateDeferredRunsMutationRequest,
+    decodePathTail,
+    asRecord,
+    mapRunSubmissionStatusCode,
+    buildRuntimeInvalidRequestResponse,
+    writeJson,
+    logResponse,
+    runRoutes: Object.freeze({
+      startRun: SystemRuntimeTransportRoutes.startRun,
+      listRuns: RunOrchestrationTransportRoutes.listRuns,
+      getExecutionReadiness: RunOrchestrationTransportRoutes.getExecutionReadiness,
+      listQueueStatus: RunOrchestrationTransportRoutes.listQueueStatus,
+      listSchedulingStaleReservations: RunOrchestrationTransportRoutes.listSchedulingStaleReservations,
+      releaseSchedulingStaleReservation: RunOrchestrationTransportRoutes.releaseSchedulingStaleReservation,
+      reevaluateSchedulingDeferredRuns: RunOrchestrationTransportRoutes.reevaluateSchedulingDeferredRuns,
+    }),
+    imageRunRoutes: Object.freeze({
+      listRuns: ImageRunApiRoutes.listRuns,
+    }),
+  });
+  const handleRunReadRouteFamily = createRunReadRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    resolveRequestSearchParams,
+    requireAuthenticatedWorkspaceSession,
+    requireAuthenticatedNodeTransport,
+    parseAndValidateRuntimeMutationBody,
+    parseAndValidateAuthoritativeRunSubmissionMutationRequest,
+    parseAndValidateAuthoritativeRunListReadRequest,
+    parseAndValidateExecutionReadinessReadRequest,
+    parseAndValidateAuthoritativeRunCancellationMutationRequest,
+    parseAndValidateAuthoritativeRunRetryMutationRequest,
+    parseAndValidateAuthoritativeRunExecutionUpdateMutationRequest,
+    parseAndValidateAuthoritativeRunQueueStatusReadRequest,
+    parseAndValidateSchedulingAdminStaleReservationsReadRequest,
+    parseAndValidateSchedulingAdminReleaseStaleReservationMutationRequest,
+    parseAndValidateSchedulingAdminReevaluateDeferredRunsMutationRequest,
+    decodePathTail,
+    asRecord,
+    mapRunSubmissionStatusCode,
+    buildRuntimeInvalidRequestResponse,
+    writeJson,
+    logResponse,
+    runRoutes: Object.freeze({
+      startRun: SystemRuntimeTransportRoutes.startRun,
+      listRuns: RunOrchestrationTransportRoutes.listRuns,
+      getExecutionReadiness: RunOrchestrationTransportRoutes.getExecutionReadiness,
+      listQueueStatus: RunOrchestrationTransportRoutes.listQueueStatus,
+      listSchedulingStaleReservations: RunOrchestrationTransportRoutes.listSchedulingStaleReservations,
+      releaseSchedulingStaleReservation: RunOrchestrationTransportRoutes.releaseSchedulingStaleReservation,
+      reevaluateSchedulingDeferredRuns: RunOrchestrationTransportRoutes.reevaluateSchedulingDeferredRuns,
+    }),
+    imageRunRoutes: Object.freeze({
+      listRuns: ImageRunApiRoutes.listRuns,
+    }),
+  });
+  const handleRunMutationRouteFamily = createRunMutationRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    resolveRequestSearchParams,
+    requireAuthenticatedWorkspaceSession,
+    requireAuthenticatedNodeTransport,
+    parseAndValidateRuntimeMutationBody,
+    parseAndValidateAuthoritativeRunSubmissionMutationRequest,
+    parseAndValidateAuthoritativeRunListReadRequest,
+    parseAndValidateExecutionReadinessReadRequest,
+    parseAndValidateAuthoritativeRunCancellationMutationRequest,
+    parseAndValidateAuthoritativeRunRetryMutationRequest,
+    parseAndValidateAuthoritativeRunExecutionUpdateMutationRequest,
+    parseAndValidateAuthoritativeRunQueueStatusReadRequest,
+    parseAndValidateSchedulingAdminStaleReservationsReadRequest,
+    parseAndValidateSchedulingAdminReleaseStaleReservationMutationRequest,
+    parseAndValidateSchedulingAdminReevaluateDeferredRunsMutationRequest,
+    decodePathTail,
+    asRecord,
+    mapRunSubmissionStatusCode,
+    buildRuntimeInvalidRequestResponse,
+    writeJson,
+    logResponse,
+    runRoutes: Object.freeze({
+      startRun: SystemRuntimeTransportRoutes.startRun,
+      listRuns: RunOrchestrationTransportRoutes.listRuns,
+      getExecutionReadiness: RunOrchestrationTransportRoutes.getExecutionReadiness,
+      listQueueStatus: RunOrchestrationTransportRoutes.listQueueStatus,
+      listSchedulingStaleReservations: RunOrchestrationTransportRoutes.listSchedulingStaleReservations,
+      releaseSchedulingStaleReservation: RunOrchestrationTransportRoutes.releaseSchedulingStaleReservation,
+      reevaluateSchedulingDeferredRuns: RunOrchestrationTransportRoutes.reevaluateSchedulingDeferredRuns,
+    }),
+    imageRunRoutes: Object.freeze({
+      listRuns: ImageRunApiRoutes.listRuns,
+    }),
+  });
+  const handleRunExecutionUpdateRouteFamily = createRunExecutionUpdateRouteFamilyHandler({
+    options,
+    maxBodyBytes,
+    resolveRequestSearchParams,
+    requireAuthenticatedWorkspaceSession,
+    requireAuthenticatedNodeTransport,
+    parseAndValidateRuntimeMutationBody,
+    parseAndValidateAuthoritativeRunSubmissionMutationRequest,
+    parseAndValidateAuthoritativeRunListReadRequest,
+    parseAndValidateExecutionReadinessReadRequest,
+    parseAndValidateAuthoritativeRunCancellationMutationRequest,
+    parseAndValidateAuthoritativeRunRetryMutationRequest,
+    parseAndValidateAuthoritativeRunExecutionUpdateMutationRequest,
+    parseAndValidateAuthoritativeRunQueueStatusReadRequest,
+    parseAndValidateSchedulingAdminStaleReservationsReadRequest,
+    parseAndValidateSchedulingAdminReleaseStaleReservationMutationRequest,
+    parseAndValidateSchedulingAdminReevaluateDeferredRunsMutationRequest,
+    decodePathTail,
+    asRecord,
+    mapRunSubmissionStatusCode,
+    buildRuntimeInvalidRequestResponse,
+    writeJson,
+    logResponse,
+    runRoutes: Object.freeze({
+      startRun: SystemRuntimeTransportRoutes.startRun,
+      listRuns: RunOrchestrationTransportRoutes.listRuns,
+      getExecutionReadiness: RunOrchestrationTransportRoutes.getExecutionReadiness,
+      listQueueStatus: RunOrchestrationTransportRoutes.listQueueStatus,
+      listSchedulingStaleReservations: RunOrchestrationTransportRoutes.listSchedulingStaleReservations,
+      releaseSchedulingStaleReservation: RunOrchestrationTransportRoutes.releaseSchedulingStaleReservation,
+      reevaluateSchedulingDeferredRuns: RunOrchestrationTransportRoutes.reevaluateSchedulingDeferredRuns,
+    }),
+    imageRunRoutes: Object.freeze({
+      listRuns: ImageRunApiRoutes.listRuns,
+    }),
+  });
+  const defaultRouteFamilyHandlers: Readonly<Partial<Record<string, IdentityHttpRouteFamilyHandler>>> = Object.freeze({
+    "identity-auth": handleIdentityAndTrustedDeviceRouteFamily,
+    "workspace-invitations": handleWorkspaceRouteFamily,
+    "workspace-administration": handleWorkspaceRouteFamily,
+    "authorization-management": handleAuthorizationRouteFamily,
+    "storage-management": handleStorageManagementRouteFamily,
+    "audit-ledger": handleAuditLedgerRouteFamily,
+    "execution-node-management": handleExecutionNodeManagementRouteFamily,
+    "run-submission": handleRunSubmissionRouteFamily,
+    "run-read": handleRunReadRouteFamily,
+    "run-mutation": handleRunMutationRouteFamily,
+    "run-execution-update": handleRunExecutionUpdateRouteFamily,
+    "asset-management": async (context) => {
+      const generated = await handleGeneratedResultRouteFamily(context);
+      if (generated.handled) {
+        return generated;
+      }
+      return handleAssetRouteFamily(context);
+    },
+    "image-asset-management": handleImageAssetRouteFamily,
+    "image-run-api": handleGeneratedResultRouteFamily,
+    "deployment-policy-read": handleDeploymentPolicyRouteFamily,
+    "deployment-policy-write": handleDeploymentPolicyRouteFamily,
+    "security-secret-metadata": handleSecretMetadataRouteFamily,
+    "security-certificate-operations": handleCertificateOperationsRouteFamily,
+    "node-trust": handleNodeTrustRouteFamily,
+  });
+  const routeFamilyHandlers: Readonly<Partial<Record<string, IdentityHttpRouteFamilyHandler>>> = (
+    Object.freeze({
+      ...defaultRouteFamilyHandlers,
+      ...(options.routeFamilyHandlers ?? Object.freeze({})),
+    })
+  );
+  logger.info(Object.freeze({
+    event: "identity-http.route-families.composed",
+    requestId: "startup-route-composition",
+    details: routeCompositionLogDetails,
+  }));
+  let hasLoggedRootReadinessProbe = false;
+  const server = transportComposition.serverAdapter.createServer(async (request, response) => {
+    const requestStartedAt = Date.now();
     const requestId = randomUUID();
-    const path = new URL(request.url ?? "/", "http://localhost").pathname;
+    const correlationId = resolveRequestCorrelationId(request, requestId);
+    setResponseCorrelationHeaders(response, requestId, correlationId);
+    const path = resolveCanonicalRequestPath(request.url);
     const transportState = resolveInboundHttpTransportConnectionState(request);
-    logger.info(Object.freeze({
-      event: "identity-http.request.received",
-      requestId,
-      method: request.method,
-      path,
-    }));
+    const rootReadinessProbe = isRootReadinessProbeRequest(request.method, path);
+    if (!rootReadinessProbe) {
+      logger.info(Object.freeze({
+        event: "identity-http.request.received",
+        requestId,
+        correlationId,
+        method: request.method,
+        path,
+        details: Object.freeze({
+          startedAt: new Date(requestStartedAt).toISOString(),
+        }),
+      }));
+    }
 
     try {
       if (path.startsWith("/api/")) {
@@ -928,6 +3161,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger.info(Object.freeze({
             event: "identity-http.cors.preflight.accepted",
             requestId,
+            correlationId,
             method: request.method,
             path,
             statusCode: 204,
@@ -951,4321 +3185,453 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         }
       }
 
-      if (request.method === "POST" && path === "/api/v1/identity/register") {
-        await handleRegister(request, response, requestId, options.backendApi, logger, maxBodyBytes);
-        return;
-      }
-      if (request.method === "POST" && path === "/api/v1/identity/login") {
-        await handleLogin(request, response, requestId, options.backendApi, logger, maxBodyBytes);
-        return;
-      }
-      if (request.method === "POST" && path === "/api/v1/identity/dev-login" && options.development?.enableDevLoginRoute) {
-        await handleDevLogin(request, response, requestId, options.backendApi, logger);
-        return;
-      }
-      if (request.method === "GET" && path === "/api/v1/identity/session") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const responseBody: IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse> = Object.freeze({
-              ok: true,
-              data: Object.freeze({
-                principal: context.principal,
-                session: context.session,
+      const matchedRouteFamily = transportComposition.routeModuleRegistry.resolveRouteFamilyByPath(path);
+      if (matchedRouteFamily) {
+        const routeFamilyHandler = routeFamilyHandlers[matchedRouteFamily.routeFamilyId];
+        if (routeFamilyHandler) {
+          const handlerResult = await routeFamilyHandler({
+            request,
+            response,
+            requestId,
+            correlationId,
+            path,
+            method: request.method,
+            logger,
+            routeFamily: matchedRouteFamily,
+          });
+          const handled = handlerResult?.handled ?? true;
+          if (handled) {
+            logger.info(Object.freeze({
+              event: "identity-http.route-family.modular-handled",
+              requestId,
+              correlationId,
+              method: request.method,
+              path,
+              details: Object.freeze({
+                routeFamilyId: matchedRouteFamily.routeFamilyId,
               }),
-            });
-            writeJson(response, 200, responseBody);
-            logResponse(logger, requestId, request, 200, Object.freeze({
-              principal: context.principal,
-              session: context.session,
-              sessionToken: context.sessionToken,
-              transport: context.transport,
-            }), responseBody);
-          },
-        );
-        return;
-      }
-      if (request.method === "POST" && path === "/api/v1/identity/logout") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const apiResponse = await options.backendApi.logoutAuthenticatedSession({
-              sessionToken: context.sessionToken,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({ sessionToken: context.sessionToken }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (request.method === "POST" && path === "/api/v1/identity/session/revoke") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              RevokeSessionRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
+            }));
+            return;
+          }
 
-            const apiResponse = await options.backendApi.revokeIdentitySession({
-              sessionId: parsedRequest.data.sessionId,
-              reason: parsedRequest.data.reason,
-              actorUserIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              sessionToken: context.sessionToken,
-              ...parsedRequest.data,
-              actorUserIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (request.method === "POST" && path === "/api/v1/identity/credential/change") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              ChangeCredentialRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.changeLocalPasswordCredential({
-              userIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              sessionToken: context.sessionToken,
-              userIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (request.method === "GET" && path === "/api/v1/identity/admin/accounts") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const includeStatuses = url.searchParams.getAll("status");
-            const limit = parseOptionalInteger(url.searchParams.get("limit"));
-            const offset = parseOptionalInteger(url.searchParams.get("offset"));
-            const providerId = normalizeOptionalString(url.searchParams.get("providerId"));
-
-            const statusValidation = z.array(AdminAccountStatusValues).safeParse(includeStatuses);
-            if (!statusValidation.success) {
-              const validationError = buildQueryValidationError("status", "status values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.listIdentityAdminAccounts({
-              context: buildAdminContext(context.principal.userIdentityId),
-              providerId,
-              includeStatuses: statusValidation.data,
-              limit,
-              offset,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              context: buildAdminContext(context.principal.userIdentityId),
-              providerId,
-              includeStatuses: statusValidation.data,
-              limit,
-              offset,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "GET" && path.startsWith("/api/v1/identity/admin/accounts/")) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const userIdentityId = decodePathTail(path, "/api/v1/identity/admin/accounts/");
-            if (!userIdentityId) {
-              const invalid = buildInvalidRequestResponse("userIdentityId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const providerId = normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("providerId"));
-            const apiResponse = await options.backendApi.getIdentityAdminAccountStatus({
-              context: buildAdminContext(context.principal.userIdentityId),
-              userIdentityId,
-              providerId,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              context: buildAdminContext(context.principal.userIdentityId),
-              userIdentityId,
-              providerId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "POST" && path.endsWith("/status") && path.startsWith("/api/v1/identity/admin/accounts/")) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const userIdentityId = decodePathTail(path, "/api/v1/identity/admin/accounts/", "/status");
-            if (!userIdentityId) {
-              const invalid = buildInvalidRequestResponse("userIdentityId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              SetAdminAccountStatusRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.setIdentityAdminAccountStatus({
-              context: buildAdminContext(context.principal.userIdentityId),
-              userIdentityId,
-              action: parsedRequest.data.action,
-              providerId: parsedRequest.data.providerId,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              context: buildAdminContext(context.principal.userIdentityId),
-              userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "GET" && path === "/api/v1/identity/admin/trusted-devices") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const userIdentityId = normalizeOptionalString(url.searchParams.get("userIdentityId"));
-            if (!userIdentityId) {
-              const invalid = buildInvalidRequestResponse("userIdentityId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const workspaceId = normalizeOptionalString(url.searchParams.get("workspaceId"));
-            const includeStatuses = url.searchParams.getAll("status");
-            const limit = parseOptionalInteger(url.searchParams.get("limit"));
-            const offset = parseOptionalInteger(url.searchParams.get("offset"));
-            const statusValidation = z.array(TrustedDeviceStatusValues).safeParse(includeStatuses);
-            if (!statusValidation.success) {
-              const validationError = buildQueryValidationError("status", "status values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.listIdentityAdminTrustedDevices({
-              context: buildAdminContext(context.principal.userIdentityId),
-              userIdentityId,
-              workspaceId,
-              includeStatuses: statusValidation.data,
-              limit,
-              offset,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              context: buildAdminContext(context.principal.userIdentityId),
-              userIdentityId,
-              workspaceId,
-              includeStatuses: statusValidation.data,
-              limit,
-              offset,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        request.method === "POST"
-        && path.endsWith("/revoke")
-        && path.startsWith("/api/v1/identity/admin/trusted-devices/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const trustedDeviceId = decodePathTail(path, "/api/v1/identity/admin/trusted-devices/", "/revoke");
-            if (!trustedDeviceId) {
-              const invalid = buildInvalidRequestResponse("trustedDeviceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              RevokeIdentityAdminTrustedDeviceRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.revokeIdentityAdminTrustedDevice({
-              context: buildAdminContext(context.principal.userIdentityId),
-              trustedDeviceId,
-              reason: parsedRequest.data.reason,
-              note: parsedRequest.data.note,
-              revokedAt: parsedRequest.data.revokedAt,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              context: buildAdminContext(context.principal.userIdentityId),
-              trustedDeviceId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "GET" && path === "/api/v1/identity/trusted-devices") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const includeStatuses = url.searchParams.getAll("status");
-            const statusValidation = z.array(TrustedDeviceStatusValues).safeParse(includeStatuses);
-            if (!statusValidation.success) {
-              const validationError = buildQueryValidationError("status", "status values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.listTrustedDevices({
-              userIdentityId: context.principal.userIdentityId,
-              workspaceId: normalizeOptionalString(url.searchParams.get("workspaceId")),
-              includeStatuses: statusValidation.data,
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              userIdentityId: context.principal.userIdentityId,
-              workspaceId: normalizeOptionalString(url.searchParams.get("workspaceId")),
-              includeStatuses: statusValidation.data,
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "GET" && path.startsWith("/api/v1/identity/trusted-devices/")) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/");
-            if (!trustedDeviceId) {
-              const invalid = buildInvalidRequestResponse("trustedDeviceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.getTrustedDevice({
-              trustedDeviceId,
-            });
-            if (apiResponse.ok && apiResponse.data?.trustedDevice.userIdentityId !== context.principal.userIdentityId) {
-              const forbidden = buildForbiddenResponse("Trusted device is not available for this account.");
-              writeJson(response, 403, forbidden);
-              logResponse(logger, requestId, request, 403, Object.freeze({
-                trustedDeviceId,
-                actorUserIdentityId: context.principal.userIdentityId,
-              }), forbidden);
-              return;
-            }
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              trustedDeviceId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "POST" && path.endsWith("/revoke") && path.startsWith("/api/v1/identity/trusted-devices/")) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/", "/revoke");
-            if (!trustedDeviceId) {
-              const invalid = buildInvalidRequestResponse("trustedDeviceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const authorizedDevice = await options.backendApi.getTrustedDevice({ trustedDeviceId });
-            if (authorizedDevice.ok && authorizedDevice.data?.trustedDevice.userIdentityId !== context.principal.userIdentityId) {
-              const forbidden = buildForbiddenResponse("Trusted device is not available for this account.");
-              writeJson(response, 403, forbidden);
-              logResponse(logger, requestId, request, 403, Object.freeze({
-                trustedDeviceId,
-                actorUserIdentityId: context.principal.userIdentityId,
-              }), forbidden);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              RevokeTrustedDeviceRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.revokeTrustedDevice({
-              trustedDeviceId,
-              reason: parsedRequest.data.reason,
-              note: parsedRequest.data.note,
-              revokedAt: parsedRequest.data.revokedAt,
-              revokedByUserIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              trustedDeviceId,
-              ...parsedRequest.data,
-              revokedByUserIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        request.method === "POST"
-        && path.endsWith("/display-name")
-        && path.startsWith("/api/v1/identity/trusted-devices/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/", "/display-name");
-            if (!trustedDeviceId) {
-              const invalid = buildInvalidRequestResponse("trustedDeviceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const authorizedDevice = await options.backendApi.getTrustedDevice({ trustedDeviceId });
-            if (authorizedDevice.ok && authorizedDevice.data?.trustedDevice.userIdentityId !== context.principal.userIdentityId) {
-              const forbidden = buildForbiddenResponse("Trusted device is not available for this account.");
-              writeJson(response, 403, forbidden);
-              logResponse(logger, requestId, request, 403, Object.freeze({
-                trustedDeviceId,
-                actorUserIdentityId: context.principal.userIdentityId,
-              }), forbidden);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              UpdateTrustedDeviceDisplayNameRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.updateTrustedDeviceDisplayName({
-              trustedDeviceId,
-              displayName: parsedRequest.data.displayName,
-              updatedAt: parsedRequest.data.updatedAt,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              trustedDeviceId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "POST" && path === "/api/v1/identity/trusted-devices/pairing/initiate") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              InitiateTrustedDevicePairingRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.initiateTrustedDevicePairing({
-              ...parsedRequest.data,
-              userIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              ...parsedRequest.data,
-              userIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "POST" && path === "/api/v1/identity/trusted-devices/pairing/validate") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              ValidateTrustedDevicePairingRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.validateTrustedDevicePairing({
-              ...parsedRequest.data,
-              userIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              ...parsedRequest.data,
-              userIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (request.method === "POST" && path === "/api/v1/identity/trusted-devices/pairing/complete") {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              CompleteTrustedDevicePairingRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.backendApi.completeTrustedDevicePairing({
-              ...parsedRequest.data,
-              userIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              ...parsedRequest.data,
-              userIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/security/secrets/health"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {},
-          async (context) => {
-            const apiResponse = await options.secretMetadataBackendApi.getSecretServiceHealth({
-              actorUserIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/security/secrets/diagnostics"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const apiResponse = await options.secretMetadataBackendApi.getSecretServiceDiagnostics({
-              actorUserIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "POST"
-        && path === "/api/v1/security/secrets/maintenance/re-encryption"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const parsedBody = await parseJsonBody(request, maxBodyBytes);
-            if (!parsedBody.ok) {
-              const invalid = buildSecretMetadataInvalidRequestResponse(parsedBody.error);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = ReEncryptSecretsCommandSchema.safeParse(parsedBody.value);
-            if (!parsedRequest.success) {
-              const invalid = buildSecretMetadataValidationErrors(parsedRequest.error.issues);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const reEncryptRequest: ReEncryptSecretsMetadataApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              operationKey: parsedRequest.data.operationKey,
-              operationId: parsedRequest.data.operationId,
-              maxTargetsPerInvocation: parsedRequest.data.maxTargetsPerInvocation,
-              occurredAt: parsedRequest.data.occurredAt,
-            });
-            const apiResponse = await options.secretMetadataBackendApi.reEncryptSecrets(reEncryptRequest);
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              operationKey: reEncryptRequest.operationKey,
-              operationId: reEncryptRequest.operationId,
-              maxTargetsPerInvocation: reEncryptRequest.maxTargetsPerInvocation,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/security/secrets/maintenance/re-encryption/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const operationId = decodePathTail(path, "/api/v1/security/secrets/maintenance/re-encryption/");
-            if (!operationId || operationId.includes("/")) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("operationId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const queryParsed = GetSecretReEncryptionStatusQuerySchema.safeParse({
-              operationId,
-              occurredAt: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("occurredAt")),
-            });
-            if (!queryParsed.success) {
-              const invalid = buildSecretMetadataValidationErrors(queryParsed.error.issues);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const statusRequest: GetSecretReEncryptionStatusApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              operationId: queryParsed.data.operationId,
-              occurredAt: queryParsed.data.occurredAt,
-            });
-            const apiResponse = await options.secretMetadataBackendApi.getSecretReEncryptionStatus(statusRequest);
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, statusRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "POST"
-        && path === "/api/v1/security/secrets"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const parsedRequest = await parseAndValidateSecretMetadataRequest(
-              request,
-              CreateSecretMetadataCommandSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const createRequest: CreateSecretMetadataApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            });
-            const apiResponse = await options.secretMetadataBackendApi.createSecret(createRequest);
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              operationKey: createRequest.operationKey,
-              secretId: createRequest.secretId,
-              name: createRequest.name,
-              owner: createRequest.owner,
-              kind: createRequest.kind,
-              plaintextProvided: true,
-              metadataProvided: Boolean(createRequest.metadata),
-              createdAt: createRequest.createdAt,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/security/secrets"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const scope = normalizeOptionalString(url.searchParams.get("scope"));
-            const workspaceId = normalizeOptionalString(url.searchParams.get("workspaceId"));
-            const userIdentityId = normalizeOptionalString(url.searchParams.get("userIdentityId"));
-            const actorWorkspaceId = normalizeOptionalString(url.searchParams.get("actorWorkspaceId"));
-            const kinds = url.searchParams.getAll("kind").map((kind) => kind.trim()).filter(Boolean);
-            const tagAnyOf = url.searchParams.getAll("tag").map((tag) => tag.trim()).filter(Boolean);
-            const includeDisabledInput = url.searchParams.get("includeDisabled");
-            const includeArchivedInput = url.searchParams.get("includeArchived");
-            const includeSoftDeletedInput = url.searchParams.get("includeSoftDeleted");
-            const includeDisabled = parseOptionalBoolean(includeDisabledInput);
-            const includeArchived = parseOptionalBoolean(includeArchivedInput);
-            const includeSoftDeleted = parseOptionalBoolean(includeSoftDeletedInput);
-            const limitInput = url.searchParams.get("limit");
-            const offsetInput = url.searchParams.get("offset");
-            const limit = parseOptionalInteger(limitInput);
-            const offset = parseOptionalInteger(offsetInput);
-            if (includeDisabledInput !== null && includeDisabled === undefined) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("includeDisabled must be 'true' or 'false'.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (includeArchivedInput !== null && includeArchived === undefined) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("includeArchived must be 'true' or 'false'.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (includeSoftDeletedInput !== null && includeSoftDeleted === undefined) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("includeSoftDeleted must be 'true' or 'false'.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (limitInput !== null && limit === undefined) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("limit must be an integer >= 1.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (offsetInput !== null && offset === undefined) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("offset must be an integer >= 0.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedQuery = ListSecretMetadataQuerySchema.safeParse({
-              owner: {
-                scope,
-                workspaceId,
-                userIdentityId,
-              },
-              actorWorkspaceId,
-              kinds: kinds.length > 0 ? kinds : undefined,
-              tagAnyOf: tagAnyOf.length > 0 ? tagAnyOf : undefined,
-              includeDisabled: includeDisabledInput === null ? undefined : includeDisabled,
-              includeArchived: includeArchivedInput === null ? undefined : includeArchived,
-              includeSoftDeleted: includeSoftDeletedInput === null ? undefined : includeSoftDeleted,
-              limit: limitInput === null ? undefined : limit,
-              offset: offsetInput === null ? undefined : offset,
-            });
-            if (!parsedQuery.success) {
-              const invalid = buildSecretMetadataValidationErrors(parsedQuery.error.issues);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const listRequest: ListSecretMetadataApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              actorWorkspaceId: parsedQuery.data.actorWorkspaceId,
-              owner: parsedQuery.data.owner,
-              kinds: parsedQuery.data.kinds,
-              tagAnyOf: parsedQuery.data.tagAnyOf,
-              includeDisabled: parsedQuery.data.includeDisabled,
-              includeArchived: parsedQuery.data.includeArchived,
-              includeSoftDeleted: parsedQuery.data.includeSoftDeleted,
-              limit: parsedQuery.data.limit,
-              offset: parsedQuery.data.offset,
-            });
-
-            const apiResponse = await options.secretMetadataBackendApi.listSecrets(listRequest);
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/security/secrets/")
-        && !path.endsWith("/disable")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const secretId = decodePathTail(path, "/api/v1/security/secrets/");
-            if (!secretId || secretId.includes("/")) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("secretId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedQuery = GetSecretMetadataQuerySchema.safeParse({
-              secretId,
-              actorWorkspaceId: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("actorWorkspaceId")),
-              occurredAt: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("occurredAt")),
-            });
-            if (!parsedQuery.success) {
-              const invalid = buildSecretMetadataValidationErrors(parsedQuery.error.issues);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const getRequest: GetSecretMetadataApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              actorWorkspaceId: parsedQuery.data.actorWorkspaceId,
-              secretId: parsedQuery.data.secretId,
-              occurredAt: parsedQuery.data.occurredAt,
-            });
-            const apiResponse = await options.secretMetadataBackendApi.getSecret(getRequest);
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, getRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/security/secrets/")
-        && path.endsWith("/rotate")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const secretId = decodePathTail(path, "/api/v1/security/secrets/", "/rotate");
-            if (!secretId || secretId.includes("/")) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("secretId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedBody = await parseJsonBody(request, maxBodyBytes);
-            if (!parsedBody.ok) {
-              const invalid = buildSecretMetadataInvalidRequestResponse(parsedBody.error);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = RotateSecretMetadataCommandSchema.safeParse({
-              ...(parsedBody.value as Record<string, unknown>),
-              secretId,
-            });
-            if (!parsedRequest.success) {
-              const invalid = buildSecretMetadataValidationErrors(parsedRequest.error.issues);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const rotateRequest: RotateSecretMetadataApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              secretId: parsedRequest.data.secretId,
-              plaintext: parsedRequest.data.plaintext,
-              operationKey: parsedRequest.data.operationKey,
-              expectedCurrentVersionId: parsedRequest.data.expectedCurrentVersionId,
-              rotatedAt: parsedRequest.data.rotatedAt,
-              actorWorkspaceId: parsedRequest.data.actorWorkspaceId,
-            });
-            const apiResponse = await options.secretMetadataBackendApi.rotateSecret(rotateRequest);
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              secretId: rotateRequest.secretId,
-              operationKey: rotateRequest.operationKey,
-              expectedCurrentVersionId: rotateRequest.expectedCurrentVersionId,
-              rotatedAt: rotateRequest.rotatedAt,
-              actorWorkspaceId: rotateRequest.actorWorkspaceId,
-              plaintextProvided: true,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.secretMetadataBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/security/secrets/")
-        && path.endsWith("/disable")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const secretId = decodePathTail(path, "/api/v1/security/secrets/", "/disable");
-            if (!secretId || secretId.includes("/")) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("secretId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedBody = await parseJsonBody(request, maxBodyBytes);
-            if (!parsedBody.ok) {
-              const invalid = buildSecretMetadataInvalidRequestResponse(parsedBody.error);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = DisableSecretMetadataCommandSchema.safeParse({
-              ...(parsedBody.value as Record<string, unknown>),
-              secretId,
-            });
-            if (!parsedRequest.success) {
-              const invalid = buildSecretMetadataValidationErrors(parsedRequest.error.issues);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const disableRequest: DisableSecretMetadataApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              secretId: parsedRequest.data.secretId,
-              operationKey: parsedRequest.data.operationKey,
-              disabledAt: parsedRequest.data.disabledAt,
-              actorWorkspaceId: parsedRequest.data.actorWorkspaceId,
-            });
-            const apiResponse = await options.secretMetadataBackendApi.disableSecret(disableRequest);
-            const statusCode = mapSecretMetadataStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, disableRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.certificateOperationsBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/security/certificates/authority/status"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const asOf = normalizeOptionalString(url.searchParams.get("asOf"));
-            const rotationWarningWindowDaysInput = url.searchParams.get("rotationWarningWindowDays");
-            const certificateExpiryWarningWindowDaysInput = url.searchParams.get("certificateExpiryWarningWindowDays");
-            const rotationWarningWindowDays = parseOptionalInteger(rotationWarningWindowDaysInput);
-            const certificateExpiryWarningWindowDays = parseOptionalInteger(certificateExpiryWarningWindowDaysInput);
-
-            if (
-              rotationWarningWindowDaysInput !== null
-              && (rotationWarningWindowDays === undefined || rotationWarningWindowDays < 1)
-            ) {
-              const invalid = buildCertificateOperationsQueryValidationError(
-                "rotationWarningWindowDays",
-                "rotationWarningWindowDays must be an integer >= 1.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            if (
-              certificateExpiryWarningWindowDaysInput !== null
-              && (certificateExpiryWarningWindowDays === undefined || certificateExpiryWarningWindowDays < 1)
-            ) {
-              const invalid = buildCertificateOperationsQueryValidationError(
-                "certificateExpiryWarningWindowDays",
-                "certificateExpiryWarningWindowDays must be an integer >= 1.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const apiResponse = await options.certificateOperationsBackendApi.getCertificateAuthorityStatus({
-              actorUserIdentityId: context.principal.userIdentityId,
-              asOf,
-              rotationWarningWindowDays,
-              certificateExpiryWarningWindowDays,
-            });
-            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              asOf,
-              rotationWarningWindowDays,
-              certificateExpiryWarningWindowDays,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.certificateOperationsBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/security/certificates"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const statuses = url.searchParams.getAll("status");
-            const subjectReferenceKinds = url.searchParams.getAll("subjectReferenceKind");
-            const usageAnyOf = url.searchParams.getAll("usage");
-            const trustStatuses = url.searchParams.getAll("trustStatus");
-            const includeRevokedInput = url.searchParams.get("includeRevoked");
-            const includeRevoked = parseOptionalBoolean(includeRevokedInput);
-            const limitInput = url.searchParams.get("limit");
-            const offsetInput = url.searchParams.get("offset");
-            const limit = parseOptionalInteger(limitInput);
-            const offset = parseOptionalInteger(offsetInput);
-
-            if (statuses.some((status) => !CertificateStatusValues.has(status))) {
-              const invalid = buildCertificateOperationsQueryValidationError("status", "status values are invalid.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (subjectReferenceKinds.some((kind) => !CertificateSubjectReferenceKindValues.has(kind))) {
-              const invalid = buildCertificateOperationsQueryValidationError(
-                "subjectReferenceKind",
-                "subjectReferenceKind values are invalid.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (usageAnyOf.some((usage) => !CertificateUsageValues.has(usage))) {
-              const invalid = buildCertificateOperationsQueryValidationError("usage", "usage values are invalid.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (trustStatuses.some((status) => !CertificateTrustStatusValues.has(status))) {
-              const invalid = buildCertificateOperationsQueryValidationError(
-                "trustStatus",
-                "trustStatus values are invalid.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (includeRevokedInput !== null && includeRevoked === undefined) {
-              const invalid = buildCertificateOperationsQueryValidationError(
-                "includeRevoked",
-                "includeRevoked must be 'true' or 'false'.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (limitInput !== null && (limit === undefined || limit < 1)) {
-              const invalid = buildCertificateOperationsQueryValidationError("limit", "limit must be an integer >= 1.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (offsetInput !== null && (offset === undefined || offset < 0)) {
-              const invalid = buildCertificateOperationsQueryValidationError(
-                "offset",
-                "offset must be an integer >= 0.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const listRequest: ListIssuedCertificatesApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              certificateAuthorityId: normalizeOptionalString(url.searchParams.get("certificateAuthorityId")),
-              statuses: statuses.length > 0
-                ? statuses as NonNullable<ListIssuedCertificatesApiRequest["statuses"]>
-                : undefined,
-              subjectReferenceKinds: subjectReferenceKinds.length > 0
-                ? subjectReferenceKinds as NonNullable<ListIssuedCertificatesApiRequest["subjectReferenceKinds"]>
-                : undefined,
-              subjectReferenceId: normalizeOptionalString(url.searchParams.get("subjectReferenceId")),
-              linkedNodeId: normalizeOptionalString(url.searchParams.get("linkedNodeId")),
-              subjectCommonNameContains: normalizeOptionalString(url.searchParams.get("subjectCommonNameContains")),
-              usageAnyOf: usageAnyOf.length > 0
-                ? usageAnyOf as NonNullable<ListIssuedCertificatesApiRequest["usageAnyOf"]>
-                : undefined,
-              issuedAfter: normalizeOptionalString(url.searchParams.get("issuedAfter")),
-              issuedBefore: normalizeOptionalString(url.searchParams.get("issuedBefore")),
-              trustStatuses: trustStatuses.length > 0
-                ? trustStatuses as NonNullable<ListIssuedCertificatesApiRequest["trustStatuses"]>
-                : undefined,
-              includeRevoked,
-              asOf: normalizeOptionalString(url.searchParams.get("asOf")),
-              limit,
-              offset,
-            });
-
-            const apiResponse = await options.certificateOperationsBackendApi.listIssuedCertificates(listRequest);
-            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.certificateOperationsBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/security/certificates/")
-        && !path.endsWith("/revoke")
-        && !path.endsWith("/renew")
-        && !path.endsWith("/authority/status")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const serialNumber = decodePathTail(path, "/api/v1/security/certificates/");
-            if (!serialNumber || serialNumber.includes("/")) {
-              const invalid = buildCertificateOperationsInvalidRequestResponse("serialNumber is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const apiResponse = await options.certificateOperationsBackendApi.getIssuedCertificate({
-              actorUserIdentityId: context.principal.userIdentityId,
-              serialNumber,
-              asOf: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("asOf")),
-            });
-            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              serialNumber,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.certificateOperationsBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/security/certificates/")
-        && path.endsWith("/revoke")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const serialNumber = decodePathTail(path, "/api/v1/security/certificates/", "/revoke");
-            if (!serialNumber || serialNumber.includes("/")) {
-              const invalid = buildCertificateOperationsInvalidRequestResponse("serialNumber is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              RevokeIssuedCertificateRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const revokeRequest: RevokeIssuedCertificateApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              serialNumber,
-              ...parsedRequest.data,
-            });
-            const apiResponse = await options.certificateOperationsBackendApi.revokeIssuedCertificate(revokeRequest);
-            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, revokeRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.certificateOperationsBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/security/certificates/")
-        && path.endsWith("/renew")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          {
-            minimumAssuranceLevel: "authenticated-trusted",
-          },
-          async (context) => {
-            const serialNumber = decodePathTail(path, "/api/v1/security/certificates/", "/renew");
-            if (!serialNumber || serialNumber.includes("/")) {
-              const invalid = buildCertificateOperationsInvalidRequestResponse("serialNumber is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateRequest(
-              request,
-              RenewIssuedCertificateRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const renewRequest: RenewIssuedCertificateApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              serialNumber,
-              ...parsedRequest.data,
-            });
-            const apiResponse = await options.certificateOperationsBackendApi.renewIssuedCertificate(renewRequest);
-            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, renewRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.nodeTrustBackendApi
-        && request.method === "POST"
-        && path === "/api/v1/nodes/enrollments"
-      ) {
-        const parsedRequest = await parseAndValidateNodeEnrollmentSubmissionRequest(
-          request,
-          requestId,
-          logger,
-          maxBodyBytes,
-        );
-        if (!parsedRequest.ok) {
-          writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-          return;
         }
-
-        const apiResponse = await options.nodeTrustBackendApi.submitNodeEnrollment(parsedRequest.data);
-        const statusCode = mapNodeTrustStatusCode(apiResponse);
-        writeJson(response, statusCode, apiResponse);
-        logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
-        return;
       }
       if (
-        options.nodeTrustBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/nodes/enrollments/pending"
+        options.systemRuntimeBackendApi
+        && request.method === "POST"
+        && path === SystemRuntimeTransportRoutes.startRun
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
           async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const statuses = url.searchParams.getAll("status");
-            const statusValidation = z.array(NodePendingEnrollmentStatusValues).safeParse(statuses);
-            if (!statusValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError("status", "status values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedBody.body);
+              return;
+            }
+            const parsedRequest = parseAndValidateRuntimeStartRunMutationRequest(parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
               return;
             }
 
-            const apiResponse = await options.nodeTrustBackendApi.listPendingNodeEnrollments({
-              actorUserIdentityId: context.principal.userIdentityId,
-              nodeId: normalizeOptionalString(url.searchParams.get("nodeId")),
-              statuses: statusValidation.data.length > 0 ? statusValidation.data : undefined,
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            const requestContext = buildRuntimeApiRequestContext(context, "mutation");
+            const apiResponse = await options.systemRuntimeBackendApi.startExecutionAsync({
+              ...parsedRequest.data,
+              requestContext,
             });
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              query: Object.fromEntries(url.searchParams.entries()),
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              systemId: parsedRequest.data.systemId,
+              versionId: parsedRequest.data.versionId,
+              executionId: parsedRequest.data.executionId,
             }), apiResponse);
           },
         );
         return;
       }
       if (
-        options.nodeTrustBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/nodes/trusted"
+        options.systemRuntimeBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/cancel")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
           async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const nodeTypes = url.searchParams.getAll("nodeType");
-            const nodeTypeValidation = z.array(NodeTypeValues).safeParse(nodeTypes);
-            if (!nodeTypeValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError("nodeType", "nodeType values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+            const executionId = decodePathTail(path, "/api/v1/runtime/runs/", "/cancel");
+            if (!executionId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and executionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes, true);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                executionId,
+                workspaceId: context.workspace.workspaceId,
+              }), parsedBody.body);
+              return;
+            }
+            const parsedRequest = parseAndValidateRuntimeCancelRunMutationRequest(executionId, parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                executionId,
+                workspaceId: context.workspace.workspaceId,
+              }), parsedRequest.body);
               return;
             }
 
-            const capabilities = url.searchParams.getAll("capability");
-            const capabilityValidation = z.array(NodeCapabilityValues).safeParse(capabilities);
-            if (!capabilityValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError("capability", "capability values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const inventoryRequest: ListTrustedNodeInventoryApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              nodeTypes: nodeTypeValidation.data.length > 0 ? nodeTypeValidation.data : undefined,
-              capabilityAnyOf: capabilityValidation.data.length > 0 ? capabilityValidation.data : undefined,
-              deploymentTagAnyOf: url.searchParams.getAll("deploymentTag"),
-              lastSeenAfter: normalizeOptionalString(url.searchParams.get("lastSeenAfter")),
-              lastSeenBefore: normalizeOptionalString(url.searchParams.get("lastSeenBefore")),
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            const requestContext = buildRuntimeApiRequestContext(context, "mutation");
+            const apiResponse = await options.systemRuntimeBackendApi.cancelExecution({
+              ...parsedRequest.data,
+              requestContext,
             });
-
-            const apiResponse = await options.nodeTrustBackendApi.listTrustedNodeInventory(inventoryRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              query: Object.fromEntries(url.searchParams.entries()),
+              executionId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
             }), apiResponse);
           },
         );
         return;
       }
       if (
-        options.nodeTrustBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/nodes/inventory"
+        options.systemRuntimeBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/runtime/queue/")
+        && path.endsWith("/dequeue")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
           async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const nodeTypes = url.searchParams.getAll("nodeType");
-            const nodeTypeValidation = z.array(NodeTypeValues).safeParse(nodeTypes);
-            if (!nodeTypeValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError("nodeType", "nodeType values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+            const queueItemId = decodePathTail(path, "/api/v1/runtime/queue/", "/dequeue");
+            if (!queueItemId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and queueItemId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes, true);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                queueItemId,
+                workspaceId: context.workspace.workspaceId,
+              }), parsedBody.body);
+              return;
+            }
+            const parsedRequest = parseAndValidateRuntimeDequeueMutationRequest(queueItemId, parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                queueItemId,
+                workspaceId: context.workspace.workspaceId,
+              }), parsedRequest.body);
               return;
             }
 
-            const approvalStatuses = url.searchParams.getAll("approvalStatus");
-            const approvalStatusValidation = z.array(NodeApprovalStatusValues).safeParse(approvalStatuses);
-            if (!approvalStatusValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError("approvalStatus", "approvalStatus values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const operationalStates = url.searchParams.getAll("operationalState");
-            const operationalStateValidation = z.array(NodeInventoryOperationalStateValues).safeParse(operationalStates);
-            if (!operationalStateValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError(
-                "operationalState",
-                "operationalState values are invalid.",
-              );
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const presenceStates = url.searchParams.getAll("presenceState");
-            const presenceStateValidation = z.array(NodeInventoryPresenceStateValues).safeParse(presenceStates);
-            if (!presenceStateValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError("presenceState", "presenceState values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const enrollmentStatuses = url.searchParams.getAll("enrollmentStatus");
-            const enrollmentStatusValidation = z.array(NodeEnrollmentRequestStatusValues).safeParse(enrollmentStatuses);
-            if (!enrollmentStatusValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError(
-                "enrollmentStatus",
-                "enrollmentStatus values are invalid.",
-              );
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const capabilities = url.searchParams.getAll("capability");
-            const capabilityValidation = z.array(NodeCapabilityValues).safeParse(capabilities);
-            if (!capabilityValidation.success) {
-              const validationError = buildNodeTrustQueryValidationError("capability", "capability values are invalid.");
-              writeJson(response, 400, validationError);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
-              return;
-            }
-
-            const inventoryRequest: ListNodeInventoryApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              nodeTypes: nodeTypeValidation.data.length > 0 ? nodeTypeValidation.data : undefined,
-              approvalStatuses: approvalStatusValidation.data.length > 0 ? approvalStatusValidation.data : undefined,
-              operationalStates: operationalStateValidation.data.length > 0 ? operationalStateValidation.data : undefined,
-              enrollmentStatuses: enrollmentStatusValidation.data.length > 0 ? enrollmentStatusValidation.data : undefined,
-              presenceStates: presenceStateValidation.data.length > 0 ? presenceStateValidation.data : undefined,
-              capabilityAnyOf: capabilityValidation.data.length > 0 ? capabilityValidation.data : undefined,
-              deploymentTagAnyOf: url.searchParams.getAll("deploymentTag"),
-              lastSeenAfter: normalizeOptionalString(url.searchParams.get("lastSeenAfter")),
-              lastSeenBefore: normalizeOptionalString(url.searchParams.get("lastSeenBefore")),
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            const requestContext = buildRuntimeApiRequestContext(context, "mutation");
+            const apiResponse = await options.systemRuntimeBackendApi.dequeueQueueItem({
+              ...parsedRequest.data,
+              requestContext,
             });
-
-            const apiResponse = await options.nodeTrustBackendApi.listNodeInventory(inventoryRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              query: Object.fromEntries(url.searchParams.entries()),
+              queueItemId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
             }), apiResponse);
           },
         );
         return;
       }
       if (
-        options.nodeTrustBackendApi
+        options.systemRuntimeBackendApi
         && request.method === "GET"
-        && path.startsWith("/api/v1/nodes/inventory/")
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/status")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
           async (context) => {
-            const nodeId = decodePathTail(path, "/api/v1/nodes/inventory/");
-            if (!nodeId) {
-              const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
+            const executionId = decodePathTail(path, "/api/v1/runtime/runs/", "/status");
+            if (!executionId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and executionId are required.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
 
-            const inventoryDetailRequest: GetNodeInventoryDetailApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              nodeId,
-            });
-            const apiResponse = await options.nodeTrustBackendApi.getNodeInventoryDetail(inventoryDetailRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, inventoryDetailRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.nodeTrustBackendApi
-        && request.method === "POST"
-        && path.endsWith("/revoke")
-        && path.startsWith("/api/v1/nodes/")
-        && !path.startsWith("/api/v1/nodes/enrollments/")
-        && !path.startsWith("/api/v1/nodes/inventory/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const nodeId = decodePathTail(path, "/api/v1/nodes/", "/revoke");
-            if (!nodeId) {
-              const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateRevokeNodeTrustRequest(
-              request,
-              context.principal.userIdentityId,
-              nodeId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const revokeRequest: RevokeNodeTrustApiRequest = Object.freeze({
-              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
-              nodeId: parsedRequest.data.nodeId,
-              reason: parsedRequest.data.reason,
-              revokedAt: parsedRequest.data.revokedAt,
-              note: parsedRequest.data.note,
-              correlationId: parsedRequest.data.correlationId,
-              metadata: parsedRequest.data.metadata,
-            });
-            const apiResponse = await options.nodeTrustBackendApi.revokeNodeTrust(revokeRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, revokeRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.nodeTrustBackendApi
-        && request.method === "GET"
-        && path.endsWith("/runtime-trust-material")
-        && path.startsWith("/api/v1/nodes/")
-        && !path.startsWith("/api/v1/nodes/enrollments/")
-      ) {
-        const runtimeTrustMaterialNodeId = decodePathTail(path, "/api/v1/nodes/", "/runtime-trust-material");
-        await requireAuthenticatedNodeTransport(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          options.nodeTrustBackendApi,
-          logger,
-          options.transportTrust,
-          runtimeTrustMaterialNodeId,
-          async (context) => {
-            const nodeId = context.nodeId;
-
-            const includeLeafCertificateInput = searchParams.get("includeLeafCertificate");
-            const includeCertificateChainInput = searchParams.get("includeCertificateChain");
-            const includeTrustBundleInput = searchParams.get("includeTrustBundle");
-            const includeLeafCertificate = parseOptionalBoolean(includeLeafCertificateInput);
-            const includeCertificateChain = parseOptionalBoolean(includeCertificateChainInput);
-            const includeTrustBundle = parseOptionalBoolean(includeTrustBundleInput);
-
-            if (includeLeafCertificateInput !== null && includeLeafCertificate === undefined) {
-              const invalid = buildNodeTrustQueryValidationError(
-                "includeLeafCertificate",
-                "includeLeafCertificate must be 'true' or 'false'.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({
-                nodeId,
-                includeLeafCertificate: includeLeafCertificateInput,
-              }), invalid);
-              return;
-            }
-
-            if (includeCertificateChainInput !== null && includeCertificateChain === undefined) {
-              const invalid = buildNodeTrustQueryValidationError(
-                "includeCertificateChain",
-                "includeCertificateChain must be 'true' or 'false'.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({
-                nodeId,
-                includeCertificateChain: includeCertificateChainInput,
-              }), invalid);
-              return;
-            }
-
-            if (includeTrustBundleInput !== null && includeTrustBundle === undefined) {
-              const invalid = buildNodeTrustQueryValidationError(
-                "includeTrustBundle",
-                "includeTrustBundle must be 'true' or 'false'.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({
-                nodeId,
-                includeTrustBundle: includeTrustBundleInput,
-              }), invalid);
-              return;
-            }
-
-            let runtimeTrustMaterialRequest: ResolveNodeRuntimeTrustMaterialApiRequest;
-            try {
-              const parsedRequest = parseResolveNodeRuntimeTrustMaterialRequestDto({
-                actorUserIdentityId: nodeId,
-                nodeId,
-                workspaceId: normalizeOptionalString(searchParams.get("workspaceId")),
-                certificateAuthorityId: normalizeOptionalString(searchParams.get("certificateAuthorityId")),
-                serialNumber: normalizeOptionalString(searchParams.get("serialNumber")),
-                includeLeafCertificate,
-                includeCertificateChain,
-                includeTrustBundle,
-                occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-              });
-              runtimeTrustMaterialRequest = Object.freeze({
-                actorUserIdentityId: parsedRequest.actorUserIdentityId,
-                nodeId: parsedRequest.nodeId,
-                workspaceId: parsedRequest.workspaceId,
-                certificateAuthorityId: parsedRequest.certificateAuthorityId,
-                serialNumber: parsedRequest.serialNumber,
-                includeLeafCertificate: parsedRequest.includeLeafCertificate,
-                includeCertificateChain: parsedRequest.includeCertificateChain,
-                includeTrustBundle: parsedRequest.includeTrustBundle,
-                occurredAt: parsedRequest.occurredAt,
-              });
-            } catch (error) {
-              if (error instanceof NodeTrustApiSchemaValidationError) {
-                const invalid: NodeTrustApiResponse<never> = Object.freeze({
-                  ok: false,
-                  error: Object.freeze({
-                    code: NodeTrustApiErrorCodes.invalidRequest,
-                    message: "Request validation failed.",
-                    validationErrors: Object.freeze(error.issues.map((issue) => Object.freeze({
-                      path: issue.path,
-                      code: issue.code,
-                      message: issue.message,
-                    }))),
-                  }),
-                });
-                writeJson(response, 400, invalid);
-                logResponse(logger, requestId, request, 400, Object.freeze({
-                  nodeId,
-                  query: Object.freeze({
-                    workspaceId: normalizeOptionalString(searchParams.get("workspaceId")),
-                    certificateAuthorityId: normalizeOptionalString(searchParams.get("certificateAuthorityId")),
-                    serialNumber: normalizeOptionalString(searchParams.get("serialNumber")),
-                    includeLeafCertificate: includeLeafCertificateInput,
-                    includeCertificateChain: includeCertificateChainInput,
-                    includeTrustBundle: includeTrustBundleInput,
-                    occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-                  }),
-                }), invalid);
-                return;
-              }
-
-              const invalid = buildNodeTrustInvalidRequestResponse("Request validation failed.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({
-                nodeId,
-              }), invalid);
-              return;
-            }
-
-            const apiResponse = await options.nodeTrustBackendApi.resolveNodeRuntimeTrustMaterial(runtimeTrustMaterialRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, runtimeTrustMaterialRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.nodeTrustBackendApi
-        && request.method === "POST"
-        && path.endsWith("/heartbeat")
-        && path.startsWith("/api/v1/nodes/")
-        && !path.startsWith("/api/v1/nodes/enrollments/")
-      ) {
-        const heartbeatNodeId = decodePathTail(path, "/api/v1/nodes/", "/heartbeat");
-        await requireAuthenticatedNodeTransport(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          options.nodeTrustBackendApi,
-          logger,
-          options.transportTrust,
-          heartbeatNodeId,
-          async (context) => {
-            const nodeId = context.nodeId;
-
-            const parsedRequest = await parseAndValidateNodeHeartbeatRequest(
-              request,
-              nodeId,
-              nodeId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const heartbeatRequest: RecordNodeHeartbeatApiRequest = Object.freeze({
-              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
-              nodeId: parsedRequest.data.nodeId,
-              heartbeatStatus: parsedRequest.data.heartbeatStatus,
-              seenAt: parsedRequest.data.seenAt,
-              observedBy: parsedRequest.data.observedBy,
-              metadata: parsedRequest.data.metadata,
-            });
-            const apiResponse = await options.nodeTrustBackendApi.recordNodeHeartbeat(heartbeatRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, heartbeatRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.nodeTrustBackendApi
-        && request.method === "POST"
-        && path.endsWith("/operational-update")
-        && path.startsWith("/api/v1/nodes/")
-        && !path.startsWith("/api/v1/nodes/enrollments/")
-      ) {
-        const operationalUpdateNodeId = decodePathTail(path, "/api/v1/nodes/", "/operational-update");
-        await requireAuthenticatedNodeTransport(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          options.nodeTrustBackendApi,
-          logger,
-          options.transportTrust,
-          operationalUpdateNodeId,
-          async (context) => {
-            const nodeId = context.nodeId;
-
-            const parsedRequest = await parseAndValidateNodeOperationalUpdateRequest(
-              request,
-              nodeId,
-              nodeId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const operationalUpdateRequest: RecordNodeOperationalUpdateApiRequest = Object.freeze({
-              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
-              nodeId: parsedRequest.data.nodeId,
-              heartbeatStatus: parsedRequest.data.heartbeatStatus,
-              seenAt: parsedRequest.data.seenAt,
-              observedBy: parsedRequest.data.observedBy,
-              capabilityProfile: parsedRequest.data.capabilityProfile,
-              deploymentTags: parsedRequest.data.deploymentTags,
-              metadata: parsedRequest.data.metadata,
-            });
-            const apiResponse = await options.nodeTrustBackendApi.recordNodeOperationalUpdate(operationalUpdateRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, operationalUpdateRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.nodeTrustBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/nodes/enrollments/")
-        && !path.endsWith("/approve")
-        && !path.endsWith("/reject")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/");
-            if (!enrollmentRequestId) {
-              const invalid = buildNodeTrustInvalidRequestResponse("requestId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const enrollmentDetailRequest: GetNodeEnrollmentDetailApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              requestId: enrollmentRequestId,
-            });
-            const apiResponse = await options.nodeTrustBackendApi.getNodeEnrollmentDetail(enrollmentDetailRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, enrollmentDetailRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.nodeTrustBackendApi
-        && request.method === "POST"
-        && path.endsWith("/approve")
-        && path.startsWith("/api/v1/nodes/enrollments/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/", "/approve");
-            if (!enrollmentRequestId) {
-              const invalid = buildNodeTrustInvalidRequestResponse("requestId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateApproveNodeEnrollmentRequest(
-              request,
-              context.principal.userIdentityId,
-              enrollmentRequestId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const approveRequest: ApproveNodeEnrollmentApiRequest = Object.freeze({
-              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
-              requestId: parsedRequest.data.requestId,
-              reviewedAt: parsedRequest.data.reviewedAt,
-              decisionNote: parsedRequest.data.decisionNote,
-              certificate: parsedRequest.data.certificate,
-              correlationId: parsedRequest.data.correlationId,
-              metadata: parsedRequest.data.metadata,
-            });
-            const apiResponse = await options.nodeTrustBackendApi.approveNodeEnrollment(approveRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, approveRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.nodeTrustBackendApi
-        && request.method === "POST"
-        && path.endsWith("/reject")
-        && path.startsWith("/api/v1/nodes/enrollments/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/", "/reject");
-            if (!enrollmentRequestId) {
-              const invalid = buildNodeTrustInvalidRequestResponse("requestId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateRejectNodeEnrollmentRequest(
-              request,
-              context.principal.userIdentityId,
-              enrollmentRequestId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const rejectRequest: RejectNodeEnrollmentApiRequest = Object.freeze({
-              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
-              requestId: parsedRequest.data.requestId,
-              reviewedAt: parsedRequest.data.reviewedAt,
-              decisionNote: parsedRequest.data.decisionNote,
-              correlationId: parsedRequest.data.correlationId,
-              metadata: parsedRequest.data.metadata,
-            });
-            const apiResponse = await options.nodeTrustBackendApi.rejectNodeEnrollment(rejectRequest);
-            const statusCode = mapNodeTrustStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, rejectRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.storageManagementBackendApi
-        && request.method === "POST"
-        && path === "/api/v1/storage/instances"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateStorageCreateRequest(
-              request,
-              context.principal.userIdentityId,
-              workspaceId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.storageManagementBackendApi.createStorageInstance(parsedRequest.data);
-            const statusCode = mapStorageManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.storageManagementBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/storage/instances"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parseArrayEnum = <TValue extends string>(
-              key: string,
-              values: ReadonlyArray<string>,
-              schema: z.ZodType<ReadonlyArray<TValue>>,
-            ): { readonly ok: true; readonly data: ReadonlyArray<TValue> } | { readonly ok: false } => {
-              const validation = schema.safeParse(values);
-              if (validation.success) {
-                return { ok: true, data: validation.data };
-              }
-              const invalid = buildStorageManagementQueryValidationError(key, `${key} values are invalid.`);
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return { ok: false };
-            };
-
-            const backendTypesValidation = parseArrayEnum("backendType", searchParams.getAll("backendType"), z.array(StorageBackendTypeValues));
-            if (!backendTypesValidation.ok) {
-              return;
-            }
-            const lifecycleStatesValidation = parseArrayEnum("lifecycleState", searchParams.getAll("lifecycleState"), z.array(StorageLifecycleStateValues));
-            if (!lifecycleStatesValidation.ok) {
-              return;
-            }
-            const accessModesValidation = parseArrayEnum("accessMode", searchParams.getAll("accessMode"), z.array(StorageAccessModeValues));
-            if (!accessModesValidation.ok) {
-              return;
-            }
-            const accessScopesValidation = parseArrayEnum("accessScope", searchParams.getAll("accessScope"), z.array(StorageAccessScopeValues));
-            if (!accessScopesValidation.ok) {
-              return;
-            }
-
-            const listRequestDto = {
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              backendTypes: backendTypesValidation.data.length > 0 ? backendTypesValidation.data : undefined,
-              lifecycleStates: lifecycleStatesValidation.data.length > 0 ? lifecycleStatesValidation.data : undefined,
-              accessModes: accessModesValidation.data.length > 0 ? accessModesValidation.data : undefined,
-              accessScopes: accessScopesValidation.data.length > 0 ? accessScopesValidation.data : undefined,
-              limit: parseOptionalInteger(searchParams.get("limit")),
-              offset: parseOptionalInteger(searchParams.get("offset")),
-              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-            };
-
-            try {
-              parseListStorageInstancesRequestDto(listRequestDto);
-            } catch (error) {
-              if (error instanceof StorageTransportSchemaValidationError) {
-                const invalid = buildStorageManagementValidationErrors(error.issues);
-                writeJson(response, 400, invalid);
-                logResponse(logger, requestId, request, 400, Object.freeze({ query: Object.fromEntries(searchParams.entries()) }), invalid);
-                return;
-              }
-              throw error;
-            }
-
-            const listRequest: ListStorageInstancesApiRequest = Object.freeze({
-              ...listRequestDto,
-              includeCapabilities: parseOptionalBoolean(searchParams.get("includeCapabilities")),
-            });
-            const apiResponse = await options.storageManagementBackendApi.listStorageInstances(listRequest);
-            const statusCode = mapStorageManagementStatusCode(apiResponse);
+            const requestContext = buildRuntimeApiRequestContext(context);
+            const apiResponse = await options.systemRuntimeBackendApi.getExecutionStatus(executionId, requestContext);
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
+              executionId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/result")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const executionId = decodePathTail(path, "/api/v1/runtime/runs/", "/result");
+            if (!executionId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and executionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const nodeResultLimit = parseOptionalInteger(searchParams.get("nodeResultLimit"));
+            const diagnosticsLimit = parseOptionalInteger(searchParams.get("diagnosticsLimit"));
+            if ((searchParams.get("nodeResultLimit") && nodeResultLimit === undefined)
+              || (searchParams.get("diagnosticsLimit") && diagnosticsLimit === undefined)) {
+              const invalid = buildRuntimeInvalidRequestResponse("nodeResultLimit and diagnosticsLimit must be integers.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                executionId,
+                workspaceId: context.workspace.workspaceId,
+              }), invalid);
+              return;
+            }
+
+            const requestContext = buildRuntimeApiRequestContext(context);
+            const apiResponse = await options.systemRuntimeBackendApi.getExecutionResultBounded({
+              executionId,
+              nodeResultLimit,
+              diagnosticsLimit,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              executionId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              nodeResultLimit,
+              diagnosticsLimit,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/trace")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const executionId = decodePathTail(path, "/api/v1/runtime/runs/", "/trace");
+            if (!executionId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and executionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const eventLimit = parseOptionalInteger(searchParams.get("eventLimit"));
+            const logLimit = parseOptionalInteger(searchParams.get("logLimit"));
+            if ((searchParams.get("eventLimit") && eventLimit === undefined)
+              || (searchParams.get("logLimit") && logLimit === undefined)) {
+              const invalid = buildRuntimeInvalidRequestResponse("eventLimit and logLimit must be integers.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                executionId,
+                workspaceId: context.workspace.workspaceId,
+              }), invalid);
+              return;
+            }
+
+            const requestContext = buildRuntimeApiRequestContext(context);
+            const apiResponse = await options.systemRuntimeBackendApi.getExecutionTrace({
+              executionId,
+              eventLimit,
+              logLimit,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              executionId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              eventLimit,
+              logLimit,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/runtime/queue"
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = parseAndValidateRuntimeQueueListRequest({
+              workspaceId: context.workspace.workspaceId,
+              searchParams,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedRequest.statusCode,
+                Object.freeze({ workspaceId: context.workspace.workspaceId }),
+                parsedRequest.body,
+              );
+              return;
+            }
+            const requestContext = buildRuntimeApiRequestContext(context);
+            const apiResponse = await options.systemRuntimeBackendApi.listQueueItems({
+              ...parsedRequest.data,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
               query: Object.fromEntries(searchParams.entries()),
             }), apiResponse);
           },
         );
         return;
       }
-      if (
-        options.storageManagementBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/storage/instances/")
-        && path.endsWith("/health")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/health");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse(
-                "workspaceId and storageInstanceId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
 
-            const healthRequest: GetStorageInstanceHealthApiRequest = {
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              storageInstanceId,
-              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-            };
-            try {
-              parseGetStorageInstanceDetailRequestDto(healthRequest);
-            } catch (error) {
-              if (error instanceof StorageTransportSchemaValidationError) {
-                const invalid = buildStorageManagementValidationErrors(error.issues);
-                writeJson(response, 400, invalid);
-                logResponse(logger, requestId, request, 400, healthRequest, invalid);
-                return;
-              }
-              throw error;
-            }
-
-            const apiResponse = await options.storageManagementBackendApi.getStorageInstanceHealth(healthRequest);
-            const statusCode = mapStorageManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, healthRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.storageManagementBackendApi
-        && request.method === "PATCH"
-        && path.startsWith("/api/v1/storage/instances/")
-        && path.endsWith("/metadata")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/metadata");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse(
-                "workspaceId and storageInstanceId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateStorageMetadataUpdateRequest(
-              request,
-              context.principal.userIdentityId,
-              workspaceId,
-              storageInstanceId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.storageManagementBackendApi.updateStorageMetadata(parsedRequest.data);
-            const statusCode = mapStorageManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.storageManagementBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/storage/instances/")
-        && path.endsWith("/activate")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/activate");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse(
-                "workspaceId and storageInstanceId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateStorageLifecycleRequest(
-              request,
-              ActivateStorageInstanceRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const activateRequest: ActivateStorageInstanceApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              storageInstanceId,
-              ...parsedRequest.data,
-            });
-            const apiResponse = await options.storageManagementBackendApi.activateStorageInstance(activateRequest);
-            const statusCode = mapStorageManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, activateRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.storageManagementBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/storage/instances/")
-        && path.endsWith("/deactivate")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/deactivate");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse(
-                "workspaceId and storageInstanceId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateStorageLifecycleRequest(
-              request,
-              DeactivateStorageInstanceRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const deactivateRequest: DeactivateStorageInstanceApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              storageInstanceId,
-              ...parsedRequest.data,
-            });
-            const apiResponse = await options.storageManagementBackendApi.deactivateStorageInstance(deactivateRequest);
-            const statusCode = mapStorageManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, deactivateRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.storageManagementBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/storage/instances/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse(
-                "workspaceId and storageInstanceId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const detailRequestDto = {
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              storageInstanceId,
-              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-            };
-            try {
-              parseGetStorageInstanceDetailRequestDto(detailRequestDto);
-            } catch (error) {
-              if (error instanceof StorageTransportSchemaValidationError) {
-                const invalid = buildStorageManagementValidationErrors(error.issues);
-                writeJson(response, 400, invalid);
-                logResponse(logger, requestId, request, 400, detailRequestDto, invalid);
-                return;
-              }
-              throw error;
-            }
-
-            const detailRequest: GetStorageInstanceDetailApiRequest = Object.freeze({
-              ...detailRequestDto,
-              includeCapabilities: parseOptionalBoolean(searchParams.get("includeCapabilities")),
-            });
-            const apiResponse = await options.storageManagementBackendApi.getStorageInstanceDetail(detailRequest);
-            const statusCode = mapStorageManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/assets"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = parseAndValidateAssetListRequest(
-              context.principal.userIdentityId,
-              workspaceId,
-              searchParams,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId }), parsedRequest.body);
-              return;
-            }
-
-            const listRequest = parsedRequest.data;
-            const apiResponse = await options.assetManagementBackendApi.listAssets(listRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/assets/")
-        && path.endsWith("/downloads/content")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            const assetId = decodePathTail(path, "/api/v1/assets/", "/downloads/content");
-            const contentToken = normalizeOptionalString(searchParams.get("contentToken"));
-            if (!workspaceId || !assetId || assetId.includes("/") || !contentToken) {
-              const invalid = buildAssetManagementInvalidRequestResponse(
-                "workspaceId, assetId, and contentToken are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const streamRequest: OpenAuthorizedAssetDownloadStreamApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              assetId,
-              contentToken,
-              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
-              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-            });
-            const apiResponse = await options.assetManagementBackendApi.openAuthorizedAssetDownloadStream(streamRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            if (!apiResponse.ok || !apiResponse.data) {
-              writeJson(response, statusCode, apiResponse);
-              logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
-              return;
-            }
-
-            const contentDisposition = buildContentDispositionHeader(
-              apiResponse.data.contentDisposition,
-              apiResponse.data.contentDispositionFileName,
-            );
-            response.statusCode = 200;
-            response.setHeader("content-type", apiResponse.data.mimeType);
-            response.setHeader("content-length", String(apiResponse.data.sizeBytes));
-            response.setHeader("content-disposition", contentDisposition);
-            response.setHeader("x-content-type-options", "nosniff");
-            response.setHeader("cache-control", "private, no-store");
-
-            try {
-              for await (const chunk of apiResponse.data.stream) {
-                const encoded = Buffer.from(chunk);
-                if (!response.write(encoded)) {
-                  await once(response, "drain");
-                }
-              }
-              response.end();
-              logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
-                ok: true,
-                data: Object.freeze({
-                  assetId: apiResponse.data.assetId,
-                  versionId: apiResponse.data.versionId,
-                  mimeType: apiResponse.data.mimeType,
-                  sizeBytes: apiResponse.data.sizeBytes,
-                }),
-              }));
-            } catch (error) {
-              if (!response.headersSent) {
-                const failed = buildAssetManagementInternalErrorResponse(
-                  "Download content stream could not be completed.",
-                );
-                writeJson(response, 500, failed);
-                logResponse(logger, requestId, request, 500, streamRequest, failed);
-                return;
-              }
-              response.destroy(error instanceof Error ? error : undefined);
-            }
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/assets/")
-        && path.endsWith("/downloads/authorize")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            const assetId = decodePathTail(path, "/api/v1/assets/", "/downloads/authorize");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateAssetDownloadAuthorizationRequest(
-              request,
-              context.principal.userIdentityId,
-              workspaceId,
-              assetId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.assetManagementBackendApi.authorizeAssetDownload(parsedRequest.data);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/assets/")
-        && path.endsWith("/preview")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            const assetId = decodePathTail(path, "/api/v1/assets/", "/preview");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = parseAndValidateAssetPreviewRequest(
-              context.principal.userIdentityId,
-              workspaceId,
-              assetId,
-              searchParams,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId, assetId }), parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.assetManagementBackendApi.resolveAssetPreview(parsedRequest.data);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/assets/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            const assetId = decodePathTail(path, "/api/v1/assets/");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const detailRequest: GetAssetDetailApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              assetId,
-              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
-              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-              includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
-            });
-            const apiResponse = await options.assetManagementBackendApi.getAssetDetail(detailRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "POST"
-        && path === "/api/v1/assets/register"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateAssetRegisterRequest(
-              request,
-              context.principal.userIdentityId,
-              workspaceId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const registerRequest: RegisterAssetApiRequest = parsedRequest.data;
-            const apiResponse = await options.assetManagementBackendApi.registerAsset(registerRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, registerRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "POST"
-        && path === "/api/v1/assets/generated-outputs/register"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateGeneratedOutputRegisterRequest(
-              request,
-              context.principal.userIdentityId,
-              workspaceId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const registerRequest: RegisterGeneratedOutputApiRequest = parsedRequest.data;
-            const apiResponse = await options.assetManagementBackendApi.registerGeneratedOutput(registerRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, registerRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/assets/")
-        && path.endsWith("/archive")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            const assetId = decodePathTail(path, "/api/v1/assets/", "/archive");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const archiveRequest: ArchiveAssetApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              assetId,
-              operationKey: normalizeOptionalString(searchParams.get("operationKey")),
-              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
-              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-            });
-            const apiResponse = await options.assetManagementBackendApi.archiveAsset(archiveRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, archiveRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/assets/")
-        && path.endsWith("/delete")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            const assetId = decodePathTail(path, "/api/v1/assets/", "/delete");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const deleteRequest: DeleteAssetApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              assetId,
-              operationKey: normalizeOptionalString(searchParams.get("operationKey")),
-              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
-              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
-            });
-            const apiResponse = await options.assetManagementBackendApi.deleteAsset(deleteRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, deleteRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/assets/")
-        && path.endsWith("/uploads/initiate")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            const assetId = decodePathTail(path, "/api/v1/assets/", "/uploads/initiate");
-            if (!workspaceId || !assetId) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateAssetUploadInitiationRequest(
-              request,
-              context.principal.userIdentityId,
-              workspaceId,
-              assetId,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const initiateRequest: InitiateAssetUploadApiRequest = parsedRequest.data;
-            const apiResponse = await options.assetManagementBackendApi.initiateAssetUpload(initiateRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, initiateRequest, apiResponse);
-          },
-        );
-        return;
-      }
-      if (
-        options.assetManagementBackendApi
-        && request.method === "POST"
-        && path.startsWith("/api/v1/assets/upload-sessions/")
-        && path.endsWith("/content")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            const uploadSessionId = decodePathTail(path, "/api/v1/assets/upload-sessions/", "/content");
-            if (!workspaceId || !uploadSessionId) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and uploadSessionId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            const contentLength = parseOptionalInteger(
-              typeof request.headers["content-length"] === "string" ? request.headers["content-length"] : null,
-            );
-            if (typeof contentLength === "number" && contentLength > maxBodyBytes) {
-              const invalid = buildAssetManagementInvalidRequestResponse(
-                `Request body exceeds limit of ${maxBodyBytes} bytes.`,
-              );
-              writeJson(response, 413, invalid);
-              logResponse(logger, requestId, request, 413, Object.freeze({
-                workspaceId,
-                uploadSessionId,
-                contentLength,
-              }), invalid);
-              return;
-            }
-
-            const parsedRequest = parseAssetUploadContentRequest(
-              request,
-              context.principal.userIdentityId,
-              workspaceId,
-              uploadSessionId,
-            );
-
-            const apiResponse = await options.assetManagementBackendApi.ingestAssetUploadContent(parsedRequest);
-            const statusCode = mapAssetManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, {
-              actorUserIdentityId: parsedRequest.actorUserIdentityId,
-              workspaceId: parsedRequest.workspaceId,
-              uploadSessionId: parsedRequest.uploadSessionId,
-              contentType: parsedRequest.contentType,
-            }, apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.authorizationManagementBackendApi
-        && request.method === "PATCH"
-        && path.endsWith("/visibility")
-        && path.startsWith("/api/v1/authorization/resources/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const resource = decodeAuthorizationResourcePath(path, "/visibility");
-            if (!resource) {
-              const invalid = buildAuthorizationManagementInvalidRequestResponse(
-                "resourceFamily, resourceType, and resourceId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
-              request,
-              AuthorizationUpdateVisibilityRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.authorizationManagementBackendApi.updateVisibility({
-              actorUserIdentityId: context.principal.userIdentityId,
-              resource,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              resource,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.authorizationManagementBackendApi
-        && request.method === "POST"
-        && path.endsWith("/sharing-grants")
-        && path.startsWith("/api/v1/authorization/resources/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const resource = decodeAuthorizationResourcePath(path, "/sharing-grants");
-            if (!resource) {
-              const invalid = buildAuthorizationManagementInvalidRequestResponse(
-                "resourceFamily, resourceType, and resourceId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
-              request,
-              AuthorizationGrantSharingRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.authorizationManagementBackendApi.grantSharingAccess({
-              actorUserIdentityId: context.principal.userIdentityId,
-              resource,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              resource,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.authorizationManagementBackendApi
-        && request.method === "DELETE"
-        && path.includes("/sharing-grants/")
-        && path.startsWith("/api/v1/authorization/resources/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const pathParams = decodeAuthorizationResourceAndGrantPath(path);
-            if (!pathParams) {
-              const invalid = buildAuthorizationManagementInvalidRequestResponse(
-                "resourceFamily, resourceType, resourceId, and grantId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
-              request,
-              AuthorizationRevokeSharingRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-              {
-                allowEmptyBody: true,
-              },
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.authorizationManagementBackendApi.revokeSharingAccess({
-              actorUserIdentityId: context.principal.userIdentityId,
-              resource: pathParams.resource,
-              grantId: pathParams.grantId,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              resource: pathParams.resource,
-              grantId: pathParams.grantId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.authorizationManagementBackendApi
-        && request.method === "POST"
-        && path === "/api/v1/authorization/sharing-grants/workspace-role/bulk-upsert"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
-              request,
-              AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.authorizationManagementBackendApi.bulkGrantWorkspaceRoleAccess({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId: parsedRequest.data.workspaceId,
-              roleKey: parsedRequest.data.roleKey,
-              resources: parsedRequest.data.resources,
-              permissionKeys: parsedRequest.data.permissionKeys,
-              reason: parsedRequest.data.reason,
-              correlationId: parsedRequest.data.correlationId,
-              metadata: parsedRequest.data.metadata,
-            });
-            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId: parsedRequest.data.workspaceId,
-              roleKey: parsedRequest.data.roleKey,
-              resourceCount: parsedRequest.data.resources.length,
-              permissionKeys: parsedRequest.data.permissionKeys,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.authorizationManagementBackendApi
-        && request.method === "GET"
-        && path.endsWith("/access-state")
-        && path.startsWith("/api/v1/authorization/resources/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const resource = decodeAuthorizationResourcePath(path, "/access-state");
-            if (!resource) {
-              const invalid = buildAuthorizationManagementInvalidRequestResponse(
-                "resourceFamily, resourceType, and resourceId are required.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const includeDenied = parseOptionalBoolean(url.searchParams.get("includeDenied"));
-            const includeRevokedSharingGrants = parseOptionalBoolean(url.searchParams.get("includeRevokedSharingGrants"));
-            const asOf = normalizeOptionalString(url.searchParams.get("asOf"));
-            const inspectedActorUserIdentityId = normalizeOptionalString(url.searchParams.get("inspectedActorUserIdentityId"));
-
-            if (asOf && !z.string().datetime({ offset: true }).safeParse(asOf).success) {
-              const invalid = buildAuthorizationManagementInvalidRequestResponse("asOf must be a valid ISO-8601 timestamp.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({
-                actorUserIdentityId: context.principal.userIdentityId,
-                resource,
-                asOf,
-              }), invalid);
-              return;
-            }
-
-            const apiResponse = await options.authorizationManagementBackendApi.readAccessState({
-              actorUserIdentityId: context.principal.userIdentityId,
-              inspectedActorUserIdentityId,
-              resource,
-              asOf,
-              includeDenied,
-              includeRevokedSharingGrants,
-            });
-            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              resource,
-              query: Object.fromEntries(url.searchParams.entries()),
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.authorizationManagementBackendApi
-        && request.method === "GET"
-        && path.startsWith("/api/v1/authorization/reporting/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodeAuthorizationWorkspaceReportingPath(path);
-            if (!workspaceId) {
-              const invalid = buildAuthorizationManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const asOf = normalizeOptionalString(url.searchParams.get("asOf"));
-            const includeRevokedRoleAssignments = parseOptionalBoolean(url.searchParams.get("includeRevokedRoleAssignments"));
-            const includeRevokedSharingGrants = parseOptionalBoolean(url.searchParams.get("includeRevokedSharingGrants"));
-            const recentSharingMutationsLimit = parseOptionalInteger(url.searchParams.get("recentSharingMutationsLimit"));
-
-            if (asOf && !z.string().datetime({ offset: true }).safeParse(asOf).success) {
-              const invalid = buildAuthorizationManagementInvalidRequestResponse("asOf must be a valid ISO-8601 timestamp.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({
-                actorUserIdentityId: context.principal.userIdentityId,
-                workspaceId,
-                asOf,
-              }), invalid);
-              return;
-            }
-
-            const apiResponse = await options.authorizationManagementBackendApi.readWorkspaceSharingReport({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              asOf,
-              includeRevokedRoleAssignments,
-              includeRevokedSharingGrants,
-              recentSharingMutationsLimit,
-            });
-            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
-              query: Object.fromEntries(url.searchParams.entries()),
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "GET"
-        && path === "/api/v1/workspaces"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const statuses = url.searchParams.getAll("status");
-            const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaces({
-              actorUserIdentityId: context.principal.userIdentityId,
-              ownerUserIdentityId: normalizeOptionalString(url.searchParams.get("ownerUserIdentityId")),
-              statuses: statuses.length > 0 ? statuses.filter((status) => WorkspaceStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceStatusValues>> : undefined,
-              visibility: parseOptionalEnum(url.searchParams.get("visibility"), WorkspaceVisibilityValues.options),
-              slugPrefix: normalizeOptionalString(url.searchParams.get("slugPrefix")),
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              query: Object.fromEntries(url.searchParams.entries()),
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "POST"
-        && path === "/api/v1/workspaces"
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
-              request,
-              CreateWorkspaceRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.createWorkspace({
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "GET"
-        && path.endsWith("/admin-view")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/admin-view");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const apiResponse = await options.workspaceAdministrationBackendApi.readWorkspaceAdministrationView({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              asOf: normalizeOptionalString(url.searchParams.get("asOf")),
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "PATCH"
-        && path.startsWith("/api/v1/workspaces/")
-        && !path.endsWith("/lifecycle")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
-              request,
-              UpdateWorkspaceRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.updateWorkspace({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "POST"
-        && path.endsWith("/lifecycle")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/lifecycle");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
-              request,
-              TransitionWorkspaceLifecycleRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.transitionWorkspaceLifecycle({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              action: parsedRequest.data.action,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              action: parsedRequest.data.action,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "GET"
-        && path.endsWith("/members")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/members");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const statuses = url.searchParams.getAll("status")
-              .filter((status) => WorkspaceMembershipStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceMembershipStatusValues>>;
-            const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceMemberships({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              userIdentityId: normalizeOptionalString(url.searchParams.get("userIdentityId")),
-              statuses: statuses.length > 0 ? statuses : undefined,
-              invitationId: normalizeOptionalString(url.searchParams.get("invitationId")),
-              invitedByUserIdentityId: normalizeOptionalString(url.searchParams.get("invitedByUserIdentityId")),
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              query: Object.fromEntries(url.searchParams.entries()),
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "POST"
-        && path.endsWith("/members")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/members");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
-              request,
-              AddWorkspaceMemberRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.addWorkspaceMember({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "POST"
-        && path.endsWith("/status")
-        && path.includes("/members/")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const pathParams = decodeWorkspaceUserScopedPath(path, "/members/", "/status");
-            if (!pathParams) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId and userIdentityId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
-              request,
-              ChangeWorkspaceMembershipStatusRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.changeWorkspaceMembershipStatus({
-              workspaceId: pathParams.workspaceId,
-              targetUserIdentityId: pathParams.userIdentityId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              status: parsedRequest.data.status,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId: pathParams.workspaceId,
-              targetUserIdentityId: pathParams.userIdentityId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              status: parsedRequest.data.status,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "DELETE"
-        && path.includes("/members/")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const pathParams = decodeWorkspaceUserScopedPath(path, "/members/");
-            if (!pathParams) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId and userIdentityId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.removeWorkspaceMember({
-              workspaceId: pathParams.workspaceId,
-              targetUserIdentityId: pathParams.userIdentityId,
-              actorUserIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId: pathParams.workspaceId,
-              targetUserIdentityId: pathParams.userIdentityId,
-              actorUserIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "GET"
-        && path.endsWith("/invitations")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/invitations");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const statuses = url.searchParams.getAll("status")
-              .filter((status) => WorkspaceInvitationStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceInvitationStatusValues>>;
-            const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceInvitations({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              invitedEmail: normalizeOptionalString(url.searchParams.get("invitedEmail")),
-              invitedByUserIdentityId: normalizeOptionalString(url.searchParams.get("invitedByUserIdentityId")),
-              statuses: statuses.length > 0 ? statuses : undefined,
-              activeOnly: parseOptionalBoolean(url.searchParams.get("activeOnly")),
-              expiresBefore: normalizeOptionalString(url.searchParams.get("expiresBefore")),
-              expiresAfter: normalizeOptionalString(url.searchParams.get("expiresAfter")),
-              asOf: normalizeOptionalString(url.searchParams.get("asOf")),
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              query: Object.fromEntries(url.searchParams.entries()),
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "DELETE"
-        && path.includes("/invitations/")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const pathParams = decodeWorkspaceEntityPath(path, "/invitations/");
-            if (!pathParams) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId and invitationId are required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.cancelWorkspaceInvitation({
-              workspaceId: pathParams.workspaceId,
-              invitationId: pathParams.entityId,
-              actorUserIdentityId: context.principal.userIdentityId,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId: pathParams.workspaceId,
-              invitationId: pathParams.entityId,
-              actorUserIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "GET"
-        && path.endsWith("/roles")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const url = new URL(request.url ?? "/", "http://localhost");
-            const roles = url.searchParams.getAll("role")
-              .filter((role) => WorkspaceRoleValues.safeParse(role).success) as Array<z.infer<typeof WorkspaceRoleValues>>;
-            const statuses = url.searchParams.getAll("status")
-              .filter((status) => WorkspaceRoleAssignmentStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceRoleAssignmentStatusValues>>;
-            const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceRoleAssignments({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              userIdentityId: normalizeOptionalString(url.searchParams.get("userIdentityId")),
-              roles: roles.length > 0 ? roles : undefined,
-              statuses: statuses.length > 0 ? statuses : undefined,
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              query: Object.fromEntries(url.searchParams.entries()),
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "POST"
-        && path.endsWith("/roles/assign")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/assign");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
-              request,
-              AssignWorkspaceRoleRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.assignWorkspaceRole({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "POST"
-        && path.endsWith("/roles/reassign")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/reassign");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
-              request,
-              ReassignWorkspaceRoleRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.reassignWorkspaceRole({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceAdministrationBackendApi
-        && request.method === "POST"
-        && path.endsWith("/roles/revoke")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/revoke");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
-              request,
-              RevokeWorkspaceRoleRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceAdministrationBackendApi.revokeWorkspaceRole({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            });
-            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceBackendApi
-        && request.method === "POST"
-        && path.endsWith("/invitations")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/invitations");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceRequest(
-              request,
-              IssueWorkspaceInvitationRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceBackendApi.issueWorkspaceInvitation({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              invitedEmail: parsedRequest.data.invitedEmail,
-              invitedRoles: parsedRequest.data.invitedRoles,
-              expiresAt: parsedRequest.data.expiresAt,
-              expiresInMs: parsedRequest.data.expiresInMs,
-              targetUserIdentityIdHint: parsedRequest.data.targetUserIdentityIdHint,
-              onboardingMetadata: parsedRequest.data.onboardingMetadata,
-            });
-            const statusCode = mapWorkspaceStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              actorUserIdentityId: context.principal.userIdentityId,
-              ...parsedRequest.data,
-            }), apiResponse);
-          },
-        );
-        return;
-      }
-
-      if (
-        options.workspaceBackendApi
-        && request.method === "POST"
-        && path.endsWith("/onboarding/accept")
-        && path.startsWith("/api/v1/workspaces/")
-      ) {
-        await requireAuthenticatedSession(
-          request,
-          response,
-          requestId,
-          options.backendApi,
-          logger,
-          options.transportTrust,
-          undefined,
-          async (context) => {
-            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/onboarding/accept");
-            if (!workspaceId) {
-              const invalid = buildWorkspaceInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
-            const actorEmail = normalizeOptionalString(context.principal.email ?? null);
-            if (!actorEmail) {
-              const invalid = buildWorkspaceInvalidRequestResponse(
-                "Authenticated principal email is required for invitation onboarding acceptance.",
-              );
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({ workspaceId }), invalid);
-              return;
-            }
-
-            const parsedRequest = await parseAndValidateWorkspaceRequest(
-              request,
-              AcceptWorkspaceInvitationOnboardingRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              return;
-            }
-
-            const apiResponse = await options.workspaceBackendApi.acceptWorkspaceInvitationOnboarding({
-              workspaceId,
-              invitationToken: parsedRequest.data.invitationToken,
-              onboardingMetadata: parsedRequest.data.onboardingMetadata,
-              session: Object.freeze({
-                sessionId: context.session.sessionId,
-                userIdentityId: context.principal.userIdentityId,
-                email: actorEmail,
-                assuranceLevel: context.session.deviceTrustContext?.sessionAssuranceLevel,
-                trustedDeviceId: context.session.deviceTrustContext?.trustedDeviceId,
-                externalIdentityProvider: context.session.providerId,
-                metadata: Object.freeze({
-                  accessChannel: context.session.accessChannel,
-                  deviceId: context.session.deviceId,
-                }),
-              }),
-            });
-            const statusCode = mapWorkspaceStatusCode(apiResponse);
-            writeJson(response, statusCode, apiResponse);
-            logResponse(logger, requestId, request, statusCode, Object.freeze({
-              workspaceId,
-              invitationToken: parsedRequest.data.invitationToken,
-              sessionId: context.session.sessionId,
-              userIdentityId: context.principal.userIdentityId,
-            }), apiResponse);
-          },
-        );
+      if (request.method === "GET" && path === "/") {
+        const apiResponse = Object.freeze({
+          ok: true,
+          data: Object.freeze({
+            service: "identity-http",
+            status: "ready",
+          }),
+        });
+        writeJson(response, 200, apiResponse);
+        if (!hasLoggedRootReadinessProbe) {
+          hasLoggedRootReadinessProbe = true;
+          logger.info(Object.freeze({
+            event: "identity-http.readiness.confirmed",
+            requestId,
+            correlationId,
+            method: request.method,
+            path,
+            statusCode: 200,
+            details: {
+              response: redactSensitiveAuthPayload(apiResponse),
+            },
+          }));
+        }
         return;
       }
 
       writeJson(response, 404, {
         ok: false,
         error: {
-          code: IdentityAuthApiErrorCodes.invalidRequest,
+          code: IdentityAuthApiErrorCodes.notFound,
           message: "Route not found.",
         },
       });
       logger.warn(Object.freeze({
         event: "identity-http.request.not-found",
         requestId,
+        correlationId,
         method: request.method,
         path,
         statusCode: 404,
@@ -5281,6 +3647,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       logger.error(Object.freeze({
         event: "identity-http.request.unhandled-error",
         requestId,
+        correlationId,
         method: request.method,
         path,
         statusCode: 500,
@@ -5288,35 +3655,58 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           error: normalizeError(error),
         },
       }));
+    } finally {
+      if (!rootReadinessProbe) {
+        const requestCompletedAt = Date.now();
+        logger.info(Object.freeze({
+          event: "identity-http.request.timing",
+          requestId,
+          correlationId,
+          method: request.method,
+          path,
+          statusCode: response.statusCode,
+          details: Object.freeze({
+            startedAt: new Date(requestStartedAt).toISOString(),
+            completedAt: new Date(requestCompletedAt).toISOString(),
+            durationMs: requestCompletedAt - requestStartedAt,
+          }),
+        }));
+      }
     }
   });
 
-  if (options.webSocket) {
-    server.on("upgrade", (request, socket) => {
-      void handleWebSocketUpgrade({
+  installIdentityHttpUpgradeBoundary({
+    server,
+    dispatchUpgrade: options.webSocket
+      ? ({ request, socket }) => handleWebSocketUpgrade({
         request,
         socket,
         logger,
         backendApi: options.backendApi,
+        auditLedgerBackendApi: options.auditLedgerBackendApi,
+        systemRuntimeBackendApi: options.systemRuntimeBackendApi,
         secureTransport: options.secureTransport,
         transportTrust: options.transportTrust,
         webSocket: options.webSocket,
         channelRegistry,
-      }).catch((error) => {
-        logger.error(Object.freeze({
-          event: "identity-websocket.upgrade.unhandled-error",
-          requestId: randomUUID(),
-          method: request.method,
-          path: request.url,
-          statusCode: 500,
-          details: Object.freeze({
-            error: normalizeError(error),
-          }),
-        }));
-        socket.destroy();
-      });
-    });
-  }
+      })
+      : undefined,
+    onUnhandledUpgradeError: ({ request, error }) => {
+      const requestId = randomUUID();
+      const correlationId = resolveRequestCorrelationId(request, requestId);
+      logger.error(Object.freeze({
+        event: "identity-websocket.upgrade.unhandled-error",
+        requestId,
+        correlationId,
+        method: request.method,
+        path: request.url,
+        statusCode: 500,
+        details: Object.freeze({
+          error: normalizeError(error),
+        }),
+      }));
+    },
+  });
 
   return server;
 }
@@ -5326,19 +3716,22 @@ async function handleWebSocketUpgrade(input: {
   readonly socket: Socket;
   readonly logger: IdentityHttpServerLogger;
   readonly backendApi: IdentityAuthBackendApi;
+  readonly auditLedgerBackendApi: AuditLedgerBackendApi | undefined;
+  readonly systemRuntimeBackendApi: SystemRuntimeBackendApi | undefined;
   readonly secureTransport: IdentityHttpServerSecureTransportOptions | undefined;
   readonly transportTrust: IdentityHttpServerTransportTrustOptions | undefined;
   readonly webSocket: IdentityHttpServerWebSocketOptions;
   readonly channelRegistry: WebSocketChannelRegistry;
 }): Promise<void> {
   const requestId = randomUUID();
+  const correlationId = resolveRequestCorrelationId(input.request, requestId);
   const requestUrl = new URL(input.request.url ?? "/", "http://localhost");
   const path = requestUrl.pathname;
   const channelPathPrefix = normalizeOptionalString(input.webSocket.channelPathPrefix ?? "/ws") ?? "/ws";
   const transportState = resolveInboundHttpTransportConnectionState(input.request);
 
   if (!path.startsWith(channelPathPrefix)) {
-    denyWebSocketUpgrade(input, requestId, 404, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 404, {
       code: "invalid-upgrade-request",
       message: "WebSocket endpoint was not found.",
     });
@@ -5350,19 +3743,21 @@ async function handleWebSocketUpgrade(input: {
     transportState,
   });
   if (!secureTransportDecision.ok) {
-    denyWebSocketUpgrade(input, requestId, secureTransportDecision.statusCode, secureTransportDecision.reason);
+    denyWebSocketUpgrade(input, requestId, correlationId, secureTransportDecision.statusCode, secureTransportDecision.reason);
     return;
   }
 
   const handshake = validateWebSocketUpgradeRequestHeaders(input.request);
   if (!handshake.ok) {
-    denyWebSocketUpgrade(input, requestId, handshake.statusCode, handshake.reason);
+    denyWebSocketUpgrade(input, requestId, correlationId, handshake.statusCode, handshake.reason);
     return;
   }
 
-  const sessionToken = extractBearerToken(input.request.headers.authorization);
+  const requestedSubprotocols = parseWebSocketSubprotocolHeader(input.request.headers["sec-websocket-protocol"]);
+  const sessionToken = extractBearerSessionToken(input.request.headers.authorization)
+    ?? extractWebSocketBearerTokenFromSubprotocols(requestedSubprotocols);
   if (!sessionToken) {
-    denyWebSocketUpgrade(input, requestId, 401, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 401, {
       code: "authentication-failed",
       closeCode: 4401,
       message: "Missing Authorization bearer token for websocket upgrade.",
@@ -5373,7 +3768,7 @@ async function handleWebSocketUpgrade(input: {
   const resolvedSession = await input.backendApi.resolveAuthenticatedSession({ sessionToken });
   if (!resolvedSession.ok) {
     const statusCode = mapStatusCode(resolvedSession);
-    denyWebSocketUpgrade(input, requestId, statusCode, {
+    denyWebSocketUpgrade(input, requestId, correlationId, statusCode, {
       code: "authentication-failed",
       closeCode: 4401,
       message: resolvedSession.error?.message ?? "WebSocket upgrade authentication failed.",
@@ -5384,7 +3779,7 @@ async function handleWebSocketUpgrade(input: {
     return;
   }
   if (!resolvedSession.data) {
-    denyWebSocketUpgrade(input, requestId, 500, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 500, {
       code: "authentication-failed",
       closeCode: 1011,
       message: "Session resolution returned no payload for websocket upgrade.",
@@ -5402,7 +3797,7 @@ async function handleWebSocketUpgrade(input: {
       transportState,
     });
     if (!originPolicy.accepted) {
-      denyWebSocketUpgrade(input, requestId, 403, {
+      denyWebSocketUpgrade(input, requestId, correlationId, 403, {
         code: "origin-not-allowed",
         closeCode: 4403,
         message: "WebSocket origin is not allowed for thin-client sessions.",
@@ -5419,7 +3814,7 @@ async function handleWebSocketUpgrade(input: {
   const requestedPurpose = normalizeOptionalString(requestUrl.searchParams.get("purpose"));
   const parsedPurpose = parseWebSocketChannelPurpose(requestedPurpose);
   if (requestedPurpose && !parsedPurpose) {
-    denyWebSocketUpgrade(input, requestId, 403, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 403, {
       code: "unsupported-channel-purpose",
       closeCode: 4403,
       message: "WebSocket channel purpose is not supported.",
@@ -5433,7 +3828,7 @@ async function handleWebSocketUpgrade(input: {
     ?? input.webSocket.defaultPurpose
     ?? WebSocketChannelPurposes.status;
   if (!supportedPurposes.includes(purpose)) {
-    denyWebSocketUpgrade(input, requestId, 403, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 403, {
       code: "unsupported-channel-purpose",
       closeCode: 4403,
       message: "WebSocket channel purpose is not allowed.",
@@ -5454,7 +3849,7 @@ async function handleWebSocketUpgrade(input: {
     input.transportTrust && shouldBypassTransportTrustValidation(transportState, input.transportTrust, transportRouting),
   );
   if (input.transportTrust && !input.transportTrust.websocketValidator && !bypassTransportTrustValidation) {
-    denyWebSocketUpgrade(input, requestId, 500, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 500, {
       code: "transport-trust-rejected",
       closeCode: 1011,
       message: "WebSocket transport trust validation is not configured.",
@@ -5470,7 +3865,12 @@ async function handleWebSocketUpgrade(input: {
     });
     const transportValidation = await input.transportTrust.websocketValidator.validate(transportValidationRequest);
     if (!transportValidation.ok) {
-      denyWebSocketUpgrade(input, requestId, mapWebSocketCloseCodeToStatusCode(transportValidation.closeCode), {
+      denyWebSocketUpgrade(
+        input,
+        requestId,
+        correlationId,
+        mapWebSocketCloseCodeToStatusCode(transportValidation.closeCode),
+        {
         code: "transport-trust-rejected",
         closeCode: transportValidation.closeCode,
         message: transportValidation.reason,
@@ -5478,7 +3878,8 @@ async function handleWebSocketUpgrade(input: {
           errorCode: transportValidation.error.code,
           reasons: transportValidation.error.reasons,
         }),
-      });
+      },
+      );
       return;
     }
   }
@@ -5513,10 +3914,16 @@ async function handleWebSocketUpgrade(input: {
     input.channelRegistry.release(channelContext.channelId);
   });
 
-  input.socket.write(buildWebSocketUpgradeAcceptedResponse(handshake.websocketKey));
+  input.socket.write(buildWebSocketUpgradeAcceptedResponse(
+    handshake.websocketKey,
+    requestId,
+    correlationId,
+    resolveAcceptedWebSocketSubprotocol(requestedSubprotocols),
+  ));
   input.logger.info(Object.freeze({
     event: "identity-websocket.upgrade.accepted",
     requestId,
+    correlationId,
     method: input.request.method,
     path,
     statusCode: 101,
@@ -5549,7 +3956,479 @@ async function handleWebSocketUpgrade(input: {
     initialCertificateBinding,
   });
 
+  initializeRuntimeRealtimeWebSocketChannel({
+    requestId,
+    correlationId,
+    logger: input.logger,
+    socket: input.socket,
+    channelContext,
+    systemRuntimeBackendApi: input.systemRuntimeBackendApi,
+    auditLedgerBackendApi: input.auditLedgerBackendApi,
+  });
+
   await input.webSocket.onChannelEstablished?.(channelContext, input.socket);
+}
+
+interface RuntimeRealtimeWebSocketSessionState {
+  subscription?: {
+    readonly unsubscribe: () => void;
+    readonly subscriptionId: string;
+  };
+  incomingBuffer: Buffer;
+}
+
+interface ParsedWebSocketFrame {
+  readonly fin: boolean;
+  readonly opcode: number;
+  readonly payload: Buffer;
+  readonly nextOffset: number;
+  readonly masked: boolean;
+}
+
+function initializeRuntimeRealtimeWebSocketChannel(input: {
+  readonly requestId: string;
+  readonly correlationId: string;
+  readonly logger: IdentityHttpServerLogger;
+  readonly socket: Socket;
+  readonly channelContext: WebSocketChannelContext;
+  readonly systemRuntimeBackendApi: SystemRuntimeBackendApi | undefined;
+  readonly auditLedgerBackendApi: AuditLedgerBackendApi | undefined;
+}): void {
+  if (!input.systemRuntimeBackendApi) {
+    return;
+  }
+
+  const state: RuntimeRealtimeWebSocketSessionState = {
+    subscription: undefined,
+    incomingBuffer: Buffer.alloc(0),
+  };
+
+  const teardown = () => {
+    state.subscription?.unsubscribe();
+    state.subscription = undefined;
+  };
+  input.socket.once("close", teardown);
+  input.socket.once("error", teardown);
+
+  input.socket.on("data", (chunk) => {
+    state.incomingBuffer = Buffer.concat([state.incomingBuffer, chunk]);
+    let offset = 0;
+    try {
+      while (offset < state.incomingBuffer.length) {
+        const frame = tryParseWebSocketFrame(state.incomingBuffer, offset);
+        if (!frame) {
+          break;
+        }
+        offset = frame.nextOffset;
+        if (!frame.masked) {
+          sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Client frames must be masked.");
+          sendWebSocketCloseFrame(input.socket, 1002, "Protocol error");
+          return;
+        }
+        if (!frame.fin) {
+          sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Fragmented websocket frames are not supported.");
+          sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+          return;
+        }
+        if (frame.opcode === 8) {
+          sendWebSocketCloseFrame(input.socket, 1000, "normal-close");
+          return;
+        }
+        if (frame.opcode === 9) {
+          input.socket.write(buildWebSocketDataFrame(10, frame.payload));
+          continue;
+        }
+        if (frame.opcode !== 1) {
+          sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Only text websocket frames are supported.");
+          sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+          return;
+        }
+
+        const payloadText = frame.payload.toString("utf8");
+        void handleRuntimeRealtimeWebSocketTextFrame({
+          requestId: input.requestId,
+          correlationId: input.correlationId,
+          logger: input.logger,
+          socket: input.socket,
+          channelContext: input.channelContext,
+          runtimeBackendApi: input.systemRuntimeBackendApi,
+          auditLedgerBackendApi: input.auditLedgerBackendApi,
+          state,
+          payloadText,
+        });
+      }
+    } catch {
+      sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Websocket frame parsing failed.");
+      sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+      return;
+    }
+
+    state.incomingBuffer = offset >= state.incomingBuffer.length
+      ? Buffer.alloc(0)
+      : state.incomingBuffer.subarray(offset);
+  });
+}
+
+async function handleRuntimeRealtimeWebSocketTextFrame(input: {
+  readonly requestId: string;
+  readonly correlationId: string;
+  readonly logger: IdentityHttpServerLogger;
+  readonly socket: Socket;
+  readonly channelContext: WebSocketChannelContext;
+  readonly runtimeBackendApi: SystemRuntimeBackendApi;
+  readonly auditLedgerBackendApi: AuditLedgerBackendApi | undefined;
+  readonly state: RuntimeRealtimeWebSocketSessionState;
+  readonly payloadText: string;
+}): Promise<void> {
+  let parsedPayload: unknown;
+  try {
+    parsedPayload = JSON.parse(input.payloadText);
+  } catch {
+    sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Websocket payload must be valid JSON.");
+    sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+    return;
+  }
+
+  let subscribeMessage;
+  try {
+    subscribeMessage = parseRuntimeRealtimeWebSocketSubscribeMessage(parsedPayload);
+  } catch (error) {
+    const message = error instanceof RuntimeRealtimeSchemaValidationError
+      ? error.message
+      : "Realtime subscription payload is invalid.";
+    sendRuntimeRealtimeWebSocketError(input, "invalid-request", message);
+    sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+    return;
+  }
+
+  if (subscribeMessage.action !== RuntimeRealtimeWebSocketActions.subscribe) {
+    sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Unsupported realtime websocket action.");
+    sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+    return;
+  }
+
+  const actorWorkspaceId = input.channelContext.workspaceScope.workspaceId?.trim();
+  const hasDisallowedTopic = subscribeMessage.request.topics.some(
+    (topic) => !isRuntimeRealtimeTopicAllowedForPurpose(topic.topic, input.channelContext.purpose),
+  );
+  if (hasDisallowedTopic) {
+    sendRuntimeRealtimeWebSocketError(
+      input,
+      "forbidden",
+      `One or more realtime topics are not allowed for websocket purpose '${input.channelContext.purpose}'.`,
+    );
+    sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+    return;
+  }
+  const requestedTopics: RuntimeRealtimeSubscriptionTopic[] = subscribeMessage.request.topics.map((topic) => Object.freeze({
+    topic: topic.topic,
+    workspaceId: topic.workspaceId ?? actorWorkspaceId,
+    executionId: topic.executionId,
+  }));
+
+  if (requestedTopics.length < 1) {
+    sendRuntimeRealtimeWebSocketError(
+      input,
+      "forbidden",
+      `No requested realtime topics are allowed for websocket purpose '${input.channelContext.purpose}'.`,
+    );
+    sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+    return;
+  }
+
+  const workspaceMismatch = requestedTopics.some((topic) => {
+    const topicWorkspaceId = topic.workspaceId?.trim();
+    return Boolean(actorWorkspaceId && topicWorkspaceId && actorWorkspaceId !== topicWorkspaceId);
+  });
+  if (workspaceMismatch) {
+    sendRuntimeRealtimeWebSocketError(input, "forbidden", "Topic workspace scope must match websocket workspace scope.");
+    sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+    return;
+  }
+
+  const requestedAuditGovernanceTopic = requestedTopics.some(
+    (topic) => topic.topic === RuntimeRealtimeTopics.auditGovernance,
+  );
+  if (requestedAuditGovernanceTopic) {
+    if (!input.auditLedgerBackendApi || !actorWorkspaceId) {
+      sendRuntimeRealtimeWebSocketError(
+        input,
+        "forbidden",
+        "Audit/governance realtime subscriptions require workspace-scoped audit ledger access.",
+      );
+      sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+      return;
+    }
+    const authorizationProbe = await input.auditLedgerBackendApi.listGovernanceAuditEvents({
+      actorUserIdentityId: input.channelContext.actor.userIdentityId,
+      workspaceId: actorWorkspaceId,
+      query: Object.freeze({
+        pagination: Object.freeze({
+          limit: 1,
+          offset: 0,
+        }),
+      }),
+    });
+    if (!authorizationProbe.ok) {
+      sendRuntimeRealtimeWebSocketError(
+        input,
+        "forbidden",
+        "Audit/governance realtime subscription is not authorized for this actor/workspace.",
+      );
+      sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+      return;
+    }
+  }
+
+  const subscriptionRequest: RuntimeRealtimeSubscriptionRequest = Object.freeze({
+    actor: Object.freeze({
+      actorUserIdentityId: input.channelContext.actor.userIdentityId,
+      accessChannel: input.channelContext.actor.accessChannel,
+      sessionId: input.channelContext.actor.sessionId,
+      workspaceId: actorWorkspaceId,
+    }),
+    topics: Object.freeze(requestedTopics),
+    mode: subscribeMessage.request.mode ?? RuntimeRealtimeSubscriptionModes.liveOnly,
+    reconnect: subscribeMessage.request.reconnect,
+  });
+
+  const subscription = input.runtimeBackendApi.subscribeToRealtimeEvents({
+    request: subscriptionRequest,
+    requestContext: Object.freeze({
+      requestSource: "identity-websocket-runtime-realtime",
+      accessContext: Object.freeze({
+        callerKind: "user" as const,
+        callerId: input.channelContext.actor.userIdentityId,
+        sessionId: input.channelContext.actor.sessionId,
+        metadata: Object.freeze({
+          workspaceId: actorWorkspaceId,
+          activeWorkspaceId: actorWorkspaceId,
+          accessChannel: input.channelContext.actor.accessChannel,
+        }),
+      }),
+    }),
+    listener: (event) => {
+      if (input.socket.destroyed) {
+        return;
+      }
+      const eventMessage = Object.freeze({
+        type: RuntimeRealtimeWebSocketMessageTypes.event,
+        event,
+      });
+      input.socket.write(buildWebSocketTextFrame(JSON.stringify(eventMessage)));
+    },
+  });
+
+  if (!subscription.ok || !subscription.data) {
+    const mappedCode = mapRuntimeRealtimeErrorCode(subscription.error?.code);
+    const message = subscription.error?.message ?? "Realtime subscription failed.";
+    sendRuntimeRealtimeWebSocketError(input, mappedCode, message);
+    sendWebSocketCloseFrame(input.socket, mappedCode === "forbidden" ? 4403 : 4400, mappedCode);
+    return;
+  }
+
+  input.state.subscription?.unsubscribe();
+  input.state.subscription = Object.freeze({
+    subscriptionId: subscription.data.subscriptionId,
+    unsubscribe: subscription.data.unsubscribe,
+  });
+
+  const ackMessage = parseRuntimeRealtimeWebSocketSubscriptionAckMessage({
+    type: RuntimeRealtimeWebSocketMessageTypes.subscriptionAck,
+    subscriptionId: subscription.data.subscriptionId,
+    acceptedAt: new Date().toISOString(),
+    mode: subscriptionRequest.mode ?? RuntimeRealtimeSubscriptionModes.liveOnly,
+    topics: requestedTopics,
+    reconnect: subscriptionRequest.reconnect,
+  });
+  input.socket.write(buildWebSocketTextFrame(JSON.stringify(ackMessage)));
+  input.logger.info(Object.freeze({
+    event: "identity-websocket.runtime-realtime.subscription.accepted",
+    requestId: input.requestId,
+    correlationId: input.correlationId,
+    statusCode: 101,
+    details: Object.freeze({
+      channelId: input.channelContext.channelId,
+      purpose: input.channelContext.purpose,
+      subscriptionId: subscription.data.subscriptionId,
+      topics: requestedTopics,
+      mode: subscriptionRequest.mode ?? RuntimeRealtimeSubscriptionModes.liveOnly,
+    }),
+  }));
+}
+
+function mapRuntimeRealtimeErrorCode(
+  code: "not-found" | "invalid-request" | "forbidden" | "unauthorized" | "quota-exceeded" | "rate-limit-exceeded" | "internal" | undefined,
+): "invalid-request" | "forbidden" | "internal" {
+  if (code === "forbidden" || code === "unauthorized") {
+    return "forbidden";
+  }
+  if (code === "invalid-request" || code === "not-found" || code === "quota-exceeded" || code === "rate-limit-exceeded") {
+    return "invalid-request";
+  }
+  return "internal";
+}
+
+function isRuntimeRealtimeTopicAllowedForPurpose(
+  topic: RuntimeRealtimeSubscriptionTopic["topic"],
+  purpose: WebSocketChannelPurpose,
+): boolean {
+  switch (purpose) {
+    case WebSocketChannelPurposes.status:
+      return topic === RuntimeRealtimeTopics.connectivity;
+    case WebSocketChannelPurposes.queueMonitoring:
+      return topic === RuntimeRealtimeTopics.queue || topic === RuntimeRealtimeTopics.runStatus || topic === RuntimeRealtimeTopics.connectivity;
+    case WebSocketChannelPurposes.runMonitoring:
+      return topic === RuntimeRealtimeTopics.runStatus || topic === RuntimeRealtimeTopics.queue || topic === RuntimeRealtimeTopics.connectivity;
+    case WebSocketChannelPurposes.streamControl:
+      return topic === RuntimeRealtimeTopics.admin
+        || topic === RuntimeRealtimeTopics.connectivity
+        || topic === RuntimeRealtimeTopics.auditGovernance;
+    default:
+      return false;
+  }
+}
+
+function sendRuntimeRealtimeWebSocketError(
+  input: {
+    readonly socket: Socket;
+    readonly logger: IdentityHttpServerLogger;
+    readonly requestId: string;
+    readonly correlationId: string;
+    readonly channelContext: WebSocketChannelContext;
+  },
+  code: "invalid-request" | "forbidden" | "internal",
+  message: string,
+): void {
+  if (input.socket.destroyed) {
+    return;
+  }
+  const normalizedEnvelope = normalizeSharedApiErrorEnvelope(Object.freeze({
+    ok: false,
+    error: Object.freeze({
+      code,
+      message: redactSensitiveText(message.trim() || "Realtime websocket operation failed."),
+    }),
+  })) as { readonly error?: { readonly message?: string } };
+  const safeMessage = normalizedEnvelope.error?.message ?? "Realtime websocket operation failed.";
+  const payload = Object.freeze({
+    type: RuntimeRealtimeWebSocketMessageTypes.error,
+    error: Object.freeze({
+      code,
+      message: safeMessage,
+      correlationId: input.correlationId,
+    }),
+  });
+  input.logger.warn(Object.freeze({
+    event: "identity-websocket.runtime-realtime.error",
+    requestId: input.requestId,
+    correlationId: input.correlationId,
+    statusCode: code === "forbidden" ? 403 : (code === "internal" ? 500 : 400),
+    details: Object.freeze({
+      channelId: input.channelContext.channelId,
+      purpose: input.channelContext.purpose,
+      code,
+      message: safeMessage,
+    }),
+  }));
+  input.socket.write(buildWebSocketTextFrame(JSON.stringify(payload)));
+}
+
+function sendWebSocketCloseFrame(socket: Socket, closeCode: number, reason: string): void {
+  if (socket.destroyed) {
+    return;
+  }
+  const normalizedReason = reason.trim().slice(0, 120);
+  const reasonBytes = Buffer.from(normalizedReason, "utf8");
+  const payload = Buffer.alloc(2 + reasonBytes.length);
+  payload.writeUInt16BE(closeCode, 0);
+  reasonBytes.copy(payload, 2);
+  socket.write(buildWebSocketDataFrame(8, payload));
+  socket.end();
+}
+
+function buildWebSocketTextFrame(payload: string): Buffer {
+  return buildWebSocketDataFrame(1, Buffer.from(payload, "utf8"));
+}
+
+function buildWebSocketDataFrame(opcode: number, payload: Buffer): Buffer {
+  const payloadLength = payload.length;
+  if (payloadLength <= 125) {
+    const frame = Buffer.alloc(2 + payloadLength);
+    frame[0] = 0x80 | (opcode & 0x0f);
+    frame[1] = payloadLength;
+    payload.copy(frame, 2);
+    return frame;
+  }
+  if (payloadLength <= 65535) {
+    const frame = Buffer.alloc(4 + payloadLength);
+    frame[0] = 0x80 | (opcode & 0x0f);
+    frame[1] = 126;
+    frame.writeUInt16BE(payloadLength, 2);
+    payload.copy(frame, 4);
+    return frame;
+  }
+
+  const frame = Buffer.alloc(10 + payloadLength);
+  frame[0] = 0x80 | (opcode & 0x0f);
+  frame[1] = 127;
+  frame.writeBigUInt64BE(BigInt(payloadLength), 2);
+  payload.copy(frame, 10);
+  return frame;
+}
+
+function tryParseWebSocketFrame(buffer: Buffer, offset: number): ParsedWebSocketFrame | undefined {
+  if (buffer.length - offset < 2) {
+    return undefined;
+  }
+  const first = buffer[offset];
+  const second = buffer[offset + 1];
+  const fin = (first & 0x80) === 0x80;
+  const opcode = first & 0x0f;
+  const masked = (second & 0x80) === 0x80;
+  let payloadLength = second & 0x7f;
+  let cursor = offset + 2;
+
+  if (payloadLength === 126) {
+    if (buffer.length - cursor < 2) {
+      return undefined;
+    }
+    payloadLength = buffer.readUInt16BE(cursor);
+    cursor += 2;
+  } else if (payloadLength === 127) {
+    if (buffer.length - cursor < 8) {
+      return undefined;
+    }
+    const bigLength = buffer.readBigUInt64BE(cursor);
+    cursor += 8;
+    if (bigLength > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error("WebSocket frame payload exceeds safe integer range.");
+    }
+    payloadLength = Number(bigLength);
+  }
+
+  const maskLength = masked ? 4 : 0;
+  if (buffer.length - cursor < maskLength + payloadLength) {
+    return undefined;
+  }
+
+  const mask = masked ? buffer.subarray(cursor, cursor + 4) : undefined;
+  cursor += maskLength;
+  const payload = Buffer.from(buffer.subarray(cursor, cursor + payloadLength));
+  if (mask) {
+    for (let index = 0; index < payload.length; index += 1) {
+      payload[index] = payload[index] ^ mask[index % 4];
+    }
+  }
+  cursor += payloadLength;
+
+  return Object.freeze({
+    fin,
+    opcode,
+    payload,
+    nextOffset: cursor,
+    masked,
+  });
 }
 
 function startWebSocketChannelLifecycleMonitoring(input: {
@@ -5848,7 +4727,7 @@ async function requireAuthenticatedSession(
   logger: IdentityHttpServerLogger,
   transportTrust: IdentityHttpServerTransportTrustOptions | undefined,
   options: {
-    readonly minimumAssuranceLevel?: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
+    readonly sessionAssuranceRequirement?: SessionAssuranceRequirement;
     readonly transportScenario?: TransportSecurityScenario;
     readonly transportActorType?: TransportConnectionActorType;
     readonly transportRemotePeerType?: TransportPeerType;
@@ -5856,56 +4735,53 @@ async function requireAuthenticatedSession(
   } | undefined,
   onAuthenticated: (context: AuthenticatedRequestContext) => Promise<void>,
 ): Promise<void> {
-  const sessionToken = extractBearerToken(request.headers.authorization);
-  if (!sessionToken) {
-    const authFailure = buildAuthenticationFailedResponse("Missing Authorization bearer token.");
-    writeJson(response, 401, authFailure);
-    logResponse(logger, requestId, request, 401, Object.freeze({}), authFailure);
+  const sessionResolution = await resolveAuthenticatedSessionFromRequest(request, backendApi, {
+    mapStatusCode,
+  });
+  if (!sessionResolution.ok) {
+    writeJson(response, sessionResolution.statusCode, sessionResolution.body);
+    logResponse(
+      logger,
+      requestId,
+      request,
+      sessionResolution.statusCode,
+      sessionResolution.requestLogPayload,
+      sessionResolution.body,
+    );
     return;
   }
+  const { resolvedSession, sessionToken } = sessionResolution;
 
-  const resolvedSession = await backendApi.resolveAuthenticatedSession({ sessionToken });
-  if (!resolvedSession.ok) {
-    const statusCode = mapStatusCode(resolvedSession);
-    writeJson(response, statusCode, resolvedSession);
-    logResponse(logger, requestId, request, statusCode, Object.freeze({ sessionToken }), resolvedSession);
-    return;
-  }
-  if (!resolvedSession.data) {
-    const internalFailure: IdentityAuthApiResponse<never> = Object.freeze({
-      ok: false,
-      error: {
-        code: IdentityAuthApiErrorCodes.internal,
-        message: "Session resolution returned no payload.",
-      },
-    });
-    writeJson(response, 500, internalFailure);
-    logResponse(logger, requestId, request, 500, Object.freeze({ sessionToken }), internalFailure);
-    return;
-  }
-
-  const sessionAssuranceLevel = normalizeSessionAssuranceLevel(resolvedSession.data.session.deviceTrustContext?.sessionAssuranceLevel);
-  if (options?.minimumAssuranceLevel && !isSessionAssuranceAllowed(sessionAssuranceLevel, options.minimumAssuranceLevel)) {
-    const forbidden: IdentityAuthApiResponse<never> = Object.freeze({
-      ok: false,
-      error: {
-        code: IdentityAuthApiErrorCodes.forbidden,
-        message: "Session trust level is insufficient for this route.",
-      },
-    });
-    writeJson(response, 403, forbidden);
-    logResponse(logger, requestId, request, 403, Object.freeze({
-      sessionToken,
-      sessionAssuranceLevel,
-      minimumAssuranceLevel: options.minimumAssuranceLevel,
-    }), forbidden);
+  const sessionAssuranceLevel = normalizeSessionAssuranceLevel(resolvedSession.session.deviceTrustContext?.sessionAssuranceLevel);
+  const sessionAssuranceEnforcement = enforceTrustedSessionAssurance({
+    sessionAssuranceLevel,
+    requirement: options?.sessionAssuranceRequirement,
+    buildForbiddenResponse: buildForbiddenResponse,
+  });
+  if (!sessionAssuranceEnforcement.ok) {
+    writeJson(
+      response,
+      sessionAssuranceEnforcement.failure.statusCode,
+      sessionAssuranceEnforcement.failure.body,
+    );
+    logResponse(
+      logger,
+      requestId,
+      request,
+      sessionAssuranceEnforcement.failure.statusCode,
+      Object.freeze({
+        sessionToken,
+        ...sessionAssuranceEnforcement.failure.requestLogPayload,
+      }),
+      sessionAssuranceEnforcement.failure.body,
+    );
     return;
   }
 
   const transportState = resolveInboundHttpTransportConnectionState(request);
   const defaultScenario = transportTrust?.defaultScenario ?? TransportSecurityScenarios.thinClientToControlPlane;
   const transportRouting = resolveTransportTrustRouting({
-    resolvedSession: resolvedSession.data,
+    resolvedSession,
     options,
     defaultScenario,
   });
@@ -5916,7 +4792,7 @@ async function requireAuthenticatedSession(
     const transportValidationRequest = buildTransportTrustValidationRequest({
       transportState,
       requestId,
-      resolvedSession: resolvedSession.data,
+      resolvedSession,
       routing: transportRouting,
       nodeId: options?.nodeId,
     });
@@ -5942,18 +4818,14 @@ async function requireAuthenticatedSession(
     }
   }
 
-  await onAuthenticated(Object.freeze({
-    principal: resolvedSession.data.principal,
-    session: resolvedSession.data.session,
+  await onAuthenticated(buildAuthenticatedSessionActorContext({
+    resolvedSession,
     sessionToken,
-    sessionTrust: Object.freeze({
-      assuranceLevel: sessionAssuranceLevel,
-      isTrusted: sessionAssuranceLevel === "authenticated-trusted",
-    }),
+    sessionAssuranceLevel,
     transport: Object.freeze({
       connection: transportState,
       channel: resolveTransportAccessChannelContext({
-        accessChannel: resolvedSession.data.session.accessChannel === "desktop" ? "desktop" : "thin-client",
+        accessChannel: resolvedSession.session.accessChannel === "desktop" ? "desktop" : "thin-client",
         request,
       }),
       trustValidation: Object.freeze({
@@ -5964,6 +4836,42 @@ async function requireAuthenticatedSession(
       }),
     }),
   }));
+}
+
+async function requireAuthenticatedWorkspaceSession(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requestId: string,
+  backendApi: IdentityAuthBackendApi,
+  logger: IdentityHttpServerLogger,
+  transportTrust: IdentityHttpServerTransportTrustOptions | undefined,
+  options: RequireAuthenticatedWorkspaceSessionOptions,
+  onAuthenticated: (context: AuthenticatedWorkspaceRequestContext) => Promise<void>,
+): Promise<void> {
+  await requireAuthenticatedSession(
+    request,
+    response,
+    requestId,
+    backendApi,
+    logger,
+    transportTrust,
+    options.sessionOptions,
+    async (context) => {
+      const workspaceResolution = resolveWorkspaceContextFromRequest(request, options);
+      if (!workspaceResolution.ok) {
+        writeJson(response, workspaceResolution.statusCode, workspaceResolution.body);
+        logResponse(logger, requestId, request, workspaceResolution.statusCode, Object.freeze({
+          actorUserIdentityId: context.actor.userIdentityId,
+        }), workspaceResolution.body);
+        return;
+      }
+
+      await onAuthenticated(Object.freeze({
+        ...context,
+        workspace: workspaceResolution.workspace,
+      }));
+    },
+  );
 }
 
 async function requireAuthenticatedNodeTransport(
@@ -5977,12 +4885,17 @@ async function requireAuthenticatedNodeTransport(
   nodeId: string | undefined,
   onAuthenticated: (context: AuthenticatedNodeTransportContext) => Promise<void>,
 ): Promise<void> {
-  if (!nodeId) {
-    const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
-    writeJson(response, 400, invalid);
-    logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+  const requiredNodeId = resolveRequiredNodeRouteNodeId({
+    nodeId,
+    buildInvalidResponse: buildNodeTrustInvalidRequestResponse,
+  });
+  if (!requiredNodeId.ok) {
+    writeJson(response, requiredNodeId.statusCode, requiredNodeId.body);
+    logResponse(logger, requestId, request, requiredNodeId.statusCode, requiredNodeId.requestLogPayload, requiredNodeId.body);
     return;
   }
+
+  const resolvedNodeId = requiredNodeId.nodeId;
 
   if (!transportTrust) {
     await requireAuthenticatedSession(
@@ -5996,29 +4909,30 @@ async function requireAuthenticatedNodeTransport(
         transportScenario: TransportSecurityScenarios.nodeToControlPlane,
         transportActorType: TransportConnectionActorTypes.nodeIdentity,
         transportRemotePeerType: TransportPeerTypes.nodeRuntime,
-        nodeId,
+        nodeId: resolvedNodeId,
       },
       async (context) => {
-        if (!isAuthenticatedNodePrincipalForNode(context, nodeId)) {
-          const forbidden = buildNodeTrustForbiddenResponse(
-            `Authenticated session is not authorized to establish node transport for '${nodeId}'.`,
+        const principalAuthorization = authorizeSessionNodeRoutePrincipal({
+          nodeId: resolvedNodeId,
+          context,
+          buildForbiddenResponse: buildNodeTrustForbiddenResponse,
+        });
+        if (!principalAuthorization.ok) {
+          writeJson(response, principalAuthorization.statusCode, principalAuthorization.body);
+          logResponse(
+            logger,
+            requestId,
+            request,
+            principalAuthorization.statusCode,
+            principalAuthorization.requestLogPayload,
+            principalAuthorization.body,
           );
-          writeJson(response, 403, forbidden);
-          logResponse(logger, requestId, request, 403, Object.freeze({
-            nodeId,
-            principalUserIdentityId: context.principal.userIdentityId,
-            principalUsername: context.principal.username,
-            sessionProviderSubject: context.session.providerSubject,
-          }), forbidden);
           return;
         }
 
-        await onAuthenticated(Object.freeze({
-          nodeId,
-          transport: Object.freeze({
-            connection: context.transport.connection,
-            trustValidation: context.transport.trustValidation,
-          }),
+        await onAuthenticated(buildSessionNodeRouteTransportContext({
+          nodeId: resolvedNodeId,
+          context,
         }));
       },
     );
@@ -6028,35 +4942,32 @@ async function requireAuthenticatedNodeTransport(
   const transportState = resolveInboundHttpTransportConnectionState(request);
   const mutualTlsValidation = await validateNodeMutualTlsTransport({
     requestId,
-    nodeId,
+    nodeId: resolvedNodeId,
     transportState,
     ports: Object.freeze({
       trustValidator: transportTrust.httpValidator,
       nodeIdentityResolver: nodeTrustBackendApi,
     }),
   });
-  if (!mutualTlsValidation.ok) {
-    writeJson(response, mutualTlsValidation.statusCode, mutualTlsValidation.body);
-    logResponse(logger, requestId, request, mutualTlsValidation.statusCode, Object.freeze({
-      nodeId,
-      transport: Object.freeze({
-        channelType: transportState.channelType,
-        encryptedTransportEstablished: transportState.encryptedTransportEstablished,
-        mutualTlsEstablished: transportState.mutualTlsEstablished,
-        peerCertificatePresented: transportState.peerCertificatePresented,
-        peerCertificateSerialNumber: transportState.peerCertificateSerialNumber,
-      }),
-    }), mutualTlsValidation.body);
+  const mutualTlsResolution = resolveMutualTlsNodeRouteTransportContext({
+    nodeId: resolvedNodeId,
+    transportState,
+    validation: mutualTlsValidation,
+  });
+  if (!mutualTlsResolution.ok) {
+    writeJson(response, mutualTlsResolution.statusCode, mutualTlsResolution.body);
+    logResponse(
+      logger,
+      requestId,
+      request,
+      mutualTlsResolution.statusCode,
+      mutualTlsResolution.requestLogPayload,
+      mutualTlsResolution.body,
+    );
     return;
   }
 
-  await onAuthenticated(Object.freeze({
-    nodeId: mutualTlsValidation.node.nodeId,
-    transport: Object.freeze({
-      connection: transportState,
-      trustValidation: mutualTlsValidation.trust,
-    }),
-  }));
+  await onAuthenticated(mutualTlsResolution.context);
 }
 
 async function handleLogin(
@@ -6091,7 +5002,38 @@ async function handleDevLogin(
   requestId: string,
   backendApi: IdentityAuthBackendApi,
   logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
 ): Promise<void> {
+  const handlerStartedAt = Date.now();
+  logger.info(Object.freeze({
+    event: "identity-auth.dev-login.flow.started",
+    requestId,
+    details: Object.freeze({
+      startedAt: new Date(handlerStartedAt).toISOString(),
+    }),
+  }));
+  const parsedRequest = await parseAndValidateRequest(
+    request,
+    DevLoginRequestSchema,
+    requestId,
+    logger,
+    maxBodyBytes,
+  );
+  if (!parsedRequest.ok) {
+    writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+    logger.warn(Object.freeze({
+      event: "identity-auth.dev-login.flow.failed",
+      requestId,
+      statusCode: parsedRequest.statusCode,
+      details: Object.freeze({
+        stage: "request-validation",
+        totalDurationMs: Date.now() - handlerStartedAt,
+      }),
+    }));
+    return;
+  }
+
+  const registerStartedAt = Date.now();
   const registerResponse = await backendApi.registerLocalAccount({
     username: DEV_LOGIN_DEFAULT_USERNAME,
     providerId: DEV_LOGIN_DEFAULT_PROVIDER_ID,
@@ -6100,6 +5042,17 @@ async function handleDevLogin(
       candidate: DEV_LOGIN_DEFAULT_PASSWORD,
     },
   });
+  const registerDurationMs = Date.now() - registerStartedAt;
+  logger.info(Object.freeze({
+    event: "identity-auth.dev-login.register.completed",
+    requestId,
+    statusCode: mapStatusCode(registerResponse),
+    details: Object.freeze({
+      ok: registerResponse.ok,
+      errorCode: registerResponse.error?.code,
+      durationMs: registerDurationMs,
+    }),
+  }));
 
   if (!registerResponse.ok && registerResponse.error?.code !== IdentityAuthApiErrorCodes.conflict) {
     const statusCode = mapStatusCode(registerResponse);
@@ -6107,21 +5060,57 @@ async function handleDevLogin(
     logResponse(logger, requestId, request, statusCode, Object.freeze({
       providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
     }), registerResponse);
+    logger.warn(Object.freeze({
+      event: "identity-auth.dev-login.flow.failed",
+      requestId,
+      statusCode,
+      details: Object.freeze({
+        stage: "register-local-account",
+        errorCode: registerResponse.error?.code,
+        totalDurationMs: Date.now() - handlerStartedAt,
+      }),
+    }));
     return;
   }
 
+  const loginStartedAt = Date.now();
   const loginResponse = await backendApi.loginLocalAccount({
     providerId: DEV_LOGIN_DEFAULT_PROVIDER_ID,
     providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
+    accessChannel: parsedRequest.data.accessChannel,
+    sessionTrustRequirement: parsedRequest.data.sessionTrustRequirement,
+    client: parsedRequest.data.client,
     credential: {
       candidate: DEV_LOGIN_DEFAULT_PASSWORD,
     },
   });
+  const loginDurationMs = Date.now() - loginStartedAt;
   const statusCode = mapStatusCode(loginResponse);
   writeJson(response, statusCode, loginResponse);
   logResponse(logger, requestId, request, statusCode, Object.freeze({
     providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
   }), loginResponse);
+  logger.info(Object.freeze({
+    event: "identity-auth.dev-login.login.completed",
+    requestId,
+    statusCode,
+    details: Object.freeze({
+      ok: loginResponse.ok,
+      errorCode: loginResponse.error?.code,
+      durationMs: loginDurationMs,
+    }),
+  }));
+  logger.info(Object.freeze({
+    event: "identity-auth.dev-login.flow.completed",
+    requestId,
+    statusCode,
+    details: Object.freeze({
+      outcome: loginResponse.ok ? "success" : "failure",
+      totalDurationMs: Date.now() - handlerStartedAt,
+      registerDurationMs,
+      loginDurationMs,
+    }),
+  }));
 }
 
 function shouldBypassTransportTrustValidation(
@@ -6424,22 +5413,26 @@ function denyWebSocketUpgrade(
     readonly logger: IdentityHttpServerLogger;
   },
   requestId: string,
+  correlationId: string,
   statusCode: number,
   reason: WebSocketUpgradeDeniedReason,
 ): void {
-  const payload = Object.freeze({
+  const safeMessage = redactSensitiveText(reason.message);
+  const payload = normalizeSharedApiErrorEnvelope(Object.freeze({
     ok: false,
     error: Object.freeze({
       code: reason.code,
-      message: reason.message,
+      message: safeMessage,
       closeCode: reason.closeCode,
-      details: reason.details,
+      correlationId,
     }),
-  });
+  }));
   const body = JSON.stringify(payload);
   const responseLines = [
     `HTTP/1.1 ${statusCode} ${resolveHttpStatusText(statusCode)}`,
     "Connection: close",
+    `${REQUEST_ID_HEADER}: ${requestId}`,
+    `${CORRELATION_ID_HEADER}: ${correlationId}`,
     "Content-Type: application/json; charset=utf-8",
     `Content-Length: ${Buffer.byteLength(body)}`,
     "",
@@ -6449,6 +5442,7 @@ function denyWebSocketUpgrade(
   input.logger.warn(Object.freeze({
     event: "identity-websocket.upgrade.denied",
     requestId,
+    correlationId,
     method: input.request.method,
     path: input.request.url,
     statusCode,
@@ -6458,18 +5452,28 @@ function denyWebSocketUpgrade(
   }));
 }
 
-function buildWebSocketUpgradeAcceptedResponse(websocketKey: string): string {
+function buildWebSocketUpgradeAcceptedResponse(
+  websocketKey: string,
+  requestId: string,
+  correlationId: string,
+  selectedProtocol?: string,
+): string {
   const accept = createHash("sha1")
     .update(`${websocketKey}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`, "utf8")
     .digest("base64");
-  return [
+  const responseLines = [
     "HTTP/1.1 101 Switching Protocols",
     "Upgrade: websocket",
     "Connection: Upgrade",
     `Sec-WebSocket-Accept: ${accept}`,
-    "",
-    "",
-  ].join("\r\n");
+    `${REQUEST_ID_HEADER}: ${requestId}`,
+    `${CORRELATION_ID_HEADER}: ${correlationId}`,
+  ];
+  if (selectedProtocol) {
+    responseLines.push(`Sec-WebSocket-Protocol: ${selectedProtocol}`);
+  }
+  responseLines.push("", "");
+  return responseLines.join("\r\n");
 }
 
 function resolveHttpStatusText(statusCode: number): string {
@@ -7310,6 +6314,60 @@ async function parseAndValidateNodeTrustActionRequest<T>(
   }
 }
 
+async function parseAndValidateExecutionNodeSetAvailabilityOverrideRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  nodeId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: ExecutionNodeSetAvailabilityOverrideRequestDtoPayload & { readonly actorUserIdentityId: string } }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ExecutionNodeManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildExecutionNodeManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "execution-node-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  try {
+    const payload = Object.freeze({
+      ...parsedBody.value as Record<string, unknown>,
+      nodeId,
+    });
+    const parsed = parseExecutionNodeSetAvailabilityOverrideRequestDto(payload);
+    return {
+      ok: true,
+      data: Object.freeze({
+        actorUserIdentityId,
+        ...parsed,
+      }),
+    };
+  } catch (error) {
+    const body = buildExecutionNodeManagementValidationErrorResponse(error);
+    logger.warn(Object.freeze({
+      event: "execution-node-management-http.request.validation-failed",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+        issues: body.error?.validationErrors,
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+}
+
 async function parseAndValidateStorageCreateRequest(
   request: IncomingMessage,
   actorUserIdentityId: string,
@@ -7565,6 +6623,251 @@ async function parseAndValidateGeneratedOutputRegisterRequest(
   };
 }
 
+async function parseAndValidateImageAssetCreateRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: CreateImageAssetApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ImageAssetManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildImageAssetManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "image-asset-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const bodyRecord = asRecord(parsedBody.value);
+  if (!bodyRecord) {
+    const body = buildImageAssetManagementInvalidRequestResponse("Request body must be an object.");
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      ...bodyRecord,
+      actorUserIdentityId,
+      workspaceId,
+    }) as CreateImageAssetApiRequest,
+  };
+}
+
+async function parseAndValidateImageAssetCompleteRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  assetId: string,
+  uploadSessionId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: CompleteImageAssetUploadApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ImageAssetManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildImageAssetManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "image-asset-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const bodyRecord = asRecord(parsedBody.value);
+  if (!bodyRecord) {
+    const body = buildImageAssetManagementInvalidRequestResponse("Request body must be an object.");
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      ...bodyRecord,
+      actorUserIdentityId,
+      workspaceId,
+      assetId,
+      uploadSessionId,
+    }) as CompleteImageAssetUploadApiRequest,
+  };
+}
+
+function parseAndValidateImageAssetPreviewRequest(
+  actorUserIdentityId: string,
+  workspaceId: string,
+  assetId: string,
+  searchParams: URLSearchParams,
+):
+  | { readonly ok: true; readonly data: RequestImageAssetPreviewApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ImageAssetManagementApiResponse<never> } {
+  const representationRaw = normalizeOptionalString(searchParams.get("representation"));
+  const representation = parseOptionalEnum(representationRaw ?? null, [
+    "original",
+    "gallery",
+    "thumbnail",
+  ] as const);
+  if (representationRaw && !representation) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("representation is invalid."),
+    };
+  }
+
+  const preferredMediaTypes = parseOptionalMultiEnumList(
+    searchParams,
+    "preferredMediaType",
+    "preferredMediaTypes",
+    ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff", "image/avif", "image/heic", "image/heif"] as const,
+  );
+  if (!preferredMediaTypes.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("preferredMediaType values are invalid."),
+    };
+  }
+
+  const expiresInSeconds = parseOptionalInteger(searchParams.get("expiresInSeconds"));
+  if (expiresInSeconds !== undefined && expiresInSeconds < 1) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("expiresInSeconds must be an integer >= 1."),
+    };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      actorUserIdentityId,
+      workspaceId,
+      assetId,
+      representation,
+      preferredMediaTypes: preferredMediaTypes.value,
+      expiresInSeconds,
+      correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+      occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+    }),
+  };
+}
+
+function parseAndValidateImageAssetListRequest(
+  actorUserIdentityId: string,
+  workspaceId: string,
+  searchParams: URLSearchParams,
+):
+  | { readonly ok: true; readonly data: ListImageAssetMetadataApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ImageAssetManagementApiResponse<never> } {
+  const originKinds = parseOptionalMultiEnumList(
+    searchParams,
+    "originKind",
+    "originKinds",
+    ["uploaded-source", "generated-result"] as const,
+  );
+  if (!originKinds.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("originKind values are invalid."),
+    };
+  }
+
+  const lifecycleStatuses = parseOptionalMultiEnumList(
+    searchParams,
+    "status",
+    "statuses",
+    ["ingesting", "available", "failed", "archived", "deleted"] as const,
+  );
+  if (!lifecycleStatuses.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("status values are invalid."),
+    };
+  }
+
+  const visibilities = parseOptionalMultiEnumList(
+    searchParams,
+    "visibility",
+    "visibilities",
+    ["private", "workspace", "shared", "published"] as const,
+  );
+  if (!visibilities.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("visibility values are invalid."),
+    };
+  }
+
+  const mediaTypes = parseOptionalMultiEnumList(
+    searchParams,
+    "mediaType",
+    "mediaTypes",
+    ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff", "image/avif", "image/heic", "image/heif"] as const,
+  );
+  if (!mediaTypes.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("mediaType values are invalid."),
+    };
+  }
+
+  const pagination = parseSharedListPaginationFromQuery(searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse(pagination.issue.message),
+    };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      actorUserIdentityId,
+      workspaceId,
+      ownerUserIdentityIds: mergeOptionalStringLists(
+        parseOptionalStringList(searchParams, "ownerUserId", "ownerUserIds"),
+        parseOptionalStringList(searchParams, "ownerUserIdentityId", "ownerUserIdentityIds"),
+      ),
+      originKinds: originKinds.value,
+      lifecycleStatuses: lifecycleStatuses.value,
+      visibilities: visibilities.value,
+      mediaTypes: mediaTypes.value,
+      storageInstanceIds: parseOptionalStringList(searchParams, "storageInstanceId", "storageInstanceIds"),
+      sourceRunIds: parseOptionalStringList(searchParams, "sourceRunId", "sourceRunIds"),
+      generationOperationIds: parseOptionalStringList(searchParams, "generationOperationId", "generationOperationIds"),
+      createdAfter: normalizeOptionalString(searchParams.get("createdAfter")),
+      createdBefore: normalizeOptionalString(searchParams.get("createdBefore")),
+      updatedAfter: normalizeOptionalString(searchParams.get("updatedAfter")),
+      updatedBefore: normalizeOptionalString(searchParams.get("updatedBefore")),
+      includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+      limit: pagination.limit,
+      offset: pagination.offset,
+      correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+      occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+    }),
+  };
+}
+
 function parseAndValidateAssetListRequest(
   actorUserIdentityId: string,
   workspaceId: string,
@@ -7572,39 +6875,45 @@ function parseAndValidateAssetListRequest(
 ):
   | { readonly ok: true; readonly data: ListAssetsApiRequest }
   | { readonly ok: false; readonly statusCode: number; readonly body: AssetManagementApiResponse<never> } {
-  const assetKinds = parseOptionalCsvEnumList(
-    searchParams.get("assetKinds"),
+  const assetKinds = parseOptionalMultiEnumList(
+    searchParams,
+    "assetKind",
+    "assetKinds",
     ["uploaded-file", "generated-output", "preview", "derived"] as const,
   );
   if (!assetKinds.ok) {
     return {
       ok: false,
       statusCode: 400,
-      body: buildAssetManagementInvalidRequestResponse("assetKinds includes unsupported values."),
+      body: buildAssetManagementInvalidRequestResponse("assetKind values are invalid."),
     };
   }
 
-  const visibilities = parseOptionalCsvEnumList(
-    searchParams.get("visibilities"),
+  const visibilities = parseOptionalMultiEnumList(
+    searchParams,
+    "visibility",
+    "visibilities",
     ["private", "workspace", "shared", "published"] as const,
   );
   if (!visibilities.ok) {
     return {
       ok: false,
       statusCode: 400,
-      body: buildAssetManagementInvalidRequestResponse("visibilities includes unsupported values."),
+      body: buildAssetManagementInvalidRequestResponse("visibility values are invalid."),
     };
   }
 
-  const lifecycleStates = parseOptionalCsvEnumList(
-    searchParams.get("lifecycleStates"),
+  const lifecycleStates = parseOptionalMultiEnumList(
+    searchParams,
+    "lifecycleState",
+    "lifecycleStates",
     ["active", "archived", "deleted"] as const,
   );
   if (!lifecycleStates.ok) {
     return {
       ok: false,
       statusCode: 400,
-      body: buildAssetManagementInvalidRequestResponse("lifecycleStates includes unsupported values."),
+      body: buildAssetManagementInvalidRequestResponse("lifecycleState values are invalid."),
     };
   }
 
@@ -7617,6 +6926,15 @@ function parseAndValidateAssetListRequest(
       ok: false,
       statusCode: 400,
       body: buildAssetManagementInvalidRequestResponse("scope must be one of: private, workspace, all."),
+    };
+  }
+
+  const pagination = parseSharedListPaginationFromQuery(searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildAssetManagementInvalidRequestResponse(pagination.issue.message),
     };
   }
 
@@ -7636,10 +6954,873 @@ function parseAndValidateAssetListRequest(
       lifecycleStates: lifecycleStates.value,
       sourceAssetId: normalizeOptionalString(searchParams.get("sourceAssetId")),
       sourceAssetVersionId: normalizeOptionalString(searchParams.get("sourceAssetVersionId")),
-      limit: parseOptionalInteger(searchParams.get("limit")),
-      offset: parseOptionalInteger(searchParams.get("offset")),
+      limit: pagination.limit,
+      offset: pagination.offset,
     }),
   };
+}
+
+function parseAndValidateRuntimeQueueListRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly workspaceId: string;
+      readonly systemId?: string;
+      readonly statuses?: ReadonlyArray<typeof RuntimeQueueItemStatuses[keyof typeof RuntimeQueueItemStatuses]>;
+      readonly limit?: number;
+      readonly offset?: number;
+    };
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const statuses = parseOptionalMultiEnumList(
+    input.searchParams,
+    "status",
+    "statuses",
+    [
+      RuntimeQueueItemStatuses.queued,
+      RuntimeQueueItemStatuses.running,
+      RuntimeQueueItemStatuses.completed,
+      RuntimeQueueItemStatuses.failed,
+      RuntimeQueueItemStatuses.cancelled,
+    ] as const,
+  );
+  if (!statuses.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("status values are invalid."),
+    };
+  }
+  const pagination = parseSharedListPaginationFromQuery(input.searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(pagination.issue.message),
+    };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      workspaceId: input.workspaceId,
+      systemId: normalizeOptionalString(input.searchParams.get("systemId")),
+      statuses: statuses.value,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    }),
+  };
+}
+
+function parseAndValidateDeploymentPolicyStateReadRequest(input: {
+  readonly workspaceId: string;
+  readonly actorUserIdentityId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly actorUserIdentityId: string;
+      readonly workspaceId: string;
+      readonly profileId?: "home" | "classroom" | "organization";
+      readonly includeCatalog?: boolean;
+      readonly includeOverrideRecords?: boolean;
+      readonly includeEffectiveMetadata?: boolean;
+      readonly evaluatedAt?: string;
+    };
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const profileIdRaw = normalizeOptionalString(input.searchParams.get("profileId"));
+  const profileId = profileIdRaw === "home" || profileIdRaw === "classroom" || profileIdRaw === "organization"
+    ? profileIdRaw
+    : profileIdRaw
+      ? null
+      : undefined;
+  if (profileId === null) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("profileId must be one of: home, classroom, organization."),
+    };
+  }
+
+  const includeCatalog = parseBooleanSearchParam(input.searchParams.get("includeCatalog"));
+  if (includeCatalog === null) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("includeCatalog must be 'true' or 'false'."),
+    };
+  }
+
+  const includeOverrideRecords = parseBooleanSearchParam(input.searchParams.get("includeOverrideRecords"));
+  if (includeOverrideRecords === null) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("includeOverrideRecords must be 'true' or 'false'."),
+    };
+  }
+
+  const includeEffectiveMetadata = parseBooleanSearchParam(input.searchParams.get("includeEffectiveMetadata"));
+  if (includeEffectiveMetadata === null) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("includeEffectiveMetadata must be 'true' or 'false'."),
+    };
+  }
+
+  const evaluatedAt = normalizeOptionalString(input.searchParams.get("evaluatedAt"));
+  try {
+    const parsed = parseReadDeploymentPolicyStateRequest({
+      scope: {
+        kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
+        scopeId: input.workspaceId,
+      },
+      actorUserIdentityId: input.actorUserIdentityId,
+      profileId: profileId ?? undefined,
+      includeCatalog: includeCatalog ?? undefined,
+      includeOverrideRecords: includeOverrideRecords ?? undefined,
+      includeEffectiveMetadata: includeEffectiveMetadata ?? undefined,
+      evaluatedAt,
+    });
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        actorUserIdentityId: parsed.actorUserIdentityId,
+        workspaceId: parsed.scope.scopeId,
+        profileId: parsed.profileId,
+        includeCatalog: parsed.includeCatalog,
+        includeOverrideRecords: parsed.includeOverrideRecords,
+        includeEffectiveMetadata: parsed.includeEffectiveMetadata,
+        evaluatedAt: parsed.evaluatedAt,
+      }),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(
+        error instanceof Error ? error.message : "Deployment policy read request is invalid.",
+      ),
+    };
+  }
+}
+
+function parseAndValidateDeploymentPolicyActiveProfileWriteRequest(payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseUpdateDeploymentPolicyActiveProfileRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: 400; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    return {
+      ok: true,
+      data: parseUpdateDeploymentPolicyActiveProfileRequest(payload),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(
+        error instanceof Error ? error.message : "Deployment policy active-profile request is invalid.",
+      ),
+    };
+  }
+}
+
+function parseAndValidateDeploymentPolicyOverrideWriteRequest(payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseApplyDeploymentPolicyOverrideOperationsRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: 400; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    return {
+      ok: true,
+      data: parseApplyDeploymentPolicyOverrideOperationsRequest(payload),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(
+        error instanceof Error ? error.message : "Deployment policy override request is invalid.",
+      ),
+    };
+  }
+}
+
+function parseAndValidateAuthoritativeRunListReadRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunListReadRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  let parsedConventions: ReturnType<typeof parseSharedApiListQueryConventions>;
+  try {
+    parsedConventions = parseSharedApiListQueryConventions(input.searchParams);
+  } catch (error) {
+    if (error instanceof SharedApiQuerySchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run list query is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Run list query is invalid."),
+    };
+  }
+
+  const states = input.searchParams.getAll("state")
+    .map((value) => resolveRunLifecycleState(value))
+    .filter((value): value is string => Boolean(value));
+  if (states.length !== input.searchParams.getAll("state").length) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("state values are invalid."),
+    };
+  }
+  const sources = input.searchParams.getAll("source")
+    .map((value) => resolveRunSubmissionSource(value));
+  if (
+    input.searchParams.getAll("source").some((value) => {
+      const normalized = value.trim();
+      return normalized.length > 0 && resolveRunSubmissionSource(normalized) !== normalized;
+    })
+  ) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("source values are invalid."),
+    };
+  }
+
+  const request = {
+    workspaceId: input.workspaceId,
+    states: states.length > 0 ? Object.freeze(states) : undefined,
+    sources: sources.length > 0 ? Object.freeze(sources) : undefined,
+    search: parsedConventions.search,
+    limit: parsedConventions.pagination?.limit,
+    offset: parsedConventions.pagination?.offset,
+    sortBy: parsedConventions.sorting?.sortBy as "submittedAt" | "updatedAt" | "state" | undefined,
+    sortDirection: parsedConventions.sorting?.sortDirection as "asc" | "desc" | undefined,
+  };
+
+  try {
+    return {
+      ok: true,
+      data: parseRunListReadRequest(request),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run list request is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Run list request is invalid."),
+    };
+  }
+}
+
+function parseBooleanSearchParam(value: string | null): boolean | undefined | null {
+  if (value === null) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") {
+    return true;
+  }
+  if (normalized === "false") {
+    return false;
+  }
+  return null;
+}
+
+function parseAndValidateAuthoritativeRunQueueStatusReadRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunQueueStatusReadRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const statuses = input.searchParams.getAll("status")
+    .map((value) => resolveRunLifecycleState(value))
+    .filter((value): value is string => Boolean(value));
+  if (statuses.length !== input.searchParams.getAll("status").length) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("status values are invalid."),
+    };
+  }
+
+  const pagination = parseSharedListPaginationFromQuery(input.searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(pagination.issue.message),
+    };
+  }
+
+  try {
+    return {
+      ok: true,
+      data: parseRunQueueStatusReadRequest({
+        workspaceId: input.workspaceId,
+        statuses: statuses.length > 0 ? Object.freeze(statuses) : undefined,
+        limit: pagination.limit,
+        offset: pagination.offset,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run queue request is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Run queue request is invalid."),
+    };
+  }
+}
+
+function parseAndValidateExecutionReadinessReadRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseExecutionReadinessReadRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    return {
+      ok: true,
+      data: parseExecutionReadinessReadRequest({
+        workspaceId: input.workspaceId,
+        systemId: normalizeOptionalString(input.searchParams.get("systemId")),
+        operationKind: normalizeOptionalString(input.searchParams.get("operationKind")),
+        translationContractVersion: normalizeOptionalString(input.searchParams.get("translationContractVersion")),
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Execution readiness query is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Execution readiness query is invalid."),
+    };
+  }
+}
+
+function parseAndValidateSchedulingAdminStaleReservationsReadRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseSchedulingAdminListStaleReservationsRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const pagination = parseSharedListPaginationFromQuery(input.searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(pagination.issue.message),
+    };
+  }
+
+  try {
+    return {
+      ok: true,
+      data: parseSchedulingAdminListStaleReservationsRequest({
+        workspaceId: input.workspaceId,
+        queueId: normalizeOptionalString(input.searchParams.get("queueId")),
+        asOf: normalizeOptionalString(input.searchParams.get("asOf")),
+        limit: pagination.limit,
+        offset: pagination.offset,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Scheduling stale reservation query is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Scheduling stale reservation query is invalid."),
+    };
+  }
+}
+
+function parseAndValidateSchedulingAdminReleaseStaleReservationMutationRequest(
+  payload: unknown,
+):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseSchedulingAdminReleaseStaleReservationRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(payload);
+  try {
+    return {
+      ok: true,
+      data: parseSchedulingAdminReleaseStaleReservationRequest(bodyRecord),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(
+          error.issues[0]?.message ?? "Scheduling stale reservation release payload is invalid.",
+        ),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateSchedulingAdminReevaluateDeferredRunsMutationRequest(
+  payload: unknown,
+):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseSchedulingAdminReevaluateDeferredRunsRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(payload);
+  try {
+    return {
+      ok: true,
+      data: parseSchedulingAdminReevaluateDeferredRunsRequest(bodyRecord),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(
+          error.issues[0]?.message ?? "Scheduling deferred re-evaluation payload is invalid.",
+        ),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateAuditLedgerListQuery(searchParams: URLSearchParams):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseAuditEventListQueryFromSearchParams>;
+  }
+  | {
+    readonly ok: false;
+    readonly statusCode: number;
+    readonly body: AuditLedgerApiResponse<never>;
+  } {
+  try {
+    return {
+      ok: true,
+      data: parseAuditEventListQueryFromSearchParams(searchParams),
+    };
+  } catch (error) {
+    if (error instanceof AuditEventSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: Object.freeze({
+          ok: false,
+          error: Object.freeze({
+            code: AuditLedgerApiErrorCodes.invalidRequest,
+            message: "Audit list query is invalid.",
+            validationErrors: Object.freeze(error.issues.map((issue) => Object.freeze({
+              path: issue.path,
+              code: issue.code,
+              message: issue.message,
+            }))),
+          }),
+        }),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildAuditLedgerInvalidRequestResponse("Audit list query is invalid."),
+    };
+  }
+}
+
+async function parseAndValidateRuntimeMutationBody(
+  request: IncomingMessage,
+  maxBodyBytes: number,
+  allowEmptyBody = false,
+): Promise<
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    if (allowEmptyBody && parsedBody.error === "Request body is required.") {
+      return {
+        ok: true,
+        value: Object.freeze({}),
+      };
+    }
+    return {
+      ok: false,
+      body: buildRuntimeInvalidRequestResponse(parsedBody.error),
+    };
+  }
+  return {
+    ok: true,
+    value: parsedBody.value,
+  };
+}
+
+function parseAndValidateRuntimeStartRunMutationRequest(payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly systemId: string;
+      readonly versionId: string;
+      readonly executionId?: string;
+      readonly tenantId?: string;
+      readonly idempotencyKey?: string;
+    };
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    const parsed = parseRuntimeStartRunRequest(payload);
+    if (parsed.async === false) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("async must be true when provided."),
+      };
+    }
+    return {
+      ok: true,
+      data: Object.freeze({
+        systemId: parsed.systemId,
+        versionId: parsed.versionId,
+        executionId: parsed.executionId,
+        tenantId: parsed.tenantId,
+        idempotencyKey: parsed.idempotencyKey,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof SystemRuntimeTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Runtime start payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateAuthoritativeRunSubmissionMutationRequest(input: {
+  readonly payload: unknown;
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+}):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly workflowId?: string;
+      readonly workspaceId?: string;
+      readonly source?: string;
+      readonly submittedByActorId?: string;
+      readonly clientRequestId?: string;
+      readonly correlationId?: string;
+      readonly idempotencyKey?: string;
+      readonly runtimeTarget: {
+        readonly systemId: string;
+        readonly versionId: string;
+        readonly executionId?: string;
+        readonly tenantId?: string;
+        readonly async?: boolean;
+      };
+      readonly tags?: ReadonlyArray<string>;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+    };
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    const parsed = parseRunSubmissionRequest(input.payload);
+    if (parsed.runtimeTarget.async === false) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("runtimeTarget.async must be true when provided."),
+      };
+    }
+    if (parsed.workspaceId && parsed.workspaceId !== input.workspaceId) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("submission.workspaceId must match authenticated workspaceId."),
+      };
+    }
+    if (parsed.submittedByActorId && parsed.submittedByActorId !== input.actorUserIdentityId) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("submission.submittedByActorId must match authenticated actor."),
+      };
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        ...parsed,
+        workspaceId: input.workspaceId,
+        submittedByActorId: input.actorUserIdentityId,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(
+          error.issues[0]?.message ?? "Run submission payload is invalid.",
+        ),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateAuthoritativeRunExecutionUpdateMutationRequest(input: {
+  readonly payload: unknown;
+  readonly runId: string;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunLifecycleUpdateRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(input.payload);
+  try {
+    const parsed = parseRunLifecycleUpdateRequest({
+      ...bodyRecord,
+      runId: input.runId,
+    });
+
+    if (!parsed.senderNodeId) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("senderNodeId is required."),
+      };
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        ...parsed,
+        runId: input.runId,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run execution update payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateAuthoritativeRunCancellationMutationRequest(input: {
+  readonly payload: unknown;
+  readonly runId: string;
+  readonly actorUserIdentityId: string;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunCancellationRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(input.payload);
+  try {
+    const parsed = parseRunCancellationRequest({
+      ...bodyRecord,
+      runId: input.runId,
+    });
+
+    if (parsed.requestedByActorId && parsed.requestedByActorId !== input.actorUserIdentityId) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("cancellation.requestedByActorId must match authenticated actor."),
+      };
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        ...parsed,
+        runId: input.runId,
+        requestedByActorId: input.actorUserIdentityId,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run cancellation payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateAuthoritativeRunRetryMutationRequest(input: {
+  readonly payload: unknown;
+  readonly runId: string;
+  readonly actorUserIdentityId: string;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunRetryRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(input.payload);
+  try {
+    const parsed = parseRunRetryRequest({
+      ...bodyRecord,
+      runId: input.runId,
+    });
+
+    if (parsed.requestedByActorId && parsed.requestedByActorId !== input.actorUserIdentityId) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("retry.requestedByActorId must match authenticated actor."),
+      };
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        ...parsed,
+        runId: input.runId,
+        requestedByActorId: input.actorUserIdentityId,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run retry payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateRuntimeCancelRunMutationRequest(executionId: string, payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly executionId: string;
+      readonly reason?: string;
+      readonly cancelledAt?: string;
+      readonly idempotencyKey?: string;
+    };
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(payload);
+  try {
+    const parsed = parseRuntimeCancelRunRequest({
+      ...bodyRecord,
+      executionId,
+    });
+    return {
+      ok: true,
+      data: Object.freeze({
+        executionId: parsed.executionId,
+        reason: parsed.reason,
+        cancelledAt: parsed.cancelledAt,
+        idempotencyKey: parsed.idempotencyKey,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof SystemRuntimeTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Runtime cancellation payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateRuntimeDequeueMutationRequest(queueItemId: string, payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly queueItemId: string;
+      readonly reason?: string;
+      readonly dequeuedAt?: string;
+      readonly idempotencyKey?: string;
+    };
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(payload);
+  try {
+    const parsed = parseRuntimeDequeueRequest({
+      ...bodyRecord,
+      queueItemId,
+    });
+    return {
+      ok: true,
+      data: Object.freeze({
+        queueItemId: parsed.queueItemId,
+        reason: parsed.reason,
+        dequeuedAt: parsed.dequeuedAt,
+        idempotencyKey: parsed.idempotencyKey,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof SystemRuntimeTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Runtime dequeue payload is invalid."),
+      };
+    }
+    throw error;
+  }
 }
 
 function parseAndValidateAssetPreviewRequest(
@@ -7759,9 +7940,7 @@ function parseAssetUploadContentRequest(
   workspaceId: string,
   uploadSessionId: string,
 ): IngestAssetUploadContentApiRequest {
-  const contentType = typeof request.headers["content-type"] === "string"
-    ? request.headers["content-type"].trim()
-    : undefined;
+  const contentType = normalizeRequestContentType(request.headers["content-type"]);
 
   return Object.freeze({
     actorUserIdentityId,
@@ -7776,271 +7955,52 @@ function buildContentDispositionHeader(
   disposition: "attachment" | "inline",
   fileName: string | undefined,
 ): string {
-  const safeFileName = sanitizeDownloadFileName(fileName);
-  if (!safeFileName) {
-    return disposition;
-  }
-
-  const encoded = encodeURIComponent(safeFileName).replace(/['()*]/g, (character) => `%${character.charCodeAt(0).toString(16)}`);
-  return `${disposition}; filename="${safeFileName}"; filename*=UTF-8''${encoded}`;
+  return buildFileContentDispositionHeader(disposition, fileName);
 }
 
 function sanitizeDownloadFileName(fileName: string | undefined): string | undefined {
-  if (!fileName) {
-    return undefined;
-  }
-
-  const normalized = fileName
-    .trim()
-    .replace(/["]/g, "'")
-    .replace(/[\/\\]/g, "-")
-    .replace(/[\u0000-\u001F\u007F]/g, "")
-    .replace(/\s+/g, " ");
-  if (!normalized || normalized === "." || normalized === "..") {
-    return undefined;
-  }
-  return normalized.length > 255 ? normalized.slice(0, 255) : normalized;
+  return sanitizeDownloadFileNamePrimitive(fileName);
 }
 
 async function* toRequestBodyStream(request: IncomingMessage): AsyncIterable<Uint8Array> {
-  for await (const chunk of request) {
-    yield Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-  }
+  yield* toRequestBodyByteStream(request);
 }
 
 async function parseJsonBody(
   request: IncomingMessage,
   maxBodyBytes: number,
 ): Promise<{ readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string }> {
-  const chunks: Buffer[] = [];
-  let totalBytes = 0;
-
-  for await (const chunk of request) {
-    const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    totalBytes += bufferChunk.length;
-    if (totalBytes > maxBodyBytes) {
-      return {
-        ok: false,
-        error: `Request body exceeds limit of ${maxBodyBytes} bytes.`,
-      };
-    }
-    chunks.push(bufferChunk);
-  }
-
-  if (chunks.length === 0) {
-    return { ok: false, error: "Request body is required." };
-  }
-
-  try {
-    return { ok: true, value: JSON.parse(Buffer.concat(chunks).toString("utf8")) };
-  } catch {
-    return { ok: false, error: "Request body must be valid JSON." };
-  }
+  return parseJsonRequestBody(request, maxBodyBytes);
 }
 
-function mapStatusCode(response: IdentityAuthApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case IdentityAuthApiErrorCodes.invalidRequest:
-      return 400;
-    case IdentityAuthApiErrorCodes.conflict:
-      return 409;
-    case IdentityAuthApiErrorCodes.authenticationFailed:
-      return 401;
-    case IdentityAuthApiErrorCodes.accountInactive:
-      return 403;
-    case IdentityAuthApiErrorCodes.forbidden:
-      return 403;
-    case IdentityAuthApiErrorCodes.unsupportedProvider:
-      return 422;
-    case IdentityAuthApiErrorCodes.notFound:
-      return 404;
-    default:
-      return 500;
-  }
-}
-
-function mapWorkspaceStatusCode(response: WorkspaceInvitationApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case WorkspaceInvitationApiErrorCodes.invalidRequest:
-      return 400;
-    case WorkspaceInvitationApiErrorCodes.authenticationFailed:
-      return 401;
-    case WorkspaceInvitationApiErrorCodes.forbidden:
-      return 403;
-    case WorkspaceInvitationApiErrorCodes.notFound:
-      return 404;
-    case WorkspaceInvitationApiErrorCodes.conflict:
-      return 409;
-    case WorkspaceInvitationApiErrorCodes.invalidInvite:
-      return 400;
-    default:
-      return 500;
-  }
-}
-
-function mapWorkspaceAdministrationStatusCode(response: WorkspaceAdministrationApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case WorkspaceAdministrationApiErrorCodes.invalidRequest:
-      return 400;
-    case WorkspaceAdministrationApiErrorCodes.authenticationFailed:
-      return 401;
-    case WorkspaceAdministrationApiErrorCodes.forbidden:
-      return 403;
-    case WorkspaceAdministrationApiErrorCodes.notFound:
-      return 404;
-    case WorkspaceAdministrationApiErrorCodes.conflict:
-      return 409;
-    case WorkspaceAdministrationApiErrorCodes.invalidTransition:
-      return 422;
-    default:
-      return 500;
-  }
-}
-
-function mapAuthorizationManagementStatusCode(response: AuthorizationManagementApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case AuthorizationManagementApiErrorCodes.invalidRequest:
-      return 400;
-    case AuthorizationManagementApiErrorCodes.authenticationFailed:
-      return 401;
-    case AuthorizationManagementApiErrorCodes.forbidden:
-      return 403;
-    case AuthorizationManagementApiErrorCodes.notFound:
-      return 404;
-    case AuthorizationManagementApiErrorCodes.conflict:
-      return 409;
-    default:
-      return 500;
-  }
-}
-
-function mapNodeTrustStatusCode(response: NodeTrustApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case NodeTrustApiErrorCodes.invalidRequest:
-      return 400;
-    case NodeTrustApiErrorCodes.authenticationFailed:
-      return 401;
-    case NodeTrustApiErrorCodes.forbidden:
-      return 403;
-    case NodeTrustApiErrorCodes.notFound:
-      return 404;
-    case NodeTrustApiErrorCodes.conflict:
-      return 409;
-    default:
-      return 500;
-  }
-}
-
-function mapCertificateOperationsStatusCode(response: CertificateOperationsApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case CertificateOperationsApiErrorCodes.invalidRequest:
-      return 400;
-    case CertificateOperationsApiErrorCodes.authenticationFailed:
-      return 401;
-    case CertificateOperationsApiErrorCodes.forbidden:
-      return 403;
-    case CertificateOperationsApiErrorCodes.notFound:
-      return 404;
-    case CertificateOperationsApiErrorCodes.conflict:
-      return 409;
-    default:
-      return 500;
-  }
-}
-
-function mapSecretMetadataStatusCode(response: SecretMetadataApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case SecretMetadataApiErrorCodes.invalidRequest:
-      return 400;
-    case SecretMetadataApiErrorCodes.authenticationFailed:
-      return 401;
-    case SecretMetadataApiErrorCodes.forbidden:
-      return 403;
-    case SecretMetadataApiErrorCodes.notFound:
-      return 404;
-    case SecretMetadataApiErrorCodes.conflict:
-      return 409;
-    default:
-      return 500;
-  }
-}
-
-function mapStorageManagementStatusCode(response: StorageManagementApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case StorageManagementApiErrorCodes.invalidRequest:
-      return 400;
-    case StorageManagementApiErrorCodes.authenticationFailed:
-      return 401;
-    case StorageManagementApiErrorCodes.forbidden:
-      return 403;
-    case StorageManagementApiErrorCodes.notFound:
-      return 404;
-    case StorageManagementApiErrorCodes.conflict:
-      return 409;
-    case StorageManagementApiErrorCodes.invalidState:
-      return 422;
-    case StorageManagementApiErrorCodes.capabilityUnsupported:
-      return 422;
-    case StorageManagementApiErrorCodes.provisioningFailed:
-      return 409;
-    default:
-      return 500;
-  }
-}
-
-function mapAssetManagementStatusCode(response: AssetManagementApiResponse<unknown>): number {
-  if (response.ok) {
-    return 200;
-  }
-
-  switch (response.error?.code) {
-    case AssetManagementApiErrorCodes.invalidRequest:
-      return 400;
-    case AssetManagementApiErrorCodes.authenticationFailed:
-      return 401;
-    case AssetManagementApiErrorCodes.forbidden:
-      return 403;
-    case AssetManagementApiErrorCodes.notFound:
-      return 404;
-    case AssetManagementApiErrorCodes.conflict:
-      return 409;
-    case AssetManagementApiErrorCodes.invalidState:
-      return 422;
-    default:
-      return 500;
-  }
+function resolveRouteBackendAvailability(
+  options: IdentityHttpServerOptions,
+): Readonly<Record<AuthoritativeApiRouteBackendKey, boolean>> {
+  return Object.freeze({
+    [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+    [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: Boolean(options.workspaceBackendApi),
+    [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: Boolean(options.workspaceAdministrationBackendApi),
+    [AuthoritativeApiRouteBackendKeys.authorizationManagement]: Boolean(options.authorizationManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: Boolean(options.deploymentPolicyReadBackendApi),
+    [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: Boolean(options.deploymentPolicyWriteBackendApi),
+    [AuthoritativeApiRouteBackendKeys.auditLedger]: Boolean(options.auditLedgerBackendApi),
+    [AuthoritativeApiRouteBackendKeys.nodeTrust]: Boolean(options.nodeTrustBackendApi),
+    [AuthoritativeApiRouteBackendKeys.executionNodeManagement]: Boolean(options.executionNodeManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.certificateOperations]: Boolean(options.certificateOperationsBackendApi),
+    [AuthoritativeApiRouteBackendKeys.secretMetadata]: Boolean(options.secretMetadataBackendApi),
+    [AuthoritativeApiRouteBackendKeys.storageManagement]: Boolean(options.storageManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.assetManagement]: Boolean(
+      options.assetManagementBackendApi
+      || options.generatedResultManagementBackendApi,
+    ),
+    [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: Boolean(options.imageAssetManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.systemRuntime]: Boolean(options.systemRuntimeBackendApi),
+    [AuthoritativeApiRouteBackendKeys.runSubmission]: Boolean(options.authoritativeRunSubmissionBackendApi),
+    [AuthoritativeApiRouteBackendKeys.runRead]: Boolean(options.authoritativeRunQueryBackendApi),
+    [AuthoritativeApiRouteBackendKeys.runMutation]: Boolean(options.authoritativeRunMutationBackendApi),
+    [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]:
+      Boolean(options.authoritativeRunExecutionUpdateBackendApi && options.nodeTrustBackendApi),
+  });
 }
 
 function parseOptionalInteger(value: string | null): number | undefined {
@@ -8069,6 +8029,14 @@ function parseOptionalBoolean(value: string | null): boolean | undefined {
   return undefined;
 }
 
+function parseOptionalMultiStringList(
+  searchParams: URLSearchParams,
+  repeatedKey: string,
+  csvFallbackKey: string,
+): ReadonlyArray<string> | undefined {
+  return parseOptionalStringList(searchParams, repeatedKey, csvFallbackKey);
+}
+
 function parseOptionalEnum<TValue extends string>(
   value: string | null,
   enumeration: ReadonlyArray<TValue>,
@@ -8079,44 +8047,30 @@ function parseOptionalEnum<TValue extends string>(
   return enumeration.includes(value as TValue) ? (value as TValue) : undefined;
 }
 
-function parseOptionalCsvEnumList<TValue extends string>(
-  value: string | null,
-  enumeration: ReadonlyArray<TValue>,
-): { readonly ok: true; readonly value?: ReadonlyArray<TValue> } | { readonly ok: false } {
-  if (!value) {
-    return { ok: true, value: undefined };
-  }
-
-  const values = value
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-
-  if (values.length < 1) {
-    return { ok: true, value: undefined };
-  }
-
-  const normalized: TValue[] = [];
-  for (const candidate of values) {
-    if (!enumeration.includes(candidate as TValue)) {
-      return { ok: false };
-    }
-    normalized.push(candidate as TValue);
-  }
-
-  return {
-    ok: true,
-    value: Object.freeze(normalized),
-  };
-}
-
-function normalizeOptionalString(value: string | null): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const normalized = value.trim();
-  return normalized ? normalized : undefined;
+function buildRuntimeApiRequestContext(
+  context: AuthenticatedWorkspaceRequestContext,
+  operation: "read" | "mutation" = "read",
+) {
+  return Object.freeze({
+    trustedInternal: true,
+    trustedInternalAuthorization: Object.freeze({
+      actorMode: "propagate-caller" as const,
+      systemActionId: operation === "mutation"
+        ? "identity-http-authoritative-runtime-mutation"
+        : "identity-http-authoritative-runtime-read",
+    }),
+    accessContext: Object.freeze({
+      callerKind: "user" as const,
+      callerId: context.actor.userIdentityId,
+      sessionId: context.session.sessionId,
+      metadata: Object.freeze({
+        workspaceId: context.workspace.workspaceId,
+        activeWorkspaceId: context.workspace.workspaceId,
+        authenticatedAt: context.session.issuedAt,
+        accessChannel: context.session.accessChannel,
+      }),
+    }),
+  });
 }
 
 function buildAdminContext(actorUserIdentityId: string): ListIdentityAdminAccountsApiRequest["context"] {
@@ -8134,6 +8088,32 @@ function decodePathTail(path: string, prefix: string, suffix = ""): string | und
 
   const decoded = decodeURIComponent(tail).trim();
   return decoded ? decoded : undefined;
+}
+
+function decodeImageAssetUploadSessionPath(
+  path: string,
+  suffix: "/content" | "/complete",
+): { readonly assetId: string; readonly uploadSessionId: string } | undefined {
+  if (!path.startsWith("/api/v1/image-assets/") || !path.endsWith(suffix)) {
+    return undefined;
+  }
+
+  const stem = path.slice("/api/v1/image-assets/".length, path.length - suffix.length);
+  const [rawAssetId, rawUploadSessionId] = stem.split("/uploads/");
+  if (!rawAssetId || !rawUploadSessionId) {
+    return undefined;
+  }
+
+  const assetId = decodeURIComponent(rawAssetId).trim();
+  const uploadSessionId = decodeURIComponent(rawUploadSessionId).trim();
+  if (!assetId || !uploadSessionId || assetId.includes("/") || uploadSessionId.includes("/")) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    assetId,
+    uploadSessionId,
+  });
 }
 
 function decodeWorkspaceEntityPath(
@@ -8314,6 +8294,39 @@ function buildNodeTrustInvalidRequestResponse(message: string): NodeTrustApiResp
   });
 }
 
+function buildExecutionNodeManagementInvalidRequestResponse(
+  message: string,
+): ExecutionNodeManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: ExecutionNodeManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildExecutionNodeManagementValidationErrorResponse(
+  error: unknown,
+): ExecutionNodeManagementApiResponse<never> {
+  if (error instanceof ExecutionNodeManagementApiSchemaValidationError) {
+    return Object.freeze({
+      ok: false,
+      error: {
+        code: ExecutionNodeManagementApiErrorCodes.invalidRequest,
+        message: "Request validation failed.",
+        validationErrors: Object.freeze(error.issues.map((issue) => Object.freeze({
+          path: issue.path,
+          code: issue.code,
+          message: issue.message,
+        }))),
+      },
+    });
+  }
+
+  return buildExecutionNodeManagementInvalidRequestResponse("Request validation failed.");
+}
+
 function buildCertificateOperationsInvalidRequestResponse(message: string): CertificateOperationsApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -8354,11 +8367,79 @@ function buildAssetManagementInvalidRequestResponse(message: string): AssetManag
   });
 }
 
+function buildImageAssetManagementInvalidRequestResponse(message: string): ImageAssetManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: ImageAssetManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildGeneratedResultManagementInvalidRequestResponse(message: string): GeneratedResultManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: GeneratedResultManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildAuditLedgerInvalidRequestResponse(message: string): AuditLedgerApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: AuditLedgerApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildRuntimeInvalidRequestResponse(message: string): {
+  readonly ok: false;
+  readonly error: {
+    readonly code: "invalid-request";
+    readonly message: string;
+  };
+} {
+  return Object.freeze({
+    ok: false,
+    error: Object.freeze({
+      code: "invalid-request" as const,
+      message,
+    }),
+  });
+}
+
 function buildAssetManagementInternalErrorResponse(message: string): AssetManagementApiResponse<never> {
   return Object.freeze({
     ok: false,
     error: {
       code: AssetManagementApiErrorCodes.internal,
+      message,
+    },
+  });
+}
+
+function buildImageAssetManagementInternalErrorResponse(message: string): ImageAssetManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: ImageAssetManagementApiErrorCodes.internal,
+      message,
+    },
+  });
+}
+
+function buildGeneratedResultManagementInternalErrorResponse(
+  message: string,
+): GeneratedResultManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: GeneratedResultManagementApiErrorCodes.internal,
       message,
     },
   });
@@ -8384,25 +8465,29 @@ function buildForbiddenResponse(message: string): IdentityAuthApiResponse<never>
   });
 }
 
-function isAuthenticatedNodePrincipalForNode(context: AuthenticatedRequestContext, nodeId: string): boolean {
-  const expectedNodeId = nodeId.trim();
-  if (!expectedNodeId) {
-    return false;
-  }
-
-  const candidateValues = [
-    context.principal.userIdentityId,
-    context.principal.username,
-    context.session.providerSubject,
-  ];
-  return candidateValues.some((candidate) => candidate.trim() === expectedNodeId);
-}
-
 function buildQueryValidationError(path: string, message: string): IdentityAuthApiResponse<never> {
   return Object.freeze({
     ok: false,
     error: {
       code: IdentityAuthApiErrorCodes.invalidRequest,
+      message: "Request validation failed.",
+      validationErrors: Object.freeze([Object.freeze({
+        path,
+        code: "invalid_enum_value",
+        message,
+      })]),
+    },
+  });
+}
+
+function buildWorkspaceAdministrationQueryValidationError(
+  path: string,
+  message: string,
+): WorkspaceAdministrationApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: WorkspaceAdministrationApiErrorCodes.invalidRequest,
       message: "Request validation failed.",
       validationErrors: Object.freeze([Object.freeze({
         path,
@@ -8503,33 +8588,45 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>;
 }
 
-function extractBearerToken(authorizationHeader: string | string[] | undefined): string | undefined {
-  if (!authorizationHeader) {
-    return undefined;
+function parseWebSocketSubprotocolHeader(headerValue: string | string[] | undefined): ReadonlyArray<string> {
+  if (!headerValue) {
+    return Object.freeze([]);
   }
 
-  const value = Array.isArray(authorizationHeader) ? authorizationHeader[0] : authorizationHeader;
-  if (!value) {
-    return undefined;
-  }
-
-  const match = value.match(/^\s*Bearer\s+(.+)\s*$/i);
-  if (!match) {
-    return undefined;
-  }
-
-  const token = match[1]?.trim();
-  return token ? token : undefined;
+  const combined = Array.isArray(headerValue) ? headerValue.join(",") : headerValue;
+  return Object.freeze(
+    combined
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
+  );
 }
 
-function buildAuthenticationFailedResponse(message: string): IdentityAuthApiResponse<never> {
-  return Object.freeze({
-    ok: false,
-    error: {
-      code: IdentityAuthApiErrorCodes.authenticationFailed,
-      message,
-    },
-  });
+function extractWebSocketBearerTokenFromSubprotocols(subprotocols: ReadonlyArray<string>): string | undefined {
+  const encodedToken = subprotocols
+    .find((value) => value.startsWith(RuntimeRealtimeWebSocketAuthSubprotocolPrefix))
+    ?.slice(RuntimeRealtimeWebSocketAuthSubprotocolPrefix.length);
+  if (!encodedToken) {
+    return undefined;
+  }
+
+  return decodeBase64UrlToUtf8(encodedToken);
+}
+
+function resolveAcceptedWebSocketSubprotocol(subprotocols: ReadonlyArray<string>): string | undefined {
+  const runtimeRealtimeProtocol = subprotocols.find((value) => value === RuntimeRealtimeWebSocketSubprotocol);
+  return runtimeRealtimeProtocol || undefined;
+}
+
+function decodeBase64UrlToUtf8(value: string): string | undefined {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  try {
+    const decoded = Buffer.from(padded, "base64").toString("utf8").trim();
+    return decoded || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function logResponse<TRequest extends Record<string, unknown>>(
@@ -8540,11 +8637,13 @@ function logResponse<TRequest extends Record<string, unknown>>(
   requestPayload: TRequest,
   responsePayload: unknown,
 ): void {
+  const correlationId = resolveRequestCorrelationId(request, requestId);
   const event = Object.freeze({
     event: "identity-http.request.completed",
     requestId,
+    correlationId,
     method: request.method,
-    path: request.url,
+    path: resolveCanonicalRequestPath(request.url),
     statusCode,
     details: {
       request: redactSensitiveAuthPayload(requestPayload),
@@ -8564,6 +8663,14 @@ function logResponse<TRequest extends Record<string, unknown>>(
   logger.info(event);
 }
 
+function isRootReadinessProbeRequest(method: string | undefined, path: string): boolean {
+  return method === "GET" && path === "/";
+}
+
+function resolveCanonicalRequestPath(requestUrl: string | undefined): string {
+  return resolveRequestUrl(requestUrl).pathname;
+}
+
 function normalizeError(error: unknown): string {
   if (error instanceof Error) {
     return redactSensitiveText(error.message);
@@ -8571,52 +8678,85 @@ function normalizeError(error: unknown): string {
   return "Unknown error";
 }
 
+function createObservedIdentityHttpServerLogger(
+  delegate: IdentityHttpServerLogger,
+  onOperationalEvent: ((event: IdentityHttpServerLogEvent) => void) | undefined,
+): IdentityHttpServerLogger {
+  const emit = (level: "info" | "warn" | "error", event: IdentityHttpServerLogEvent) => {
+    const sanitized = sanitizeIdentityHttpServerLogEvent(event);
+    try {
+      if (level === "info") {
+        delegate.info(sanitized);
+      } else if (level === "warn") {
+        delegate.warn(sanitized);
+      } else {
+        delegate.error(sanitized);
+      }
+    } catch {
+      // Keep request handling resilient even if external logger integration fails.
+    }
+    if (!onOperationalEvent) {
+      return;
+    }
+    try {
+      onOperationalEvent(sanitized);
+    } catch {
+      // Keep request handling resilient even if observability hook integration fails.
+    }
+  };
+
+  return Object.freeze({
+    info: (event) => emit("info", event),
+    warn: (event) => emit("warn", event),
+    error: (event) => emit("error", event),
+  });
+}
+
+function sanitizeIdentityHttpServerLogEvent(event: IdentityHttpServerLogEvent): IdentityHttpServerLogEvent {
+  return Object.freeze({
+    ...event,
+    details: redactSensitiveAuthPayload(event.details) as Readonly<Record<string, unknown>> | undefined,
+  });
+}
+
 function writeJson(response: ServerResponse, statusCode: number, payload: unknown): void {
-  response.statusCode = statusCode;
-  response.setHeader("content-type", "application/json; charset=utf-8");
-  response.end(JSON.stringify(payload));
+  const correlationHeader = response.getHeader(CORRELATION_ID_HEADER);
+  const normalizedPayload = addCorrelationIdToErrorEnvelope(
+    normalizeSharedApiErrorEnvelope(payload),
+    normalizeResponseHeaderValue(correlationHeader),
+  );
+  writeJsonResponse(response, statusCode, normalizedPayload);
 }
 
 function writeNoContent(response: ServerResponse, statusCode: number): void {
-  response.statusCode = statusCode;
-  response.end();
+  writeNoContentResponse(response, statusCode);
 }
 
-function normalizeSessionAssuranceLevel(
-  value: ResolveAuthenticatedSessionApiResponse["session"]["deviceTrustContext"] extends { readonly sessionAssuranceLevel?: infer T } ? T : never,
-): "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted" {
-  if (value === "authenticated-trusted" || value === "authenticated-restricted") {
-    return value;
+function resolveSessionActorContextWorkspaceId(
+  requestedWorkspaceId: string | undefined,
+  workspaces: ReadonlyArray<ResolveSessionActorWorkspaceContextApiRecord>,
+): string | undefined {
+  if (!requestedWorkspaceId) {
+    return workspaces[0]?.workspaceId;
   }
-  return "authenticated-untrusted";
-}
 
-function isSessionAssuranceAllowed(
-  actual: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted",
-  minimum: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted",
-): boolean {
-  const order = Object.freeze({
-    "authenticated-untrusted": 1,
-    "authenticated-restricted": 2,
-    "authenticated-trusted": 3,
-  });
-  return order[actual] >= order[minimum];
+  const matched = workspaces.find((workspace) => workspace.workspaceId === requestedWorkspaceId);
+  return matched?.workspaceId ?? workspaces[0]?.workspaceId;
 }
 
 class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
   public info(event: IdentityHttpServerLogEvent): void {
-    console.info(JSON.stringify(event));
+    console.info(`${JSON.stringify(event)}\n`);
   }
 
   public warn(event: IdentityHttpServerLogEvent): void {
-    console.warn(JSON.stringify(event));
+    console.warn(`${JSON.stringify(event)}\n`);
   }
 
   public error(event: IdentityHttpServerLogEvent): void {
-    console.error(JSON.stringify(event));
+    console.error(`${JSON.stringify(event)}\n`);
   }
 }
-
 
 
 

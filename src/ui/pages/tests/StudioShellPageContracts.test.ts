@@ -61,6 +61,11 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("service.transitionLifecycle");
     expect(source).toContain("service.publishVersion");
     expect(source).toContain("service.validateDraft");
+    expect(source).toContain("service.listImageWorkflowDefinitions");
+    expect(source).toContain("service.getImageWorkflowDefinition");
+    expect(source).toContain("service.listImageSystemDefinitions");
+    expect(source).toContain("service.getImageSystemDefinition");
+    expect(source).toContain("service.saveImageSystemDefinition");
     expect(source).toContain("service.getPersistedWorkflow");
     expect(source).toContain("service.duplicatePersistedWorkflow");
     expect(source).toContain("service.assessWorkflowExecutionReadiness");

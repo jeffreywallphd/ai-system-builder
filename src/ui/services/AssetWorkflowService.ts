@@ -24,6 +24,10 @@ export class AssetWorkflowService {
     this.client.initiateUpload(request, sessionToken)
   );
 
+  public uploadContent: AssetWorkflowClient["uploadContent"] = (request, content, sessionToken) => (
+    this.client.uploadContent(request, content, sessionToken)
+  );
+
   public authorizeDownload: AssetWorkflowClient["authorizeDownload"] = (request, sessionToken) => (
     this.client.authorizeDownload(request, sessionToken)
   );

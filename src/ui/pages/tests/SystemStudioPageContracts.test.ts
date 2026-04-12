@@ -5,6 +5,7 @@ describe("SystemStudioPage contracts", () => {
   it("binds System Studio route surface to the shared Studio Shell page with system registration", () => {
     const pageSource = readSource("ui/pages/SystemStudioPage.tsx");
     const registrationSource = readSource("ui/studio-shell/registrations/SystemStudioRegistration.ts");
+    const workManagementPanelSource = readSource("ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx");
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("systemStudioRegistration");
@@ -31,6 +32,9 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).not.toContain("system-studio-advanced-setup");
     expect(registrationSource).not.toContain("system-studio-composition-capabilities");
     expect(registrationSource).not.toContain("system-studio-metadata-summary");
+    expect(workManagementPanelSource).toContain("Supported edit types");
+    expect(workManagementPanelSource).toContain("listImageWorkflowDefinitions");
+    expect(workManagementPanelSource).toContain("getImageWorkflowDefinition");
   });
 
   it("keeps System Studio wired into shared route and navigation configuration", () => {

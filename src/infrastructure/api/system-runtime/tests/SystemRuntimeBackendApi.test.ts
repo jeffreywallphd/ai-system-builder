@@ -18,6 +18,8 @@ import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication"
 import { InMemoryExecutionAuditRepository } from "@application/system-runtime/ExecutionAuditRepository";
 import { ExecutionAuditEventKinds } from "@domain/system-runtime/ExecutionAuditTrailDomain";
 import { RuntimeRateLimitEvaluator } from "@application/system-runtime/RuntimeRateLimitEvaluator";
+import { RuntimeRealtimeTopics } from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import type { SystemRuntimeObservabilityEvent, SystemRuntimeObservabilityLogger } from "../SystemRuntimeObservability";
 
 class RecordingCallbackDispatcher implements ExecutionCallbackDispatcher {
   public readonly deliveries: Array<{ payload: ExecutionCallbackPayload; targetUrl: string }> = [];
@@ -58,6 +60,24 @@ class InMemoryStudioShellRepository implements IStudioShellRepository {
   async saveAssetVersion(version: AssetVersion): Promise<AssetVersion> { this.versions.set(version.versionId, version); return version; }
   async getAssetVersion(versionId: string): Promise<AssetVersion | undefined> { return this.versions.get(versionId); }
   async listAssetVersionsByAssetId(assetId: string): Promise<ReadonlyArray<AssetVersion>> { return [...this.versions.values()].filter((entry) => entry.assetId.value === assetId); }
+}
+
+class RecordingSystemRuntimeObservabilityLogger implements SystemRuntimeObservabilityLogger {
+  public readonly infoEvents: SystemRuntimeObservabilityEvent[] = [];
+  public readonly warnEvents: SystemRuntimeObservabilityEvent[] = [];
+  public readonly errorEvents: SystemRuntimeObservabilityEvent[] = [];
+
+  public info(event: SystemRuntimeObservabilityEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: SystemRuntimeObservabilityEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: SystemRuntimeObservabilityEvent): void {
+    this.errorEvents.push(event);
+  }
 }
 
 describe("SystemRuntimeBackendApi", () => {
@@ -149,6 +169,60 @@ describe("SystemRuntimeBackendApi", () => {
     const invalid = await runtimeApi.startExecution({});
     expect(invalid.ok).toBeFalse();
     expect(invalid.error?.code).toBe("invalid-request");
+  });
+
+  it("emits structured observability for runtime start success and rejection paths", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const logger = new RecordingSystemRuntimeObservabilityLogger();
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        observabilityLogger: logger,
+      },
+    );
+
+    const invalid = await runtimeApi.startExecution({});
+    expect(invalid.ok).toBeFalse();
+    expect(logger.warnEvents.some((event) => event.action === "start-execution" && event.outcome === "rejected")).toBeTrue();
+
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:observability",
+      versionId: "system:observability:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const started = await runtimeApi.startExecution({
+      versionId: "system:observability:v1",
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "runtime-observability-user" },
+      },
+    });
+    expect(started.ok).toBeTrue();
+    expect(logger.infoEvents.some((event) =>
+      event.action === "start-execution"
+      && event.outcome === "success"
+      && event.executionId === started.data?.executionId
+      && event.callerId === "runtime-observability-user")).toBeTrue();
   });
 
   it("creates execution sessions and supports async polling/result retrieval", async () => {
@@ -497,6 +571,295 @@ describe("SystemRuntimeBackendApi", () => {
     expect(events.some((event) => event.kind === ExecutionUpdateEventKinds.executionStatus)).toBeTrue();
     expect(events.some((event) => event.kind === ExecutionUpdateEventKinds.executionTrace)).toBeTrue();
     expect(events.some((event) => event.kind === ExecutionUpdateEventKinds.executionCompleted || event.kind === ExecutionUpdateEventKinds.executionFailed)).toBeTrue();
+  });
+
+  it("emits converged realtime run/queue envelopes and supports reconnect-safe replay", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:realtime",
+      versionId: "system:realtime:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+
+    const runtimeApi = new SystemRuntimeBackendApi(repository);
+    const started = await runtimeApi.startExecutionAsync({
+      versionId: "system:realtime:v1",
+      requestContext: {
+        trustedInternal: true,
+        accessContext: {
+          callerKind: "user",
+          callerId: "realtime-user",
+          metadata: { activeWorkspaceId: "workspace-a" },
+        },
+      },
+    });
+    expect(started.ok).toBeTrue();
+
+    const initialEvents: string[] = [];
+    const liveSubscription = runtimeApi.subscribeToRealtimeEvents({
+      requestContext: {
+        trustedInternal: true,
+        accessContext: {
+          callerKind: "user",
+          callerId: "realtime-user",
+          metadata: { activeWorkspaceId: "workspace-a" },
+        },
+      },
+      request: {
+        actor: {
+          actorUserIdentityId: "realtime-user",
+          accessChannel: "desktop",
+          workspaceId: "workspace-a",
+        },
+        topics: [
+          { topic: RuntimeRealtimeTopics.runStatus, executionId: started.data!.executionId },
+          { topic: RuntimeRealtimeTopics.queue, executionId: started.data!.executionId },
+        ],
+      },
+      listener: (event) => {
+        initialEvents.push(event.cursor);
+      },
+    });
+    expect(liveSubscription.ok).toBeTrue();
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const poll = await runtimeApi.pollExecution({
+        executionId: started.data!.executionId,
+        requestContext: {
+          trustedInternal: true,
+          accessContext: { callerKind: "user", callerId: "realtime-user" },
+        },
+      });
+      if (poll.ok && (poll.data?.acceptedState === "completed" || poll.data?.acceptedState === "failed")) {
+        break;
+      }
+      await Bun.sleep(5);
+    }
+
+    expect(initialEvents.length).toBeGreaterThan(0);
+    liveSubscription.data?.unsubscribe();
+
+    const replayedEvents: string[] = [];
+    const replaySubscription = runtimeApi.subscribeToRealtimeEvents({
+      requestContext: {
+        trustedInternal: true,
+        accessContext: {
+          callerKind: "user",
+          callerId: "realtime-user",
+          metadata: { activeWorkspaceId: "workspace-a" },
+        },
+      },
+      request: {
+        actor: {
+          actorUserIdentityId: "realtime-user",
+          accessChannel: "thin-client",
+          workspaceId: "workspace-a",
+        },
+        topics: [
+          { topic: RuntimeRealtimeTopics.runStatus, executionId: started.data!.executionId },
+          { topic: RuntimeRealtimeTopics.queue, executionId: started.data!.executionId },
+        ],
+        mode: "resume-from-cursor",
+        reconnect: {
+          afterCursor: "runtime-realtime:1",
+        },
+      },
+      listener: (event) => {
+        replayedEvents.push(event.cursor);
+      },
+    });
+    expect(replaySubscription.ok).toBeTrue();
+    expect(replayedEvents.length).toBeGreaterThan(0);
+    expect(replayedEvents.every((entry) => entry !== "runtime-realtime:1")).toBeTrue();
+    replaySubscription.data?.unsubscribe();
+  });
+
+  it("exposes converged connectivity/admin event publishing with shared envelope shape", async () => {
+    const runtimeApi = new SystemRuntimeBackendApi(new InMemoryStudioShellRepository());
+    const captured: string[] = [];
+    const subscription = runtimeApi.subscribeToRealtimeEvents({
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "admin-user" },
+      },
+      request: {
+        actor: {
+          actorUserIdentityId: "admin-user",
+          accessChannel: "desktop",
+          workspaceId: "workspace-admin",
+        },
+        topics: [
+          { topic: RuntimeRealtimeTopics.connectivity, workspaceId: "workspace-admin" },
+          { topic: RuntimeRealtimeTopics.admin, workspaceId: "workspace-admin" },
+        ],
+      },
+      listener: (event) => {
+        captured.push(event.topic);
+      },
+    });
+    expect(subscription.ok).toBeTrue();
+
+    const connectivity = runtimeApi.publishRuntimeConnectivityState({
+      workspaceId: "workspace-admin",
+      actorUserIdentityId: "admin-user",
+      payload: {
+        state: "reconnecting",
+        reason: "session-refresh",
+        observedAt: "2026-04-07T12:00:00.000Z",
+        reconnectHint: { retryAfterMs: 250 },
+      },
+    });
+    const admin = runtimeApi.publishRuntimeAdminChange({
+      workspaceId: "workspace-admin",
+      actorUserIdentityId: "admin-user",
+      payload: {
+        changeKind: "runtime-policy-updated",
+        summary: "Updated runtime retry policy.",
+        changedAt: "2026-04-07T12:00:01.000Z",
+      },
+    });
+
+    expect(connectivity.topic).toBe(RuntimeRealtimeTopics.connectivity);
+    expect(admin.topic).toBe(RuntimeRealtimeTopics.admin);
+    expect(captured).toEqual(expect.arrayContaining([
+      RuntimeRealtimeTopics.connectivity,
+      RuntimeRealtimeTopics.admin,
+    ]));
+    subscription.data?.unsubscribe();
+  });
+
+  it("publishes audit/governance realtime events through the shared runtime subscription surface", () => {
+    const runtimeApi = new SystemRuntimeBackendApi(new InMemoryStudioShellRepository());
+    const captured: Array<{ topic: string; eventId?: string }> = [];
+    const subscription = runtimeApi.subscribeToRealtimeEvents({
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "audit-admin" },
+      },
+      request: {
+        actor: {
+          actorUserIdentityId: "audit-admin",
+          accessChannel: "desktop",
+          workspaceId: "workspace-audit",
+        },
+        topics: [
+          { topic: RuntimeRealtimeTopics.auditGovernance, workspaceId: "workspace-audit" },
+        ],
+      },
+      listener: (event) => {
+        captured.push({
+          topic: event.topic,
+          eventId: (event.payload as { eventId?: string }).eventId,
+        });
+      },
+    });
+    expect(subscription.ok).toBeTrue();
+
+    const published = runtimeApi.publishRuntimeAuditGovernance({
+      workspaceId: "workspace-audit",
+      actorUserIdentityId: "audit-admin",
+      payload: {
+        eventId: "audit:event:ws-policy-1",
+        eventType: "workspace-policy-updated",
+        auditCategory: "policy",
+        eventKind: "policy-action-recorded",
+        action: "policy.updated",
+        outcome: "succeeded",
+        occurredAt: "2026-04-07T12:00:00.000Z",
+        recordedAt: "2026-04-07T12:00:00.000Z",
+        actorId: "user:admin",
+        actorKind: "user",
+        workspaceId: "workspace-audit",
+        details: {
+          summary: "updated policy",
+        },
+        hasProtectedData: false,
+        redactionReasons: [],
+      },
+    });
+
+    expect(published.topic).toBe(RuntimeRealtimeTopics.auditGovernance);
+    expect(captured).toEqual(expect.arrayContaining([
+      { topic: RuntimeRealtimeTopics.auditGovernance, eventId: "audit:event:ws-policy-1" },
+    ]));
+    subscription.data?.unsubscribe();
+  });
+
+  it("publishes authoritative orchestration run/queue events through runtime realtime subscriptions", () => {
+    const runtimeApi = new SystemRuntimeBackendApi(new InMemoryStudioShellRepository());
+    const captured: Array<{ topic: string; eventKind: unknown }> = [];
+    const subscription = runtimeApi.subscribeToRealtimeEvents({
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "ops-user" },
+      },
+      request: {
+        actor: {
+          actorUserIdentityId: "ops-user",
+          accessChannel: "desktop",
+          workspaceId: "workspace-ops",
+        },
+        topics: [
+          { topic: RuntimeRealtimeTopics.runStatus, workspaceId: "workspace-ops", executionId: "run:1" },
+          { topic: RuntimeRealtimeTopics.queue, workspaceId: "workspace-ops", executionId: "run:1" },
+        ],
+      },
+      listener: (event) => {
+        captured.push({
+          topic: event.topic,
+          eventKind: (event.payload as { eventKind?: string }).eventKind,
+        });
+      },
+    });
+    expect(subscription.ok).toBeTrue();
+
+    runtimeApi.publishRuntimeRunStatus({
+      workspaceId: "workspace-ops",
+      actorUserIdentityId: "ops-user",
+      payload: {
+        executionId: "run:1",
+        runId: "run:1",
+        workflowId: "workflow:demo",
+        queueId: "queue:default",
+        lifecycleState: "queued",
+        eventKind: "submission-accepted",
+        status: "queued",
+        changedAt: "2026-04-07T12:00:00.000Z",
+      },
+    });
+    runtimeApi.publishRuntimeQueueMovement({
+      workspaceId: "workspace-ops",
+      actorUserIdentityId: "ops-user",
+      payload: {
+        queueItemId: "runtime-queue:run:1",
+        executionId: "run:1",
+        runId: "run:1",
+        workflowId: "workflow:demo",
+        queueId: "queue:default",
+        lifecycleState: "queued",
+        eventKind: "queue-enqueued",
+        status: "queued",
+        changedAt: "2026-04-07T12:00:00.000Z",
+      },
+    });
+
+    expect(captured).toEqual(expect.arrayContaining([
+      { topic: RuntimeRealtimeTopics.runStatus, eventKind: "submission-accepted" },
+      { topic: RuntimeRealtimeTopics.queue, eventKind: "queue-enqueued" },
+    ]));
+    subscription.data?.unsubscribe();
   });
 
   it("returns structured runtime input validation errors before orchestration", async () => {
@@ -1129,4 +1492,3 @@ describe("SystemRuntimeBackendApi", () => {
   });
 
 });
-

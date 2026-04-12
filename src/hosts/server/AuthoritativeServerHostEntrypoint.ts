@@ -14,11 +14,13 @@ import {
   type AuthoritativeServerHostRuntimeHandle,
 } from "./AuthoritativeServerCompositionRoot";
 import type { IdentityServerHost, IdentityServerHostOptions } from "./IdentityServerHost";
+import { recordAuthoritativeServerStartupBaseline } from "./AuthoritativeServerStartupBaselineRecorder";
 
 export const AuthoritativeServerHostEnvironmentKeys = Object.freeze({
   databasePath: "AI_LOOM_SERVER_DATABASE_PATH",
   host: "AI_LOOM_SERVER_HOST",
   port: "AI_LOOM_SERVER_PORT",
+  startupRegressionWarningThresholdMs: "AI_LOOM_SERVER_STARTUP_REGRESSION_WARNING_THRESHOLD_MS",
 });
 
 export interface AuthoritativeServerHostEntrypointBootOptions {
@@ -65,6 +67,22 @@ function resolvePort(value: string | undefined): number | undefined {
   return parsed;
 }
 
+function resolveStartupRegressionWarningThresholdMs(
+  env: Readonly<Record<string, string | undefined>>,
+): number | undefined {
+  const normalized = normalizeOptional(env[AuthoritativeServerHostEnvironmentKeys.startupRegressionWarningThresholdMs]);
+  if (!normalized) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(
+      `Environment variable '${AuthoritativeServerHostEnvironmentKeys.startupRegressionWarningThresholdMs}' must be a non-negative integer.`,
+    );
+  }
+  return parsed;
+}
+
 export function createAuthoritativeServerHostBootConfiguration(
   options?: AuthoritativeServerHostEntrypointBootOptions,
 ): HostBootConfiguration {
@@ -81,10 +99,23 @@ export function createAuthoritativeServerHostBootConfiguration(
 export function constructAuthoritativeServerHostAssembly(
   options: AuthoritativeServerHostEntrypointOptions,
 ): ConstructedAuthoritativeServerHostAssembly {
+  const resolvedEnvironment = options.boot?.environment ?? options.hostOptions.env ?? process.env;
+  const startupRegressionWarningThresholdMs = resolveStartupRegressionWarningThresholdMs(resolvedEnvironment);
+  const bootstrap = Object.freeze({
+    ...(options.bootstrap ?? {}),
+    recordStartupBaseline: options.bootstrap?.recordStartupBaseline
+      ?? (async (measurement) => {
+        return recordAuthoritativeServerStartupBaseline({
+          databasePath: options.hostOptions.databasePath,
+          measurement,
+          regressionWarningThresholdMs: startupRegressionWarningThresholdMs,
+        });
+      }),
+  } satisfies NonNullable<AuthoritativeServerCompositionRootOptions["bootstrap"]>);
   const compositionRoot = createAuthoritativeServerCompositionRoot({
     hostOptions: options.hostOptions,
     startHost: options.startHost,
-    bootstrap: options.bootstrap,
+    bootstrap,
   });
   const boot = createAuthoritativeServerHostBootConfiguration(options.boot);
 
@@ -129,12 +160,27 @@ function isMainModule(metaUrl: string): boolean {
   return pathToFileURL(path.resolve(mainScriptPath)).href === metaUrl;
 }
 
+function extractStartupCorrelationIdFromError(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+  const candidate = error as { startupCorrelationId?: unknown; traceId?: unknown };
+  const startupCorrelationId = normalizeOptional(
+    typeof candidate.startupCorrelationId === "string" ? candidate.startupCorrelationId : undefined,
+  );
+  if (startupCorrelationId) {
+    return startupCorrelationId;
+  }
+  return normalizeOptional(typeof candidate.traceId === "string" ? candidate.traceId : undefined);
+}
+
 async function runAuthoritativeServerHostFromCli(): Promise<void> {
   const runtime = await startAuthoritativeServerHostAssembly(
     resolveAuthoritativeServerHostEntrypointOptionsFromEnvironment(process.env),
   );
+  const startupCorrelationId = runtime.startupCorrelationId ? ` (startupCorrelationId=${runtime.startupCorrelationId})` : "";
   process.stdout.write(
-    `[ai-loom] authoritative server host started at ${runtime.address} (phase=${runtime.phase})\n`,
+    `[ai-loom] authoritative server host started at ${runtime.address} (phase=${runtime.phase})${startupCorrelationId}\n`,
   );
 
   let stopping = false;
@@ -143,7 +189,7 @@ async function runAuthoritativeServerHostFromCli(): Promise<void> {
       return;
     }
     stopping = true;
-    process.stdout.write(`[ai-loom] authoritative server host stopping (${signal})\n`);
+    process.stdout.write(`[ai-loom] authoritative server host stopping (${signal})${startupCorrelationId}\n`);
     await runtime.stop();
     process.exit(0);
   };
@@ -160,7 +206,9 @@ const thisModulePath = fileURLToPath(import.meta.url);
 if (isMainModule(pathToFileURL(thisModulePath).href)) {
   runAuthoritativeServerHostFromCli().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[ai-loom] authoritative server host failed: ${message}\n`);
+    const startupCorrelationId = extractStartupCorrelationIdFromError(error);
+    const suffix = startupCorrelationId ? ` (startupCorrelationId=${startupCorrelationId})` : "";
+    process.stderr.write(`[ai-loom] authoritative server host failed: ${message}${suffix}\n`);
     process.exit(1);
   });
 }

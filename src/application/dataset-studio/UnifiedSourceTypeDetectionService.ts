@@ -298,7 +298,7 @@ export class UnifiedSourceTypeDetectionService implements IUnifiedIngestionSourc
           UnifiedIngestionSourceKinds.json,
           UnifiedIngestionEvidenceKinds.contentSniff,
           "Content sample is valid JSON.",
-          55,
+          110,
         );
       } else if (looksLikeCsv(textSample)) {
         addEvidence(
@@ -382,4 +382,3 @@ export function createUnifiedSourceTypeDetectionService(options?: {
 }): IUnifiedIngestionSourceTypeDetector {
   return new UnifiedSourceTypeDetectionService(options);
 }
-

@@ -21,6 +21,7 @@ import {
   type WorkspaceCreationAuditSink,
   type WorkspaceCreationAuthorizationHook,
   type WorkspaceCreationClock,
+  type WorkspaceCreationDeploymentPolicyContextResolver,
   type WorkspaceCreationIdGenerator,
 } from "../use-cases/CreateWorkspaceUseCase";
 import { WorkspaceAdministrationAuditEventTypes } from "../use-cases/WorkspaceAdministrationAudit";
@@ -30,6 +31,10 @@ import type {
   WorkspaceRoleAssignmentListQuery,
   WorkspaceListQuery,
 } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import type { IDeploymentAuthorizationPolicyEvaluationPort } from "@application/policy-administration/DeploymentPolicyEvaluationPorts";
+import { DeploymentPolicyEvaluationService } from "@application/policy-administration/DeploymentPolicyEvaluationService";
+import { CanonicalDeploymentPolicySnapshotResolver } from "@application/policy-administration/CanonicalDeploymentPolicySnapshotResolver";
+import { DeploymentProfileIds } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
 
 class InMemoryWorkspaceInitializationAdapter
   implements
@@ -171,6 +176,22 @@ class StubWorkspaceCreationClock implements WorkspaceCreationClock {
   }
 }
 
+class FixedWorkspaceCreationDeploymentPolicyContextResolver implements WorkspaceCreationDeploymentPolicyContextResolver {
+  public constructor(private readonly profileId: typeof DeploymentProfileIds[keyof typeof DeploymentProfileIds]) {}
+
+  public async resolveContext(_input: {
+    readonly actorUserIdentityId: string;
+    readonly workspaceSlug: string;
+    readonly occurredAt: string;
+  }): Promise<{
+    readonly profileId: typeof DeploymentProfileIds[keyof typeof DeploymentProfileIds];
+  }> {
+    return Object.freeze({
+      profileId: this.profileId,
+    });
+  }
+}
+
 describe("CreateWorkspaceUseCase", () => {
   it("creates a workspace with active creator membership and owner role assignment", async () => {
     const adapter = new InMemoryWorkspaceInitializationAdapter();
@@ -229,6 +250,38 @@ describe("CreateWorkspaceUseCase", () => {
     expect(adapter.workspaces.size).toBe(1);
     expect(adapter.memberships.size).toBe(1);
     expect(adapter.roleAssignments.size).toBe(1);
+  });
+
+  it("uses deployment sharing policy default visibility when request does not provide one", async () => {
+    const adapter = new InMemoryWorkspaceInitializationAdapter();
+    const deploymentAuthorizationPolicyPort: IDeploymentAuthorizationPolicyEvaluationPort = new DeploymentPolicyEvaluationService(
+      new CanonicalDeploymentPolicySnapshotResolver(),
+    );
+    const useCase = new CreateWorkspaceUseCase({
+      workspaceRepository: adapter,
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new StubWorkspaceCreationIdGenerator(),
+      clock: new StubWorkspaceCreationClock(),
+      deploymentAuthorizationPolicyPort,
+      deploymentPolicyContextResolver: new FixedWorkspaceCreationDeploymentPolicyContextResolver(
+        DeploymentProfileIds.organization,
+      ),
+    });
+
+    const result = await useCase.execute({
+      slug: "team-policy-default",
+      displayName: "Team Policy Default",
+      actorUserIdentityId: "user:owner",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.workspace.ownership.visibility).toBe(WorkspaceVisibilities.team);
   });
 
   it("rejects invalid workspace creation input predictably", async () => {

@@ -320,6 +320,24 @@ describe("SecretMetadataBackendApi", () => {
               message: "Required system secret is missing.",
               secretId: "secret:server:provider:openai",
             })]),
+            materialMetadata: Object.freeze([]),
+          }),
+          securityMaterial: Object.freeze({
+            lifecycleStage: "production",
+            summary: Object.freeze({
+              total: 1,
+              healthy: 0,
+              degraded: 0,
+              missing: 1,
+              nonCompliant: 0,
+            }),
+            governanceAssertions: Object.freeze({
+              total: 0,
+              warning: 0,
+              blocked: 0,
+              entries: Object.freeze([]),
+            }),
+            entries: Object.freeze([]),
           }),
         }),
       },
@@ -363,6 +381,115 @@ describe("SecretMetadataBackendApi", () => {
               message: "secret-store:/sensitive/path leaked",
               secretId: "secret:server:provider:openai",
             })]),
+            materialMetadata: Object.freeze([Object.freeze({
+              providerId: "openai",
+              secretId: "secret:server:provider:openai",
+              scope: "server",
+              materialKind: "provider-credential",
+              backend: Object.freeze({
+                backendId: "durable-server-secret-store",
+                backendKind: "durable-server-secret-store",
+              }),
+              reference: Object.freeze({
+                secretId: "secret:server:provider:openai",
+                name: "provider.openai.api-key",
+                scope: "server",
+                kind: "api-key",
+                state: "active",
+                currentVersionId: "secret:server:provider:openai:v1",
+                metadata: Object.freeze({
+                  tags: Object.freeze(["server", "openai"]),
+                  labels: Object.freeze({
+                    provider: "openai",
+                  }),
+                }),
+                updatedAt: "2026-04-06T12:00:00.000Z",
+              }),
+              timestamps: Object.freeze({
+                updatedAt: "2026-04-06T12:00:00.000Z",
+              }),
+              rotation: Object.freeze({
+                status: "active",
+                currentVersionId: "secret:server:provider:openai:v1",
+              }),
+              policyFlags: Object.freeze({
+                metadataSafeForDiagnostics: true,
+                plaintextAccessRequiresDedicatedRetrievalFlow: true,
+                failFastRequiredOnStartup: true,
+              }),
+            })]),
+          }),
+          securityMaterial: Object.freeze({
+            lifecycleStage: "production",
+            summary: Object.freeze({
+              total: 1,
+              healthy: 0,
+              degraded: 0,
+              missing: 0,
+              nonCompliant: 1,
+            }),
+            governanceAssertions: Object.freeze({
+              total: 1,
+              warning: 0,
+              blocked: 1,
+              entries: Object.freeze([Object.freeze({
+                assertionId: "secret:server:provider:openai:ephemeral-bootstrap-material:production",
+                secretId: "secret:server:provider:openai",
+                materialId: "material:server:provider:openai",
+                allowanceKind: "ephemeral-bootstrap-material",
+                lifecycleStage: "production",
+                productionCapable: true,
+                enforcement: "blocked",
+                message: "secret-store:/governance/path leaked",
+                details: Object.freeze({
+                  fallbackPolicy: "generate-ephemeral-for-development",
+                }),
+              })]),
+            }),
+            entries: Object.freeze([Object.freeze({
+              secretId: "secret:server:provider:openai",
+              state: "non-compliant",
+              present: true,
+              degraded: true,
+              nonCompliant: true,
+              fallbackModeActive: false,
+              provider: Object.freeze({
+                providerId: "openai",
+                materialKind: "provider-credential",
+              }),
+              classification: Object.freeze({
+                materialId: "material:server:provider:openai",
+                category: "secret-credential",
+                scope: "server",
+                rotationPosture: "manual",
+                usageContexts: Object.freeze(["startup-bootstrap", "provider-credential"]),
+              }),
+              policy: Object.freeze({
+                startupRequirement: "fail-fast-required",
+                durabilityClass: "durable",
+                fallbackPolicy: "migrate-legacy-input",
+              }),
+              backend: Object.freeze({
+                backendId: "durable-server-secret-store",
+                backendKind: "durable-server-secret-store",
+              }),
+              rotation: Object.freeze({
+                status: "active",
+                currentVersionId: "secret:server:provider:openai:v1",
+              }),
+              validation: Object.freeze({
+                failures: Object.freeze([Object.freeze({
+                  code: "bootstrap-error",
+                  severity: "error",
+                  message: "secret-store:/sensitive/path leaked",
+                  secretId: "secret:server:provider:openai",
+                  startupRequirement: "fail-fast-required",
+                  durabilityClass: "durable",
+                  fallbackPolicy: "migrate-legacy-input",
+                })]),
+                warnings: Object.freeze([]),
+              }),
+            })]),
           }),
         }),
       },
@@ -378,8 +505,17 @@ describe("SecretMetadataBackendApi", () => {
     }
 
     expect(response.data.diagnostics.bootstrap.requiredSecretIds).toEqual(["secret:server:provider:openai"]);
+    expect(response.data.diagnostics.bootstrap.materialMetadata).toHaveLength(1);
+    expect((response.data.diagnostics.bootstrap.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
     expect(response.data.diagnostics.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
     expect(response.data.diagnostics.bootstrap.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
+    expect(response.data.diagnostics.securityMaterial.governanceAssertions.entries[0]?.message).toBe(
+      "Security material governance assertion emitted.",
+    );
+    expect(response.data.diagnostics.securityMaterial.entries[0]?.state).toBe("non-compliant");
+    expect(response.data.diagnostics.securityMaterial.entries[0]?.validation.failures[0]?.message).toBe(
+      "Secret service diagnostic emitted.",
+    );
   });
 });
 

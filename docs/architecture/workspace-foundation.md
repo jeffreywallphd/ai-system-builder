@@ -203,6 +203,7 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - write-time uniqueness failures are mapped to deterministic duplicate outcomes.
 - Added optional extension seams in the use case for:
   - authorization gating (`assertCanCreateWorkspace`),
+  - deployment-policy-driven default visibility resolution (sharing posture policy seam when request visibility is omitted),
   - post-commit audit emission (now aligned to `WorkspaceAdministrationAuditSink`, best effort in this slice).
 - Added transaction seam `IWorkspaceTransactionManager` and wired SQLite adapter support:
   - `SqliteWorkspacePersistenceAdapter.runInTransaction(...)` uses `BEGIN IMMEDIATE`, `COMMIT`, and rollback on error.
@@ -508,4 +509,8 @@ Story 3.1.4 extends the adapter integration tests to validate:
 - Workspace persistence now aligns to the encryption-policy model:
   - `workspace_records` includes `encryption_mode`, `content_encryption_required`, `key_scope`, `allow_preview_decryption`, `allow_worker_decryption`
   - schema migration version is incremented with additive column migration for existing databases.
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`
 

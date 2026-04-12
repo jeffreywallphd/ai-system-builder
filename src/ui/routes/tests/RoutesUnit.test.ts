@@ -3,7 +3,7 @@ import { readSource } from "../../tests/testUtils";
 
 describe("ui/routes unit coverage", () => {
   it("defines route paths and route metadata", () => {
-    const source = readSource("ui/routes/RouteConfig.ts");
+    const source = readSource("src/ui/routes/RouteConfig.ts");
 
     expect(source).toContain('export const ROUTE_PATHS = Object.freeze({');
     expect(source).toContain('login: "/auth/login"');
@@ -21,13 +21,19 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "run"');
     expect(source).toContain('key: "workflow-editor"');
     expect(source).toContain('key: "settings"');
+    expect(source).toContain('key: "admin-shell"');
+    expect(source).toContain('key: "admin-lite-shell"');
     expect(source).toContain('key: "authorization-reporting"');
+    expect(source).toContain('key: "security-policy"');
     expect(source).toContain('key: "workspace-admin"');
     expect(source).toContain('key: "node-enrollment-review"');
     expect(source).toContain('key: "workspace-thin-membership"');
     expect(source).toContain('key: "workspace-invitation-accept"');
     expect(source).toContain('key: "identity-admin"');
     expect(source).toContain('key: "secrets-admin"');
+    expect(source).toContain('key: "governance-review"');
+    expect(source).toContain('key: "governance-review-thin"');
+    expect(source).toContain('key: "deployment-policy-admin"');
     expect(source).toContain('key: "mcp"');
     expect(source).toContain('key: "services"');
     expect(source).toContain('key: "context"');
@@ -47,12 +53,18 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('embeddingIndexStudio: "/studio-shell/embedding-index"');
     expect(source).toContain('configProfileStudio: "/studio-shell/config-profile"');
     expect(source).toContain('workspaceAdmin: "/settings/workspaces"');
+    expect(source).toContain('adminShell: "/settings/admin"');
+    expect(source).toContain('adminLiteShell: "/settings/admin-lite"');
     expect(source).toContain('nodeEnrollmentReview: "/settings/node-enrollments"');
     expect(source).toContain('authorizationReporting: "/settings/sharing/reporting"');
+    expect(source).toContain('securityPolicy: "/settings/security-policy"');
     expect(source).toContain('workspaceThinMembership: "/settings/workspaces/thin"');
     expect(source).toContain('workspaceInvitationAccept: "/workspaces/:workspaceId/invitations/:invitationToken/accept"');
     expect(source).toContain('identityAdmin: "/settings/identity-admin"');
     expect(source).toContain('secretsAdmin: "/settings/secrets"');
+    expect(source).toContain('governanceReview: "/settings/governance-review"');
+    expect(source).toContain('governanceReviewThin: "/settings/governance-review/thin"');
+    expect(source).toContain('deploymentPolicyAdmin: "/settings/deployment-policy"');
     expect(source).toContain('key: "agent-studio"');
     expect(source).toContain('key: "registry"');
     expect(source).toContain('key: "registry-asset-detail"');
@@ -70,8 +82,8 @@ describe("ui/routes unit coverage", () => {
   });
 
   it("provides navigation helper and protected route behavior", () => {
-    const configSource = readSource("ui/routes/RouteConfig.ts");
-    const protectedRouteSource = readSource("ui/routes/ProtectedRoute.tsx");
+    const configSource = readSource("src/ui/routes/RouteConfig.ts");
+    const protectedRouteSource = readSource("src/ui/routes/ProtectedRoute.tsx");
 
     expect(configSource).toContain("getNavigationRoutes");
     expect(protectedRouteSource).toContain("useLocation");
@@ -80,10 +92,12 @@ describe("ui/routes unit coverage", () => {
   });
 
   it("wires route tree to layout and pages", () => {
-    const source = readSource("ui/routes/AppRouter.tsx");
+    const source = readSource("src/ui/routes/AppRouter.tsx");
 
     expect(source).toContain("createBrowserRouter");
     expect(source).toContain("<RouterProvider router={router} />");
+    expect(source).toContain("<Suspense fallback={<AppRouterLoadingFallback />}>");
+    expect(source).toContain('const BuildPage = lazy(async () => await import("../pages/BuildPage"));');
     expect(source).toContain("<ProtectedRoute");
     expect(source).toContain("path: ROUTE_PATHS.build");
     expect(source).toContain("path: ROUTE_PATHS.login");
@@ -93,13 +107,19 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.notFound");
     expect(source).toContain('path: "/index.html"');
     expect(source).toContain("path: ROUTE_PATHS.settings");
+    expect(source).toContain("path: ROUTE_PATHS.adminShell");
+    expect(source).toContain("path: ROUTE_PATHS.adminLiteShell");
     expect(source).toContain("path: ROUTE_PATHS.authorizationReporting");
+    expect(source).toContain("path: ROUTE_PATHS.securityPolicy");
     expect(source).toContain("path: ROUTE_PATHS.workspaceAdmin");
     expect(source).toContain("path: ROUTE_PATHS.nodeEnrollmentReview");
     expect(source).toContain("path: ROUTE_PATHS.workspaceThinMembership");
     expect(source).toContain("path: ROUTE_PATHS.workspaceInvitationAccept");
     expect(source).toContain("path: ROUTE_PATHS.identityAdmin");
     expect(source).toContain("path: ROUTE_PATHS.secretsAdmin");
+    expect(source).toContain("path: ROUTE_PATHS.governanceReview");
+    expect(source).toContain("path: ROUTE_PATHS.governanceReviewThin");
+    expect(source).toContain("path: ROUTE_PATHS.deploymentPolicyAdmin");
     expect(source).toContain("path: ROUTE_PATHS.mcp");
     expect(source).toContain("path: ROUTE_PATHS.services");
     expect(source).toContain("path: ROUTE_PATHS.agentStudio");

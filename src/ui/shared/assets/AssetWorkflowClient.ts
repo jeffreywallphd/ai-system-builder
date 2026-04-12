@@ -4,6 +4,8 @@
 } from "@infrastructure/api/assets/sdk/PublicAssetManagementApiContract";
 import {
   AssetWorkflowClientContractVersions,
+  AssetWorkflowTransportRoutes,
+  buildAssetUploadSessionContentPath,
   buildAuthorizedAssetDownloadPath,
   toAssetWorkflowDetailQueryParams,
   toAssetWorkflowListQueryParams,
@@ -16,6 +18,8 @@ import {
   type AssetWorkflowListResponse,
   type AssetWorkflowPreviewRequest,
   type AssetWorkflowPreviewResponse,
+  type AssetWorkflowUploadContentRequest,
+  type AssetWorkflowUploadContentResponse,
   type AssetWorkflowUploadInitiationRequest,
   type AssetWorkflowUploadInitiationResponse,
 } from "@shared/contracts/assets/AssetWorkflowClientContracts";
@@ -25,6 +29,11 @@ export interface AssetWorkflowClient {
     request: Omit<AssetWorkflowUploadInitiationRequest, "contractVersion">,
     sessionToken: string,
   ): Promise<AssetManagementApiResponse<AssetWorkflowUploadInitiationResponse>>;
+  uploadContent(
+    request: Omit<AssetWorkflowUploadContentRequest, "contractVersion">,
+    content: Uint8Array,
+    sessionToken: string,
+  ): Promise<AssetManagementApiResponse<AssetWorkflowUploadContentResponse>>;
   listAssets(
     request: Omit<AssetWorkflowListRequest, "contractVersion">,
     sessionToken: string,
@@ -62,7 +71,7 @@ export class HttpAssetWorkflowClient implements AssetWorkflowClient {
       readonly asset: AssetWorkflowUploadInitiationResponse["asset"];
       readonly upload: AssetWorkflowUploadInitiationResponse["upload"];
     }>>(
-      `/api/v1/assets/${encodeURIComponent(request.assetId)}/uploads/initiate${toQuerySuffix(query)}`,
+      `${AssetWorkflowTransportRoutes.initiateUpload.replace(":assetId", encodeURIComponent(request.assetId))}${toQuerySuffix(query)}`,
       {
         storageInstanceId: request.storageInstanceId,
         fileName: request.fileName,
@@ -88,6 +97,39 @@ export class HttpAssetWorkflowClient implements AssetWorkflowClient {
     });
   }
 
+  public async uploadContent(
+    request: Omit<AssetWorkflowUploadContentRequest, "contractVersion">,
+    content: Uint8Array,
+    sessionToken: string,
+  ): Promise<AssetManagementApiResponse<AssetWorkflowUploadContentResponse>> {
+    const path = buildAssetUploadSessionContentPath({
+      workspaceId: request.workspaceId,
+      uploadSessionId: request.uploadSessionId,
+    });
+    const response = await this.request<AssetManagementApiResponse<Omit<AssetWorkflowUploadContentResponse, "contractVersion">>>(
+      "POST",
+      path,
+      sessionToken,
+      content,
+      request.contentType ?? "application/octet-stream",
+    );
+
+    if (!response.ok || !response.data) {
+      return response as AssetManagementApiResponse<AssetWorkflowUploadContentResponse>;
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        contractVersion: AssetWorkflowClientContractVersions.v1,
+        asset: response.data.asset,
+        uploadSessionId: response.data.uploadSessionId,
+        finalizedVersionId: response.data.finalizedVersionId,
+        content: response.data.content,
+      }),
+    });
+  }
+
   public async listAssets(
     request: Omit<AssetWorkflowListRequest, "contractVersion">,
     sessionToken: string,
@@ -96,7 +138,7 @@ export class HttpAssetWorkflowClient implements AssetWorkflowClient {
       readonly items: AssetWorkflowListResponse["items"];
       readonly pagination: AssetWorkflowListResponse["pagination"];
     }>>(
-      `/api/v1/assets${toQuerySuffix(toAssetWorkflowListQueryParams({
+      `${AssetWorkflowTransportRoutes.listAssets}${toQuerySuffix(toAssetWorkflowListQueryParams({
         ...request,
         contractVersion: AssetWorkflowClientContractVersions.v1,
       }))}`,
@@ -122,7 +164,7 @@ export class HttpAssetWorkflowClient implements AssetWorkflowClient {
     sessionToken: string,
   ): Promise<AssetManagementApiResponse<AssetWorkflowDetailResponse>> {
     const response = await this.get<AssetManagementApiResponse<{ readonly asset: AssetWorkflowDetailResponse["asset"] }>>(
-      `/api/v1/assets/${encodeURIComponent(request.assetId)}${toQuerySuffix(toAssetWorkflowDetailQueryParams({
+      `${AssetWorkflowTransportRoutes.getAssetDetail.replace(":assetId", encodeURIComponent(request.assetId))}${toQuerySuffix(toAssetWorkflowDetailQueryParams({
         ...request,
         contractVersion: AssetWorkflowClientContractVersions.v1,
       }))}`,
@@ -152,7 +194,7 @@ export class HttpAssetWorkflowClient implements AssetWorkflowClient {
     const response = await this.post<AssetManagementApiResponse<{
       readonly authorization: AssetWorkflowDownloadActionResponse["authorization"];
     }>>(
-      `/api/v1/assets/${encodeURIComponent(request.assetId)}/downloads/authorize${toQuerySuffix(query)}`,
+      `${AssetWorkflowTransportRoutes.authorizeDownload.replace(":assetId", encodeURIComponent(request.assetId))}${toQuerySuffix(query)}`,
       {
         versionId: request.versionId,
         purpose: request.purpose,
@@ -185,7 +227,7 @@ export class HttpAssetWorkflowClient implements AssetWorkflowClient {
     sessionToken: string,
   ): Promise<AssetManagementApiResponse<AssetWorkflowPreviewResponse>> {
     const response = await this.get<AssetManagementApiResponse<{ readonly preview: AssetWorkflowPreviewResponse["preview"] }>>(
-      `/api/v1/assets/${encodeURIComponent(request.assetId)}/preview${toQuerySuffix(toAssetWorkflowPreviewQueryParams({
+      `${AssetWorkflowTransportRoutes.resolvePreview.replace(":assetId", encodeURIComponent(request.assetId))}${toQuerySuffix(toAssetWorkflowPreviewQueryParams({
         ...request,
         contractVersion: AssetWorkflowClientContractVersions.v1,
       }))}`,
@@ -211,25 +253,27 @@ export class HttpAssetWorkflowClient implements AssetWorkflowClient {
 
   private async post<TResponse>(
     path: string,
-    body: Readonly<Record<string, unknown>>,
+    body: Readonly<Record<string, unknown>> | Uint8Array,
     sessionToken: string,
+    contentType = "application/json",
   ): Promise<TResponse> {
-    return this.request<TResponse>("POST", path, sessionToken, body);
+    return this.request<TResponse>("POST", path, sessionToken, body, contentType);
   }
 
   private async request<TResponse>(
     method: "GET" | "POST",
     path: string,
     sessionToken: string,
-    body?: Readonly<Record<string, unknown>>,
+    body?: Readonly<Record<string, unknown>> | Uint8Array,
+    contentType = "application/json",
   ): Promise<TResponse> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers: {
-        "content-type": "application/json",
+        "content-type": contentType,
         authorization: `Bearer ${sessionToken}`,
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: body instanceof Uint8Array ? body : body ? JSON.stringify(body) : undefined,
     });
     return await response.json() as TResponse;
   }

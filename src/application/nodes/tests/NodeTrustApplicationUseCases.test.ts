@@ -1717,6 +1717,10 @@ describe("node trust application use-cases", () => {
     expect(result.value.update.capabilityProfileSynchronized).toBeTrue();
     expect(result.value.update.deploymentTagsSynchronized).toBeTrue();
     expect(audit.events.some((event) => event.type === NodeTrustAuditEventTypes.heartbeatRecorded)).toBeTrue();
+    const transitionEvent = audit.events.find((event) => event.type === NodeTrustAuditEventTypes.availabilityTransitioned);
+    expect(transitionEvent).toBeDefined();
+    expect((transitionEvent?.details as { previousHeartbeatStatus?: string } | undefined)?.previousHeartbeatStatus).toBe("online");
+    expect((transitionEvent?.details as { heartbeatStatus?: string } | undefined)?.heartbeatStatus).toBe("degraded");
   });
 
   it("enforces node-authenticated trust gates for approved, pending, rejected, unknown, and revoked states", async () => {

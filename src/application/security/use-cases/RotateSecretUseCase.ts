@@ -233,6 +233,8 @@ export class RotateSecretUseCase {
         details: Object.freeze({
           changed: persisted.changed,
           wasReplay: persisted.wasReplay,
+          previousVersionId: expectedCurrentVersionId,
+          activatedVersionId: persisted.record.currentVersionId,
         }),
       });
 
@@ -329,6 +331,7 @@ export class RotateSecretUseCase {
           userIdentityId: input.userIdentityId,
         }),
         occurredAt: input.occurredAt,
+        details: input.details,
       }));
     } catch {
       // Audit failures are intentionally non-fatal.

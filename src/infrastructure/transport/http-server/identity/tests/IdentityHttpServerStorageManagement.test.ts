@@ -3,7 +3,11 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import { StorageManagementBackendApi } from "../../../../api/storage/StorageManagementBackendApi";
-import { createIdentityHttpServer } from "../IdentityHttpServer";
+import {
+  createIdentityHttpServer,
+  type IdentityHttpServerLogEvent,
+  type IdentityHttpServerLogger,
+} from "../IdentityHttpServer";
 import type {
   IStorageManagementService,
   StorageManagementResult,
@@ -19,6 +23,19 @@ import {
 } from "@domain/storage/StorageDomain";
 
 const servers: Server[] = [];
+
+class CapturingLogger implements IdentityHttpServerLogger {
+  public readonly events: IdentityHttpServerLogEvent[] = [];
+  public info(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public warn(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+  public error(event: IdentityHttpServerLogEvent): void {
+    this.events.push(event);
+  }
+}
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => {
@@ -158,7 +175,7 @@ class StubStorageManagementService implements IStorageManagementService {
   }
 }
 
-async function startServer(): Promise<string> {
+async function startServer(logger?: CapturingLogger): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const storageManagementBackendApi = new StorageManagementBackendApi({
     storageManagementService: new StubStorageManagementService(),
@@ -167,6 +184,7 @@ async function startServer(): Promise<string> {
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
     storageManagementBackendApi,
+    logger,
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -209,8 +227,31 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 }
 
 describe("IdentityHttpServer storage management routes", () => {
-  it("serves authenticated storage create/list/detail/update/deactivate/health flows", async () => {
+  it("enforces shared auth and workspace guard semantics for converged storage routes", async () => {
     const baseUrl = await startServer();
+    const token = await registerAndLogin(baseUrl, "storage.http.guard.1");
+
+    const unauthenticatedResponse = await fetch(`${baseUrl}/api/v1/storage/instances`);
+    expect(unauthenticatedResponse.status).toBe(401);
+    const unauthenticatedBody = await unauthenticatedResponse.json();
+    expect(unauthenticatedBody.ok).toBe(false);
+    expect(unauthenticatedBody.error.code).toBe("authentication-failed");
+
+    const missingWorkspaceResponse = await fetch(`${baseUrl}/api/v1/storage/instances`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(missingWorkspaceResponse.status).toBe(400);
+    const missingWorkspaceBody = await missingWorkspaceResponse.json();
+    expect(missingWorkspaceBody.ok).toBe(false);
+    expect(missingWorkspaceBody.error.code).toBe("invalid-request");
+  });
+
+  it("serves authenticated storage create/list/detail/update/deactivate/health flows", async () => {
+    const logger = new CapturingLogger();
+    const baseUrl = await startServer(logger);
     const token = await registerAndLogin(baseUrl, "storage.http.owner");
 
     const unauthenticatedList = await fetch(`${baseUrl}/api/v1/storage/instances?workspaceId=workspace-alpha`);
@@ -314,6 +355,9 @@ describe("IdentityHttpServer storage management routes", () => {
     expect(healthBody.data.synchronizationStatus).toBe("disabled");
     expect(healthBody.data.operationalStatus).toBe("healthy");
     expect(healthBody.data.lastCheckedAt).toBe("2026-04-06T12:40:00.000Z");
+    expect(
+      logger.events.some((event) => event.event === "identity-http.route-family.modular-handled" && event.path === "/api/v1/storage/instances"),
+    ).toBeTrue();
   });
 
   it("maps policy violations and invalid query input to stable HTTP responses", async () => {

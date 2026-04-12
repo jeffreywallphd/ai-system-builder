@@ -135,6 +135,7 @@ Protected-resource composition pattern is canonical:
 - Creator metadata attribution is deterministic on initialization records (`createdBy` / `lastModifiedBy` and assignment/join timestamps from one clock instant).
 - Creation flow has bounded extension hooks for:
   - authorization gating (pre-write actor validation seam),
+  - deployment-policy sharing posture default visibility resolution when `visibility` is omitted,
   - best-effort audit event emission (post-commit seam for future durable audit integration).
 - New tests cover:
   - successful workspace initialization with owner membership/role bootstrap,
@@ -433,4 +434,8 @@ Protected-resource composition pattern is canonical:
 - Workspace persistence is now aligned to this model:
   - `workspace_records` includes `encryption_mode`, `content_encryption_required`, `key_scope`, `allow_preview_decryption`, `allow_worker_decryption`
   - migration version is bumped to include additive schema evolution for existing databases.
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`
 

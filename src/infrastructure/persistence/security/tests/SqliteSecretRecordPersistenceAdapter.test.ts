@@ -79,7 +79,7 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM secret_record_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(2);
+    expect(versionRow.version).toBe(3);
 
     const tables = database.prepare(`
       SELECT name

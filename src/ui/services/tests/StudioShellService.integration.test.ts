@@ -79,6 +79,21 @@ function installBridge(
     validateDraft(requestJson: string) {
       return api.validateDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    listImageWorkflowDefinitions(requestJson: string) {
+      return api.listImageWorkflowDefinitions(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    getImageWorkflowDefinition(requestJson: string) {
+      return api.getImageWorkflowDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    listImageSystemDefinitions(requestJson: string) {
+      return api.listImageSystemDefinitions(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    getImageSystemDefinition(requestJson: string) {
+      return api.getImageSystemDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    saveImageSystemDefinition(requestJson: string) {
+      return api.saveImageSystemDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
     getPersistedWorkflow(workflowId: string) {
       return api.getPersistedWorkflow(workflowId).then((response) => JSON.stringify(response));
     },
@@ -367,6 +382,161 @@ async function runLifecycleScenario(
 }
 
 describe("StudioShellService integration", () => {
+  it("lists and reads authoritative image workflow definitions through service -> bridge -> backend", async () => {
+    const backendApi = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const listed = await service.listImageWorkflowDefinitions({
+      workspaceId: "workspace-alpha",
+      actorUserId: "user-author",
+    });
+    expect(listed.ok).toBeTrue();
+    expect((listed.data?.items.length ?? 0) > 0).toBeTrue();
+
+    const workflowId = listed.data?.items[0]?.workflowId;
+    expect(workflowId).toBeDefined();
+    const detail = await service.getImageWorkflowDefinition({
+      workspaceId: "workspace-alpha",
+      actorUserId: "user-author",
+      workflowId: workflowId!,
+    });
+    expect(detail.ok).toBeTrue();
+    expect(detail.data?.workflowId).toBe(workflowId);
+    expect(detail.data?.version.versionTag).toBeDefined();
+    expect((detail.data?.parameterSpecifications.length ?? 0) > 0).toBeTrue();
+    expect(typeof detail.data?.parameterSpecifications[0]?.ui.control).toBe("string");
+    expect(typeof detail.data?.parameterDefaults).toBe("object");
+  });
+
+  it("saves, updates, lists, and reopens authoritative image system definitions through service -> bridge -> backend", async () => {
+    const backendApi = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    installBridge(backendApi);
+    const service = new StudioShellService();
+
+    const initialized = await service.initializeStudio("studio-system", "System Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+    expect(sessionId).toBeDefined();
+
+    const workflowId = "image-template:enhance-upscale:v1";
+    const created = await service.createDraft({
+      studioId: "studio-system",
+      sessionId: sessionId!,
+      content: JSON.stringify({
+        systemSpec: {
+          serialization: {
+            runtime: {
+              workflowBindings: [{
+                bindingId: "component:primary",
+                workflowAssetId: workflowId,
+                workflowVersionId: "1.0.0",
+              }],
+              datasetInstances: [{
+                instanceId: "dataset-instance:output-images",
+              }],
+              state: {
+                imageWorkflowParameterValuesByWorkflowId: {
+                  [workflowId]: {
+                    scaleFactor: 2,
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      metadata: {
+        title: "Service System",
+        tags: ["system", "image"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const draftId = created.data?.draft?.draftId;
+    expect(draftId).toBeDefined();
+
+    const savedNew = await service.saveImageSystemDefinition({
+      studioId: "studio-system",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      saveAsNew: true,
+    });
+    expect(savedNew.ok).toBeTrue();
+    expect(savedNew.data?.workflowId).toBe(workflowId);
+    expect(savedNew.data?.parameterBaseline).toEqual({
+      scaleFactor: 2,
+    });
+    expect(savedNew.data?.readiness).toBeDefined();
+
+    const systemId = savedNew.data?.systemId;
+    expect(systemId).toBeDefined();
+
+    const listed = await service.listImageSystemDefinitions({});
+    expect(listed.ok).toBeTrue();
+    expect(listed.data?.items.some((entry) => entry.systemId === systemId)).toBeTrue();
+    expect(typeof listed.data?.items[0]?.readiness.blockingIssueCount).toBe("number");
+
+    const updated = await service.updateDraft({
+      studioId: "studio-system",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      content: JSON.stringify({
+        systemSpec: {
+          serialization: {
+            runtime: {
+              workflowBindings: [{
+                bindingId: "component:primary",
+                workflowAssetId: workflowId,
+                workflowVersionId: "1.0.0",
+              }],
+              datasetInstances: [{
+                instanceId: "dataset-instance:output-images",
+              }],
+              state: {
+                imageSystemDefinitionId: systemId,
+                imageWorkflowParameterValuesByWorkflowId: {
+                  [workflowId]: {
+                    scaleFactor: 4,
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    });
+    expect(updated.ok).toBeTrue();
+
+    const savedUpdate = await service.saveImageSystemDefinition({
+      studioId: "studio-system",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      existingSystemId: systemId!,
+      saveAsNew: false,
+    });
+    expect(savedUpdate.ok).toBeTrue();
+    expect(savedUpdate.data?.systemId).toBe(systemId);
+    expect(savedUpdate.data?.parameterBaseline).toEqual({
+      scaleFactor: 4,
+    });
+    expect(savedUpdate.data?.readiness).toBeDefined();
+
+    const reopened = await service.getImageSystemDefinition({
+      systemId: systemId!,
+    });
+    expect(reopened.ok).toBeTrue();
+    expect(reopened.data?.workflowId).toBe(workflowId);
+    expect(reopened.data?.parameterBaseline).toEqual({
+      scaleFactor: 4,
+    });
+    expect(reopened.data?.readiness).toBeDefined();
+  });
+
   it("lists workflow run summaries and loads run detail through the studio-shell bridge", async () => {
     const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
     const summary = createWorkflowRunSummaryRecord({

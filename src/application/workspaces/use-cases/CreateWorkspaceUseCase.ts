@@ -27,6 +27,12 @@ import {
   publishWorkspaceAdministrationAuditEventBestEffort,
   type WorkspaceAdministrationAuditSink,
 } from "./WorkspaceAdministrationAudit";
+import type {
+  DeploymentPolicyEvaluationContext,
+  DeploymentWorkspaceVisibility,
+} from "@application/policy-administration/DeploymentPolicyEvaluationContracts";
+import type { IDeploymentAuthorizationPolicyEvaluationPort } from "@application/policy-administration/DeploymentPolicyEvaluationPorts";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 
 export const WorkspaceCreationErrorCodes = Object.freeze({
   invalidRequest: "workspace-invalid-request",
@@ -92,6 +98,14 @@ export interface WorkspaceCreationAuthorizationHook {
   }): Promise<void>;
 }
 
+export interface WorkspaceCreationDeploymentPolicyContextResolver {
+  resolveContext(input: {
+    readonly actorUserIdentityId: string;
+    readonly workspaceSlug: string;
+    readonly occurredAt: string;
+  }): Promise<DeploymentPolicyEvaluationContext | undefined>;
+}
+
 export type WorkspaceCreationAuditSink = WorkspaceAdministrationAuditSink;
 
 interface CreateWorkspaceUseCaseDependencies {
@@ -102,6 +116,8 @@ interface CreateWorkspaceUseCaseDependencies {
   readonly idGenerator: WorkspaceCreationIdGenerator;
   readonly clock: WorkspaceCreationClock;
   readonly authorizationHook?: WorkspaceCreationAuthorizationHook;
+  readonly deploymentAuthorizationPolicyPort?: IDeploymentAuthorizationPolicyEvaluationPort;
+  readonly deploymentPolicyContextResolver?: WorkspaceCreationDeploymentPolicyContextResolver;
   readonly auditSink?: WorkspaceCreationAuditSink;
 }
 
@@ -137,6 +153,12 @@ export class CreateWorkspaceUseCase {
     let membership: WorkspaceMembership;
     let roleAssignment: WorkspaceRoleAssignment;
     try {
+      const resolvedVisibility = await this.resolveWorkspaceVisibility({
+        requestedVisibility: input.visibility,
+        actorUserIdentityId,
+        slug: input.slug,
+        occurredAt: nowIso,
+      });
       workspace = createWorkspace({
         id: workspaceId,
         slug: input.slug,
@@ -144,7 +166,7 @@ export class CreateWorkspaceUseCase {
         description: input.description,
         encryptionPolicy: input.encryptionPolicy,
         ownerUserId: actorUserIdentityId,
-        visibility: input.visibility,
+        visibility: resolvedVisibility,
         createdBy: actorUserIdentityId,
         status: input.status ?? WorkspaceStatuses.active,
         now,
@@ -272,6 +294,42 @@ export class CreateWorkspaceUseCase {
       return undefined;
     }
     return normalized;
+  }
+
+  private async resolveWorkspaceVisibility(input: {
+    readonly requestedVisibility: WorkspaceVisibility | undefined;
+    readonly actorUserIdentityId: string;
+    readonly slug: string;
+    readonly occurredAt: string;
+  }): Promise<WorkspaceVisibility | undefined> {
+    if (input.requestedVisibility) {
+      return input.requestedVisibility;
+    }
+    if (!this.dependencies.deploymentAuthorizationPolicyPort || !this.dependencies.deploymentPolicyContextResolver) {
+      return undefined;
+    }
+
+    const context = await this.dependencies.deploymentPolicyContextResolver.resolveContext({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceSlug: input.slug,
+      occurredAt: input.occurredAt,
+    });
+    if (!context) {
+      return undefined;
+    }
+
+    const authorizationPolicy = await this.dependencies.deploymentAuthorizationPolicyPort.evaluateAuthorizationPolicy(context);
+    return this.mapDeploymentVisibility(authorizationPolicy.defaultWorkspaceVisibility.value);
+  }
+
+  private mapDeploymentVisibility(value: DeploymentWorkspaceVisibility): WorkspaceVisibility {
+    if (value === "private") {
+      return WorkspaceVisibilities.private;
+    }
+    if (value === "workspace") {
+      return WorkspaceVisibilities.team;
+    }
+    return WorkspaceVisibilities.public;
   }
 
   private asDuplicateErrorIfPossible(

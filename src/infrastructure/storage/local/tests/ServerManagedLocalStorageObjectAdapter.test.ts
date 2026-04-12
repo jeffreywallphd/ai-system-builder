@@ -13,7 +13,11 @@ import {
   StorageObjectAccessError,
   StorageObjectErrorCodes,
 } from "@application/storage/ports/StorageObjectPort";
-import { ServerManagedLocalStorageObjectAdapter } from "../ServerManagedLocalStorageObjectAdapter";
+import {
+  ServerManagedLocalStorageObjectAdapter,
+  type LocalStorageObjectDiagnosticsEvent,
+  type LocalStorageObjectDiagnosticsLogger,
+} from "../ServerManagedLocalStorageObjectAdapter";
 
 const createdRoots: string[] = [];
 
@@ -65,6 +69,69 @@ async function streamToText(stream: AsyncIterable<Uint8Array>): Promise<string> 
 }
 
 describe("ServerManagedLocalStorageObjectAdapter", () => {
+  it("emits diagnostics with the resolved absolute file path for successful writes", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-storage-object-logging-success-"));
+    createdRoots.push(root);
+    const infoEvents: LocalStorageObjectDiagnosticsEvent[] = [];
+    const logger: LocalStorageObjectDiagnosticsLogger = {
+      info: (event) => infoEvents.push(event),
+      error: () => undefined,
+    };
+    const adapter = new ServerManagedLocalStorageObjectAdapter({
+      managedStorageRootPath: root,
+      diagnosticsLogger: logger,
+    });
+    const storageInstance = createManagedFilesystemStorage("storage-assets");
+    const objectKey = adapter.createObjectKey({
+      storageInstance,
+      namespace: "assets",
+      logicalPathSegments: ["input", "asset-upload-001", "v1"],
+      originalFileName: "sample.png",
+    }).objectKey;
+
+    await adapter.writeObject({
+      reference: {
+        storageInstance,
+        objectKey,
+      },
+      content: Buffer.from("hello logical storage", "utf8"),
+    });
+
+    expect(infoEvents).toHaveLength(1);
+    expect(infoEvents[0]?.event).toBe("storage.local.write.succeeded");
+    expect(infoEvents[0]?.absolutePath).toContain(path.join("objects", "assets", "input", "asset-upload-001", "v1"));
+    expect(infoEvents[0]?.objectKey).toBe(objectKey);
+    expect(infoEvents[0]?.storageInstanceId).toBe(storageInstance.id);
+  });
+
+  it("emits diagnostics with the resolved absolute file path when writes fail", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-storage-object-logging-failure-"));
+    createdRoots.push(root);
+    const errorEvents: LocalStorageObjectDiagnosticsEvent[] = [];
+    const logger: LocalStorageObjectDiagnosticsLogger = {
+      info: () => undefined,
+      error: (event) => errorEvents.push(event),
+    };
+    const adapter = new ServerManagedLocalStorageObjectAdapter({
+      managedStorageRootPath: root,
+      diagnosticsLogger: logger,
+    });
+    const storageInstance = createManagedFilesystemStorage("storage-assets");
+
+    await expect(adapter.writeObject({
+      reference: {
+        storageInstance,
+        objectKey: "../outside.txt",
+      },
+      content: Buffer.from("x", "utf8"),
+    })).rejects.toBeDefined();
+
+    expect(errorEvents).toHaveLength(1);
+    expect(errorEvents[0]?.event).toBe("storage.local.write.failed");
+    expect(errorEvents[0]?.absolutePath).toBe("<unresolved>");
+    expect(errorEvents[0]?.errorCode).toBe(StorageObjectErrorCodes.invalidRequest);
+  });
+
   it("writes and reads storage objects using logical keys only", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-storage-object-success-"));
     createdRoots.push(root);
@@ -234,4 +301,3 @@ describe("ServerManagedLocalStorageObjectAdapter", () => {
     } satisfies Partial<StorageObjectAccessError>);
   });
 });
-

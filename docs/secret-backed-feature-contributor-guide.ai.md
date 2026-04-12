@@ -1,44 +1,27 @@
 # AI Companion: Secret-Backed Feature Contributor Guide
 
+Primary reference: `docs/secret-backed-feature-contributor-guide.md`
+
 ## Purpose
 
-Story 8.3.7 operational companion for Feature 8 / Epic 8.3: give contributors a concrete setup + implementation checklist for secret-backed features.
+Guide contributors on how to add secret-backed behavior while preserving hardened startup policy, scope boundaries, and diagnostics/audit safety.
 
-## Setup baseline
+## Core Expectations
 
-- Configure host envelope encryption (`AI_LOOM_SECRET_MASTER_KEY_ID`, `AI_LOOM_SECRET_MASTER_KEY`).
-- Configure required bootstrap secrets when needed (`AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`).
-- Validate health/diagnostics before integrating dependent runtime features.
+- choose explicit owner scope (`server`, `workspace`, `user`)
+- use scoped provider retrieval adapters; avoid direct env/persistence shortcuts
+- keep plaintext out of query/list/diagnostic surfaces
+- keep audit and log details redaction-safe
+- respect production fail-fast vs development/test optional policy behavior
+- ensure development-only allowances emit explicit governance assertions in startup/diagnostics surfaces
 
-## Contributor implementation rules
+## Extension Paths
 
-- Choose scope by ownership (`server`, `workspace`, `user`) and keep it explicit.
-- Runtime secret reads go through adapters/use cases, not env vars/persistence shortcuts.
-- Keep command/query DTO boundaries strict: plaintext only for mutation input.
-- Enforce log/audit redaction; plaintext and decrypted values are never allowed.
-- Handle `forbidden`/`conflict` outcomes deterministically; do not retry with broadened scope silently.
-- Treat rotation as active-version replacement; use optimistic version matching for sensitive update flows.
+- new secret consumer: define classification/hierarchy/policy, route runtime retrieval through official ports, and add policy-aware tests
+- new provider backend: implement `ISecretProviderMaterialResolutionPort`, emit full metadata model, and integrate routing in `DefaultSecretProviderResolutionService`
 
-## Recommended adapters
+## Validation
 
-- workspace credential: `resolveWorkspaceProviderCredential(...)`
-- user personal API key: `resolveUserPersonalApiKey(...)`
-- server signing/provider credentials: `ServerPlatformSecretConsumers`
-
-## Related docs
-
-- `docs/architecture/secrets-feature-extension-guidance.md`
-- `docs/architecture/secrets-service-consumption-adapters.md`
-- `docs/secret-bootstrap-and-migration-operations.md`
-- `docs/secret-health-and-operational-diagnostics.md`
-
-## Story 8.3.8 regression baseline
-
-Final production-readiness hardening now expects these regression seams to stay green:
-
-- `src/application/security/tests/ReEncryptSecretsUseCase.test.ts`
-  - ensures re-encryption failure status uses safe fixed messages and does not persist raw exception text.
-- `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
-  - validates end-to-end lifecycle consistency across create/rotate/retrieve/re-encrypt/delete with audit redaction checks.
-- `src/infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
-  - validates API error sanitization for opaque sensitive token-like values.
+- verify `/api/v1/security/secrets/health`
+- verify trusted `/api/v1/security/secrets/diagnostics`
+- update docs/tests when adding new required secrets, policy behavior, or backend kinds

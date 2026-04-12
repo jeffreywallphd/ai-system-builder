@@ -1370,7 +1370,7 @@ describe("loadServiceDefinitionsFromEnvironment", () => {
 
     const started = await supervisor.start("python-runtime");
 
-    expect(supervisor.getDefinition("python-runtime")?.workingDirectory).toBe(path.join(repoRoot, "python-runtime"));
+    expect(supervisor.getDefinition("python-runtime")?.workingDirectory).toBe(path.join(process.cwd(), "python-runtime"));
     expect(started.state).toBe(ServiceStates.healthy);
   });
 

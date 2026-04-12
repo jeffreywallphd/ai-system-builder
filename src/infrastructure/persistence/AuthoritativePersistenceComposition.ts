@@ -12,6 +12,8 @@ import { AUTHORIZATION_PERSISTENCE_MIGRATIONS } from "./authorization/SqliteAuth
 import { SqliteNodeTrustPersistenceAdapter } from "./nodes/SqliteNodeTrustPersistenceAdapter";
 import { SqliteNodeTrustAuditRecorder } from "./nodes/SqliteNodeTrustAuditRecorder";
 import { NODE_TRUST_PERSISTENCE_MIGRATIONS } from "./nodes/SqliteNodeTrustPersistenceMigrations";
+import { SqliteExecutionNodeRepository } from "./nodes/SqliteExecutionNodeRepository";
+import { EXECUTION_NODE_PERSISTENCE_MIGRATIONS } from "./nodes/SqliteExecutionNodePersistenceMigrations";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "./security/SqliteCertificateAuthorityPersistenceAdapter";
 import { CERTIFICATE_AUTHORITY_PERSISTENCE_MIGRATIONS } from "./security/SqliteCertificateAuthorityPersistenceMigrations";
 import { SqliteSecretRecordPersistenceAdapter } from "./security/SqliteSecretRecordPersistenceAdapter";
@@ -24,8 +26,18 @@ import { SqliteAssetAuditRecorder } from "./assets/SqliteAssetAuditRecorder";
 import { ASSET_PERSISTENCE_MIGRATIONS } from "./assets/SqliteAssetPersistenceMigrations";
 import { SqliteAssetUploadSessionPersistenceAdapter } from "./assets/SqliteAssetUploadSessionPersistenceAdapter";
 import { ASSET_UPLOAD_SESSION_PERSISTENCE_MIGRATIONS } from "./assets/SqliteAssetUploadSessionPersistenceMigrations";
+import { SqliteImageAssetPersistenceAdapter } from "./image-assets/SqliteImageAssetPersistenceAdapter";
+import { IMAGE_ASSET_PERSISTENCE_MIGRATIONS } from "./image-assets/SqliteImageAssetPersistenceMigrations";
+import { SqliteImageWorkflowSystemPersistenceAdapter } from "./image-workflows/SqliteImageWorkflowSystemPersistenceAdapter";
+import { IMAGE_WORKFLOW_SYSTEM_PERSISTENCE_MIGRATIONS } from "./image-workflows/SqliteImageWorkflowSystemPersistenceMigrations";
 import { SqlitePlatformPersistenceAdapter } from "./platform/SqlitePlatformPersistenceAdapter";
 import { PLATFORM_PERSISTENCE_MIGRATIONS } from "./platform/SqlitePlatformPersistenceMigrations";
+import { SqliteAuditLedgerRepository } from "./audit/SqliteAuditLedgerRepository";
+import { AUDIT_LEDGER_PERSISTENCE_MIGRATIONS } from "./audit/SqliteAuditLedgerPersistenceMigrations";
+import { SqliteDeploymentPolicyPersistenceAdapter } from "./deployment/SqliteDeploymentPolicyPersistenceAdapter";
+import { DEPLOYMENT_POLICY_PERSISTENCE_MIGRATIONS } from "./deployment/SqliteDeploymentPolicyPersistenceMigrations";
+import { SqliteGeneratedResultPersistenceAdapter } from "./generated-results/SqliteGeneratedResultPersistenceAdapter";
+import { GENERATED_RESULT_PERSISTENCE_MIGRATIONS } from "./generated-results/SqliteGeneratedResultPersistenceMigrations";
 
 interface VersionedMigrationSource {
   readonly domainId: string;
@@ -41,6 +53,7 @@ export interface AuthoritativePersistentPlatformServices {
   readonly authorizationRepository: SqliteAuthorizationPersistenceAdapter;
   readonly nodeTrustRepository: SqliteNodeTrustPersistenceAdapter;
   readonly nodeTrustAuditRecorder: SqliteNodeTrustAuditRecorder;
+  readonly executionNodeRepository: SqliteExecutionNodeRepository;
   readonly certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter;
   readonly secretRecordRepository: SqliteSecretRecordPersistenceAdapter;
   readonly storageInstanceRepository: SqliteStorageInstancePersistenceAdapter;
@@ -48,7 +61,12 @@ export interface AuthoritativePersistentPlatformServices {
   readonly assetRepository: SqliteAssetPersistenceAdapter;
   readonly assetAuditRecorder: SqliteAssetAuditRecorder;
   readonly assetUploadSessionRepository: SqliteAssetUploadSessionPersistenceAdapter;
+  readonly imageAssetRepository: SqliteImageAssetPersistenceAdapter;
+  readonly imageWorkflowSystemRepository: SqliteImageWorkflowSystemPersistenceAdapter;
   readonly platformPersistenceRepository: SqlitePlatformPersistenceAdapter;
+  readonly auditLedgerRepository: SqliteAuditLedgerRepository;
+  readonly deploymentPolicyRepository: SqliteDeploymentPolicyPersistenceAdapter;
+  readonly generatedResultRepository: SqliteGeneratedResultPersistenceAdapter;
   dispose(): void;
 }
 
@@ -74,6 +92,11 @@ const VersionedMigrationSources = Object.freeze<ReadonlyArray<VersionedMigration
     migrations: NODE_TRUST_PERSISTENCE_MIGRATIONS,
   }),
   Object.freeze({
+    domainId: "execution-nodes",
+    migrationTableName: "execution_node_repository_migrations",
+    migrations: EXECUTION_NODE_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
     domainId: "storage",
     migrationTableName: "storage_instance_repository_migrations",
     migrations: STORAGE_INSTANCE_PERSISTENCE_MIGRATIONS,
@@ -89,9 +112,34 @@ const VersionedMigrationSources = Object.freeze<ReadonlyArray<VersionedMigration
     migrations: ASSET_UPLOAD_SESSION_PERSISTENCE_MIGRATIONS,
   }),
   Object.freeze({
+    domainId: "image-assets",
+    migrationTableName: "image_asset_repository_migrations",
+    migrations: IMAGE_ASSET_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "image-workflow-system",
+    migrationTableName: "image_workflow_system_repository_migrations",
+    migrations: IMAGE_WORKFLOW_SYSTEM_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
     domainId: "platform",
     migrationTableName: "platform_repository_migrations",
     migrations: PLATFORM_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "deployment-policy",
+    migrationTableName: "deployment_policy_repository_migrations",
+    migrations: DEPLOYMENT_POLICY_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "generated-results",
+    migrationTableName: "generated_result_repository_migrations",
+    migrations: GENERATED_RESULT_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "audit-ledger",
+    migrationTableName: "audit_ledger_repository_migrations",
+    migrations: AUDIT_LEDGER_PERSISTENCE_MIGRATIONS,
   }),
   Object.freeze({
     domainId: "certificate-authority",
@@ -109,10 +157,131 @@ const AddColumnStatementPattern = /^\s*ALTER\s+TABLE\b[\s\S]*\bADD\s+COLUMN\b/i;
 const DuplicateColumnErrorPattern = /duplicate column name:/i;
 
 function splitSqlStatements(sql: string): ReadonlyArray<string> {
-  return sql
-    .split(";")
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0);
+  const statements: string[] = [];
+  let buffer = "";
+  let insideSingleQuote = false;
+  let insideDoubleQuote = false;
+  let insideLineComment = false;
+  let insideBlockComment = false;
+  let insideTriggerBody = false;
+  let pendingCreateKeyword = false;
+  let pendingTriggerBodyBegin = false;
+  let currentWord = "";
+
+  const commitWord = (): void => {
+    if (currentWord.length === 0) {
+      return;
+    }
+    const word = currentWord.toUpperCase();
+    if (word === "CREATE") {
+      pendingCreateKeyword = true;
+      pendingTriggerBodyBegin = false;
+    } else if (word === "TRIGGER" && pendingCreateKeyword) {
+      pendingTriggerBodyBegin = true;
+    } else if (word === "BEGIN" && pendingTriggerBodyBegin) {
+      insideTriggerBody = true;
+      pendingTriggerBodyBegin = false;
+    } else if (word === "END" && insideTriggerBody) {
+      insideTriggerBody = false;
+    }
+    currentWord = "";
+  };
+
+  for (let index = 0; index < sql.length; index += 1) {
+    const current = sql[index] ?? "";
+    const next = sql[index + 1] ?? "";
+    const previous = sql[index - 1] ?? "";
+    buffer += current;
+
+    if (insideLineComment) {
+      if (current === "\n") {
+        insideLineComment = false;
+      }
+      continue;
+    }
+
+    if (insideBlockComment) {
+      if (previous === "*" && current === "/") {
+        insideBlockComment = false;
+      }
+      continue;
+    }
+
+    if (!insideSingleQuote && !insideDoubleQuote) {
+      if (current === "-" && next === "-") {
+        commitWord();
+        insideLineComment = true;
+        continue;
+      }
+      if (current === "/" && next === "*") {
+        commitWord();
+        insideBlockComment = true;
+        continue;
+      }
+    }
+
+    if (insideSingleQuote) {
+      if (current === "'" && next === "'") {
+        buffer += next;
+        index += 1;
+        continue;
+      }
+      if (current === "'" && previous !== "\\") {
+        insideSingleQuote = false;
+      }
+      continue;
+    }
+
+    if (insideDoubleQuote) {
+      if (current === "\"" && next === "\"") {
+        buffer += next;
+        index += 1;
+        continue;
+      }
+      if (current === "\"" && previous !== "\\") {
+        insideDoubleQuote = false;
+      }
+      continue;
+    }
+
+    if (current === "'") {
+      commitWord();
+      insideSingleQuote = true;
+      continue;
+    }
+    if (current === "\"") {
+      commitWord();
+      insideDoubleQuote = true;
+      continue;
+    }
+
+    if (/[A-Za-z0-9_]/.test(current)) {
+      currentWord += current;
+      continue;
+    }
+    commitWord();
+
+    if (!/\s/.test(current) && current !== "(") {
+      pendingCreateKeyword = false;
+    }
+
+    if (current === ";" && !insideTriggerBody) {
+      const statement = buffer.trim();
+      if (statement.length > 1) {
+        statements.push(statement);
+      }
+      buffer = "";
+      pendingCreateKeyword = false;
+      pendingTriggerBodyBegin = false;
+    }
+  }
+
+  commitWord();
+  const trailing = buffer.trim();
+  if (trailing.length > 0) {
+    statements.push(trailing);
+  }
+  return statements;
 }
 
 function isIgnorableDuplicateAddColumnError(error: unknown, statement: string): boolean {
@@ -203,6 +372,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
   const authorizationRepository = new SqliteAuthorizationPersistenceAdapter(databasePath);
   const nodeTrustRepository = new SqliteNodeTrustPersistenceAdapter(databasePath);
   const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(databasePath);
+  const executionNodeRepository = new SqliteExecutionNodeRepository(databasePath);
   const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(databasePath);
   const secretRecordRepository = new SqliteSecretRecordPersistenceAdapter(databasePath);
   const storageInstanceRepository = new SqliteStorageInstancePersistenceAdapter(databasePath);
@@ -210,7 +380,12 @@ export function createAuthoritativePersistentPlatformServices(input: {
   const assetRepository = new SqliteAssetPersistenceAdapter(databasePath);
   const assetAuditRecorder = new SqliteAssetAuditRecorder(databasePath);
   const assetUploadSessionRepository = new SqliteAssetUploadSessionPersistenceAdapter(databasePath);
+  const imageAssetRepository = new SqliteImageAssetPersistenceAdapter(databasePath);
+  const imageWorkflowSystemRepository = new SqliteImageWorkflowSystemPersistenceAdapter(databasePath);
   const platformPersistenceRepository = new SqlitePlatformPersistenceAdapter(databasePath);
+  const auditLedgerRepository = new SqliteAuditLedgerRepository(databasePath);
+  const deploymentPolicyRepository = new SqliteDeploymentPolicyPersistenceAdapter(databasePath);
+  const generatedResultRepository = new SqliteGeneratedResultPersistenceAdapter(databasePath);
 
   return Object.freeze({
     databasePath,
@@ -220,6 +395,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
     authorizationRepository,
     nodeTrustRepository,
     nodeTrustAuditRecorder,
+    executionNodeRepository,
     certificateAuthorityRepository,
     secretRecordRepository,
     storageInstanceRepository,
@@ -227,7 +403,12 @@ export function createAuthoritativePersistentPlatformServices(input: {
     assetRepository,
     assetAuditRecorder,
     assetUploadSessionRepository,
+    imageAssetRepository,
+    imageWorkflowSystemRepository,
     platformPersistenceRepository,
+    auditLedgerRepository,
+    deploymentPolicyRepository,
+    generatedResultRepository,
     dispose(): void {
       identityRepository.dispose();
       trustedDeviceRepository.dispose();
@@ -235,6 +416,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
       authorizationRepository.dispose();
       nodeTrustRepository.dispose();
       nodeTrustAuditRecorder.dispose();
+      executionNodeRepository.dispose();
       certificateAuthorityRepository.dispose();
       secretRecordRepository.dispose();
       storageInstanceRepository.dispose();
@@ -242,7 +424,12 @@ export function createAuthoritativePersistentPlatformServices(input: {
       assetRepository.dispose();
       assetAuditRecorder.dispose();
       assetUploadSessionRepository.dispose();
+      imageAssetRepository.dispose();
+      imageWorkflowSystemRepository.dispose();
       platformPersistenceRepository.dispose();
+      auditLedgerRepository.dispose();
+      deploymentPolicyRepository.dispose();
+      generatedResultRepository.dispose();
     },
   });
 }

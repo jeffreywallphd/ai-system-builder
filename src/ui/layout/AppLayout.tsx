@@ -1,10 +1,11 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   Outlet,
   useBlocker,
   useBeforeUnload,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import { ContextNavigationService } from "../routes/ContextNavigation";
 import { useUiDependencies } from "../composition/AppProviders";
@@ -18,6 +19,13 @@ import { GlobalCommandTrigger } from "../routes/CommandPalette";
 import GuidedOnboardingFlowSurface from "../components/navigation/GuidedOnboardingFlow";
 import { SystemRuntimeWindowLaunchQueryParam } from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import SystemRuntimeWindowHost from "../components/studio-shell/SystemRuntimeWindowHost";
+import {
+  SurfaceLiveRegion,
+  SurfaceSkipLink,
+  useSurfaceRouteFocus,
+} from "../shared/accessibility";
+import { SurfaceStatePanel } from "../shared/components/presentation-state";
+import { useDeferredRuntimeFeatureGate } from "../runtime/DeferredRuntimeFeatureGate";
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
@@ -28,7 +36,7 @@ const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   healthChecks: Object.freeze([]),
   isRefreshingHealth: false,
   appState: "starting",
-  appStateDetail: "Checking runtime statusâ€¦",
+  appStateDetail: "Checking runtime status…",
   canRestartRuntime: false,
   isRestartingRuntime: false,
 });
@@ -58,13 +66,21 @@ export interface AppLayoutProps {
 export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Element {
   const { runtimeConsoleStore, workflowStore } = useUiDependencies();
   const location = useLocation();
+  const navigate = useNavigate();
   const contextNavigationService = useMemo(() => new ContextNavigationService(), []);
   const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [routeAnnouncement, setRouteAnnouncement] = useState<string | undefined>(undefined);
   const globalCommandTrigger = useMemo(() => new GlobalCommandTrigger(), []);
   const previousPathnameRef = useRef(location.pathname);
+  const mainContentRef = useRef<HTMLElement>(null);
+  const deferredRuntimeGate = useDeferredRuntimeFeatureGate(location.pathname);
+
+  useSurfaceRouteFocus(location.pathname, mainContentRef, {
+    onAnnounce: setRouteAnnouncement,
+  });
 
   useEffect(() => {
     return runtimeConsoleStore.subscribe(setRuntimeConsoleState);
@@ -185,6 +201,7 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
 
   return (
     <div className="ui-app ui-surface-app">
+      <SurfaceSkipLink targetId="main-content" />
       <header className="ui-app__header">
         <div className="ui-app__header-inner">
           <Link to="/" className="ui-app__brand" aria-label="AI Loom Studio home">
@@ -224,7 +241,7 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
         </div>
       </header>
 
-      <main className="ui-app__main">
+      <main id="main-content" ref={mainContentRef} tabIndex={-1} className="ui-app__main">
         <div
           className={`ui-app__main-inner${
             isWideWorkspace ? " ui-app__main-inner--wide" : ""
@@ -232,7 +249,29 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
         >
           <GuidedOnboardingFlowSurface pathname={location.pathname} />
           <ContextNavigationBar model={contextNavigation} />
-          <Outlet />
+          {deferredRuntimeGate.surfaceState ? (
+            <section className="ui-page">
+              <SurfaceStatePanel
+                state={deferredRuntimeGate.surfaceState}
+                action={deferredRuntimeGate.surfaceState.retryable
+                  ? (
+                    <button
+                      type="button"
+                      className="ui-button ui-button--secondary"
+                      onClick={() => {
+                        void deferredRuntimeGate.retry();
+                      }}
+                      disabled={deferredRuntimeGate.isRetrying}
+                    >
+                      {deferredRuntimeGate.isRetrying ? "Retrying startup..." : "Retry startup"}
+                    </button>
+                  )
+                  : undefined}
+              />
+            </section>
+          ) : (
+            <Outlet />
+          )}
         </div>
       </main>
 
@@ -255,6 +294,7 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
       />
 
       <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
+      <SurfaceLiveRegion id="ui-route-change-announcer" message={routeAnnouncement} />
 
       <footer className="ui-app__footer">
         <div className="ui-app__footer-inner">

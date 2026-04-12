@@ -6,6 +6,10 @@ import type {
   CertificateAuthoritySecretMetadata,
   ICertificateAuthorityBootstrapSecretService,
 } from "@application/security/ports/ICertificateAuthorityBootstrapSecretService";
+import { SecretProviderMaterialKinds } from "@application/security/ports/SecretProviderPorts";
+import { ScopedSecretProviderMaterialRetrievalUseCase } from "@application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase";
+import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretManagementServiceContracts";
+import { SecretAccessActions, SecretActorTypes } from "@domain/security/SecretDomain";
 import {
   INTERNAL_CA_PROTECTED_SECRET_REF_PREFIX,
   type FileSystemProtectedSecretStore,
@@ -40,6 +44,8 @@ export class EnvironmentCertificateAuthoritySecretService implements ICertificat
     private readonly env: Readonly<Record<string, string | undefined>>,
     private readonly options?: {
       readonly protectedSecretStore?: FileSystemProtectedSecretStore;
+      readonly scopedSecretProviderRetrievalUseCase?: ScopedSecretProviderMaterialRetrievalUseCase;
+      readonly providerId?: string;
     },
   ) {}
 
@@ -68,8 +74,52 @@ export class EnvironmentCertificateAuthoritySecretService implements ICertificat
       });
     }
 
+    if (normalized.startsWith("secret:")) {
+      if (!this.options?.scopedSecretProviderRetrievalUseCase) {
+        throw new Error("Internal CA secret provider retrieval is unavailable.");
+      }
+
+      const metadata = await this.options.scopedSecretProviderRetrievalUseCase
+        .getServerScopedSecretProviderMaterialMetadata({
+          caller: Object.freeze({
+            actorId: "runtime:server:ca-bootstrap-secret-metadata",
+            actorType: SecretActorTypes.serverRuntime,
+            grantedActions: Object.freeze([SecretAccessActions.readMetadata]),
+          }),
+          providerId: this.options.providerId ?? "platform",
+          secretId: normalized,
+          materialKind: SecretProviderMaterialKinds.trustMaterial,
+          access: {
+            operationKey: `op:ca:secret-metadata:${normalized}:${Date.now()}`,
+            serviceIdentity: "runtime:server:ca-bootstrap-secret-metadata",
+            usage: "ca-bootstrap-secret-metadata",
+            justification: `resolve CA bootstrap secret metadata for '${normalized}'`,
+            occurredAt: new Date().toISOString(),
+          },
+        });
+      if (metadata.ok) {
+        return Object.freeze({
+          secretRef: normalized,
+          exists: true,
+          source: "secret-provider",
+        });
+      }
+
+      if (metadata.error.code === SecretServiceErrorCodes.notFound) {
+        return Object.freeze({
+          secretRef: normalized,
+          exists: false,
+          source: "secret-provider",
+        });
+      }
+
+      throw new Error(
+        `Internal CA secret provider lookup failed for '${normalized}' (${metadata.error.code}).`,
+      );
+    }
+
     throw new Error(
-      `Internal CA secret reference '${normalized}' is unsupported. Use 'env:<VARIABLE_NAME>' or '${INTERNAL_CA_PROTECTED_SECRET_REF_PREFIX}<id>'.`,
+      `Internal CA secret reference '${normalized}' is unsupported. Use 'env:<VARIABLE_NAME>', '${INTERNAL_CA_PROTECTED_SECRET_REF_PREFIX}<id>', or 'secret:<id>'.`,
     );
   }
 }
