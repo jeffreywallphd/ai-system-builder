@@ -1877,6 +1877,42 @@
       "supersededBy": "docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.md",
       "owner": "team:platform-architecture",
       "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-documentation-quality-worked-examples",
+      "path": "docs/contributors/documentation-quality-worked-examples.md",
+      "aiPath": "docs/contributors/documentation-quality-worked-examples.ai.md",
+      "title": "Documentation Quality Worked Examples",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Worked passing and failing documentation-quality examples for architecture docs, ADRs, context packs, routing assets, registry entries, and baseline handling.",
+      "keywords": [
+        "documentation quality",
+        "worked examples",
+        "pass fail patterns",
+        "docs lint",
+        "contributor onboarding"
+      ],
+      "relatedCodePaths": [
+        "dev/scripts/lint-docs.cjs",
+        "dev/scripts/validate-docs-category-compliance.cjs",
+        "dev/tests/DocumentationQualityWorkedExamplesStory734Guardrails.test.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
+      ],
+      "relatedDocs": [
+        "docs/contributors/docs-foundation-validation.md",
+        "docs/contributors/docs-placement-guide.md",
+        "docs/contributors/documentation-index-assisted-discovery-worked-examples.md",
+        "docs/context/governance/documentation-quality-standard.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
     }
   ],
   "discoveryIndex": {
@@ -1911,7 +1947,8 @@
         "doc-contributors-docs-foundation-validation-guide",
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
-        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples",
+        "doc-contributors-documentation-quality-worked-examples"
       ],
       "runbook": [
         "doc-operations-node-bootstrap-identity",
@@ -1991,7 +2028,8 @@
         "doc-operations-workspace-administration",
         "doc-operations-storage-administration",
         "doc-baseline-documentation-segmentation-migration-inventory",
-        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples",
+        "doc-contributors-documentation-quality-worked-examples"
       ],
       "deprecated": [],
       "superseded": [
@@ -2036,7 +2074,8 @@
         "doc-contributors-docs-foundation-validation-guide",
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
-        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples",
+        "doc-contributors-documentation-quality-worked-examples"
       ],
       "operations": [
         "doc-context-pack-runtime-and-host",
@@ -2098,7 +2137,8 @@
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
         "doc-operations-node-bootstrap-identity",
-        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples",
+        "doc-contributors-documentation-quality-worked-examples"
       ],
       "reference": [
         "doc-architecture-document-scope-boundaries",
@@ -2190,7 +2230,8 @@
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-foundation-validation-guide",
         "doc-context-documentation-identity-and-reference-conventions",
-        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples",
+        "doc-contributors-documentation-quality-worked-examples"
       ]
     }
   },
