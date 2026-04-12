@@ -1,4 +1,4 @@
-﻿import {
+import {
   createServer as createHttpServer,
   type IncomingMessage,
   type RequestListener,
@@ -351,6 +351,22 @@ import { composeAuthoritativeApiRouteRegistrationPlan } from "../AuthoritativeAp
 import { composeIdentityHttpTransport } from "./composition/IdentityHttpTransportComposition";
 import { buildIdentityHttpRouteCompositionLogDetails } from "./middleware/request-observability";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
+import {
+  normalizeRequestContentType,
+  parseJsonBody as parseJsonRequestBody,
+  resolveRequestSearchParams,
+  resolveRequestUrl,
+  toRequestBodyStream as toRequestBodyByteStream,
+} from "./primitives/HttpRequestPrimitives";
+import {
+  writeJsonResponse,
+  writeNoContentResponse,
+  writeResponseStream,
+} from "./primitives/HttpResponsePrimitives";
+import {
+  buildContentDispositionHeader as buildFileContentDispositionHeader,
+  sanitizeDownloadFileName as sanitizeDownloadFileNamePrimitive,
+} from "./primitives/HttpFileResponsePrimitives";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 const DefaultWebSocketTrustRevalidationIntervalMs = 30_000;
@@ -1546,7 +1562,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               return;
             }
 
-            const providerId = normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("providerId"));
+            const providerId = normalizeOptionalString(resolveRequestSearchParams(request.url).get("providerId"));
             const apiResponse = await options.backendApi.getIdentityAdminAccountStatus({
               context: buildAdminContext(context.principal.userIdentityId),
               userIdentityId,
@@ -2300,7 +2316,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
             const queryParsed = GetSecretReEncryptionStatusQuerySchema.safeParse({
               operationId,
-              occurredAt: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("occurredAt")),
+              occurredAt: normalizeOptionalString(resolveRequestSearchParams(request.url).get("occurredAt")),
             });
             if (!queryParsed.success) {
               const invalid = buildSecretMetadataValidationErrors(queryParsed.error.issues);
@@ -2506,8 +2522,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
             const parsedQuery = GetSecretMetadataQuerySchema.safeParse({
               secretId,
-              actorWorkspaceId: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("actorWorkspaceId")),
-              occurredAt: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("occurredAt")),
+              actorWorkspaceId: normalizeOptionalString(resolveRequestSearchParams(request.url).get("actorWorkspaceId")),
+              occurredAt: normalizeOptionalString(resolveRequestSearchParams(request.url).get("occurredAt")),
             });
             if (!parsedQuery.success) {
               const invalid = buildSecretMetadataValidationErrors(parsedQuery.error.issues);
@@ -2872,7 +2888,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const apiResponse = await options.certificateOperationsBackendApi.getIssuedCertificate({
               actorUserIdentityId: context.principal.userIdentityId,
               serialNumber,
-              asOf: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("asOf")),
+              asOf: normalizeOptionalString(resolveRequestSearchParams(request.url).get("asOf")),
             });
             const statusCode = mapCertificateOperationsStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -4699,13 +4715,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             response.setHeader("cache-control", "private, no-store");
 
             try {
-              for await (const chunk of apiResponse.data.stream) {
-                const encoded = Buffer.from(chunk);
-                if (!response.write(encoded)) {
-                  await once(response, "drain");
-                }
-              }
-              response.end();
+              await writeResponseStream(response, apiResponse.data.stream);
               logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
                 ok: true,
                 data: Object.freeze({
@@ -4848,13 +4858,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             response.setHeader("cache-control", "private, no-store");
 
             try {
-              for await (const chunk of apiResponse.data.stream) {
-                const encoded = Buffer.from(chunk);
-                if (!response.write(encoded)) {
-                  await once(response, "drain");
-                }
-              }
-              response.end();
+              await writeResponseStream(response, apiResponse.data.stream);
               logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
                 ok: true,
                 data: Object.freeze({
@@ -4979,13 +4983,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             response.setHeader("cache-control", "private, no-store");
 
             try {
-              for await (const chunk of apiResponse.data.stream) {
-                const encoded = Buffer.from(chunk);
-                if (!response.write(encoded)) {
-                  await once(response, "drain");
-                }
-              }
-              response.end();
+              await writeResponseStream(response, apiResponse.data.stream);
               logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
                 ok: true,
                 data: Object.freeze({
@@ -5117,13 +5115,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             response.setHeader("cache-control", "private, no-store");
 
             try {
-              for await (const chunk of apiResponse.data.stream) {
-                const encoded = Buffer.from(chunk);
-                if (!response.write(encoded)) {
-                  await once(response, "drain");
-                }
-              }
-              response.end();
+              await writeResponseStream(response, apiResponse.data.stream);
               logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
                 ok: true,
                 data: Object.freeze({
@@ -5428,13 +5420,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             response.setHeader("cache-control", "private, no-store");
 
             try {
-              for await (const chunk of apiResponse.data.stream) {
-                const encoded = Buffer.from(chunk);
-                if (!response.write(encoded)) {
-                  await once(response, "drain");
-                }
-              }
-              response.end();
+              await writeResponseStream(response, apiResponse.data.stream);
               logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
                 ok: true,
                 data: Object.freeze({
@@ -10050,7 +10036,7 @@ async function requireAuthenticatedWorkspaceSession(
     transportTrust,
     options.sessionOptions,
     async (context) => {
-      const searchParams = new URL(request.url ?? "/", "http://localhost").searchParams;
+      const searchParams = resolveRequestSearchParams(request.url);
       const workspaceId = options.workspaceId
         ?? normalizeOptionalString(searchParams.get(options.workspaceQueryParam ?? "workspaceId"));
       if (!workspaceId) {
@@ -13136,9 +13122,7 @@ function parseAssetUploadContentRequest(
   workspaceId: string,
   uploadSessionId: string,
 ): IngestAssetUploadContentApiRequest {
-  const contentType = typeof request.headers["content-type"] === "string"
-    ? request.headers["content-type"].trim()
-    : undefined;
+  const contentType = normalizeRequestContentType(request.headers["content-type"]);
 
   return Object.freeze({
     actorUserIdentityId,
@@ -13153,66 +13137,22 @@ function buildContentDispositionHeader(
   disposition: "attachment" | "inline",
   fileName: string | undefined,
 ): string {
-  const safeFileName = sanitizeDownloadFileName(fileName);
-  if (!safeFileName) {
-    return disposition;
-  }
-
-  const encoded = encodeURIComponent(safeFileName).replace(/['()*]/g, (character) => `%${character.charCodeAt(0).toString(16)}`);
-  return `${disposition}; filename="${safeFileName}"; filename*=UTF-8''${encoded}`;
+  return buildFileContentDispositionHeader(disposition, fileName);
 }
 
 function sanitizeDownloadFileName(fileName: string | undefined): string | undefined {
-  if (!fileName) {
-    return undefined;
-  }
-
-  const normalized = fileName
-    .trim()
-    .replace(/["]/g, "'")
-    .replace(/[\/\\]/g, "-")
-    .replace(/[\u0000-\u001F\u007F]/g, "")
-    .replace(/\s+/g, " ");
-  if (!normalized || normalized === "." || normalized === "..") {
-    return undefined;
-  }
-  return normalized.length > 255 ? normalized.slice(0, 255) : normalized;
+  return sanitizeDownloadFileNamePrimitive(fileName);
 }
 
 async function* toRequestBodyStream(request: IncomingMessage): AsyncIterable<Uint8Array> {
-  for await (const chunk of request) {
-    yield Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-  }
+  yield* toRequestBodyByteStream(request);
 }
 
 async function parseJsonBody(
   request: IncomingMessage,
   maxBodyBytes: number,
 ): Promise<{ readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string }> {
-  const chunks: Buffer[] = [];
-  let totalBytes = 0;
-
-  for await (const chunk of request) {
-    const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    totalBytes += bufferChunk.length;
-    if (totalBytes > maxBodyBytes) {
-      return {
-        ok: false,
-        error: `Request body exceeds limit of ${maxBodyBytes} bytes.`,
-      };
-    }
-    chunks.push(bufferChunk);
-  }
-
-  if (chunks.length === 0) {
-    return { ok: false, error: "Request body is required." };
-  }
-
-  try {
-    return { ok: true, value: JSON.parse(Buffer.concat(chunks).toString("utf8")) };
-  } catch {
-    return { ok: false, error: "Request body must be valid JSON." };
-  }
+  return parseJsonRequestBody(request, maxBodyBytes);
 }
 
 function mapStatusCode(response: IdentityAuthApiResponse<unknown>): number {
@@ -14382,12 +14322,7 @@ function isRootReadinessProbeRequest(method: string | undefined, path: string): 
 }
 
 function resolveCanonicalRequestPath(requestUrl: string | undefined): string {
-  const normalizedUrl = requestUrl?.trim() || "/";
-  try {
-    return new URL(normalizedUrl, "http://localhost").pathname;
-  } catch {
-    return "/";
-  }
+  return resolveRequestUrl(requestUrl).pathname;
 }
 
 function normalizeError(error: unknown): string {
@@ -14482,14 +14417,11 @@ function writeJson(response: ServerResponse, statusCode: number, payload: unknow
     normalizeSharedApiErrorEnvelope(payload),
     normalizeResponseHeaderValue(correlationHeader),
   );
-  response.statusCode = statusCode;
-  response.setHeader("content-type", "application/json; charset=utf-8");
-  response.end(JSON.stringify(normalizedPayload));
+  writeJsonResponse(response, statusCode, normalizedPayload);
 }
 
 function writeNoContent(response: ServerResponse, statusCode: number): void {
-  response.statusCode = statusCode;
-  response.end();
+  writeNoContentResponse(response, statusCode);
 }
 
 function normalizeResponseHeaderValue(value: number | string | string[] | undefined): string | undefined {

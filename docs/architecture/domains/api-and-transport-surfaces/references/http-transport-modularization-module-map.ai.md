@@ -11,6 +11,10 @@ related_code_paths:
   - src/infrastructure/transport/http-server/identity/composition/IdentityHttpTransportComposition.ts
   - src/infrastructure/transport/http-server/identity/composition/RouteModuleRegistry.ts
   - src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts
+  - src/infrastructure/transport/http-server/identity/primitives/HttpRequestPrimitives.ts
+  - src/infrastructure/transport/http-server/identity/primitives/HttpResponsePrimitives.ts
+  - src/infrastructure/transport/http-server/identity/primitives/HttpFileResponsePrimitives.ts
+  - src/infrastructure/transport/http-server/identity/tests/HttpTransportPrimitives.test.ts
   - src/hosts/server/AuthoritativeServerApiRouteComposition.ts
   - src/hosts/server/IdentityServerHost.ts
 ---
@@ -18,7 +22,7 @@ related_code_paths:
 
 Feature: 1  
 Epic: 1.1  
-Story: 1.1.2
+Story: 1.1.3
 
 ## Purpose
 
@@ -116,6 +120,17 @@ Implemented scaffolding in production paths:
 Behavioral posture:
 - `IdentityHttpServer.ts` now composes route families through `composeIdentityHttpTransport(...)` during startup.
 - Request dispatch order and existing inline handler behavior remain unchanged in this story.
+
+## Story 1.1.3 Implementation Status
+
+Implemented shared request/response primitives in production paths:
+- `identity/primitives/HttpRequestPrimitives.ts` centralizes URL/query parsing, content-type normalization, JSON request body parsing with payload-size enforcement, and request body stream adaptation.
+- `identity/primitives/HttpResponsePrimitives.ts` centralizes JSON emission, no-content responses, and streamed byte writing with backpressure handling.
+- `identity/primitives/HttpFileResponsePrimitives.ts` centralizes content-disposition and download filename sanitization behavior.
+- `IdentityHttpServer.ts` now consumes these primitives for shared transport concerns across route families while preserving existing route ordering and response semantics.
+
+Targeted regression coverage:
+- `identity/tests/HttpTransportPrimitives.test.ts` covers JSON body parsing limits/error behavior, request body streaming, content-type and URL normalization, JSON/no-content response writing, stream response writing, and file content-disposition primitives.
 
 ## Registration and Composition Seams
 
