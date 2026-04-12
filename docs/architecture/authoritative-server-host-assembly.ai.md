@@ -30,6 +30,17 @@ Story 2.1.2 adds the first bounded-control-plane composition scaffold:
 
 ## Startup expectations
 - Shared bootstrap pipeline order remains authoritative: `configuration`, `dependencies`, `logging`, `security`, `persistence`, `feature-registration`.
+- Story 2.1.3 adds a canonical staged bootstrap/state model in
+  `src/hosts/server/composition/contracts/AuthoritativeServerBootstrapPipelineStateModel.ts`
+  to make control-plane startup sequencing explicit for refactor planning:
+  1. `configuration-load`
+  2. `security-material-resolution`
+  3. `persistence-initialization`
+  4. `migration-execution`
+  5. `subsystem-composition`
+  6. `readiness-verification`
+  7. `transport-startup`
+  8. `shutdown-preparation` (`planned` adoption state)
 - Bootstrap stage contracts for staged decomposition live in `src/hosts/server/AuthoritativeServerBootstrapStageContracts.ts` with typed boundaries for `config`, `security`, `persistence`, `services`, and `transport`.
 - Contract-to-host-stage bindings keep runtime order unchanged while exposing logical boundaries (`services -> dependencies`, `transport -> feature-registration`).
 - Story 1.2.2 extracts initial authoritative bootstrap stage implementations into:

@@ -87,6 +87,18 @@ Story B.2.4 narrows auth-minimal dependencies composition further:
 
 The entrypoint defaults to a full authoritative startup dependency contract and uses the shared host bootstrap pipeline (`configuration -> dependencies -> logging -> security -> persistence -> feature-registration`).
 
+Story 2.1.3 adds a canonical staged bootstrap/state model in
+`src/hosts/server/composition/contracts/AuthoritativeServerBootstrapPipelineStateModel.ts`
+to keep control-plane startup sequencing explicit for refactor adoption:
+1. `configuration-load`
+2. `security-material-resolution`
+3. `persistence-initialization`
+4. `migration-execution`
+5. `subsystem-composition`
+6. `readiness-verification`
+7. `transport-startup`
+8. `shutdown-preparation` (`planned` adoption state)
+
 Bootstrap stage contracts for controlled decomposition are now defined in `src/hosts/server/AuthoritativeServerBootstrapStageContracts.ts` with typed boundaries for:
 - `config`
 - `security`

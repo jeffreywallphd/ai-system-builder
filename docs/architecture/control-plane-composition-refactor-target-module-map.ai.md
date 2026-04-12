@@ -2,7 +2,7 @@
 
 Feature: 2  
 Epic: 2.1  
-Story: 2.1.1
+Story: 2.1.3
 
 ## Purpose
 
@@ -80,6 +80,39 @@ This scaffold intentionally does not move runtime behavior yet. It introduces:
 - lifecycle/disposal contract hooks for composition modules;
 - an ordered module map with dependency direction, stage ownership hints, produced artifacts, and disposal responsibilities;
 - regression coverage to keep module-map shape and dependency ordering stable for follow-on extraction stories.
+
+## Story 2.1.3 Staged Bootstrap Pipeline and Startup State Model
+
+Story 2.1.3 adds an explicit staged bootstrap model and typed startup/readiness states for the authoritative control-plane startup boundary:
+
+- `src/hosts/server/composition/contracts/AuthoritativeServerBootstrapPipelineStateModel.ts`
+- `src/hosts/server/tests/AuthoritativeServerBootstrapPipelineStateModel.test.ts`
+
+Canonical bootstrap stage order for control-plane startup:
+
+1. `configuration-load`
+2. `security-material-resolution`
+3. `persistence-initialization`
+4. `migration-execution`
+5. `subsystem-composition`
+6. `readiness-verification`
+7. `transport-startup`
+8. `shutdown-preparation`
+
+State model coverage:
+
+- stage execution state: `pending`, `running`, `success`, `failed`, `skipped`
+- stage readiness state: `not-ready`, `ready`, `degraded`
+- pipeline readiness derivation:
+  - `ready` only when readiness verification and transport startup are successful
+  - `degraded` when any stage fails
+  - `not-ready` otherwise
+
+Incremental-adoption safety:
+
+- stage definitions are explicit and immutable;
+- each stage declares module ownership and current host/authoritative stage bindings;
+- `shutdown-preparation` is intentionally marked `planned`, allowing staged adoption without destabilizing current startup behavior.
 
 ## Dependency And Stage Contracts
 
