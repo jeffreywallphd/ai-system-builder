@@ -19,36 +19,45 @@ const inventoryAiDocPath = path.resolve(
 const architectureReadmePath = path.resolve(repoRoot, "docs", "architecture", "README.md");
 const architectureReadmeAiPath = path.resolve(repoRoot, "docs", "architecture", "README.ai.md");
 
-describe("story 3.1.1 security-critical runtime material inventory guardrails", () => {
+describe("story 3.1.1+3.4.4 security-critical runtime material inventory guardrails", () => {
   it("keeps canonical and ai inventory docs checked in", () => {
     expect(existsSync(inventoryDocPath)).toBeTrue();
     expect(existsSync(inventoryAiDocPath)).toBeTrue();
   });
 
-  it("covers core server, workspace, and user scoped security material with fallback behavior", () => {
+  it("documents hardened material classes, startup expectations, provider architecture, and extension guidance", () => {
     const doc = readFileSync(inventoryDocPath, "utf8");
 
-    expect(doc).toContain("| Material | Scope | Resolution Source |");
-    expect(doc).toContain("server");
-    expect(doc).toContain("workspace");
-    expect(doc).toContain("user");
+    expect(doc).toContain("## Required Material Classes");
+    expect(doc).toContain("## Startup Configuration Expectations");
+    expect(doc).toContain("## Provider Architecture and Scope Resolution");
+    expect(doc).toContain("## Lifecycle and Rotation Behavior");
+    expect(doc).toContain("## Diagnostics and Readiness Interpretation");
+    expect(doc).toContain("## Development and Test Profile Allowances");
+    expect(doc).toContain("## Extension Guide: New Secret Consumers");
+    expect(doc).toContain("## Extension Guide: New Provider Backends");
 
-    expect(doc).toContain("AI_LOOM_SECRET_MASTER_KEY_ID");
-    expect(doc).toContain("AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET");
-    expect(doc).toContain("AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY");
-    expect(doc).toContain("AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET");
-    expect(doc).toContain("AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET");
-    expect(doc).toContain("AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET");
-    expect(doc).toContain("AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED");
-    expect(doc).toContain("AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_DIRECTORY");
-    expect(doc).toContain("OPENAI_API_KEY");
-    expect(doc).toContain("HUGGINGFACE_API_TOKEN");
-    expect(doc).toContain("AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY");
+    for (const requiredPhrase of [
+      "server",
+      "workspace",
+      "user",
+      "AI_LOOM_SECRET_MASTER_KEY_ID",
+      "AI_LOOM_SECRET_MASTER_KEY",
+      "AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS",
+      "ISecretProviderMaterialResolutionPort",
+      "GET /api/v1/security/secrets/health",
+      "GET /api/v1/security/secrets/diagnostics",
+    ]) {
+      expect(doc).toContain(requiredPhrase);
+    }
+  });
 
-    expect(doc).toContain("randomUUID()");
-    expect(doc).toContain("non-durable");
-    expect(doc).toContain("Ambiguous and Duplicated Resolution Paths");
-    expect(doc).toContain("Host vs Infrastructure Resolution Boundaries");
+  it("does not regress to obsolete random fallback framing in canonical inventory guidance", () => {
+    const doc = readFileSync(inventoryDocPath, "utf8");
+
+    expect(doc).not.toContain("Ambiguous and Duplicated Resolution Paths");
+    expect(doc).not.toContain("asset-download-grant:${randomUUID()}");
+    expect(doc).not.toContain("explicit -> AI_LOOM_SECRET_MASTER_KEY -> random generated hash");
   });
 
   it("keeps architecture routers discoverable for the inventory document", () => {
@@ -59,12 +68,12 @@ describe("story 3.1.1 security-critical runtime material inventory guardrails", 
     expect(aiReadme).toContain("security-critical-runtime-material-inventory.md");
   });
 
-  it("keeps ai companion inventory aligned to canonical doc and ambiguity callouts", () => {
+  it("keeps ai companion inventory aligned to hardened canonical guidance", () => {
     const aiDoc = readFileSync(inventoryAiDocPath, "utf8");
 
     expect(aiDoc).toContain("docs/architecture/security-critical-runtime-material-inventory.md");
-    expect(aiDoc).toContain("AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET");
-    expect(aiDoc).toContain("AI_LOOM_SECRET_MASTER_KEY");
-    expect(aiDoc).toContain("Ambiguity and Duplication Callouts");
+    expect(aiDoc).toContain("hardened");
+    expect(aiDoc).toContain("scope-routed");
+    expect(aiDoc).toContain("Obsolete random runtime fallback references were removed");
   });
 });

@@ -1,86 +1,104 @@
 # System Secret Bootstrap and Migration Operations
 
-This note documents Story 8.3.3 (Feature 8 / Epic 8.3): bootstrap required system secrets during authoritative host startup and migrate legacy environment-based secret values into the formal secret service.
+This runbook documents the hardened bootstrap path for required system secrets and legacy migration in authoritative and auth-minimal hosts.
 
 ## Canonical artifacts
 
 - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
+- `src/hosts/server/composition/ServerSecretCompositionModule.ts`
 - `src/hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/AuthMinimalIdentityServerHost.ts`
 - `src/infrastructure/security/secrets/tests/SystemSecretBootstrapService.test.ts`
 - `src/hosts/server/tests/IdentityServerHost.test.ts`
 - `.env.example`
 
-## Startup behavior
+## Required secret catalog
 
-`startIdentityServerHost(...)` now runs system secret bootstrap validation immediately after composing the secret service.
-
-- Server-scoped provider/signing bootstrap resolution runs through the durable server backend behind `ISecretProviderMaterialResolutionPort`.
-- Backend initialization performs a fail-closed repository readiness check before server-scope operations.
-- If no required system secrets are configured, startup proceeds unchanged.
-- If required system secrets are configured:
-  - each required secret must be present in the secret service and runtime-retrievable, or
-  - the secret must be migrated from a supported legacy environment variable value, or
-  - for policy-eligible signing material, bootstrap creates durable key material and persists it through provider backends.
-- If validation or migration fails, startup fails closed with a clear bootstrap validation error.
-
-## Required system secret configuration
-
-Use `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS` to declare required server-scoped system secret records.
-
-Supported IDs in this slice:
+Currently supported required IDs:
 
 - `secret:server:provider:openai`
 - `secret:server:provider:huggingface`
 - `secret:server:signing:identity-session`
 
-## Legacy migration behavior
+Configured with:
 
-Migration is enabled by default and can be disabled with:
+- `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`
 
-- `AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV=false`
+If this variable is empty/unset, bootstrap validation succeeds with no required-secret checks.
 
-Supported legacy environment migration sources:
+## Startup execution order
+
+1. Compose server secret service (`composeServerSecretService`).
+2. Run `assertSystemSecretBootstrapSafe(...)`.
+3. Resolve metadata existence for each required secret through scoped provider retrieval.
+4. If missing, attempt migration/bootstrap creation according to policy.
+5. Re-resolve metadata and perform runtime retrieval validation.
+6. Fail startup when any required secret remains missing/unusable.
+
+## Production configuration expectations
+
+For production-capable startup:
+
+- configure envelope encryption for durable secret operations:
+  - `AI_LOOM_SECRET_MASTER_KEY_ID`
+  - `AI_LOOM_SECRET_MASTER_KEY`
+- configure required secret IDs with `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`
+- provide legacy migration inputs only for migration windows, not permanent runtime dependency
+
+Migration toggle:
+
+- `AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV` (`true` by default)
+
+Supported legacy env mappings:
 
 - `OPENAI_API_KEY` -> `secret:server:provider:openai`
 - `HUGGINGFACE_API_TOKEN` -> `secret:server:provider:huggingface`
 - `AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY` -> `secret:server:signing:identity-session`
 
-Migration only occurs when the required secret is missing from the secret service and the mapped legacy environment value is present.
+## Development/test allowances
 
-## Story 3.3.2 key bootstrap creation policy update
+Lifecycle stage is environment-driven (`production`/`development`/`test`) and governs optional fallback behavior.
 
-- `secret:server:signing:identity-session` now follows an explicit bootstrap creation policy:
-  - try legacy migration from `AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY` first (when migration is enabled);
-  - otherwise generate an Ed25519 PKCS#8 private key in bootstrap and persist it through `ISecretProviderMaterialResolutionPort`.
-- Bootstrap-created signing material is tagged with bootstrap source/policy metadata and persists durably across restarts.
-- Runtime critical material resolution no longer writes/bootstrap-creates provider records during lookup; mutation is confined to explicit bootstrap flows.
+- provider credentials remain fail-fast required by default policy
+- identity-session signing material can be optional in development policy
+- when policy allows and migration value is absent, signing material can be bootstrap-generated (Ed25519 PKCS#8) and persisted durably
 
-## Story 3.4.3 security material lifecycle audit hooks
+## Failure diagnostics matrix
 
-- Scoped provider metadata/existence/runtime retrieval checks now emit secret audit events for:
-  - access decisions (`allowed` / `denied`)
-  - operation outcomes (`succeeded` / `missing` / `denied` / `rejected` / `failed`)
-- Bootstrap lifecycle paths now produce audit records for:
-  - bootstrap creation and first activation of required secrets
-  - bootstrap validation attempts that fail due to missing or unusable material
-  - backend-resolved metadata/runtime checks (including backend kind in safe details where available)
-- Secret lifecycle mutation events (`create`, `rotate`, `revoke-version`, `retire-version`) now carry safe contextual details in audit payloads.
-- Audit payload safety posture:
-  - no raw secret plaintext, key bytes, or token material is emitted
-  - operation details are redacted through shared secret-redaction safeguards before authoritative persistence.
+- `unsupported-required-secret`: required id is not registered for bootstrap
+- `required-secret-missing`: required secret does not exist and no allowed creation path succeeded
+- `required-secret-unusable`: metadata/runtime retrieval validation failed
+- `legacy-migration-unavailable`: migration needed but secret encryption is unconfigured
+- `legacy-migration-failed`: migration create/read path failed
+- `bootstrap-creation-unavailable`: generation path needed but secret encryption is unconfigured
+- `bootstrap-creation-failed`: generated bootstrap create path failed
 
-## Initial setup steps
+Any `error` severity diagnostic yields invalid bootstrap state and startup failure.
 
-1. Configure secret envelope encryption (`AI_LOOM_SECRET_MASTER_KEY_ID` + `AI_LOOM_SECRET_MASTER_KEY`).
-2. Set `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS` with required IDs for your deployment.
-3. For first migration boot, provide matching legacy environment values or pre-create those secrets through secret metadata operations.
-4. Start the host and verify startup succeeds.
-5. After migration, remove legacy environment values and continue managing those records through the secret service.
+## Operational procedure
 
-## Fail-safe posture
+1. Set durable master-key configuration.
+2. Declare required secret IDs.
+3. For initial migration, provide temporary legacy env values (if used).
+4. Start host and verify startup does not throw bootstrap validation errors.
+5. Validate health/diagnostics endpoints:
+   - `GET /api/v1/security/secrets/health`
+   - `GET /api/v1/security/secrets/diagnostics`
+6. Remove temporary legacy env inputs after durable secret records are confirmed.
 
-- Missing required system secrets fail startup.
-- Unsupported required secret identifiers fail startup.
-- Migration attempts fail startup when encryption is unavailable or create/runtime validation fails.
-- Durable server backend initialization failures fail startup.
-- Runtime validation checks do not expose plaintext in diagnostics.
+## Extension guidance
+
+When adding a new required system secret:
+
+1. Register it in `SystemSecretDefinitions` with classification + hierarchy + lifecycle policy.
+2. Assign creation policy (`migrate-legacy-only` or `migrate-legacy-or-generate`) and optional generation strategy.
+3. Add migration mapping only if explicitly needed.
+4. Add bootstrap tests for success, missing, migration failure, and policy-specific behavior.
+5. Update this runbook and diagnostics documentation.
+
+## Audit and safety posture
+
+- bootstrap metadata/existence/runtime checks emit secret audit events
+- bootstrap create/activation lifecycle events are auditable
+- diagnostics and audit payloads are metadata-only and redacted
+- plaintext secret values and key bytes are not emitted
