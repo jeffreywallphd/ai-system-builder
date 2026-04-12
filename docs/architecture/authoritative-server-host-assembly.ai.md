@@ -11,6 +11,8 @@
 - Auth-minimal runtime host startup implementation: `src/hosts/server/AuthMinimalIdentityServerHost.ts`
 - Runtime host startup implementation: `src/hosts/server/IdentityServerHost.ts`
 - Identity/session/trusted-device bounded composition module: `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
+- Workspace/authorization/sharing bounded composition module: `src/hosts/server/composition/ServerWorkspaceAuthorizationCompositionModule.ts`
+- Deployment-policy administration bounded composition module: `src/hosts/server/composition/ServerDeploymentPolicyCompositionModule.ts`
 - Bounded composition contract scaffold: `src/hosts/server/composition/contracts/*`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - Auth-minimal persistence composition seam: `src/infrastructure/persistence/AuthMinimalPersistenceComposition.ts`
@@ -28,6 +30,14 @@ Story 2.2.1 extracts identity/session/trusted-device assembly from `IdentityServ
 
 - `src/hosts/server/composition/ServerIdentitySessionTrustedDeviceCompositionModule.ts`
 - regression coverage: `src/hosts/server/tests/ServerIdentitySessionTrustedDeviceCompositionModule.test.ts`
+
+Story 2.2.2 extracts workspace lifecycle, authorization/sharing, and deployment-policy administration assembly from `IdentityServerHost.ts` into:
+
+- `src/hosts/server/composition/ServerWorkspaceAuthorizationCompositionModule.ts`
+- `src/hosts/server/composition/ServerDeploymentPolicyCompositionModule.ts`
+- regression coverage:
+  - `src/hosts/server/tests/ServerWorkspaceAuthorizationCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerDeploymentPolicyCompositionModule.test.ts`
 
 ## Control-plane ownership
 - Authoritative server is the single runtime with control-plane authority.
@@ -166,6 +176,8 @@ Story 2.2.1 extracts identity/session/trusted-device assembly from `IdentityServ
 - `src/hosts/server/tests/AuthMinimalServerHostEntrypoint.test.ts`
 - `src/hosts/server/tests/AuthMinimalServerApiRouteComposition.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
+- `src/hosts/server/tests/ServerWorkspaceAuthorizationCompositionModule.test.ts`
+- `src/hosts/server/tests/ServerDeploymentPolicyCompositionModule.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
 ## Related ADRs
