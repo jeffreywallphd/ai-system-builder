@@ -589,6 +589,40 @@ describe("IdentityAuthSessionCoordinator", () => {
       expect(result.error?.code).toBe("cancelled");
     }
   });
+
+  it("logs unknown actor-context failures with red stack-trace diagnostics", async () => {
+    const store = createSessionStore();
+    store.saveSession(createSession());
+    const consoleErrorCalls: unknown[][] = [];
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      consoleErrorCalls.push(args);
+    };
+    const coordinator = new IdentityAuthSessionCoordinator(store, {
+      resolveSessionActorContext: async () => ({
+        ok: false,
+        error: {
+          code: "internal",
+          message: "Unexpected actor-context fault.",
+          domainCode: "upstream-unexpected",
+          stack: "Error: Unexpected actor-context fault\\n    at IdentityAuthService.resolveSessionActorContext",
+        },
+      }),
+    });
+
+    try {
+      const result = await coordinator.bootstrap();
+      expect(result.status).toBe(IdentitySessionBootstrapStatus.unauthenticated);
+      expect(consoleErrorCalls.length).toBe(1);
+      const [formatMessage, colorStyle] = consoleErrorCalls[0] ?? [];
+      expect(formatMessage).toBeString();
+      expect((formatMessage as string).includes("[ai-loom][init] resolveSessionActorContext:unknown-failure")).toBeTrue();
+      expect((formatMessage as string).includes("IdentityAuthService.resolveSessionActorContext")).toBeTrue();
+      expect(colorStyle).toBe("color: #ff4d4f; font-weight: 700;");
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
 });
 
 function createSession(overrides: Partial<ReturnType<typeof buildSession>> = {}) {
