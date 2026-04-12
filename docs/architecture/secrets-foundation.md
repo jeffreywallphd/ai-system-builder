@@ -152,6 +152,27 @@ These contracts establish stable extension points for persistence adapters, auth
 - keeps caller isolation from storage details:
   - bootstrap and runtime consumers no longer compose secret metadata/create/runtime flows manually
 
+## Story 3.2.2 Durable server secret store backend
+
+- adds a dedicated durable backend for server-scoped provider/signing material:
+  - `src/infrastructure/security/secrets/DurableServerSecretStoreBackend.ts`
+- routes server-scope provider resolution operations through this backend while preserving workspace/user resolution behavior:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+- adds controlled bootstrap initialization for server backend readiness checks before server-scope secret operations:
+  - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
+- backend responsibilities:
+  - runtime secret-value resolution for server-scoped provider/signing material
+  - metadata lookup and existence checks for server-scoped material
+  - atomic bootstrap create with conflict-safe existing-record fallback
+- persistence posture:
+  - durable storage remains the composed secret service persistence stack (SQL secret records + encrypted payload storage), so server material survives host restarts
+- scope boundaries:
+  - belongs in server backend: authoritative control-plane provider credentials, server signing material, and other server-owned fail-fast runtime secrets
+  - does not belong in server backend: workspace-shared credentials, user-personal credentials, or transient request/session-local values
+- extension posture:
+  - callers continue to depend on `ISecretProviderMaterialResolutionPort`
+  - backend injection seam in `DefaultSecretProviderResolutionService` preserves compatibility with future external secret-store adapters
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants

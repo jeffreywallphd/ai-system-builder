@@ -28,6 +28,8 @@ Story 8.3.7 operational companion for Feature 8 / Epic 8.3: give contributors a 
 
 - Choose scope by ownership (`server`, `workspace`, `user`) and keep it explicit.
 - Runtime secret reads go through adapters/use cases (`ISecretRuntimeConsumptionAdapters`, `ServerPlatformSecretConsumers`, or `ISecretProviderMaterialResolutionPort`), not env vars/persistence shortcuts.
+- Server-scoped control-plane material (provider credentials, server signing keys, fail-fast runtime secrets) must resolve through `ISecretProviderMaterialResolutionPort`, which routes through the durable server backend.
+- Do not place workspace-shared or user-personal credentials into server-scoped material IDs.
 - Keep command/query DTO boundaries strict: plaintext only for mutation input.
 - Enforce log/audit redaction; plaintext and decrypted values are never allowed.
 - Handle `forbidden`/`conflict` outcomes deterministically; do not retry with broadened scope silently.

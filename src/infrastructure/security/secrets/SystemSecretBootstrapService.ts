@@ -1,4 +1,6 @@
 import {
+  SecretAccessActions,
+  SecretActorTypes,
   SecretKinds,
   SecretScopes,
   type SecretKind,
@@ -229,6 +231,26 @@ export async function bootstrapSystemSecretsFromEnvironment(
       runtimeSecretConsumptionAdapters: input.secretService.runtimeSecretConsumptionAdapters,
       getSecretMetadata: (request) => input.secretService.getSecretMetadataUseCase.execute(request),
       createSecret: (request) => input.secretService.createSecretUseCase.execute(request),
+      initializeServerSecretStore: async () => {
+        const repositoryCheck = await input.secretService.listSecretsUseCase.execute({
+          actor: Object.freeze({
+            actorId: "system:secret-provider-backend:init",
+            actorType: SecretActorTypes.serverAdmin,
+            grantedActions: Object.freeze([SecretAccessActions.list]),
+          }),
+          owner: Object.freeze({
+            scope: SecretScopes.server,
+          }),
+          limit: 1,
+          offset: 0,
+          includeDisabled: true,
+          includeArchived: true,
+          includeSoftDeleted: true,
+        });
+        if (!repositoryCheck.ok) {
+          throw new Error(`server-secret-repository-init-failed:${repositoryCheck.error.code}`);
+        }
+      },
     });
 
   for (const secretId of requiredSecretIds) {

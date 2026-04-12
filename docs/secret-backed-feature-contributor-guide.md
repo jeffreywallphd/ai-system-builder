@@ -61,6 +61,7 @@ Selection checks:
 - prefer the narrowest valid owner scope;
 - avoid promoting user credentials to workspace/server scope;
 - document secret ID conventions in the feature notes.
+- keep authoritative control-plane provider/signing material in server scope only; keep workspace and user credentials in their own scopes.
 
 ## Safe implementation pattern
 
@@ -68,6 +69,7 @@ Selection checks:
 
 - Accept secret ID(s) and runtime governance context (`operationKey`, `serviceIdentity`, justification).
 - Depend on `ISecretRuntimeConsumptionAdapters`, `ServerPlatformSecretConsumers`, or `ISecretProviderMaterialResolutionPort`.
+- Server-scoped provider/signing material should resolve via `ISecretProviderMaterialResolutionPort`, which routes through the durable server backend.
 - Keep domain entities free from secret retrieval logic.
 
 ### 2. Keep transport contracts plaintext-safe

@@ -15,6 +15,8 @@ Story 8.3.3 baseline for Feature 8 / Epic 8.3: add host startup bootstrap checks
 ## Behavior summary
 
 - Host startup now calls `assertSystemSecretBootstrapSafe(...)` after secret service composition.
+- Server-scoped provider/signing bootstrap resolution runs through the durable server backend used by `ISecretProviderMaterialResolutionPort`.
+- Backend initialization performs a fail-closed repository readiness check before server-scope operations.
 - Required system secret IDs are configured via `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`.
 - Bootstrap verifies required secrets are present and runtime-retrievable through formal secret retrieval paths.
 - Missing required secrets can be auto-migrated from supported legacy env values when migration is enabled.
@@ -43,5 +45,6 @@ Coverage verifies:
 - successful migration from legacy env into required system secret records,
 - invalid startup state when required secrets are missing,
 - invalid migration state when encryption is unavailable,
+- durable server backend initialization failure propagates as an invalid startup state,
 - authoritative host fail-closed startup on missing required system secret,
 - authoritative host successful startup when required secret is migrated during bootstrap.

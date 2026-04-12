@@ -100,3 +100,24 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
 - Adds infrastructure resolution model implementation in:
   - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
 - Migrates `SystemSecretBootstrapService` to consume the provider resolution/bootstrap port for metadata lookup, existence checks, bootstrap creation, and runtime validation.
+
+## Story 3.2.2 Durable server secret store backend
+
+- Adds a dedicated durable backend for server-scoped provider/signing material:
+  - `src/infrastructure/security/secrets/DurableServerSecretStoreBackend.ts`
+- Routes server-scope provider resolution operations through this backend while preserving workspace/user resolution behavior:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+- Adds controlled bootstrap initialization for server backend readiness checks before server-scope secret operations:
+  - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
+- Backend responsibilities:
+  - runtime secret-value resolution for server-scoped provider/signing material
+  - metadata lookup and existence checks for server-scoped material
+  - atomic bootstrap create with conflict-safe existing-record fallback
+- Persistence posture:
+  - durable storage remains the composed secret service persistence stack (SQL secret records + encrypted payload storage), so server material survives host restarts.
+- Scope boundaries:
+  - belongs in server backend: authoritative control-plane provider credentials, server signing material, and other server-owned fail-fast runtime secrets
+  - does not belong in server backend: workspace-shared credentials, user-personal credentials, or transient request/session-local values
+- Extension posture:
+  - callers continue to depend on `ISecretProviderMaterialResolutionPort`
+  - backend injection seam in `DefaultSecretProviderResolutionService` preserves compatibility with future external secret-store adapters.
