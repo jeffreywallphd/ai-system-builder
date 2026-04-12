@@ -51,6 +51,35 @@ describe("docs category-compliance validation script", () => {
     expect(combinedOutput).toContain("domain-and-application-core.md");
   });
 
+  it("detects ADR entries with unsupported lifecycle status values", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-category-compliance-adr-status-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const registryPath = join(fixtureRoot, "docs", "context", "documentation-registry.seed.json");
+    const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
+      entries: Array<{ docType: string; status: string }>;
+    };
+
+    const adrEntry = registry.entries.find((entry) => entry.docType === "adr");
+    expect(adrEntry).toBeDefined();
+    if (!adrEntry) {
+      return;
+    }
+
+    adrEntry.status = "archived";
+    writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CATEGORY_ADR_STATUS_INVALID]");
+    expect(combinedOutput).toContain("unsupported lifecycle status");
+  });
+
   it("detects baseline entries with invalid status or authoritativeness", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-category-compliance-baseline-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
@@ -116,5 +145,49 @@ describe("docs category-compliance validation script", () => {
     expect(result.status).toBe(1);
     expect(combinedOutput).toContain("[CATEGORY_ROUTING_STATUS_INVALID]");
     expect(combinedOutput).toContain(supersededEntry.path);
+  });
+
+  it("detects routing references that target active records marked as historical", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-category-compliance-routing-authority-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const registryPath = join(fixtureRoot, "docs", "context", "documentation-registry.seed.json");
+    const routingSeedPath = join(fixtureRoot, "docs", "context", "routing", "task-to-context-routing.seed.json");
+
+    const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
+      entries: Array<{ recordId: string; status: string; authoritativeness: string }>;
+    };
+    const routingSeed = JSON.parse(readFileSync(routingSeedPath, "utf8")) as {
+      mappings: Array<{ relatedDocRecordIds?: string[] }>;
+    };
+
+    const routeMapping = routingSeed.mappings.find(
+      (mapping) => Array.isArray(mapping.relatedDocRecordIds) && mapping.relatedDocRecordIds.length > 0,
+    );
+    expect(routeMapping).toBeDefined();
+    if (!routeMapping || !routeMapping.relatedDocRecordIds || routeMapping.relatedDocRecordIds.length === 0) {
+      return;
+    }
+
+    const targetedRecordId = routeMapping.relatedDocRecordIds[0];
+    const referencedEntry = registry.entries.find((entry) => entry.recordId === targetedRecordId);
+    expect(referencedEntry).toBeDefined();
+    if (!referencedEntry) {
+      return;
+    }
+
+    referencedEntry.status = "active";
+    referencedEntry.authoritativeness = "historical";
+    writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CATEGORY_ROUTING_AUTHORITY_INVALID]");
+    expect(combinedOutput).toContain(targetedRecordId);
   });
 });

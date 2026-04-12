@@ -43,6 +43,57 @@ describe("ADR validation script", () => {
     expect(combinedOutput).toContain("## Decision Drivers");
   });
 
+  it("detects missing required ADR metadata fields", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "adr-validator-metadata-missing-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    for (const variant of [
+      "adr-001-single-authoritative-control-plane.md",
+      "adr-001-single-authoritative-control-plane.ai.md",
+    ]) {
+      const adrPath = join(fixtureRoot, "docs", "adr", "records", variant);
+      const content = readFileSync(adrPath, "utf8").replace(/review_tier:\s*heightened\r?\n/, "");
+      writeFileSync(adrPath, content, "utf8");
+    }
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ADR_METADATA_MISSING]");
+    expect(combinedOutput).toContain("missing required metadata field 'review_tier'");
+  });
+
+  it("detects required ADR sections that are present but empty", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "adr-validator-section-empty-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    for (const variant of [
+      "adr-001-single-authoritative-control-plane.md",
+      "adr-001-single-authoritative-control-plane.ai.md",
+    ]) {
+      const adrPath = join(fixtureRoot, "docs", "adr", "records", variant);
+      const content = readFileSync(adrPath, "utf8").replace(
+        /\n## Consequences[\s\S]*?\n## Related Documentation/m,
+        "\n## Consequences\n\n## Related Documentation",
+      );
+      writeFileSync(adrPath, content, "utf8");
+    }
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ADR_REQUIRED_SECTION_EMPTY]");
+    expect(combinedOutput).toContain("section '## Consequences' must not be empty");
+  });
+
   it("detects identifier drift between registry and ADR metadata", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "adr-validator-identifier-mismatch-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
