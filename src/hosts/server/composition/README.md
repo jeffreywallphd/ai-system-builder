@@ -37,6 +37,8 @@ This folder is the bounded contract surface for control-plane composition refact
   - Bounded image/media preview composition module used by `IdentityServerHost.ts`.
 - `ServerGeneratedResultCompositionModule.ts`
   - Bounded generated-result preview/media and collected-result persistence composition module used by `IdentityServerHost.ts`.
+- `ServerAuditDiagnosticsPlatformCompositionModule.ts`
+  - Bounded audit-service, diagnostics, and cross-cutting operational logging composition module used by `IdentityServerHost.ts`.
 - `contracts/index.ts`
   - Barrel export for composition contract consumers and tests.
 
