@@ -13,8 +13,10 @@ Story 8.2.5 standardizes how resilience diagnostics are emitted across the image
 ## Where enforced now
 - `RunOrchestrationObservability`
 - `ImageAssetManagementObservability`
+- `SystemRuntimeObservability` (`SystemRuntimeBackendApi` start/start-async events)
 - `ComfyUiExecutionObservability`
 - `SqliteRunCollectedResultPersistenceAdapter` (`IPersistenceDiagnosticsLogger` events)
+- `ServerManagedLocalStorageObjectAdapter` (`storage.local.write.succeeded|failed` diagnostics)
 
 ## Required behavior
 - Emit structured events with `slice`, `correlation`, and `resilience` on degraded/failure/retry/recovery paths.
@@ -25,9 +27,17 @@ Story 8.2.5 standardizes how resilience diagnostics are emitted across the image
 ## Unsafe content policy
 Never log raw:
 - prompts or backend payload fragments,
-- storage filesystem paths or raw object handles,
+- storage object handles in transport/user-facing payloads,
 - secrets/tokens/credentials/session artifacts,
 - internal credential-bearing backend responses.
+
+Exception for operator-only local managed-storage diagnostics:
+- `ServerManagedLocalStorageObjectAdapter` emits resolved `absolutePath` in structured write diagnostics to make on-disk upload troubleshooting deterministic.
+
+## Upload file location formula (managed filesystem)
+- `<managedStorageRootPath>/workspaces/<workspace-safe-segment>/storage/<storage-safe-segment>/objects/<objectKey>`
+- `managedStorageRootPath` defaults to `<server-database-directory>/runtime-assets/managed-storage`.
+- Image-asset object keys typically look like `workspaces/<workspaceId>/image-assets/<assetId>/<area>/<partition>/<filename>`.
 
 ## Extension checklist
 - Use shared diagnostics helper.

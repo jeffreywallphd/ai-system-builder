@@ -22,14 +22,34 @@ import { StorageBackendTypes } from "@domain/storage/StorageDomain";
 export interface LocalStorageObjectAdapterConfiguration {
   readonly managedStorageRootPath: string;
   readonly objectsDirectoryName?: string;
+  readonly diagnosticsLogger?: LocalStorageObjectDiagnosticsLogger;
 }
 
 const DefaultObjectsDirectoryName = "objects";
+
+export interface LocalStorageObjectDiagnosticsEvent {
+  readonly event: "storage.local.write.succeeded" | "storage.local.write.failed";
+  readonly occurredAt: string;
+  readonly storageInstanceId: string;
+  readonly objectKey: string;
+  readonly absolutePath: string;
+  readonly operation: "writeObject";
+  readonly sizeBytes?: number;
+  readonly checksumSha256?: string;
+  readonly errorCode?: string;
+  readonly errorMessage?: string;
+}
+
+export interface LocalStorageObjectDiagnosticsLogger {
+  info(event: LocalStorageObjectDiagnosticsEvent): void;
+  error(event: LocalStorageObjectDiagnosticsEvent): void;
+}
 
 export class ServerManagedLocalStorageObjectAdapter implements IStorageObjectPort {
   private readonly managedStorageRootPath: string;
 
   private readonly objectsDirectoryName: string;
+  private readonly diagnosticsLogger?: LocalStorageObjectDiagnosticsLogger;
 
   public constructor(configuration: LocalStorageObjectAdapterConfiguration) {
     const normalizedRoot = configuration.managedStorageRootPath.trim();
@@ -46,6 +66,7 @@ export class ServerManagedLocalStorageObjectAdapter implements IStorageObjectPor
 
     this.managedStorageRootPath = path.resolve(normalizedRoot);
     this.objectsDirectoryName = normalizedObjectsDirectoryName;
+    this.diagnosticsLogger = configuration.diagnosticsLogger;
   }
 
   public createObjectKey(input: CreateStorageObjectKeyRequest): CreateStorageObjectKeyResult {
@@ -79,11 +100,13 @@ export class ServerManagedLocalStorageObjectAdapter implements IStorageObjectPor
 
   public async writeObject(input: StorageObjectWriteRequest): Promise<StorageObjectWriteResult> {
     const occurredAt = new Date().toISOString();
-    const targetPath = this.resolveObjectPath(input.reference);
-    const tempPath = `${targetPath}.tmp-${createHash("sha256").update(`${targetPath}:${occurredAt}`).digest("hex").slice(0, 12)}`;
+    let targetPath: string | undefined;
+    let tempPath: string | undefined;
     const objectLimit = input.reference.storageInstance.policy.maxObjectBytes;
 
     try {
+      targetPath = this.resolveObjectPath(input.reference);
+      tempPath = `${targetPath}.tmp-${createHash("sha256").update(`${targetPath}:${occurredAt}`).digest("hex").slice(0, 12)}`;
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
       if (!input.overwriteExisting) {
         await this.assertObjectAbsent(targetPath, input.reference.objectKey);
@@ -129,6 +152,17 @@ export class ServerManagedLocalStorageObjectAdapter implements IStorageObjectPor
 
       await fs.rename(tempPath, targetPath);
 
+      this.diagnosticsLogger?.info(Object.freeze({
+        event: "storage.local.write.succeeded",
+        occurredAt,
+        storageInstanceId: input.reference.storageInstance.id,
+        objectKey: input.reference.objectKey,
+        absolutePath: targetPath,
+        operation: "writeObject",
+        sizeBytes,
+        checksumSha256: hasher.copy().digest("hex"),
+      }));
+
       return Object.freeze({
         objectKey: input.reference.objectKey,
         sizeBytes,
@@ -139,8 +173,21 @@ export class ServerManagedLocalStorageObjectAdapter implements IStorageObjectPor
         writtenAt: occurredAt,
       });
     } catch (error) {
-      await fs.rm(tempPath, { force: true }).catch(() => undefined);
-      throw this.mapError(error, input.reference, "writeObject");
+      if (tempPath) {
+        await fs.rm(tempPath, { force: true }).catch(() => undefined);
+      }
+      const mapped = this.mapError(error, input.reference, "writeObject");
+      this.diagnosticsLogger?.error(Object.freeze({
+        event: "storage.local.write.failed",
+        occurredAt,
+        storageInstanceId: input.reference.storageInstance.id,
+        objectKey: input.reference.objectKey,
+        absolutePath: targetPath ?? "<unresolved>",
+        operation: "writeObject",
+        errorCode: mapped.code,
+        errorMessage: mapped.message,
+      }));
+      throw mapped;
     }
   }
 
@@ -442,4 +489,3 @@ export class ServerManagedLocalStorageObjectAdapter implements IStorageObjectPor
     return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "EEXIST";
   }
 }
-

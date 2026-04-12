@@ -19,6 +19,7 @@ import { InMemoryExecutionAuditRepository } from "@application/system-runtime/Ex
 import { ExecutionAuditEventKinds } from "@domain/system-runtime/ExecutionAuditTrailDomain";
 import { RuntimeRateLimitEvaluator } from "@application/system-runtime/RuntimeRateLimitEvaluator";
 import { RuntimeRealtimeTopics } from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import type { SystemRuntimeObservabilityEvent, SystemRuntimeObservabilityLogger } from "../SystemRuntimeObservability";
 
 class RecordingCallbackDispatcher implements ExecutionCallbackDispatcher {
   public readonly deliveries: Array<{ payload: ExecutionCallbackPayload; targetUrl: string }> = [];
@@ -59,6 +60,24 @@ class InMemoryStudioShellRepository implements IStudioShellRepository {
   async saveAssetVersion(version: AssetVersion): Promise<AssetVersion> { this.versions.set(version.versionId, version); return version; }
   async getAssetVersion(versionId: string): Promise<AssetVersion | undefined> { return this.versions.get(versionId); }
   async listAssetVersionsByAssetId(assetId: string): Promise<ReadonlyArray<AssetVersion>> { return [...this.versions.values()].filter((entry) => entry.assetId.value === assetId); }
+}
+
+class RecordingSystemRuntimeObservabilityLogger implements SystemRuntimeObservabilityLogger {
+  public readonly infoEvents: SystemRuntimeObservabilityEvent[] = [];
+  public readonly warnEvents: SystemRuntimeObservabilityEvent[] = [];
+  public readonly errorEvents: SystemRuntimeObservabilityEvent[] = [];
+
+  public info(event: SystemRuntimeObservabilityEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: SystemRuntimeObservabilityEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: SystemRuntimeObservabilityEvent): void {
+    this.errorEvents.push(event);
+  }
 }
 
 describe("SystemRuntimeBackendApi", () => {
@@ -150,6 +169,60 @@ describe("SystemRuntimeBackendApi", () => {
     const invalid = await runtimeApi.startExecution({});
     expect(invalid.ok).toBeFalse();
     expect(invalid.error?.code).toBe("invalid-request");
+  });
+
+  it("emits structured observability for runtime start success and rejection paths", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const logger = new RecordingSystemRuntimeObservabilityLogger();
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        observabilityLogger: logger,
+      },
+    );
+
+    const invalid = await runtimeApi.startExecution({});
+    expect(invalid.ok).toBeFalse();
+    expect(logger.warnEvents.some((event) => event.action === "start-execution" && event.outcome === "rejected")).toBeTrue();
+
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:observability",
+      versionId: "system:observability:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const started = await runtimeApi.startExecution({
+      versionId: "system:observability:v1",
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "runtime-observability-user" },
+      },
+    });
+    expect(started.ok).toBeTrue();
+    expect(logger.infoEvents.some((event) =>
+      event.action === "start-execution"
+      && event.outcome === "success"
+      && event.executionId === started.data?.executionId
+      && event.callerId === "runtime-observability-user")).toBeTrue();
   });
 
   it("creates execution sessions and supports async polling/result retrieval", async () => {
@@ -1419,4 +1492,3 @@ describe("SystemRuntimeBackendApi", () => {
   });
 
 });
-

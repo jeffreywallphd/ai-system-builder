@@ -100,6 +100,7 @@ import {
   shapeAuthorizationAwareResponse,
   type AuthorizationResponseAccessLevel,
 } from "@application/authorization/use-cases/AuthorizationResponseRedaction";
+import { SystemRuntimeObservability, type SystemRuntimeObservabilityLogger } from "./SystemRuntimeObservability";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -221,6 +222,7 @@ export interface SystemRuntimeAuthorizationOptions {
   readonly queueProtectedResourceType?: string;
   readonly logProtectedResourceType?: string;
   readonly now?: () => Date;
+  readonly observabilityLogger?: SystemRuntimeObservabilityLogger;
 }
 
 function mapExecutionStatusToQueueItemStatus(status: RuntimeExecutionStatusReadModel["status"]): RuntimeQueueItemStatus | undefined {
@@ -292,6 +294,7 @@ export class SystemRuntimeBackendApi {
   private readonly queueProtectedResourceType: string;
   private readonly logProtectedResourceType: string;
   private readonly now: () => Date;
+  private readonly observability: SystemRuntimeObservability;
 
   public constructor(
     repository: IStudioShellRepository,
@@ -312,6 +315,7 @@ export class SystemRuntimeBackendApi {
     this.queueProtectedResourceType = authorizationOptions?.queueProtectedResourceType?.trim() || "runtime-queue";
     this.logProtectedResourceType = authorizationOptions?.logProtectedResourceType?.trim() || "runtime-log";
     this.now = authorizationOptions?.now ?? (() => new Date());
+    this.observability = new SystemRuntimeObservability(authorizationOptions?.observabilityLogger);
   }
 
   public async startExecution(request: StartSystemRuntimeExecutionRequest & {
@@ -322,7 +326,7 @@ export class SystemRuntimeBackendApi {
     readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
     readonly tenantId?: string;
   }): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>> {
-    return this.wrap(async () => {
+    const response = await this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
       const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
       const requestSource = this.resolveRequestSource(request.requestContext);
@@ -438,6 +442,19 @@ export class SystemRuntimeBackendApi {
         nestedExecutionLineage: this.service.getExecutionStatus(started.execution.executionId).nestedExecutionLineage,
       });
     });
+    this.observability.recordApiOutcome({
+      action: "start-execution",
+      response,
+      request: {
+        studioId: request.studioId,
+        draftId: request.draftId,
+        versionId: request.versionId,
+        systemId: request.systemId,
+        tenantId: request.tenantId,
+        callerId: request.requestContext?.accessContext?.callerId,
+      },
+    });
+    return response;
   }
 
   public async startExecutionAsync(request: StartSystemRuntimeExecutionRequest & {
@@ -449,7 +466,7 @@ export class SystemRuntimeBackendApi {
     readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
     readonly tenantId?: string;
   }): Promise<SystemRuntimeApiResponse<AsyncExecutionStartResponse>> {
-    return this.wrap(async () => {
+    const response = await this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
       const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
       const requestSource = this.resolveRequestSource(request.requestContext);
@@ -657,6 +674,19 @@ export class SystemRuntimeBackendApi {
         nestedExecutionLineage: Object.freeze([]),
       });
     });
+    this.observability.recordApiOutcome({
+      action: "start-execution-async",
+      response,
+      request: {
+        studioId: request.studioId,
+        draftId: request.draftId,
+        versionId: request.versionId,
+        systemId: request.systemId,
+        tenantId: request.tenantId,
+        callerId: request.requestContext?.accessContext?.callerId,
+      },
+    });
+    return response;
   }
 
   public async getExecutionStatus(
@@ -2252,4 +2282,3 @@ export class SystemRuntimeBackendApi {
     return Object.freeze({ code: "internal", message });
   }
 }
-
