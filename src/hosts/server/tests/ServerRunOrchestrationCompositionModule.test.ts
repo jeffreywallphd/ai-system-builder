@@ -10,6 +10,7 @@ import { composeServerRunOrchestrationCompositionModule } from "../composition/S
 import { composeServerRunSchedulingCompositionModule } from "../composition/ServerRunSchedulingCompositionModule";
 import { composeServerStorageAssetCompositionModule } from "../composition/ServerStorageAssetCompositionModule";
 import { composeServerWorkspaceAuthorizationCompositionModule } from "../composition/ServerWorkspaceAuthorizationCompositionModule";
+import { composeServerSecretCompositionModule } from "../composition/ServerSecretCompositionModule";
 
 const testClock = Object.freeze({
   now: () => new Date("2026-04-12T00:00:00.000Z"),
@@ -22,7 +23,7 @@ const configuredCriticalSecurityMaterial = Object.freeze({
 });
 
 describe("ServerRunOrchestrationCompositionModule", () => {
-  it("composes run orchestration and scheduling APIs behind typed outputs", () => {
+  it("composes run orchestration and scheduling APIs behind typed outputs", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-run-orchestration-composition-module-"));
     const databasePath = join(tempDirectory, "run-orchestration-composition-module.sqlite");
     const persistentServices = createAuthoritativePersistentPlatformServices({ databasePath });
@@ -50,14 +51,22 @@ describe("ServerRunOrchestrationCompositionModule", () => {
         executionNodeManagementAuditSink: auditDiagnostics.executionNodeManagementAuditSink,
         nodeEligibilityEvaluationService: executionNodeManagementComposition.nodeEligibilityEvaluationService,
       });
-      const storageAssetComposition = composeServerStorageAssetCompositionModule({
+      const secretComposition = await composeServerSecretCompositionModule({
         databasePath,
         env: configuredCriticalSecurityMaterial,
+        workspaceRepository: persistentServices.workspaceRepository,
+        authoritativeAuditRecorder: auditDiagnostics.authoritativeAuditRecorder,
+      });
+      const storageAssetComposition = await composeServerStorageAssetCompositionModule({
+        databasePath,
+        env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         authoritativeAuditRecorder: auditDiagnostics.authoritativeAuditRecorder,
       });
-      const generatedResultComposition = composeServerGeneratedResultCompositionModule({
+      const generatedResultComposition = await composeServerGeneratedResultCompositionModule({
         env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         workspaceClock: testClock,
         authoritativeAuditRecorder: auditDiagnostics.authoritativeAuditRecorder,
@@ -81,6 +90,7 @@ describe("ServerRunOrchestrationCompositionModule", () => {
       expect(composed.authoritativeRunQueryBackendApi).toBeDefined();
       expect(composed.authoritativeRunMutationBackendApi).toBeDefined();
       expect(composed.authoritativeRunExecutionUpdateBackendApi).toBeDefined();
+      secretComposition.secretService.dispose();
     } finally {
       persistentServices.dispose();
       rmSync(tempDirectory, { recursive: true, force: true });

@@ -7,6 +7,7 @@ import { createAuthoritativePersistentPlatformServices } from "@infrastructure/p
 import { composeServerWorkspaceAuthorizationCompositionModule } from "../composition/ServerWorkspaceAuthorizationCompositionModule";
 import { composeServerStorageAssetCompositionModule } from "../composition/ServerStorageAssetCompositionModule";
 import { composeServerGeneratedResultCompositionModule } from "../composition/ServerGeneratedResultCompositionModule";
+import { composeServerSecretCompositionModule } from "../composition/ServerSecretCompositionModule";
 
 const configuredCriticalSecurityMaterial = Object.freeze({
   AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET: "asset-download-grant-secret-value-12345",
@@ -15,7 +16,7 @@ const configuredCriticalSecurityMaterial = Object.freeze({
 });
 
 describe("ServerGeneratedResultCompositionModule", () => {
-  it("composes generated result preview/media and persistence adapters behind one typed output", () => {
+  it("composes generated result preview/media and persistence adapters behind one typed output", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-generated-result-composition-module-"));
     const databasePath = join(tempDirectory, "generated-result-composition-module.sqlite");
     const persistentServices = createAuthoritativePersistentPlatformServices({ databasePath });
@@ -29,15 +30,23 @@ describe("ServerGeneratedResultCompositionModule", () => {
         authorizationRepository: persistentServices.authorizationRepository,
         authoritativeAuditRecorder,
       });
-      const storageAssetComposition = composeServerStorageAssetCompositionModule({
+      const secretComposition = await composeServerSecretCompositionModule({
         databasePath,
         env: configuredCriticalSecurityMaterial,
+        workspaceRepository: persistentServices.workspaceRepository,
+        authoritativeAuditRecorder,
+      });
+      const storageAssetComposition = await composeServerStorageAssetCompositionModule({
+        databasePath,
+        env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         authoritativeAuditRecorder,
       });
 
-      const composed = composeServerGeneratedResultCompositionModule({
+      const composed = await composeServerGeneratedResultCompositionModule({
         env: configuredCriticalSecurityMaterial,
+        secretService: secretComposition.secretService,
         persistentPlatformServices: persistentServices,
         workspaceClock: workspaceAuthorizationComposition.workspaceClock,
         authoritativeAuditRecorder,
@@ -46,6 +55,7 @@ describe("ServerGeneratedResultCompositionModule", () => {
 
       expect(composed.generatedResultManagementBackendApi).toBeDefined();
       expect(composed.runCollectedResultPersistencePort).toBeDefined();
+      secretComposition.secretService.dispose();
     } finally {
       persistentServices.dispose();
       rmSync(tempDirectory, { recursive: true, force: true });

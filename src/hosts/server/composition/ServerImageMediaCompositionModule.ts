@@ -17,10 +17,12 @@ import { ManagedImageAssetStorageAdapter } from "@infrastructure/storage/image-a
 import type { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
 import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
 import { resolveCriticalServerSecurityMaterial } from "./ResolveCriticalServerSecurityMaterial";
+import type { ServerComposedSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
 
 export interface ServerImageMediaCompositionModuleInput {
   readonly databasePath: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly secretService: ServerComposedSecretService;
   readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
   readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
   readonly authorizationDecisionEvaluator: AuthorizationPolicyDecisionEvaluator;
@@ -39,12 +41,13 @@ export interface ServerImageMediaCompositionModuleOutput {
   dispose(): void;
 }
 
-export function composeServerImageMediaCompositionModule(
+export async function composeServerImageMediaCompositionModule(
   input: ServerImageMediaCompositionModuleInput,
-): ServerImageMediaCompositionModuleOutput {
+): Promise<ServerImageMediaCompositionModuleOutput> {
   const imageAssetRepository = new SqliteImageAssetPersistenceAdapter(input.databasePath);
-  const imageAssetStorageTokenSecret = resolveCriticalServerSecurityMaterial({
+  const imageAssetStorageTokenSecret = await resolveCriticalServerSecurityMaterial({
     environment: input.env,
+    secretService: input.secretService,
     materialId: "material:server:image-asset-storage-token-secret",
     environmentKey: "AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET",
     inheritedEnvironmentKey: "AI_LOOM_SECRET_MASTER_KEY",
@@ -52,8 +55,9 @@ export function composeServerImageMediaCompositionModule(
     logger: input.imageAssetObservabilityLogger,
     materialFormat: "string-secret",
   });
-  const imageAssetUploadSessionTokenSecret = resolveCriticalServerSecurityMaterial({
+  const imageAssetUploadSessionTokenSecret = await resolveCriticalServerSecurityMaterial({
     environment: input.env,
+    secretService: input.secretService,
     materialId: "material:server:image-upload-session-token-secret",
     environmentKey: "AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET",
     inheritedEnvironmentKey: "AI_LOOM_SECRET_MASTER_KEY",
