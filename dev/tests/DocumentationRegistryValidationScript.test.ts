@@ -66,6 +66,28 @@ describe("documentation registry validation script", () => {
     expect(combinedOutput).toContain("invalid-doc-type-for-test");
   });
 
+  it("detects future lastReviewed metadata values", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-registry-validator-future-last-reviewed-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const registryPath = join(fixtureRoot, "docs", "context", "documentation-registry.seed.json");
+    const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
+      entries: Array<{ lastReviewed?: string }>;
+    };
+    registry.entries[0].lastReviewed = "2999-01-01";
+    writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[REGISTRY_ENTRY_INVALID]");
+    expect(combinedOutput).toContain("future lastReviewed '2999-01-01'");
+  });
+
   it("detects unknown relatedRecordIds and discovery references", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-registry-validator-related-record-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });

@@ -77,6 +77,38 @@ describe("documentation cross-reference validation script", () => {
     expect(combinedOutput).toContain("doc-contributors-docs-placement-guide");
   });
 
+  it("detects unknown relatedDocRecordIds in routing mappings", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-cross-reference-routing-unknown-record-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const routingSeedPath = join(fixtureRoot, "docs", "context", "routing", "task-to-context-routing.seed.json");
+    const routingSeed = JSON.parse(readFileSync(routingSeedPath, "utf8")) as {
+      mappings: Array<{
+        relatedDocRecordIds?: string[];
+      }>;
+    };
+    expect(routingSeed.mappings.length).toBeGreaterThan(0);
+    if (routingSeed.mappings.length === 0) {
+      return;
+    }
+
+    routingSeed.mappings[0].relatedDocRecordIds = [
+      ...(routingSeed.mappings[0].relatedDocRecordIds ?? []),
+      "doc-missing-routing-record-id-for-test",
+    ];
+    writeFileSync(routingSeedPath, `${JSON.stringify(routingSeed, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ROUTING_RELATED_RECORD_UNKNOWN]");
+    expect(combinedOutput).toContain("doc-missing-routing-record-id-for-test");
+  });
+
   it("detects documentation-index record link mismatches", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-cross-reference-index-mismatch-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });

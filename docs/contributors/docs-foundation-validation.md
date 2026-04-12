@@ -18,7 +18,7 @@ related_code_paths:
   - dev/tests/DocsFoundationValidationScript.test.ts
   - dev/tests/DocsCategoryComplianceValidationScript.test.ts
   - dev/tests/DocumentationRegistryValidationScript.test.ts
-  - dev/tests/DocumentationRegistryCrossReferenceValidationStory642Guardrails.test.ts
+  - dev/tests/DocumentationCrossReferenceValidationScript.test.ts
   - dev/tests/AdrValidationScript.test.ts
   - dev/tests/ArchitectureDomainValidationScript.test.ts
   - dev/tests/DocsSegmentationValidationScript.test.ts
@@ -107,6 +107,34 @@ npm run docs:validate:segmentation
 npm run docs:validate:cross-references
 npm run docs:validate:category-compliance
 ```
+
+## Targeted Test Coverage
+
+The validator test suite intentionally keeps focused pass/fail fixtures for core rule families so changes are safer to evolve:
+
+- Metadata rules:
+  - ADR metadata field presence and format checks.
+  - Registry `lastReviewed` validity and future-date rejection.
+  - Non-active lifecycle metadata and taxonomy enum validation.
+- Structural rules:
+  - Required section presence and non-empty section body checks for ADRs and non-active docs.
+  - Required heading anchors in quality-standard and indexing artifacts.
+- Cross-reference rules:
+  - Broken docs link detection in high-value docs.
+  - Routing `relatedDocPaths` and `relatedDocRecordIds` alignment and unknown-ID rejection.
+  - Documentation-index record/link alignment and supersession-registry target alignment.
+- Category-specific rules:
+  - ADR placement and lifecycle status restrictions.
+  - Baseline lifecycle/authority restrictions.
+  - Routing references restricted to active, non-historical records.
+
+Primary targeted suites:
+- `dev/tests/AdrValidationScript.test.ts`
+- `dev/tests/DocumentationRegistryValidationScript.test.ts`
+- `dev/tests/DocumentationCrossReferenceValidationScript.test.ts`
+- `dev/tests/DocsCategoryComplianceValidationScript.test.ts`
+- `dev/tests/DocsFoundationValidationScript.test.ts`
+- `dev/tests/DocsSegmentationValidationScript.test.ts`
 
 ## Lint Output Triage Flow
 
