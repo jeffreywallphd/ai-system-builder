@@ -17,6 +17,14 @@ class InMemoryCredentialStore implements LocalUserSecretCredentialStore {
   public async setSecret(account: string, value: string): Promise<void> {
     this.values.set(account, value);
   }
+
+  public setRaw(account: string, value: string): void {
+    this.values.set(account, value);
+  }
+
+  public findAccount(suffix: string): string | undefined {
+    return [...this.values.keys()].find((key) => key.endsWith(suffix));
+  }
 }
 
 describe("LocalUserSecureSecretStoreBackend", () => {
@@ -92,6 +100,8 @@ describe("LocalUserSecureSecretStoreBackend", () => {
     if (metadata.ok) {
       expect(metadata.value.reference.name).toBe("provider.openai.local-user-key");
       expect(metadata.value.reference.metadata.tags).toEqual(["user", "local"]);
+      expect(metadata.value.rotation.currentVersionId).toContain(":local-");
+      expect(metadata.value.rotation.versions[0]?.state).toBe("active");
       expect((metadata.value as Record<string, unknown>).rawValue).toBeUndefined();
     }
     expect(resolved.ok).toBeTrue();
@@ -103,6 +113,102 @@ describe("LocalUserSecureSecretStoreBackend", () => {
     if (existing.ok) {
       expect(existing.value.outcome).toBe("existing");
     }
+  });
+
+  it("returns persisted active, previous, and pending rotation metadata when available", async () => {
+    const credentialStore = new InMemoryCredentialStore();
+    const backend = new LocalUserSecureSecretStoreBackend({
+      credentialStore,
+      clock: () => new Date("2026-04-10T00:00:00.000Z"),
+    });
+    const selector = {
+      providerId: "openai",
+      secretId: "secret:user:provider:openai",
+      scope: {
+        scope: SecretScopes.user,
+        workspaceId: "workspace:alpha",
+        userIdentityId: "user:alpha",
+      },
+      materialKind: SecretProviderMaterialKinds.providerCredential,
+    } as const;
+    const access = {
+      operationKey: "op:test:user-local:rotation-metadata",
+      serviceIdentity: "runtime:user:test",
+      usage: "provider-runtime",
+      occurredAt: "2026-04-10T00:00:00.000Z",
+    } as const;
+
+    await backend.bootstrapUserMaterial({
+      selector,
+      access,
+      name: "provider.openai.local-user-key",
+      kind: SecretKinds.apiKey,
+      plaintext: "sk-local-v2",
+    });
+
+    const metadataAccount = credentialStore.findAccount(":metadata");
+    expect(metadataAccount).toBeDefined();
+    credentialStore.setRaw(metadataAccount as string, JSON.stringify({
+      kind: SecretKinds.apiKey,
+      name: "provider.openai.local-user-key",
+      metadata: {
+        tags: ["user", "local", "rotation"],
+        labels: {
+          provider: "openai",
+        },
+      },
+      updatedAt: "2026-04-11T00:00:00.000Z",
+      currentVersionId: "secret:user:provider:openai:local-v2",
+      rotation: {
+        currentVersionId: "secret:user:provider:openai:local-v2",
+        previousVersionId: "secret:user:provider:openai:local-v1",
+        pendingVersionId: "secret:user:provider:openai:local-v3",
+        effectiveAsOf: "2026-04-11T00:00:00.000Z",
+        versions: [
+          {
+            versionId: "secret:user:provider:openai:local-v1",
+            state: "previous",
+            effectiveFrom: "2026-04-01T00:00:00.000Z",
+            effectiveUntil: "2026-04-11T00:00:00.000Z",
+            successorVersionId: "secret:user:provider:openai:local-v2",
+          },
+          {
+            versionId: "secret:user:provider:openai:local-v2",
+            state: "active",
+            effectiveFrom: "2026-04-11T00:00:00.000Z",
+            predecessorVersionId: "secret:user:provider:openai:local-v1",
+            successorVersionId: "secret:user:provider:openai:local-v3",
+          },
+          {
+            versionId: "secret:user:provider:openai:local-v3",
+            state: "pending",
+            effectiveFrom: "2026-05-01T00:00:00.000Z",
+            predecessorVersionId: "secret:user:provider:openai:local-v2",
+          },
+        ],
+        policy: {
+          rotationMode: "scheduled",
+          cutoverStrategy: "scheduled-cutover",
+          rotationIntervalDays: 30,
+          pendingActivationWindowDays: 7,
+        },
+      },
+    }));
+
+    const metadata = await backend.resolveUserMaterialMetadata({
+      selector,
+      access,
+    });
+
+    expect(metadata.ok).toBeTrue();
+    if (!metadata.ok) {
+      return;
+    }
+    expect(metadata.value.rotation.currentVersionId).toBe("secret:user:provider:openai:local-v2");
+    expect(metadata.value.rotation.previousVersionId).toBe("secret:user:provider:openai:local-v1");
+    expect(metadata.value.rotation.pendingVersionId).toBe("secret:user:provider:openai:local-v3");
+    expect(metadata.value.rotation.versions).toHaveLength(3);
+    expect(metadata.value.rotation.policy?.rotationMode).toBe("scheduled");
   });
 
   it("rejects non-user scopes to enforce server/workspace boundaries", async () => {

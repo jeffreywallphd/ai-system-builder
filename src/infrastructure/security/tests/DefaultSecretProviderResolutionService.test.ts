@@ -439,6 +439,11 @@ describe("DefaultSecretProviderResolutionService", () => {
         rotation: {
           status: SecretProviderMaterialRotationStatuses.active,
           currentVersionId: "secret:user:provider:openai:v1",
+          versions: [{
+            versionId: "secret:user:provider:openai:v1",
+            state: "active",
+            effectiveFrom: "2026-04-09T00:00:00.000Z",
+          }],
         },
         policyFlags: {
           metadataSafeForDiagnostics: true,
@@ -480,6 +485,11 @@ describe("DefaultSecretProviderResolutionService", () => {
           rotation: {
             status: SecretProviderMaterialRotationStatuses.active,
             currentVersionId: "secret:user:provider:openai:v1",
+            versions: [{
+              versionId: "secret:user:provider:openai:v1",
+              state: "active",
+              effectiveFrom: "2026-04-09T00:00:00.000Z",
+            }],
           },
           policyFlags: {
             metadataSafeForDiagnostics: true,
@@ -534,6 +544,8 @@ describe("DefaultSecretProviderResolutionService", () => {
     expect(metadata.ok).toBeTrue();
     if (metadata.ok) {
       expect((metadata.value as Record<string, unknown>).rawValue).toBeUndefined();
+      expect(metadata.value.rotation.versions[0]?.state).toBe("active");
+      expect(metadata.value.rotation.policy?.rotationMode).toBeDefined();
     }
     expect(bootstrapped.ok).toBeTrue();
     expect(localBackend.resolveCalls).toHaveLength(1);

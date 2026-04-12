@@ -1,5 +1,9 @@
 import type { SecretKind, SecretReference, SecretReferenceMetadata, SecretScopeOwner } from "@domain/security/SecretDomain";
 import type { SecretServiceResult } from "../use-cases/SecretManagementServiceContracts";
+import type {
+  SecurityMaterialRotationPolicyMetadata,
+  SecurityMaterialRotationVersionContract,
+} from "@application/security/contracts/SecurityMaterialRotationContract";
 
 export const SecretProviderMaterialKinds = Object.freeze({
   providerCredential: "provider-credential",
@@ -83,6 +87,11 @@ export interface SecretProviderMaterialLifecycleTimestamps {
 export interface SecretProviderMaterialRotationMetadata {
   readonly status: SecretProviderMaterialRotationStatus;
   readonly currentVersionId?: string;
+  readonly previousVersionId?: string;
+  readonly pendingVersionId?: string;
+  readonly effectiveAsOf?: string;
+  readonly versions: ReadonlyArray<SecurityMaterialRotationVersionContract>;
+  readonly policy?: SecurityMaterialRotationPolicyMetadata;
 }
 
 export interface SecretProviderMaterialMetadata {

@@ -1,3 +1,8 @@
+import {
+  createSecurityMaterialRotationPolicyMetadata,
+  type SecurityMaterialRotationPolicyMetadata,
+} from "./SecurityMaterialRotationContract";
+
 export const SecurityMaterialHierarchyClasses = Object.freeze({
   serverRootMaterial: "server-root-material",
   tokenSigningKey: "token-signing-key",
@@ -82,6 +87,7 @@ export interface SecurityMaterialHierarchyLifecycleGovernance {
   readonly rotationMode: SecurityMaterialRotationMode;
   readonly revocationMode: SecurityMaterialRevocationMode;
   readonly requiresReEncryptionOnRotation: boolean;
+  readonly rotationPolicy?: SecurityMaterialRotationPolicyMetadata;
 }
 
 export interface SecurityMaterialHierarchyOwnership {
@@ -208,6 +214,9 @@ export function createSecurityMaterialKeyHierarchyContract(
       rotationMode: input.lifecycle.rotationMode,
       revocationMode: input.lifecycle.revocationMode,
       requiresReEncryptionOnRotation: input.lifecycle.requiresReEncryptionOnRotation,
+      rotationPolicy: input.lifecycle.rotationPolicy
+        ? createSecurityMaterialRotationPolicyMetadata(input.lifecycle.rotationPolicy)
+        : undefined,
     }),
   });
 }

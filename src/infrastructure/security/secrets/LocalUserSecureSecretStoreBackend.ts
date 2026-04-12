@@ -2,6 +2,13 @@ import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { SecretKinds, SecretScopes, type SecretReference, type SecretReferenceMetadata } from "@domain/security/SecretDomain";
 import {
+  SecurityMaterialRotationCutoverStrategies,
+  SecurityMaterialRotationPolicyModes,
+  SecurityMaterialRotationVersionStates,
+  type SecurityMaterialRotationPolicyMetadata,
+  type SecurityMaterialRotationVersionContract,
+} from "@application/security/contracts/SecurityMaterialRotationContract";
+import {
   SecretProviderMaterialBackendKinds,
   SecretProviderBootstrapOutcomes,
   SecretProviderMaterialRotationStatuses,
@@ -34,6 +41,16 @@ interface StoredLocalSecretMetadata {
   readonly metadata: SecretReferenceMetadata;
   readonly updatedAt: string;
   readonly currentVersionId: string;
+  readonly rotation?: StoredLocalSecretRotationMetadata;
+}
+
+interface StoredLocalSecretRotationMetadata {
+  readonly currentVersionId: string;
+  readonly previousVersionId?: string;
+  readonly pendingVersionId?: string;
+  readonly effectiveAsOf?: string;
+  readonly versions?: ReadonlyArray<Partial<SecurityMaterialRotationVersionContract>>;
+  readonly policy?: SecurityMaterialRotationPolicyMetadata;
 }
 
 export class LocalUserSecureSecretStoreBackend {
@@ -60,7 +77,7 @@ export class LocalUserSecureSecretStoreBackend {
       value: Object.freeze({
         providerId: input.selector.providerId,
         secretId: input.selector.secretId,
-        currentVersionId: metadata?.currentVersionId ?? toVersionId(input.selector.secretId, material),
+        currentVersionId: metadata?.rotation?.currentVersionId ?? metadata?.currentVersionId ?? toVersionId(input.selector.secretId, material),
         scope: input.selector.scope,
         materialKind: input.selector.materialKind,
         rawValue: material,
@@ -80,13 +97,15 @@ export class LocalUserSecureSecretStoreBackend {
       return createNotFoundResult(input.selector.secretId);
     }
 
-    const reference = await this.resolveReference(input.selector, material);
+    const storedMetadata = await this.readMetadata(input.selector);
+    const reference = await this.resolveReference(input.selector, material, storedMetadata);
     return {
       ok: true,
       value: toSecretProviderMaterialMetadata({
         selector: input.selector,
         reference,
         backendKind: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
+        rotation: storedMetadata?.rotation,
       }),
     };
   }
@@ -116,7 +135,8 @@ export class LocalUserSecureSecretStoreBackend {
 
     const existingMaterial = await this.dependencies.credentialStore.getSecret(toMaterialAccount(input.selector));
     if (existingMaterial) {
-      const reference = await this.resolveReference(input.selector, existingMaterial);
+      const storedMetadata = await this.readMetadata(input.selector);
+      const reference = await this.resolveReference(input.selector, existingMaterial, storedMetadata);
       return {
         ok: true,
         value: Object.freeze({
@@ -125,6 +145,7 @@ export class LocalUserSecureSecretStoreBackend {
             selector: input.selector,
             reference,
             backendKind: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
+            rotation: storedMetadata?.rotation,
           }),
         }),
       };
@@ -138,6 +159,23 @@ export class LocalUserSecureSecretStoreBackend {
       metadata: toReferenceMetadata(input.metadata),
       updatedAt,
       currentVersionId,
+      rotation: Object.freeze({
+        currentVersionId,
+        previousVersionId: undefined,
+        pendingVersionId: undefined,
+        effectiveAsOf: updatedAt,
+        versions: Object.freeze([
+          Object.freeze({
+            versionId: currentVersionId,
+            state: SecurityMaterialRotationVersionStates.active,
+            effectiveFrom: updatedAt,
+          }),
+        ]),
+        policy: Object.freeze({
+          rotationMode: SecurityMaterialRotationPolicyModes.manual,
+          cutoverStrategy: SecurityMaterialRotationCutoverStrategies.immediate,
+        }),
+      }),
     });
 
     await this.dependencies.credentialStore.setSecret(toMaterialAccount(input.selector), input.plaintext);
@@ -153,6 +191,7 @@ export class LocalUserSecureSecretStoreBackend {
         reference: toSecretProviderMaterialMetadata({
           selector: input.selector,
           backendKind: SecretProviderMaterialBackendKinds.localUserSecureSecretStore,
+          rotation: metadataRecord.rotation,
           reference: Object.freeze({
             secretId: input.selector.secretId,
             name: metadataRecord.name,
@@ -173,8 +212,8 @@ export class LocalUserSecureSecretStoreBackend {
   private async resolveReference(
     selector: ResolveSecretProviderMaterialInput["selector"],
     material: string,
+    metadata: StoredLocalSecretMetadata | undefined,
   ): Promise<SecretReference> {
-    const metadata = await this.readMetadata(selector);
     if (metadata) {
       return Object.freeze({
         secretId: selector.secretId,
@@ -235,6 +274,7 @@ export class LocalUserSecureSecretStoreBackend {
         metadata: toReferenceMetadata(parsed.metadata),
         updatedAt: parsed.updatedAt,
         currentVersionId: parsed.currentVersionId,
+        rotation: normalizeRotationMetadata(parsed.rotation, parsed.currentVersionId, parsed.updatedAt),
       });
     } catch {
       return undefined;
@@ -393,6 +433,11 @@ function normalizeTimestamp(value: string | undefined, clock: () => Date): strin
   return parsed.toISOString();
 }
 
+function normalizeOptional(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
 function normalizeError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -404,7 +449,20 @@ function toSecretProviderMaterialMetadata(input: {
   readonly selector: ResolveSecretProviderMaterialInput["selector"];
   readonly reference: SecretReference;
   readonly backendKind: typeof SecretProviderMaterialBackendKinds[keyof typeof SecretProviderMaterialBackendKinds];
+  readonly rotation?: StoredLocalSecretRotationMetadata;
 }): SecretProviderMaterialMetadata {
+  const currentVersionId = input.rotation?.currentVersionId ?? input.reference.currentVersionId;
+  const versions = input.rotation?.versions
+    ?? (currentVersionId
+      ? Object.freeze([
+        Object.freeze({
+          versionId: currentVersionId,
+          state: SecurityMaterialRotationVersionStates.active,
+          effectiveFrom: input.reference.updatedAt,
+        }),
+      ])
+      : Object.freeze([]));
+
   return Object.freeze({
     providerId: input.selector.providerId,
     secretId: input.selector.secretId,
@@ -420,7 +478,14 @@ function toSecretProviderMaterialMetadata(input: {
     }),
     rotation: Object.freeze({
       status: toRotationStatus(input.reference.state),
-      currentVersionId: input.reference.currentVersionId,
+      currentVersionId,
+      previousVersionId: input.rotation?.previousVersionId,
+      pendingVersionId: input.rotation?.pendingVersionId,
+      effectiveAsOf: input.rotation?.effectiveAsOf ?? input.reference.updatedAt,
+      versions,
+      policy: input.rotation?.policy ?? Object.freeze({
+        rotationMode: SecurityMaterialRotationPolicyModes.manual,
+      }),
     }),
     policyFlags: Object.freeze({
       metadataSafeForDiagnostics: true,
@@ -445,4 +510,83 @@ function toRotationStatus(
     return SecretProviderMaterialRotationStatuses.softDeleted;
   }
   return SecretProviderMaterialRotationStatuses.unknown;
+}
+
+function normalizeRotationMetadata(
+  rotation: unknown,
+  fallbackCurrentVersionId: string,
+  fallbackUpdatedAt: string,
+): StoredLocalSecretRotationMetadata {
+  const parsed = (rotation ?? {}) as Partial<StoredLocalSecretRotationMetadata>;
+  const currentVersionId = normalizeOptional(parsed.currentVersionId) ?? fallbackCurrentVersionId;
+  const versions = parsed.versions && parsed.versions.length > 0
+    ? normalizeRotationVersions(parsed.versions)
+    : Object.freeze([
+      Object.freeze({
+        versionId: currentVersionId,
+        state: SecurityMaterialRotationVersionStates.active,
+        effectiveFrom: fallbackUpdatedAt,
+      }),
+    ]);
+
+  return Object.freeze({
+    currentVersionId,
+    previousVersionId: normalizeOptional(parsed.previousVersionId),
+    pendingVersionId: normalizeOptional(parsed.pendingVersionId),
+    effectiveAsOf: normalizeOptional(parsed.effectiveAsOf) ?? fallbackUpdatedAt,
+    versions,
+    policy: normalizeRotationPolicyMetadata(parsed.policy),
+  });
+}
+
+function normalizeRotationVersions(
+  versions: ReadonlyArray<Partial<SecurityMaterialRotationVersionContract>>,
+): ReadonlyArray<SecurityMaterialRotationVersionContract> {
+  const normalized: SecurityMaterialRotationVersionContract[] = [];
+  for (const version of versions) {
+    const versionId = normalizeOptional(version.versionId);
+    const effectiveFrom = normalizeOptional(version.effectiveFrom);
+    if (!versionId || !effectiveFrom) {
+      continue;
+    }
+    const isKnownState = typeof version.state === "string"
+      && Object.values(SecurityMaterialRotationVersionStates).includes(version.state as typeof SecurityMaterialRotationVersionStates[keyof typeof SecurityMaterialRotationVersionStates]);
+    const state = isKnownState
+      ? version.state as typeof SecurityMaterialRotationVersionStates[keyof typeof SecurityMaterialRotationVersionStates]
+      : SecurityMaterialRotationVersionStates.previous;
+
+    normalized.push(Object.freeze({
+      versionId,
+      state,
+      effectiveFrom,
+      effectiveUntil: normalizeOptional(version.effectiveUntil),
+      predecessorVersionId: normalizeOptional(version.predecessorVersionId),
+      successorVersionId: normalizeOptional(version.successorVersionId),
+    }));
+  }
+
+  if (normalized.length === 0) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(normalized);
+}
+
+function normalizeRotationPolicyMetadata(policy: unknown): SecurityMaterialRotationPolicyMetadata | undefined {
+  if (!policy || typeof policy !== "object") {
+    return undefined;
+  }
+  const parsed = policy as Partial<SecurityMaterialRotationPolicyMetadata>;
+  if (!parsed.rotationMode || !Object.values(SecurityMaterialRotationPolicyModes).includes(parsed.rotationMode)) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    rotationMode: parsed.rotationMode,
+    cutoverStrategy: parsed.cutoverStrategy,
+    rotationIntervalDays: parsed.rotationIntervalDays,
+    pendingActivationWindowDays: parsed.pendingActivationWindowDays,
+    maxActiveOverlapMinutes: parsed.maxActiveOverlapMinutes,
+    lastRotatedAt: normalizeOptional(parsed.lastRotatedAt),
+    nextRotationDueAt: normalizeOptional(parsed.nextRotationDueAt),
+  });
 }

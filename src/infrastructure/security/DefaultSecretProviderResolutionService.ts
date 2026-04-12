@@ -29,6 +29,11 @@ import {
   type SecretProviderMaterialBootstrapInput,
 } from "@application/security/ports/SecretProviderPorts";
 import {
+  SecurityMaterialRotationCutoverStrategies,
+  SecurityMaterialRotationPolicyModes,
+  SecurityMaterialRotationVersionStates,
+} from "@application/security/contracts/SecurityMaterialRotationContract";
+import {
   DurableServerSecretStoreBackend,
   type DurableServerSecretStoreBackendDependencies,
 } from "@infrastructure/security/secrets/DurableServerSecretStoreBackend";
@@ -414,6 +419,19 @@ function toSecretProviderMaterialMetadata(input: {
     rotation: Object.freeze({
       status: toRotationStatus(input.reference.state),
       currentVersionId: input.reference.currentVersionId,
+      previousVersionId: undefined,
+      pendingVersionId: undefined,
+      effectiveAsOf: input.reference.updatedAt,
+      versions: input.reference.currentVersionId
+        ? Object.freeze([
+          Object.freeze({
+            versionId: input.reference.currentVersionId,
+            state: SecurityMaterialRotationVersionStates.active,
+            effectiveFrom: input.reference.updatedAt,
+          }),
+        ])
+        : Object.freeze([]),
+      policy: toRotationPolicy(input.selector.materialKind),
     }),
     policyFlags: Object.freeze({
       metadataSafeForDiagnostics: true,
@@ -445,4 +463,28 @@ function toRotationStatus(
     return SecretProviderMaterialRotationStatuses.softDeleted;
   }
   return SecretProviderMaterialRotationStatuses.unknown;
+}
+
+function toRotationPolicy(
+  materialKind: typeof SecretProviderMaterialKinds[keyof typeof SecretProviderMaterialKinds],
+) {
+  if (materialKind === SecretProviderMaterialKinds.encryptionMaterial) {
+    return Object.freeze({
+      rotationMode: SecurityMaterialRotationPolicyModes.scheduled,
+      cutoverStrategy: SecurityMaterialRotationCutoverStrategies.scheduledCutover,
+      rotationIntervalDays: 90,
+      maxActiveOverlapMinutes: 60,
+    });
+  }
+
+  if (materialKind === SecretProviderMaterialKinds.signingMaterial) {
+    return Object.freeze({
+      rotationMode: SecurityMaterialRotationPolicyModes.onCompromise,
+      cutoverStrategy: SecurityMaterialRotationCutoverStrategies.immediate,
+    });
+  }
+
+  return Object.freeze({
+    rotationMode: SecurityMaterialRotationPolicyModes.manual,
+  });
 }

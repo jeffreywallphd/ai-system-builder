@@ -26,11 +26,16 @@ describe("SecurityMaterialKeyHierarchyContract", () => {
         rotationMode: SecurityMaterialRotationModes.onCompromise,
         revocationMode: SecurityMaterialRevocationModes.required,
         requiresReEncryptionOnRotation: false,
+        rotationPolicy: Object.freeze({
+          rotationMode: "on-compromise",
+          cutoverStrategy: "immediate",
+        }),
       }),
     });
 
     expect(contract.hierarchyClass).toBe(SecurityMaterialHierarchyClasses.tokenSigningKey);
     expect(contract.ownership.ownerScope).toBe("server");
+    expect(contract.lifecycle.rotationPolicy?.rotationMode).toBe("on-compromise");
   });
 
   it("rejects hierarchy classes that do not allow the supplied category", () => {
