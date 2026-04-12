@@ -371,6 +371,11 @@ import {
   resolveAuthenticatedSessionFromRequest,
   type AuthenticatedSessionActorContext,
 } from "./middleware/session-authentication";
+import {
+  resolveWorkspaceContextFromRequest,
+  type ResolveWorkspaceContextOptions,
+  type ResolvedWorkspaceRequestContext,
+} from "./middleware/workspace-context";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 import {
   normalizeRequestContentType,
@@ -1082,20 +1087,14 @@ interface AuthenticatedRequestContext extends AuthenticatedSessionActorContext<
     readonly remotePeerType: TransportPeerType;
   }
 > {
-  readonly workspace?: {
-    readonly workspaceId: string;
-    readonly source: "query";
-  };
+  readonly workspace?: ResolvedWorkspaceRequestContext;
 }
 
 interface AuthenticatedWorkspaceRequestContext extends AuthenticatedRequestContext {
-  readonly workspace: {
-    readonly workspaceId: string;
-    readonly source: "query";
-  };
+  readonly workspace: ResolvedWorkspaceRequestContext;
 }
 
-interface RequireAuthenticatedWorkspaceSessionOptions {
+interface RequireAuthenticatedWorkspaceSessionOptions extends ResolveWorkspaceContextOptions {
   readonly sessionOptions?: {
     readonly minimumAssuranceLevel?: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
     readonly transportScenario?: TransportSecurityScenario;
@@ -1103,10 +1102,6 @@ interface RequireAuthenticatedWorkspaceSessionOptions {
     readonly transportRemotePeerType?: TransportPeerType;
     readonly nodeId?: string;
   };
-  readonly workspaceId?: string;
-  readonly workspaceQueryParam?: string;
-  readonly missingWorkspaceMessage: string;
-  readonly buildInvalidResponse(message: string): unknown;
 }
 
 interface AuthenticatedNodeTransportContext {
@@ -10091,24 +10086,18 @@ async function requireAuthenticatedWorkspaceSession(
     transportTrust,
     options.sessionOptions,
     async (context) => {
-      const searchParams = resolveRequestSearchParams(request.url);
-      const workspaceId = options.workspaceId
-        ?? normalizeOptionalString(searchParams.get(options.workspaceQueryParam ?? "workspaceId"));
-      if (!workspaceId) {
-        const invalid = options.buildInvalidResponse(options.missingWorkspaceMessage);
-        writeJson(response, 400, invalid);
-        logResponse(logger, requestId, request, 400, Object.freeze({
+      const workspaceResolution = resolveWorkspaceContextFromRequest(request, options);
+      if (!workspaceResolution.ok) {
+        writeJson(response, workspaceResolution.statusCode, workspaceResolution.body);
+        logResponse(logger, requestId, request, workspaceResolution.statusCode, Object.freeze({
           actorUserIdentityId: context.actor.userIdentityId,
-        }), invalid);
+        }), workspaceResolution.body);
         return;
       }
 
       await onAuthenticated(Object.freeze({
         ...context,
-        workspace: Object.freeze({
-          workspaceId,
-          source: "query",
-        }),
+        workspace: workspaceResolution.workspace,
       }));
     },
   );
