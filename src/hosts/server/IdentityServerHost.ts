@@ -44,7 +44,6 @@ import { WorkspaceInvitationBackendApi } from "@infrastructure/api/workspaces/Wo
 import { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { AuthorizationManagementBackendApi } from "@infrastructure/api/authorization/AuthorizationManagementBackendApi";
 import { NodeTrustBackendApi } from "@infrastructure/api/nodes/NodeTrustBackendApi";
-import { ExecutionNodeManagementBackendApi } from "@infrastructure/api/nodes/ExecutionNodeManagementBackendApi";
 import { CertificateOperationsBackendApi } from "@infrastructure/api/security/CertificateOperationsBackendApi";
 import { SecretMetadataBackendApi } from "@infrastructure/api/security/SecretMetadataBackendApi";
 import { StorageManagementBackendApi } from "@infrastructure/api/storage/StorageManagementBackendApi";
@@ -53,16 +52,11 @@ import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManag
 import { ImageAssetManagementBackendApi } from "@infrastructure/api/image-assets/ImageAssetManagementBackendApi";
 import { ImageAssetManagementObservability } from "@infrastructure/api/image-assets/ImageAssetManagementObservability";
 import { GeneratedResultManagementBackendApi } from "@infrastructure/api/generated-results/GeneratedResultManagementBackendApi";
-import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi";
-import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
-import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/AuthoritativeRunMutationBackendApi";
-import { AuthoritativeRunExecutionUpdateBackendApi } from "@infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import { DeploymentPolicyReadBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyReadBackendApi";
 import { DeploymentPolicyWriteBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyWriteBackendApi";
 import { PlatformDeploymentPolicyAdministrationObservabilityPort } from "@infrastructure/api/deployment/PlatformDeploymentPolicyAdministrationObservabilityPort";
 import { PlatformDeploymentPolicyGovernanceEventSink } from "@infrastructure/api/deployment/PlatformDeploymentPolicyGovernanceEventSink";
 import { WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService } from "@infrastructure/api/deployment/WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService";
-import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
 import { StorageSyncDeploymentAvailabilities } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
@@ -158,31 +152,14 @@ import { RevokeIssuedCertificateUseCase } from "@application/security/use-cases/
 import { RenewIssuedCertificateUseCase } from "@application/security/use-cases/RenewIssuedCertificateUseCase";
 import { TrustMaterialKinds } from "@domain/security/CertificateAuthorityDomain";
 import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
-import { ValidateRunSubmissionUseCase } from "@application/runs/use-cases/ValidateRunSubmissionUseCase";
-import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
-import { SubmitImageRunUseCase } from "@application/runs/use-cases/SubmitImageRunUseCase";
-import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
-import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
-import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
-import { ListStaleSchedulingReservationsUseCase } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
-import { IngestRunExecutionUpdateUseCase } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
-import { ReevaluateDeferredSchedulingRunsUseCase } from "@application/runs/use-cases/ReevaluateDeferredSchedulingRunsUseCase";
-import { ReleaseStaleSchedulingReservationUseCase } from "@application/runs/use-cases/ReleaseStaleSchedulingReservationUseCase";
-import { RequestAuthoritativeRunCancellationUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
-import { RequestAuthoritativeRunRetryUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
-import { RecoverRunOrchestrationStartupStateUseCase } from "@application/runs/use-cases/RecoverRunOrchestrationStartupStateUseCase";
 import { ReadDeploymentPolicyAdministrationUseCase } from "@application/policy-administration/use-cases/ReadDeploymentPolicyAdministrationUseCase";
 import { DeploymentPolicyAdministrationAuthoritativeUpdateUseCase } from "@application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
-import { GetImageManipulationExecutionReadinessUseCase } from "@application/image-workflows/GetImageManipulationExecutionReadinessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
 import { UpdateAuthorizationVisibilityUseCase } from "@application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
 import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "@application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
 import { ListAuthorizationEffectiveAccessUseCase } from "@application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
-import { ImageRunSubmissionReadinessValidationService } from "@application/image-workflows/ImageRunSubmissionReadinessValidationService";
-import { ImageRunNodeEligibilityEvaluationService } from "@application/nodes/use-cases/ImageRunNodeEligibilityEvaluationService";
-import { ImageRunExecutionNodeSelectionService } from "@application/nodes/use-cases/ImageRunExecutionNodeSelectionService";
 import {
   IssueWorkspaceInvitationUseCase,
   type WorkspaceInvitationIssuanceClock,
@@ -213,13 +190,10 @@ import { GetNodeInventoryDetailUseCase } from "@application/nodes/use-cases/GetN
 import { GetNodeEnrollmentDetailUseCase } from "@application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
 import { ListNodeInventoryUseCase } from "@application/nodes/use-cases/ListNodeInventoryUseCase";
 import { ListTrustedNodeInventoryUseCase } from "@application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
-import { ListExecutionNodesUseCase } from "@application/nodes/use-cases/ListExecutionNodesUseCase";
-import { GetExecutionNodeDetailUseCase } from "@application/nodes/use-cases/GetExecutionNodeDetailUseCase";
 import { RecordNodeHeartbeatUseCase } from "@application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RecordNodeOperationalUpdateUseCase } from "@application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "@application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "@application/nodes/use-cases/RejectNodeEnrollmentUseCase";
-import { SetExecutionNodeAvailabilityOverrideUseCase } from "@application/nodes/use-cases/SetExecutionNodeAvailabilityOverrideUseCase";
 import { ResolveApprovedNodeCertificateEligibilityUseCase } from "@application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase";
 import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "@application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
 import { ResolveNodeMutualTlsTransportIdentityUseCase } from "@application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase";
@@ -244,6 +218,10 @@ import { composeServerStorageAssetCompositionModule } from "./composition/Server
 import { composeServerImageMediaCompositionModule } from "./composition/ServerImageMediaCompositionModule";
 import { composeServerGeneratedResultCompositionModule } from "./composition/ServerGeneratedResultCompositionModule";
 import { composeServerAuditDiagnosticsPlatformCompositionModule } from "./composition/ServerAuditDiagnosticsPlatformCompositionModule";
+import { composeServerExecutionNodeManagementCompositionModule } from "./composition/ServerExecutionNodeManagementCompositionModule";
+import { composeServerRunSchedulingCompositionModule } from "./composition/ServerRunSchedulingCompositionModule";
+import { composeServerRunOrchestrationCompositionModule } from "./composition/ServerRunOrchestrationCompositionModule";
+import { composeServerOrchestrationRecoveryCompositionModule } from "./composition/ServerOrchestrationRecoveryCompositionModule";
 import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   evaluateTransportConnectionTrust,
@@ -453,14 +431,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     const secretMetadataBackendApi = secretComposition.secretMetadataBackendApi;
     const nodeTrustComposition = composeServerNodeTrustCompositionModule({
       nodeTrustRepository,
-      executionNodeRepository,
       nodeTrustAuditRecorder,
       authoritativeAuditRecorder,
       runtimeTrustMaterialResolver: certificateComposition.runtimeTrustMaterialResolver,
-      workspaceClock,
     });
     const nodeTrustBackendApi = nodeTrustComposition.nodeTrustBackendApi;
-    const executionNodeManagementBackendApi = nodeTrustComposition.executionNodeManagementBackendApi;
+    const executionNodeManagementComposition = composeServerExecutionNodeManagementCompositionModule({
+      executionNodeRepository,
+      executionNodeManagementAuditSink: auditDiagnosticsPlatformComposition.executionNodeManagementAuditSink,
+      workspaceClock,
+    });
+    const executionNodeManagementBackendApi = executionNodeManagementComposition.executionNodeManagementBackendApi;
   const storageAssetComposition = composeServerStorageAssetCompositionModule({
     databasePath: options.databasePath,
     env,
@@ -484,80 +465,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceAwareStoragePolicyEvaluationAdapter,
   });
   const imageAssetManagementBackendApi = imageMediaComposition.imageAssetManagementBackendApi;
-  const authoritativeRunSubmissionAuditSink = auditDiagnosticsPlatformComposition.runSubmissionAuditSink;
-  const executionNodeManagementAuditSink = auditDiagnosticsPlatformComposition.executionNodeManagementAuditSink;
-  const validateRunSubmissionUseCase = new ValidateRunSubmissionUseCase({
-    workspaceRepository,
+  const runSchedulingComposition = composeServerRunSchedulingCompositionModule({
+    persistentPlatformServices,
     authorizationDecisionEvaluator,
-    targetResolver: new AssetBackedRunSubmissionTargetResolver(persistentPlatformServices.assetRepository),
-    storageInstanceRepository: persistentPlatformServices.storageInstanceRepository,
-    storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
-    encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
-    deploymentSchedulingPolicyEvaluationPort: options.deploymentPolicyBootstrap?.evaluationService,
-    deploymentPolicyContextResolver: options.deploymentPolicyBootstrap?.contextResolver,
-    auditSink: authoritativeRunSubmissionAuditSink,
-    clock: workspaceClock,
-  });
-  const createAuthoritativeRunUseCase = new CreateAuthoritativeRunUseCase({
-    runRepository: persistentPlatformServices.platformPersistenceRepository,
-    queueRepository: persistentPlatformServices.platformPersistenceRepository,
-    orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-    auditSink: authoritativeRunSubmissionAuditSink,
-    transactionManager: persistentPlatformServices.platformPersistenceRepository,
-  });
-  const imageRunNodeEligibilityEvaluationService = new ImageRunNodeEligibilityEvaluationService({
-    nodeRepository: executionNodeRepository,
-  });
-  const imageRunExecutionNodeSelectionService = new ImageRunExecutionNodeSelectionService({
-    eligibilityService: imageRunNodeEligibilityEvaluationService,
-    auditSink: executionNodeManagementAuditSink,
-  });
-  const getImageManipulationExecutionReadinessUseCase = new GetImageManipulationExecutionReadinessUseCase({
-    capabilityPort: options.runExecutionAdapters?.capabilityProbePort,
-    nodeSelectionService: imageRunExecutionNodeSelectionService,
-    now: () => workspaceClock.now(),
-  });
-  const imageRunSubmissionReadinessValidationService = new ImageRunSubmissionReadinessValidationService({
-    workflowRepository: persistentPlatformServices.imageWorkflowSystemRepository,
-    systemRepository: persistentPlatformServices.imageWorkflowSystemRepository,
-    assetRepository: persistentPlatformServices.assetRepository,
-    authorizationDecisionEvaluator,
-    executionReadinessUseCase: getImageManipulationExecutionReadinessUseCase,
-    now: () => workspaceClock.now(),
-  });
-  const submitImageRunUseCase = new SubmitImageRunUseCase({
-    validateRunSubmissionUseCase,
-    createAuthoritativeRunUseCase,
-    imageRunReadinessResolver: imageRunSubmissionReadinessValidationService,
-    now: () => workspaceClock.now(),
-  });
-  const runOrchestrationObservability = auditDiagnosticsPlatformComposition.runOrchestrationObservability;
-  const authoritativeRunSubmissionBackendApi = new AuthoritativeRunSubmissionBackendApi({
-    submitImageRunUseCase,
-    observability: runOrchestrationObservability,
-  });
-  const authoritativeRunQueryBackendApi = new AuthoritativeRunQueryBackendApi({
-    listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(
-      persistentPlatformServices.platformPersistenceRepository,
-    ),
-    listAuthoritativeRunQueueStatusUseCase: new ListAuthoritativeRunQueueStatusUseCase({
-      runRepository: persistentPlatformServices.platformPersistenceRepository,
-      queueRepository: persistentPlatformServices.platformPersistenceRepository,
-      now: () => workspaceClock.now(),
-    }),
-    listStaleSchedulingReservationsUseCase: new ListStaleSchedulingReservationsUseCase({
-      queueRepository: persistentPlatformServices.platformPersistenceRepository,
-      now: () => workspaceClock.now(),
-    }),
-    getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(
-      persistentPlatformServices.platformPersistenceRepository,
-    ),
-    getImageManipulationExecutionReadinessUseCase,
-    runRepository: persistentPlatformServices.platformPersistenceRepository,
-    auditEventRepository: persistentPlatformServices.platformPersistenceRepository,
-    authorizationDecisionEvaluator,
-    observability: runOrchestrationObservability,
-    now: () => workspaceClock.now(),
+    workspaceClock,
+    executionNodeManagementAuditSink: auditDiagnosticsPlatformComposition.executionNodeManagementAuditSink,
+    nodeEligibilityEvaluationService: executionNodeManagementComposition.nodeEligibilityEvaluationService,
+    runExecutionAdapters: options.runExecutionAdapters,
   });
   const deploymentPolicyComposition = composeServerDeploymentPolicyCompositionModule({
     persistentPlatformServices,
@@ -579,94 +493,34 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
   const generatedResultManagementBackendApi = generatedResultComposition.generatedResultManagementBackendApi;
   const runCollectedResultPersistencePort = generatedResultComposition.runCollectedResultPersistencePort;
-  const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
-    requestAuthoritativeRunCancellationUseCase: new RequestAuthoritativeRunCancellationUseCase({
-      runRepository: persistentPlatformServices.platformPersistenceRepository,
-      queueRepository: persistentPlatformServices.platformPersistenceRepository,
-      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-      cancellationSignalPort: options.runExecutionAdapters?.cancellationSignalPort,
-      resultCollectionPersistencePort: runCollectedResultPersistencePort,
-      transactionManager: persistentPlatformServices.platformPersistenceRepository,
-      authoritativeAuditRecorder: authoritativeAuditRecorder,
-      now: () => workspaceClock.now(),
-    }),
-    requestAuthoritativeRunRetryUseCase: new RequestAuthoritativeRunRetryUseCase({
-      runRepository: persistentPlatformServices.platformPersistenceRepository,
-      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-      validateRunSubmissionUseCase,
-      createAuthoritativeRunUseCase,
-      authoritativeAuditRecorder: authoritativeAuditRecorder,
-      now: () => workspaceClock.now(),
-    }),
-    releaseStaleSchedulingReservationUseCase: new ReleaseStaleSchedulingReservationUseCase({
-      queueRepository: persistentPlatformServices.platformPersistenceRepository,
-      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-      authoritativeAuditRecorder: authoritativeAuditRecorder,
-      now: () => workspaceClock.now(),
-    }),
-    reevaluateDeferredSchedulingRunsUseCase: new ReevaluateDeferredSchedulingRunsUseCase({
-      queueRepository: persistentPlatformServices.platformPersistenceRepository,
-      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-      authoritativeAuditRecorder: authoritativeAuditRecorder,
-      now: () => workspaceClock.now(),
-    }),
+  const runOrchestrationComposition = composeServerRunOrchestrationCompositionModule({
+    persistentPlatformServices,
     authorizationDecisionEvaluator,
-    observability: runOrchestrationObservability,
-    now: () => workspaceClock.now(),
-  });
-  const authoritativeRunExecutionUpdateBackendApi = new AuthoritativeRunExecutionUpdateBackendApi({
-    ingestRunExecutionUpdateUseCase: new IngestRunExecutionUpdateUseCase({
-      runRepository: persistentPlatformServices.platformPersistenceRepository,
-      queueRepository: persistentPlatformServices.platformPersistenceRepository,
-      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-      resultCollectionPersistencePort: runCollectedResultPersistencePort,
-      authoritativeAuditRecorder: authoritativeAuditRecorder,
-      transactionManager: persistentPlatformServices.platformPersistenceRepository,
-      now: () => workspaceClock.now(),
-    }),
-    observability: runOrchestrationObservability,
-  });
-  const runStartupRecovery = await runStartupStepSpan({
-    tracer: startupTracer,
-    parentSpan: startupRootSpan,
-    name: "orchestration-recovery",
-    run: async () => new RecoverRunOrchestrationStartupStateUseCase({
-      runRepository: persistentPlatformServices.platformPersistenceRepository,
-      queueRepository: persistentPlatformServices.platformPersistenceRepository,
-      placementHoldRepository: persistentPlatformServices.platformPersistenceRepository,
-      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-      resultCollectionPersistencePort: runCollectedResultPersistencePort,
-      transactionManager: persistentPlatformServices.platformPersistenceRepository,
-      now: () => workspaceClock.now(),
-    }).execute(),
-  });
-  if (runStartupRecovery.summary.appliedCount > 0 || runStartupRecovery.summary.manualFollowUpCount > 0) {
-    options.logger?.info({
-      event: "run.orchestration-recovery.startup",
-      requestId: "server-startup",
-      details: Object.freeze({
-        asOf: runStartupRecovery.asOf,
-        appliedCount: runStartupRecovery.summary.appliedCount,
-        manualFollowUpCount: runStartupRecovery.summary.manualFollowUpCount,
-      }),
-    });
-  }
-  const auditStartupReconciliation = await auditDiagnosticsPlatformComposition.reconcileAuditLedgerStartupState({
     workspaceClock,
+    authoritativeAuditRecorder,
+    runSubmissionAuditSink: auditDiagnosticsPlatformComposition.runSubmissionAuditSink,
+    runOrchestrationObservability: auditDiagnosticsPlatformComposition.runOrchestrationObservability,
+    scheduling: runSchedulingComposition,
+    workspaceAwareStoragePolicyEvaluationAdapter,
+    assetEncryptionPolicyEvaluationService,
+    runCollectedResultPersistencePort,
+    deploymentPolicyBootstrap: options.deploymentPolicyBootstrap,
+    runExecutionAdapters: options.runExecutionAdapters,
   });
-  if (auditStartupReconciliation.manualFollowUpCount > 0 || auditStartupReconciliation.repairedCount > 0) {
-    options.logger?.warn({
-      event: "audit-ledger.write-reconciliation.startup",
-      requestId: "server-startup",
-      details: Object.freeze({
-        checkedAt: auditStartupReconciliation.checkedAt,
-        supported: auditStartupReconciliation.supported,
-        repairedCount: auditStartupReconciliation.repairedCount,
-        manualFollowUpCount: auditStartupReconciliation.manualFollowUpCount,
-        issueCount: auditStartupReconciliation.issueCount,
-      }),
-    });
-  }
+  const authoritativeRunSubmissionBackendApi = runOrchestrationComposition.authoritativeRunSubmissionBackendApi;
+  const authoritativeRunQueryBackendApi = runOrchestrationComposition.authoritativeRunQueryBackendApi;
+  const authoritativeRunMutationBackendApi = runOrchestrationComposition.authoritativeRunMutationBackendApi;
+  const authoritativeRunExecutionUpdateBackendApi = runOrchestrationComposition.authoritativeRunExecutionUpdateBackendApi;
+
+  await composeServerOrchestrationRecoveryCompositionModule({
+    startupTracer,
+    startupRootSpan,
+    persistentPlatformServices,
+    runCollectedResultPersistencePort,
+    workspaceClock,
+    reconcileAuditLedgerStartupState: auditDiagnosticsPlatformComposition.reconcileAuditLedgerStartupState,
+    logger: options.logger,
+  });
   const tlsComposition = await composeServerTlsMaterialCompositionModule({
     env,
     logger: options.logger,

@@ -118,6 +118,22 @@ Story 2.2.3 extracts security-heavy startup composition from inline `IdentitySer
 
 This extraction preserves fail-closed startup behavior while making secret, trust, certificate, and TLS composition dependencies explicit and bounded for follow-on hardening stories.
 
+## Story 2.2.6 Orchestration/Scheduling/Execution-Node Composition Extraction
+
+Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation, and execution-node management composition from inline `IdentityServerHost.ts` startup assembly into:
+
+- `src/hosts/server/composition/ServerExecutionNodeManagementCompositionModule.ts`
+- `src/hosts/server/composition/ServerRunSchedulingCompositionModule.ts`
+- `src/hosts/server/composition/ServerRunOrchestrationCompositionModule.ts`
+- `src/hosts/server/composition/ServerOrchestrationRecoveryCompositionModule.ts`
+- regression coverage:
+  - `src/hosts/server/tests/ServerExecutionNodeManagementCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerRunSchedulingCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerRunOrchestrationCompositionModule.test.ts`
+  - `src/hosts/server/tests/ServerOrchestrationRecoveryCompositionModule.test.ts`
+
+This extraction keeps startup recovery ordering and scheduling behavior unchanged while reducing control-plane wiring concentration in `IdentityServerHost.ts`.
+
 ## Story 2.1.3 Staged Bootstrap Pipeline and Startup State Model
 
 Story 2.1.3 adds an explicit staged bootstrap model and typed startup/readiness states for the authoritative control-plane startup boundary:
