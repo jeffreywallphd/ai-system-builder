@@ -10,6 +10,7 @@ related_code_paths:
   - docs/context/governance/documentation-quality-standard.ai.md
   - docs/contributors/docs-foundation-validation.ai.md
   - docs/contributors/docs-placement-guide.ai.md
+  - docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md
   - docs/contributors/router-overview-writing-standard.ai.md
   - docs/context/templates/README.ai.md
   - dev/scripts/validate-docs-foundation.cjs
@@ -140,6 +141,7 @@ npm run validate:ci
   - `docs/context/documentation-supersession-and-redirect-conventions.ai.md`
   - `docs/context/documentation-segmentation-seed-guidance.ai.md`
 - Failure-code and validator reference: `docs/contributors/docs-foundation-validation.ai.md`.
+- Step-by-step local run/fix workflow: `docs/contributors/documentation-quality-checks-run-and-fix-guide.ai.md`.
 
 ## Interpreting Common Failure Categories
 

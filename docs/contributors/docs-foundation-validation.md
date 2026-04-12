@@ -195,6 +195,7 @@ Use this order to fix issues quickly without scanning policy docs first:
 - Start with `critical` issues.
 - Use the `file:` line to open the failing artifact immediately.
 - Use `Guides:` links only when message context is insufficient.
+- For a full local run/fix loop and category triage workflow, use `docs/contributors/documentation-quality-checks-run-and-fix-guide.md`.
 
 ## Failure Output
 
