@@ -139,3 +139,23 @@ The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/
 - Architectural effect:
   - callers stay on `ISecretProviderMaterialResolutionPort`
   - local secure storage remains an adapter concern rather than a caller-level branching concern
+
+## Story 3.2.4 Scoped secret retrieval use cases
+
+- Adds scoped provider retrieval use-case flows in:
+  - `src/application/security/use-cases/ScopedSecretProviderMaterialRetrievalUseCase.ts`
+- Scope-explicit reads are now available for:
+  - server scope
+  - workspace scope
+  - user scope
+- Permission/context posture:
+  - each flow checks caller context against requested scope before provider-port access
+  - plaintext retrieval requires `retrieve-plaintext`
+  - metadata/existence checks require `read-metadata`
+  - out-of-scope access is denied before storage/provider resolution runs
+- Runtime integration update:
+  - `SystemSecretBootstrapService` now uses the scoped retrieval use case for metadata existence and runtime validation checks
+  - this reduces direct provider-port read bypasses in bootstrap validation paths
+- Secret exposure minimization:
+  - metadata/existence remain available without plaintext retrieval permissions
+  - plaintext resolution remains isolated to explicit runtime retrieval flows
