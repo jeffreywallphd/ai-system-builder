@@ -68,6 +68,23 @@ Story 7.3.1 adds a dedicated node-to-server HTTP transport adapter path for cert
   - require node mTLS trust validation when transport trust enforcement is enabled;
   - keep transport-authenticated node identity authoritative over payload-claimed identities.
 
+## Story 1.2.4 node route authentication utilities for HTTP transport modularization
+
+Story 1.2.4 extracts node-route authentication and trust-context shaping into shared HTTP transport middleware utilities so node-originated route handlers can rely on one normalized node-auth context path instead of embedding low-level checks.
+
+### Canonical files
+
+- `src/infrastructure/transport/http-server/identity/middleware/node-route-authentication.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/tests/NodeRouteAuthenticationMiddleware.test.ts`
+
+### Modularized route-auth behavior
+
+- required node-id validation for node-originated route scopes is centralized (`resolveRequiredNodeRouteNodeId(...)`);
+- session-backed node principal authorization is centralized and reusable (`authorizeSessionNodeRoutePrincipal(...)`);
+- mTLS node trust result mapping into normalized route context is centralized (`resolveMutualTlsNodeRouteTransportContext(...)`);
+- route handlers continue to consume `requireAuthenticatedNodeTransport(...)`, but low-level node auth/trust derivation now lives in dedicated shared middleware utilities.
+
 ## Story 7.3.3 policy-gated node-to-node secure communication seam
 
 Story 7.3.3 adds a dedicated node-peer channel seam so direct node-to-node communication is explicit, authenticated, and disabled by default unless policy rules allow a specific operation class.
