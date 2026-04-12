@@ -62,10 +62,26 @@ export interface AuthoritativeServerSecurityStageInput extends AuthoritativeServ
   readonly hostConfiguration: IdentityServerHostOptions;
 }
 
+export const AuthoritativeServerReadinessCheckStates = Object.freeze({
+  ready: "ready",
+  degraded: "degraded",
+  failed: "failed",
+});
+
+export type AuthoritativeServerReadinessCheckState =
+  typeof AuthoritativeServerReadinessCheckStates[keyof typeof AuthoritativeServerReadinessCheckStates];
+
+export interface AuthoritativeServerReadinessCheck {
+  readonly checkId: string;
+  readonly subsystem: string;
+  readonly state: AuthoritativeServerReadinessCheckState;
+  readonly summary: string;
+  readonly blocking: boolean;
+  readonly details?: Readonly<Record<string, string>>;
+}
+
 export interface AuthoritativeServerSecurityStageOutput {
-  readonly transportTrustReady: boolean;
-  readonly certificateAuthorityReady: boolean;
-  readonly requiredSecretsValidated: boolean;
+  readonly checks: ReadonlyArray<AuthoritativeServerReadinessCheck>;
 }
 
 export interface AuthoritativeServerPersistenceStageInput extends AuthoritativeServerConfigStageOutput {
@@ -145,7 +161,7 @@ export const AuthoritativeServerBootstrapStageContracts = Object.freeze({
     description: "Establish transport trust, certificate authority, and required secret baseline.",
     boundary: Object.freeze({
       consumes: Object.freeze(["deploymentProfile", "environment", "enabledCapabilities", "runtimeMetadata", "startupTracer", "hostConfiguration"]),
-      produces: Object.freeze(["transportTrustReady", "certificateAuthorityReady", "requiredSecretsValidated"]),
+      produces: Object.freeze(["checks"]),
     }),
   } satisfies BootstrapStageContract<AuthoritativeServerSecurityStageInput, AuthoritativeServerSecurityStageOutput>),
   [AuthoritativeServerBootstrapStageIds.persistence]: Object.freeze({

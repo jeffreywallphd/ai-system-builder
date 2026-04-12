@@ -148,6 +148,14 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
     - `authoritative-server.startup.baseline-regression.detected`
   - warning event payload includes baseline and current duration, regression delta, threshold, and sample counts
   - baseline comparison and warning emission remain non-blocking for startup completion
+- Story 2.3.2 adds typed readiness verification and startup result reporting:
+  - security-stage output now emits typed readiness checks (transport-trust material, certificate-authority material, required-secrets validation) instead of opaque booleans.
+  - readiness-verification stage now emits structured checks for persistence runtime readiness, migration/bootstrap availability, composition completeness (service/route coverage), orchestration-recovery prerequisites, and transport binding validity.
+  - startup summary now includes `startupResult` with explicit `outcome` and structured readiness report (`state`, check list, and check-count aggregates).
+  - startup can now distinguish:
+    - startup failure (`outcome=failed`)
+    - successful startup with full readiness (`outcome=succeeded`, readiness `ready`)
+    - successful startup with degraded readiness (`outcome=succeeded`, readiness `degraded`)
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `subsystem-composition`
   - `security-material-resolution`

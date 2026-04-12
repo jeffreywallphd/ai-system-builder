@@ -32,7 +32,11 @@ import type { AuthoritativePersistentPlatformServices } from "@infrastructure/pe
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
 import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
 import { createStartupTracer, type StartupSpanLogger } from "../../bootstrap/startupTracer";
-import type { AuthoritativeServerSecurityStageOutput } from "../AuthoritativeServerBootstrapStageContracts";
+import {
+  AuthoritativeServerReadinessCheckStates,
+  type AuthoritativeServerSecurityStageOutput,
+} from "../AuthoritativeServerBootstrapStageContracts";
+import { createAuthoritativeServerSecurityBootstrapStage } from "../AuthoritativeServerSecurityBootstrapStage";
 
 class CapturingStartupSpanLogger implements StartupSpanLogger {
   public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
@@ -270,11 +274,12 @@ describe("AuthoritativeServerCompositionRoot", () => {
     });
 
     const runtime = await root.compose(boot);
-    expect(observedSecurity).toEqual({
-      transportTrustReady: true,
-      certificateAuthorityReady: true,
-      requiredSecretsValidated: true,
-    });
+    expect(observedSecurity?.checks.map((check) => check.checkId)).toEqual([
+      "security.transport-trust-material",
+      "security.certificate-authority-material",
+      "security.required-secrets",
+    ]);
+    expect(observedSecurity?.checks.every((check) => check.state === "ready")).toBeTrue();
     await runtime.stop();
   });
 
@@ -996,7 +1001,60 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(summary?.durationMs).toBeTypeOf("number");
     expect((summary?.pipeline as Record<string, unknown> | undefined)?.stageCount).toBe(6);
     expect((summary?.authoritativeStages as Record<string, unknown> | undefined)?.stageCount).toBe(7);
+    const startupResult = summary?.startupResult as Record<string, unknown> | undefined;
+    expect(startupResult?.outcome).toBe("succeeded");
+    const readiness = startupResult?.readiness as Record<string, unknown> | undefined;
+    expect(readiness?.state).toBe("ready");
+    expect(readiness?.totalCheckCount).toBeGreaterThanOrEqual(7);
     expect(hostLogger.errorEvents).toHaveLength(0);
+  });
+
+  it("reports degraded readiness when non-blocking readiness checks degrade during startup", async () => {
+    const hostLogger = new CapturingHostLogger();
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+        logger: hostLogger,
+      },
+      startHost: async () => ({
+        port: 5903,
+        address: "127.0.0.1:5903",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        createSecurityStage: () => createAuthoritativeServerSecurityBootstrapStage({
+          validateRequiredSecrets: () => false,
+        }),
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-startup-summary-degraded-readiness-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    const runtime = await root.compose(boot);
+    await runtime.stop();
+
+    const summary = hostLogger.infoEvents.find((event) => event.event === "authoritative-server.startup.summary");
+    expect(summary).toBeDefined();
+    expect(summary?.outcome).toBe("succeeded");
+    const startupResult = summary?.startupResult as Record<string, unknown> | undefined;
+    const readiness = startupResult?.readiness as Record<string, unknown> | undefined;
+    expect(readiness?.state).toBe("degraded");
+    expect(readiness?.degradedCheckCount).toBeGreaterThanOrEqual(1);
+    const checks = readiness?.checks as ReadonlyArray<{
+      readonly checkId: string;
+      readonly state: string;
+    }> | undefined;
+    expect(checks?.some((check) => (
+      check.checkId === "security.required-secrets"
+      && check.state === AuthoritativeServerReadinessCheckStates.degraded
+    ))).toBeTrue();
   });
 
   it("emits warning logs when startup baseline regression exceeds threshold", async () => {
@@ -1084,6 +1142,10 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(summary?.startupCorrelationId).toBe(summary?.traceId);
     const pipeline = summary?.pipeline as Record<string, unknown> | undefined;
     expect(pipeline?.failedStageCount).toBe(1);
+    const startupResult = summary?.startupResult as Record<string, unknown> | undefined;
+    expect(startupResult?.outcome).toBe("failed");
+    const readiness = startupResult?.readiness as Record<string, unknown> | undefined;
+    expect(readiness?.state).toBe("degraded");
     expect(summary?.startupFailure).toEqual({
       name: "Error",
       message: "security-stage-failed",

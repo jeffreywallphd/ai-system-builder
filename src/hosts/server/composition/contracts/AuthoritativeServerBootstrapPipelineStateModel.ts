@@ -244,6 +244,9 @@ export function deriveAuthoritativeServerBootstrapReadiness(
   if (stages.some((stage) => stage.executionState === AuthoritativeServerBootstrapStageExecutionStates.failed)) {
     return AuthoritativeServerBootstrapReadinessStates.degraded;
   }
+  if (stages.some((stage) => stage.readinessState === AuthoritativeServerBootstrapReadinessStates.degraded)) {
+    return AuthoritativeServerBootstrapReadinessStates.degraded;
+  }
   const transportStartupStage = stages.find(
     (stage) => stage.stageId === AuthoritativeServerBootstrapPipelineStageIds.transportStartup,
   );

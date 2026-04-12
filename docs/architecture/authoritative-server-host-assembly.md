@@ -222,6 +222,15 @@ Story 1.4.3 adds startup regression alerts against those baselines:
 - warning payload includes baseline duration, current duration, regression delta, threshold, and baseline sample counts
 - baseline comparison and warning publication are best-effort and never block startup completion
 
+Story 2.3.2 adds typed readiness verification and startup result reporting:
+- security-stage output now emits typed readiness checks (transport-trust material, certificate-authority material, required-secrets validation) instead of opaque booleans.
+- readiness-verification now emits structured checks for persistence runtime readiness, migration/bootstrap availability, composition completeness (service/route coverage), orchestration-recovery prerequisites, and transport binding validity.
+- startup summary now includes `startupResult` with explicit `outcome` and structured readiness report (`state`, check list, and check-count aggregates).
+- startup now distinguishes:
+  - startup failure (`outcome=failed`)
+  - successful startup with full readiness (`outcome=succeeded`, readiness `ready`)
+  - successful startup with degraded readiness (`outcome=succeeded`, readiness `degraded`)
+
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) aligned to logical bootstrap stages plus nested diagnostics:
 - `subsystem-composition`
 - `security-material-resolution`

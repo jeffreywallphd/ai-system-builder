@@ -1,6 +1,8 @@
 import {
   AuthoritativeServerBootstrapStageIds,
+  AuthoritativeServerReadinessCheckStates,
   type AuthoritativeServerSecurityBootstrapStage,
+  type AuthoritativeServerReadinessCheck,
   type AuthoritativeServerSecurityStageInput,
   type AuthoritativeServerSecurityStageOutput,
 } from "./AuthoritativeServerBootstrapStageContracts";
@@ -37,10 +39,44 @@ export function createAuthoritativeServerSecurityBootstrapStage(
         ?? (() => true)
       )(input);
 
+      const checks: ReadonlyArray<AuthoritativeServerReadinessCheck> = Object.freeze([
+        Object.freeze({
+          checkId: "security.transport-trust-material",
+          subsystem: "security",
+          state: transportTrustReady
+            ? AuthoritativeServerReadinessCheckStates.ready
+            : AuthoritativeServerReadinessCheckStates.degraded,
+          summary: transportTrustReady
+            ? "Transport trust material is available."
+            : "Transport trust material is unavailable.",
+          blocking: false,
+        }),
+        Object.freeze({
+          checkId: "security.certificate-authority-material",
+          subsystem: "security",
+          state: certificateAuthorityReady
+            ? AuthoritativeServerReadinessCheckStates.ready
+            : AuthoritativeServerReadinessCheckStates.degraded,
+          summary: certificateAuthorityReady
+            ? "Certificate authority material is available."
+            : "Certificate authority material is unavailable.",
+          blocking: false,
+        }),
+        Object.freeze({
+          checkId: "security.required-secrets",
+          subsystem: "security",
+          state: requiredSecretsValidated
+            ? AuthoritativeServerReadinessCheckStates.ready
+            : AuthoritativeServerReadinessCheckStates.degraded,
+          summary: requiredSecretsValidated
+            ? "Required secret material is validated."
+            : "Required secret material is not fully validated.",
+          blocking: false,
+        }),
+      ]);
+
       return Object.freeze({
-        transportTrustReady,
-        certificateAuthorityReady,
-        requiredSecretsValidated,
+        checks,
       });
     },
   });
