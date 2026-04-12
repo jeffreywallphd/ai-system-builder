@@ -167,6 +167,10 @@ Story 2.2.6 extracts orchestration, scheduling, startup recovery/reconciliation,
   - `src/hosts/server/tests/AuthoritativeServerBootstrapOrchestrator.test.ts` validates startup success wiring across bounded module composition seams and staged startup status output.
   - verifies startup can complete with degraded non-blocking readiness and surfaces explicit readiness report aggregates/checks.
   - verifies meaningful failure behavior for missing required stage contracts and missing required route-plan composition inputs.
+- Story 2.4.2 adds regression coverage for staged startup order, readiness gating, and shutdown semantics:
+  - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts` now asserts canonical authoritative stage ordering in startup summary output.
+  - verifies blocking readiness failures fail startup in `readiness-verification` before `transport-startup`/`shutdown-preparation` can complete.
+  - verifies runtime stop cleanup follows startup-composed shutdown-preparation ordering (`transport` cleanup before persistence cleanup) and emits ordered lifecycle cleanup events.
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `subsystem-composition`
   - `security-material-resolution`
