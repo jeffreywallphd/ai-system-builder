@@ -24,6 +24,7 @@ related_code_paths:
   - dev/tests/DocsCategoryComplianceValidationScript.test.ts
   - dev/tests/DocumentationQualityContributorStandardsStory716Guardrails.test.ts
   - dev/tests/DocumentationWorkflowIntegrationStory731Guardrails.test.ts
+  - dev/tests/DocumentationCiFailurePolicyStory732Guardrails.test.ts
 ---
 
 # Documentation Quality Enforced Standards Guide
@@ -164,4 +165,20 @@ Use category-first triage so fixes are fast and consistent:
 - `advisory`: non-blocking guidance.
 
 Escalate for manual review when changes affect authority meaning, supersession chains, or high-risk domains (identity, authorization, trust, secrets, runtime startup, routing contracts).
+
+## CI and Shared Automation Behavior (Story 7.3.2)
+
+- Default shared automation command is `npm run docs:lint`.
+- Default blocking policy:
+  - If output contains one or more `critical` findings, CI fails and the change is blocked.
+  - `important` findings are non-blocking warnings by default; merge is allowed with explicit follow-up tracking when needed.
+  - `advisory` findings are informational and non-blocking.
+- If a validator fails without parseable issue codes, treat it as blocking until triage determines severity.
+- Use strict mode only for scoped cleanup campaigns:
+
+```bash
+npm run docs:lint -- --strict-important
+```
+
+- `--strict-important` promotes `important` findings to blocking for that run; do not make it the default repository policy while transitional and historical docs are still being normalized.
 

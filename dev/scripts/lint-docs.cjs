@@ -107,6 +107,7 @@ function parseArgs(argv) {
   let repoRoot = process.cwd();
   let lintRoot = null;
   let listChecks = false;
+  let strictImportant = false;
   const selectedCheckIds = [];
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -147,6 +148,11 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--strict-important") {
+      strictImportant = true;
+      continue;
+    }
+
     throw new Error(`Unknown argument '${arg}'.`);
   }
 
@@ -154,6 +160,7 @@ function parseArgs(argv) {
     repoRoot,
     lintRoot,
     listChecks,
+    strictImportant,
     selectedCheckIds,
   };
 }
@@ -207,14 +214,68 @@ function writeListChecks() {
   }
   process.stdout.write("Run all checks: node dev/scripts/lint-docs.cjs\n");
   process.stdout.write("Run selected checks: node dev/scripts/lint-docs.cjs --checks <id1,id2>\n");
+  process.stdout.write("Escalate important findings to blocking: node dev/scripts/lint-docs.cjs --strict-important\n");
 }
 
-function writeResultSummary({ results, lintFailed }) {
-  const destination = lintFailed ? process.stderr : process.stdout;
-  destination.write(lintFailed ? "Docs lint failed.\n" : "Docs lint passed.\n");
-  for (const result of results) {
-    const statusLabel = result.status === 0 ? "PASS" : "FAIL";
-    destination.write(`- [${statusLabel}] ${result.check.id} (${result.elapsedMs}ms)\n`);
+function evaluateCheckOutcome({ result, strictImportant }) {
+  if (result.status === 0) {
+    return {
+      result,
+      outcome: "pass",
+      parsed: { issues: [], extraContextLines: [] },
+    };
+  }
+
+  const parsed = parseCheckIssues(result);
+  if (parsed.issues.length === 0) {
+    return {
+      result,
+      outcome: "fail",
+      parsed,
+    };
+  }
+
+  const hasCritical = parsed.issues.some((issue) => issue.severity === "critical");
+  const hasImportant = parsed.issues.some((issue) => issue.severity === "important");
+  if (hasCritical || (strictImportant && hasImportant)) {
+    return {
+      result,
+      outcome: "fail",
+      parsed,
+    };
+  }
+
+  return {
+    result,
+    outcome: "warn",
+    parsed,
+  };
+}
+
+function summarizeRunOutcome(evaluations) {
+  return {
+    hasFailures: evaluations.some((entry) => entry.outcome === "fail"),
+    hasWarnings: evaluations.some((entry) => entry.outcome === "warn"),
+  };
+}
+
+function writeResultSummary({ evaluations, summary }) {
+  const destination = summary.hasFailures ? process.stderr : process.stdout;
+  if (summary.hasFailures) {
+    destination.write("Docs lint failed.\n");
+  } else if (summary.hasWarnings) {
+    destination.write("Docs lint passed with non-blocking findings.\n");
+  } else {
+    destination.write("Docs lint passed.\n");
+  }
+
+  for (const evaluation of evaluations) {
+    const statusLabel = evaluation.outcome === "fail"
+      ? "FAIL"
+      : evaluation.outcome === "warn"
+        ? "WARN"
+        : "PASS";
+    destination.write(`- [${statusLabel}] ${evaluation.result.check.id} (${evaluation.result.elapsedMs}ms)\n`);
   }
 }
 
@@ -313,76 +374,83 @@ function countSeverities(issues) {
   return counts;
 }
 
-function writeFailureDetails(results) {
-  const failedResults = results.filter((result) => result.status !== 0);
-  if (failedResults.length === 0) {
+function writeFindingDetails({ evaluations, strictImportant }) {
+  const actionableEvaluations = evaluations.filter((entry) => entry.outcome !== "pass");
+  if (actionableEvaluations.length === 0) {
     return;
   }
 
-  const parsedByCheck = failedResults.map((result) => ({
-    result,
-    parsed: parseCheckIssues(result),
-  }));
-
-  const allIssues = parsedByCheck.flatMap((entry) => entry.parsed.issues);
+  const allIssues = actionableEvaluations.flatMap((entry) => entry.parsed.issues);
   const severityCounts = countSeverities(allIssues);
-  process.stderr.write([
+  const destination = evaluations.some((entry) => entry.outcome === "fail")
+    ? process.stderr
+    : process.stdout;
+
+  destination.write([
     "",
     "Actionable findings by check:",
     `Severity summary: critical=${severityCounts.critical}, important=${severityCounts.important}, advisory=${severityCounts.advisory}`,
+    strictImportant
+      ? "CI policy: critical and important findings are blocking in strict mode."
+      : "CI policy: critical findings are blocking; important/advisory findings are non-blocking by default.",
   ].join("\n") + "\n");
 
-  for (const result of failedResults) {
-    const parsed = parsedByCheck.find((entry) => entry.result === result)?.parsed || {
-      issues: [],
-      extraContextLines: [],
-    };
-    const guidance = CHECK_GUIDANCE[result.check.id] || {
+  for (const evaluation of actionableEvaluations) {
+    const guidance = CHECK_GUIDANCE[evaluation.result.check.id] || {
       quickFix: "Review validator output and repair the referenced contract issue.",
       guidePaths: ["docs/contributors/docs-foundation-validation.ai.md"],
     };
 
-    process.stderr.write(`\n## ${result.check.id}\n`);
-    process.stderr.write(`Description: ${result.check.description}\n`);
-    process.stderr.write(`Quick fix: ${guidance.quickFix}\n`);
-    process.stderr.write(`Guides: ${guidance.guidePaths.join(", ")}\n`);
+    destination.write(`\n## ${evaluation.result.check.id}\n`);
+    destination.write(`Outcome: ${evaluation.outcome === "fail" ? "blocking" : "non-blocking warning"}\n`);
+    destination.write(`Description: ${evaluation.result.check.description}\n`);
+    destination.write(`Quick fix: ${guidance.quickFix}\n`);
+    destination.write(`Guides: ${guidance.guidePaths.join(", ")}\n`);
 
-    if (result.error) {
-      process.stderr.write(`Spawn error: ${result.error.message}\n`);
+    if (evaluation.result.error) {
+      destination.write(`Spawn error: ${evaluation.result.error.message}\n`);
     }
-    if (result.signal) {
-      process.stderr.write(`Signal: ${result.signal}\n`);
+    if (evaluation.result.signal) {
+      destination.write(`Signal: ${evaluation.result.signal}\n`);
     }
 
-    if (parsed.issues.length > 0) {
-      process.stderr.write("Issues:\n");
-      for (const issue of parsed.issues) {
-        process.stderr.write(`- [${issue.severity.toUpperCase()}] [${issue.code}] ${issue.message}\n`);
+    if (evaluation.parsed.issues.length > 0) {
+      destination.write("Issues:\n");
+      for (const issue of evaluation.parsed.issues) {
+        destination.write(`- [${issue.severity.toUpperCase()}] [${issue.code}] ${issue.message}\n`);
         if (issue.filePath) {
-          process.stderr.write(`  file: ${issue.filePath}\n`);
+          destination.write(`  file: ${issue.filePath}\n`);
         }
       }
     } else {
-      process.stderr.write("Issues:\n");
-      process.stderr.write("- [CRITICAL] [UNPARSED_VALIDATOR_FAILURE] Validator failed without parseable issue lines.\n");
+      destination.write("Issues:\n");
+      destination.write("- [CRITICAL] [UNPARSED_VALIDATOR_FAILURE] Validator failed without parseable issue lines.\n");
     }
 
-    if (parsed.extraContextLines.length > 0) {
-      process.stderr.write("Additional context:\n");
-      for (const line of parsed.extraContextLines) {
-        process.stderr.write(`- ${line}\n`);
+    if (evaluation.parsed.extraContextLines.length > 0) {
+      destination.write("Additional context:\n");
+      for (const line of evaluation.parsed.extraContextLines) {
+        destination.write(`- ${line}\n`);
       }
     }
 
-    if (result.stdout.trim().length > 0 || result.stderr.trim().length > 0) {
-      process.stderr.write("Raw validator output:\n");
-      if (result.stdout.trim().length > 0) {
-        process.stderr.write("stdout:\n");
-        process.stderr.write(result.stdout.endsWith("\n") ? result.stdout : `${result.stdout}\n`);
+    if (evaluation.result.stdout.trim().length > 0 || evaluation.result.stderr.trim().length > 0) {
+      destination.write("Raw validator output:\n");
+      if (evaluation.result.stdout.trim().length > 0) {
+        destination.write("stdout:\n");
+        destination.write(
+          evaluation.result.stdout.endsWith("\n")
+            ? evaluation.result.stdout
+            : `${evaluation.result.stdout}\n`,
+        );
       }
-      if (result.stderr.trim().length > 0) {
-        process.stderr.write("stderr:\n");
-        process.stderr.write(result.stderr.endsWith("\n") ? result.stderr : `${result.stderr}\n`);
+      if (evaluation.result.stderr.trim().length > 0) {
+        destination.write("stderr:\n");
+        destination.write(
+          evaluation.result.stderr.endsWith("\n")
+            ? evaluation.result.stderr
+            : `${evaluation.result.stderr}\n`,
+        );
       }
     }
   }
@@ -415,14 +483,30 @@ function main() {
     lintRoot: parsedArgs.lintRoot,
     check,
   }));
-  const lintFailed = results.some((result) => result.status !== 0);
+  const evaluations = results.map((result) => evaluateCheckOutcome({
+    result,
+    strictImportant: parsedArgs.strictImportant,
+  }));
+  const summary = summarizeRunOutcome(evaluations);
 
-  writeResultSummary({ results, lintFailed });
+  writeResultSummary({ evaluations, summary });
+  writeFindingDetails({
+    evaluations,
+    strictImportant: parsedArgs.strictImportant,
+  });
 
-  if (lintFailed) {
-    writeFailureDetails(results);
+  if (summary.hasFailures) {
     process.exit(1);
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  inferSeverityFromIssueCode,
+  parseCheckIssues,
+  evaluateCheckOutcome,
+  summarizeRunOutcome,
+};

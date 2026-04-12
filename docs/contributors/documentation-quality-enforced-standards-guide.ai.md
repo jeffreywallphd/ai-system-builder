@@ -24,6 +24,7 @@ related_code_paths:
   - dev/tests/DocsCategoryComplianceValidationScript.test.ts
   - dev/tests/DocumentationQualityContributorStandardsStory716Guardrails.test.ts
   - dev/tests/DocumentationWorkflowIntegrationStory731Guardrails.test.ts
+  - dev/tests/DocumentationCiFailurePolicyStory732Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Quality Enforced Standards Guide
@@ -162,4 +163,20 @@ npm run validate:ci
 - `advisory`: non-blocking guidance.
 
 Escalate to additional manual review when authority meaning, supersession chains, or high-risk domains (identity, authorization, trust, secrets, runtime startup, routing contracts) are affected.
+
+## CI and Shared Automation Behavior (Story 7.3.2)
+
+- Default shared automation command is `npm run docs:lint`.
+- Default blocking behavior:
+  - `critical` findings block merge (CI fails).
+  - `important` findings are non-blocking warnings by default and should be fixed now or tracked explicitly.
+  - `advisory` findings are informational and non-blocking.
+- Non-zero validator exits without parseable issue codes remain blocking until triaged because severity cannot be trusted.
+- Scoped cleanup campaigns can enable strict escalation:
+
+```bash
+npm run docs:lint -- --strict-important
+```
+
+- `--strict-important` promotes `important` findings to blocking for that run only; default repo policy remains warning-first for transitional and historical documentation hygiene.
 
