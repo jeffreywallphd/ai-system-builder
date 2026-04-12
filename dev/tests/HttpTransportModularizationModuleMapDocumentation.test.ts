@@ -84,6 +84,10 @@ describe("HTTP transport modularization module map documentation guardrails", ()
       expect(doc).toContain(token);
     }
 
+    expect(doc).not.toContain("legacyInlineRouteFamilyIds");
+    expect(doc).not.toContain("hybrid posture");
+    expect(doc).not.toContain("legacy fallback");
+
     const requiredTestingTokens = [
       "AuthoritativeApiRouteRegistrationCatalog.test.ts",
       "IdentityHttpTransportComposition.test.ts",

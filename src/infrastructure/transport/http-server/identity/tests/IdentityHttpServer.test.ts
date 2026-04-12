@@ -85,7 +85,7 @@ describe("IdentityHttpServer", () => {
     expect(details?.routeFamilyIds).toEqual(["identity-auth"]);
   });
 
-  it("supports hybrid modular and legacy route handling during migration", async () => {
+  it("keeps modular route handling active while inline identity auth routes stay operational", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger, {}, {
       routeFamilyHandlers: Object.freeze({
@@ -113,7 +113,7 @@ describe("IdentityHttpServer", () => {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        username: "hybrid.route.user",
+        username: "inline.route.user",
         credential: {
           candidate: "StrongPass!2026",
         },
@@ -131,11 +131,11 @@ describe("IdentityHttpServer", () => {
     expect(modularRouteBody.ok).toBe(true);
     expect(modularRouteBody.data.delegated).toBe(true);
 
-    const fallbackEvent = logger.events.find((entry) => (
-      entry.event === "identity-http.route-family.legacy-fallback"
+    const requestReceivedEvent = logger.events.find((entry) => (
+      entry.event === "identity-http.request.received"
       && entry.path === "/api/v1/identity/register"
     ));
-    expect(fallbackEvent).toBeDefined();
+    expect(requestReceivedEvent).toBeDefined();
 
     const modularEvent = logger.events.find((entry) => (
       entry.event === "identity-http.route-family.modular-handled"
@@ -254,12 +254,12 @@ describe("IdentityHttpServer", () => {
     expect(logger.events.some((entry) => entry.event === "identity-http.route-family.modular-handled" && entry.path === "/api/v1/execution-nodes")).toBeTrue();
     expect(logger.events.some((entry) => entry.event === "identity-http.route-family.modular-handled" && entry.path === "/api/v1/runtime/runs/start")).toBeTrue();
 
-    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.legacy-fallback" && entry.path === "/api/v1/audit/events")).toBeFalse();
-    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.legacy-fallback" && entry.path === "/api/v1/execution-nodes")).toBeFalse();
-    expect(logger.events.some((entry) => entry.event === "identity-http.route-family.legacy-fallback" && entry.path === "/api/v1/runtime/runs/start")).toBeFalse();
+    expect(logger.events.some((entry) => entry.event === "identity-http.request.received" && entry.path === "/api/v1/audit/events")).toBeTrue();
+    expect(logger.events.some((entry) => entry.event === "identity-http.request.received" && entry.path === "/api/v1/execution-nodes")).toBeTrue();
+    expect(logger.events.some((entry) => entry.event === "identity-http.request.received" && entry.path === "/api/v1/runtime/runs/start")).toBeTrue();
   });
 
-  it("does not apply legacy fallback when a migrated route family handler declines handling", async () => {
+  it("returns not-found when a modular route family handler declines handling", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger, {}, {
       authoritativeRunSubmissionBackendApi: {
@@ -301,7 +301,7 @@ describe("IdentityHttpServer", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        username: "no.legacy.fallback.user",
+        username: "no.modular.handler.user",
         credential: { candidate: "StrongPass!2026" },
       }),
     });
@@ -311,7 +311,7 @@ describe("IdentityHttpServer", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        providerSubject: "no.legacy.fallback.user",
+        providerSubject: "no.modular.handler.user",
         credential: { candidate: "StrongPass!2026" },
       }),
     });
@@ -336,7 +336,7 @@ describe("IdentityHttpServer", () => {
     expect(runResponse.status).toBe(404);
 
     expect(logger.events.some((entry) => (
-      entry.event === "identity-http.route-family.legacy-fallback"
+      entry.event === "identity-http.route-family.modular-handled"
       && entry.path === "/api/v1/runtime/runs/start"
     ))).toBeFalse();
   });

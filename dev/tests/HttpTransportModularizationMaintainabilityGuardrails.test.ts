@@ -93,4 +93,11 @@ describe("HTTP transport modularization maintainability guardrails", () => {
       expect(source).toContain(token);
     }
   });
+
+  it("removes transition-era legacy fallback markers from the transport surface", () => {
+    const source = readFileSync(identityHttpServerPath, "utf8");
+
+    expect(source).not.toContain("legacyInlineRouteFamilyIds");
+    expect(source).not.toContain("identity-http.route-family.legacy-fallback");
+  });
 });

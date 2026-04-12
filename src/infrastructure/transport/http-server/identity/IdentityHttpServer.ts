@@ -3055,17 +3055,6 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     requestId: "startup-route-composition",
     details: routeCompositionLogDetails,
   }));
-  const legacyInlineRouteFamilyIds = Object.freeze(new Set<string>([
-    "identity-auth",
-    "workspace-invitations",
-    "workspace-administration",
-    "authorization-management",
-    "node-trust",
-    "security-certificate-operations",
-    "security-secret-metadata",
-    "system-runtime",
-  ]));
-
   let hasLoggedRootReadinessProbe = false;
   const server = transportComposition.serverAdapter.createServer(async (request, response) => {
     const requestStartedAt = Date.now();
@@ -3166,18 +3155,6 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             return;
           }
 
-          if (legacyInlineRouteFamilyIds.has(matchedRouteFamily.routeFamilyId)) {
-            logger.info(Object.freeze({
-              event: "identity-http.route-family.legacy-fallback",
-              requestId,
-              correlationId,
-              method: request.method,
-              path,
-              details: Object.freeze({
-                routeFamilyId: matchedRouteFamily.routeFamilyId,
-              }),
-            }));
-          }
         }
       }
 
