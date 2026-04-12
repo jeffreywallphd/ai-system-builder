@@ -25,6 +25,7 @@ import ImageManipulationRuntimeEditorPanel, {
   resolveRunParameterSnapshot,
   resolveSelectionConfirmationMessage,
   isPersistedReferenceUploadReady,
+  resolveWorkspaceIdFromSession,
 } from "../ImageManipulationRuntimeEditorPanel";
 
 describe("ImageManipulationRuntimeEditorPanel", () => {
@@ -252,6 +253,59 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
         storedFilePathProduced: false,
       },
     })).toBeFalse();
+  });
+
+  it("resolves a workspace id from fallback session workspace context fields", () => {
+    expect(resolveWorkspaceIdFromSession(undefined)).toBeUndefined();
+    expect(resolveWorkspaceIdFromSession({
+      userIdentityId: "user-1",
+      username: "alice",
+      providerId: "provider:local-password",
+      sessionId: "session-1",
+      sessionToken: "token-1",
+      sessionTokenType: "Bearer",
+      sessionIssuedAt: "2026-04-12T00:00:00.000Z",
+      sessionExpiresAt: "2026-04-12T23:59:59.000Z",
+      workspaceContext: {
+        requestedWorkspaceId: "workspace:requested",
+        resolvedWorkspaceId: undefined,
+        workspaces: Object.freeze([]),
+      },
+      initialCapabilityState: {
+        workspaceId: "workspace:capability",
+        effectiveRoles: Object.freeze([]),
+        canAdministrate: false,
+        isWorkspaceOwner: false,
+      },
+    })).toBe("workspace:requested");
+    expect(resolveWorkspaceIdFromSession({
+      userIdentityId: "user-1",
+      username: "alice",
+      providerId: "provider:local-password",
+      sessionId: "session-1",
+      sessionToken: "token-1",
+      sessionTokenType: "Bearer",
+      sessionIssuedAt: "2026-04-12T00:00:00.000Z",
+      sessionExpiresAt: "2026-04-12T23:59:59.000Z",
+      workspaceContext: {
+        requestedWorkspaceId: undefined,
+        resolvedWorkspaceId: undefined,
+        workspaces: Object.freeze([
+          {
+            workspaceId: "workspace:first",
+            slug: "workspace-first",
+            displayName: "Workspace First",
+            status: "active",
+            visibility: "private",
+            membershipStatus: "active",
+            effectiveRoles: Object.freeze(["member"]),
+            canAdministrate: false,
+            isWorkspaceOwner: false,
+          },
+        ]),
+      },
+      initialCapabilityState: undefined,
+    })).toBe("workspace:first");
   });
 
   it("builds selection confirmation copy from selected source/reference asset metadata", () => {
