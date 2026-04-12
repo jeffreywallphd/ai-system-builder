@@ -1,4 +1,8 @@
 import {
+  generateKeyPairSync,
+  randomBytes,
+} from "node:crypto";
+import {
   SecretAccessActions,
   SecretActorTypes,
   SecretKinds,
@@ -49,6 +53,23 @@ const SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS = Object.freeze({
   identitySessionSigningPrivateKey: "AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY",
 });
 
+const SystemSecretBootstrapCreationPolicies = Object.freeze({
+  migrateLegacyOnly: "migrate-legacy-only",
+  migrateLegacyOrGenerate: "migrate-legacy-or-generate",
+});
+
+type SystemSecretBootstrapCreationPolicy =
+  typeof SystemSecretBootstrapCreationPolicies[keyof typeof SystemSecretBootstrapCreationPolicies];
+
+const SystemSecretBootstrapGenerationStrategies = Object.freeze({
+  ed25519PrivateKeyPkcs8Pem: "ed25519-private-key-pkcs8-pem",
+  random32ByteBase64: "random-32-byte-base64",
+  random48ByteBase64Url: "random-48-byte-base64url",
+});
+
+type SystemSecretBootstrapGenerationStrategy =
+  typeof SystemSecretBootstrapGenerationStrategies[keyof typeof SystemSecretBootstrapGenerationStrategies];
+
 interface SystemSecretDefinition {
   readonly secretId: string;
   readonly name: string;
@@ -62,6 +83,8 @@ interface SystemSecretDefinition {
   readonly runtimeConsumer: "provider-credential" | "server-signing";
   readonly providerId?: "openai" | "huggingface";
   readonly legacyEnvironmentVariable?: string;
+  readonly bootstrapCreationPolicy: SystemSecretBootstrapCreationPolicy;
+  readonly bootstrapGenerationStrategy?: SystemSecretBootstrapGenerationStrategy;
 }
 
 const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.freeze([
@@ -93,6 +116,7 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
     runtimeConsumer: "provider-credential",
     providerId: ServerPlatformProviderIds.openAi,
     legacyEnvironmentVariable: SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.openAiApiKey,
+    bootstrapCreationPolicy: SystemSecretBootstrapCreationPolicies.migrateLegacyOnly,
   }),
   Object.freeze({
     secretId: "secret:server:provider:huggingface",
@@ -122,6 +146,7 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
     runtimeConsumer: "provider-credential",
     providerId: ServerPlatformProviderIds.huggingFace,
     legacyEnvironmentVariable: SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.huggingFaceApiToken,
+    bootstrapCreationPolicy: SystemSecretBootstrapCreationPolicies.migrateLegacyOnly,
   }),
   Object.freeze({
     secretId: "secret:server:signing:identity-session",
@@ -155,6 +180,8 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
     runtimePurpose: "identity-session-token-signing",
     runtimeConsumer: "server-signing",
     legacyEnvironmentVariable: SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.identitySessionSigningPrivateKey,
+    bootstrapCreationPolicy: SystemSecretBootstrapCreationPolicies.migrateLegacyOrGenerate,
+    bootstrapGenerationStrategy: SystemSecretBootstrapGenerationStrategies.ed25519PrivateKeyPkcs8Pem,
   }),
 ]);
 
@@ -196,7 +223,7 @@ function createServerTokenSigningHierarchy() {
       ]),
     }),
     lifecycle: Object.freeze({
-      creationMode: SecurityMaterialCreationModes.migratedFromLegacyInput,
+      creationMode: SecurityMaterialCreationModes.generatedAtBootstrap,
       rotationMode: SecurityMaterialRotationModes.onCompromise,
       revocationMode: SecurityMaterialRevocationModes.required,
       requiresReEncryptionOnRotation: false,
@@ -220,6 +247,8 @@ export const SystemSecretBootstrapDiagnosticCodes = Object.freeze({
   legacyMigrationFailed: "legacy-migration-failed",
   requiredSecretUnusable: "required-secret-unusable",
   optionalSecretUnusable: "optional-secret-unusable",
+  bootstrapCreationUnavailable: "bootstrap-creation-unavailable",
+  bootstrapCreationFailed: "bootstrap-creation-failed",
 });
 
 export type SystemSecretBootstrapDiagnosticCode =
@@ -404,7 +433,10 @@ export async function bootstrapSystemSecretsFromEnvironment(
           name: definition.name,
           kind: definition.kind,
           plaintext: legacyValue as string,
-          metadata: definition.metadata,
+          metadata: enrichBootstrapMetadata({
+            definition,
+            source: "legacy-environment-migration",
+          }),
         });
 
         if (!bootstrapResult.ok) {
@@ -422,6 +454,64 @@ export async function bootstrapSystemSecretsFromEnvironment(
         }
 
         migratedSecretIds.push(definition.secretId);
+        shouldResolveMetadata = true;
+      } else if (shouldAttemptBootstrapGeneration(definition)) {
+        if (!input.secretService.status.configured) {
+          diagnostics.push(Object.freeze({
+            code: SystemSecretBootstrapDiagnosticCodes.bootstrapCreationUnavailable,
+            secretId: definition.secretId,
+            message: "Bootstrap key creation requires secret encryption configuration.",
+            severity: failFastRequired ? "error" : "warning",
+            startupRequirement: policy.startupRequirement,
+            durabilityClass: policy.durabilityClass,
+            fallbackPolicy: policy.fallbackPolicy,
+          }));
+          continue;
+        }
+
+        const generatedPlaintextResult = createBootstrapGeneratedPlaintext(definition);
+        if (!generatedPlaintextResult.ok) {
+          diagnostics.push(Object.freeze({
+            code: SystemSecretBootstrapDiagnosticCodes.bootstrapCreationFailed,
+            secretId: definition.secretId,
+            message: generatedPlaintextResult.error,
+            severity: failFastRequired ? "error" : "warning",
+            startupRequirement: policy.startupRequirement,
+            durabilityClass: policy.durabilityClass,
+            fallbackPolicy: policy.fallbackPolicy,
+          }));
+          continue;
+        }
+
+        const bootstrapCreateResult = await secretProviderResolutionPort.bootstrapSecretProviderMaterial({
+          selector,
+          access: {
+            operationKey: `op:system-secret-bootstrap:create:${definition.secretId}:${now().getTime()}`,
+            serviceIdentity: "runtime:server:system-secret-bootstrap",
+            usage: "system-secret-bootstrap-create",
+            occurredAt: now().toISOString(),
+          },
+          name: definition.name,
+          kind: definition.kind,
+          plaintext: generatedPlaintextResult.value,
+          metadata: enrichBootstrapMetadata({
+            definition,
+            source: "bootstrap-generated",
+          }),
+        });
+        if (!bootstrapCreateResult.ok) {
+          diagnostics.push(Object.freeze({
+            code: SystemSecretBootstrapDiagnosticCodes.bootstrapCreationFailed,
+            secretId: definition.secretId,
+            message: `Bootstrap key creation failed (${bootstrapCreateResult.error.code}).`,
+            severity: failFastRequired ? "error" : "warning",
+            startupRequirement: policy.startupRequirement,
+            durabilityClass: policy.durabilityClass,
+            fallbackPolicy: policy.fallbackPolicy,
+          }));
+          continue;
+        }
+
         shouldResolveMetadata = true;
       } else {
         diagnostics.push(Object.freeze({
@@ -604,6 +694,72 @@ function createSystemSecretMaterialSelector(
     materialKind: definition.runtimeConsumer === "provider-credential"
       ? SecretProviderMaterialKinds.providerCredential
       : SecretProviderMaterialKinds.signingMaterial,
+  });
+}
+
+function shouldAttemptBootstrapGeneration(definition: SystemSecretDefinition): boolean {
+  return definition.bootstrapCreationPolicy === SystemSecretBootstrapCreationPolicies.migrateLegacyOrGenerate
+    && typeof definition.bootstrapGenerationStrategy === "string";
+}
+
+function createBootstrapGeneratedPlaintext(
+  definition: SystemSecretDefinition,
+): { readonly ok: true; readonly value: string } | { readonly ok: false; readonly error: string } {
+  const strategy = definition.bootstrapGenerationStrategy;
+  if (!strategy) {
+    return {
+      ok: false,
+      error: "Bootstrap key creation strategy is not configured.",
+    };
+  }
+
+  if (strategy === SystemSecretBootstrapGenerationStrategies.ed25519PrivateKeyPkcs8Pem) {
+    const keyPair = generateKeyPairSync("ed25519");
+    return {
+      ok: true,
+      value: keyPair.privateKey.export({
+        type: "pkcs8",
+        format: "pem",
+      }).toString(),
+    };
+  }
+
+  if (strategy === SystemSecretBootstrapGenerationStrategies.random32ByteBase64) {
+    return {
+      ok: true,
+      value: randomBytes(32).toString("base64"),
+    };
+  }
+
+  if (strategy === SystemSecretBootstrapGenerationStrategies.random48ByteBase64Url) {
+    return {
+      ok: true,
+      value: randomBytes(48).toString("base64url"),
+    };
+  }
+
+  return {
+    ok: false,
+    error: `Bootstrap key creation strategy '${strategy}' is unsupported.`,
+  };
+}
+
+function enrichBootstrapMetadata(input: {
+  readonly definition: SystemSecretDefinition;
+  readonly source: "legacy-environment-migration" | "bootstrap-generated";
+}) {
+  const tags = new Set(input.definition.metadata.tags);
+  tags.add("bootstrap");
+  tags.add(input.source === "bootstrap-generated" ? "bootstrap-generated" : "bootstrap-migrated");
+
+  return Object.freeze({
+    tags: Object.freeze([...tags.values()]),
+    labels: Object.freeze({
+      ...input.definition.metadata.labels,
+      bootstrapSource: input.source,
+      bootstrapPolicy: input.definition.bootstrapCreationPolicy,
+      material: input.definition.classification.materialId,
+    }),
   });
 }
 

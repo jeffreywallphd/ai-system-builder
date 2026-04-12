@@ -19,7 +19,8 @@ This note documents Story 8.3.3 (Feature 8 / Epic 8.3): bootstrap required syste
 - If no required system secrets are configured, startup proceeds unchanged.
 - If required system secrets are configured:
   - each required secret must be present in the secret service and runtime-retrievable, or
-  - the secret must be migrated from a supported legacy environment variable value.
+  - the secret must be migrated from a supported legacy environment variable value, or
+  - for policy-eligible signing material, bootstrap creates durable key material and persists it through provider backends.
 - If validation or migration fails, startup fails closed with a clear bootstrap validation error.
 
 ## Required system secret configuration
@@ -45,6 +46,14 @@ Supported legacy environment migration sources:
 - `AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY` -> `secret:server:signing:identity-session`
 
 Migration only occurs when the required secret is missing from the secret service and the mapped legacy environment value is present.
+
+## Story 3.3.2 key bootstrap creation policy update
+
+- `secret:server:signing:identity-session` now follows an explicit bootstrap creation policy:
+  - try legacy migration from `AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY` first (when migration is enabled);
+  - otherwise generate an Ed25519 PKCS#8 private key in bootstrap and persist it through `ISecretProviderMaterialResolutionPort`.
+- Bootstrap-created signing material is tagged with bootstrap source/policy metadata and persists durably across restarts.
+- Runtime critical material resolution no longer writes/bootstrap-creates provider records during lookup; mutation is confined to explicit bootstrap flows.
 
 ## Initial setup steps
 

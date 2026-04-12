@@ -2,9 +2,7 @@ import { createHash } from "node:crypto";
 import {
   SecretAccessActions,
   SecretActorTypes,
-  SecretKinds,
   SecretScopes,
-  type SecretKind,
 } from "@domain/security/SecretDomain";
 import {
   SecretProviderMaterialKinds,
@@ -40,8 +38,6 @@ interface CriticalServerSecurityMaterialBinding {
   readonly providerId: string;
   readonly secretId: string;
   readonly materialKind: SecretProviderMaterialKind;
-  readonly secretName: string;
-  readonly secretKind: SecretKind;
   readonly usage: string;
 }
 
@@ -52,8 +48,6 @@ const CriticalServerSecurityMaterialBindings = new Map<string, CriticalServerSec
       providerId: "platform",
       secretId: "secret:server:asset-download-grant",
       materialKind: SecretProviderMaterialKinds.generic,
-      secretName: "runtime.asset-download-grant.secret",
-      secretKind: SecretKinds.accessToken,
       usage: "asset-download-grant",
     }),
   ],
@@ -63,8 +57,6 @@ const CriticalServerSecurityMaterialBindings = new Map<string, CriticalServerSec
       providerId: "platform",
       secretId: "secret:server:asset-content-encryption-key",
       materialKind: SecretProviderMaterialKinds.encryptionMaterial,
-      secretName: "runtime.asset-content-encryption.key",
-      secretKind: SecretKinds.generic,
       usage: "asset-content-encryption",
     }),
   ],
@@ -74,8 +66,6 @@ const CriticalServerSecurityMaterialBindings = new Map<string, CriticalServerSec
       providerId: "platform",
       secretId: "secret:server:image-asset-storage-token",
       materialKind: SecretProviderMaterialKinds.generic,
-      secretName: "runtime.image-asset-storage-token.secret",
-      secretKind: SecretKinds.accessToken,
       usage: "image-asset-storage-token",
     }),
   ],
@@ -85,8 +75,6 @@ const CriticalServerSecurityMaterialBindings = new Map<string, CriticalServerSec
       providerId: "platform",
       secretId: "secret:server:image-upload-session-token",
       materialKind: SecretProviderMaterialKinds.generic,
-      secretName: "runtime.image-upload-session-token.secret",
-      secretKind: SecretKinds.accessToken,
       usage: "image-upload-session-token",
     }),
   ],
@@ -96,8 +84,6 @@ const CriticalServerSecurityMaterialBindings = new Map<string, CriticalServerSec
       providerId: "platform",
       secretId: "secret:server:generated-result-preview-access-token",
       materialKind: SecretProviderMaterialKinds.generic,
-      secretName: "runtime.generated-result-preview-access-token.secret",
-      secretKind: SecretKinds.accessToken,
       usage: "generated-result-preview-access-token",
     }),
   ],
@@ -138,13 +124,6 @@ export async function resolveCriticalServerSecurityMaterial(
 
   const configured = resolveLegacyConfiguredMaterial(input);
   if (configured) {
-    await tryBootstrapLegacyValue({
-      input,
-      binding,
-      providerResolutionPort,
-      now,
-      plaintext: configured,
-    });
     return configured;
   }
 
@@ -229,52 +208,6 @@ function createDefaultSecretProviderResolutionPort(
   });
 }
 
-async function tryBootstrapLegacyValue(input: {
-  readonly input: ResolveCriticalServerSecurityMaterialInput;
-  readonly binding: CriticalServerSecurityMaterialBinding;
-  readonly providerResolutionPort: ISecretProviderMaterialResolutionPort;
-  readonly now: string;
-  readonly plaintext: string;
-}): Promise<void> {
-  const result = await input.providerResolutionPort.bootstrapSecretProviderMaterial({
-    selector: Object.freeze({
-      providerId: input.binding.providerId,
-      secretId: input.binding.secretId,
-      scope: Object.freeze({
-        scope: SecretScopes.server,
-      }),
-      materialKind: input.binding.materialKind,
-    }),
-    access: {
-      operationKey: `op:runtime:critical-security-material:bootstrap:${input.binding.secretId}:${Date.now()}`,
-      serviceIdentity: "runtime:server:critical-security-material-resolver",
-      usage: input.binding.usage,
-      justification: `bootstrap critical server security material '${input.input.materialId}' from legacy configuration`,
-      occurredAt: input.now,
-    },
-    name: input.binding.secretName,
-    kind: input.binding.secretKind,
-    plaintext: input.plaintext,
-    metadata: Object.freeze({
-      tags: Object.freeze(["server", "runtime", "security-material"]),
-      labels: Object.freeze({
-        material: input.input.materialId,
-        usage: input.binding.usage,
-      }),
-    }),
-  });
-  if (!result.ok) {
-    input.input.logger?.warn(Object.freeze({
-      event: "authoritative-server.startup.security-material-provider-bootstrap-failed",
-      details: Object.freeze({
-        materialId: input.input.materialId,
-        secretId: input.binding.secretId,
-        errorCode: result.error.code,
-      }),
-    }));
-  }
-}
-
 function resolveLegacyConfiguredMaterial(input: ResolveCriticalServerSecurityMaterialInput): string | undefined {
   const configured = normalizeOptional(input.environment[input.environmentKey]);
   if (configured) {
@@ -305,8 +238,6 @@ function resolveSecurityMaterialBinding(
     materialKind: input.materialFormat === "aes256-base64"
       ? SecretProviderMaterialKinds.encryptionMaterial
       : SecretProviderMaterialKinds.generic,
-    secretName: `runtime.${input.materialId.replaceAll(":", ".")}`,
-    secretKind: input.materialFormat === "aes256-base64" ? SecretKinds.generic : SecretKinds.accessToken,
     usage: input.materialId,
   });
 }

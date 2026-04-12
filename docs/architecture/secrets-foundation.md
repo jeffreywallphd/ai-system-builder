@@ -277,6 +277,20 @@ These contracts establish stable extension points for persistence adapters, auth
   - updates to `src/application/security/tests/SecurityMaterialClassificationContract.test.ts`
   - updates to `src/application/security/tests/SecurityMaterialStartupValidationPipeline.test.ts`
 
+## Story 3.3.2 Key Bootstrap and Creation Policies
+
+- makes key bootstrap creation explicit and policy-driven in:
+  - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
+- identity-session signing material bootstrap now follows governed order:
+  - migrate from legacy environment input when available and migration is enabled
+  - otherwise generate Ed25519 PKCS#8 private key material during bootstrap and persist durably through provider bootstrap port
+- bootstrap-created signing material is tagged with bootstrap source/policy metadata for diagnostics and later rotation workflows
+- removes runtime-path mutation from critical material lookup:
+  - `src/hosts/server/composition/ResolveCriticalServerSecurityMaterial.ts` now stays read-only and no longer performs provider bootstrap writes
+- test coverage:
+  - updates to `src/infrastructure/security/secrets/tests/SystemSecretBootstrapService.test.ts`
+  - updates to `src/hosts/server/tests/ResolveCriticalServerSecurityMaterial.test.ts`
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants
