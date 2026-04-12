@@ -93,5 +93,45 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("keeps bootstrap healthy with warning diagnostics for optional development-ephemeral material", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-secret-diagnostics-optional-dev-"));
+    const secretService = composeServerSecretService({
+      databasePath: path.join(root, "secret-diagnostics-optional-dev.sqlite"),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 26).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+      },
+    });
+
+    try {
+      const provider = new SecretServiceOperationalDiagnosticsProvider({
+        env: {
+          NODE_ENV: "development",
+          AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+          AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 26).toString("base64"),
+          AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:signing:identity-session",
+          AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV: "false",
+        },
+        secretService,
+        now: () => new Date("2026-04-06T12:10:00.000Z"),
+      });
+      const diagnostics = await provider.collectDiagnostics();
+
+      expect(diagnostics.state).toBe("healthy");
+      expect(diagnostics.healthFlags.bootstrapSecretsHealthy).toBeTrue();
+      expect(diagnostics.bootstrap.diagnostics).toEqual([
+        expect.objectContaining({
+          code: "optional-secret-missing",
+          severity: "warning",
+        }),
+      ]);
+    } finally {
+      secretService.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
