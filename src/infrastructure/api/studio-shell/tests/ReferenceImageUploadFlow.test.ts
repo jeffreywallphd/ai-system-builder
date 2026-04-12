@@ -1,4 +1,5 @@
-﻿import { describe, expect, it } from "bun:test";
+﻿import fs from "node:fs";
+import { describe, expect, it } from "bun:test";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
 import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
@@ -35,10 +36,11 @@ describe("Reference image upload flow", () => {
     expect(upload.ok).toBeTrue();
     expect(upload.data?.datasetInstanceId).toBe("dataset-instance:reference-image:input");
     expect(upload.data?.recordId).toContain("record:");
-    expect(upload.data?.image.assetId).toContain("generated-output:storage-instance://");
-    expect(upload.data?.image.assetId).not.toContain("/uploads/");
+    expect(upload.data?.image.assetId).toContain("generated-output:");
+    expect(upload.data?.image.assetId).toContain("reference-image-uploads");
     expect(upload.data?.image.width).toBeGreaterThan(0);
     expect(upload.data?.image.height).toBeGreaterThan(0);
+    expect(upload.data?.storedFilePath).toBeString();
+    expect(fs.existsSync(upload.data!.storedFilePath!)).toBeTrue();
   });
 });
-

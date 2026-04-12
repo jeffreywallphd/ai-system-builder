@@ -11,6 +11,7 @@ export interface ImageUploadPanelProps extends ImageUploadPanelPropsContract, Im
   readonly title?: string;
   readonly className?: string;
   readonly disabled?: boolean;
+  readonly resolvedPreviewPathsByFileName?: Readonly<Record<string, string>>;
 }
 
 function buildSelectionSummary(issues: ReadonlyArray<ImageUploadValidationIssue>): string {
@@ -33,6 +34,7 @@ export function ImageUploadPanel({
   title = "Upload images",
   className,
   disabled = false,
+  resolvedPreviewPathsByFileName,
 }: ImageUploadPanelProps): JSX.Element {
   const [isDragActive, setIsDragActive] = useState(false);
   const [validation, setValidation] = useState<ImageUploadValidationResult>({
@@ -40,7 +42,11 @@ export function ImageUploadPanel({
     rejectedFiles: Object.freeze([]),
     issues: Object.freeze([]),
   });
-  const [previewUrls, setPreviewUrls] = useState<ReadonlyArray<{ readonly fileName: string; readonly url: string }>>(Object.freeze([]));
+  const [previewUrls, setPreviewUrls] = useState<ReadonlyArray<{
+    readonly fileName: string;
+    readonly filePath?: string;
+    readonly url: string;
+  }>>(Object.freeze([]));
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const acceptAttribute = acceptedMimeTypes.join(",");
@@ -64,7 +70,17 @@ export function ImageUploadPanel({
     setValidation(result);
     setPreviewUrls((current) => {
       current.forEach((entry) => URL.revokeObjectURL(entry.url));
-      return Object.freeze(result.acceptedFiles.map((file) => ({ fileName: file.name, url: URL.createObjectURL(file) })));
+      return Object.freeze(result.acceptedFiles.map((file) => {
+        const maybePath = (file as File & { readonly path?: string }).path;
+        const filePath = typeof maybePath === "string" && maybePath.trim().length > 0
+          ? maybePath.trim()
+          : undefined;
+        return {
+          fileName: file.name,
+          filePath,
+          url: URL.createObjectURL(file),
+        };
+      }));
     });
   };
 
@@ -188,6 +204,9 @@ export function ImageUploadPanel({
             <article key={entry.fileName} className="ui-image-upload-panel__preview-item">
               <img src={entry.url} alt={entry.fileName} className="ui-image-upload-panel__preview-image" loading="lazy" decoding="async" />
               <span className="ui-text-small ui-text-secondary">{entry.fileName}</span>
+              <span className="ui-text-small ui-text-secondary">
+                {resolvedPreviewPathsByFileName?.[entry.fileName] ?? entry.filePath ?? entry.fileName}
+              </span>
             </article>
           ))}
         </div>
