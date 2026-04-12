@@ -62,6 +62,7 @@ Lifecycle stage is environment-driven (`production`/`development`/`test`) and go
 - provider credentials remain fail-fast required by default policy
 - identity-session signing material can be optional in development policy
 - when policy allows and migration value is absent, signing material can be bootstrap-generated (Ed25519 PKCS#8) and persisted durably
+- startup and diagnostics now emit explicit governance assertions for development-only allowances with `warning` or `blocked` enforcement
 
 ## Failure diagnostics matrix
 
@@ -74,6 +75,7 @@ Lifecycle stage is environment-driven (`production`/`development`/`test`) and go
 - `bootstrap-creation-failed`: generated bootstrap create path failed
 
 Any `error` severity diagnostic yields invalid bootstrap state and startup failure.
+Governance assertions with `enforcement=blocked` must be treated as production-policy violations.
 
 ## Operational procedure
 

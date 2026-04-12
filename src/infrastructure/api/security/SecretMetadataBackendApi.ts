@@ -1074,6 +1074,22 @@ function sanitizeSecretServiceOperationalDiagnostics(
         missing: input.securityMaterial.summary.missing,
         nonCompliant: input.securityMaterial.summary.nonCompliant,
       }),
+      governanceAssertions: Object.freeze({
+        total: input.securityMaterial.governanceAssertions.total,
+        warning: input.securityMaterial.governanceAssertions.warning,
+        blocked: input.securityMaterial.governanceAssertions.blocked,
+        entries: Object.freeze(input.securityMaterial.governanceAssertions.entries.map((entry) => Object.freeze({
+          assertionId: normalizeOptional(entry.assertionId) ?? "security-material-governance-assertion",
+          secretId: normalizeOptional(entry.secretId) ?? "",
+          materialId: normalizeOptional(entry.materialId) ?? "material:unknown",
+          allowanceKind: entry.allowanceKind,
+          lifecycleStage: entry.lifecycleStage,
+          productionCapable: entry.productionCapable,
+          enforcement: entry.enforcement,
+          message: toSafeClientErrorMessage(entry.message, "Security material governance assertion emitted."),
+          details: entry.details ? Object.freeze({ ...entry.details }) : undefined,
+        }))),
+      }),
       entries: Object.freeze(input.securityMaterial.entries.map((entry) => Object.freeze({
         secretId: normalizeOptional(entry.secretId) ?? "",
         state: entry.state,

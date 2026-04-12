@@ -63,6 +63,12 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
         missing: 0,
         nonCompliant: 0,
       });
+      expect(diagnostics.securityMaterial.governanceAssertions).toEqual({
+        total: 0,
+        warning: 0,
+        blocked: 0,
+        entries: [],
+      });
       expect(diagnostics.securityMaterial.entries[0]?.state).toBe("healthy");
       expect(diagnostics.securityMaterial.entries[0]?.backend?.backendKind).toBe("durable-server-secret-store");
       expect((diagnostics.bootstrap.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
@@ -107,6 +113,7 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
         missing: 1,
         nonCompliant: 0,
       });
+      expect(diagnostics.securityMaterial.governanceAssertions.total).toBe(0);
       expect(diagnostics.securityMaterial.entries[0]?.state).toBe("missing");
       expect(diagnostics.securityMaterial.entries[0]?.policy.startupRequirement).toBe("fail-fast-required");
       expect(diagnostics.bootstrap.diagnostics.some((entry) => entry.message.includes("sk-live"))).toBeFalse();
@@ -161,6 +168,11 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
         missing: 1,
         nonCompliant: 0,
       });
+      expect(diagnostics.securityMaterial.governanceAssertions.warning).toBeGreaterThan(0);
+      expect(diagnostics.securityMaterial.governanceAssertions.entries.some((entry) => (
+        entry.allowanceKind === "ephemeral-bootstrap-material"
+        && entry.enforcement === "warning"
+      ))).toBeTrue();
       expect(diagnostics.securityMaterial.entries[0]?.fallbackModeActive).toBeTrue();
     } finally {
       secretService.dispose();

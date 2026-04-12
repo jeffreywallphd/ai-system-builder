@@ -13,6 +13,7 @@ Guide contributors on how to add secret-backed behavior while preserving hardene
 - keep plaintext out of query/list/diagnostic surfaces
 - keep audit and log details redaction-safe
 - respect production fail-fast vs development/test optional policy behavior
+- ensure development-only allowances emit explicit governance assertions in startup/diagnostics surfaces
 
 ## Extension Paths
 

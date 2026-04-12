@@ -130,6 +130,18 @@ export interface AuthoritativeServerSecurityMaterialReadinessSummary {
   readonly nonCompliant: number;
 }
 
+export interface AuthoritativeServerSecurityMaterialGovernanceAssertion {
+  readonly assertionId: string;
+  readonly materialId: string;
+  readonly allowanceKind: "ephemeral-bootstrap-material" | "relaxed-validation-mode" | "conditional-provider-backend";
+  readonly lifecycleStage: string;
+  readonly productionCapable: boolean;
+  readonly enforcement: "warning" | "blocked";
+  readonly message: string;
+  readonly sourceKind: string;
+  readonly details?: Readonly<Record<string, string>>;
+}
+
 export interface AuthoritativeServerSecurityMaterialReadinessReport {
   readonly state: AuthoritativeServerSecurityMaterialReadinessState;
   readonly blocking: boolean;
@@ -141,6 +153,12 @@ export interface AuthoritativeServerSecurityMaterialReadinessReport {
   readonly summary: AuthoritativeServerSecurityMaterialReadinessSummary;
   readonly issues: ReadonlyArray<AuthoritativeServerSecurityMaterialReadinessIssue>;
   readonly entries: ReadonlyArray<AuthoritativeServerSecurityMaterialReadinessEntry>;
+  readonly governanceAssertions: {
+    readonly total: number;
+    readonly warning: number;
+    readonly blocked: number;
+    readonly entries: ReadonlyArray<AuthoritativeServerSecurityMaterialGovernanceAssertion>;
+  };
 }
 
 export interface AuthoritativeServerSecurityStageOutput {

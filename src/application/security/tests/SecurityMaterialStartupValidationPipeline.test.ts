@@ -102,6 +102,11 @@ describe("SecurityMaterialStartupValidationPipeline", () => {
       SecurityMaterialStartupValidationIssueCodes.nonDurableSource,
     );
     expect(result.productionCapable).toBeTrue();
+    expect(result.governanceAssertions.blocked).toBeGreaterThan(0);
+    expect(result.governanceAssertions.entries.some((entry) => (
+      entry.allowanceKind === "ephemeral-bootstrap-material"
+      && entry.enforcement === "blocked"
+    ))).toBeTrue();
   });
 
   it("keeps development pipeline ready and reports warning diagnostics for optional policy material", () => {
@@ -114,6 +119,11 @@ describe("SecurityMaterialStartupValidationPipeline", () => {
       SecurityMaterialStartupValidationIssueCodes.nonDurableSource,
     );
     expect(result.fatalIssues).toHaveLength(0);
+    expect(result.governanceAssertions.warning).toBeGreaterThan(0);
+    expect(result.governanceAssertions.entries.some((entry) => (
+      entry.allowanceKind === "relaxed-validation-mode"
+      && entry.enforcement === "warning"
+    ))).toBeTrue();
   });
 
   it("records missing material diagnostics when observation is absent", () => {
@@ -124,5 +134,6 @@ describe("SecurityMaterialStartupValidationPipeline", () => {
     );
     expect(result.state).toBe(SecurityMaterialStartupValidationStates.invalid);
     expect(result.issues.map((issue) => issue.code)).toContain(SecurityMaterialStartupValidationIssueCodes.missing);
+    expect(result.governanceAssertions.total).toBe(0);
   });
 });

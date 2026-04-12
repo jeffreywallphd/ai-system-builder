@@ -26,6 +26,7 @@ Keep operator/admin bootstrap guidance aligned to hardened startup behavior for 
 - policy can allow optional/development handling for selected signing material
 - bootstrap generation is policy-governed and persisted durably
 - provider credentials remain fail-fast required by default policy
+- development-only allowances are surfaced as explicit governance assertions (`warning` or `blocked`) in startup/diagnostics outputs
 
 ## Extension Expectations
 

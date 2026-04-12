@@ -331,6 +331,12 @@ describe("SecretMetadataBackendApi", () => {
               missing: 1,
               nonCompliant: 0,
             }),
+            governanceAssertions: Object.freeze({
+              total: 0,
+              warning: 0,
+              blocked: 0,
+              entries: Object.freeze([]),
+            }),
             entries: Object.freeze([]),
           }),
         }),
@@ -422,6 +428,24 @@ describe("SecretMetadataBackendApi", () => {
               missing: 0,
               nonCompliant: 1,
             }),
+            governanceAssertions: Object.freeze({
+              total: 1,
+              warning: 0,
+              blocked: 1,
+              entries: Object.freeze([Object.freeze({
+                assertionId: "secret:server:provider:openai:ephemeral-bootstrap-material:production",
+                secretId: "secret:server:provider:openai",
+                materialId: "material:server:provider:openai",
+                allowanceKind: "ephemeral-bootstrap-material",
+                lifecycleStage: "production",
+                productionCapable: true,
+                enforcement: "blocked",
+                message: "secret-store:/governance/path leaked",
+                details: Object.freeze({
+                  fallbackPolicy: "generate-ephemeral-for-development",
+                }),
+              })]),
+            }),
             entries: Object.freeze([Object.freeze({
               secretId: "secret:server:provider:openai",
               state: "non-compliant",
@@ -485,6 +509,9 @@ describe("SecretMetadataBackendApi", () => {
     expect((response.data.diagnostics.bootstrap.materialMetadata[0] as Record<string, unknown>).rawValue).toBeUndefined();
     expect(response.data.diagnostics.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
     expect(response.data.diagnostics.bootstrap.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
+    expect(response.data.diagnostics.securityMaterial.governanceAssertions.entries[0]?.message).toBe(
+      "Security material governance assertion emitted.",
+    );
     expect(response.data.diagnostics.securityMaterial.entries[0]?.state).toBe("non-compliant");
     expect(response.data.diagnostics.securityMaterial.entries[0]?.validation.failures[0]?.message).toBe(
       "Secret service diagnostic emitted.",

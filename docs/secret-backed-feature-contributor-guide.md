@@ -43,6 +43,7 @@ Never collapse user/workspace material into server scope to bypass authorization
 - production-capable startup must satisfy fail-fast-required material with durable configured values
 - development/test may permit optional warning-only behavior when classification policy allows it
 - deterministic development fallback for critical server material is allowed only when startup validation policy marks it eligible
+- development-only allowances must emit explicit governance assertions (`warning` or `blocked`) in startup/diagnostics state
 - obsolete random runtime fallback behavior is not an accepted implementation pattern
 
 ## Adding a new secret consumer

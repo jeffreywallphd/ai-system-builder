@@ -17,6 +17,7 @@ Keep diagnostics usage aligned with hardened secret material governance and star
 - bootstrap required ids + bootstrap diagnostics + metadata-only material descriptors
 - `securityMaterial` lifecycle summary and per-material classification/policy/rotation/backend status
 - warning/failure breakdown and `fallbackModeActive` indicators
+- explicit `securityMaterial.governanceAssertions` for development-only allowance governance (`warning` vs `blocked`)
 
 ## Safety Guarantees
 
@@ -28,4 +29,5 @@ Keep diagnostics usage aligned with hardened secret material governance and star
 
 - prioritize repository and encryption availability first
 - then remediate required-secret bootstrap diagnostics
+- treat `securityMaterial.governanceAssertions.entries` as authoritative allowance policy signals
 - treat optional fallback diagnostics as non-production signals unless policy explicitly allows lifecycle use
