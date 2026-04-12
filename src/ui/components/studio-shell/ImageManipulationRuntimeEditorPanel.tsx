@@ -98,14 +98,14 @@ import {
 } from "./image-manipulation/GeneratedResultGalleryHistoryAdapter";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
-  acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
-  acceptedMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/webp"]),
+  acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "gif", "webp"]),
+  acceptedMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/gif", "image/webp"]),
   maxFileSizeBytes: 15 * 1024 * 1024,
   conversion: Object.freeze({
     mode: "forbidden",
     allowedOutputFormats: Object.freeze([]),
-    passThroughExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
-    passThroughMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/webp"]),
+    passThroughExtensions: Object.freeze(["png", "jpg", "jpeg", "gif", "webp"]),
+    passThroughMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/gif", "image/webp"]),
   }),
 });
 
@@ -3311,7 +3311,7 @@ export function ImageManipulationRuntimeEditorPanel({
         <aside className="ui-image-editor-page__left-column ui-stack ui-stack--sm" aria-label="Preparation and run controls">
           <ImageUploadPanel
             title="Choose a photo"
-            acceptedMimeTypes={["image/png", "image/jpeg", "image/webp"]}
+            acceptedMimeTypes={["image/png", "image/jpeg", "image/gif", "image/webp"]}
             maxUploadCount={1}
             ingestionAdapter={uploadAdapter}
             targetContext={{
@@ -4563,6 +4563,5 @@ export function ImageManipulationRuntimeEditorPanel({
 }
 
 export default ImageManipulationRuntimeEditorPanel;
-
 
 
