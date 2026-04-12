@@ -27,6 +27,11 @@ const CHECK_CATALOG = [
     description: "Validate docs segmentation and supersession rules.",
     scriptPath: "dev/scripts/validate-docs-segmentation.cjs",
   },
+  {
+    id: "cross-references",
+    description: "Validate high-value docs internal links and cross-reference integrity.",
+    scriptPath: "dev/scripts/validate-docs-cross-references.cjs",
+  },
 ];
 
 function parseCheckIds(rawValue) {

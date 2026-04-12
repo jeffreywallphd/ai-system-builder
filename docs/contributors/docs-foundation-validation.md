@@ -12,6 +12,7 @@ related_code_paths:
   - dev/scripts/validate-adr-records.cjs
   - dev/scripts/validate-architecture-domains.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/scripts/validate-docs-cross-references.cjs
   - dev/tests/DocsLintEntrypointScript.test.ts
   - dev/tests/DocsFoundationValidationScript.test.ts
   - dev/tests/DocumentationRegistryValidationScript.test.ts
@@ -63,6 +64,8 @@ Use this guide when you need a fast contract check for the documentation foundat
 - Non-active registry docs (`archived`, `superseded`, `deprecated`) keep required metadata fields, taxonomy-aligned enums, and status/authority structural sections (`## Documentation Status` or supersession sections as applicable).
 - Registry validation enforces lightweight shape and metadata invariants for `docs/context/documentation-registry.seed.json`.
 - Registry validation also enforces cross-reference integrity for indexed `relatedDocs` to `relatedRecordIds` alignment.
+- High-value docs link validation catches broken internal documentation links across architecture docs, ADR records, routing docs, index docs, and governance quality standards.
+- Cross-reference validation enforces routing doc path to `relatedDocRecordIds` alignment, documentation-index record/link alignment, architecture `## Related ADRs` registration integrity, and supersession-registry alignment for indexed superseded docs.
 
 ## Run Locally
 
@@ -78,6 +81,7 @@ npm run docs:validate:registry
 npm run docs:validate:adr
 npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
+npm run docs:validate:cross-references
 ```
 
 ## CI Usage
@@ -96,6 +100,7 @@ npm run docs:validate:registry
 npm run docs:validate:adr
 npm run docs:validate:architecture-domains
 npm run docs:validate:segmentation
+npm run docs:validate:cross-references
 ```
 
 ## Failure Output
@@ -163,6 +168,14 @@ Examples:
 - `REGISTRY_REFERENCE_INVALID`
 - `REGISTRY_CROSS_REFERENCE_INVALID`
 - `REGISTRY_TAXONOMY_MISMATCH`
+- `DOC_INTERNAL_LINK_BROKEN`
+- `ARCHITECTURE_RELATED_ADR_INVALID`
+- `ROUTING_DOC_REFERENCE_BROKEN`
+- `ROUTING_RELATED_RECORD_MISSING`
+- `ROUTING_RELATED_RECORD_UNKNOWN`
+- `INDEX_RECORD_REFERENCE_INVALID`
+- `INDEX_RECORD_LINK_MISMATCH`
+- `SUPERSESSION_REGISTRY_ALIGNMENT_INVALID`
 
 ## Scope Notes
 
