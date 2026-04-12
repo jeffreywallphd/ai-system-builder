@@ -64,6 +64,23 @@ Bounded composition modules:
 10. `ServerTransportCompositionModule`
 11. `ServerDiagnosticsCompositionModule`
 
+## Story 2.1.2 Implementation Scaffold
+
+Story 2.1.2 adds the initial bounded composition contract scaffold under:
+
+- `src/hosts/server/composition/README.md`
+- `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleContracts.ts`
+- `src/hosts/server/composition/contracts/AuthoritativeServerCompositionModuleMap.ts`
+- `src/hosts/server/composition/contracts/index.ts`
+- `src/hosts/server/tests/AuthoritativeServerCompositionAssemblyContracts.test.ts`
+
+This scaffold intentionally does not move runtime behavior yet. It introduces:
+
+- explicit typed input/output contracts for all target modules;
+- lifecycle/disposal contract hooks for composition modules;
+- an ordered module map with dependency direction, stage ownership hints, produced artifacts, and disposal responsibilities;
+- regression coverage to keep module-map shape and dependency ordering stable for follow-on extraction stories.
+
 ## Dependency And Stage Contracts
 
 Contract direction:
