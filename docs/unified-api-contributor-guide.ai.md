@@ -35,6 +35,11 @@ related_code_paths:
 2. Wire backend availability in `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`.
 3. Keep deterministic registration ownership in `src/infrastructure/transport/http-server/identity/route-families/AuthoritativeIdentityRouteFamilyModules.ts`.
 4. Implement/adjust handler behavior in `src/infrastructure/transport/http-server/identity/route-families/*` and register the handler in `defaultRouteFamilyHandlers` in `IdentityHttpServer.ts`.
+   - security/governance route-family handlers are modularized in:
+     - `DeploymentPolicyRouteFamilyHandler.ts`
+     - `SecretMetadataRouteFamilyHandler.ts`
+     - `CertificateOperationsRouteFamilyHandler.ts`
+     - `NodeTrustRouteFamilyHandler.ts`
 5. Preserve middleware order: metadata -> CORS -> secure transport -> auth/trust -> parse/map -> backend -> status translation -> response envelope.
 6. Keep transport mapping seams in `src/infrastructure/transport/http-server/identity/dto/*`; do not move business policy into transport handlers/mappers.
 7. If the family is required at host startup, update `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`.

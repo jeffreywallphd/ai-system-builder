@@ -16,6 +16,8 @@ import type { AuthoritativeRunQueryBackendApi } from "../../../../api/runs/Autho
 import type { AuthoritativeRunMutationBackendApi } from "../../../../api/runs/AuthoritativeRunMutationBackendApi";
 import type { AuthoritativeRunExecutionUpdateBackendApi } from "../../../../api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import type { NodeTrustBackendApi } from "../../../../api/nodes/NodeTrustBackendApi";
+import type { SecretMetadataBackendApi } from "../../../../api/security/SecretMetadataBackendApi";
+import type { CertificateOperationsBackendApi } from "../../../../api/security/CertificateOperationsBackendApi";
 import type { AuthorizationManagementBackendApi } from "../../../../api/authorization/AuthorizationManagementBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../../api/workspaces/WorkspaceInvitationBackendApi";
@@ -299,7 +301,49 @@ class ParityBackends {
     },
   } satisfies Partial<AuthoritativeRunExecutionUpdateBackendApi>;
 
-  public readonly nodeTrust = {} satisfies Partial<NodeTrustBackendApi>;
+  public readonly secretMetadata = {
+    getSecretServiceHealth: async (request: Readonly<Record<string, unknown>>) => {
+      this.lastSecretHealthRequest = request;
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          health: Object.freeze({
+            service: "ok",
+          }),
+        }),
+      });
+    },
+  } satisfies Partial<SecretMetadataBackendApi>;
+
+  public readonly certificateOperations = {
+    getCertificateAuthorityStatus: async (request: Readonly<Record<string, unknown>>) => {
+      this.lastCertificateAuthorityStatusRequest = request;
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          status: Object.freeze({
+            certificateAuthorityId: "ca:internal",
+          }),
+        }),
+      });
+    },
+  } satisfies Partial<CertificateOperationsBackendApi>;
+
+  public readonly nodeTrust = {
+    submitNodeEnrollment: async (request: Readonly<Record<string, unknown>>) => {
+      this.lastNodeEnrollmentSubmissionRequest = request;
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          enrollment: Object.freeze({
+            requestId: "enrollment:1",
+            nodeId: String(request.nodeId),
+            status: "submitted",
+          }),
+        }),
+      });
+    },
+  } satisfies Partial<NodeTrustBackendApi>;
 
   public lastStorageListRequest: Readonly<Record<string, unknown>> | undefined;
   public lastAssetListRequest: Readonly<Record<string, unknown>> | undefined;
@@ -316,6 +360,9 @@ class ParityBackends {
   public lastRunListRequest: Readonly<Record<string, unknown>> | undefined;
   public lastRunCancelRequest: Readonly<Record<string, unknown>> | undefined;
   public lastRunExecutionUpdateRequest: Readonly<Record<string, unknown>> | undefined;
+  public lastSecretHealthRequest: Readonly<Record<string, unknown>> | undefined;
+  public lastCertificateAuthorityStatusRequest: Readonly<Record<string, unknown>> | undefined;
+  public lastNodeEnrollmentSubmissionRequest: Readonly<Record<string, unknown>> | undefined;
 }
 
 interface ParityFixture {
@@ -342,6 +389,8 @@ async function startParityFixture(): Promise<ParityFixture> {
     executionNodeManagementBackendApi: backends.executionNodeManagement as unknown as ExecutionNodeManagementBackendApi,
     deploymentPolicyReadBackendApi: backends.deploymentRead as unknown as DeploymentPolicyReadBackendApi,
     deploymentPolicyWriteBackendApi: backends.deploymentWrite as unknown as DeploymentPolicyWriteBackendApi,
+    secretMetadataBackendApi: backends.secretMetadata as unknown as SecretMetadataBackendApi,
+    certificateOperationsBackendApi: backends.certificateOperations as unknown as CertificateOperationsBackendApi,
     authoritativeRunSubmissionBackendApi: backends.runSubmission as unknown as AuthoritativeRunSubmissionBackendApi,
     authoritativeRunQueryBackendApi: backends.runRead as unknown as AuthoritativeRunQueryBackendApi,
     authoritativeRunMutationBackendApi: backends.runMutation as unknown as AuthoritativeRunMutationBackendApi,
@@ -664,6 +713,57 @@ describe("IdentityHttpServer migrated route-family parity regression", () => {
     expect(fixture.backends.lastRunCancelRequest?.workspaceId).toBe("workspace-alpha");
     expect(fixture.backends.lastRunExecutionUpdateRequest?.senderNodeId).toBe("node:trusted-1");
 
+  });
+
+  it("dispatches migrated security and node-trust families through modular handlers", async () => {
+    const fixture = await startParityFixture();
+    const token = await registerAndLogin(fixture.baseUrl, "route.parity.security.user");
+
+    const secretHealth = await fetch(`${fixture.baseUrl}/api/v1/security/secrets/health`, {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(secretHealth.status).toBe(200);
+
+    const certificateAuthorityStatus = await fetch(`${fixture.baseUrl}/api/v1/security/certificates/authority/status`, {
+      headers: {},
+    });
+    expect(certificateAuthorityStatus.status).toBe(401);
+
+    const nodeEnrollment = await fetch(`${fixture.baseUrl}/api/v1/nodes/enrollments`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        actorUserIdentityId: "node:bootstrap:parity:1",
+        nodeId: "node:parity:1",
+        nodeType: "compute",
+        displayName: "Parity Node 1",
+        capabilityProfile: {
+          enabledCapabilities: ["executor"],
+          supportsRemoteScheduling: true,
+        },
+      }),
+    });
+    expect(nodeEnrollment.status).toBe(200);
+
+    expect(fixture.logger.events.some((event) => (
+      event.event === "identity-http.route-family.modular-handled"
+      && event.path === "/api/v1/security/secrets/health"
+      && event.details?.routeFamilyId === "security-secret-metadata"
+    ))).toBeTrue();
+    expect(fixture.logger.events.some((event) => (
+      event.event === "identity-http.route-family.modular-handled"
+      && event.path === "/api/v1/security/certificates/authority/status"
+      && event.details?.routeFamilyId === "security-certificate-operations"
+    ))).toBeTrue();
+    expect(fixture.logger.events.some((event) => (
+      event.event === "identity-http.route-family.modular-handled"
+      && event.path === "/api/v1/nodes/enrollments"
+      && event.details?.routeFamilyId === "node-trust"
+    ))).toBeTrue();
   });
 
   it("enforces trust-bound sender identity checks for run-execution-update parity", async () => {
