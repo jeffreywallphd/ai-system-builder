@@ -14,6 +14,8 @@ This note documents Story 8.3.3 (Feature 8 / Epic 8.3): bootstrap required syste
 
 `startIdentityServerHost(...)` now runs system secret bootstrap validation immediately after composing the secret service.
 
+- Server-scoped provider/signing bootstrap resolution runs through the durable server backend behind `ISecretProviderMaterialResolutionPort`.
+- Backend initialization performs a fail-closed repository readiness check before server-scope operations.
 - If no required system secrets are configured, startup proceeds unchanged.
 - If required system secrets are configured:
   - each required secret must be present in the secret service and runtime-retrievable, or
@@ -57,4 +59,5 @@ Migration only occurs when the required secret is missing from the secret servic
 - Missing required system secrets fail startup.
 - Unsupported required secret identifiers fail startup.
 - Migration attempts fail startup when encryption is unavailable or create/runtime validation fails.
+- Durable server backend initialization failures fail startup.
 - Runtime validation checks do not expose plaintext in diagnostics.

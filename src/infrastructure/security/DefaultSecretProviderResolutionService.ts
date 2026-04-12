@@ -16,7 +16,6 @@ import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretM
 import type { SecretRuntimeConsumptionAdapters } from "@application/security/services/SecretRuntimeConsumptionAdapters";
 import {
   SecretProviderBootstrapOutcomes,
-  SecretProviderMaterialKinds,
   type ISecretProviderMaterialResolutionPort,
   type ResolveSecretProviderMaterialExistenceInput,
   type ResolveSecretProviderMaterialInput,
@@ -26,15 +25,26 @@ import {
   type SecretProviderMaterialBootstrapInput,
   type SecretProviderMaterialReference,
 } from "@application/security/ports/SecretProviderPorts";
+import {
+  DurableServerSecretStoreBackend,
+  type DurableServerSecretStoreBackendDependencies,
+} from "@infrastructure/security/secrets/DurableServerSecretStoreBackend";
 
 export interface DefaultSecretProviderResolutionServiceDependencies {
   readonly runtimeSecretConsumptionAdapters: SecretRuntimeConsumptionAdapters;
   readonly getSecretMetadata: (request: GetSecretMetadataRequest) => Promise<SecretServiceResult<SecretReference>>;
   readonly createSecret: (request: CreateSecretRequest) => Promise<SecretServiceResult<CreateSecretResult>>;
+  readonly initializeServerSecretStore?: () => Promise<void>;
+  readonly serverSecretStoreBackend?: DurableServerSecretStoreBackend;
 }
 
 export class DefaultSecretProviderResolutionService implements ISecretProviderMaterialResolutionPort {
-  public constructor(private readonly dependencies: DefaultSecretProviderResolutionServiceDependencies) {}
+  private readonly serverSecretStoreBackend: DurableServerSecretStoreBackend;
+
+  public constructor(private readonly dependencies: DefaultSecretProviderResolutionServiceDependencies) {
+    this.serverSecretStoreBackend = dependencies.serverSecretStoreBackend
+      ?? new DurableServerSecretStoreBackend(toServerSecretStoreBackendDependencies(dependencies));
+  }
 
   public async resolveSecretProviderMaterial(
     input: ResolveSecretProviderMaterialInput,
@@ -44,28 +54,13 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
       ?? defaultResolutionJustification(input);
 
     if (scope === SecretScopes.server) {
-      const result = await this.dependencies.runtimeSecretConsumptionAdapters.resolveServerSigningCredential({
-        secretId: input.selector.secretId,
-        operationKey: input.access.operationKey,
-        serviceIdentity: input.access.serviceIdentity,
-        signingPurpose: toServerSigningPurpose(input),
-        justification,
-        occurredAt: input.access.occurredAt,
-      });
-      if (!result.ok) {
-        return result;
-      }
-      return {
-        ok: true,
-        value: Object.freeze({
-          providerId: input.selector.providerId,
-          secretId: result.value.secretId,
-          currentVersionId: result.value.currentVersionId,
-          scope: result.value.scope,
-          materialKind: input.selector.materialKind,
-          rawValue: result.value.credential,
+      return this.serverSecretStoreBackend.resolveServerMaterial({
+        selector: input.selector,
+        access: Object.freeze({
+          ...input.access,
+          justification,
         }),
-      };
+      });
     }
 
     if (scope === SecretScopes.workspace) {
@@ -123,6 +118,10 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
   public async resolveSecretProviderMaterialMetadata(
     input: ResolveSecretProviderMaterialMetadataInput,
   ): Promise<SecretServiceResult<SecretProviderMaterialReference>> {
+    if (input.selector.scope.scope === SecretScopes.server) {
+      return this.serverSecretStoreBackend.resolveServerMaterialMetadata(input);
+    }
+
     const metadata = await this.dependencies.getSecretMetadata({
       actor: createMetadataActor({
         scope: input.selector.scope,
@@ -151,6 +150,10 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
   public async secretProviderMaterialExists(
     input: ResolveSecretProviderMaterialExistenceInput,
   ): Promise<SecretServiceResult<{ readonly exists: boolean }>> {
+    if (input.selector.scope.scope === SecretScopes.server) {
+      return this.serverSecretStoreBackend.serverMaterialExists(input);
+    }
+
     const metadata = await this.resolveSecretProviderMaterialMetadata({
       selector: input.selector,
       access: input.access,
@@ -179,6 +182,10 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
   public async bootstrapSecretProviderMaterial(
     input: SecretProviderMaterialBootstrapInput,
   ): Promise<SecretServiceResult<SecretProviderBootstrapResult>> {
+    if (input.selector.scope.scope === SecretScopes.server) {
+      return this.serverSecretStoreBackend.bootstrapServerMaterial(input);
+    }
+
     const metadata = await this.resolveSecretProviderMaterialMetadata({
       selector: input.selector,
       access: input.access,
@@ -239,6 +246,17 @@ export class DefaultSecretProviderResolutionService implements ISecretProviderMa
       }),
     };
   }
+}
+
+function toServerSecretStoreBackendDependencies(
+  dependencies: DefaultSecretProviderResolutionServiceDependencies,
+): DurableServerSecretStoreBackendDependencies {
+  return Object.freeze({
+    runtimeSecretConsumptionAdapters: dependencies.runtimeSecretConsumptionAdapters,
+    getSecretMetadata: dependencies.getSecretMetadata,
+    createSecret: dependencies.createSecret,
+    initialize: dependencies.initializeServerSecretStore,
+  });
 }
 
 function toMaterialReference(
@@ -312,13 +330,6 @@ function createBootstrapActor(input: {
     userIdentityId: input.scope.userIdentityId,
     grantedActions: Object.freeze([SecretAccessActions.create]),
   });
-}
-
-function toServerSigningPurpose(input: ResolveSecretProviderMaterialInput): string {
-  if (input.selector.materialKind === SecretProviderMaterialKinds.providerCredential) {
-    return `provider-credential:${input.selector.providerId}`;
-  }
-  return input.access.usage;
 }
 
 function defaultResolutionJustification(input: ResolveSecretProviderMaterialInput): string {
