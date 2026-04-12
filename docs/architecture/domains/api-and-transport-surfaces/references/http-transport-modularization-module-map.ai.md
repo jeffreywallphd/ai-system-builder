@@ -356,6 +356,32 @@ Targeted mapper seam coverage:
 - `identity/tests/ExecutionNodeManagementRouteDtoMapper.test.ts`
 - `identity/tests/RunRouteDtoMapper.test.ts`
 
+## Story 1.4.3 Verification Status
+
+Added objective cutover verification focused on startup readiness, dispatch behavior, determinism, and maintainability posture:
+
+Startup and dispatch verification anchors:
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts` verifies startup composition emits `identity-http.route-families.composed` and that representative modular families dispatch without legacy fallback.
+- `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts` verifies authoritative startup composes deterministic route registration and rejects invalid route-family plans before host start.
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerRouteParityRegression.test.ts` verifies migrated family dispatch, auth/workspace guard parity, and transport-shape parity across representative endpoints.
+
+dispatch-overhead benchmark guardrail:
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpTransportComposition.test.ts` includes a lightweight lookup benchmark that exercises mixed representative API paths across all composed route families.
+- Guardrail budget is enforced by average route-family lookup time (microseconds per lookup) so meaningful dispatch regressions fail test execution.
+
+route registration determinism:
+- `IdentityHttpTransportComposition.test.ts` asserts repeated transport compositions produce identical route-family and route-prefix snapshots.
+- `IdentityHttpServer.test.ts` asserts explicit registration-plan startup logs retain deterministic route-family order.
+
+maintainability outcomes:
+- main transport entry file line count reduced from `15,153` lines (`7e5ebb6f`) to `11,779` lines (`2d45a250`) as of `2026-04-12` (`22.3%` reduction).
+- explicit module ownership remains concentrated in dedicated folders (`composition/`, `middleware/`, `primitives/`, `dto/`, `route-families/`) with guardrails in `dev/tests/HttpTransportModularizationMaintainabilityGuardrails.test.ts`.
+- maintainability guardrails enforce bounded monolith size, minimum extracted-module footprint, and canonical route-family module ownership declarations.
+
+Performance regression handling posture:
+- No meaningful modular-dispatch regression is currently observed under the cutover verification benchmark.
+- If the dispatch-overhead guardrail fails, treat it as a transport cutover regression and either optimize lookup/composition paths or document/approve the measured regression before release.
+
 ## Registration and Composition Seams
 
 Host seam remains authoritative:
