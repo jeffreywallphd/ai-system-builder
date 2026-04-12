@@ -288,6 +288,7 @@ export default function App({
           <div className="ui-card__header">
             <h1 className="ui-card__title">{stagePresentation.title}</h1>
             <p className="ui-card__subtitle">{stagePresentation.subtitle}</p>
+            <p className="ui-card__subtitle">Restoring any previously saved session before showing sign-in.</p>
           </div>
           <div className="ui-auth-page__progress-layout">
             <div>
