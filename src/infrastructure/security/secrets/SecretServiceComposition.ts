@@ -17,7 +17,9 @@ import { GetSecretMetadataUseCase } from "@application/security/use-cases/GetSec
 import { ListSecretsUseCase } from "@application/security/use-cases/ListSecretsUseCase";
 import { RetrieveSecretPlaintextForRuntimeUseCase } from "@application/security/use-cases/RetrieveSecretPlaintextForRuntimeUseCase";
 import { ReEncryptSecretsUseCase } from "@application/security/use-cases/ReEncryptSecretsUseCase";
+import { RetireSecretVersionUseCase } from "@application/security/use-cases/RetireSecretVersionUseCase";
 import { RotateSecretUseCase } from "@application/security/use-cases/RotateSecretUseCase";
+import { RevokeSecretVersionUseCase } from "@application/security/use-cases/RevokeSecretVersionUseCase";
 import { SecretAuthorizationPolicyEvaluator } from "@application/security/use-cases/SecretAuthorizationPolicyEvaluator";
 import { SecretScopeResolver } from "@application/security/use-cases/SecretScopeResolver";
 import { SecretRuntimeConsumptionAdapters } from "@application/security/services/SecretRuntimeConsumptionAdapters";
@@ -62,6 +64,8 @@ export interface ServerComposedSecretService {
   readonly getSecretMetadataUseCase: GetSecretMetadataUseCase;
   readonly retrieveSecretPlaintextForRuntimeUseCase: RetrieveSecretPlaintextForRuntimeUseCase;
   readonly rotateSecretUseCase: RotateSecretUseCase;
+  readonly revokeSecretVersionUseCase: RevokeSecretVersionUseCase;
+  readonly retireSecretVersionUseCase: RetireSecretVersionUseCase;
   readonly reEncryptSecretsUseCase: ReEncryptSecretsUseCase;
   readonly disableSecretUseCase: DisableSecretUseCase;
   readonly deleteSecretUseCase: DeleteSecretUseCase;
@@ -135,6 +139,18 @@ export function composeServerSecretService(input: ComposeServerSecretServiceInpu
     rotateSecretUseCase: new RotateSecretUseCase({
       secretRecordRepository,
       secretEncryptionPort,
+      secretAccessPolicyPort: accessPolicyPort,
+      secretAccessAuditPort: accessAuditPort,
+      secretObservabilityPort: observabilityPort,
+    }),
+    revokeSecretVersionUseCase: new RevokeSecretVersionUseCase({
+      secretRecordRepository,
+      secretAccessPolicyPort: accessPolicyPort,
+      secretAccessAuditPort: accessAuditPort,
+      secretObservabilityPort: observabilityPort,
+    }),
+    retireSecretVersionUseCase: new RetireSecretVersionUseCase({
+      secretRecordRepository,
       secretAccessPolicyPort: accessPolicyPort,
       secretAccessAuditPort: accessAuditPort,
       secretObservabilityPort: observabilityPort,

@@ -115,7 +115,7 @@ describe("LocalUserSecureSecretStoreBackend", () => {
     }
   });
 
-  it("returns persisted active, previous, and pending rotation metadata when available", async () => {
+  it("surfaces revoked and retired rotation timeline states while resolving only active material", async () => {
     const credentialStore = new InMemoryCredentialStore();
     const backend = new LocalUserSecureSecretStoreBackend({
       credentialStore,
@@ -160,14 +160,14 @@ describe("LocalUserSecureSecretStoreBackend", () => {
       updatedAt: "2026-04-11T00:00:00.000Z",
       currentVersionId: "secret:user:provider:openai:local-v2",
       rotation: {
-        currentVersionId: "secret:user:provider:openai:local-v2",
+        currentVersionId: "secret:user:provider:openai:local-v3",
         previousVersionId: "secret:user:provider:openai:local-v1",
-        pendingVersionId: "secret:user:provider:openai:local-v3",
+        pendingVersionId: "secret:user:provider:openai:local-v5",
         effectiveAsOf: "2026-04-11T00:00:00.000Z",
         versions: [
           {
             versionId: "secret:user:provider:openai:local-v1",
-            state: "previous",
+            state: "retired",
             effectiveFrom: "2026-04-01T00:00:00.000Z",
             effectiveUntil: "2026-04-11T00:00:00.000Z",
             successorVersionId: "secret:user:provider:openai:local-v2",
@@ -181,9 +181,15 @@ describe("LocalUserSecureSecretStoreBackend", () => {
           },
           {
             versionId: "secret:user:provider:openai:local-v3",
+            state: "revoked",
+            effectiveFrom: "2026-04-12T00:00:00.000Z",
+            predecessorVersionId: "secret:user:provider:openai:local-v2",
+          },
+          {
+            versionId: "secret:user:provider:openai:local-v5",
             state: "pending",
             effectiveFrom: "2026-05-01T00:00:00.000Z",
-            predecessorVersionId: "secret:user:provider:openai:local-v2",
+            predecessorVersionId: "secret:user:provider:openai:local-v3",
           },
         ],
         policy: {
@@ -199,6 +205,10 @@ describe("LocalUserSecureSecretStoreBackend", () => {
       selector,
       access,
     });
+    const resolved = await backend.resolveUserMaterial({
+      selector,
+      access,
+    });
 
     expect(metadata.ok).toBeTrue();
     if (!metadata.ok) {
@@ -206,9 +216,15 @@ describe("LocalUserSecureSecretStoreBackend", () => {
     }
     expect(metadata.value.rotation.currentVersionId).toBe("secret:user:provider:openai:local-v2");
     expect(metadata.value.rotation.previousVersionId).toBe("secret:user:provider:openai:local-v1");
-    expect(metadata.value.rotation.pendingVersionId).toBe("secret:user:provider:openai:local-v3");
-    expect(metadata.value.rotation.versions).toHaveLength(3);
+    expect(metadata.value.rotation.pendingVersionId).toBe("secret:user:provider:openai:local-v5");
+    expect(metadata.value.rotation.versions).toHaveLength(4);
+    expect(metadata.value.rotation.status).toBe("revoked");
     expect(metadata.value.rotation.policy?.rotationMode).toBe("scheduled");
+    expect(resolved.ok).toBeTrue();
+    if (!resolved.ok) {
+      return;
+    }
+    expect(resolved.value.currentVersionId).toBe("secret:user:provider:openai:local-v2");
   });
 
   it("rejects non-user scopes to enforce server/workspace boundaries", async () => {
