@@ -27,7 +27,7 @@ Story 8.3.7 operational companion for Feature 8 / Epic 8.3: give contributors a 
 ## Contributor implementation rules
 
 - Choose scope by ownership (`server`, `workspace`, `user`) and keep it explicit.
-- Runtime secret reads go through adapters/use cases, not env vars/persistence shortcuts.
+- Runtime secret reads go through adapters/use cases (`ISecretRuntimeConsumptionAdapters`, `ServerPlatformSecretConsumers`, or `ISecretProviderMaterialResolutionPort`), not env vars/persistence shortcuts.
 - Keep command/query DTO boundaries strict: plaintext only for mutation input.
 - Enforce log/audit redaction; plaintext and decrypted values are never allowed.
 - Handle `forbidden`/`conflict` outcomes deterministically; do not retry with broadened scope silently.
@@ -38,6 +38,7 @@ Story 8.3.7 operational companion for Feature 8 / Epic 8.3: give contributors a 
 - workspace credential: `resolveWorkspaceProviderCredential(...)`
 - user personal API key: `resolveUserPersonalApiKey(...)`
 - server signing/provider credentials: `ServerPlatformSecretConsumers`
+- provider bootstrap/read/metadata/existence: `ISecretProviderMaterialResolutionPort`
 
 ## Related docs
 

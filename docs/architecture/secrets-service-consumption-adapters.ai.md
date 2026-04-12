@@ -7,10 +7,14 @@ Story 8.2.5 baseline for Feature 8 / Epic 8.2 and Story 8.3.4 integration for Fe
 ## Canonical files
 
 - `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`
+- `src/application/security/ports/SecretProviderPorts.ts`
 - `src/infrastructure/security/secrets/ServerPlatformSecretConsumers.ts`
+- `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
 - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
 - `src/infrastructure/security/secrets/tests/ServerPlatformSecretConsumers.test.ts`
+- `src/infrastructure/security/tests/DefaultSecretProviderResolutionService.test.ts`
 - `src/application/security/tests/SecretRuntimeConsumptionAdapters.test.ts`
+- `src/application/security/tests/SecretProviderPorts.test.ts`
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 - `src/hosts/server/tests/IdentityServerHost.test.ts`
 - `docs/architecture/secrets-service-consumption-adapters.md`
@@ -36,6 +40,11 @@ Each adapter method:
 - `resolveServerProviderCredential(...)` for server-scoped provider credentials
 - `resolveIdentitySessionSigningMaterial(...)` for server-scoped signing materials
 
+Story 3.2.1 adds a provider-resolution seam for broader provider workflows:
+
+- `src/application/security/ports/SecretProviderPorts.ts`
+- `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+
 ## Governance and boundary posture
 
 - Adapters do not perform crypto, persistence, or secret-store reads directly.
@@ -48,7 +57,7 @@ Each adapter method:
 
 - `composeServerSecretService(...)` now exposes `runtimeSecretConsumptionAdapters` so host-level or infrastructure services can depend on a stable secret-consumption seam.
 - Existing use-case exposures remain unchanged; adapters are additive and narrow.
-- Story 8.3.4 integrates `SystemSecretBootstrapService` runtime validation through `ServerPlatformSecretConsumers`, covering server provider credentials and identity-session signing material.
+- Story 8.3.4 and Story 3.2.1 integrate `SystemSecretBootstrapService` through `ISecretProviderMaterialResolutionPort` for metadata lookup, existence checks, bootstrap creation, and runtime material validation.
 
 ## Test posture
 
@@ -61,3 +70,4 @@ Coverage verifies:
 - host composition exposes and successfully executes adapter-based runtime retrieval
 - platform secret consumers route through runtime adapter semantics with passthrough failures
 - host startup bootstrap migration can resolve provider credentials through the platform consumer seam
+- provider resolution service validates scope-aware server/workspace/user reads plus metadata/existence/bootstrap operations

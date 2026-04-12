@@ -13,6 +13,8 @@ This note documents Story 8.3.7 (Feature 8 / Epic 8.3): contributor guidance for
 - `src/shared/security/SecretRedaction.ts`
 - `src/shared/dto/security/SecretTransportDtos.ts`
 - `src/infrastructure/security/secrets/ServerPlatformSecretConsumers.ts`
+- `src/application/security/ports/SecretProviderPorts.ts`
+- `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 
 ## Extension objective
@@ -58,7 +60,7 @@ Runtime consumers should depend on adapters rather than on repositories/crypto p
 
 Preferred pattern:
 
-1. Depend on `ISecretRuntimeConsumptionAdapters` (or `ServerPlatformSecretConsumers` for server-host integrations).
+1. Depend on `ISecretRuntimeConsumptionAdapters`, `ServerPlatformSecretConsumers`, or `ISecretProviderMaterialResolutionPort` (for scope-aware metadata/existence/bootstrap + runtime resolution).
 2. Provide `operationKey`, `serviceIdentity`, and scope-specific IDs.
 3. Call only the narrow resolver that matches ownership scope.
 4. Use returned `credential` in-memory for the immediate operation.

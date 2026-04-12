@@ -1,6 +1,4 @@
 import {
-  SecretAccessActions,
-  SecretActorTypes,
   SecretKinds,
   SecretScopes,
   type SecretKind,
@@ -24,11 +22,13 @@ import {
   type SecurityMaterialStartupRequirement,
 } from "@application/security/contracts/SecurityMaterialClassificationContract";
 import type { ServerComposedSecretService } from "./SecretServiceComposition";
+import { ServerPlatformProviderIds } from "./ServerPlatformSecretConsumers";
 import {
-  ServerPlatformProviderIds,
-  ServerPlatformSecretConsumers,
-} from "./ServerPlatformSecretConsumers";
-import type { IRuntimeSecurityMaterialResolverPort } from "@application/security/ports/SecurityMaterialResolutionPorts";
+  SecretProviderMaterialKinds,
+  type ISecretProviderMaterialResolutionPort,
+  type SecretProviderMaterialSelector,
+} from "@application/security/ports/SecretProviderPorts";
+import { DefaultSecretProviderResolutionService } from "@infrastructure/security/DefaultSecretProviderResolutionService";
 
 const SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS = Object.freeze({
   requiredSecretIds: "AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS",
@@ -190,19 +190,8 @@ export interface SystemSecretBootstrapResult {
 export interface BootstrapSystemSecretsFromEnvironmentInput {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly secretService: ServerComposedSecretService;
-  readonly runtimeMaterialResolver?: IRuntimeSecurityMaterialResolverPort;
+  readonly secretProviderResolutionPort?: ISecretProviderMaterialResolutionPort;
   readonly now?: () => Date;
-}
-
-interface SystemSecretBootstrapPersistencePort {
-  readonly encryptionConfigured: boolean;
-  getSecretMetadata(input: {
-    readonly actor: ReturnType<typeof createAdministrativeActor>;
-    readonly secretId: string;
-    readonly occurredAt: string;
-  }): ReturnType<ServerComposedSecretService["getSecretMetadataUseCase"]["execute"]>;
-  createSecret(input: Parameters<ServerComposedSecretService["createSecretUseCase"]["execute"]>[0]):
-    ReturnType<ServerComposedSecretService["createSecretUseCase"]["execute"]>;
 }
 
 export class SystemSecretBootstrapValidationError extends Error {
@@ -235,10 +224,12 @@ export async function bootstrapSystemSecretsFromEnvironment(
   const migrationEnabled = parseOptionalBoolean(
     input.env[SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.migrateLegacyEnvironmentValues],
   ) ?? true;
-  const administrativeActor = createAdministrativeActor();
-  const runtimeMaterialResolver = input.runtimeMaterialResolver
-    ?? new ServerPlatformSecretConsumers(input.secretService.runtimeSecretConsumptionAdapters);
-  const bootstrapPersistence = createSystemSecretBootstrapPersistencePort(input.secretService);
+  const secretProviderResolutionPort = input.secretProviderResolutionPort
+    ?? new DefaultSecretProviderResolutionService({
+      runtimeSecretConsumptionAdapters: input.secretService.runtimeSecretConsumptionAdapters,
+      getSecretMetadata: (request) => input.secretService.getSecretMetadataUseCase.execute(request),
+      createSecret: (request) => input.secretService.createSecretUseCase.execute(request),
+    });
 
   for (const secretId of requiredSecretIds) {
     const definition = SystemSecretDefinitionsById.get(secretId);
@@ -263,14 +254,35 @@ export async function bootstrapSystemSecretsFromEnvironment(
       classification: definition.classification,
       lifecycleStage,
     });
+    const selector = createSystemSecretMaterialSelector(definition);
 
-    const existingMetadata = await bootstrapPersistence.getSecretMetadata({
-      actor: administrativeActor,
-      secretId: definition.secretId,
-      occurredAt: now().toISOString(),
+    const metadataExists = await secretProviderResolutionPort.secretProviderMaterialExists({
+      selector,
+      access: {
+        operationKey: `op:system-secret-bootstrap:metadata:${definition.secretId}:${now().getTime()}`,
+        serviceIdentity: "runtime:server:system-secret-bootstrap",
+        usage: "system-secret-bootstrap-metadata-check",
+        occurredAt: now().toISOString(),
+      },
     });
+    if (!metadataExists.ok) {
+      diagnostics.push(Object.freeze({
+        code: failFastRequired
+          ? SystemSecretBootstrapDiagnosticCodes.requiredSecretUnusable
+          : SystemSecretBootstrapDiagnosticCodes.optionalSecretUnusable,
+        secretId: definition.secretId,
+        message: failFastRequired
+          ? `Required system secret metadata could not be resolved (${metadataExists.error.code}).`
+          : `Optional startup secret metadata could not be resolved (${metadataExists.error.code}).`,
+        severity: failFastRequired ? "error" : "warning",
+        startupRequirement: policy.startupRequirement,
+        durabilityClass: policy.durabilityClass,
+        fallbackPolicy: policy.fallbackPolicy,
+      }));
+      continue;
+    }
 
-    if (!existingMetadata.ok) {
+    if (!metadataExists.value.exists) {
       const legacyEnvironmentVariable = definition.legacyEnvironmentVariable;
       const legacyValue = legacyEnvironmentVariable
         ? normalizeOptional(input.env[legacyEnvironmentVariable])
@@ -278,7 +290,7 @@ export async function bootstrapSystemSecretsFromEnvironment(
       const canAttemptMigration = migrationEnabled && Boolean(legacyEnvironmentVariable && legacyValue);
 
       if (canAttemptMigration) {
-        if (!bootstrapPersistence.encryptionConfigured) {
+        if (!input.secretService.status.configured) {
           diagnostics.push(Object.freeze({
             code: SystemSecretBootstrapDiagnosticCodes.legacyMigrationUnavailable,
             secretId: definition.secretId,
@@ -292,26 +304,26 @@ export async function bootstrapSystemSecretsFromEnvironment(
           continue;
         }
 
-        const createResult = await bootstrapPersistence.createSecret({
-          actor: administrativeActor,
-          operationKey: `op:system-secret-bootstrap:create:${definition.secretId}:${now().getTime()}`,
-          secretId: definition.secretId,
+        const bootstrapResult = await secretProviderResolutionPort.bootstrapSecretProviderMaterial({
+          selector,
+          access: {
+            operationKey: `op:system-secret-bootstrap:create:${definition.secretId}:${now().getTime()}`,
+            serviceIdentity: "runtime:server:system-secret-bootstrap",
+            usage: "system-secret-bootstrap-create",
+            occurredAt: now().toISOString(),
+          },
           name: definition.name,
-          owner: Object.freeze({
-            scope: SecretScopes.server,
-          }),
           kind: definition.kind,
           plaintext: legacyValue as string,
           metadata: definition.metadata,
-          createdAt: now().toISOString(),
         });
 
-        if (!createResult.ok) {
+        if (!bootstrapResult.ok) {
           diagnostics.push(Object.freeze({
             code: SystemSecretBootstrapDiagnosticCodes.legacyMigrationFailed,
             secretId: definition.secretId,
             legacyEnvironmentVariable,
-            message: `Legacy secret migration failed (${createResult.error.code}).`,
+            message: `Legacy secret migration failed (${bootstrapResult.error.code}).`,
             severity: "error",
             startupRequirement: SecurityMaterialStartupRequirements.failFastRequired,
             durabilityClass: SecurityMaterialDurabilityClasses.durable,
@@ -340,23 +352,16 @@ export async function bootstrapSystemSecretsFromEnvironment(
       }
     }
 
-    const runtimeCheck = definition.runtimeConsumer === "provider-credential"
-      ? await runtimeMaterialResolver.resolveServerProviderCredential({
-        providerId: definition.providerId as "openai" | "huggingface",
-        secretId: definition.secretId,
+    const runtimeCheck = await secretProviderResolutionPort.resolveSecretProviderMaterial({
+      selector,
+      access: {
         operationKey: `op:system-secret-bootstrap:validate:${definition.secretId}:${now().getTime()}`,
         serviceIdentity: "runtime:server:system-secret-bootstrap",
+        usage: definition.runtimePurpose,
         justification: `validate required system secret for '${definition.runtimePurpose}'`,
         occurredAt: now().toISOString(),
-      })
-      : await runtimeMaterialResolver.resolveIdentitySessionSigningMaterial({
-        secretId: definition.secretId,
-        operationKey: `op:system-secret-bootstrap:validate:${definition.secretId}:${now().getTime()}`,
-        serviceIdentity: "runtime:server:system-secret-bootstrap",
-        signingPurpose: definition.runtimePurpose,
-        justification: `validate required system secret for '${definition.runtimePurpose}'`,
-        occurredAt: now().toISOString(),
-      });
+      },
+    });
 
     if (!runtimeCheck.ok) {
       diagnostics.push(Object.freeze({
@@ -398,31 +403,6 @@ export async function assertSystemSecretBootstrapSafe(
     );
   }
   return result;
-}
-
-function createSystemSecretBootstrapPersistencePort(
-  secretService: ServerComposedSecretService,
-): SystemSecretBootstrapPersistencePort {
-  return Object.freeze({
-    encryptionConfigured: secretService.status.configured,
-    getSecretMetadata: (input) => secretService.getSecretMetadataUseCase.execute({
-      actor: input.actor,
-      secretId: input.secretId,
-      occurredAt: input.occurredAt,
-    }),
-    createSecret: (input) => secretService.createSecretUseCase.execute(input),
-  });
-}
-
-function createAdministrativeActor() {
-  return Object.freeze({
-    actorId: "system:secret-bootstrap",
-    actorType: SecretActorTypes.serverAdmin,
-    grantedActions: Object.freeze([
-      SecretAccessActions.create,
-      SecretAccessActions.readMetadata,
-    ]),
-  });
 }
 
 function parseOptionalCsvList(value: string | undefined): ReadonlyArray<string> {
@@ -467,4 +447,19 @@ function resolveLifecycleStage(
     return SecurityMaterialLifecycleStages.test;
   }
   return SecurityMaterialLifecycleStages.production;
+}
+
+function createSystemSecretMaterialSelector(
+  definition: SystemSecretDefinition,
+): SecretProviderMaterialSelector {
+  return Object.freeze({
+    providerId: definition.providerId ?? "platform",
+    secretId: definition.secretId,
+    scope: Object.freeze({
+      scope: SecretScopes.server,
+    }),
+    materialKind: definition.runtimeConsumer === "provider-credential"
+      ? SecretProviderMaterialKinds.providerCredential
+      : SecretProviderMaterialKinds.signingMaterial,
+  });
 }

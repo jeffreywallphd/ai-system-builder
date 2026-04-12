@@ -135,6 +135,23 @@ These contracts establish stable extension points for persistence adapters, auth
   - `ServerTlsMaterialCompositionModule` consumes typed `HostSecureTransportConfig.trustMaterial` fields plus the managed TLS resolver port, instead of ad hoc environment parsing
 - reduces host-level secret/key lookup sprawl by enforcing one resolver seam for secret credentials and one resolver seam for managed TLS transport material
 
+## Story 3.2.1 Secret provider ports and scope-aware resolution model
+
+- adds provider-facing application ports in:
+  - `src/application/security/ports/SecretProviderPorts.ts`
+- introduces explicit provider material contracts for:
+  - scope-aware selectors (`server`/`workspace`/`user`)
+  - runtime read access context (`operationKey`, `serviceIdentity`, usage/justification, timestamp)
+  - metadata/reference lookup versus raw value resolution
+  - existence checks
+  - bootstrap/write operations for missing provider material
+- adds infrastructure resolution model implementation:
+  - `src/infrastructure/security/DefaultSecretProviderResolutionService.ts`
+- migrates a real startup consumer:
+  - `SystemSecretBootstrapService` now uses the provider resolution/bootstrap port for metadata lookup, existence checks, bootstrap creation, and runtime usability validation
+- keeps caller isolation from storage details:
+  - bootstrap and runtime consumers no longer compose secret metadata/create/runtime flows manually
+
 ## Tests
 
 - `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants
