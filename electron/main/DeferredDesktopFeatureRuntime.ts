@@ -24,6 +24,7 @@ import { SqliteImageRunHistoryRepository } from "../../src/infrastructure/filesy
 import { SqliteSystemRuntimeExecutionStore } from "../../src/infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import { StudioShellBackendApi } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import type { SystemRuntimeObservabilityLogger } from "../../src/infrastructure/api/system-runtime/SystemRuntimeObservability";
 import { SystemStudioBackendApi } from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SqliteImageWorkflowSystemPersistenceAdapter } from "../../src/infrastructure/persistence/image-workflows/SqliteImageWorkflowSystemPersistenceAdapter";
 import type { resolveDesktopStoragePaths } from "../../src/infrastructure/desktop/DesktopAppPaths";
@@ -95,6 +96,7 @@ export interface CreateDeferredDesktopFeatureRuntimeOptions {
   readonly storagePaths: DesktopStoragePaths;
   readonly runtimeConfigValues: AppRuntimeConfigValues;
   readonly repoRoot: string;
+  readonly observabilityLogger?: SystemRuntimeObservabilityLogger;
   readonly factories?: Partial<DeferredDesktopFeatureRuntimeFactories>;
 }
 
@@ -119,7 +121,9 @@ function instrumentDeferredRuntimeCreation<T>(timingPhase: string, checkpoint: s
   }
 }
 
-function createDefaultFactories(): DeferredDesktopFeatureRuntimeFactories {
+function createDefaultFactories(
+  observabilityLogger?: SystemRuntimeObservabilityLogger,
+): DeferredDesktopFeatureRuntimeFactories {
   return {
     createWorkflowPersistence({ workflowsDirectory, workflowIndexDatabasePath }) {
       return new DesktopWorkflowPersistence({
@@ -196,6 +200,10 @@ function createDefaultFactories(): DeferredDesktopFeatureRuntimeFactories {
         undefined,
         undefined,
         args.executionAuditRepository,
+        undefined,
+        {
+          observabilityLogger,
+        },
       );
     },
   };
@@ -249,7 +257,7 @@ export function createDeferredDesktopFeatureRuntime(
   options: CreateDeferredDesktopFeatureRuntimeOptions,
 ): DeferredDesktopFeatureRuntime {
   const factories = {
-    ...createDefaultFactories(),
+    ...createDefaultFactories(options.observabilityLogger),
     ...options.factories,
   };
   const workflowPaths = resolveWorkflowPaths(options.runtimeConfigValues, options.repoRoot);

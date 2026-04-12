@@ -40,6 +40,17 @@ Shared client transport diagnostics are emitted by `src/ui/shared/api/SharedApiC
 - `createIdentityHttpServer({ observability: { onOperationalEvent } })`
 - Hook receives sanitized `IdentityHttpServerLogEvent` payloads.
 
+## Desktop sink coverage
+
+- Electron main now uses one operational logger adapter for runtime/server observability.
+- Sink targets:
+  - main-process console JSON (dev terminal visibility),
+  - `desktop-operational.log` in `app.getPath("logs")/ai-loom-studio`.
+- Injection points:
+  - `startAuthMinimalServerHostAssembly(...)` host logger option,
+  - deferred-runtime `SystemRuntimeBackendApi` observability logger option.
+- Redaction remains upstream in observability adapters; sink writes already-sanitized events.
+
 ## Troubleshooting quick flow
 
 1. Capture correlation id from client response/frame.

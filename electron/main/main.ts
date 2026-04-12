@@ -45,6 +45,10 @@ import type { DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeP
 import type { CanonicalRegistryRuntimeProvider } from "./runtime/CanonicalRegistryRuntimeProvider";
 import { createPostLoginRuntimeBootstrapper, type AuthShellBootstrapResult } from "./runtime/PostLoginRuntimeBootstrapper";
 import { createDesktopRuntimeDisposalCoordinator } from "./runtime/DesktopRuntimeDisposalCoordinator";
+import {
+  createDesktopOperationalEventLogger,
+  type DesktopOperationalEventLogger,
+} from "./DesktopOperationalEventLogger";
 
 // Provide ESM-safe CommonJS path globals for runtime compatibility with CJS dependencies.
 const __filename = fileURLToPath(import.meta.url);
@@ -111,6 +115,7 @@ let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 let deferredFeatureRuntime: DeferredDesktopFeatureRuntime | undefined;
 let agentRuntimeProvider: DesktopAgentRuntimeProvider | undefined;
 let canonicalRegistryRuntimeProvider: CanonicalRegistryRuntimeProvider | undefined;
+let desktopOperationalEventLogger: DesktopOperationalEventLogger | undefined;
 let authIpcRegistered = false;
 let deferredFeatureIpcRegistered = false;
 let deferredFeatureIpcReady = false;
@@ -278,6 +283,9 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
       userDataPath: app.getPath("userData"),
       logsPath: app.getPath("logs"),
     });
+    desktopOperationalEventLogger = createDesktopOperationalEventLogger({
+      logsDirectory: storagePaths.logsDirectory,
+    });
     logDevelopmentUserDataPath(storagePaths.appDataDirectory);
     storageDatabase = new DesktopStorageDatabase({ paths: storagePaths });
     await new InitializeProductionStorageUseCase(storageDatabase).execute({
@@ -300,6 +308,7 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
           allowNullOrigin: isPackaged,
         },
         env: process.env,
+        logger: desktopOperationalEventLogger,
       },
       boot: {
         startupReason: "electron-main-auth-minimal-server-host-startup",
@@ -372,6 +381,7 @@ const postLoginRuntimeBootstrapper = createPostLoginRuntimeBootstrapper({
   postLoginRuntimeStatusStore,
   buildBootstrapContext,
   launchRuntimeWindowFromContract: (launchContractJson) => windowManager.launchRuntimeWindowFromContract(launchContractJson),
+  getOperationalLogger: () => desktopOperationalEventLogger,
 });
 
 const runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({

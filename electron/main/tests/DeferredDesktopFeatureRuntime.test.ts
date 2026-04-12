@@ -2,9 +2,16 @@
  * Integration-style tests for deferred desktop runtime feature composition and lifecycle orchestration behavior.
  */
 import { describe, expect, it } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import path from "node:path";
+import { tmpdir } from "node:os";
 import type { AppRuntimeConfigValues } from "../../../src/infrastructure/config/AppRuntimeConfig";
 import type { resolveDesktopStoragePaths } from "../../../src/infrastructure/desktop/DesktopAppPaths";
 import { createDeferredDesktopFeatureRuntime } from "../DeferredDesktopFeatureRuntime";
+import type {
+  SystemRuntimeObservabilityEvent,
+  SystemRuntimeObservabilityLogger,
+} from "../../../src/infrastructure/api/system-runtime/SystemRuntimeObservability";
 
 type DesktopStoragePaths = ReturnType<typeof resolveDesktopStoragePaths>;
 
@@ -16,6 +23,24 @@ function createRuntimeConfigValues(): AppRuntimeConfigValues {
 }
 
 describe("createDeferredDesktopFeatureRuntime", () => {
+  class CapturingSystemRuntimeObservabilityLogger implements SystemRuntimeObservabilityLogger {
+    public readonly infoEvents: SystemRuntimeObservabilityEvent[] = [];
+    public readonly warnEvents: SystemRuntimeObservabilityEvent[] = [];
+    public readonly errorEvents: SystemRuntimeObservabilityEvent[] = [];
+
+    public info(event: SystemRuntimeObservabilityEvent): void {
+      this.infoEvents.push(event);
+    }
+
+    public warn(event: SystemRuntimeObservabilityEvent): void {
+      this.warnEvents.push(event);
+    }
+
+    public error(event: SystemRuntimeObservabilityEvent): void {
+      this.errorEvents.push(event);
+    }
+  }
+
   it("lazily creates workflow/studio/system runtime dependencies on first use", () => {
     const created: Record<string, number> = Object.create(null);
     const increment = (key: string) => {
@@ -183,5 +208,38 @@ describe("createDeferredDesktopFeatureRuntime", () => {
       "workflow-persistence-repo",
       "image-workflow-system-persistence",
     ]);
+  });
+
+  it("injects runtime observability logger into deferred system runtime backend", async () => {
+    const tempRoot = mkdtempSync(path.join(tmpdir(), "ai-loom-deferred-runtime-observability-"));
+    const storageDirectory = path.join(tempRoot, "storage");
+    const assetsDirectory = path.join(tempRoot, "assets");
+    mkdirSync(storageDirectory, { recursive: true });
+    mkdirSync(assetsDirectory, { recursive: true });
+    const logger = new CapturingSystemRuntimeObservabilityLogger();
+
+    try {
+      const runtime = createDeferredDesktopFeatureRuntime({
+        storagePaths: {
+          databasePath: path.join(storageDirectory, "desktop.sqlite"),
+          storageDirectory,
+          assetsDirectory,
+        } as DesktopStoragePaths,
+        runtimeConfigValues: createRuntimeConfigValues(),
+        repoRoot: tempRoot,
+        observabilityLogger: logger,
+      });
+      try {
+        const systemRuntimeBackendApi = runtime.ensureSystemRuntimeBackendApi();
+        const response = await systemRuntimeBackendApi.startExecution({});
+        expect(response.ok).toBeFalse();
+        expect(logger.warnEvents.some((event) =>
+          event.action === "start-execution" && event.outcome === "rejected")).toBeTrue();
+      } finally {
+        runtime.dispose();
+      }
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 });

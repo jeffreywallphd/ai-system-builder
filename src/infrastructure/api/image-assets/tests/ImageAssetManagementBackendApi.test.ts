@@ -37,8 +37,10 @@ const baseAsset = Object.freeze({
   sharingPolicy: Object.freeze({
     mode: SharingPolicyModes.ownerOnly,
   }),
-  storageInstanceId: "storage-alpha",
-  storageBindingReference: "storage-instance://storage-alpha/image-assets",
+  storage: Object.freeze({
+    storageInstanceId: "storage-alpha",
+    storageBindingReference: "storage-instance://storage-alpha/image-assets",
+  }),
   lifecycle: Object.freeze({
     status: ImageAssetStatuses.ingesting,
   }),
@@ -1084,5 +1086,131 @@ describe("ImageAssetManagementBackendApi", () => {
     const serialized = JSON.stringify(event);
     expect(serialized).not.toContain("preview-token-secret");
     expect(serialized).toContain("[REDACTED]");
+  });
+
+  it("emits create/ingest/finalize observability events for upload flow", async () => {
+    const logger = new CapturingLogger();
+    const clock = new MutableClock(new Date("2026-04-08T10:01:00.000Z"));
+    const backend = new ImageAssetManagementBackendApi({
+      uploadSessionTokenSecret: "test-secret",
+      clock,
+      observability: new ImageAssetManagementObservability({ logger }),
+      initiateImageAssetCreationUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              imageAsset: baseAsset,
+              upload: Object.freeze({
+                status: "upload-pending" as const,
+                reservation: Object.freeze({
+                  reservationId: "reservation-001",
+                  reference: Object.freeze({
+                    storageInstanceId: "storage-alpha",
+                    objectKey: "workspaces/workspace-alpha/image-assets/image-asset-001/original/image.png",
+                    area: ImageAssetStorageObjectAreas.original,
+                  }),
+                  expiresAt: "2026-04-08T10:20:00.000Z",
+                }),
+              }),
+            }),
+          };
+        },
+      },
+      finalizeImageAssetUploadUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              imageAsset: Object.freeze({
+                ...baseAsset,
+                lifecycle: Object.freeze({
+                  status: ImageAssetStatuses.available,
+                  ingestedAt: "2026-04-08T10:05:00.000Z",
+                }),
+              }),
+              upload: Object.freeze({
+                status: "finalized" as const,
+                reference: Object.freeze({
+                  storageInstanceId: "storage-alpha",
+                  objectKey: "workspaces/workspace-alpha/image-assets/image-asset-001/original/image.png",
+                  area: ImageAssetStorageObjectAreas.original,
+                }),
+                finalizedAt: "2026-04-08T10:05:00.000Z",
+                observedSizeBytes: 4,
+                observedChecksumSha256: "b".repeat(64),
+              }),
+            }),
+          };
+        },
+      },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() {
+          return Object.freeze({
+            reference: Object.freeze({
+              storageInstanceId: "storage-alpha",
+              objectKey: "workspaces/workspace-alpha/image-assets/image-asset-001/original/image.png",
+              area: ImageAssetStorageObjectAreas.original,
+            }),
+            sizeBytes: 4,
+            checksum: Object.freeze({
+              algorithm: "sha256" as const,
+              digest: "b".repeat(64),
+            }),
+            writtenAt: "2026-04-08T10:04:00.000Z",
+          });
+        },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const created = await backend.createImageAsset({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      mediaType: "image/png",
+      originalFilename: "image.png",
+      sizeBytes: 4,
+      fingerprint: {
+        algorithm: "sha256",
+        digest: "a".repeat(64),
+      },
+      correlationId: "corr-upload-flow-1",
+    });
+    expect(created.ok).toBeTrue();
+    if (!created.ok || !created.data) {
+      return;
+    }
+
+    const ingested = await backend.ingestImageAssetUploadContent({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      uploadSessionId: created.data.upload.uploadSessionId,
+      contentType: "image/png",
+      content: new Uint8Array([1, 2, 3, 4]),
+      correlationId: "corr-upload-flow-1",
+    });
+    expect(ingested.ok).toBeTrue();
+
+    const finalized = await backend.completeImageAssetUpload({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      uploadSessionId: created.data.upload.uploadSessionId,
+      correlationId: "corr-upload-flow-1",
+    });
+    expect(finalized.ok).toBeTrue();
+
+    const emittedFlows = logger.infoEvents.map((event) => event.flow);
+    expect(emittedFlows).toEqual(expect.arrayContaining(["create", "upload-ingest", "upload-finalize"]));
   });
 });
