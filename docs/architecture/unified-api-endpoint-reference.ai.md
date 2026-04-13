@@ -40,6 +40,7 @@
     - `GET /api/v1/runtime/execution/readiness`
     - intended consumers: desktop/thin runtime clients plus later studio/admin readiness surfaces
     - response contract is normalized (readiness state, actionable readiness boolean, capability summary, issues) and avoids raw adapter probe leakage
+    - desktop startup lifecycle is state-driven: pre-login, warming, and failed phases remain reachable and return canonical `runtimeLifecycle` contracts instead of transport-level route outage behavior
 
 ## Runtime realtime contracts
 

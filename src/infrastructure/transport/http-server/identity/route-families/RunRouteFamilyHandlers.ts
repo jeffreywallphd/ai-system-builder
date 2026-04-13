@@ -3,6 +3,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { URLSearchParams } from "node:url";
 import type { IdentityHttpRouteFamilyHandler, IdentityHttpRouteFamilyHandlerResult } from "../IdentityHttpServer";
 import {
+  evaluateRuntimeCapabilityGuard,
+  type RuntimeCapabilityGuardDecision,
+} from "../middleware/runtime-capability-guard";
+import {
   toRunCancellationApiRequest,
   toRunDetailApiRequest,
   toRunExecutionUpdateApiRequest,
@@ -131,6 +135,14 @@ interface CreateRunRouteFamilyHandlerDependencies {
   readonly imageRunRoutes: {
     readonly listRuns: string;
   };
+  readonly resolveRouteFamilyAvailability?: (
+    routeFamilyId: string,
+  ) => {
+    readonly routeFamilyId: string;
+    readonly capabilityId?: string;
+    readonly state?: string;
+    readonly available: boolean;
+  } | undefined;
 }
 
 export function createRunSubmissionRouteFamilyHandler(
@@ -253,6 +265,50 @@ export function createRunReadRouteFamilyHandler(
       return Object.freeze({ handled: true });
     }
     if (method === "GET" && path === deps.runRoutes.getExecutionReadiness) {
+      const requestedWorkspaceId = (searchParams.get("workspaceId") ?? "").trim();
+      const parsedStatefulRequest = deps.parseAndValidateExecutionReadinessReadRequest({
+        workspaceId: requestedWorkspaceId,
+        searchParams,
+      });
+      if (!parsedStatefulRequest.ok) {
+        deps.writeJson(response, parsedStatefulRequest.statusCode, parsedStatefulRequest.body);
+        deps.logResponse(logger, requestId, request, parsedStatefulRequest.statusCode, Object.freeze({
+          workspaceId: requestedWorkspaceId,
+          query: Object.fromEntries(searchParams.entries()),
+        }), parsedStatefulRequest.body);
+        return Object.freeze({ handled: true });
+      }
+      const routeFamilyAvailability = deps.resolveRouteFamilyAvailability?.("run-read");
+      const runtimeCapabilityGuard: RuntimeCapabilityGuardDecision = routeFamilyAvailability
+        ? evaluateRuntimeCapabilityGuard({
+          endpoint: path,
+          requestId,
+          routeFamilyId: "run-read",
+          availability: routeFamilyAvailability,
+        })
+        : Object.freeze({
+          blocked: false,
+        });
+      if (runtimeCapabilityGuard.blocked && runtimeCapabilityGuard.response?.runtime) {
+        const apiRequest = Object.freeze({
+          ...parsedStatefulRequest.data,
+          authorization: Object.freeze({
+            actorUserIdentityId: "",
+            activeWorkspaceId: parsedStatefulRequest.data.workspaceId,
+          }),
+          runtimeLifecycle: runtimeCapabilityGuard.response.runtime,
+        });
+        const apiResponse = await deps.options.authoritativeRunQueryBackendApi!.getExecutionReadiness(apiRequest);
+        const statusCode = deps.mapRunSubmissionStatusCode(apiResponse);
+        deps.writeJson(response, statusCode, apiResponse);
+        deps.logResponse(logger, requestId, request, statusCode, Object.freeze({
+          workspaceId: parsedStatefulRequest.data.workspaceId,
+          routeFamilyId: "run-read",
+          runtimeState: runtimeCapabilityGuard.runtimeState,
+          query: Object.fromEntries(searchParams.entries()),
+        }), apiResponse);
+        return Object.freeze({ handled: true });
+      }
       await deps.requireAuthenticatedWorkspaceSession(request, response, requestId, deps.options.backendApi, logger, deps.options.transportTrust, {
         missingWorkspaceMessage: "workspaceId is required.",
         buildInvalidResponse: deps.buildRuntimeInvalidRequestResponse,

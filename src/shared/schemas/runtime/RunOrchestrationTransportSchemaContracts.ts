@@ -14,6 +14,10 @@ import {
   type RunSubmissionRequest,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import {
+  RuntimeAvailabilityResponseContractVersions,
+  RuntimeAvailabilityStates,
+} from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
+import {
   RunAssignmentStatuses,
   RunExecutionOutcomeKinds,
   RunLifecycleStates,
@@ -492,6 +496,40 @@ const ExecutionReadinessNodeAvailabilitySummarySchema = z.object({
   reasonCode: z.string().trim().min(1).max(256).optional(),
 }).strict();
 
+const RuntimeAvailabilityBlockingReasonSchema = z.object({
+  code: z.string().trim().min(1).max(128),
+  message: z.string().trim().min(1).max(2000),
+  retryable: z.boolean(),
+  retryAfterMs: z.number().int().min(0).optional(),
+  observedAt: TimestampSchema.optional(),
+}).strict();
+
+const RuntimeAvailabilityFailureDetailSchema = z.object({
+  code: z.string().trim().min(1).max(128),
+  message: z.string().trim().min(1).max(2000),
+  failedAt: TimestampSchema,
+  retryable: z.boolean(),
+  retryAfterMs: z.number().int().min(0).optional(),
+}).strict();
+
+const RuntimeAvailabilityResponseSchema = z.object({
+  contractVersion: z.literal(RuntimeAvailabilityResponseContractVersions.v1),
+  state: z.enum([
+    RuntimeAvailabilityStates.unavailable,
+    RuntimeAvailabilityStates.warming,
+    RuntimeAvailabilityStates.ready,
+    RuntimeAvailabilityStates.failed,
+  ]),
+  checkedAt: TimestampSchema,
+  updatedAt: TimestampSchema,
+  retryable: z.boolean(),
+  blockingReasons: z.array(RuntimeAvailabilityBlockingReasonSchema).max(64),
+  warmupStartedAt: TimestampSchema.optional(),
+  readyAt: TimestampSchema.optional(),
+  failure: RuntimeAvailabilityFailureDetailSchema.optional(),
+  diagnostics: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
 export const ExecutionReadinessReadResponseSchema = z.object({
   backendFamily: IdentifierSchema,
   checkedAt: TimestampSchema,
@@ -501,6 +539,7 @@ export const ExecutionReadinessReadResponseSchema = z.object({
     ExecutionReadinessStates.unavailable,
   ]),
   readyForExecution: z.boolean(),
+  runtimeLifecycle: RuntimeAvailabilityResponseSchema.optional(),
   message: z.string().trim().min(1).max(2000).optional(),
   capabilities: ExecutionReadinessCapabilitySummarySchema,
   nodeAvailability: ExecutionReadinessNodeAvailabilitySummarySchema,

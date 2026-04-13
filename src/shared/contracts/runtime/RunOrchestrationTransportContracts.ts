@@ -1,4 +1,5 @@
 import type { SharedApiMutationResult, SharedApiResponseEnvelope } from "@shared/contracts/api/SharedApiContractPrimitives";
+import type { RuntimeAvailabilityResponseContract } from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
 import {
   RunAssignmentStatuses,
   RunExecutionOutcomeKinds,
@@ -454,6 +455,7 @@ export interface ExecutionReadinessReadResponse {
   readonly checkedAt: string;
   readonly readiness: ExecutionReadinessState;
   readonly readyForExecution: boolean;
+  readonly runtimeLifecycle?: RuntimeAvailabilityResponseContract;
   readonly message?: string;
   readonly capabilities: ExecutionReadinessCapabilitySummary;
   readonly nodeAvailability: ExecutionReadinessNodeAvailabilitySummary;

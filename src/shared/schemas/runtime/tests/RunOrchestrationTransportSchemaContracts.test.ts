@@ -145,6 +145,19 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
       checkedAt: "2026-04-08T12:10:00.000Z",
       readiness: "degraded",
       readyForExecution: false,
+      runtimeLifecycle: {
+        contractVersion: "runtime-availability-response/v1",
+        state: "warming",
+        checkedAt: "2026-04-08T12:10:00.000Z",
+        updatedAt: "2026-04-08T12:10:00.000Z",
+        retryable: true,
+        blockingReasons: [{
+          code: "capability-warmup-in-progress",
+          message: "Deferred runtime activation is still warming.",
+          retryable: true,
+        }],
+        warmupStartedAt: "2026-04-08T12:09:59.000Z",
+      },
       message: "Execution backend is reachable but incompatible.",
       capabilities: {
         backendFamily: "adapter.comfyui.image-manipulation",
@@ -178,6 +191,7 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
       },
     });
     expect(response.readiness).toBe("degraded");
+    expect(response.runtimeLifecycle?.state).toBe("warming");
     expect(response.issues[0]?.severity).toBe("error");
   });
 

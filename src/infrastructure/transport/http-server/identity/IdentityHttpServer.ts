@@ -2980,6 +2980,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     imageRunRoutes: Object.freeze({
       listRuns: ImageRunApiRoutes.listRuns,
     }),
+    resolveRouteFamilyAvailability: (routeFamilyId) => options.routeFamilyAvailability?.resolveRouteFamilyAvailability?.(routeFamilyId),
   });
   const handleRunReadRouteFamily = createRunReadRouteFamilyHandler({
     options,
@@ -3016,6 +3017,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     imageRunRoutes: Object.freeze({
       listRuns: ImageRunApiRoutes.listRuns,
     }),
+    resolveRouteFamilyAvailability: (routeFamilyId) => options.routeFamilyAvailability?.resolveRouteFamilyAvailability?.(routeFamilyId),
   });
   const handleRunMutationRouteFamily = createRunMutationRouteFamilyHandler({
     options,
@@ -3052,6 +3054,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     imageRunRoutes: Object.freeze({
       listRuns: ImageRunApiRoutes.listRuns,
     }),
+    resolveRouteFamilyAvailability: (routeFamilyId) => options.routeFamilyAvailability?.resolveRouteFamilyAvailability?.(routeFamilyId),
   });
   const handleRunExecutionUpdateRouteFamily = createRunExecutionUpdateRouteFamilyHandler({
     options,
@@ -3088,6 +3091,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     imageRunRoutes: Object.freeze({
       listRuns: ImageRunApiRoutes.listRuns,
     }),
+    resolveRouteFamilyAvailability: (routeFamilyId) => options.routeFamilyAvailability?.resolveRouteFamilyAvailability?.(routeFamilyId),
   });
   const defaultRouteFamilyHandlers: Readonly<Partial<Record<string, IdentityHttpRouteFamilyHandler>>> = Object.freeze({
     "identity-auth": handleIdentityAndTrustedDeviceRouteFamily,
@@ -3201,6 +3205,11 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       const matchedRouteFamily = transportComposition.routeModuleRegistry.resolveRouteFamilyByPath(path);
       if (matchedRouteFamily) {
         const routeFamilyAvailability = options.routeFamilyAvailability;
+        const shouldAllowStateDrivenReadinessBypass = (
+          matchedRouteFamily.routeFamilyId === "run-read"
+          && request.method === "GET"
+          && path === RunOrchestrationTransportRoutes.getExecutionReadiness
+        );
         if (
           routeFamilyAvailability
           && !routeFamilyAvailability.isRouteFamilyAvailable(matchedRouteFamily.routeFamilyId)
@@ -3214,25 +3223,27 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             routeFamilyId: matchedRouteFamily.routeFamilyId,
             availability: availabilityDetails,
           });
-          const unavailableResponse = runtimeCapabilityGuard.response ?? buildRouteFamilyCapabilityUnavailableResponse({
-            routeFamilyId: matchedRouteFamily.routeFamilyId,
-            capabilityId: availabilityDetails?.capabilityId,
-          });
-          writeJson(response, 503, unavailableResponse);
-          logger.info(Object.freeze({
-            event: "identity-http.route-family.capability-unavailable",
-            requestId,
-            correlationId,
-            method: request.method,
-            path,
-            details: Object.freeze({
+          if (!shouldAllowStateDrivenReadinessBypass) {
+            const unavailableResponse = runtimeCapabilityGuard.response ?? buildRouteFamilyCapabilityUnavailableResponse({
               routeFamilyId: matchedRouteFamily.routeFamilyId,
               capabilityId: availabilityDetails?.capabilityId,
-              capabilityState: availabilityDetails?.state,
-              runtimeState: runtimeCapabilityGuard.runtimeState,
-            }),
-          }));
-          return;
+            });
+            writeJson(response, 503, unavailableResponse);
+            logger.info(Object.freeze({
+              event: "identity-http.route-family.capability-unavailable",
+              requestId,
+              correlationId,
+              method: request.method,
+              path,
+              details: Object.freeze({
+                routeFamilyId: matchedRouteFamily.routeFamilyId,
+                capabilityId: availabilityDetails?.capabilityId,
+                capabilityState: availabilityDetails?.state,
+                runtimeState: runtimeCapabilityGuard.runtimeState,
+              }),
+            }));
+            return;
+          }
         }
         const routeFamilyHandler = routeFamilyHandlers[matchedRouteFamily.routeFamilyId];
         if (routeFamilyHandler) {

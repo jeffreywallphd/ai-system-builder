@@ -238,6 +238,7 @@ Readiness endpoint intent:
 - `GET /api/v1/runtime/execution/readiness` is the authoritative adapter-backed readiness surface for image-manipulation execution.
 - Desktop/thin clients and later studio/admin readiness flows should use this route instead of direct backend probes.
 - Response shape is normalized for UX/operations consumers: backend readiness state, actionable `readyForExecution`, capability summary, and issue list.
+- During desktop startup, pre-login/warming/failed lifecycle phases stay reachable and return canonical `runtimeLifecycle` state contracts instead of transport-level route outages.
 
 ### Image run authoritative aliases (`/api/v1/image-systems/*`, `/api/v1/image-runs*`)
 
