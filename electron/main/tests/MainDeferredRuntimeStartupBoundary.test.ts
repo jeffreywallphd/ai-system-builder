@@ -45,6 +45,11 @@ describe("electron main deferred runtime startup boundary", () => {
     expect(warmupEntrySource).not.toContain("bootstrapAuthShell");
   });
 
+  it("activates post-login capabilities on the already-bound control-plane host without rebinding", () => {
+    expect(warmupEntrySource).toContain("persistent control-plane host");
+    expect(warmupEntrySource).not.toContain("startAuthoritativeServerHostAssembly");
+    expect(warmupEntrySource).not.toContain("markTransportBinding");
+  });
 
   it("keeps a single authoritative host composition path and removes host promotion handoff", () => {
     expect(mainSource).not.toContain("promoteControlPlaneRuntimeForPostLogin");

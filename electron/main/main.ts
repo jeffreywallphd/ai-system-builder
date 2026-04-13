@@ -270,6 +270,61 @@ function registerAuthIpc(): void {
 }
 
 /**
+ * Starts the authoritative desktop control-plane host once and reuses the same runtime for the full desktop session.
+ */
+async function ensureDesktopControlPlaneHostBound(params: {
+  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
+  readonly rendererOrigin: string | undefined;
+}): Promise<AuthoritativeServerHostRuntimeHandle> {
+  const existingRuntime = controlPlaneServerRuntime;
+  if (existingRuntime) {
+    console.info(
+      `[ai-loom][startup] Reusing authoritative control-plane host at ${existingRuntime.address} for desktop session lifecycle.`,
+    );
+    postLoginRuntimeStatusStore.markTransportAvailable({
+      boundAddress: existingRuntime.address,
+      boundPort: existingRuntime.port,
+      reason: "authoritative-host-bind-reused",
+    });
+    return existingRuntime;
+  }
+
+  const controlPlaneHostStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
+  logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "start");
+  console.info("[ai-loom][startup] Starting authoritative control-plane host with bind-once desktop lifecycle.");
+  postLoginRuntimeStatusStore.markTransportBinding({
+    reason: "authoritative-host-bind-start",
+  });
+  const runtime = await startAuthoritativeServerHostAssembly({
+    hostOptions: {
+      databasePath: path.join(params.storagePaths.storageDirectory, "identity", "identity.sqlite"),
+      cors: {
+        allowedOrigins: params.rendererOrigin ? [params.rendererOrigin] : [],
+        allowLoopbackOrigins: true,
+        allowNullOrigin: isPackaged,
+      },
+      env: process.env,
+      logger: desktopOperationalEventLogger,
+    },
+    boot: {
+      startupReason: "electron-main-authoritative-server-host-startup",
+      environment: process.env,
+    },
+  });
+  controlPlaneServerRuntime = runtime;
+  logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, controlPlaneHostStartAt);
+  console.info(`[ai-loom][startup] Authoritative control-plane host ready at ${runtime.address} (bind-once).`);
+  postLoginRuntimeStatusStore.markTransportAvailable({
+    boundAddress: runtime.address,
+    boundPort: runtime.port,
+    reason: "authoritative-host-bind-ready",
+  });
+  logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "ready");
+
+  return runtime;
+}
+
+/**
  * Bootstraps pre-login runtime infrastructure, including storage, identity host, runtime config, and auth IPC.
  */
 async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
@@ -294,40 +349,14 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "storage-ready");
 
     const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
-    const controlPlaneHostStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
-    logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "start");
-    console.info("[ai-loom][startup] Starting authoritative control-plane host for desktop session bootstrap.");
-    postLoginRuntimeStatusStore.markTransportBinding({
-      reason: "authoritative-host-bind-start",
+    const controlPlaneRuntime = await ensureDesktopControlPlaneHostBound({
+      storagePaths,
+      rendererOrigin,
     });
-    controlPlaneServerRuntime = await startAuthoritativeServerHostAssembly({
-      hostOptions: {
-        databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
-        cors: {
-          allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
-          allowLoopbackOrigins: true,
-          allowNullOrigin: isPackaged,
-        },
-        env: process.env,
-        logger: desktopOperationalEventLogger,
-      },
-      boot: {
-        startupReason: "electron-main-authoritative-server-host-startup",
-        environment: process.env,
-      },
-    });
-    logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, controlPlaneHostStartAt);
-    console.info(`[ai-loom][startup] Authoritative control-plane host ready at ${controlPlaneServerRuntime.address}.`);
-    postLoginRuntimeStatusStore.markTransportAvailable({
-      boundAddress: controlPlaneServerRuntime.address,
-      boundPort: controlPlaneServerRuntime.port,
-      reason: "authoritative-host-bind-ready",
-    });
-    logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "ready");
     logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready", authShellStartedAt);
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready");
     const identityApiBaseUrl = assertSecureTransportEndpoint(
-      `http://${controlPlaneServerRuntime.address}`,
+      `http://${controlPlaneRuntime.address}`,
       resolveHostSecureTransportConfig({
         hostKind: HostSecureTransportKinds.desktop,
         hostAddress: "127.0.0.1",
@@ -466,6 +495,11 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
   }
 
   postLoginWarmupStarted = true;
+  const controlPlaneRuntime = controlPlaneServerRuntime;
+  if (!controlPlaneRuntime) {
+    throw new Error("Desktop control-plane host is unavailable for post-login warmup.");
+  }
+  console.info(`[ai-loom] Post-login warmup will activate capabilities on persistent control-plane host (${controlPlaneRuntime.address}).`);
   postLoginRuntimeStatusStore.markWarming(request);
   connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
