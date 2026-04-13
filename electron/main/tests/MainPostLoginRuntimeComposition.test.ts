@@ -11,7 +11,7 @@ const bootstrapperSource = fs.readFileSync(
 describe("electron main post-login runtime composition", () => {
   it("delegates post-login runtime composition to a dedicated bootstrapper module", () => {
     expect(mainSource).toContain("createPostLoginRuntimeBootstrapper({");
-    expect(mainSource).toContain("postLoginRuntimeBootstrapper.bootstrap(authShell)");
+    expect(mainSource).toContain("postLoginRuntimeBootstrapper.bootstrap(runtimeAuthShell)");
     expect(mainSource).not.toContain("async function composePostLoginRuntime(");
     expect(mainSource).not.toContain("function createOnDemandFeatureCompositionPaths(");
     expect(mainSource).not.toContain("async function bootstrapPostLoginRuntime(");
@@ -23,7 +23,8 @@ describe("electron main post-login runtime composition", () => {
     expect(bootstrapperSource).toContain("const pythonRuntime = resolveDesktopPythonRuntime(");
     expect(bootstrapperSource).toContain("const serviceSupervisor = new DesktopServiceSupervisor(");
     expect(bootstrapperSource).toContain("await serviceSupervisor.start()");
-    expect(mainSource).toContain("connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl)");
+    expect(mainSource).toContain("const runtimeAuthShell = await promoteControlPlaneRuntimeForPostLogin(authShell);");
+    expect(mainSource).toContain("connectivityRuntimeController.startMonitoring(runtimeAuthShell.identityApiBaseUrl)");
   });
 
   it("keeps legacy eager bootstrap entrypoint removed", () => {
