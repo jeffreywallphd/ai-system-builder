@@ -59,7 +59,9 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/runtime/queue");
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/image-systems");
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/image-runs");
-    expect(plan.registeredRoutePrefixes).toContain("/api/v1/deployment/policy");
+    expect(plan.registeredRoutePrefixes).toContain("/api/v1/deployment/policy/state");
+    expect(plan.registeredRoutePrefixes).toContain("/api/v1/deployment/policy/active-profile");
+    expect(plan.registeredRoutePrefixes).toContain("/api/v1/deployment/policy/overrides");
   });
 
   it("throws when required route family coverage is missing", () => {
