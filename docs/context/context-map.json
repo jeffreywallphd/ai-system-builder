@@ -118,8 +118,12 @@
           "priorityOrder": 3
         },
         {
-          "packId": "context-system-foundations",
+          "packId": "startup-and-host-promotion",
           "priorityOrder": 4
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 5
         }
       ],
       "excludePackIds": [],
@@ -244,8 +248,16 @@
           "priorityOrder": 2
         },
         {
-          "packId": "context-system-foundations",
+          "packId": "transport-and-runtime-availability",
           "priorityOrder": 3
+        },
+        {
+          "packId": "storage-persistence-and-materialization",
+          "priorityOrder": 4
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 5
         }
       ],
       "excludePackIds": [],
@@ -370,8 +382,20 @@
           "priorityOrder": 3
         },
         {
-          "packId": "context-system-foundations",
+          "packId": "startup-and-host-promotion",
           "priorityOrder": 4
+        },
+        {
+          "packId": "transport-and-runtime-availability",
+          "priorityOrder": 5
+        },
+        {
+          "packId": "observability-and-readiness",
+          "priorityOrder": 6
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 7
         }
       ],
       "excludePackIds": [],

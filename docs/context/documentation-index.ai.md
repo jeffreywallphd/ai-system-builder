@@ -25,8 +25,8 @@ This index is generated from the machine-readable documentation registry so cont
 
 ## At a Glance
 
-- Indexed records: **54**
-- Active records: **49**
+- Indexed records: **59**
+- Active records: **54**
 - Non-active records: **5**
 - Document types covered: **7**
 - Domains covered: **8**
@@ -59,7 +59,7 @@ This index is generated from the machine-readable documentation registry so cont
 - [Shared Asset Contracts (Legacy Link Stub)](../architecture/shared-asset-contracts.ai.md) (`doc-architecture-superseded-shared-asset-contracts`)
 - [Workflow Execution and Tools (Legacy Link Stub)](../architecture/workflow-execution-and-tools.ai.md) (`doc-architecture-superseded-workflow-execution-and-tools`)
 
-### `contributor-guide` (11)
+### `contributor-guide` (12)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.ai.md) (`doc-contributors-adr-informed-implementation-and-review-examples`)
 - [Context Engineering System Contributor Guide](../contributors/context-engineering-system-guide.ai.md) (`doc-contributors-context-engineering-system-guide`)
 - [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.ai.md) (`doc-contributors-docs-foundation-validation-guide`)
@@ -93,20 +93,24 @@ This index is generated from the machine-readable documentation registry so cont
 - [Documentation Segmentation Migration Inventory](../documentation-segmentation-migration-inventory.ai.md) (`doc-baseline-documentation-segmentation-migration-inventory`)
 - [Feature 1 Documentation Foundation Completion Handoff](../baselines/feature-1-documentation-foundation-handoff.ai.md) (`doc-baseline-feature-1-documentation-foundation-handoff`)
 
-### `ai-context` (9)
+### `ai-context` (13)
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.ai.md) (`doc-context-documentation-taxonomy`)
 - [Context System Foundations Pack](./packs/context-system-foundations.pack.ai.md) (`doc-context-pack-context-system-foundations`)
 - [Core Architecture Context Pack](./packs/architecture-core.pack.ai.md) (`doc-context-pack-architecture-core`)
 - [Documentation Identity, Stable Keys, and Reference Conventions](./documentation-identity-and-reference-conventions.ai.md) (`doc-context-documentation-identity-and-reference-conventions`)
 - [Documentation Refactor Context Pack](./packs/documentation-refactor.pack.ai.md) (`doc-context-pack-documentation-refactor`)
 - [Identity and Security Context Pack](./packs/identity-and-security.pack.ai.md) (`doc-context-pack-identity-and-security`)
+- [Observability and Readiness Context Pack](./packs/observability-and-readiness.pack.ai.md) (`doc-context-pack-observability-and-readiness`)
 - [Repository Overview Context Pack](./packs/repository-overview.pack.ai.md) (`doc-context-pack-repository-overview`)
 - [Runtime and Host Context Pack](./packs/runtime-and-host.pack.ai.md) (`doc-context-pack-runtime-and-host`)
+- [Startup and Host Promotion Context Pack](./packs/startup-and-host-promotion.pack.ai.md) (`doc-context-pack-startup-and-host-promotion`)
+- [Storage, Persistence, and Materialization Context Pack](./packs/storage-persistence-and-materialization.pack.ai.md) (`doc-context-pack-storage-persistence-and-materialization`)
 - [Studio and System Composition Context Pack](./packs/studio-and-system-composition.pack.ai.md) (`doc-context-pack-studio-and-system-composition`)
+- [Transport and Runtime Availability Context Pack](./packs/transport-and-runtime-availability.pack.ai.md) (`doc-context-pack-transport-and-runtime-availability`)
 
 ## Browse by Task Workflow
 
-### `architecture-review` (6)
+### `architecture-review` (7)
 - Routing task IDs: `architecture-review-host-boundaries`
 - Context-map mapping IDs: `context-map-architecture-review-v1`
 - Selection mode / priority: `ordered` / `high`
@@ -117,8 +121,9 @@ This index is generated from the machine-readable documentation registry so cont
 - [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.ai.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Domain and Application Core](../architecture/domain-and-application-core.ai.md) (`doc-architecture-domain-and-application-core`)
 - [Runtime Host Surfaces Domain Overview](../architecture/domains/runtime-host-surfaces/overview.ai.md) (`doc-architecture-domain-runtime-host-surfaces-overview`)
+- [Startup and Host Promotion Context Pack](./packs/startup-and-host-promotion.pack.ai.md) (`doc-context-pack-startup-and-host-promotion`)
 
-### `coding-implementation` (5)
+### `coding-implementation` (7)
 - Routing task IDs: `repo-implementation-core-workflows`, `runtime-host-coding-implementation`
 - Context-map mapping IDs: `context-map-coding-implementation-v1`
 - Selection mode / priority: `ordered` / `normal`
@@ -128,8 +133,10 @@ This index is generated from the machine-readable documentation registry so cont
 - [Layers and Boundaries](../architecture/layers-and-boundaries.ai.md) (`doc-architecture-layers-and-boundaries`)
 - [Repository Overview Context Pack](./packs/repository-overview.pack.ai.md) (`doc-context-pack-repository-overview`)
 - [Runtime and Host Context Pack](./packs/runtime-and-host.pack.ai.md) (`doc-context-pack-runtime-and-host`)
+- [Storage, Persistence, and Materialization Context Pack](./packs/storage-persistence-and-materialization.pack.ai.md) (`doc-context-pack-storage-persistence-and-materialization`)
+- [Transport and Runtime Availability Context Pack](./packs/transport-and-runtime-availability.pack.ai.md) (`doc-context-pack-transport-and-runtime-availability`)
 
-### `diagnostics` (6)
+### `diagnostics` (9)
 - Routing task IDs: `runtime-host-diagnostics-triage`
 - Context-map mapping IDs: `context-map-diagnostics-v1`
 - Selection mode / priority: `fallback` / `high`
@@ -137,11 +144,14 @@ This index is generated from the machine-readable documentation registry so cont
 - [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.ai.md) (`doc-adr-001-single-authoritative-control-plane`)
 - [Documentation Index-Assisted Discovery Worked Examples](../contributors/documentation-index-assisted-discovery-worked-examples.ai.md) (`doc-contributors-documentation-index-assisted-discovery-worked-examples`)
 - [Node Bootstrap Identity Operations](../node-bootstrap-identity-operations.ai.md) (`doc-operations-node-bootstrap-identity`)
+- [Observability and Readiness Context Pack](./packs/observability-and-readiness.pack.ai.md) (`doc-context-pack-observability-and-readiness`)
 - [Runtime and Host Context Pack](./packs/runtime-and-host.pack.ai.md) (`doc-context-pack-runtime-and-host`)
 - [Runtime Host Surfaces Domain Overview](../architecture/domains/runtime-host-surfaces/overview.ai.md) (`doc-architecture-domain-runtime-host-surfaces-overview`)
 - [Secret Health and Operational Diagnostics](../secret-health-and-operational-diagnostics.ai.md) (`doc-operations-secret-health-diagnostics`)
+- [Startup and Host Promotion Context Pack](./packs/startup-and-host-promotion.pack.ai.md) (`doc-context-pack-startup-and-host-promotion`)
+- [Transport and Runtime Availability Context Pack](./packs/transport-and-runtime-availability.pack.ai.md) (`doc-context-pack-transport-and-runtime-availability`)
 
-### `documentation-change` (11)
+### `documentation-change` (12)
 - Routing task IDs: `documentation-refactor-context-and-architecture`
 - Context-map mapping IDs: `context-map-documentation-change-v1`
 - Selection mode / priority: `single` / `normal`
@@ -233,7 +243,7 @@ This index is generated from the machine-readable documentation registry so cont
 - [Documentation Segmentation Migration Inventory](../documentation-segmentation-migration-inventory.ai.md) (`doc-baseline-documentation-segmentation-migration-inventory`)
 - [Feature 1 Documentation Foundation Completion Handoff](../baselines/feature-1-documentation-foundation-handoff.ai.md) (`doc-baseline-feature-1-documentation-foundation-handoff`)
 
-### `contributors` (11)
+### `contributors` (12)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.ai.md) (`doc-contributors-adr-informed-implementation-and-review-examples`)
 - [Context Engineering System Contributor Guide](../contributors/context-engineering-system-guide.ai.md) (`doc-contributors-context-engineering-system-guide`)
 - [Documentation Foundation Validation Guide](../contributors/docs-foundation-validation.ai.md) (`doc-contributors-docs-foundation-validation-guide`)
@@ -270,12 +280,16 @@ This index is generated from the machine-readable documentation registry so cont
 - [Identity and Security Context Pack](./packs/identity-and-security.pack.ai.md) (`doc-context-pack-identity-and-security`)
 - [Identity Trust and Security Domain Overview](../architecture/domains/identity-trust-and-security/overview.ai.md) (`doc-architecture-domain-identity-trust-and-security-overview`)
 
-### `operations` (6)
+### `operations` (10)
 - [Node Bootstrap Identity Operations](../node-bootstrap-identity-operations.ai.md) (`doc-operations-node-bootstrap-identity`)
+- [Observability and Readiness Context Pack](./packs/observability-and-readiness.pack.ai.md) (`doc-context-pack-observability-and-readiness`)
 - [Runtime and Host Context Pack](./packs/runtime-and-host.pack.ai.md) (`doc-context-pack-runtime-and-host`)
 - [Secret Health and Operational Diagnostics](../secret-health-and-operational-diagnostics.ai.md) (`doc-operations-secret-health-diagnostics`)
 - [Security and Policy Configuration Operations](../security-policy-configuration-operations.ai.md) (`doc-operations-security-policy-configuration`)
+- [Startup and Host Promotion Context Pack](./packs/startup-and-host-promotion.pack.ai.md) (`doc-context-pack-startup-and-host-promotion`)
 - [Storage Administration Operations](../storage-administration-operations.ai.md) (`doc-operations-storage-administration`)
+- [Storage, Persistence, and Materialization Context Pack](./packs/storage-persistence-and-materialization.pack.ai.md) (`doc-context-pack-storage-persistence-and-materialization`)
+- [Transport and Runtime Availability Context Pack](./packs/transport-and-runtime-availability.pack.ai.md) (`doc-context-pack-transport-and-runtime-availability`)
 - [Workspace Administration Operations](../workspace-administration-operations.ai.md) (`doc-operations-workspace-administration`)
 
 ## Browse by Status
@@ -283,7 +297,7 @@ This index is generated from the machine-readable documentation registry so cont
 ### `draft` (0)
 - No indexed records.
 
-### `active` (49)
+### `active` (54)
 - [ADR-001 Single Authoritative Control Plane](../adr/records/adr-001-single-authoritative-control-plane.ai.md) (`doc-adr-001-single-authoritative-control-plane`)
 - [ADR-002 Workspace-Centered Tenancy and Resource Ownership](../adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md) (`doc-adr-002-workspace-centered-tenancy-and-resource-ownership`)
 - [ADR-003 Storage as Managed Platform Resource](../adr/records/adr-003-storage-as-managed-platform-resource.ai.md) (`doc-adr-003-storage-as-managed-platform-resource`)
@@ -324,14 +338,18 @@ This index is generated from the machine-readable documentation registry so cont
 - [Identity Trust and Security Domain Overview](../architecture/domains/identity-trust-and-security/overview.ai.md) (`doc-architecture-domain-identity-trust-and-security-overview`)
 - [Layers and Boundaries](../architecture/layers-and-boundaries.ai.md) (`doc-architecture-layers-and-boundaries`)
 - [Node Bootstrap Identity Operations](../node-bootstrap-identity-operations.ai.md) (`doc-operations-node-bootstrap-identity`)
+- [Observability and Readiness Context Pack](./packs/observability-and-readiness.pack.ai.md) (`doc-context-pack-observability-and-readiness`)
 - [Repository Overview Context Pack](./packs/repository-overview.pack.ai.md) (`doc-context-pack-repository-overview`)
 - [Runtime and Host Context Pack](./packs/runtime-and-host.pack.ai.md) (`doc-context-pack-runtime-and-host`)
 - [Runtime Host Surfaces Domain Overview](../architecture/domains/runtime-host-surfaces/overview.ai.md) (`doc-architecture-domain-runtime-host-surfaces-overview`)
 - [Secret Health and Operational Diagnostics](../secret-health-and-operational-diagnostics.ai.md) (`doc-operations-secret-health-diagnostics`)
 - [Security and Policy Configuration Operations](../security-policy-configuration-operations.ai.md) (`doc-operations-security-policy-configuration`)
+- [Startup and Host Promotion Context Pack](./packs/startup-and-host-promotion.pack.ai.md) (`doc-context-pack-startup-and-host-promotion`)
 - [Storage Administration Operations](../storage-administration-operations.ai.md) (`doc-operations-storage-administration`)
+- [Storage, Persistence, and Materialization Context Pack](./packs/storage-persistence-and-materialization.pack.ai.md) (`doc-context-pack-storage-persistence-and-materialization`)
 - [Studio and System Composition Context Pack](./packs/studio-and-system-composition.pack.ai.md) (`doc-context-pack-studio-and-system-composition`)
 - [Studio and System Composition Domain Overview](../architecture/domains/studio-and-system-composition/overview.ai.md) (`doc-architecture-domain-studio-and-system-composition-overview`)
+- [Transport and Runtime Availability Context Pack](./packs/transport-and-runtime-availability.pack.ai.md) (`doc-context-pack-transport-and-runtime-availability`)
 - [Workspace Administration Operations](../workspace-administration-operations.ai.md) (`doc-operations-workspace-administration`)
 - [Workspace Storage and Assets Domain Overview](../architecture/domains/workspace-storage-and-assets/overview.ai.md) (`doc-architecture-domain-workspace-storage-and-assets-overview`)
 

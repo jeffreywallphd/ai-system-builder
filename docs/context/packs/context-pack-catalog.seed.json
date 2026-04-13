@@ -317,6 +317,158 @@
         "doc-architecture-domain-studio-and-system-composition-overview",
         "doc-adr-004-studios-as-views-over-shared-system-and-asset-model"
       ]
+    },
+    {
+      "id": "startup-and-host-promotion",
+      "title": "Startup and Host Promotion Pack",
+      "purpose": "Focused context for control-plane startup sequencing, auth-minimal/post-login boundaries, and host-promotion lifecycle discipline.",
+      "domain": "runtime-host-composition",
+      "owner": "team:runtime-platform",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/startup-and-host-promotion.pack.md",
+      "aiDocPath": "docs/context/packs/startup-and-host-promotion.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+        "docs/architecture/auth-only-server-startup-contract.md",
+        "docs/architecture/desktop-auth-first-startup-boundary.md",
+        "docs/architecture/post-login-runtime-deferral-boundary.md",
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
+        "docs/architecture/host-bootstrap-pipeline.md"
+      ],
+      "relatedCodePaths": [
+        "electron/main/main.ts",
+        "electron/main/runtime/PostLoginRuntimeActivationService.ts",
+        "src/hosts/bootstrap/HostBootstrapPipeline.ts",
+        "src/hosts/lifecycle/HostLifecycleCoordinator.ts",
+        "dev/tests/HostDevelopmentStartupScripts.test.ts"
+      ],
+      "tags": [
+        "runtime",
+        "startup",
+        "host-promotion",
+        "desktop-lifecycle"
+      ],
+      "relatedDocRecordIds": [
+        "doc-context-pack-startup-and-host-promotion",
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-architecture-domain-runtime-host-surfaces-overview"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-story-and-epic-milestone",
+        "lastReviewed": "2026-04-13"
+      }
+    },
+    {
+      "id": "transport-and-runtime-availability",
+      "title": "Transport and Runtime Availability Pack",
+      "purpose": "Focused context for deferred API readiness gating, transport lifecycle discipline, and explicit degraded-runtime truthfulness.",
+      "domain": "api-and-transport-surfaces",
+      "owner": "team:runtime-platform",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/transport-and-runtime-availability.pack.md",
+      "aiDocPath": "docs/context/packs/transport-and-runtime-availability.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
+        "docs/architecture/desktop-renderer-startup-boundary.md",
+        "docs/architecture/unified-api-authoritative-surface.md",
+        "docs/architecture/domains/api-and-transport-surfaces/references/unified-api-surface-contracts.md",
+        "docs/unified-api-observability-troubleshooting.md"
+      ],
+      "relatedCodePaths": [
+        "src/shared/contracts/runtime/RuntimeAvailabilityResponseContracts.ts",
+        "src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts",
+        "src/ui/runtime/DeferredRuntimeFeatureGate.ts",
+        "src/ui/shared/api/SharedApiClient.ts"
+      ],
+      "tags": [
+        "transport",
+        "runtime-availability",
+        "deferred-api",
+        "fallback-truthfulness"
+      ],
+      "relatedDocRecordIds": [
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-architecture-domain-api-and-transport-surfaces-overview"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-story-and-epic-milestone",
+        "lastReviewed": "2026-04-13"
+      }
+    },
+    {
+      "id": "observability-and-readiness",
+      "title": "Observability and Readiness Pack",
+      "purpose": "Focused context for readiness checkpoints, truthful diagnostics, and correlated/redacted observability contracts.",
+      "domain": "runtime-observability",
+      "owner": "team:runtime-platform",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/observability-and-readiness.pack.md",
+      "aiDocPath": "docs/context/packs/observability-and-readiness.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
+        "docs/architecture/deployment-profile-policy-admin-observability-redaction-and-failure-handling.md",
+        "docs/architecture/audit-observability-failure-handling-and-redaction-safeguards.md",
+        "docs/unified-api-observability-troubleshooting.md"
+      ],
+      "relatedCodePaths": [
+        "electron/main/runtime/PostLoginRuntimeActivationService.ts",
+        "src/shared/contracts/runtime/RuntimeAvailabilityResponseContracts.ts",
+        "src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts",
+        "src/ui/shared/api/SharedApiClient.ts"
+      ],
+      "tags": [
+        "observability",
+        "readiness",
+        "diagnostics",
+        "redaction"
+      ],
+      "relatedDocRecordIds": [
+        "doc-context-pack-observability-and-readiness"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-story-and-epic-milestone",
+        "lastReviewed": "2026-04-13"
+      }
+    },
+    {
+      "id": "storage-persistence-and-materialization",
+      "title": "Storage, Persistence, and Materialization Pack",
+      "purpose": "Focused context for canonical durable storage, persistence verification, and materialized runtime file truth.",
+      "domain": "workspace-storage-and-assets",
+      "owner": "team:storage-platform",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/storage-persistence-and-materialization.pack.md",
+      "aiDocPath": "docs/context/packs/storage-persistence-and-materialization.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md",
+        "docs/adr/records/adr-003-storage-as-managed-platform-resource.md",
+        "docs/architecture/storage-foundation.md",
+        "docs/architecture/storage-persistence-contracts.md",
+        "docs/architecture/persistence-bootstrap-and-lifecycle.md",
+        "docs/architecture/generated-result-authoritative-persistence-preview-lineage-posture.md"
+      ],
+      "relatedCodePaths": [
+        "src/domain/storage/StorageDomain.ts",
+        "src/application/storage/ports/IStorageInstanceRepository.ts",
+        "src/infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter.ts",
+        "src/infrastructure/persistence/generated-results/SqliteGeneratedResultPersistenceAdapter.ts"
+      ],
+      "tags": [
+        "storage",
+        "durability",
+        "persistence",
+        "materialization-truth"
+      ],
+      "relatedDocRecordIds": [
+        "doc-context-pack-storage-persistence-and-materialization",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-adr-003-storage-as-managed-platform-resource",
+        "doc-architecture-domain-workspace-storage-and-assets-overview"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-story-and-epic-milestone",
+        "lastReviewed": "2026-04-13"
+      }
     }
   ]
 }

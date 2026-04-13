@@ -68,6 +68,10 @@
 
 - `repository-overview`: load first for baseline repository orientation before runtime-host depth.
 - `architecture-core`: combine for cross-layer boundary checks when host changes affect application/domain seams.
+- `startup-and-host-promotion`: add for explicit host-promotion sequencing, startup rollback discipline, and pre-login/post-login boundary changes.
+- `transport-and-runtime-availability`: add when deferred API gating, runtime availability contracts, or degraded fallback semantics are in scope.
+- `observability-and-readiness`: add when readiness checkpoints, diagnostics truthfulness, or redaction/correlation behavior changes.
+- `storage-persistence-and-materialization`: add when runtime behavior depends on canonical durable storage or materialization truth.
 - `context-system-foundations`: add when changing routing maps, context-pack metadata, or context governance assets.
 
 ## Retrieval Order
