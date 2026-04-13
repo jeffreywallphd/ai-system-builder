@@ -242,6 +242,17 @@ export function resolveNextGalleryPreviewRoleByKey(input: {
   return undefined;
 }
 
+function isDesktopDeferredFeatureApiReady(): boolean {
+  if (typeof window === "undefined" || !window.aiLoomDesktop) {
+    return true;
+  }
+  const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
+  if (!runtimeBridge?.isDeferredFeatureApiReady) {
+    return true;
+  }
+  return runtimeBridge.isDeferredFeatureApiReady();
+}
+
 function mergeHydratedSelectionWithPersistedSession(input: {
   readonly hydratedSelection: {
     readonly selectedDatasetBindingId?: string;
@@ -1955,7 +1966,7 @@ export function ImageManipulationRuntimeEditorPanel({
 
     const request = datasetBindingId === "output-image-dataset"
       ? (async () => {
-        if (actorUserIdentityId && workspaceId && sessionToken) {
+        if (actorUserIdentityId && workspaceId && sessionToken && isDesktopDeferredFeatureApiReady()) {
           const listed = await generatedResults.listGeneratedResults({
             actorUserIdentityId,
             workspaceId,
@@ -2025,7 +2036,7 @@ export function ImageManipulationRuntimeEditorPanel({
   };
 
   const loadRecentAssets = (): Promise<ReadonlyArray<RecentStudioImageAsset>> => {
-    if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+    if (!actorUserIdentityId || !workspaceId || !sessionToken || !isDesktopDeferredFeatureApiReady()) {
       setRecentImageAssets(Object.freeze([]));
       setRecentImageAssetsError(undefined);
       return Promise.resolve(Object.freeze([]));
@@ -2080,7 +2091,7 @@ export function ImageManipulationRuntimeEditorPanel({
     readonly search?: string;
     readonly offset?: number;
   }): Promise<ReadonlyArray<ImageLibraryStudioImageAsset>> => {
-    if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+    if (!actorUserIdentityId || !workspaceId || !sessionToken || !isDesktopDeferredFeatureApiReady()) {
       setImageLibraryAssets(Object.freeze([]));
       setImageLibraryError(undefined);
       setImageLibraryHasMore(false);
@@ -2304,7 +2315,7 @@ export function ImageManipulationRuntimeEditorPanel({
     }
     setIsLoadingRunHistory(true);
     setRunHistoryError(undefined);
-    const request = actorUserIdentityId && workspaceId && sessionToken
+    const request = actorUserIdentityId && workspaceId && sessionToken && isDesktopDeferredFeatureApiReady()
       ? generatedResults.listGeneratedResults({
         actorUserIdentityId,
         workspaceId,
