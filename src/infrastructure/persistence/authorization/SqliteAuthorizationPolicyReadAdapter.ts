@@ -17,9 +17,14 @@ import {
   createRoleAssignment,
 } from "@domain/authorization/AuthorizationDomain";
 import type { SqliteAuthorizationPersistenceAdapter } from "./SqliteAuthorizationPersistenceAdapter";
+import {
+  ConsolePersistenceDiagnosticsLogger,
+  type IPersistenceDiagnosticsLogger,
+} from "@infrastructure/logging/PersistenceDiagnosticsLogger";
 
 export interface SqliteAuthorizationPolicyReadAdapterDependencies {
   readonly authorizationPersistenceAdapter: SqliteAuthorizationPersistenceAdapter;
+  readonly diagnosticsLogger?: IPersistenceDiagnosticsLogger;
 }
 
 export class SqliteAuthorizationPolicyReadAdapter
@@ -27,13 +32,51 @@ export class SqliteAuthorizationPolicyReadAdapter
     IAuthorizationRoleGrantReadRepository,
     IAuthorizationSharingGrantReadRepository,
     IAuthorizationResourcePolicyMetadataReadRepository {
-  public constructor(private readonly dependencies: SqliteAuthorizationPolicyReadAdapterDependencies) {}
+  private readonly diagnosticsLogger: IPersistenceDiagnosticsLogger;
+
+  public constructor(private readonly dependencies: SqliteAuthorizationPolicyReadAdapterDependencies) {
+    this.diagnosticsLogger = dependencies.diagnosticsLogger ?? new ConsolePersistenceDiagnosticsLogger();
+  }
 
   public async getActorRoleGrantSnapshot(
     query: AuthorizationActorRoleGrantSnapshotQuery,
   ): Promise<AuthorizationActorRoleGrantSnapshot> {
     const actorUserIdentityId = normalizeOptional(query.actor.actorUserIdentityId);
+    this.diagnosticsLogger.info({
+      type: "persistence-diagnostic",
+      level: "info",
+      repository: "AuthorizationPolicy",
+      operation: "getActorRoleGrantSnapshot",
+      code: "auth.sqlite.role-snapshot.query",
+      retryable: false,
+      occurredAt: new Date().toISOString(),
+      details: Object.freeze({
+        actorUserIdentityId,
+        actorServiceId: normalizeOptional(query.actor.actorServiceId),
+        activeWorkspaceId: normalizeOptional(query.actor.activeWorkspaceId),
+        asOf: query.asOf,
+        resourceType: normalizeOptional(query.resource?.resourceType),
+        resourceId: normalizeOptional(query.resource?.resourceId),
+        resourceWorkspaceId: normalizeOptional(query.resource?.workspaceId),
+      }),
+    });
     if (!actorUserIdentityId) {
+      this.diagnosticsLogger.info({
+        type: "persistence-diagnostic",
+        level: "info",
+        repository: "AuthorizationPolicy",
+        operation: "getActorRoleGrantSnapshot",
+        code: "auth.sqlite.role-snapshot.result",
+        retryable: false,
+        occurredAt: new Date().toISOString(),
+        details: Object.freeze({
+          actorUserIdentityId,
+          roleAssignmentCount: 0,
+          permissionGrantCount: 0,
+          roleScopes: Object.freeze([]),
+          roleKeys: Object.freeze([]),
+        }),
+      });
       return emptyRoleGrantSnapshot();
     }
 
@@ -56,6 +99,22 @@ export class SqliteAuthorizationPolicyReadAdapter
       assignedAt: record.assignedAt,
       revokedAt: record.revokedAt,
     }));
+    this.diagnosticsLogger.info({
+      type: "persistence-diagnostic",
+      level: "info",
+      repository: "AuthorizationPolicy",
+      operation: "getActorRoleGrantSnapshot",
+      code: "auth.sqlite.role-snapshot.result",
+      retryable: false,
+      occurredAt: new Date().toISOString(),
+      details: Object.freeze({
+        actorUserIdentityId,
+        roleAssignmentCount: roleAssignments.length,
+        permissionGrantCount: 0,
+        roleScopes: Object.freeze([...new Set(roleAssignments.map((assignment) => assignment.scope))].slice(0, 4)),
+        roleKeys: Object.freeze([...new Set(roleAssignments.map((assignment) => assignment.roleKey))].slice(0, 8)),
+      }),
+    });
 
     return Object.freeze({
       roleAssignments: Object.freeze(roleAssignments),
@@ -159,4 +218,3 @@ function emptyRoleGrantSnapshot(): AuthorizationActorRoleGrantSnapshot {
     permissionGrants: Object.freeze([]),
   });
 }
-

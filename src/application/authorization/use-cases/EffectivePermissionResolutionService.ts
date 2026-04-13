@@ -67,6 +67,9 @@ export interface EffectivePermissionResolutionClock {
 export interface EffectivePermissionResolutionServiceDependencies {
   readonly roleCatalog?: AuthorizationRoleCatalogContract;
   readonly clock?: EffectivePermissionResolutionClock;
+  readonly diagnosticsLogger?: {
+    info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+  };
 }
 
 const VisibilityReadableActions = new Set<string>(["read", "list"]);
@@ -75,11 +78,17 @@ export class EffectivePermissionResolutionService
   implements IAuthorizationPolicyEvaluator, IEffectivePermissionResolutionService {
   private readonly roleCatalog: AuthorizationRoleCatalogContract;
   private readonly clock: EffectivePermissionResolutionClock;
+  private readonly diagnosticsLogger: {
+    info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+  };
 
   public constructor(dependencies?: EffectivePermissionResolutionServiceDependencies) {
     this.roleCatalog = dependencies?.roleCatalog ?? AuthorizationRoleCatalog;
     this.clock = dependencies?.clock ?? {
       now: () => new Date(),
+    };
+    this.diagnosticsLogger = dependencies?.diagnosticsLogger ?? {
+      info: () => {},
     };
   }
 
@@ -225,7 +234,7 @@ export class EffectivePermissionResolutionService
       }
     }
 
-    return this.toResolution(
+    const deniedResolution = this.toResolution(
       requiredPermissionKey,
       request.asOf,
       PolicyDecisionOutcomes.deny,
@@ -233,6 +242,26 @@ export class EffectivePermissionResolutionService
       "no-effective-permission",
       "No role grant, owner override, sharing grant, or visibility rule allowed the permission.",
     );
+    this.diagnosticsLogger.info({
+      event: "auth.permission-resolution.denied.no-effective-permission",
+      details: Object.freeze({
+        requiredPermissionKey,
+        actorUserIdentityIdPresent: !!request.actor.actorUserIdentityId,
+        actorServiceIdPresent: !!request.actor.actorServiceId,
+        actorActiveWorkspaceId: request.actor.activeWorkspaceId,
+        resourceWorkspaceId: request.resource.workspaceId,
+        resourceType: request.resource.resourceType,
+        resourceId: request.resource.resourceId,
+        applicableRoleAssignmentCount: applicableRoleAssignments.length,
+        matchingRoleGrantCount: matchedRoleAssignmentIds.length,
+        matchingAllowPermissionGrantCount: allowedPermissionGrantIds.length,
+        matchingDenyPermissionGrantCount: deniedPermissionGrantIds.length,
+        matchingSharingGrantCount: matchedSharingGrantIds.length,
+        visibilityRuleEligible: VisibilityReadableActions.has(action),
+        permissionAction: action,
+      }),
+    });
+    return deniedResolution;
   }
 
   public resolvePermissions(
@@ -427,4 +456,3 @@ function toPermissionAction(permissionKey: PermissionKey): string {
   const action = segments[segments.length - 1] ?? permissionKey;
   return action.trim().toLowerCase();
 }
-

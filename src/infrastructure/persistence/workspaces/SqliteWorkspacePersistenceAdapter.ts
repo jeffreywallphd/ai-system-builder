@@ -29,6 +29,10 @@ import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/S
 import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
 import {
+  ConsolePersistenceDiagnosticsLogger,
+  type IPersistenceDiagnosticsLogger,
+} from "@infrastructure/logging/PersistenceDiagnosticsLogger";
+import {
   mapWorkspaceInvitationRowToDomain,
   mapWorkspaceInvitationToRowValues,
   mapWorkspaceMembershipRowToDomain,
@@ -62,9 +66,14 @@ export class SqliteWorkspacePersistenceAdapter
   private database?: SqliteCompatDatabase;
   private initialized = false;
   private readonly transactionCoordinator: SqliteTransactionCoordinator;
+  private readonly diagnosticsLogger: IPersistenceDiagnosticsLogger;
 
-  public constructor(private readonly databasePath: string) {
+  public constructor(
+    private readonly databasePath: string,
+    options: { readonly diagnosticsLogger?: IPersistenceDiagnosticsLogger } = {},
+  ) {
     super("Workspace");
+    this.diagnosticsLogger = options.diagnosticsLogger ?? new ConsolePersistenceDiagnosticsLogger();
     this.transactionCoordinator = new SqliteTransactionCoordinator(() => this.getDatabase());
   }
 
@@ -793,6 +802,23 @@ export class SqliteWorkspacePersistenceAdapter
   ): Promise<WorkspaceAuthorizationSnapshot | undefined> {
     const workspace = await this.findWorkspaceById(query.workspaceId);
     if (!workspace) {
+      this.diagnosticsLogger.info({
+        type: "persistence-diagnostic",
+        level: "info",
+        repository: "Workspace",
+        operation: "getWorkspaceAuthorizationSnapshot",
+        code: "workspace.sqlite.auth-snapshot.result",
+        retryable: false,
+        occurredAt: new Date().toISOString(),
+        details: Object.freeze({
+          workspaceId: query.workspaceId,
+          userIdentityId: query.userIdentityId,
+          membershipStatus: undefined,
+          activeRoleAssignmentCount: 0,
+          effectiveRoles: Object.freeze([]),
+          isWorkspaceOwner: false,
+        }),
+      });
       return undefined;
     }
 
@@ -806,13 +832,31 @@ export class SqliteWorkspacePersistenceAdapter
       ...new Set(activeRoleAssignments.map((assignment) => assignment.role)),
     ]);
 
-    return Object.freeze({
+    const snapshot = Object.freeze({
       workspace,
       membership,
       activeRoleAssignments,
       effectiveRoles,
       isWorkspaceOwner: effectiveRoles.includes(WorkspaceRoles.owner),
     });
+    this.diagnosticsLogger.info({
+      type: "persistence-diagnostic",
+      level: "info",
+      repository: "Workspace",
+      operation: "getWorkspaceAuthorizationSnapshot",
+      code: "workspace.sqlite.auth-snapshot.result",
+      retryable: false,
+      occurredAt: new Date().toISOString(),
+      details: Object.freeze({
+        workspaceId: query.workspaceId,
+        userIdentityId: query.userIdentityId,
+        membershipStatus: snapshot.membership?.status,
+        activeRoleAssignmentCount: snapshot.activeRoleAssignments.length,
+        effectiveRoles: snapshot.effectiveRoles,
+        isWorkspaceOwner: snapshot.isWorkspaceOwner,
+      }),
+    });
+    return snapshot;
   }
 
   public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
@@ -881,4 +925,3 @@ export class SqliteWorkspacePersistenceAdapter
     return roleAssignment.revokedAt ?? roleAssignment.assignedAt;
   }
 }
-

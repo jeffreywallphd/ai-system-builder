@@ -40,6 +40,9 @@ export interface AuthorizationPolicyDecisionEvaluatorDependencies {
   readonly resourcePolicyMetadataReadRepository: IAuthorizationResourcePolicyMetadataReadRepository;
   readonly effectivePermissionResolver?: IEffectivePermissionResolutionService;
   readonly clock?: AuthorizationPolicyDecisionEvaluatorClock;
+  readonly diagnosticsLogger?: {
+    info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+  };
 }
 
 const WorkspaceCapabilitySyntheticOwnerUserIdentityId = "__workspace-capability-owner__";
@@ -47,11 +50,17 @@ const WorkspaceCapabilitySyntheticOwnerUserIdentityId = "__workspace-capability-
 export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolicyDecisionEvaluator {
   private readonly effectivePermissionResolver: IEffectivePermissionResolutionService;
   private readonly clock: AuthorizationPolicyDecisionEvaluatorClock;
+  private readonly diagnosticsLogger: {
+    info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+  };
 
   public constructor(private readonly dependencies: AuthorizationPolicyDecisionEvaluatorDependencies) {
     this.effectivePermissionResolver = dependencies.effectivePermissionResolver ?? new EffectivePermissionResolutionService();
     this.clock = dependencies.clock ?? {
       now: () => new Date(),
+    };
+    this.diagnosticsLogger = dependencies.diagnosticsLogger ?? {
+      info: () => {},
     };
   }
 
@@ -96,12 +105,36 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
     }
 
     try {
+      this.diagnosticsLogger.info({
+        event: "auth.decision.role-snapshot.query",
+        details: Object.freeze({
+          targetKind: request.target.kind,
+          requiredPermissionKey,
+          actorUserIdentityId,
+          actorServiceId,
+          activeWorkspaceId: normalizeOptional(request.actor.activeWorkspaceId),
+          asOf: request.asOf,
+        }),
+      });
       const roleGrantSnapshot = await this.dependencies.roleGrantReadRepository.getActorRoleGrantSnapshot({
         actor: request.actor,
         resource: request.target.kind === AuthorizationPolicyEvaluationTargetKinds.resourceInstance
           ? request.target.resource
           : undefined,
         asOf: request.asOf,
+      });
+      this.diagnosticsLogger.info({
+        event: "auth.decision.role-snapshot.result",
+        details: Object.freeze({
+          roleAssignmentCount: roleGrantSnapshot.roleAssignments.length,
+          permissionGrantCount: roleGrantSnapshot.permissionGrants.length,
+          sampleRoleAssignmentScopes: Object.freeze(
+            [...new Set(roleGrantSnapshot.roleAssignments.map((assignment) => assignment.scope))].slice(0, 4),
+          ),
+          sampleRoleKeys: Object.freeze(
+            [...new Set(roleGrantSnapshot.roleAssignments.map((assignment) => assignment.roleKey))].slice(0, 8),
+          ),
+        }),
       });
 
       const actorContext = createActorContext({
@@ -169,7 +202,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           asOf: request.asOf,
         });
 
-        return this.toResult({
+        const result = this.toResult({
           request,
           decision: toAuthorizationPolicyDecision(resolution.decision),
           debug: request.includeDebugDetails
@@ -182,6 +215,17 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
             )
             : undefined,
         });
+        this.diagnosticsLogger.info({
+          event: "auth.decision.completed",
+          details: Object.freeze({
+            outcome: result.decision.isAllowed ? "allow" : "deny",
+            reasonCode: result.decision.reasonCode,
+            sourceKind: resolution.sourceKind,
+            targetKind: request.target.kind,
+            requiredPermissionKey,
+          }),
+        });
+        return result;
       }
 
       const workspaceId = request.target.workspaceId.trim();
@@ -207,8 +251,16 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
         requiredPermissionKey,
         asOf: request.asOf,
       });
+      this.diagnosticsLogger.info({
+        event: "auth.decision.workspace-capability.evaluate",
+        details: Object.freeze({
+          workspaceId,
+          capabilityResourceType,
+          requiredPermissionKey,
+        }),
+      });
 
-      return this.toResult({
+      const result = this.toResult({
         request,
         decision: toAuthorizationPolicyDecision(resolution.decision),
         debug: request.includeDebugDetails
@@ -221,6 +273,17 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           )
           : undefined,
       });
+      this.diagnosticsLogger.info({
+        event: "auth.decision.completed",
+        details: Object.freeze({
+          outcome: result.decision.isAllowed ? "allow" : "deny",
+          reasonCode: result.decision.reasonCode,
+          sourceKind: resolution.sourceKind,
+          targetKind: request.target.kind,
+          requiredPermissionKey,
+        }),
+      });
+      return result;
     } catch {
       return this.toResult({
         request,
@@ -367,4 +430,3 @@ function toDenialReason(reasonCode: string): AuthorizationPolicyDecisionDenialRe
   }
   return AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext;
 }
-

@@ -133,12 +133,29 @@ export function createIdentityAndTrustedDeviceRouteFamilyHandler(deps: Record<st
 
             const workspaceCreationApi = options.workspaceAdministrationBackendApi
               ?? options.sessionContextWorkspaceApi;
+            const workspaceCreationApiSource = options.workspaceAdministrationBackendApi
+              ? "workspaceAdministrationBackendApi"
+              : "sessionContextWorkspaceApi";
             if (workspaces.length === 0 && workspaceCreationApi?.createWorkspace) {
+              logger.info({
+                event: "identity.session-context.default-workspace.ensure.started",
+                requestId,
+                details: Object.freeze({
+                  actorUserIdentityId: context.principal.userIdentityId,
+                  existingWorkspaceCount: workspaces.length,
+                  apiSource: workspaceCreationApiSource,
+                }),
+              });
               workspaces = await ensureDefaultWorkspaceForAuthenticatedSession({
                 workspaceAdministrationBackendApi: workspaceCreationApi,
                 actorUserIdentityId: context.principal.userIdentityId,
                 username: context.principal.username,
                 existingWorkspaces: workspaces,
+                onDiagnostics: (event) => logger.info({
+                  event: event.event,
+                  requestId,
+                  details: event.details,
+                }),
               });
             }
 
@@ -1076,6 +1093,10 @@ async function ensureDefaultWorkspaceForAuthenticatedSession(input: {
     readonly canAdministrate: boolean;
     readonly isWorkspaceOwner: boolean;
   }>;
+  readonly onDiagnostics?: (event: {
+    readonly event: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }) => void;
 }): Promise<ReadonlyArray<{
   readonly workspaceId: string;
   readonly slug: string;
@@ -1100,6 +1121,16 @@ async function ensureDefaultWorkspaceForAuthenticatedSession(input: {
       status: "active",
     });
     if (created.ok && created.data?.workspace) {
+      input.onDiagnostics?.({
+        event: "identity.session-context.default-workspace.ensure.completed",
+        details: Object.freeze({
+          created: true,
+          resultingWorkspaceCount: 1,
+          resolvedWorkspaceIdCandidate: created.data.workspace.workspaceId,
+          createdWorkspaceId: created.data.workspace.workspaceId,
+          createdWorkspaceSlug: created.data.workspace.slug,
+        }),
+      });
       return Object.freeze([
         Object.freeze({
           workspaceId: created.data.workspace.workspaceId,
@@ -1115,6 +1146,14 @@ async function ensureDefaultWorkspaceForAuthenticatedSession(input: {
       ]);
     }
   }
+  input.onDiagnostics?.({
+    event: "identity.session-context.default-workspace.ensure.completed",
+    details: Object.freeze({
+      created: false,
+      resultingWorkspaceCount: input.existingWorkspaces.length,
+      resolvedWorkspaceIdCandidate: input.existingWorkspaces[0]?.workspaceId,
+    }),
+  });
   return input.existingWorkspaces;
 }
 
