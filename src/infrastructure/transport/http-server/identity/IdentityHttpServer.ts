@@ -3205,27 +3205,32 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       const matchedRouteFamily = transportComposition.routeModuleRegistry.resolveRouteFamilyByPath(path);
       if (matchedRouteFamily) {
         const routeFamilyAvailability = options.routeFamilyAvailability;
+        const runtimeGuardRouteFamilyId = resolveRuntimeCapabilityGuardRouteFamilyId({
+          method: request.method,
+          path,
+          matchedRouteFamilyId: matchedRouteFamily.routeFamilyId,
+        });
         const shouldAllowStateDrivenReadinessBypass = (
-          matchedRouteFamily.routeFamilyId === "run-read"
+          runtimeGuardRouteFamilyId === "run-read"
           && request.method === "GET"
           && path === RunOrchestrationTransportRoutes.getExecutionReadiness
         );
         if (
           routeFamilyAvailability
-          && !routeFamilyAvailability.isRouteFamilyAvailable(matchedRouteFamily.routeFamilyId)
+          && !routeFamilyAvailability.isRouteFamilyAvailable(runtimeGuardRouteFamilyId)
         ) {
           const availabilityDetails = routeFamilyAvailability.resolveRouteFamilyAvailability?.(
-            matchedRouteFamily.routeFamilyId,
+            runtimeGuardRouteFamilyId,
           );
           const runtimeCapabilityGuard = evaluateRuntimeCapabilityGuard({
             endpoint: path,
             requestId,
-            routeFamilyId: matchedRouteFamily.routeFamilyId,
+            routeFamilyId: runtimeGuardRouteFamilyId,
             availability: availabilityDetails,
           });
           if (!shouldAllowStateDrivenReadinessBypass) {
             const unavailableResponse = runtimeCapabilityGuard.response ?? buildRouteFamilyCapabilityUnavailableResponse({
-              routeFamilyId: matchedRouteFamily.routeFamilyId,
+              routeFamilyId: runtimeGuardRouteFamilyId,
               capabilityId: availabilityDetails?.capabilityId,
             });
             writeJson(response, 503, unavailableResponse);
@@ -3236,7 +3241,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               method: request.method,
               path,
               details: Object.freeze({
-                routeFamilyId: matchedRouteFamily.routeFamilyId,
+                routeFamilyId: runtimeGuardRouteFamilyId,
+                matchedRouteFamilyId: matchedRouteFamily.routeFamilyId,
                 capabilityId: availabilityDetails?.capabilityId,
                 capabilityState: availabilityDetails?.state,
                 runtimeState: runtimeCapabilityGuard.runtimeState,
@@ -8739,6 +8745,88 @@ function logResponse<TRequest extends Record<string, unknown>>(
 
 function isRootReadinessProbeRequest(method: string | undefined, path: string): boolean {
   return method === "GET" && path === "/";
+}
+
+function resolveRuntimeCapabilityGuardRouteFamilyId(input: {
+  readonly method: string | undefined;
+  readonly path: string;
+  readonly matchedRouteFamilyId: string;
+}): string {
+  const method = input.method?.toUpperCase();
+  if (!method) {
+    return input.matchedRouteFamilyId;
+  }
+
+  if (method === "POST" && input.path === RunOrchestrationTransportRoutes.submitRun) {
+    return "run-submission";
+  }
+  if (method === "POST" && input.path.startsWith("/api/v1/image-systems/") && input.path.endsWith("/runs")) {
+    return "image-run-api";
+  }
+
+  if (method === "GET" && input.path === RunOrchestrationTransportRoutes.listRuns) {
+    return "run-read";
+  }
+  if (method === "GET" && input.path === RunOrchestrationTransportRoutes.getExecutionReadiness) {
+    return "run-read";
+  }
+  if (method === "GET" && input.path === RunOrchestrationTransportRoutes.listQueueStatus) {
+    return "run-read";
+  }
+  if (method === "GET" && input.path === ImageRunApiRoutes.listRuns) {
+    return "image-run-api";
+  }
+  if (
+    method === "GET"
+    && input.path.startsWith("/api/v1/image-runs/")
+    && !input.path.endsWith("/status")
+    && !input.path.endsWith("/cancel")
+    && !input.path.endsWith("/events")
+    && !input.path.endsWith("/generated-results")
+  ) {
+    return "image-run-api";
+  }
+  if (method === "POST" && input.path.startsWith("/api/v1/image-runs/") && input.path.endsWith("/cancel")) {
+    return "image-run-api";
+  }
+
+  if (method === "POST" && input.path.startsWith("/api/v1/runtime/runs/") && input.path.endsWith("/cancel")) {
+    return "run-mutation";
+  }
+  if (method === "POST" && input.path.startsWith("/api/v1/runtime/runs/") && input.path.endsWith("/retry")) {
+    return "run-mutation";
+  }
+  if (method === "POST" && input.path.startsWith("/api/v1/runtime/runs/") && input.path.endsWith("/lifecycle")) {
+    return "run-execution-update";
+  }
+
+  if (
+    method === "GET"
+    && input.path.startsWith("/api/v1/runtime/runs/")
+    && !input.path.endsWith("/status")
+    && !input.path.endsWith("/result")
+    && !input.path.endsWith("/trace")
+    && !input.path.endsWith("/cancel")
+    && !input.path.endsWith("/retry")
+    && !input.path.endsWith("/lifecycle")
+    && !input.path.endsWith("/start")
+  ) {
+    return "run-read";
+  }
+  if (method === "GET" && input.path.startsWith("/api/v1/runtime/runs/") && input.path.endsWith("/status")) {
+    return "run-read";
+  }
+  if (method === "GET" && input.path.startsWith("/api/v1/runtime/runs/") && input.path.endsWith("/result")) {
+    return "system-runtime";
+  }
+  if (method === "GET" && input.path.startsWith("/api/v1/runtime/runs/") && input.path.endsWith("/trace")) {
+    return "system-runtime";
+  }
+  if (method === "POST" && input.path.startsWith("/api/v1/runtime/queue/") && input.path.endsWith("/dequeue")) {
+    return "system-runtime";
+  }
+
+  return input.matchedRouteFamilyId;
 }
 
 function resolveCanonicalRequestPath(requestUrl: string | undefined): string {

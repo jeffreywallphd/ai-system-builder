@@ -59,4 +59,38 @@ describe("runtime capability guard middleware", () => {
     expect(decision.blocked).toBeFalse();
     expect(decision.response).toBeUndefined();
   });
+
+  it("guards system-runtime and image-run-api route families with structured unavailable payloads", () => {
+    const systemRuntimeDecision = evaluateRuntimeCapabilityGuard({
+      endpoint: "/api/v1/runtime/queue/runtime-queue:1/dequeue",
+      requestId: "request-4",
+      routeFamilyId: "system-runtime",
+      checkedAt: "2026-04-13T12:02:00.000Z",
+      availability: Object.freeze({
+        routeFamilyId: "system-runtime",
+        capabilityId: "deferred-runtime-features",
+        state: "pre-login",
+        available: false,
+      }),
+    });
+    expect(systemRuntimeDecision.blocked).toBeTrue();
+    expect(systemRuntimeDecision.response?.runtime.state).toBe("unavailable");
+    expect(systemRuntimeDecision.response?.runtime.blockingReasons[0]?.code).toBe("authentication-required");
+
+    const imageRunDecision = evaluateRuntimeCapabilityGuard({
+      endpoint: "/api/v1/image-systems/system-1/runs",
+      requestId: "request-5",
+      routeFamilyId: "image-run-api",
+      checkedAt: "2026-04-13T12:03:00.000Z",
+      availability: Object.freeze({
+        routeFamilyId: "image-run-api",
+        capabilityId: "deferred-runtime-features",
+        state: "warming",
+        available: false,
+      }),
+    });
+    expect(imageRunDecision.blocked).toBeTrue();
+    expect(imageRunDecision.response?.runtime.state).toBe("warming");
+    expect(imageRunDecision.response?.runtime.blockingReasons[0]?.code).toBe("capability-warmup-in-progress");
+  });
 });

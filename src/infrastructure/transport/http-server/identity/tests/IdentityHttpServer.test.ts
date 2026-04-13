@@ -467,6 +467,113 @@ describe("IdentityHttpServer", () => {
     expect(unavailableEvent?.details?.runtimeState).toBe("warming");
   });
 
+  it("guards runtime read and mutation endpoints with endpoint-aware route-family resolution", async () => {
+    const logger = new CapturingLogger();
+    const routeRegistrationPlan = composeAuthoritativeApiRouteRegistrationPlan({
+      backendAvailability: Object.freeze({
+        [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: false,
+        [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: false,
+        [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
+        [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
+        [AuthoritativeApiRouteBackendKeys.executionNodeManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
+        [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
+        [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: true,
+        [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
+        [AuthoritativeApiRouteBackendKeys.runRead]: true,
+        [AuthoritativeApiRouteBackendKeys.runMutation]: true,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: true,
+      }),
+    });
+    const { baseUrl } = await startServer(logger, {}, {
+      routeRegistrationPlan,
+      systemRuntimeBackendApi: {
+        async listQueueItems() {
+          return Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              items: Object.freeze([]),
+              totalCount: 0,
+            }),
+          });
+        },
+      } as any,
+      routeFamilyAvailability: Object.freeze({
+        isRouteFamilyAvailable: (routeFamilyId: string) => routeFamilyId === "run-read",
+        resolveRouteFamilyAvailability: (routeFamilyId: string) => Object.freeze({
+          routeFamilyId,
+          capabilityId: "deferred-runtime-features",
+          state: routeFamilyId === "run-read" ? "ready" : "warming",
+          available: routeFamilyId === "run-read",
+        }),
+      }),
+    });
+
+    const retryBlockedResponse = await fetch(
+      `${baseUrl}/api/v1/runtime/runs/${encodeURIComponent("run:guarded")}/retry?workspaceId=workspace-alpha`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      },
+    );
+    expect(retryBlockedResponse.status).toBe(503);
+    const retryBlockedBody = await retryBlockedResponse.json() as {
+      readonly endpoint?: string;
+      readonly runtime?: {
+        readonly state?: string;
+      };
+    };
+    expect(retryBlockedBody.endpoint).toBe("/api/v1/runtime/runs/run%3Aguarded/retry");
+    expect(retryBlockedBody.runtime?.state).toBe("warming");
+
+    const queueResponse = await fetch(`${baseUrl}/api/v1/runtime/queue?workspaceId=workspace-alpha`);
+    expect(queueResponse.status).toBe(401);
+
+    const imageSubmissionBlockedResponse = await fetch(
+      `${baseUrl}/api/v1/image-systems/${encodeURIComponent("system-guarded")}/runs?workspaceId=workspace-alpha`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          runtimeTarget: {
+            versionId: "version-1",
+            async: true,
+          },
+        }),
+      },
+    );
+    expect(imageSubmissionBlockedResponse.status).toBe(503);
+    const imageBlockedBody = await imageSubmissionBlockedResponse.json() as {
+      readonly endpoint?: string;
+      readonly runtime?: {
+        readonly state?: string;
+      };
+    };
+    expect(imageBlockedBody.endpoint).toBe("/api/v1/image-systems/system-guarded/runs");
+    expect(imageBlockedBody.runtime?.state).toBe("warming");
+
+    const mutationUnavailableEvent = logger.events.find((entry) => (
+      entry.event === "identity-http.route-family.capability-unavailable"
+      && entry.path === "/api/v1/runtime/runs/run%3Aguarded/retry"
+    ));
+    expect(mutationUnavailableEvent?.details?.routeFamilyId).toBe("run-mutation");
+    expect(mutationUnavailableEvent?.details?.matchedRouteFamilyId).toBe("run-read");
+
+    const imageUnavailableEvent = logger.events.find((entry) => (
+      entry.event === "identity-http.route-family.capability-unavailable"
+      && entry.path === "/api/v1/image-systems/system-guarded/runs"
+    ));
+    expect(imageUnavailableEvent?.details?.routeFamilyId).toBe("image-run-api");
+  });
+
   it("starts with explicit modular route registration plans in deterministic order", async () => {
     const logger = new CapturingLogger();
     const routeRegistrationPlan = composeAuthoritativeApiRouteRegistrationPlan({
