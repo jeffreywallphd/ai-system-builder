@@ -68,6 +68,14 @@ class InMemoryDecisionPolicyRepositories
   }
 }
 
+class RecordingDiagnosticsLogger {
+  public readonly events: Array<{ readonly event: string; readonly details?: Readonly<Record<string, unknown>> }> = [];
+
+  public info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void {
+    this.events.push(event);
+  }
+}
+
 describe("AuthorizationPolicyDecisionEvaluator", () => {
   it("allows shared-resource reads when sharing grants match actor identity", async () => {
     const repositories = new InMemoryDecisionPolicyRepositories();
@@ -227,6 +235,7 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
 
   it("supports workspace-scoped capability checks without loading a resource instance", async () => {
     const repositories = new InMemoryDecisionPolicyRepositories();
+    const diagnosticsLogger = new RecordingDiagnosticsLogger();
     repositories.roleGrantSnapshot = Object.freeze({
       roleAssignments: Object.freeze([
         createRoleAssignment({
@@ -245,6 +254,7 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
       roleGrantReadRepository: repositories,
       sharingGrantReadRepository: repositories,
       resourcePolicyMetadataReadRepository: repositories,
+      diagnosticsLogger,
     });
 
     const allowed = await evaluator.evaluateDecision({
@@ -297,6 +307,9 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
       AuthorizationPolicyDecisionDenialReasons.insufficientPermissions,
     );
     expect(denied.debug?.targetKind).toBe("workspace-capability");
+    expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.role-snapshot.query");
+    expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.workspace-capability.evaluate");
+    expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.completed");
   });
 
   it("uses workspace visibility fallback for read/list when actor has workspace membership context", async () => {
@@ -362,4 +375,3 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
 function toResourceKey(resourceType: string, resourceId: string): string {
   return `${resourceType}:${resourceId}`;
 }
-

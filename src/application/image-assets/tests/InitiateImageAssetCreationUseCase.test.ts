@@ -291,6 +291,14 @@ class RecordingImageAssetAuditSink implements ImageAssetAuditSink {
   }
 }
 
+class RecordingDiagnosticsLogger {
+  public readonly events: Array<{ readonly event: string; readonly details?: Readonly<Record<string, unknown>> }> = [];
+
+  public info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void {
+    this.events.push(event);
+  }
+}
+
 function createStorage(input: {
   readonly id: string;
   readonly workspaceId?: string;
@@ -332,6 +340,7 @@ function buildFixture() {
   const storagePolicyEvaluationPort = new StoragePolicyEvaluationPort();
   const authorizationPolicyDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator();
   const auditSink = new RecordingImageAssetAuditSink();
+  const diagnosticsLogger = new RecordingDiagnosticsLogger();
 
   const useCase = new InitiateImageAssetCreationUseCase({
     imageAssetRepository,
@@ -347,6 +356,7 @@ function buildFixture() {
     clock: {
       now: () => new Date("2026-04-08T12:00:00.000Z"),
     },
+    diagnosticsLogger,
   });
 
   return {
@@ -358,6 +368,7 @@ function buildFixture() {
     storagePolicyEvaluationPort,
     authorizationPolicyDecisionEvaluator,
     auditSink,
+    diagnosticsLogger,
   };
 }
 
@@ -560,6 +571,8 @@ describe("InitiateImageAssetCreationUseCase", () => {
         code: ImageAssetCreationErrorCodes.accessDenied,
       }),
     });
+    expect(fixture.diagnosticsLogger.events.map((event) => event.event)).toContain("image-asset.create.auth-eval.started");
+    expect(fixture.diagnosticsLogger.events.map((event) => event.event)).toContain("image-asset.create.auth-eval.completed");
   });
 
   it("rejects invalid request payloads at the boundary", async () => {

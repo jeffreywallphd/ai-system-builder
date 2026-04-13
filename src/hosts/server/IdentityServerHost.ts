@@ -443,6 +443,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       authorizationRepository,
       authoritativeAuditRecorder,
       deploymentPolicyBootstrap: options.deploymentPolicyBootstrap,
+      diagnosticsLogger: auditDiagnosticsPlatformComposition.imageAssetManagementOperationalLogger,
     });
     const workspaceClock = workspaceAuthorizationComposition.workspaceClock;
     const authorizationDecisionEvaluator = workspaceAuthorizationComposition.authorizationDecisionEvaluator;

@@ -47,6 +47,12 @@ export interface ServerWorkspaceAuthorizationCompositionModuleInput {
   readonly authorizationRepository: AuthoritativePersistentPlatformServices["authorizationRepository"];
   readonly authoritativeAuditRecorder: AuthoritativeAuditRecordingService;
   readonly deploymentPolicyBootstrap?: DeploymentPolicyBootstrapResolutionResult;
+  readonly diagnosticsLogger?: {
+    info(event: {
+      readonly event: string;
+      readonly details?: Readonly<Record<string, unknown>>;
+    }): void;
+  };
 }
 
 export interface ServerWorkspaceAuthorizationCompositionModuleOutput {
@@ -269,6 +275,16 @@ export function composeServerWorkspaceAuthorizationCompositionModule(
     sharingGrantPersistenceRepository: input.authorizationRepository,
     resourcePolicyMetadataPersistenceRepository: input.authorizationRepository,
     clock: workspaceClock,
+  });
+
+  input.diagnosticsLogger?.info({
+    event: "workspace-authorization.composition.wiring",
+    details: Object.freeze({
+      workspaceAdministrationEvaluator: workspaceAdministrationAuthorizationDecisionEvaluator.constructor.name,
+      workspaceAdministrationReadAdapter: workspaceAuthorizationPolicyReadAdapter.constructor.name,
+      generalAuthorizationEvaluator: authorizationDecisionEvaluator.constructor.name,
+      generalAuthorizationReadAdapter: authorizationPolicyReadAdapter.constructor.name,
+    }),
   });
 
   return Object.freeze({

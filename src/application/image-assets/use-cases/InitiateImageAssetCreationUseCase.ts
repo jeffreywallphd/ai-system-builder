@@ -65,12 +65,18 @@ export interface InitiateImageAssetCreationUseCaseDependencies {
   readonly clock?: {
     now(): Date;
   };
+  readonly diagnosticsLogger?: {
+    info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+  };
 }
 
 export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCreationUseCase {
   private readonly idGenerator: { nextAssetId(): string };
 
   private readonly clock: { now(): Date };
+  private readonly diagnosticsLogger: {
+    info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+  };
 
   public constructor(
     private readonly dependencies: InitiateImageAssetCreationUseCaseDependencies,
@@ -80,6 +86,9 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
     };
     this.clock = dependencies.clock ?? {
       now: () => new Date(),
+    };
+    this.diagnosticsLogger = dependencies.diagnosticsLogger ?? {
+      info: () => {},
     };
   }
 
@@ -311,12 +320,39 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
     occurredAt: string,
   ): Promise<{ readonly allowed: boolean; readonly reasonCode: string; readonly evaluatedAt: string; readonly message?: string }> {
     const evaluator = this.dependencies.authorizationPolicyDecisionEvaluator;
+    const resolvedVisibility = this.resolveVisibility(request.visibility, request.ownerUserId);
+    this.diagnosticsLogger.info({
+      event: "image-asset.create.auth-eval.started",
+      details: Object.freeze({
+        actorUserId: request.actorUserId,
+        workspaceId: request.workspaceId,
+        operationKey: request.operationKey,
+        correlationId: request.correlationId,
+        occurredAt,
+        visibility: resolvedVisibility,
+        ownerUserId: request.ownerUserId,
+      }),
+    });
     if (!evaluator) {
-      return {
+      const bypassDecision = {
         allowed: true,
         reasonCode: "image-asset-create-policy-evaluator-not-configured",
         evaluatedAt: occurredAt,
       };
+      this.diagnosticsLogger.info({
+        event: "image-asset.create.auth-eval.completed",
+        details: Object.freeze({
+          allowed: bypassDecision.allowed,
+          reasonCode: bypassDecision.reasonCode,
+          evaluatedAt: bypassDecision.evaluatedAt,
+          message: undefined,
+          actorUserId: request.actorUserId,
+          workspaceId: request.workspaceId,
+          operationKey: request.operationKey,
+          correlationId: request.correlationId,
+        }),
+      });
+      return bypassDecision;
     }
 
     const decision = await evaluator.evaluateDecision(
@@ -331,12 +367,26 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
       }),
     );
 
-    return {
+    const policyDecision = {
       allowed: decision.decision.isAllowed,
       reasonCode: decision.decision.reasonCode,
       evaluatedAt: decision.decision.evaluatedAt,
       message: decision.decision.reason,
     };
+    this.diagnosticsLogger.info({
+      event: "image-asset.create.auth-eval.completed",
+      details: Object.freeze({
+        allowed: policyDecision.allowed,
+        reasonCode: policyDecision.reasonCode,
+        evaluatedAt: policyDecision.evaluatedAt,
+        message: policyDecision.message,
+        actorUserId: request.actorUserId,
+        workspaceId: request.workspaceId,
+        operationKey: request.operationKey,
+        correlationId: request.correlationId,
+      }),
+    });
+    return policyDecision;
   }
 
   private async resolveStorageInstance(input: {

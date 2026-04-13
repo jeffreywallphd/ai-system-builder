@@ -95,6 +95,10 @@ export interface ImageAssetManagementBackendApiDependencies {
   readonly clock?: {
     now(): Date;
   };
+  readonly diagnosticsLogger?: {
+    info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+    warn(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+  };
 }
 
 const UploadSessionTokenVersion = "img-upload-v1";
@@ -113,6 +117,10 @@ export class ImageAssetManagementBackendApi {
   private readonly uploadSessionTokenPreviousVersionValidationWindowMs: number;
 
   private readonly observability: ImageAssetManagementObservability;
+  private readonly diagnosticsLogger: {
+    info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+    warn(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void;
+  };
 
   public constructor(private readonly dependencies: ImageAssetManagementBackendApiDependencies) {
     const staticSecret = normalizeOptional(dependencies.uploadSessionTokenSecret);
@@ -131,6 +139,10 @@ export class ImageAssetManagementBackendApi {
       dependencies.uploadSessionTokenPreviousVersionValidationWindowMs,
     );
     this.observability = dependencies.observability ?? new ImageAssetManagementObservability();
+    this.diagnosticsLogger = dependencies.diagnosticsLogger ?? {
+      info: () => {},
+      warn: () => {},
+    };
     this.clock = dependencies.clock ?? {
       now: () => new Date(),
     };
@@ -150,6 +162,20 @@ export class ImageAssetManagementBackendApi {
 
     const operationKey = normalizeOptional(request.operationKey)
       ?? `image-asset:create:${normalizeOptional(request.assetId) ?? "new"}:${randomUUID()}`;
+    this.diagnosticsLogger.info({
+      event: "image-asset.api.create.request-normalized",
+      details: Object.freeze({
+        actorUserIdentityId: actorUserId,
+        workspaceId: request.workspaceId,
+        operationKey,
+        correlationId: request.correlationId,
+        ownerUserIdentityId: request.ownerUserIdentityId,
+        visibility: request.visibility,
+        originKind: request.originKind,
+        mediaType: request.mediaType,
+        sizeBytes: request.sizeBytes,
+      }),
+    });
     const outcome = await this.dependencies.initiateImageAssetCreationUseCase.execute({
       actorUserId,
       workspaceId: request.workspaceId,
@@ -171,6 +197,16 @@ export class ImageAssetManagementBackendApi {
     });
 
     if (!outcome.ok) {
+      this.diagnosticsLogger.warn({
+        event: "image-asset.api.create.failure",
+        details: Object.freeze({
+          code: outcome.error.code,
+          reasonCode: (outcome.error.details as { reasonCode?: string } | undefined)?.reasonCode,
+          evaluatedAt: (outcome.error.details as { evaluatedAt?: string } | undefined)?.evaluatedAt,
+          operationKey,
+          correlationId: request.correlationId,
+        }),
+      });
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.create,
         request,
