@@ -6,6 +6,7 @@ import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { McpStoreState } from "../state/McpStore";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import McpRuntimeStatusPanel from "../components/execution/McpRuntimeStatusPanel";
+import DesktopRuntimeDiagnosticsPanel from "../components/execution/DesktopRuntimeDiagnosticsPanel";
 import { useRendererRuntimeLifecycle } from "../runtime/RendererRuntimeLifecycleService";
 import DesktopOfflineStatusSurface from "../shared/connectivity/DesktopOfflineStatusSurface";
 import { DesktopConnectivityService } from "../shared/connectivity/DesktopConnectivityService";
@@ -15,6 +16,7 @@ import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSession
 import { resolveNavigationAvailabilityContextForSession } from "../routes/SurfaceRouteAccessPolicy";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { OfflineSynchronizationStateSnapshotDto } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
+import { DesktopRuntimeDiagnosticsFeatureFlag } from "../features/DesktopRuntimeDiagnosticsFeatureFlag";
 
 export default function SettingsPage(): JSX.Element {
   const { settingsStore, mcpStore, runtimeConsoleStore } = useUiDependencies();
@@ -30,6 +32,10 @@ export default function SettingsPage(): JSX.Element {
   const [isOfflineStatusLoading, setOfflineStatusLoading] = useState<boolean>(false);
   const [isOfflineModeTogglePending, setOfflineModeTogglePending] = useState<boolean>(false);
   const runtimeLifecycle = useRendererRuntimeLifecycle({ enabled: true });
+  const isDesktopRuntimeDiagnosticsEnabled = useMemo(
+    () => new DesktopRuntimeDiagnosticsFeatureFlag().isEnabled(),
+    [],
+  );
   const [expandedAdvancedSections, setExpandedAdvancedSections] = useState<ReadonlyArray<string>>(
     Object.freeze(["runtime", "development"])
   );
@@ -471,6 +477,9 @@ export default function SettingsPage(): JSX.Element {
                 placeholder="Optional token"
               />
             </div>
+            {isDesktopRuntimeDiagnosticsEnabled ? (
+              <DesktopRuntimeDiagnosticsPanel runtimeLifecycleStatus={runtimeLifecycle.status} />
+            ) : null}
           </AdvancedSection>
         </SettingsSection>
 

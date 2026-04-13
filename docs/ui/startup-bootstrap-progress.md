@@ -92,3 +92,40 @@ Tests:
 - `src/ui/runtime/tests/DesktopRuntimeLifecycleGatingConventions.test.ts`
 - `src/ui/services/tests/RuntimeOperationsService.test.ts`
 - `src/ui/shared/runtime/tests/RuntimeRealtimeSubscriptionService.test.ts`
+
+## Development runtime diagnostics surface (Story 1.4.7)
+
+Desktop settings now include a development-only runtime diagnostics panel so activation issues can be diagnosed from renderer state without exposing internals in normal user flows.
+
+How to use:
+
+1. Open **Settings**.
+2. Go to **Development Tools**.
+3. Expand **Advanced development settings**.
+4. Review the **Desktop runtime diagnostics (development)** panel.
+
+What it shows:
+
+- current backend lifecycle state (`state`, `capabilityPhase`, `transport.phase`),
+- resolved blocking dependency category (`authentication`, `capability-activation`, `runtime-supervisor`, `control-plane-transport`, `unknown`),
+- currently blocking activation stage (if any),
+- recent transition timestamps from lifecycle, transport, warmup request, failure, and activation stage updates,
+- an inspectable JSON lifecycle snapshot for local troubleshooting.
+
+Availability and clutter controls:
+
+- The diagnostics panel is gated by development feature-flag rules and is hidden in standard production flows by default.
+- Explicit overrides are supported with `VITE_ENABLE_DESKTOP_RUNTIME_DIAGNOSTICS` (or `ENABLE_DESKTOP_RUNTIME_DIAGNOSTICS`) for local troubleshooting workflows.
+
+Implementation anchors:
+
+- `src/ui/features/DesktopRuntimeDiagnosticsFeatureFlag.ts`
+- `src/ui/runtime/DesktopRuntimeDiagnosticsModel.ts`
+- `src/ui/components/execution/DesktopRuntimeDiagnosticsPanel.tsx`
+- `src/ui/pages/SettingsPage.tsx`
+
+Tests:
+
+- `src/ui/runtime/tests/DesktopRuntimeDiagnosticsModel.test.ts`
+- `src/ui/components/execution/tests/DesktopRuntimeDiagnosticsPanel.test.tsx`
+- `src/ui/pages/tests/SettingsPage.test.ts`

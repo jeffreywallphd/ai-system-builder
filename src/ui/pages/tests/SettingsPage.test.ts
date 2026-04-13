@@ -26,6 +26,10 @@ describe("SettingsPage", () => {
     expect(source).toContain("Python 3.11");
     expect(source).toContain("repair or recreate the runtime environment");
     expect(source).toContain("<McpRuntimeStatusPanel");
+    expect(source).toContain("<DesktopRuntimeDiagnosticsPanel");
+    expect(source).toContain("DesktopRuntimeDiagnosticsFeatureFlag");
+    expect(source).toContain("isDesktopRuntimeDiagnosticsEnabled");
+    expect(source).toContain("runtimeLifecycleStatus={runtimeLifecycle.status}");
     expect(source).toContain("mcpStore.subscribe(setMcpState)");
     expect(source).toContain("servers={mcpState.configuredServers}");
     expect(source).toContain("isLoading={mcpState.isLoadingConfigured || mcpState.isSearching || mcpState.isMutating}");
