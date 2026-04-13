@@ -1248,6 +1248,115 @@ describe("IdentityHttpServer", () => {
     expect(contextBody.data.workspaceContext.resolvedWorkspaceId).toBe("workspace:default:1");
   });
 
+  it("creates a default workspace from session-context workspace api when workspace administration backend is not composed", async () => {
+    const logger = new CapturingLogger();
+    const actorWorkspaces: Array<{
+      readonly workspaceId: string;
+      readonly slug: string;
+      readonly displayName: string;
+      readonly status: "active";
+      readonly visibility: "private";
+      readonly actorAccess: {
+        readonly membershipStatus: "active";
+        readonly effectiveRoles: readonly ["owner"];
+        readonly canAdministrate: true;
+        readonly isWorkspaceOwner: true;
+        readonly capabilities: {
+          readonly canManageWorkspaceSettings: true;
+          readonly canManageMembers: true;
+          readonly canManageInvitations: true;
+          readonly canManageRoles: true;
+        };
+      };
+    }> = [];
+    const sessionContextWorkspaceApi = {
+      listWorkspaces: async () => Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          workspaces: Object.freeze([...actorWorkspaces]),
+          pagination: Object.freeze({
+            limit: 200,
+            offset: 0,
+            returned: actorWorkspaces.length,
+            hasMore: false,
+          }),
+        }),
+      }),
+      createWorkspace: async (request: { readonly slug: string; readonly displayName: string }) => {
+        const workspace = Object.freeze({
+          workspaceId: "workspace:default:session-context",
+          slug: request.slug,
+          displayName: request.displayName,
+          status: "active" as const,
+          visibility: "private" as const,
+          actorAccess: Object.freeze({
+            membershipStatus: "active" as const,
+            effectiveRoles: Object.freeze(["owner"] as const),
+            canAdministrate: true as const,
+            isWorkspaceOwner: true as const,
+            capabilities: Object.freeze({
+              canManageWorkspaceSettings: true as const,
+              canManageMembers: true as const,
+              canManageInvitations: true as const,
+              canManageRoles: true as const,
+            }),
+          }),
+        });
+        actorWorkspaces.push(workspace);
+        return Object.freeze({
+          ok: true,
+          data: Object.freeze({
+            workspace,
+          }),
+        });
+      },
+    };
+    const { baseUrl } = await startServer(logger, {}, {
+      sessionContextWorkspaceApi: sessionContextWorkspaceApi as never,
+    });
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "new.user.session.context",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "new.user.session.context",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+
+    const contextResponse = await fetch(`${baseUrl}/api/v1/identity/session/context`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(contextResponse.status).toBe(200);
+    const contextBody = await contextResponse.json();
+    expect(contextBody.ok).toBe(true);
+    expect(contextBody.data.workspaceContext.workspaces.length).toBe(1);
+    expect(contextBody.data.workspaceContext.resolvedWorkspaceId).toBe("workspace:default:session-context");
+  });
+
   it("supports bearer-authenticated logout and targeted session revocation", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);
