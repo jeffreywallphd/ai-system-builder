@@ -273,6 +273,17 @@ Desktop control-plane host startup now keeps runtime route families registered f
 - Authoritative server host composition projects that status source into route-family availability resolution so runtime guarded families evaluate availability from `capabilityPhase` (`pre-login` -> `warming` -> `ready` -> `failed`) instead of a duplicate backend-only lifecycle model.
 - Capability activation remains the registration/ownership seam for deferred route families, while lifecycle gating state is now sourced from the authoritative desktop runtime lifecycle contract.
 
+## Story 1.2.6 runtime read/mutation guard consistency
+
+- Runtime lifecycle guarding now resolves endpoint-aware route-family intent for overlapping runtime prefixes before evaluating availability.
+- Guarded runtime lifecycle responses now cover:
+  - run submission (`/api/v1/runtime/runs/start`, image-system run submission),
+  - run reads (run list/detail/status, queue reads),
+  - run mutations (cancel/retry, queue dequeue),
+  - image runtime routes that depend on deferred runtime activation.
+- Non-ready runtime requests now consistently return structured runtime-unavailable payloads (`RuntimeGuardedEndpointUnavailableResponseContract`) instead of falling back to generic route-family errors.
+- Readiness-state bypass remains limited to execution-readiness reads so lifecycle status can still be observed while other runtime read/mutation endpoints stay explicitly guarded.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)
