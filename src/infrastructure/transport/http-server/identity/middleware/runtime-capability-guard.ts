@@ -1,10 +1,12 @@
 import {
+  RuntimeAvailabilityBlockingDependencyCategories,
   RuntimeAvailabilityBlockingReasonCodes,
   createRuntimeFailedResponseContract,
   createRuntimeGuardedEndpointUnavailableResponseContract,
   createRuntimeUnavailableResponseContract,
   createRuntimeWarmingResponseContract,
   type RuntimeAvailabilityBlockingReason,
+  type RuntimeAvailabilityLifecycleDiagnostics,
   type RuntimeGuardedEndpointUnavailableResponseContract,
   type RuntimeUnavailableLifecycleResponseContract,
 } from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
@@ -24,6 +26,15 @@ export interface RuntimeCapabilityGuardAvailability {
   readonly routeFamilyId: string;
   readonly capabilityId?: string;
   readonly state?: string;
+  readonly runtimeLifecycle?: {
+    readonly capabilityPhase: string;
+    readonly transportPhase?: string;
+    readonly activationMode?: string;
+    readonly triggerSource?: string;
+    readonly unavailableReason?: string;
+    readonly hasFailure?: boolean;
+    readonly failureRetryable?: boolean;
+  };
   readonly available: boolean;
 }
 
@@ -82,21 +93,22 @@ function resolveUnavailableLifecycleResponse(input: {
   readonly checkedAt: string;
   readonly availability?: RuntimeCapabilityGuardAvailability;
 }): RuntimeUnavailableLifecycleResponseContract {
-  const runtimeState = normalizeRuntimeState(input.availability?.state);
+  const runtimeCapabilityState = normalizeRuntimeState(input.availability?.state);
+  const runtimeLifecycleState = mapCapabilityStateToRuntimeLifecycleState(runtimeCapabilityState);
   const capabilityDescription = input.availability?.capabilityId
     ? `runtime capability '${input.availability.capabilityId}'`
     : "runtime capability";
-  const diagnostics = Object.freeze({
-    routeFamilyId: input.availability?.routeFamilyId,
-    capabilityId: input.availability?.capabilityId,
-    capabilityState: input.availability?.state,
+  const diagnostics = buildLifecycleDiagnostics({
+    availability: input.availability,
+    runtimeState: runtimeLifecycleState,
   });
 
-  if (runtimeState === "failed") {
+  if (runtimeCapabilityState === "failed") {
+    const retryable = diagnostics.retryable;
     const failureReason = buildBlockingReason({
       code: RuntimeAvailabilityBlockingReasonCodes.runtimeInitializationFailed,
       message: `Deferred ${capabilityDescription} activation failed.`,
-      retryable: true,
+      retryable,
       observedAt: input.checkedAt,
     });
     return createRuntimeFailedResponseContract({
@@ -107,13 +119,13 @@ function resolveUnavailableLifecycleResponse(input: {
         code: "runtime-capability-activation-failed",
         message: `Deferred ${capabilityDescription} activation failed.`,
         failedAt: input.checkedAt,
-        retryable: true,
+        retryable,
       }),
       diagnostics,
     });
   }
 
-  if (runtimeState === "warming" || runtimeState === "pending") {
+  if (runtimeCapabilityState === "warming" || runtimeCapabilityState === "pending") {
     const warmupReason = buildBlockingReason({
       code: RuntimeAvailabilityBlockingReasonCodes.capabilityWarmupInProgress,
       message: `Deferred ${capabilityDescription} activation is still warming.`,
@@ -130,7 +142,7 @@ function resolveUnavailableLifecycleResponse(input: {
     });
   }
 
-  if (runtimeState === "pre-login") {
+  if (runtimeCapabilityState === "pre-login") {
     const authReason = buildBlockingReason({
       code: RuntimeAvailabilityBlockingReasonCodes.authenticationRequired,
       message: `Deferred ${capabilityDescription} activation requires an authenticated session.`,
@@ -159,6 +171,90 @@ function resolveUnavailableLifecycleResponse(input: {
     blockingReasons: Object.freeze([unavailableReason]),
     diagnostics,
   });
+}
+
+function mapCapabilityStateToRuntimeLifecycleState(
+  runtimeState: RuntimeCapabilityState,
+): RuntimeUnavailableLifecycleResponseContract["state"] {
+  if (runtimeState === "failed") {
+    return "failed";
+  }
+  if (runtimeState === "warming" || runtimeState === "pending") {
+    return "warming";
+  }
+  return "unavailable";
+}
+
+function buildLifecycleDiagnostics(input: {
+  readonly availability?: RuntimeCapabilityGuardAvailability;
+  readonly runtimeState: RuntimeUnavailableLifecycleResponseContract["state"];
+}): RuntimeAvailabilityLifecycleDiagnostics {
+  const blockingDependencyCategory = resolveBlockingDependencyCategory(input);
+  const retryable = input.runtimeState === "failed"
+    ? input.availability?.runtimeLifecycle?.failureRetryable ?? true
+    : true;
+
+  return Object.freeze({
+    lifecycleState: input.runtimeState,
+    blockingDependencyCategory,
+    retryable,
+    summary: buildLifecycleSummary({
+      runtimeState: input.runtimeState,
+      blockingDependencyCategory,
+      availability: input.availability,
+    }),
+    routeFamilyId: input.availability?.routeFamilyId,
+    capabilityId: input.availability?.capabilityId,
+    lifecyclePhase: input.availability?.runtimeLifecycle?.capabilityPhase ?? input.availability?.state,
+    transportPhase: input.availability?.runtimeLifecycle?.transportPhase,
+  });
+}
+
+function resolveBlockingDependencyCategory(input: {
+  readonly availability?: RuntimeCapabilityGuardAvailability;
+  readonly runtimeState: RuntimeUnavailableLifecycleResponseContract["state"];
+}): RuntimeAvailabilityLifecycleDiagnostics["blockingDependencyCategory"] {
+  const transportPhase = input.availability?.runtimeLifecycle?.transportPhase;
+  if (transportPhase === "failed" || transportPhase === "unavailable" || transportPhase === "binding") {
+    return RuntimeAvailabilityBlockingDependencyCategories.controlPlaneTransport;
+  }
+
+  if (input.runtimeState === "unavailable" && normalizeRuntimeState(input.availability?.state) === "pre-login") {
+    return RuntimeAvailabilityBlockingDependencyCategories.authentication;
+  }
+  if (input.runtimeState === "failed") {
+    return input.availability?.runtimeLifecycle?.hasFailure
+      ? RuntimeAvailabilityBlockingDependencyCategories.runtimeSupervisor
+      : RuntimeAvailabilityBlockingDependencyCategories.capabilityActivation;
+  }
+  if (input.runtimeState === "warming" || input.runtimeState === "unavailable") {
+    return RuntimeAvailabilityBlockingDependencyCategories.capabilityActivation;
+  }
+  return RuntimeAvailabilityBlockingDependencyCategories.unknown;
+}
+
+function buildLifecycleSummary(input: {
+  readonly runtimeState: RuntimeUnavailableLifecycleResponseContract["state"];
+  readonly blockingDependencyCategory: RuntimeAvailabilityLifecycleDiagnostics["blockingDependencyCategory"];
+  readonly availability?: RuntimeCapabilityGuardAvailability;
+}): string {
+  if (input.blockingDependencyCategory === RuntimeAvailabilityBlockingDependencyCategories.controlPlaneTransport) {
+    const transportPhase = input.availability?.runtimeLifecycle?.transportPhase ?? "unknown";
+    return `Desktop control-plane transport is '${transportPhase}'.`;
+  }
+  if (input.blockingDependencyCategory === RuntimeAvailabilityBlockingDependencyCategories.authentication) {
+    return "An authenticated desktop session is required before deferred runtime activation.";
+  }
+  if (input.blockingDependencyCategory === RuntimeAvailabilityBlockingDependencyCategories.runtimeSupervisor) {
+    return "The runtime supervisor reported a deferred activation failure.";
+  }
+  if (input.runtimeState === "warming") {
+    return "Deferred runtime activation is currently warming.";
+  }
+  if (input.runtimeState === "failed") {
+    return "Deferred runtime activation failed and requires retry.";
+  }
+  return "Deferred runtime capability is not active yet.";
 }
 
 export function evaluateRuntimeCapabilityGuard(

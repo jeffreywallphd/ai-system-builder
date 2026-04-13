@@ -43,7 +43,18 @@ export interface AuthoritativeServerRouteFamilyAvailability {
   readonly routeFamilyId: string;
   readonly capabilityId?: string;
   readonly state?: AuthoritativeServerCapabilityActivationState;
+  readonly runtimeLifecycle?: AuthoritativeServerRouteFamilyRuntimeLifecycleSnapshot;
   readonly available: boolean;
+}
+
+export interface AuthoritativeServerRouteFamilyRuntimeLifecycleSnapshot {
+  readonly capabilityPhase: string;
+  readonly transportPhase?: string;
+  readonly activationMode?: string;
+  readonly triggerSource?: string;
+  readonly unavailableReason?: string;
+  readonly hasFailure?: boolean;
+  readonly failureRetryable?: boolean;
 }
 
 export interface AuthoritativeServerCapabilityActivationSnapshot {

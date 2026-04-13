@@ -244,6 +244,23 @@ Desktop control-plane host startup now composes runtime route families at initia
 - Non-ready runtime requests now consistently return structured runtime-unavailable payloads (`RuntimeGuardedEndpointUnavailableResponseContract`) instead of falling back to generic route-family errors.
 - Readiness-state bypass remains limited to execution-readiness reads so lifecycle status can still be observed while other runtime read/mutation endpoints stay explicitly guarded.
 
+## Story 1.2.7 typed diagnostics for blocking runtime dependencies
+
+- Runtime lifecycle blocking responses now include typed diagnostics in `RuntimeAvailabilityResponseContract.diagnostics` with stable renderer-safe fields:
+  - `lifecycleState`
+  - `blockingDependencyCategory`
+  - `retryable`
+  - optional `summary`, `routeFamilyId`, `capabilityId`, `lifecyclePhase`, and `transportPhase`
+- Blocking dependency categories are normalized to controlled values:
+  - `authentication`
+  - `capability-activation`
+  - `runtime-supervisor`
+  - `control-plane-transport`
+  - `unknown`
+- Desktop route-family availability now carries runtime lifecycle snapshots sourced from authoritative post-login runtime status (capability phase + transport/supervisor indicators) instead of placeholder guard metadata.
+- Runtime capability guard mapping now derives diagnostics from those lifecycle snapshots so responses identify whether blocking is caused by auth/session phase, capability activation warmup, runtime supervisor failure, or control-plane transport state.
+- Execution readiness state-driven bypass surfaces the same typed lifecycle diagnostics in both `runtimeLifecycle` and readiness-level diagnostics, preserving observability without leaking internal error internals.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,

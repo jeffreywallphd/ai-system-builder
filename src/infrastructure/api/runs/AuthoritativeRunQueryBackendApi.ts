@@ -892,6 +892,7 @@ export class AuthoritativeRunQueryBackendApi {
     runtimeLifecycle: RuntimeUnavailableLifecycleResponseContract,
   ): ExecutionReadinessReadResponse {
     const checkedAt = runtimeLifecycle.checkedAt;
+    const lifecycleDiagnostics = runtimeLifecycle.diagnostics;
     const primaryMessage = runtimeLifecycle.state === "failed"
       ? runtimeLifecycle.failure.message
       : runtimeLifecycle.blockingReasons[0]?.message ?? `Runtime lifecycle is '${runtimeLifecycle.state}'.`;
@@ -939,6 +940,10 @@ export class AuthoritativeRunQueryBackendApi {
       ]),
       diagnostics: Object.freeze({
         runtimeLifecycleState: runtimeLifecycle.state,
+        blockingDependencyCategory: lifecycleDiagnostics?.blockingDependencyCategory,
+        runtimeLifecycleSummary: lifecycleDiagnostics?.summary,
+        runtimeLifecyclePhase: lifecycleDiagnostics?.lifecyclePhase,
+        runtimeTransportPhase: lifecycleDiagnostics?.transportPhase,
       }),
     });
   }

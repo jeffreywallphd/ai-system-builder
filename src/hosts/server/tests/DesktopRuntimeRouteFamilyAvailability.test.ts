@@ -51,33 +51,71 @@ describe("DesktopRuntimeRouteFamilyAvailability", () => {
     const activation = createDefaultAuthoritativeServerCapabilityActivationService({
       routeRegistrationPlan: createRoutePlan(),
     });
-    let capabilityPhase: "pre-login" | "warming" | "failed" | "ready" = "pre-login";
+    let runtimeStatus = Object.freeze({
+      capabilityPhase: "pre-login" as const,
+      transport: Object.freeze({
+        phase: "available" as const,
+        updatedAt: "2026-04-13T10:00:00.000Z",
+      }),
+      activationMode: "auth-success-warmup" as const,
+      triggerSource: "explicit-login" as const,
+      unavailableReason: "pre-login" as const,
+      failure: undefined as {
+        readonly message: string;
+        readonly failedAt: string;
+        readonly retryable: boolean;
+      } | undefined,
+    });
     const availability = createAuthoritativeServerRouteFamilyAvailabilityService({
       capabilityActivation: activation,
       runtimeStatusProvider: {
-        getStatus: () => Object.freeze({ capabilityPhase }),
+        getStatus: () => runtimeStatus,
       },
     });
 
     expect(availability.resolveRouteFamilyAvailability("run-submission")).toMatchObject({
       state: "pre-login",
       available: false,
+      runtimeLifecycle: {
+        capabilityPhase: "pre-login",
+        transportPhase: "available",
+      },
     });
     expect(availability.isRouteFamilyAvailable("run-submission")).toBeFalse();
 
-    capabilityPhase = "warming";
+    runtimeStatus = Object.freeze({
+      ...runtimeStatus,
+      capabilityPhase: "warming",
+      unavailableReason: undefined,
+    });
     expect(availability.resolveRouteFamilyAvailability("run-submission")).toMatchObject({
       state: "warming",
       available: false,
     });
 
-    capabilityPhase = "failed";
+    runtimeStatus = Object.freeze({
+      ...runtimeStatus,
+      capabilityPhase: "failed",
+      failure: Object.freeze({
+        message: "runtime-failed",
+        failedAt: "2026-04-13T10:00:02.000Z",
+        retryable: true,
+      }),
+    });
     expect(availability.resolveRouteFamilyAvailability("run-submission")).toMatchObject({
       state: "failed",
       available: false,
+      runtimeLifecycle: {
+        hasFailure: true,
+        failureRetryable: true,
+      },
     });
 
-    capabilityPhase = "ready";
+    runtimeStatus = Object.freeze({
+      ...runtimeStatus,
+      capabilityPhase: "ready",
+      failure: undefined,
+    });
     expect(availability.resolveRouteFamilyAvailability("run-submission")).toMatchObject({
       state: "ready",
       available: true,
