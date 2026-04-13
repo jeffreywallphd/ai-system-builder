@@ -50,7 +50,8 @@
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - `src/infrastructure/config/HostStartupConfiguration.ts`
 - `electron/main/main.ts`
-- `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`
+- `electron/main/runtime/PostLoginRuntimeActivationService.ts`
+- `electron/main/runtime/PostLoginRuntimeDependencyActivator.ts`
 - `electron/main/DesktopServiceSupervisor.ts`
 - `dev/tests/HostCompositionArchitectureGuardrails.test.ts`
 - `dev/tests/HostDevelopmentStartupScripts.test.ts`

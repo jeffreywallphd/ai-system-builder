@@ -65,13 +65,14 @@ Shared runtime lifecycle response shapes now define explicit stateful payloads f
 Main process (`electron/main`):
 
 - owns lifecycle state transitions and authoritative status.
-- owns warmup orchestration (`ensurePostLoginWarmupStarted` -> `createPostLoginRuntimeBootstrapper(...).bootstrap(...)`).
+- owns warmup orchestration (`createPostLoginRuntimeActivationService(...).startPostLoginWarmup(...)` -> `createPostLoginRuntimeDependencyActivator(...).activateDependencies(...)`).
 - owns deferred feature IPC readiness gate (`deferredFeatureIpcReady`).
 - owns teardown/reset transitions during desktop runtime disposal through `createDesktopRuntimeDisposalCoordinator(...)`.
 - composes focused runtime-control modules for lifecycle and connectivity:
   - `electron/main/DesktopPostLoginRuntimeStatusStore.ts`
   - `electron/main/DesktopConnectivityRuntimeController.ts`
-  - `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`
+  - `electron/main/runtime/PostLoginRuntimeActivationService.ts`
+  - `electron/main/runtime/PostLoginRuntimeDependencyActivator.ts`
   - `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`
 
 Preload (`electron/preload.ts`):
@@ -137,7 +138,7 @@ Warmup diagnostics now include explicit deferred startup logs for Python runtime
 Connectivity monitoring now follows the same deferred lifecycle boundary as other non-auth runtime services:
 
 - pre-login auth-shell bootstrap does not start recurring connectivity probes.
-- monitoring starts when post-login warmup is first accepted (`ensurePostLoginWarmupStarted(...)`).
+- monitoring starts when post-login warmup is first accepted (`startPostLoginWarmup(...)` in `PostLoginRuntimeActivationService`).
 - renderer connectivity reads through auth/bootstrap IPC receive a controlled pre-warmup fallback state until monitoring starts.
 - renderer offline-mode write attempts before monitoring startup receive the same fallback state rather than partial pre-login monitoring emulation.
 - runtime teardown (`disposeDesktopRuntimeResources()`) explicitly stops connectivity monitoring before resetting runtime state, so quit/logout shutdown paths remain deterministic.
@@ -233,7 +234,8 @@ To reduce scattered mutable state in `electron/main/main.ts` while preserving be
 
 Story C.3.6 further extracts runtime lifecycle machinery from the Electron composition root:
 
-- post-login runtime composition/bootstrap details now live in `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`.
+- post-login runtime warmup orchestration now lives in `electron/main/runtime/PostLoginRuntimeActivationService.ts`.
+- post-login runtime dependency activation/composition details now live in `electron/main/runtime/PostLoginRuntimeDependencyActivator.ts`.
 - shutdown/disposal sequencing and state reset details now live in `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`.
 - `electron/main/main.ts` now primarily composes dependencies and delegates warmup/disposal orchestration to those modules.
 

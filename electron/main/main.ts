@@ -22,7 +22,6 @@ import type {
   DesktopAuthBootstrapContext,
   DesktopAuthBootstrapRuntimeConfig,
   DesktopControlPlaneCapabilityPhase,
-  DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
 import { createRendererContentSecurityPolicyResolver } from "./RendererContentSecurityPolicy";
 import { logInitializationCheckpoint, logInitializationEnd, logInitializationMemory, logInitializationStart } from "./InitializationLogging";
@@ -38,14 +37,14 @@ import { createDesktopConnectivityRuntimeController } from "./DesktopConnectivit
 import type { DeferredDesktopFeatureRuntime } from "./DeferredDesktopFeatureRuntime";
 import { startAuthoritativeServerHostAssembly } from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
 import type { AuthoritativeServerHostRuntimeHandle } from "../../src/hosts/server/AuthoritativeServerCompositionRoot";
-import { AuthoritativeServerCapabilityIds } from "../../src/hosts/server/AuthoritativeServerCapabilityActivation";
 import { composeDesktopAuthoritativeServerApiRouteRegistrationPlan } from "../../src/hosts/server/AuthoritativeServerApiRouteComposition";
 import { createDesktopWindowManager } from "./DesktopWindowManager";
 import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
 import type { DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
 import type { CanonicalRegistryRuntimeProvider } from "./runtime/CanonicalRegistryRuntimeProvider";
-import { createPostLoginRuntimeBootstrapper, type AuthShellBootstrapResult } from "./runtime/PostLoginRuntimeBootstrapper";
-import { createDesktopRuntimeDisposalCoordinator } from "./runtime/DesktopRuntimeDisposalCoordinator";
+import { createPostLoginRuntimeDependencyActivator, type AuthShellBootstrapResult } from "./runtime/PostLoginRuntimeDependencyActivator";
+import { createPostLoginRuntimeActivationService } from "./runtime/PostLoginRuntimeActivationService";
+import { createDesktopRuntimeDisposalCoordinator, type DesktopRuntimeDisposalCoordinator } from "./runtime/DesktopRuntimeDisposalCoordinator";
 import {
   createDesktopOperationalEventLogger,
   type DesktopOperationalEventLogger,
@@ -120,8 +119,6 @@ let desktopOperationalEventLogger: DesktopOperationalEventLogger | undefined;
 let authIpcRegistered = false;
 let deferredFeatureIpcRegistered = false;
 let deferredFeatureIpcReady = false;
-let postLoginBootstrapPromise: Promise<void> | undefined;
-let postLoginWarmupStarted = false;
 let isDesktopRuntimeDisposing = false;
 let authShellBootstrapResult: AuthShellBootstrapResult | undefined;
 const postLoginRuntimeStatusStore = createDesktopPostLoginRuntimeStatusStore();
@@ -239,8 +236,8 @@ function registerAuthIpc(): void {
     // Returns lifecycle status of post-login runtime warmup.
     getPostLoginRuntimeStatus: () => postLoginRuntimeStatusStore.getStatus(),
     // Handles explicit renderer requests to start post-login warmup.
-    startPostLoginWarmup: async (request: DesktopPostLoginWarmupRequest) => {
-      await ensurePostLoginWarmupStarted(request);
+    startPostLoginWarmup: async (request) => {
+      await postLoginRuntimeActivationService.startPostLoginWarmup(request);
     },
     connectivity: {
       // Returns current serialized connectivity state for auth surfaces.
@@ -407,7 +404,7 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
   }
 }
 
-const postLoginRuntimeBootstrapper = createPostLoginRuntimeBootstrapper({
+const postLoginRuntimeDependencyActivator = createPostLoginRuntimeDependencyActivator({
   ipcMain,
   isPackaged,
   repoRoot,
@@ -438,10 +435,22 @@ const postLoginRuntimeBootstrapper = createPostLoginRuntimeBootstrapper({
   getOperationalLogger: () => desktopOperationalEventLogger,
 });
 
-const runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({
-  getPostLoginBootstrapPromise: () => postLoginBootstrapPromise,
+let runtimeDisposalCoordinator: DesktopRuntimeDisposalCoordinator;
+const postLoginRuntimeActivationService = createPostLoginRuntimeActivationService({
+  postLoginRuntimeStatusStore,
+  connectivityRuntimeController,
+  getAuthShellBootstrapResult: () => authShellBootstrapResult,
+  getControlPlaneServerRuntime: () => controlPlaneServerRuntime,
+  activateRuntimeDependencies: (authShell) => postLoginRuntimeDependencyActivator.activateDependencies(authShell),
+  disposeDesktopRuntimeResources: () => runtimeDisposalCoordinator.disposeDesktopRuntimeResources(),
+  isDesktopRuntimeDisposing: () => isDesktopRuntimeDisposing,
+  exitProcess: (code) => app.exit(code),
+});
+
+runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({
+  getPostLoginBootstrapPromise: () => postLoginRuntimeActivationService.getPostLoginActivationPromise(),
   setPostLoginBootstrapPromise: (promise) => {
-    postLoginBootstrapPromise = promise;
+    postLoginRuntimeActivationService.setPostLoginActivationPromise(promise);
   },
   getControlPlaneServerRuntime: () => controlPlaneServerRuntime,
   setControlPlaneServerRuntime: (runtime) => {
@@ -472,13 +481,13 @@ const runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({
     deferredFeatureIpcReady = false;
   },
   resetWarmupStarted: () => {
-    postLoginWarmupStarted = false;
+    postLoginRuntimeActivationService.resetWarmupStarted();
   },
   clearAuthShellBootstrapResult: () => {
     authShellBootstrapResult = undefined;
   },
   clearDeferredRuntimeFactoryCache: () => {
-    postLoginRuntimeBootstrapper.clearCachedFactory();
+    postLoginRuntimeDependencyActivator.clearCachedFactory();
   },
   connectivityRuntimeController,
   postLoginRuntimeStatusStore,
@@ -486,64 +495,6 @@ const runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({
     isDesktopRuntimeDisposing = value;
   },
 });
-
-/**
- * Formats a compact post-login warmup request string for startup diagnostics logging.
- */
-function formatPostLoginWarmupRequestLog(request: DesktopPostLoginWarmupRequest): string {
-  return `source=${request.triggerSource}${request.requestedAt ? ` requestedAt=${request.requestedAt}` : ""}`;
-}
-
-/**
- * Starts post-login warmup once, deduplicates concurrent requests, and handles failure shutdown semantics.
- */
-async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupRequest): Promise<void> {
-  console.info(`[ai-loom] Post-login warmup requested (${formatPostLoginWarmupRequestLog(request)}).`);
-  if (postLoginBootstrapPromise) {
-    console.info("[ai-loom] Post-login warmup request joined in-flight warmup.");
-    await postLoginBootstrapPromise;
-    return;
-  }
-  if (postLoginWarmupStarted) {
-    console.info("[ai-loom] Post-login warmup request ignored because warmup was already started.");
-    return;
-  }
-  const authShell = authShellBootstrapResult;
-  if (!authShell) {
-    throw new Error("Auth-shell bootstrap context is unavailable for post-login warmup.");
-  }
-
-  postLoginWarmupStarted = true;
-  const controlPlaneRuntime = controlPlaneServerRuntime;
-  if (!controlPlaneRuntime) {
-    throw new Error("Desktop control-plane host is unavailable for post-login warmup.");
-  }
-  console.info(`[ai-loom] Post-login warmup will activate capabilities on persistent control-plane host (${controlPlaneRuntime.address}).`);
-  controlPlaneRuntime.activateCapabilities({
-    capabilityIds: [AuthoritativeServerCapabilityIds.deferredRuntimeFeatures],
-    reason: "desktop-post-login-warmup",
-    activatedAt: request.requestedAt,
-  });
-  postLoginRuntimeStatusStore.markWarming(request);
-  connectivityRuntimeController.startMonitoring(authShell.controlPlaneBaseUrl);
-  console.info("[ai-loom] Starting post-login desktop runtime warmup.");
-  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
-  postLoginBootstrapPromise = postLoginRuntimeBootstrapper.bootstrap(authShell);
-  try {
-    await postLoginBootstrapPromise;
-    console.info("[ai-loom] Post-login desktop runtime warmup completed.");
-  } catch (error) {
-    postLoginBootstrapPromise = undefined;
-    postLoginRuntimeStatusStore.markFailed(request, error);
-    if (!isDesktopRuntimeDisposing) {
-      console.error("Post-login desktop runtime bootstrap failed", error);
-      await runtimeDisposalCoordinator.disposeDesktopRuntimeResources();
-      app.exit(1);
-    }
-    postLoginWarmupStarted = false;
-    throw error;
-  }
-}
 
 registerDesktopAppLifecycle({
   app,

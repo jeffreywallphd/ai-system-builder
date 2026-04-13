@@ -38,12 +38,13 @@ Shared runtime lifecycle response shapes now define explicit stateful payloads f
 ## Layer responsibilities
 - main (`electron/main`):
   - owns lifecycle transitions and authoritative status payload.
-  - owns warmup orchestration (`ensurePostLoginWarmupStarted` -> `createPostLoginRuntimeBootstrapper(...).bootstrap(...)`).
+  - owns warmup orchestration (`createPostLoginRuntimeActivationService(...).startPostLoginWarmup(...)` -> `createPostLoginRuntimeDependencyActivator(...).activateDependencies(...)`).
   - owns deferred feature IPC readiness gate and runtime disposal/reset transitions.
   - composes focused runtime-control modules for stateful lifecycle concerns:
     - `electron/main/DesktopPostLoginRuntimeStatusStore.ts`
     - `electron/main/DesktopConnectivityRuntimeController.ts`
-    - `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`
+    - `electron/main/runtime/PostLoginRuntimeActivationService.ts`
+    - `electron/main/runtime/PostLoginRuntimeDependencyActivator.ts`
     - `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`
 - preload (`electron/preload.ts`):
   - exposes runtime status/readiness probes and warmup trigger bridge.
@@ -87,7 +88,7 @@ Operational diagnostics now explicitly log deferred warmup start/ready details f
 Connectivity monitoring now uses the deferred runtime lifecycle contract:
 
 - pre-login auth-shell startup no longer starts recurring connectivity monitoring probes.
-- monitoring starts only once post-login warmup is accepted (`ensurePostLoginWarmupStarted(...)`).
+- monitoring starts only once post-login warmup is accepted (`startPostLoginWarmup(...)` in `PostLoginRuntimeActivationService`).
 - pre-warmup renderer connectivity reads return a controlled fallback payload (`connecting`) with explicit deferred-monitoring detail.
 - pre-warmup offline-mode write attempts return the same fallback payload, preventing partial pre-login monitoring emulation.
 - runtime disposal/teardown explicitly stops connectivity monitoring before runtime reset so quit/logout lifecycle remains deterministic.
@@ -194,7 +195,8 @@ The deferred runtime lifecycle contract now includes explicit regression guardra
 
 ## Story C.3.6 bootstrap/disposal module extraction boundary
 
-- Post-login runtime bootstrap/composition internals are now centralized in `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`.
+- Post-login runtime warmup orchestration now lives in `electron/main/runtime/PostLoginRuntimeActivationService.ts`.
+- Post-login runtime dependency activation/composition internals now live in `electron/main/runtime/PostLoginRuntimeDependencyActivator.ts`.
 - Runtime teardown/reset sequencing internals are now centralized in `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`.
 - `electron/main/main.ts` remains the composition root that decides when warmup/disposal runs, while delegating lifecycle implementation details to those dedicated modules.
 

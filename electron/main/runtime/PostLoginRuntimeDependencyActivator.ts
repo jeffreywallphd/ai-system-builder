@@ -24,12 +24,12 @@ export type AuthShellBootstrapResult = {
   readonly controlPlaneBaseUrl: string;
 };
 
-export type PostLoginRuntimeBootstrapper = {
-  readonly bootstrap: (authShell: AuthShellBootstrapResult) => Promise<void>;
+export type PostLoginRuntimeDependencyActivator = {
+  readonly activateDependencies: (authShell: AuthShellBootstrapResult) => Promise<void>;
   readonly clearCachedFactory: () => void;
 };
 
-type CreatePostLoginRuntimeBootstrapperParams = {
+type CreatePostLoginRuntimeDependencyActivatorParams = {
   readonly ipcMain: Electron.IpcMain;
   readonly isPackaged: boolean;
   readonly repoRoot: string;
@@ -78,7 +78,9 @@ export function createOnDemandFeatureCompositionPaths(params: {
   });
 }
 
-export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntimeBootstrapperParams): PostLoginRuntimeBootstrapper {
+export function createPostLoginRuntimeDependencyActivator(
+  params: CreatePostLoginRuntimeDependencyActivatorParams,
+): PostLoginRuntimeDependencyActivator {
   let deferredDesktopFeatureRuntimeFactory: ((options: {
     readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
     readonly runtimeConfigValues: AppRuntimeConfigValues;
@@ -118,11 +120,14 @@ export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntim
     }
   }
 
-  async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, bootstrapStartedAt: number): Promise<PostLoginRuntimeComposition> {
+  async function composePostLoginRuntimeDependencies(
+    authShell: AuthShellBootstrapResult,
+    bootstrapStartedAt: number,
+  ): Promise<PostLoginRuntimeComposition> {
     const { storagePaths, controlPlaneBaseUrl } = authShell;
     const storageDatabase = params.getStorageDatabase();
     if (!storageDatabase) {
-      throw new Error("Desktop storage database is unavailable for post-login runtime bootstrap.");
+      throw new Error("Desktop storage database is unavailable for post-login runtime activation.");
     }
 
     const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-startup.post-login-python-runtime-resolve");
@@ -210,11 +215,11 @@ export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntim
     });
   }
 
-  async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
+  async function activatePostLoginRuntimeDependencies(authShell: AuthShellBootstrapResult): Promise<void> {
     const bootstrapStartedAt = logInitializationStart(DesktopStartupPhases.postLoginWarmup);
     try {
       logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "start");
-      const runtimeComposition = await composePostLoginRuntime(authShell, bootstrapStartedAt);
+      const runtimeComposition = await composePostLoginRuntimeDependencies(authShell, bootstrapStartedAt);
       const { storagePaths, runtimeConfig, pythonRuntime, featureRuntime } = runtimeComposition;
       const agentRuntimeProvider = createDesktopAgentRuntimeProvider({
         storagePaths,
@@ -255,7 +260,7 @@ export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntim
   }
 
   return Object.freeze({
-    bootstrap: bootstrapPostLoginRuntime,
+    activateDependencies: activatePostLoginRuntimeDependencies,
     clearCachedFactory: () => {
       deferredDesktopFeatureRuntimeFactory = undefined;
     },

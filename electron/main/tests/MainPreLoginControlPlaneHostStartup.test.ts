@@ -4,7 +4,7 @@ import path from "node:path";
 
 const mainSource = fs.readFileSync(path.resolve(process.cwd(), "electron/main/main.ts"), "utf8");
 const authShellStart = mainSource.indexOf("async function bootstrapAuthShell()");
-const authShellEnd = mainSource.indexOf("const postLoginRuntimeBootstrapper = createPostLoginRuntimeBootstrapper({");
+const authShellEnd = mainSource.indexOf("const postLoginRuntimeDependencyActivator = createPostLoginRuntimeDependencyActivator({");
 const authShellSource = authShellStart >= 0 && authShellEnd > authShellStart
   ? mainSource.slice(authShellStart, authShellEnd)
   : "";
