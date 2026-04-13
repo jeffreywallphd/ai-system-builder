@@ -28,13 +28,17 @@ export const DesktopStartupBootSequence = Object.freeze([
 export const DesktopPostLoginWarmupStepIds = Object.freeze({
   pythonRuntimeResolution: "python-runtime-resolution",
   serviceSupervisorStartup: "service-supervisor-startup",
-  deferredFeatureRegistration: "deferred-feature-registration",
+  deferredFeatureRuntimeComposition: "deferred-feature-runtime-composition",
+  deferredFeatureProviderSetup: "deferred-feature-provider-setup",
+  deferredFeatureIpcRegistration: "deferred-feature-ipc-registration",
 });
 
 export const DesktopPostLoginWarmupSequence = Object.freeze([
   DesktopPostLoginWarmupStepIds.pythonRuntimeResolution,
   DesktopPostLoginWarmupStepIds.serviceSupervisorStartup,
-  DesktopPostLoginWarmupStepIds.deferredFeatureRegistration,
+  DesktopPostLoginWarmupStepIds.deferredFeatureRuntimeComposition,
+  DesktopPostLoginWarmupStepIds.deferredFeatureProviderSetup,
+  DesktopPostLoginWarmupStepIds.deferredFeatureIpcRegistration,
 ]);
 
 export const PreLoginAuthShellInitializers = Object.freeze([

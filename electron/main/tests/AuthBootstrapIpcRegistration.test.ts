@@ -72,7 +72,6 @@ describe("registerAuthBootstrapIpc", () => {
         setItem: () => undefined,
         removeItem: () => undefined,
       },
-      isDeferredFeatureIpcReady: () => false,
       getPostLoginRuntimeStatus: () => createRuntimeStatus({
         state: "pre-login",
         unavailableReason: "pre-login",
@@ -131,9 +130,8 @@ describe("registerAuthBootstrapIpc", () => {
           storage.delete(key);
         },
       },
-      isDeferredFeatureIpcReady: () => true,
       getPostLoginRuntimeStatus: () => createRuntimeStatus({
-        state: "warming",
+        state: "ready",
         activationMode: "auth-success-warmup",
         triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
         updatedAt: "2026-04-10T12:00:00.000Z",
@@ -202,8 +200,8 @@ describe("registerAuthBootstrapIpc", () => {
     const runtimeStatusEvent: { returnValue?: unknown } = {};
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.postLoginRuntimeStatus)?.(runtimeStatusEvent);
     expect(runtimeStatusEvent.returnValue).toMatchObject({
-      state: "warming",
-      capabilityPhase: "warming",
+      state: "ready",
+      capabilityPhase: "ready",
       activationMode: "auth-success-warmup",
       triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
       updatedAt: "2026-04-10T12:00:00.000Z",
@@ -242,7 +240,6 @@ describe("registerAuthBootstrapIpc", () => {
         setItem: () => undefined,
         removeItem: () => undefined,
       },
-      isDeferredFeatureIpcReady: () => false,
       getPostLoginRuntimeStatus: () => createRuntimeStatus({
         state: "pre-login",
         unavailableReason: "pre-login",
@@ -280,7 +277,6 @@ describe("registerAuthBootstrapIpc", () => {
         setItem: () => undefined,
         removeItem: () => undefined,
       },
-      isDeferredFeatureIpcReady: () => false,
       getPostLoginRuntimeStatus: () => createRuntimeStatus({
         state: "pre-login",
         unavailableReason: "pre-login",

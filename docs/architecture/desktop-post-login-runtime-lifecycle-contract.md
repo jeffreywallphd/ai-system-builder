@@ -66,7 +66,7 @@ Main process (`electron/main`):
 
 - owns lifecycle state transitions and authoritative status.
 - owns warmup orchestration (`createPostLoginRuntimeActivationService(...).startPostLoginWarmup(...)` -> `createPostLoginRuntimeDependencyActivator(...).activateDependencies(...)`).
-- owns deferred feature IPC readiness gate (`deferredFeatureIpcReady`).
+- owns deferred feature IPC readiness gate derived from lifecycle status (`state === ready`).
 - owns teardown/reset transitions during desktop runtime disposal through `createDesktopRuntimeDisposalCoordinator(...)`.
 - composes focused runtime-control modules for lifecycle and connectivity:
   - `electron/main/DesktopPostLoginRuntimeStatusStore.ts`
@@ -267,6 +267,22 @@ Contract intent:
 - Concurrent warmup requests from `explicit-login`, `session-restore`, `session-refresh`, and `feature-demand` all join one in-flight activation promise.
 - After activation reaches `ready`, repeated warmup requests are no-ops and must not re-run capability activation, connectivity monitor startup, or runtime dependency activation.
 - Activation failure returns the service to `idle`, allowing subsequent warmup requests to retry without replacing the control-plane listener.
+
+## Story 1.3.5 deferred runtime registration staged behind capability lifecycle
+
+- Deferred runtime warmup now treats deferred feature registration as three explicit activation stages:
+  - `deferred-feature-runtime-composition`
+  - `deferred-feature-provider-setup`
+  - `deferred-feature-ipc-registration`
+- Activation stage ordering is explicit in `DesktopPostLoginWarmupSequence`:
+  1. `python-runtime-resolution`
+  2. `service-supervisor-startup`
+  3. `deferred-feature-runtime-composition`
+  4. `deferred-feature-provider-setup`
+  5. `deferred-feature-ipc-registration`
+- `PostLoginRuntimeDependencyActivator` now marks runtime-stage lifecycle transitions for deferred runtime composition, provider setup, and IPC registration in `DesktopPostLoginRuntimeStatusStore`.
+- Deferred IPC readiness now aligns with backend/runtime lifecycle semantics by deriving boolean readiness from the same lifecycle status channel (`state === ready`) instead of a detached flag.
+- Stage-specific failures now mark `blocked` stage state before warmup failure propagates.
 
 ## Story 1.2.2 runtime route-family registration continuity
 

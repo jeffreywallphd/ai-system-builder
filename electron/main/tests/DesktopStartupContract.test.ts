@@ -26,7 +26,9 @@ describe("desktop startup boot contract", () => {
     expect(DesktopPostLoginWarmupSequence).toEqual([
       DesktopPostLoginWarmupStepIds.pythonRuntimeResolution,
       DesktopPostLoginWarmupStepIds.serviceSupervisorStartup,
-      DesktopPostLoginWarmupStepIds.deferredFeatureRegistration,
+      DesktopPostLoginWarmupStepIds.deferredFeatureRuntimeComposition,
+      DesktopPostLoginWarmupStepIds.deferredFeatureProviderSetup,
+      DesktopPostLoginWarmupStepIds.deferredFeatureIpcRegistration,
     ]);
   });
 

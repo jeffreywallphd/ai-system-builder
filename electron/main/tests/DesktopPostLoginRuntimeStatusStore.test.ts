@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   DesktopControlPlaneHostIdentities,
   DesktopControlPlaneTransportPhases,
+  DesktopPostLoginActivationStageIds,
   DesktopPostLoginRuntimeUnavailableReasons,
   DesktopPostLoginWarmupTriggerSources,
 } from "../../shared/DesktopContracts";
@@ -10,6 +11,17 @@ import { createDesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRun
 function createTickClock() {
   let tick = 0;
   return () => `2026-04-11T00:00:${String(tick++).padStart(2, "0")}.000Z`;
+}
+
+function findStage(
+  stages: ReadonlyArray<{ readonly stageId: string }>,
+  stageId: string,
+): { readonly stageId: string } {
+  const match = stages.find((stage) => stage.stageId === stageId);
+  if (!match) {
+    throw new Error(`Expected activation stage '${stageId}' to exist.`);
+  }
+  return match;
 }
 
 describe("createDesktopPostLoginRuntimeStatusStore", () => {
@@ -23,48 +35,54 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       state: "pre-login",
       capabilityPhase: "pre-login",
       unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
-      updatedAt: "2026-04-11T00:00:02.000Z",
       transport: {
         phase: DesktopControlPlaneTransportPhases.unavailable,
       },
     });
-    expect(store.getStatus().activationStages).toEqual([
-      {
-        stageId: "python-runtime-resolution",
-        state: "pending",
-        blockingReadiness: true,
-        updatedAt: "2026-04-11T00:00:00.000Z",
-        detail: "Python runtime resolution has not started.",
-      },
-      {
-        stageId: "service-supervisor-startup",
-        state: "pending",
-        blockingReadiness: true,
-        updatedAt: "2026-04-11T00:00:01.000Z",
-        detail: "Service supervisor startup has not started.",
-      },
-    ]);
+    const initialStages = store.getStatus().activationStages ?? [];
+    expect(initialStages).toHaveLength(5);
+    expect(findStage(initialStages, DesktopPostLoginActivationStageIds.pythonRuntimeResolution)).toMatchObject({
+      stageId: DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Python runtime resolution has not started.",
+    });
+    expect(findStage(initialStages, DesktopPostLoginActivationStageIds.serviceSupervisorStartup)).toMatchObject({
+      stageId: DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Service supervisor startup has not started.",
+    });
+    expect(findStage(initialStages, DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition)).toMatchObject({
+      stageId: DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition,
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Deferred feature runtime composition has not started.",
+    });
+    expect(findStage(initialStages, DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup)).toMatchObject({
+      stageId: DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup,
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Deferred feature provider setup has not started.",
+    });
+    expect(findStage(initialStages, DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration)).toMatchObject({
+      stageId: DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Deferred feature IPC registration has not started.",
+    });
 
     store.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
     expect(store.getStatus()).toMatchObject({
       state: "pre-login",
       capabilityPhase: "pre-login",
       unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.shuttingDown,
-      updatedAt: "2026-04-11T00:00:05.000Z",
-      activationStages: [
-        {
-          stageId: "python-runtime-resolution",
-          state: "pending",
-          blockingReadiness: true,
-          detail: "Python runtime resolution has not started.",
-        },
-        {
-          stageId: "service-supervisor-startup",
-          state: "pending",
-          blockingReadiness: true,
-          detail: "Service supervisor startup has not started.",
-        },
-      ],
+    });
+    const unavailableStages = store.getStatus().activationStages ?? [];
+    expect(findStage(unavailableStages, DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition)).toMatchObject({
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Deferred feature runtime composition has not started.",
     });
 
     store.markWarming({
@@ -78,21 +96,17 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       activationMode: "lazy-feature-demand",
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: "2026-04-11T10:00:00.000Z",
-      updatedAt: "2026-04-11T00:00:08.000Z",
-      activationStages: [
-        {
-          stageId: "python-runtime-resolution",
-          state: "running",
-          blockingReadiness: true,
-          detail: "Resolving desktop Python runtime.",
-        },
-        {
-          stageId: "service-supervisor-startup",
-          state: "pending",
-          blockingReadiness: true,
-          detail: "Service supervisor startup has not started.",
-        },
-      ],
+    });
+    const warmingStages = store.getStatus().activationStages ?? [];
+    expect(findStage(warmingStages, DesktopPostLoginActivationStageIds.pythonRuntimeResolution)).toMatchObject({
+      state: "running",
+      blockingReadiness: true,
+      detail: "Resolving desktop Python runtime.",
+    });
+    expect(findStage(warmingStages, DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration)).toMatchObject({
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Deferred feature IPC registration has not started.",
     });
 
     store.markPythonRuntimeResolutionReady({ detail: "mode=development-local, available=true" });
@@ -101,6 +115,12 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       baseUrl: "http://127.0.0.1:8790",
       runtimeBaseUrl: "http://127.0.0.1:8100",
     });
+    store.markDeferredFeatureRuntimeCompositionRunning();
+    store.markDeferredFeatureRuntimeCompositionReady({ detail: "Deferred runtime composed." });
+    store.markDeferredFeatureProviderSetupRunning();
+    store.markDeferredFeatureProviderSetupReady({ detail: "Providers configured." });
+    store.markDeferredFeatureIpcRegistrationRunning();
+    store.markDeferredFeatureIpcRegistrationReady({ detail: "IPC domains registered." });
     store.markReady();
     expect(store.getStatus()).toMatchObject({
       state: "ready",
@@ -108,21 +128,32 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       activationMode: "lazy-feature-demand",
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: "2026-04-11T10:00:00.000Z",
-      updatedAt: "2026-04-11T00:00:11.000Z",
-      activationStages: [
-        {
-          stageId: "python-runtime-resolution",
-          state: "ready",
-          blockingReadiness: false,
-          detail: "mode=development-local, available=true",
-        },
-        {
-          stageId: "service-supervisor-startup",
-          state: "ready",
-          blockingReadiness: false,
-          detail: "baseUrl=http://127.0.0.1:8790, runtimeBaseUrl=http://127.0.0.1:8100",
-        },
-      ],
+    });
+    const readyStages = store.getStatus().activationStages ?? [];
+    expect(findStage(readyStages, DesktopPostLoginActivationStageIds.pythonRuntimeResolution)).toMatchObject({
+      state: "ready",
+      blockingReadiness: false,
+      detail: "mode=development-local, available=true",
+    });
+    expect(findStage(readyStages, DesktopPostLoginActivationStageIds.serviceSupervisorStartup)).toMatchObject({
+      state: "ready",
+      blockingReadiness: false,
+      detail: "baseUrl=http://127.0.0.1:8790, runtimeBaseUrl=http://127.0.0.1:8100",
+    });
+    expect(findStage(readyStages, DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition)).toMatchObject({
+      state: "ready",
+      blockingReadiness: false,
+      detail: "Deferred runtime composed.",
+    });
+    expect(findStage(readyStages, DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup)).toMatchObject({
+      state: "ready",
+      blockingReadiness: false,
+      detail: "Providers configured.",
+    });
+    expect(findStage(readyStages, DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration)).toMatchObject({
+      state: "ready",
+      blockingReadiness: false,
+      detail: "IPC domains registered.",
     });
 
     store.markFailed(
@@ -138,10 +169,8 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       activationMode: "auth-success-warmup",
       triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
       requestedAt: "2026-04-11T10:01:00.000Z",
-      updatedAt: "2026-04-11T00:00:12.000Z",
       failure: {
         message: "boom",
-        failedAt: "2026-04-11T00:00:13.000Z",
         retryable: true,
       },
     });
@@ -237,21 +266,18 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
 
     expect(store.getStatus()).toMatchObject({
       capabilityPhase: "warming",
-      activationStages: [
-        {
-          stageId: "python-runtime-resolution",
-          state: "blocked",
-          blockingReadiness: true,
-          detail: "Desktop Python runtime resolution failed.",
-          errorMessage: "python-runtime-missing",
-        },
-        {
-          stageId: "service-supervisor-startup",
-          state: "pending",
-          blockingReadiness: true,
-          detail: "Service supervisor startup has not started.",
-        },
-      ],
+    });
+    const stages = store.getStatus().activationStages ?? [];
+    expect(findStage(stages, DesktopPostLoginActivationStageIds.pythonRuntimeResolution)).toMatchObject({
+      state: "blocked",
+      blockingReadiness: true,
+      detail: "Desktop Python runtime resolution failed.",
+      errorMessage: "python-runtime-missing",
+    });
+    expect(findStage(stages, DesktopPostLoginActivationStageIds.serviceSupervisorStartup)).toMatchObject({
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Service supervisor startup has not started.",
     });
   });
 
@@ -269,21 +295,53 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
 
     expect(store.getStatus()).toMatchObject({
       capabilityPhase: "warming",
-      activationStages: [
-        {
-          stageId: "python-runtime-resolution",
-          state: "pending",
-          blockingReadiness: true,
-          detail: "Python runtime resolution has not started.",
-        },
-        {
-          stageId: "service-supervisor-startup",
-          state: "blocked",
-          blockingReadiness: true,
-          detail: "Desktop service supervisor startup failed.",
-          errorMessage: "supervisor-entrypoint-missing",
-        },
-      ],
+    });
+    const stages = store.getStatus().activationStages ?? [];
+    expect(findStage(stages, DesktopPostLoginActivationStageIds.pythonRuntimeResolution)).toMatchObject({
+      state: "pending",
+      blockingReadiness: true,
+      detail: "Python runtime resolution has not started.",
+    });
+    expect(findStage(stages, DesktopPostLoginActivationStageIds.serviceSupervisorStartup)).toMatchObject({
+      state: "blocked",
+      blockingReadiness: true,
+      detail: "Desktop service supervisor startup failed.",
+      errorMessage: "supervisor-entrypoint-missing",
+    });
+  });
+
+  it("tracks deferred runtime registration stages and keeps capability warming until IPC registration is ready", () => {
+    const store = createDesktopPostLoginRuntimeStatusStore({
+      nowIsoString: createTickClock(),
+    });
+    store.markWarming({
+      triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
+      requestedAt: "2026-04-11T12:02:00.000Z",
+    });
+    store.markDeferredFeatureRuntimeCompositionRunning();
+    store.markDeferredFeatureRuntimeCompositionReady({ detail: "runtime-composed" });
+    store.markDeferredFeatureProviderSetupRunning();
+    store.markDeferredFeatureProviderSetupReady({ detail: "providers-ready" });
+
+    const beforeIpcReady = store.getStatus();
+    expect(beforeIpcReady.capabilityPhase).toBe("warming");
+    expect(findStage(beforeIpcReady.activationStages ?? [], DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration)).toMatchObject({
+      stageId: DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+      state: "pending",
+      blockingReadiness: true,
+    });
+
+    store.markDeferredFeatureIpcRegistrationRunning();
+    store.markDeferredFeatureIpcRegistrationReady({ detail: "ipc-ready" });
+    store.markReady();
+
+    const ready = store.getStatus();
+    expect(ready.capabilityPhase).toBe("ready");
+    expect(findStage(ready.activationStages ?? [], DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration)).toMatchObject({
+      stageId: DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+      state: "ready",
+      blockingReadiness: false,
+      detail: "ipc-ready",
     });
   });
 });

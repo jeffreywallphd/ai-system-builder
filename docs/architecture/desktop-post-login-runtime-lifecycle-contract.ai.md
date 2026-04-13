@@ -294,6 +294,26 @@ Desktop control-plane host startup now composes runtime route families at initia
   - `electron/main/tests/PostLoginRuntimeActivationService.test.ts` listener-preservation behavior when supervisor startup fails.
   - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` service-supervisor stage read-model coverage.
 
+## Story 1.3.5 deferred runtime registration staged behind capability lifecycle
+
+- Deferred runtime warmup now treats deferred feature registration as three explicit activation stages instead of one opaque tail step:
+  - `deferred-feature-runtime-composition`
+  - `deferred-feature-provider-setup`
+  - `deferred-feature-ipc-registration`
+- Stage ordering is now explicit in `DesktopPostLoginWarmupSequence`:
+  1. `python-runtime-resolution`
+  2. `service-supervisor-startup`
+  3. `deferred-feature-runtime-composition`
+  4. `deferred-feature-provider-setup`
+  5. `deferred-feature-ipc-registration`
+- `PostLoginRuntimeDependencyActivator` now drives status transitions for those three stages using the same `DesktopPostLoginRuntimeStatusStore` lifecycle contract already used by backend runtime capability guarding.
+- Deferred IPC readiness now derives from the lifecycle status channel (`state === ready`) rather than a disconnected dedicated boolean.
+- Failure paths for deferred runtime composition, provider setup, and IPC registration now mark their own activation stage as `blocked` before surfacing runtime-level failure.
+- Regression coverage now includes:
+  - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` readiness transition coverage through deferred registration stages.
+  - `electron/main/tests/DesktopStartupContract.test.ts` ordering coverage for the expanded activation-stage sequence.
+  - `electron/main/tests/MainPostLoginRuntimeComposition.test.ts` orchestration-structure coverage for deferred stage transitions in the activator.
+
 ## Story 1.2.8 route-level no-connection-refusal startup regression coverage
 
 - Runtime startup regression coverage now explicitly protects route-level listener continuity during capability transitions.

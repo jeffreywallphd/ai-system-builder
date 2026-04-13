@@ -32,6 +32,15 @@ export type DesktopPostLoginRuntimeStatusStore = {
   readonly markServiceSupervisorStartupRunning: () => void;
   readonly markServiceSupervisorStartupReady: (metadata?: { readonly baseUrl: string; readonly runtimeBaseUrl: string }) => void;
   readonly markServiceSupervisorStartupBlocked: (error: unknown) => void;
+  readonly markDeferredFeatureRuntimeCompositionRunning: () => void;
+  readonly markDeferredFeatureRuntimeCompositionReady: (metadata?: { readonly detail?: string }) => void;
+  readonly markDeferredFeatureRuntimeCompositionBlocked: (error: unknown) => void;
+  readonly markDeferredFeatureProviderSetupRunning: () => void;
+  readonly markDeferredFeatureProviderSetupReady: (metadata?: { readonly detail?: string }) => void;
+  readonly markDeferredFeatureProviderSetupBlocked: (error: unknown) => void;
+  readonly markDeferredFeatureIpcRegistrationRunning: () => void;
+  readonly markDeferredFeatureIpcRegistrationReady: (metadata?: { readonly detail?: string }) => void;
+  readonly markDeferredFeatureIpcRegistrationBlocked: (error: unknown) => void;
   readonly markUnavailable: (reason: DesktopPostLoginRuntimeUnavailableReason) => void;
   readonly markWarming: (request: DesktopPostLoginWarmupRequest) => void;
   readonly markReady: () => void;
@@ -47,22 +56,56 @@ function resolveActivationMode(request: DesktopPostLoginWarmupRequest) {
 export function createDesktopPostLoginRuntimeStatusStore(
   clock: PostLoginRuntimeStatusClock = { nowIsoString: () => new Date().toISOString() },
 ): DesktopPostLoginRuntimeStatusStore {
+  const createPendingStageStatus = (stageId: string, detail: string): DesktopPostLoginActivationStageStatus => {
+    return Object.freeze({
+      stageId,
+      state: DesktopControlPlaneActivationStageStates.pending,
+      updatedAt: clock.nowIsoString(),
+      blockingReadiness: true,
+      detail,
+      errorMessage: undefined,
+    });
+  };
+
+  const pendingStageDetails = Object.freeze({
+    pythonRuntimeResolution: "Python runtime resolution has not started.",
+    serviceSupervisorStartup: "Service supervisor startup has not started.",
+    deferredFeatureRuntimeComposition: "Deferred feature runtime composition has not started.",
+    deferredFeatureProviderSetup: "Deferred feature provider setup has not started.",
+    deferredFeatureIpcRegistration: "Deferred feature IPC registration has not started.",
+  });
+
   let capabilityPhase: DesktopPostLoginRuntimeStatus["capabilityPhase"] = "pre-login";
   const stageStatuses = new Map<string, DesktopPostLoginActivationStageStatus>();
-  stageStatuses.set(DesktopPostLoginActivationStageIds.pythonRuntimeResolution, Object.freeze({
-    stageId: DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
-    state: DesktopControlPlaneActivationStageStates.pending,
-    updatedAt: clock.nowIsoString(),
-    blockingReadiness: true,
-    detail: "Python runtime resolution has not started.",
-  }));
-  stageStatuses.set(DesktopPostLoginActivationStageIds.serviceSupervisorStartup, Object.freeze({
-    stageId: DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
-    state: DesktopControlPlaneActivationStageStates.pending,
-    updatedAt: clock.nowIsoString(),
-    blockingReadiness: true,
-    detail: "Service supervisor startup has not started.",
-  }));
+  stageStatuses.set(
+    DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
+    createPendingStageStatus(DesktopPostLoginActivationStageIds.pythonRuntimeResolution, pendingStageDetails.pythonRuntimeResolution),
+  );
+  stageStatuses.set(
+    DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
+    createPendingStageStatus(DesktopPostLoginActivationStageIds.serviceSupervisorStartup, pendingStageDetails.serviceSupervisorStartup),
+  );
+  stageStatuses.set(
+    DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition,
+    createPendingStageStatus(
+      DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition,
+      pendingStageDetails.deferredFeatureRuntimeComposition,
+    ),
+  );
+  stageStatuses.set(
+    DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup,
+    createPendingStageStatus(
+      DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup,
+      pendingStageDetails.deferredFeatureProviderSetup,
+    ),
+  );
+  stageStatuses.set(
+    DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+    createPendingStageStatus(
+      DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+      pendingStageDetails.deferredFeatureIpcRegistration,
+    ),
+  );
   let transport = Object.freeze({
     phase: DesktopControlPlaneTransportPhases.unavailable,
     updatedAt: clock.nowIsoString(),
@@ -120,25 +163,48 @@ export function createDesktopPostLoginRuntimeStatusStore(
   };
 
   const resetPythonRuntimeResolutionStage = (): void => {
-    updateActivationStage(Object.freeze({
-      stageId: DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
-      state: DesktopControlPlaneActivationStageStates.pending,
-      updatedAt: clock.nowIsoString(),
-      blockingReadiness: true,
-      detail: "Python runtime resolution has not started.",
-      errorMessage: undefined,
-    }));
+    updateActivationStage(
+      createPendingStageStatus(
+        DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
+        pendingStageDetails.pythonRuntimeResolution,
+      ),
+    );
   };
 
   const resetServiceSupervisorStartupStage = (): void => {
-    updateActivationStage(Object.freeze({
-      stageId: DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
-      state: DesktopControlPlaneActivationStageStates.pending,
-      updatedAt: clock.nowIsoString(),
-      blockingReadiness: true,
-      detail: "Service supervisor startup has not started.",
-      errorMessage: undefined,
-    }));
+    updateActivationStage(
+      createPendingStageStatus(
+        DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
+        pendingStageDetails.serviceSupervisorStartup,
+      ),
+    );
+  };
+
+  const resetDeferredFeatureRuntimeCompositionStage = (): void => {
+    updateActivationStage(
+      createPendingStageStatus(
+        DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition,
+        pendingStageDetails.deferredFeatureRuntimeComposition,
+      ),
+    );
+  };
+
+  const resetDeferredFeatureProviderSetupStage = (): void => {
+    updateActivationStage(
+      createPendingStageStatus(
+        DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup,
+        pendingStageDetails.deferredFeatureProviderSetup,
+      ),
+    );
+  };
+
+  const resetDeferredFeatureIpcRegistrationStage = (): void => {
+    updateActivationStage(
+      createPendingStageStatus(
+        DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+        pendingStageDetails.deferredFeatureIpcRegistration,
+      ),
+    );
   };
 
   return Object.freeze({
@@ -291,9 +357,99 @@ export function createDesktopPostLoginRuntimeStatusStore(
         errorMessage: message,
       }));
     },
+    markDeferredFeatureRuntimeCompositionRunning() {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition,
+        state: DesktopControlPlaneActivationStageStates.running,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Composing deferred feature runtime services.",
+      }));
+    },
+    markDeferredFeatureRuntimeCompositionReady(metadata) {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition,
+        state: DesktopControlPlaneActivationStageStates.ready,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: false,
+        detail: metadata?.detail,
+      }));
+    },
+    markDeferredFeatureRuntimeCompositionBlocked(error) {
+      const message = error instanceof Error ? error.message : "Deferred feature runtime composition failed.";
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureRuntimeComposition,
+        state: DesktopControlPlaneActivationStageStates.blocked,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Deferred feature runtime composition failed.",
+        errorMessage: message,
+      }));
+    },
+    markDeferredFeatureProviderSetupRunning() {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup,
+        state: DesktopControlPlaneActivationStageStates.running,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Configuring deferred feature runtime providers.",
+      }));
+    },
+    markDeferredFeatureProviderSetupReady(metadata) {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup,
+        state: DesktopControlPlaneActivationStageStates.ready,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: false,
+        detail: metadata?.detail,
+      }));
+    },
+    markDeferredFeatureProviderSetupBlocked(error) {
+      const message = error instanceof Error ? error.message : "Deferred feature runtime provider setup failed.";
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureProviderSetup,
+        state: DesktopControlPlaneActivationStageStates.blocked,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Deferred feature runtime provider setup failed.",
+        errorMessage: message,
+      }));
+    },
+    markDeferredFeatureIpcRegistrationRunning() {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+        state: DesktopControlPlaneActivationStageStates.running,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Registering deferred feature IPC domains.",
+      }));
+    },
+    markDeferredFeatureIpcRegistrationReady(metadata) {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+        state: DesktopControlPlaneActivationStageStates.ready,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: false,
+        detail: metadata?.detail,
+      }));
+    },
+    markDeferredFeatureIpcRegistrationBlocked(error) {
+      const message = error instanceof Error ? error.message : "Deferred feature IPC registration failed.";
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.deferredFeatureIpcRegistration,
+        state: DesktopControlPlaneActivationStageStates.blocked,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Deferred feature IPC registration failed.",
+        errorMessage: message,
+      }));
+    },
     markUnavailable(reason) {
       resetPythonRuntimeResolutionStage();
       resetServiceSupervisorStartupStage();
+      resetDeferredFeatureRuntimeCompositionStage();
+      resetDeferredFeatureProviderSetupStage();
+      resetDeferredFeatureIpcRegistrationStage();
       applyCapabilityTransition("pre-login", "runtime-unavailable", {
         unavailableReason: reason,
       });

@@ -41,7 +41,6 @@ type CreatePostLoginRuntimeDependencyActivatorParams = {
   readonly getDeferredFeatureRuntime: () => DeferredDesktopFeatureRuntime | undefined;
   readonly setAgentRuntimeProvider: (provider: DesktopAgentRuntimeProvider | undefined) => void;
   readonly setCanonicalRegistryRuntimeProvider: (provider: CanonicalRegistryRuntimeProvider | undefined) => void;
-  readonly markDeferredFeatureIpcReady: () => void;
   readonly isDeferredFeatureIpcRegistered: () => boolean;
   readonly markDeferredFeatureIpcRegistered: () => void;
   readonly postLoginRuntimeStatusStore: DesktopPostLoginRuntimeStatusStore;
@@ -107,16 +106,21 @@ export function createPostLoginRuntimeDependencyActivator(
   }
 
   function registerDeferredFeatureIpc(register: () => void): void {
-    if (params.isDeferredFeatureIpcRegistered()) {
-      return;
-    }
     const deferredFeatureRegistrationStartedAt = logInitializationStart(DesktopStartupPhases.deferredFeatureRegistration);
+    params.postLoginRuntimeStatusStore.markDeferredFeatureIpcRegistrationRunning();
     try {
-      params.markDeferredFeatureIpcRegistered();
-      register();
-      params.markDeferredFeatureIpcReady();
+      if (!params.isDeferredFeatureIpcRegistered()) {
+        register();
+        params.markDeferredFeatureIpcRegistered();
+      }
+      params.postLoginRuntimeStatusStore.markDeferredFeatureIpcRegistrationReady({
+        detail: "Deferred feature IPC domains are registered and renderer bridges can bind.",
+      });
       params.postLoginRuntimeStatusStore.markReady();
       logInitializationMemory(DesktopStartupPhases.deferredFeatureRegistration, "ready");
+    } catch (error) {
+      params.postLoginRuntimeStatusStore.markDeferredFeatureIpcRegistrationBlocked(error);
+      throw error;
     } finally {
       logInitializationEnd(DesktopStartupPhases.deferredFeatureRegistration, deferredFeatureRegistrationStartedAt);
     }
@@ -187,14 +191,23 @@ export function createPostLoginRuntimeDependencyActivator(
       storagePaths,
     });
 
-    const createDeferredDesktopFeatureRuntime = await ensureDeferredDesktopFeatureRuntimeFactory();
-    const featureRuntime = createDeferredDesktopFeatureRuntime({
-      storagePaths,
-      runtimeConfigValues: runtimeConfig.toValues(),
-      repoRoot: params.repoRoot,
-      observabilityLogger: params.getOperationalLogger(),
+    params.postLoginRuntimeStatusStore.markDeferredFeatureRuntimeCompositionRunning();
+    const featureRuntime = await Promise.resolve().then(async () => {
+      const createDeferredDesktopFeatureRuntime = await ensureDeferredDesktopFeatureRuntimeFactory();
+      return createDeferredDesktopFeatureRuntime({
+        storagePaths,
+        runtimeConfigValues: runtimeConfig.toValues(),
+        repoRoot: params.repoRoot,
+        observabilityLogger: params.getOperationalLogger(),
+      });
+    }).catch((error) => {
+      params.postLoginRuntimeStatusStore.markDeferredFeatureRuntimeCompositionBlocked(error);
+      throw error;
     });
     params.setDeferredFeatureRuntime(featureRuntime);
+    params.postLoginRuntimeStatusStore.markDeferredFeatureRuntimeCompositionReady({
+      detail: "Deferred feature runtime container is composed and ready for provider wiring.",
+    });
     logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready", bootstrapStartedAt);
     logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready");
 
@@ -212,17 +225,31 @@ export function createPostLoginRuntimeDependencyActivator(
       logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "start");
       const runtimeComposition = await composePostLoginRuntimeDependencies(authShell, bootstrapStartedAt);
       const { storagePaths, runtimeConfig, pythonRuntime, featureRuntime } = runtimeComposition;
-      const agentRuntimeProvider = createDesktopAgentRuntimeProvider({
-        storagePaths,
-        onRuntimeReady: () => logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "agent-runtime-ready"),
+      params.postLoginRuntimeStatusStore.markDeferredFeatureProviderSetupRunning();
+      const providers = await Promise.resolve().then(() => {
+        const agentRuntimeProvider = createDesktopAgentRuntimeProvider({
+          storagePaths,
+          onRuntimeReady: () => logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "agent-runtime-ready"),
+        });
+        const canonicalRegistryRuntimeProvider = createCanonicalRegistryRuntimeProvider({
+          storagePaths,
+          getDeferredFeatureRuntime: () => params.getDeferredFeatureRuntime(),
+          onRuntimeReady: () => logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "canonical-registry-runtime-ready"),
+        });
+        return Object.freeze({
+          agentRuntimeProvider,
+          canonicalRegistryRuntimeProvider,
+        });
+      }).catch((error) => {
+        params.postLoginRuntimeStatusStore.markDeferredFeatureProviderSetupBlocked(error);
+        throw error;
       });
+      const { agentRuntimeProvider, canonicalRegistryRuntimeProvider } = providers;
       params.setAgentRuntimeProvider(agentRuntimeProvider);
-      const canonicalRegistryRuntimeProvider = createCanonicalRegistryRuntimeProvider({
-        storagePaths,
-        getDeferredFeatureRuntime: () => params.getDeferredFeatureRuntime(),
-        onRuntimeReady: () => logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "canonical-registry-runtime-ready"),
-      });
       params.setCanonicalRegistryRuntimeProvider(canonicalRegistryRuntimeProvider);
+      params.postLoginRuntimeStatusStore.markDeferredFeatureProviderSetupReady({
+        detail: "Deferred feature runtime providers are configured for studio, registry, and agent domains.",
+      });
       registerDeferredFeatureIpc(() => {
         const onDemand = createOnDemandFeatureCompositionPaths({
           featureRuntime,
