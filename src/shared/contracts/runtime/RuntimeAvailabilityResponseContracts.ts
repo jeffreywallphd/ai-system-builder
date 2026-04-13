@@ -55,6 +55,9 @@ export interface RuntimeAvailabilityLifecycleDiagnostics {
   readonly capabilityId?: string;
   readonly lifecyclePhase?: string;
   readonly transportPhase?: string;
+  readonly blockingActivationStageId?: string;
+  readonly blockingActivationStageState?: string;
+  readonly blockingActivationStageDetail?: string;
 }
 
 export interface RuntimeAvailabilityBlockingReason {
@@ -199,6 +202,9 @@ function normalizeLifecycleDiagnostics(
     capabilityId: normalizeOptionalText(diagnostics.capabilityId),
     lifecyclePhase: normalizeOptionalText(diagnostics.lifecyclePhase),
     transportPhase: normalizeOptionalText(diagnostics.transportPhase),
+    blockingActivationStageId: normalizeOptionalText(diagnostics.blockingActivationStageId),
+    blockingActivationStageState: normalizeOptionalText(diagnostics.blockingActivationStageState),
+    blockingActivationStageDetail: normalizeOptionalText(diagnostics.blockingActivationStageDetail),
   });
 }
 

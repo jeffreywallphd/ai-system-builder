@@ -55,6 +55,15 @@ export interface AuthoritativeServerRouteFamilyRuntimeLifecycleSnapshot {
   readonly unavailableReason?: string;
   readonly hasFailure?: boolean;
   readonly failureRetryable?: boolean;
+  readonly activationStages?: ReadonlyArray<AuthoritativeServerRuntimeActivationStageSnapshot>;
+}
+
+export interface AuthoritativeServerRuntimeActivationStageSnapshot {
+  readonly stageId: string;
+  readonly state: string;
+  readonly blockingReadiness: boolean;
+  readonly detail?: string;
+  readonly errorMessage?: string;
 }
 
 export interface AuthoritativeServerCapabilityActivationSnapshot {

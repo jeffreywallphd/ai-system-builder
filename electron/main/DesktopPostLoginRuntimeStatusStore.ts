@@ -1,9 +1,12 @@
 import type {
+  DesktopPostLoginActivationStageStatus,
   DesktopPostLoginRuntimeStatus,
   DesktopPostLoginRuntimeUnavailableReason,
   DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
 import {
+  DesktopControlPlaneActivationStageStates,
+  DesktopPostLoginActivationStageIds,
   DesktopControlPlaneHostIdentities,
   DesktopControlPlaneTransportPhases,
   resolveDesktopControlPlaneRuntimeActivationState,
@@ -23,6 +26,9 @@ export type DesktopPostLoginRuntimeStatusStore = {
   readonly markTransportAvailable: (metadata?: { readonly boundAddress?: string; readonly boundPort?: number; readonly reason?: string }) => void;
   readonly markTransportUnavailable: (reason: string) => void;
   readonly markTransportFailed: (error: unknown, metadata?: { readonly boundAddress?: string; readonly boundPort?: number }) => void;
+  readonly markPythonRuntimeResolutionRunning: () => void;
+  readonly markPythonRuntimeResolutionReady: (metadata?: { readonly detail?: string }) => void;
+  readonly markPythonRuntimeResolutionBlocked: (error: unknown) => void;
   readonly markUnavailable: (reason: DesktopPostLoginRuntimeUnavailableReason) => void;
   readonly markWarming: (request: DesktopPostLoginWarmupRequest) => void;
   readonly markReady: () => void;
@@ -39,6 +45,14 @@ export function createDesktopPostLoginRuntimeStatusStore(
   clock: PostLoginRuntimeStatusClock = { nowIsoString: () => new Date().toISOString() },
 ): DesktopPostLoginRuntimeStatusStore {
   let capabilityPhase: DesktopPostLoginRuntimeStatus["capabilityPhase"] = "pre-login";
+  const stageStatuses = new Map<string, DesktopPostLoginActivationStageStatus>();
+  stageStatuses.set(DesktopPostLoginActivationStageIds.pythonRuntimeResolution, Object.freeze({
+    stageId: DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
+    state: DesktopControlPlaneActivationStageStates.pending,
+    updatedAt: clock.nowIsoString(),
+    blockingReadiness: true,
+    detail: "Python runtime resolution has not started.",
+  }));
   let transport = Object.freeze({
     phase: DesktopControlPlaneTransportPhases.unavailable,
     updatedAt: clock.nowIsoString(),
@@ -47,7 +61,7 @@ export function createDesktopPostLoginRuntimeStatusStore(
     failureMessage: undefined as string | undefined,
   });
 
-  const composeStatus = (overrides?: Partial<Omit<DesktopPostLoginRuntimeStatus, "host" | "state" | "capabilityPhase" | "transport">>): DesktopPostLoginRuntimeStatus => {
+  const composeStatus = (overrides?: Partial<Omit<DesktopPostLoginRuntimeStatus, "host" | "state" | "capabilityPhase" | "transport" | "activationStages">>): DesktopPostLoginRuntimeStatus => {
     const updatedAt = overrides?.updatedAt ?? clock.nowIsoString();
     return Object.freeze({
       host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
@@ -60,6 +74,7 @@ export function createDesktopPostLoginRuntimeStatusStore(
       unavailableReason: overrides?.unavailableReason,
       failure: overrides?.failure,
       transport,
+      activationStages: Object.freeze([...stageStatuses.values()]),
     });
   };
   let status: DesktopPostLoginRuntimeStatus = composeStatus({
@@ -69,7 +84,7 @@ export function createDesktopPostLoginRuntimeStatusStore(
   const applyCapabilityTransition = (
     to: DesktopPostLoginRuntimeStatus["capabilityPhase"],
     reason: string,
-    overrides?: Partial<Omit<DesktopPostLoginRuntimeStatus, "host" | "state" | "capabilityPhase" | "transport">>,
+    overrides?: Partial<Omit<DesktopPostLoginRuntimeStatus, "host" | "state" | "capabilityPhase" | "transport" | "activationStages">>,
   ): void => {
     if (to !== capabilityPhase) {
       transitionDesktopControlPlaneCapabilityPhase({
@@ -81,6 +96,28 @@ export function createDesktopPostLoginRuntimeStatusStore(
     }
     capabilityPhase = to;
     status = composeStatus(overrides);
+  };
+
+  const updateActivationStage = (stageStatus: DesktopPostLoginActivationStageStatus): void => {
+    stageStatuses.set(stageStatus.stageId, stageStatus);
+    status = composeStatus({
+      activationMode: status.activationMode,
+      triggerSource: status.triggerSource,
+      requestedAt: status.requestedAt,
+      unavailableReason: status.unavailableReason,
+      failure: status.failure,
+    });
+  };
+
+  const resetPythonRuntimeResolutionStage = (): void => {
+    updateActivationStage(Object.freeze({
+      stageId: DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
+      state: DesktopControlPlaneActivationStageStates.pending,
+      updatedAt: clock.nowIsoString(),
+      blockingReadiness: true,
+      detail: "Python runtime resolution has not started.",
+      errorMessage: undefined,
+    }));
   };
 
   return Object.freeze({
@@ -175,7 +212,37 @@ export function createDesktopPostLoginRuntimeStatusStore(
         failure: status.failure,
       });
     },
+    markPythonRuntimeResolutionRunning() {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
+        state: DesktopControlPlaneActivationStageStates.running,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Resolving desktop Python runtime.",
+      }));
+    },
+    markPythonRuntimeResolutionReady(metadata) {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
+        state: DesktopControlPlaneActivationStageStates.ready,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: false,
+        detail: metadata?.detail,
+      }));
+    },
+    markPythonRuntimeResolutionBlocked(error) {
+      const message = error instanceof Error ? error.message : "Desktop Python runtime resolution failed.";
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.pythonRuntimeResolution,
+        state: DesktopControlPlaneActivationStageStates.blocked,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Desktop Python runtime resolution failed.",
+        errorMessage: message,
+      }));
+    },
     markUnavailable(reason) {
+      resetPythonRuntimeResolutionStage();
       applyCapabilityTransition("pre-login", "runtime-unavailable", {
         unavailableReason: reason,
       });

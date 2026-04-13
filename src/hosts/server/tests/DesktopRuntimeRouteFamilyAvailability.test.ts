@@ -65,6 +65,12 @@ describe("DesktopRuntimeRouteFamilyAvailability", () => {
         readonly failedAt: string;
         readonly retryable: boolean;
       } | undefined,
+      activationStages: Object.freeze([Object.freeze({
+        stageId: "python-runtime-resolution",
+        state: "pending",
+        blockingReadiness: true,
+        detail: "Python runtime resolution has not started.",
+      })]),
     });
     const availability = createAuthoritativeServerRouteFamilyAvailabilityService({
       capabilityActivation: activation,
@@ -79,6 +85,12 @@ describe("DesktopRuntimeRouteFamilyAvailability", () => {
       runtimeLifecycle: {
         capabilityPhase: "pre-login",
         transportPhase: "available",
+        activationStages: [Object.freeze({
+          stageId: "python-runtime-resolution",
+          state: "pending",
+          blockingReadiness: true,
+          detail: "Python runtime resolution has not started.",
+        })],
       },
     });
     expect(availability.isRouteFamilyAvailable("run-submission")).toBeFalse();

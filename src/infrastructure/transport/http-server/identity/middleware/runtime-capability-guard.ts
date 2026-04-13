@@ -34,6 +34,13 @@ export interface RuntimeCapabilityGuardAvailability {
     readonly unavailableReason?: string;
     readonly hasFailure?: boolean;
     readonly failureRetryable?: boolean;
+    readonly activationStages?: ReadonlyArray<{
+      readonly stageId: string;
+      readonly state: string;
+      readonly blockingReadiness: boolean;
+      readonly detail?: string;
+      readonly errorMessage?: string;
+    }>;
   };
   readonly available: boolean;
 }
@@ -89,6 +96,28 @@ function buildBlockingReason(input: {
   });
 }
 
+function resolveBlockingActivationStage(availability: RuntimeCapabilityGuardAvailability | undefined): {
+  readonly stageId?: string;
+  readonly state?: string;
+  readonly detail?: string;
+  readonly errorMessage?: string;
+} {
+  const activationStages = availability?.runtimeLifecycle?.activationStages;
+  if (!activationStages || activationStages.length < 1) {
+    return Object.freeze({});
+  }
+  const blockingStage = activationStages.find((stage) => stage.blockingReadiness && stage.state !== "ready");
+  if (!blockingStage) {
+    return Object.freeze({});
+  }
+  return Object.freeze({
+    stageId: blockingStage.stageId,
+    state: blockingStage.state,
+    detail: blockingStage.detail,
+    errorMessage: blockingStage.errorMessage,
+  });
+}
+
 function resolveUnavailableLifecycleResponse(input: {
   readonly checkedAt: string;
   readonly availability?: RuntimeCapabilityGuardAvailability;
@@ -105,9 +134,13 @@ function resolveUnavailableLifecycleResponse(input: {
 
   if (runtimeCapabilityState === "failed") {
     const retryable = diagnostics.retryable;
+    const blockingStage = resolveBlockingActivationStage(input.availability);
+    const failureMessage = blockingStage.errorMessage?.trim()
+      ? `Deferred ${capabilityDescription} activation failed: ${blockingStage.errorMessage}.`
+      : `Deferred ${capabilityDescription} activation failed.`;
     const failureReason = buildBlockingReason({
       code: RuntimeAvailabilityBlockingReasonCodes.runtimeInitializationFailed,
-      message: `Deferred ${capabilityDescription} activation failed.`,
+      message: failureMessage,
       retryable,
       observedAt: input.checkedAt,
     });
@@ -117,7 +150,7 @@ function resolveUnavailableLifecycleResponse(input: {
       blockingReasons: Object.freeze([failureReason]),
       failure: Object.freeze({
         code: "runtime-capability-activation-failed",
-        message: `Deferred ${capabilityDescription} activation failed.`,
+        message: failureMessage,
         failedAt: input.checkedAt,
         retryable,
       }),
@@ -126,9 +159,13 @@ function resolveUnavailableLifecycleResponse(input: {
   }
 
   if (runtimeCapabilityState === "warming" || runtimeCapabilityState === "pending") {
+    const blockingStage = resolveBlockingActivationStage(input.availability);
+    const warmupMessage = blockingStage.detail?.trim()
+      ? `${blockingStage.detail}`
+      : `Deferred ${capabilityDescription} activation is still warming.`;
     const warmupReason = buildBlockingReason({
       code: RuntimeAvailabilityBlockingReasonCodes.capabilityWarmupInProgress,
-      message: `Deferred ${capabilityDescription} activation is still warming.`,
+      message: warmupMessage,
       retryable: true,
       observedAt: input.checkedAt,
       retryAfterMs: 1000,
@@ -193,6 +230,7 @@ function buildLifecycleDiagnostics(input: {
   const retryable = input.runtimeState === "failed"
     ? input.availability?.runtimeLifecycle?.failureRetryable ?? true
     : true;
+  const blockingStage = resolveBlockingActivationStage(input.availability);
 
   return Object.freeze({
     lifecycleState: input.runtimeState,
@@ -207,6 +245,9 @@ function buildLifecycleDiagnostics(input: {
     capabilityId: input.availability?.capabilityId,
     lifecyclePhase: input.availability?.runtimeLifecycle?.capabilityPhase ?? input.availability?.state,
     transportPhase: input.availability?.runtimeLifecycle?.transportPhase,
+    blockingActivationStageId: blockingStage.stageId,
+    blockingActivationStageState: blockingStage.state,
+    blockingActivationStageDetail: blockingStage.detail,
   });
 }
 
@@ -238,6 +279,7 @@ function buildLifecycleSummary(input: {
   readonly blockingDependencyCategory: RuntimeAvailabilityLifecycleDiagnostics["blockingDependencyCategory"];
   readonly availability?: RuntimeCapabilityGuardAvailability;
 }): string {
+  const blockingStage = resolveBlockingActivationStage(input.availability);
   if (input.blockingDependencyCategory === RuntimeAvailabilityBlockingDependencyCategories.controlPlaneTransport) {
     const transportPhase = input.availability?.runtimeLifecycle?.transportPhase ?? "unknown";
     return `Desktop control-plane transport is '${transportPhase}'.`;
@@ -246,9 +288,15 @@ function buildLifecycleSummary(input: {
     return "An authenticated desktop session is required before deferred runtime activation.";
   }
   if (input.blockingDependencyCategory === RuntimeAvailabilityBlockingDependencyCategories.runtimeSupervisor) {
+    if (blockingStage.stageId && blockingStage.errorMessage) {
+      return `Activation stage '${blockingStage.stageId}' failed: ${blockingStage.errorMessage}`;
+    }
     return "The runtime supervisor reported a deferred activation failure.";
   }
   if (input.runtimeState === "warming") {
+    if (blockingStage.stageId && blockingStage.detail) {
+      return `Activation stage '${blockingStage.stageId}' is blocking readiness: ${blockingStage.detail}`;
+    }
     return "Deferred runtime activation is currently warming.";
   }
   if (input.runtimeState === "failed") {

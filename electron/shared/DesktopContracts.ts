@@ -6,6 +6,7 @@ import type { CanonicalEntityType } from "../../src/application/ports/interfaces
 import {
   DesktopControlPlaneCapabilityActivationModes,
   DesktopControlPlaneCapabilityPhases,
+  DesktopControlPlaneActivationStageStates,
   DesktopControlPlaneCapabilityUnavailableReasons,
   DesktopControlPlaneHostIdentities,
   DesktopControlPlaneTransportPhases,
@@ -15,6 +16,8 @@ import {
   transitionDesktopControlPlaneCapabilityPhase,
   transitionDesktopControlPlaneTransportPhase,
   type DesktopControlPlaneCapabilityActivationMode,
+  type DesktopControlPlaneActivationStageState,
+  type DesktopControlPlaneActivationStageStatus,
   type DesktopControlPlaneCapabilityPhase,
   type DesktopControlPlaneCapabilityUnavailableReason,
   type DesktopControlPlaneRuntimeStatus,
@@ -22,6 +25,7 @@ import {
 } from "../../src/application/common/DesktopControlPlaneRuntimeContracts";
 
 export {
+  DesktopControlPlaneActivationStageStates,
   DesktopControlPlaneCapabilityPhases,
   DesktopControlPlaneHostIdentities,
   DesktopControlPlaneTransportPhases,
@@ -281,6 +285,17 @@ export interface DesktopPostLoginWarmupRequest {
 export const DesktopPostLoginRuntimeActivationModes = DesktopControlPlaneCapabilityActivationModes;
 
 export type DesktopPostLoginRuntimeActivationMode = DesktopControlPlaneCapabilityActivationMode;
+
+export const DesktopPostLoginActivationStageIds = Object.freeze({
+  pythonRuntimeResolution: "python-runtime-resolution",
+});
+
+export type DesktopPostLoginActivationStageId =
+  typeof DesktopPostLoginActivationStageIds[keyof typeof DesktopPostLoginActivationStageIds];
+
+export type DesktopPostLoginActivationStageState = DesktopControlPlaneActivationStageState;
+
+export type DesktopPostLoginActivationStageStatus = DesktopControlPlaneActivationStageStatus;
 
 export const DesktopPostLoginRuntimeStates = Object.freeze({
   preLogin: DesktopControlPlaneCapabilityPhases.preLogin,

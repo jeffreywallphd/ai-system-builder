@@ -271,6 +271,18 @@ Desktop control-plane host startup now composes runtime route families at initia
 - Runtime capability guard mapping now derives diagnostics from those lifecycle snapshots so responses identify whether blocking is caused by auth/session phase, capability activation warmup, runtime supervisor failure, or control-plane transport state.
 - Execution readiness state-driven bypass surfaces the same typed lifecycle diagnostics in both `runtimeLifecycle` and readiness-level diagnostics, preserving observability without leaking internal error internals.
 
+## Story 1.3.3 Python runtime resolution activation stage
+
+- Python runtime resolution is now an explicit post-login activation stage owned by `electron/main/runtime/PythonRuntimeResolutionActivationStage.ts`.
+- Stage lifecycle reporting is surfaced through `DesktopPostLoginRuntimeStatus.activationStages` with explicit `pending` -> `running` -> `ready|blocked` transitions for `python-runtime-resolution`.
+- `PostLoginRuntimeDependencyActivator` now executes Python resolution through that stage wrapper, preserving existing packaged and development resolver behavior while adding explicit stage-level observability and error reporting.
+- Route-family runtime lifecycle snapshots now include activation-stage status so backend runtime capability guard responses can report when Python runtime resolution is currently blocking readiness.
+- Guard diagnostics now expose optional stage-level blocking fields (`blockingActivationStageId`, `blockingActivationStageState`, `blockingActivationStageDetail`) without changing existing runtime availability contract versioning.
+- Regression coverage now includes:
+  - `electron/main/tests/PythonRuntimeResolutionActivationStage.test.ts` for successful and blocked resolution paths.
+  - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` stage transition/read-model coverage.
+  - `src/infrastructure/transport/http-server/identity/tests/RuntimeCapabilityGuardMiddleware.test.ts` stage-aware blocking diagnostics.
+
 ## Story 1.2.8 route-level no-connection-refusal startup regression coverage
 
 - Runtime startup regression coverage now explicitly protects route-level listener continuity during capability transitions.

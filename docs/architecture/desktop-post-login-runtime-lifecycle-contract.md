@@ -388,3 +388,15 @@ Contract target for authenticated logout:
 4. next authenticated session may re-trigger warmup through auth-success or lazy feature demand.
 
 This story defines the logout reset contract boundary and status semantics so follow-on stories can implement logout-triggered runtime reset without re-deciding lifecycle behavior.
+
+## Story 1.3.3 Python runtime resolution activation stage
+
+- Python runtime resolution is now an explicit post-login activation stage owned by `electron/main/runtime/PythonRuntimeResolutionActivationStage.ts`.
+- Stage lifecycle reporting is surfaced through `DesktopPostLoginRuntimeStatus.activationStages` with explicit `pending` -> `running` -> `ready|blocked` transitions for `python-runtime-resolution`.
+- `PostLoginRuntimeDependencyActivator` now executes Python resolution through that stage wrapper, preserving existing packaged and development resolver behavior while adding explicit stage-level observability and error reporting.
+- Route-family runtime lifecycle snapshots now include activation-stage status so backend runtime capability guard responses can report when Python runtime resolution is currently blocking readiness.
+- Guard diagnostics now expose optional stage-level blocking fields (`blockingActivationStageId`, `blockingActivationStageState`, `blockingActivationStageDetail`) without changing existing runtime availability contract versioning.
+- Regression coverage now includes:
+  - `electron/main/tests/PythonRuntimeResolutionActivationStage.test.ts` for successful and blocked resolution paths.
+  - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` stage transition/read-model coverage.
+  - `src/infrastructure/transport/http-server/identity/tests/RuntimeCapabilityGuardMiddleware.test.ts` stage-aware blocking diagnostics.

@@ -88,6 +88,25 @@ export interface DesktopControlPlaneCapabilityFailure {
   readonly retryable: boolean;
 }
 
+export const DesktopControlPlaneActivationStageStates = Object.freeze({
+  pending: "pending",
+  running: "running",
+  ready: "ready",
+  blocked: "blocked",
+});
+
+export type DesktopControlPlaneActivationStageState =
+  typeof DesktopControlPlaneActivationStageStates[keyof typeof DesktopControlPlaneActivationStageStates];
+
+export interface DesktopControlPlaneActivationStageStatus {
+  readonly stageId: string;
+  readonly state: DesktopControlPlaneActivationStageState;
+  readonly updatedAt: string;
+  readonly blockingReadiness: boolean;
+  readonly detail?: string;
+  readonly errorMessage?: string;
+}
+
 export interface DesktopControlPlaneRuntimeStatus {
   readonly host: DesktopControlPlaneHostIdentity;
   readonly state: DesktopControlPlaneRuntimeActivationState;
@@ -99,6 +118,7 @@ export interface DesktopControlPlaneRuntimeStatus {
   readonly unavailableReason?: DesktopControlPlaneCapabilityUnavailableReason;
   readonly failure?: DesktopControlPlaneCapabilityFailure;
   readonly transport: DesktopControlPlaneTransportStatus;
+  readonly activationStages?: ReadonlyArray<DesktopControlPlaneActivationStageStatus>;
 }
 
 export const DesktopControlPlaneLifecycleTracks = Object.freeze({
