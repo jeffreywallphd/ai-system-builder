@@ -9,7 +9,7 @@ export const DeploymentPolicyReadAuthoritativeApiRouteFamily = Object.freeze({
   domain: AuthoritativeApiRouteDomains.deployment,
   description: "Authoritative deployment-policy administration read endpoints.",
   routePrefixes: Object.freeze([
-    "/api/v1/deployment/policy",
+    "/api/v1/deployment/policy/state",
   ]),
   requiredBackendKeys: Object.freeze([
     AuthoritativeApiRouteBackendKeys.deploymentPolicyRead,
@@ -21,7 +21,8 @@ export const DeploymentPolicyWriteAuthoritativeApiRouteFamily = Object.freeze({
   domain: AuthoritativeApiRouteDomains.deployment,
   description: "Authoritative deployment-policy administration write endpoints.",
   routePrefixes: Object.freeze([
-    "/api/v1/deployment/policy",
+    "/api/v1/deployment/policy/active-profile",
+    "/api/v1/deployment/policy/overrides",
   ]),
   requiredBackendKeys: Object.freeze([
     AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite,
