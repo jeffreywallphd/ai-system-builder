@@ -65,3 +65,30 @@ Implementation anchors:
 
 - `src/ui/runtime/RendererRuntimeLifecycleService.ts`
 - `src/ui/runtime/tests/RendererRuntimeLifecycleService.test.ts`
+
+## Desktop renderer lifecycle gate enforcement (Story 1.4.6)
+
+Desktop renderer runtime paths must now pass through a shared lifecycle gate before touching runtime HTTP or realtime channels.
+
+Required usage pattern:
+
+1. Resolve desktop lifecycle readiness through `resolveDesktopRendererRuntimeLifecycleGate`.
+2. If lifecycle is unavailable, return/show the explicit unavailable contract (`AI_LOOM_DESKTOP_FEATURE_API_UNAVAILABLE`) instead of attempting direct runtime transport calls.
+3. Allow web/thin-client paths to continue without desktop lifecycle gating when no desktop runtime bridge exists.
+
+Prohibited pattern:
+
+- Direct desktop runtime HTTP/WebSocket usage that bypasses lifecycle readiness checks.
+
+Implementation anchors:
+
+- `src/ui/runtime/DesktopRendererRuntimeLifecycleGate.ts`
+- `src/ui/services/RuntimeOperationsService.ts`
+- `src/ui/shared/runtime/RuntimeRealtimeSubscriptionService.ts`
+
+Tests:
+
+- `src/ui/runtime/tests/DesktopRendererRuntimeLifecycleGate.test.ts`
+- `src/ui/runtime/tests/DesktopRuntimeLifecycleGatingConventions.test.ts`
+- `src/ui/services/tests/RuntimeOperationsService.test.ts`
+- `src/ui/shared/runtime/tests/RuntimeRealtimeSubscriptionService.test.ts`

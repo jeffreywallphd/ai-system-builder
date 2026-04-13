@@ -1,9 +1,21 @@
-import { describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import { RuntimeOperationsService } from "../RuntimeOperationsService";
 import type { RuntimeControlClient } from "@shared/runtime/RuntimeControlClient";
 import type { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
+import {
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
+  DesktopPostLoginRuntimeStates,
+} from "../../../../electron/shared/DesktopContracts";
+import { resetDesktopPostLoginWarmupStateForTests } from "../../runtime/DesktopPostLoginWarmup";
+import { DesktopRendererRuntimeLifecycleUnavailableCode } from "../../runtime/DesktopRendererRuntimeLifecycleGate";
 
 describe("RuntimeOperationsService", () => {
+  afterEach(() => {
+    resetDesktopPostLoginWarmupStateForTests();
+    delete (globalThis as { window?: Window }).window;
+  });
+
   it("uses shared runtime client with authenticated session context", async () => {
     const client: RuntimeControlClient = {
       startRun: mock(async () => ({ ok: true, data: {} as any })),
@@ -308,6 +320,66 @@ describe("RuntimeOperationsService", () => {
       "asset:generated:1",
       "asset:preview:1",
     ]);
+  });
+
+  it("blocks runtime HTTP calls when desktop lifecycle is not ready", async () => {
+    const client: RuntimeControlClient = {
+      startRun: mock(async () => ({ ok: true, data: {} as any })),
+      cancelRun: mock(async () => ({ ok: true, data: {} as any })),
+      getRunStatus: mock(async () => ({ ok: true, data: {} as any })),
+      getRunResult: mock(async () => ({ ok: true, data: {} as any })),
+      getRunTrace: mock(async () => ({ ok: true, data: {} as any })),
+      getExecutionReadiness: mock(async () => ({ ok: true, data: {} as any })),
+      listQueueItems: mock(async () => ({ ok: true, data: { items: [], totalCount: 0 } })),
+      dequeueQueueItem: mock(async () => ({ ok: true, data: {} as any })),
+    };
+    const sessionStore = {
+      getSession: () => Object.freeze({
+        userIdentityId: "user-1",
+        username: "user",
+        providerId: "local",
+        sessionId: "session-1",
+        sessionToken: "token-1",
+        sessionTokenType: "Bearer" as const,
+        sessionIssuedAt: "2026-04-07T11:00:00.000Z",
+        sessionExpiresAt: "2026-04-07T23:00:00.000Z",
+        workspaceContext: Object.freeze({
+          requestedWorkspaceId: "workspace-requested",
+          resolvedWorkspaceId: "workspace-resolved",
+          workspaces: Object.freeze([]),
+        }),
+      }),
+      isSessionExpired: () => false,
+    } as unknown as IdentityAuthSessionStore;
+
+    (globalThis as { window: Window }).window = {
+      aiLoomDesktop: {
+        auth: {
+          runtime: {
+            getLifecycleStatus: () => ({
+              host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+              state: DesktopPostLoginRuntimeStates.warming,
+              capabilityPhase: DesktopPostLoginRuntimeStates.warming,
+              unavailableReason: "pre-login",
+              updatedAt: "2026-04-13T10:00:00.000Z",
+              transport: {
+                phase: DesktopControlPlaneTransportPhases.available,
+                updatedAt: "2026-04-13T10:00:00.000Z",
+              },
+            }),
+            isCapabilityReady: () => false,
+            activateCapabilities: async () => undefined,
+          },
+        },
+      },
+    } as unknown as Window;
+
+    const service = new RuntimeOperationsService(client, sessionStore);
+    const response = await service.listQueueItems();
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe(DesktopRendererRuntimeLifecycleUnavailableCode);
+    expect(client.listQueueItems).toHaveBeenCalledTimes(0);
   });
 });
 

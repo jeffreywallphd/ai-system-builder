@@ -18,6 +18,10 @@ import {
   type IdentityAuthPersistedSession,
 } from "@shared/identity/IdentityAuthSessionStore";
 import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+import {
+  resolveDesktopRendererRuntimeLifecycleGate,
+  type DesktopRendererRuntimeLifecycleUnavailableError,
+} from "../runtime/DesktopRendererRuntimeLifecycleGate";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 interface RuntimeOperationsError {
@@ -69,6 +73,10 @@ export class RuntimeOperationsService {
     readonly completedAt?: string;
     readonly priority?: number;
   }>; readonly totalCount: number }>> {
+    const lifecycleResponse = this.resolveLifecycleUnavailableResponse("runtime.queue.list");
+    if (lifecycleResponse) {
+      return lifecycleResponse;
+    }
     const context = this.resolveSessionContext();
     if (!context.ok) {
       return context.errorResponse;
@@ -87,6 +95,10 @@ export class RuntimeOperationsService {
     readonly reason?: string;
     readonly idempotencyKey?: string;
   }): Promise<RuntimeSdkResponse<{ readonly queueItemId: string; readonly executionId: string; readonly status: RuntimeQueueItemStatus; readonly mutation: { readonly changed: boolean; readonly mutationId?: string; readonly occurredAt?: string; } }>> {
+    const lifecycleResponse = this.resolveLifecycleUnavailableResponse("runtime.queue.dequeue");
+    if (lifecycleResponse) {
+      return lifecycleResponse;
+    }
     const context = this.resolveSessionContext();
     if (!context.ok) {
       return context.errorResponse;
@@ -104,6 +116,10 @@ export class RuntimeOperationsService {
     readonly reason?: string;
     readonly idempotencyKey?: string;
   }): Promise<RuntimeSdkResponse<{ readonly executionId: string; readonly status: RuntimeSdkExecutionStatusResponse["status"]; readonly mutation: { readonly changed: boolean; readonly mutationId?: string; readonly occurredAt?: string; } }>> {
+    const lifecycleResponse = this.resolveLifecycleUnavailableResponse("runtime.run.cancel");
+    if (lifecycleResponse) {
+      return lifecycleResponse;
+    }
     const context = this.resolveSessionContext();
     if (!context.ok) {
       return context.errorResponse;
@@ -117,6 +133,10 @@ export class RuntimeOperationsService {
   }
 
   public async getRunStatus(executionId: string): Promise<RuntimeSdkResponse<RuntimeSdkExecutionStatusResponse>> {
+    const lifecycleResponse = this.resolveLifecycleUnavailableResponse("runtime.run.status");
+    if (lifecycleResponse) {
+      return lifecycleResponse;
+    }
     const context = this.resolveSessionContext();
     if (!context.ok) {
       return context.errorResponse;
@@ -132,6 +152,10 @@ export class RuntimeOperationsService {
     readonly nodeResultLimit?: number;
     readonly diagnosticsLimit?: number;
   }): Promise<RuntimeSdkResponse<RuntimeSdkExecutionResultResponse>> {
+    const lifecycleResponse = this.resolveLifecycleUnavailableResponse("runtime.run.result");
+    if (lifecycleResponse) {
+      return lifecycleResponse;
+    }
     const context = this.resolveSessionContext();
     if (!context.ok) {
       return context.errorResponse;
@@ -149,6 +173,10 @@ export class RuntimeOperationsService {
     readonly eventLimit?: number;
     readonly logLimit?: number;
   }): Promise<RuntimeSdkResponse<RuntimeSdkExecutionTraceResponse>> {
+    const lifecycleResponse = this.resolveLifecycleUnavailableResponse("runtime.run.trace");
+    if (lifecycleResponse) {
+      return lifecycleResponse;
+    }
     const context = this.resolveSessionContext();
     if (!context.ok) {
       return context.errorResponse;
@@ -166,6 +194,10 @@ export class RuntimeOperationsService {
     readonly operationKind?: string;
     readonly translationContractVersion?: string;
   }): Promise<RuntimeSdkResponse<RuntimeExecutionReadinessResponse>> {
+    const lifecycleResponse = this.resolveLifecycleUnavailableResponse("runtime.execution.readiness");
+    if (lifecycleResponse) {
+      return lifecycleResponse;
+    }
     const context = this.resolveSessionContext();
     if (!context.ok) {
       return context.errorResponse;
@@ -189,6 +221,10 @@ export class RuntimeOperationsService {
     readonly metadata?: Readonly<Record<string, unknown>>;
     readonly approvedParameters?: Readonly<Record<string, unknown>>;
   }): Promise<RuntimeSdkResponse<RuntimeSdkStartExecutionResponse>> {
+    const lifecycleResponse = this.resolveLifecycleUnavailableResponse("runtime.run.start");
+    if (lifecycleResponse) {
+      return lifecycleResponse;
+    }
     const context = this.resolveSessionContext();
     if (!context.ok) {
       return context.errorResponse;
@@ -325,6 +361,18 @@ export class RuntimeOperationsService {
       next.approvedParameters = approvedParameters;
     }
     return Object.keys(next).length > 0 ? Object.freeze(next) : undefined;
+  }
+
+  private resolveLifecycleUnavailableResponse(apiPath: string): RuntimeSdkResponse<never> | undefined {
+    const session = this.sessionStore.getSession();
+    if (!session || this.sessionStore.isSessionExpired(session)) {
+      return undefined;
+    }
+    const lifecycleGate = resolveDesktopRendererRuntimeLifecycleGate({ apiPath });
+    if (lifecycleGate.ok) {
+      return undefined;
+    }
+    return this.createErrorResponse(lifecycleGate.error as RuntimeOperationsError & DesktopRendererRuntimeLifecycleUnavailableError);
   }
 }
 

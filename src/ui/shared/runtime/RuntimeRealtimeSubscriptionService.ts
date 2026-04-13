@@ -22,6 +22,7 @@ import {
   type IdentityAuthPersistedSession,
 } from "@shared/identity/IdentityAuthSessionStore";
 import { resolveDesktopIdentityApiBaseUrl } from "../../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+import { resolveDesktopRendererRuntimeLifecycleGate } from "../../runtime/DesktopRendererRuntimeLifecycleGate";
 import { resolveWebIdentityApiBaseUrl } from "../../web/identity/resolveWebIdentityApiBaseUrl";
 
 const DEFAULT_RECONNECT_DELAY_MS = 1_500;
@@ -124,6 +125,19 @@ export class RuntimeRealtimeSubscriptionService {
   public subscribeOperationalUpdates(
     options: RuntimeRealtimeOperationalSubscriptionOptions,
   ): RuntimeRealtimeOperationalSubscription {
+    const lifecycleGate = resolveDesktopRendererRuntimeLifecycleGate({
+      apiPath: "runtime.realtime.subscribeOperationalUpdates",
+    });
+    if (!lifecycleGate.ok) {
+      options.onConnectionStateChanged?.(Object.freeze({
+        state: "disconnected",
+        stale: true,
+        detail: lifecycleGate.error.message,
+      }));
+      options.onError?.(lifecycleGate.error.message);
+      return Object.freeze({ unsubscribe: () => undefined });
+    }
+
     const sessionContext = resolveRealtimeSessionContext(this.sessionStore);
     if (!sessionContext.ok) {
       options.onConnectionStateChanged?.(Object.freeze({
