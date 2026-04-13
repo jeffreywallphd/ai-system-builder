@@ -162,6 +162,19 @@ Result:
 - runtime lifecycle polling and retry semantics are canonicalized in renderer runtime infrastructure,
 - feature surfaces reuse one lifecycle contract and avoid duplicated lifecycle timing assumptions.
 
+## Story 1.4.4 user-facing runtime lifecycle UI states
+
+Renderer runtime-driven surfaces now present non-technical lifecycle copy mapped directly from backend runtime lifecycle status (`DesktopPostLoginRuntimeStatus`) so users understand startup and retry behavior without transport-level jargon:
+
+- lifecycle states shown to users:
+  - `unavailable`
+  - `warming`
+  - `ready`
+  - `failed`
+- route-level deferred runtime guard (`src/ui/runtime/DeferredRuntimeFeatureGate.ts`) now uses clear user-first state titles/messages and preserves retry on retryable failures.
+- settings runtime panel (`src/ui/components/execution/McpRuntimeStatusPanel.tsx`) now renders explicit lifecycle status including `ready` state and failed-state retry affordance when restart is available.
+- lifecycle diagnostics shown in UI state details are sourced from backend lifecycle payload fields (`state`, `capabilityPhase`, `transport.phase`, `unavailableReason`, activation stage metadata, failure metadata) rather than placeholder transport assumptions.
+
 ## Status/readiness exposure
 - status channel:
   - `ai-loom-desktop-runtime:get-post-login-runtime-status`

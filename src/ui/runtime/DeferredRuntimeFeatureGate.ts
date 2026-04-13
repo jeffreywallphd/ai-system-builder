@@ -63,8 +63,8 @@ export function buildDeferredRuntimeGateState(
   if (status.state === DesktopPostLoginRuntimeStates.warming) {
     return Object.freeze({
       ...createLoadingState(
-        "Preparing feature services",
-        "This feature is still starting in the background. It should be ready in a few seconds.",
+        "Getting your tools ready",
+        "Your workspace tools are starting now. This usually takes a few seconds.",
       ),
       details: createRuntimeDiagnosticDetails(status),
     });
@@ -73,8 +73,10 @@ export function buildDeferredRuntimeGateState(
   if (status.state === DesktopPostLoginRuntimeStates.failed) {
     return Object.freeze({
       kind: "error",
-      title: "Feature services failed to start",
-      message: "We couldn't start the services needed for this feature. Try again, and check desktop logs if this keeps happening.",
+      title: "We could not finish startup",
+      message: status.failure?.retryable === false
+        ? "Your tools stopped while starting and need attention before trying again."
+        : "Your tools stopped while starting. Try again to continue.",
       retryable: status.failure?.retryable ?? true,
       details: createRuntimeDiagnosticDetails(status),
     });
@@ -90,18 +92,69 @@ export function buildDeferredRuntimeGateState(
     });
   }
 
+  if (status.unavailableReason === DesktopPostLoginRuntimeUnavailableReasons.loggedOut) {
+    return Object.freeze({
+      ...toDisconnectedState(
+        "Sign in to continue",
+        "Your workspace tools are paused because you are signed out.",
+      ),
+      details: createRuntimeDiagnosticDetails(status),
+    });
+  }
+
+  if (status.unavailableReason === DesktopPostLoginRuntimeUnavailableReasons.preLogin) {
+    return Object.freeze({
+      ...toDisconnectedState(
+        "Sign in to start your workspace tools",
+        "Sign in first, then we will start the tools needed for this screen.",
+      ),
+      details: createRuntimeDiagnosticDetails(status),
+    });
+  }
+
   return Object.freeze({
     ...toDisconnectedState(
-      "Feature services are still warming up",
-      "Feature services are not available yet. We'll keep trying while the runtime finishes starting.",
+      "Tools are not available yet",
+      "We have not started your workspace tools yet. Please wait a moment, then try again.",
     ),
     details: createRuntimeDiagnosticDetails(status),
   });
 }
 
 function createRuntimeDiagnosticDetails(status: DesktopPostLoginRuntimeStatus): string {
-  const failureMessage = status.failure?.message?.trim();
-  const failureSuffix = failureMessage ? ` | failure=${failureMessage}` : "";
-  const reasonSuffix = status.unavailableReason ? ` | reason=${status.unavailableReason}` : "";
-  return `runtime=${status.state} capability=${status.capabilityPhase} transport=${status.transport.phase}${reasonSuffix} | updated=${status.updatedAt}${failureSuffix}`;
+  const detailTokens: string[] = [
+    `runtime=${status.state}`,
+    `capability=${status.capabilityPhase}`,
+    `transport=${status.transport.phase}`,
+    `updated=${status.updatedAt}`,
+  ];
+
+  if (status.unavailableReason) {
+    detailTokens.push(`reason=${status.unavailableReason}`);
+  }
+
+  const blockingStage = status.activationStages?.find((stage) => (
+    stage.state === "running"
+    || (stage.state === "blocked" && stage.blockingReadiness)
+  ));
+
+  if (blockingStage) {
+    detailTokens.push(`stage=${blockingStage.stageId}:${blockingStage.state}`);
+    if (blockingStage.detail?.trim()) {
+      detailTokens.push(`stageDetail=${blockingStage.detail.trim()}`);
+    }
+    if (blockingStage.errorMessage?.trim()) {
+      detailTokens.push(`stageError=${blockingStage.errorMessage.trim()}`);
+    }
+  }
+
+  if (status.failure?.message?.trim()) {
+    detailTokens.push(`failure=${status.failure.message.trim()}`);
+  }
+
+  if (status.failure?.failedAt) {
+    detailTokens.push(`failedAt=${status.failure.failedAt}`);
+  }
+
+  return detailTokens.join(" | ");
 }

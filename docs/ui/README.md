@@ -18,5 +18,6 @@
 
 ## Start Here
 - [Startup Bootstrap Progress](./startup-bootstrap-progress.md)
+- [Runtime Lifecycle UI States](./startup-bootstrap-progress.md#runtime-lifecycle-ui-states-story-144)
 - [Architecture Router](../architecture/README.md)
 - [Contributors Router](../contributors/README.md)

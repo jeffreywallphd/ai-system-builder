@@ -6,6 +6,7 @@ import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { McpStoreState } from "../state/McpStore";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import McpRuntimeStatusPanel from "../components/execution/McpRuntimeStatusPanel";
+import { useRendererRuntimeLifecycle } from "../runtime/RendererRuntimeLifecycleService";
 import DesktopOfflineStatusSurface from "../shared/connectivity/DesktopOfflineStatusSurface";
 import { DesktopConnectivityService } from "../shared/connectivity/DesktopConnectivityService";
 import { listSettingsShortcutRouteMetadata } from "../routes/SurfaceRouteMetadataCatalog";
@@ -28,6 +29,7 @@ export default function SettingsPage(): JSX.Element {
   const [offlineStatusError, setOfflineStatusError] = useState<string | undefined>(undefined);
   const [isOfflineStatusLoading, setOfflineStatusLoading] = useState<boolean>(false);
   const [isOfflineModeTogglePending, setOfflineModeTogglePending] = useState<boolean>(false);
+  const runtimeLifecycle = useRendererRuntimeLifecycle({ enabled: true });
   const [expandedAdvancedSections, setExpandedAdvancedSections] = useState<ReadonlyArray<string>>(
     Object.freeze(["runtime", "development"])
   );
@@ -321,6 +323,7 @@ export default function SettingsPage(): JSX.Element {
             runtimeAppState={runtimeState.appState}
             runtimeAppStateDetail={runtimeState.appStateDetail}
             isRuntimeUnavailable={runtimeState.appState !== "ready"}
+            runtimeLifecycleStatus={runtimeLifecycle.status}
             onSearchChange={(value) => void mcpStore.search({ query: value }).catch(() => undefined)}
             onConnectServer={(serverId, reconnect) => void mcpStore.connect(serverId, reconnect).catch(() => undefined)}
             onDisconnectServer={(serverId) => void mcpStore.disconnect(serverId).catch(() => undefined)}
