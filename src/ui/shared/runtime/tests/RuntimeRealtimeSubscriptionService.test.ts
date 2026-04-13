@@ -1,4 +1,10 @@
-import { describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it, mock } from "bun:test";
+import {
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
+  DesktopPostLoginRuntimeStates,
+} from "../../../../../electron/shared/DesktopContracts";
+import { resetDesktopPostLoginWarmupStateForTests } from "../../../runtime/DesktopPostLoginWarmup";
 import {
   RuntimeRealtimeSubscriptionService,
   type RuntimeRealtimeDocumentLifecycleTarget,
@@ -83,6 +89,11 @@ class FakeWindowLifecycleTarget implements RuntimeRealtimeWindowLifecycleTarget 
 }
 
 describe("RuntimeRealtimeSubscriptionService", () => {
+  afterEach(() => {
+    resetDesktopPostLoginWarmupStateForTests();
+    delete (globalThis as { window?: Window }).window;
+  });
+
   it("subscribes with canonical topics and routes queue/run/connectivity events", async () => {
     const sockets: FakeRuntimeRealtimeSocket[] = [];
     const openedProtocols: ReadonlyArray<string>[] = [];
@@ -391,5 +402,70 @@ describe("RuntimeRealtimeSubscriptionService", () => {
     expect(sockets).toHaveLength(socketCountBeforeHiddenResume);
 
     subscription.unsubscribe();
+  });
+
+  it("blocks desktop subscriptions while lifecycle readiness is unavailable", () => {
+    const sockets: FakeRuntimeRealtimeSocket[] = [];
+    const onError = mock(() => undefined);
+    const onConnectionStateChanged = mock(() => undefined);
+
+    (globalThis as { window: Window }).window = {
+      aiLoomDesktop: {
+        auth: {
+          runtime: {
+            getLifecycleStatus: () => ({
+              host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+              state: DesktopPostLoginRuntimeStates.warming,
+              capabilityPhase: DesktopPostLoginRuntimeStates.warming,
+              unavailableReason: "pre-login",
+              updatedAt: "2026-04-13T10:00:00.000Z",
+              transport: {
+                phase: DesktopControlPlaneTransportPhases.available,
+                updatedAt: "2026-04-13T10:00:00.000Z",
+              },
+            }),
+            isCapabilityReady: () => false,
+            activateCapabilities: async () => undefined,
+          },
+        },
+      },
+    } as unknown as Window;
+
+    const service = new RuntimeRealtimeSubscriptionService({
+      sessionStore: {
+        getSession: () => Object.freeze({
+          userIdentityId: "user-1",
+          username: "user",
+          providerId: "local",
+          sessionId: "session-1",
+          sessionToken: "token-1",
+          sessionTokenType: "Bearer" as const,
+          sessionIssuedAt: "2026-04-07T11:00:00.000Z",
+          sessionExpiresAt: "2026-04-07T23:00:00.000Z",
+          sessionAccessChannel: "desktop" as const,
+          workspaceContext: Object.freeze({
+            requestedWorkspaceId: "workspace-requested",
+            resolvedWorkspaceId: "workspace-resolved",
+            workspaces: Object.freeze([]),
+          }),
+        }),
+        isSessionExpired: () => false,
+      },
+      socketFactory: (_url, _protocols) => {
+        const socket = new FakeRuntimeRealtimeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+    });
+
+    service.subscribeOperationalUpdates({
+      onError,
+      onConnectionStateChanged,
+    });
+
+    expect(sockets).toHaveLength(0);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect((onError.mock.calls[0]?.[0] as string | undefined)?.includes("Desktop runtime APIs are unavailable")).toBeTrue();
+    expect(onConnectionStateChanged).toHaveBeenCalledTimes(1);
   });
 });
