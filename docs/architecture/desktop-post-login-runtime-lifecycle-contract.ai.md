@@ -10,9 +10,11 @@ Story: C.1.3
 
 ## Canonical boundary
 - `DesktopPostLoginRuntimeLifecycle`
+- canonical runtime contract source: `src/application/common/DesktopControlPlaneRuntimeContracts.ts`
 - trigger request: `DesktopPostLoginWarmupRequest`
 - status read model: `DesktopPostLoginRuntimeStatus`
-- states: `unavailable`, `warming`, `ready`, `failed`
+- capability phases: `pre-login`, `warming`, `ready`, `failed`
+- transport phases: `unavailable`, `binding`, `available`, `failed`
 - activation modes: `auth-success-warmup`, `lazy-feature-demand`
 
 ## Layer responsibilities
@@ -100,6 +102,7 @@ Contract rule:
 - readiness `true` implies status `ready`.
 - renderer may continue using readiness for binary gating.
 - renderer should use status probe for warming/failed/unavailable awareness.
+- runtime readiness must be inferred from capability phase (`ready`), not transport listener existence; transport continuity is reported separately in `status.transport`.
 
 ## Story C.3.2 renderer readiness/failure boundary
 

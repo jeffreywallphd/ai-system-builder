@@ -153,5 +153,5 @@ function createRuntimeDiagnosticDetails(status: DesktopPostLoginRuntimeStatus): 
   const failureMessage = status.failure?.message?.trim();
   const failureSuffix = failureMessage ? ` | failure=${failureMessage}` : "";
   const reasonSuffix = status.unavailableReason ? ` | reason=${status.unavailableReason}` : "";
-  return `runtime=${status.state}${reasonSuffix} | updated=${status.updatedAt}${failureSuffix}`;
+  return `runtime=${status.state} capability=${status.capabilityPhase} transport=${status.transport.phase}${reasonSuffix} | updated=${status.updatedAt}${failureSuffix}`;
 }

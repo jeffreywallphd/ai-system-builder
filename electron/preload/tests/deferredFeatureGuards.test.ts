@@ -4,7 +4,12 @@ import {
   createDeferredBridgeGuards,
   createDeferredFeatureUnavailableError,
 } from "../bridge/deferredFeatureGuards";
-import { DesktopPostLoginRuntimeStates, DesktopPostLoginRuntimeUnavailableReasons } from "../../shared/DesktopContracts";
+import {
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
+  DesktopPostLoginRuntimeStates,
+  DesktopPostLoginRuntimeUnavailableReasons,
+} from "../../shared/DesktopContracts";
 
 describe("deferred preload guards", () => {
   it("throws/rejects unavailable errors and triggers warmup when runtime is not ready", async () => {
@@ -12,9 +17,15 @@ describe("deferred preload guards", () => {
     const guards = createDeferredBridgeGuards({
       isDeferredFeatureApiReady: () => false,
       getPostLoginRuntimeStatus: () => ({
-        state: DesktopPostLoginRuntimeStates.unavailable,
+        host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+        state: DesktopPostLoginRuntimeStates.preLogin,
+        capabilityPhase: DesktopPostLoginRuntimeStates.preLogin,
         unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
         updatedAt: "2026-04-11T00:00:00.000Z",
+        transport: {
+          phase: DesktopControlPlaneTransportPhases.available,
+          updatedAt: "2026-04-11T00:00:00.000Z",
+        },
       }),
       startDeferredFeatureWarmupOnDemand: () => {
         warmups += 1;
@@ -35,9 +46,15 @@ describe("deferred preload guards", () => {
 
   it("creates unavailable errors with stable code and runtime reason", () => {
     const error = createDeferredFeatureUnavailableError("agents.launchAgent", () => ({
-      state: DesktopPostLoginRuntimeStates.unavailable,
+      host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+      state: DesktopPostLoginRuntimeStates.preLogin,
+      capabilityPhase: DesktopPostLoginRuntimeStates.preLogin,
       unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.loggedOut,
       updatedAt: "2026-04-11T00:00:00.000Z",
+      transport: {
+        phase: DesktopControlPlaneTransportPhases.available,
+        updatedAt: "2026-04-11T00:00:00.000Z",
+      },
     }));
 
     expect(error.code).toBe(DeferredFeatureApiUnavailableCode);

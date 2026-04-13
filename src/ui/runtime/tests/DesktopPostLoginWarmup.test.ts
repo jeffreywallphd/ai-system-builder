@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import {
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
+} from "../../../../electron/shared/DesktopContracts";
+import {
   DesktopPostLoginWarmupTriggerSources,
   requestDesktopPostLoginWarmup,
   resetDesktopPostLoginWarmupStateForTests,
@@ -52,7 +56,20 @@ describe("requestDesktopPostLoginWarmup", () => {
         auth: {
           runtime: {
             isDeferredFeatureApiReady: () => false,
-            getPostLoginRuntimeStatus: () => ({ state: "unavailable", updatedAt: new Date().toISOString() }),
+            getPostLoginRuntimeStatus: () => {
+              const updatedAt = new Date().toISOString();
+              return {
+                host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+                state: "pre-login",
+                capabilityPhase: "pre-login",
+                unavailableReason: "pre-login",
+                updatedAt,
+                transport: {
+                  phase: DesktopControlPlaneTransportPhases.available,
+                  updatedAt,
+                },
+              };
+            },
             startPostLoginWarmup,
           },
         },

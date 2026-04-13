@@ -45,6 +45,7 @@ export function createDesktopRuntimeDisposalCoordinator(
   async function disposeDesktopRuntimeResources(): Promise<void> {
     params.setIsDisposing(true);
     params.postLoginRuntimeStatusStore.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
+    params.postLoginRuntimeStatusStore.markTransportUnavailable("desktop-runtime-disposal-started");
     const pendingPostLoginBootstrap = params.getPostLoginBootstrapPromise();
     params.setPostLoginBootstrapPromise(undefined);
     await pendingPostLoginBootstrap?.catch(() => undefined);
@@ -66,6 +67,7 @@ export function createDesktopRuntimeDisposalCoordinator(
     params.resetWarmupStarted();
     params.clearAuthShellBootstrapResult();
     params.postLoginRuntimeStatusStore.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.preLogin);
+    params.postLoginRuntimeStatusStore.markTransportUnavailable("desktop-runtime-disposal-complete");
     params.setIsDisposing(false);
   }
 

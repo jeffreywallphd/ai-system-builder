@@ -1,4 +1,6 @@
 import {
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
   DesktopPostLoginRuntimeStates,
   DesktopPostLoginRuntimeUnavailableReasons,
   type DesktopPostLoginRuntimeStatus,
@@ -20,19 +22,28 @@ export function createDeferredFeatureUnavailableError(
 ): Error & { code: string } {
   const runtimeStatus = getRuntimeStatus();
   const state = runtimeStatus.state;
+  const capabilityPhase = runtimeStatus.capabilityPhase;
+  const transportPhase = runtimeStatus.transport.phase;
   const unavailableReason = runtimeStatus.unavailableReason ? ` (${runtimeStatus.unavailableReason})` : "";
   const error = new Error(
-    `${DeferredFeatureApiUnavailableDetail} Current runtime state: ${state}${unavailableReason}. Requested API: ${apiPath}.`,
+    `${DeferredFeatureApiUnavailableDetail} Current runtime state: ${state}${unavailableReason}; capability=${capabilityPhase}; transport=${transportPhase}. Requested API: ${apiPath}.`,
   ) as Error & { code: string };
   error.code = DeferredFeatureApiUnavailableCode;
   return error;
 }
 
 export function createFallbackPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus {
+  const updatedAt = new Date().toISOString();
   return Object.freeze({
-    state: DesktopPostLoginRuntimeStates.unavailable,
+    host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+    state: DesktopPostLoginRuntimeStates.preLogin,
+    capabilityPhase: DesktopPostLoginRuntimeStates.preLogin,
     unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
-    updatedAt: new Date().toISOString(),
+    updatedAt,
+    transport: Object.freeze({
+      phase: DesktopControlPlaneTransportPhases.unavailable,
+      updatedAt,
+    }),
   });
 }
 

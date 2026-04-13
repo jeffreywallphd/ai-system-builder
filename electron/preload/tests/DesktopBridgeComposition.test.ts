@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
+} from "../../shared/DesktopContracts";
+import {
   createDeferredFeatureSurface,
   createDesktopBridge,
 } from "../DesktopBridgeComposition";
@@ -11,7 +15,17 @@ describe("desktop preload bridge composition", () => {
       storage: Object.freeze({ getItem: () => null, setItem: () => undefined, removeItem: () => undefined }),
       runtime: Object.freeze({
         isDeferredFeatureApiReady: () => false,
-        getPostLoginRuntimeStatus: () => ({ state: "unavailable", updatedAt: "2026-04-11T00:00:00.000Z" }),
+        getPostLoginRuntimeStatus: () => ({
+          host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+          state: "pre-login",
+          capabilityPhase: "pre-login",
+          unavailableReason: "pre-login",
+          updatedAt: "2026-04-11T00:00:00.000Z",
+          transport: {
+            phase: DesktopControlPlaneTransportPhases.available,
+            updatedAt: "2026-04-11T00:00:00.000Z",
+          },
+        }),
         startPostLoginWarmup: async () => undefined,
       }),
     });
