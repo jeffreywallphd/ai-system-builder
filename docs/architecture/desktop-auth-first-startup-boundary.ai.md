@@ -198,6 +198,19 @@ Auth-minimal startup scope is also now observable in development logs through st
 
 Regression tests now include explicit negative checks for route/service scope expansion so boundary regressions fail loudly.
 
+## Story B.3.4 implementation update
+
+Persistent authoritative host runtime now includes explicit internal capability activation plumbing instead of inferring readiness from transport binding:
+
+- `src/hosts/server/AuthoritativeServerCapabilityActivation.ts` defines authoritative capability registration and activation state transitions.
+- capability registration is deterministic and route-family-scoped:
+  - `identity-bootstrap` remains available for pre-login identity/auth routes,
+  - `deferred-runtime-features` remains pending until post-login warmup activation.
+- `IdentityServerHost` now composes this activation service and injects route-family availability checks into `createIdentityHttpServer(...)`, so deferred route families can remain unavailable while the HTTP listener stays bound.
+- Electron main warmup (`ensurePostLoginWarmupStarted`) now explicitly activates deferred runtime capabilities on the existing authoritative host runtime before post-login runtime bootstrap proceeds.
+
+Result: runtime feature availability can transition from unavailable to available without host rebinding or renderer-facing transport churn.
+
 ## Story C.1.3 implementation update
 
 Post-login runtime orchestration now has an explicit lifecycle contract boundary:

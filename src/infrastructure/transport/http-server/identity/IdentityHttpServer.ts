@@ -1069,6 +1069,17 @@ export interface IdentityHttpServerOptions {
   readonly webSocket?: IdentityHttpServerWebSocketOptions;
   readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
   readonly routeFamilyHandlers?: Readonly<Partial<Record<string, IdentityHttpRouteFamilyHandler>>>;
+  readonly routeFamilyAvailability?: {
+    readonly isRouteFamilyAvailable: (routeFamilyId: string) => boolean;
+    readonly resolveRouteFamilyAvailability?: (
+      routeFamilyId: string,
+    ) => Readonly<{
+      readonly routeFamilyId: string;
+      readonly capabilityId?: string;
+      readonly state?: string;
+      readonly available: boolean;
+    }>;
+  };
   readonly observability?: {
     onOperationalEvent?(event: IdentityHttpServerLogEvent): void;
   };
@@ -3188,6 +3199,33 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
       const matchedRouteFamily = transportComposition.routeModuleRegistry.resolveRouteFamilyByPath(path);
       if (matchedRouteFamily) {
+        const routeFamilyAvailability = options.routeFamilyAvailability;
+        if (
+          routeFamilyAvailability
+          && !routeFamilyAvailability.isRouteFamilyAvailable(matchedRouteFamily.routeFamilyId)
+        ) {
+          const availabilityDetails = routeFamilyAvailability.resolveRouteFamilyAvailability?.(
+            matchedRouteFamily.routeFamilyId,
+          );
+          const unavailableResponse = buildRouteFamilyCapabilityUnavailableResponse({
+            routeFamilyId: matchedRouteFamily.routeFamilyId,
+            capabilityId: availabilityDetails?.capabilityId,
+          });
+          writeJson(response, 503, unavailableResponse);
+          logger.info(Object.freeze({
+            event: "identity-http.route-family.capability-unavailable",
+            requestId,
+            correlationId,
+            method: request.method,
+            path,
+            details: Object.freeze({
+              routeFamilyId: matchedRouteFamily.routeFamilyId,
+              capabilityId: availabilityDetails?.capabilityId,
+              capabilityState: availabilityDetails?.state,
+            }),
+          }));
+          return;
+        }
         const routeFamilyHandler = routeFamilyHandlers[matchedRouteFamily.routeFamilyId];
         if (routeFamilyHandler) {
           const handlerResult = await routeFamilyHandler({
@@ -8411,6 +8449,22 @@ function buildRuntimeInvalidRequestResponse(message: string): {
       code: "invalid-request" as const,
       message,
     }),
+  });
+}
+
+function buildRouteFamilyCapabilityUnavailableResponse(input: {
+  readonly routeFamilyId: string;
+  readonly capabilityId?: string;
+}): IdentityAuthApiResponse<never> {
+  const capabilityDescription = input.capabilityId
+    ? `Capability '${input.capabilityId}'`
+    : "Required capability";
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: IdentityAuthApiErrorCodes.forbidden,
+      message: `${capabilityDescription} is not available for route family '${input.routeFamilyId}'.`,
+    },
   });
 }
 

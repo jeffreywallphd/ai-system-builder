@@ -37,6 +37,7 @@ import { createDesktopConnectivityRuntimeController } from "./DesktopConnectivit
 import type { DeferredDesktopFeatureRuntime } from "./DeferredDesktopFeatureRuntime";
 import { startAuthoritativeServerHostAssembly } from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
 import type { AuthoritativeServerHostRuntimeHandle } from "../../src/hosts/server/AuthoritativeServerCompositionRoot";
+import { AuthoritativeServerCapabilityIds } from "../../src/hosts/server/AuthoritativeServerCapabilityActivation";
 import { createDesktopWindowManager } from "./DesktopWindowManager";
 import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
 import type { DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
@@ -500,6 +501,11 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     throw new Error("Desktop control-plane host is unavailable for post-login warmup.");
   }
   console.info(`[ai-loom] Post-login warmup will activate capabilities on persistent control-plane host (${controlPlaneRuntime.address}).`);
+  controlPlaneRuntime.activateCapabilities({
+    capabilityIds: [AuthoritativeServerCapabilityIds.deferredRuntimeFeatures],
+    reason: "desktop-post-login-warmup",
+    activatedAt: request.requestedAt,
+  });
   postLoginRuntimeStatusStore.markWarming(request);
   connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");

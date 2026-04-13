@@ -13,6 +13,10 @@ import {
   type AuthoritativeApiRouteRegistrationPlan,
 } from "../../AuthoritativeApiRouteRegistration";
 import { composeAuthoritativeApiRouteRegistrationPlan } from "../../AuthoritativeApiRouteRegistrationCatalog";
+import {
+  AuthoritativeServerCapabilityIds,
+  createDefaultAuthoritativeServerCapabilityActivationService,
+} from "@hosts/server/AuthoritativeServerCapabilityActivation";
 
 class CapturingLogger implements IdentityHttpServerLogger {
   public readonly events: IdentityHttpServerLogEvent[] = [];
@@ -339,6 +343,115 @@ describe("IdentityHttpServer", () => {
       entry.event === "identity-http.route-family.modular-handled"
       && entry.path === "/api/v1/runtime/runs/start"
     ))).toBeFalse();
+  });
+
+  it("gates deferred route families until capability activation transitions them to available", async () => {
+    const logger = new CapturingLogger();
+    const routeRegistrationPlan = composeAuthoritativeApiRouteRegistrationPlan({
+      backendAvailability: Object.freeze({
+        [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: false,
+        [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: false,
+        [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
+        [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
+        [AuthoritativeApiRouteBackendKeys.executionNodeManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
+        [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
+        [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
+        [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
+        [AuthoritativeApiRouteBackendKeys.runRead]: false,
+        [AuthoritativeApiRouteBackendKeys.runMutation]: false,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: false,
+      }),
+    });
+    const capabilityActivation = createDefaultAuthoritativeServerCapabilityActivationService({
+      routeRegistrationPlan,
+    });
+
+    const { baseUrl } = await startServer(logger, {}, {
+      routeRegistrationPlan,
+      authoritativeRunSubmissionBackendApi: {
+        async submitRun() {
+          return Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              run: Object.freeze({
+                contractVersion: "run-orchestration-transport/v1",
+                runId: "run:capability-activation",
+                workflowId: "workflow:capability-activation",
+                workspaceId: "workspace-alpha",
+                source: "api",
+                state: "submitted",
+                assignmentStatus: "unassigned",
+                executionOutcome: "none",
+                submittedAt: "2026-04-13T00:00:00.000Z",
+                updatedAt: "2026-04-13T00:00:00.000Z",
+                submission: Object.freeze({}),
+                assignment: Object.freeze({ status: "unassigned" }),
+                execution: Object.freeze({ outcome: "none" }),
+                retry: Object.freeze({ attempt: 1, maxAttempts: 1 }),
+              }),
+              mutation: Object.freeze({
+                changed: true,
+                mutationId: "mutation:capability-activation",
+                occurredAt: "2026-04-13T00:00:00.000Z",
+              }),
+            }),
+          });
+        },
+      } as any,
+      routeFamilyAvailability: Object.freeze({
+        isRouteFamilyAvailable: (routeFamilyId: string) => capabilityActivation.isRouteFamilyAvailable(routeFamilyId),
+        resolveRouteFamilyAvailability: (routeFamilyId: string) => capabilityActivation.resolveRouteFamilyAvailability(routeFamilyId),
+      }),
+    });
+
+    const blockedResponse = await fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        runtimeTarget: {
+          systemId: "system-capability",
+          versionId: "version-1",
+          async: true,
+        },
+      }),
+    });
+    expect(blockedResponse.status).toBe(503);
+
+    capabilityActivation.activateCapabilities({
+      capabilityIds: [AuthoritativeServerCapabilityIds.deferredRuntimeFeatures],
+      reason: "test-post-login-activation",
+      activatedAt: "2026-04-13T12:00:00.000Z",
+    });
+    const activatedResponse = await fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        runtimeTarget: {
+          systemId: "system-capability",
+          versionId: "version-1",
+          async: true,
+        },
+      }),
+    });
+    expect(activatedResponse.status).toBe(401);
+
+    const unavailableEvent = logger.events.find((entry) => (
+      entry.event === "identity-http.route-family.capability-unavailable"
+      && entry.path === "/api/v1/runtime/runs/start"
+    ));
+    expect(unavailableEvent).toBeDefined();
   });
 
   it("starts with explicit modular route registration plans in deterministic order", async () => {
