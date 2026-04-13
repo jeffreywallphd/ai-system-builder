@@ -27,3 +27,28 @@ The renderer startup card now uses a two-panel layout so users can see both:
   - `src/ui/App.tsx`
 - Styling for the split layout and terminal-like display lives in:
   - `src/ui/styles/app.css`
+
+## Runtime lifecycle UI states (Story 1.4.4)
+
+Runtime-driven feature surfaces now use explicit lifecycle state messaging from backend lifecycle status (`DesktopPostLoginRuntimeStatus`) instead of transport assumptions:
+
+1. **Unavailable**: user-first guidance explains why tools are not available yet (for example pre-login, logged out, shutting down).
+2. **Warming**: user-first startup copy confirms tools are starting and reconnect automatically.
+3. **Ready**: runtime-backed tools are available and interactive.
+4. **Failed**: startup did not complete and retry guidance is shown; retry action is shown where supported.
+
+Diagnostics shown in UI state details are sourced from backend lifecycle payload fields (`state`, `capabilityPhase`, `transport.phase`, `unavailableReason`, stage/failure metadata), not placeholder text.
+
+### Runtime lifecycle state implementation anchors
+
+- Route-level deferred runtime state mapping:
+  - `src/ui/runtime/DeferredRuntimeFeatureGate.ts`
+- Runtime status panel state mapping:
+  - `src/ui/components/execution/McpRuntimeStatusPanel.tsx`
+- Settings runtime lifecycle status wiring:
+  - `src/ui/pages/SettingsPage.tsx`
+
+### Runtime lifecycle state tests
+
+- `src/ui/runtime/tests/DeferredRuntimeFeatureGate.test.ts`
+- `src/ui/components/execution/tests/McpRuntimeStatusPanel.test.tsx`

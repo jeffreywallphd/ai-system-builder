@@ -49,7 +49,7 @@ describe("DeferredRuntimeFeatureGate", () => {
       triggerSource: "feature-demand",
     }));
     expect(state?.kind).toBe("loading");
-    expect(state?.title).toContain("Preparing feature services");
+    expect(state?.title).toContain("Getting your tools ready");
     expect(state?.details).toContain("runtime=warming");
   });
 
@@ -66,8 +66,31 @@ describe("DeferredRuntimeFeatureGate", () => {
     }));
     expect(state?.kind).toBe("error");
     expect(state?.retryable).toBeTrue();
+    expect(state?.title).toContain("could not finish startup");
     expect(state?.details).toContain("runtime=failed");
     expect(state?.details).toContain("service supervisor startup timed out");
+  });
+
+  it("maps pre-login unavailable status to sign-in guidance", () => {
+    const state = buildDeferredRuntimeGateState(createStatus({
+      state: "pre-login",
+      capabilityPhase: "pre-login",
+      unavailableReason: "pre-login",
+      updatedAt: "2026-04-10T12:00:00.000Z",
+      activationStages: [
+        {
+          stageId: "python-runtime-resolution",
+          state: "running",
+          updatedAt: "2026-04-10T12:00:00.000Z",
+          blockingReadiness: true,
+          detail: "Resolving python runtime",
+        },
+      ],
+    }));
+    expect(state?.kind).toBe("disconnected");
+    expect(state?.title).toContain("Sign in");
+    expect(state?.details).toContain("reason=pre-login");
+    expect(state?.details).toContain("stage=python-runtime-resolution:running");
   });
 
   it("treats ready or absent status as pass-through", () => {
