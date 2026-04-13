@@ -300,6 +300,9 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     const authMinimalHostStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
     logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "start");
     console.info("[ai-loom][startup] Starting auth-minimal identity host for pre-login bootstrap.");
+    postLoginRuntimeStatusStore.markTransportBinding({
+      reason: "auth-minimal-host-bind-start",
+    });
     authMinimalServerRuntime = await startAuthMinimalServerHostAssembly({
       hostOptions: {
         databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
@@ -318,6 +321,11 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     });
     logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, authMinimalHostStartAt);
     console.info(`[ai-loom][startup] Auth-minimal identity host ready at ${authMinimalServerRuntime.address}.`);
+    postLoginRuntimeStatusStore.markTransportAvailable({
+      boundAddress: authMinimalServerRuntime.address,
+      boundPort: authMinimalServerRuntime.port,
+      reason: "auth-minimal-host-bind-ready",
+    });
     logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "ready");
     logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready", authShellStartedAt);
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready");
@@ -498,6 +506,11 @@ async function promoteControlPlaneRuntimeForPostLogin(
   const previousRuntime = authMinimalServerRuntime;
   const previousRuntimePort = previousRuntime.port;
   const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
+  postLoginRuntimeStatusStore.markTransportBinding({
+    boundAddress: previousRuntime.address,
+    boundPort: previousRuntime.port,
+    reason: "authoritative-host-promotion-bind-start",
+  });
   // Stop the auth-minimal host before authoritative promotion so both hosts never contend for the same identity SQLite database.
   await previousRuntime.stop();
   authMinimalServerRuntime = undefined;
@@ -518,8 +531,18 @@ async function promoteControlPlaneRuntimeForPostLogin(
       startupReason: "electron-main-authoritative-server-host-post-login-upgrade",
       environment: process.env,
     },
+  }).catch((error) => {
+    postLoginRuntimeStatusStore.markTransportFailed(error, {
+      boundPort: previousRuntimePort,
+    });
+    throw error;
   });
   authMinimalServerRuntime = upgradedRuntime;
+  postLoginRuntimeStatusStore.markTransportAvailable({
+    boundAddress: upgradedRuntime.address,
+    boundPort: upgradedRuntime.port,
+    reason: "authoritative-host-promotion-bind-ready",
+  });
   const identityApiBaseUrl = assertSecureTransportEndpoint(
     `http://${upgradedRuntime.address}`,
     resolveHostSecureTransportConfig({

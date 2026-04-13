@@ -4,8 +4,11 @@
 import { describe, expect, it } from "bun:test";
 import type { IpcMain } from "electron";
 import {
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
   DesktopPostLoginWarmupTriggerSources,
   type DesktopAuthBootstrapContext,
+  type DesktopPostLoginRuntimeStatus,
 } from "../../shared/DesktopContracts";
 import {
   AUTH_BOOTSTRAP_IPC_CHANNELS,
@@ -35,6 +38,28 @@ function asIpcMainPort(ipcMain: unknown): Pick<IpcMain, "on" | "handle"> {
   return ipcMain as Pick<IpcMain, "on" | "handle">;
 }
 
+function createRuntimeStatus(
+  overrides?: Partial<DesktopPostLoginRuntimeStatus>,
+): DesktopPostLoginRuntimeStatus {
+  const updatedAt = overrides?.updatedAt ?? "2026-04-10T00:00:00.000Z";
+  const state: DesktopPostLoginRuntimeStatus["state"] = overrides?.state ?? "pre-login";
+  return {
+    host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+    state,
+    capabilityPhase: overrides?.capabilityPhase ?? state,
+    updatedAt,
+    activationMode: overrides?.activationMode,
+    triggerSource: overrides?.triggerSource,
+    requestedAt: overrides?.requestedAt,
+    unavailableReason: overrides?.unavailableReason,
+    failure: overrides?.failure,
+    transport: overrides?.transport ?? {
+      phase: DesktopControlPlaneTransportPhases.available,
+      updatedAt,
+    },
+  };
+}
+
 describe("registerAuthBootstrapIpc", () => {
   it("registers only auth/bootstrap IPC channels", () => {
     const { ipcMain, onHandlers, handleHandlers } = createFakeIpcMain();
@@ -48,10 +73,9 @@ describe("registerAuthBootstrapIpc", () => {
         removeItem: () => undefined,
       },
       isDeferredFeatureIpcReady: () => false,
-      getPostLoginRuntimeStatus: () => ({
-        state: "unavailable",
+      getPostLoginRuntimeStatus: () => createRuntimeStatus({
+        state: "pre-login",
         unavailableReason: "pre-login",
-        updatedAt: "2026-04-10T00:00:00.000Z",
       }),
       startPostLoginWarmup: async () => undefined,
       connectivity: {
@@ -108,7 +132,7 @@ describe("registerAuthBootstrapIpc", () => {
         },
       },
       isDeferredFeatureIpcReady: () => true,
-      getPostLoginRuntimeStatus: () => ({
+      getPostLoginRuntimeStatus: () => createRuntimeStatus({
         state: "warming",
         activationMode: "auth-success-warmup",
         triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
@@ -177,8 +201,9 @@ describe("registerAuthBootstrapIpc", () => {
     expect(deferredReadyEvent.returnValue).toBe(true);
     const runtimeStatusEvent: { returnValue?: unknown } = {};
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.postLoginRuntimeStatus)?.(runtimeStatusEvent);
-    expect(runtimeStatusEvent.returnValue).toEqual({
+    expect(runtimeStatusEvent.returnValue).toMatchObject({
       state: "warming",
+      capabilityPhase: "warming",
       activationMode: "auth-success-warmup",
       triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
       updatedAt: "2026-04-10T12:00:00.000Z",
@@ -218,10 +243,9 @@ describe("registerAuthBootstrapIpc", () => {
         removeItem: () => undefined,
       },
       isDeferredFeatureIpcReady: () => false,
-      getPostLoginRuntimeStatus: () => ({
-        state: "unavailable",
+      getPostLoginRuntimeStatus: () => createRuntimeStatus({
+        state: "pre-login",
         unavailableReason: "pre-login",
-        updatedAt: "2026-04-10T00:00:00.000Z",
       }),
       startPostLoginWarmup: async (request) => {
         operations.push(request.triggerSource);
@@ -257,10 +281,9 @@ describe("registerAuthBootstrapIpc", () => {
         removeItem: () => undefined,
       },
       isDeferredFeatureIpcReady: () => false,
-      getPostLoginRuntimeStatus: () => ({
-        state: "unavailable",
+      getPostLoginRuntimeStatus: () => createRuntimeStatus({
+        state: "pre-login",
         unavailableReason: "pre-login",
-        updatedAt: "2026-04-10T00:00:00.000Z",
       }),
       startPostLoginWarmup: async (request) => {
         operations.push(request.triggerSource);

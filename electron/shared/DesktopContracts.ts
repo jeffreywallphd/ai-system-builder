@@ -3,6 +3,32 @@
  */
 import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 import type { CanonicalEntityType } from "../../src/application/ports/interfaces/ICanonicalAssetIdentityRepository";
+import {
+  DesktopControlPlaneCapabilityActivationModes,
+  DesktopControlPlaneCapabilityPhases,
+  DesktopControlPlaneCapabilityUnavailableReasons,
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
+  DesktopControlPlaneWarmupTriggerSources,
+  isDesktopControlPlaneRuntimeReady,
+  resolveDesktopControlPlaneRuntimeActivationState,
+  transitionDesktopControlPlaneCapabilityPhase,
+  transitionDesktopControlPlaneTransportPhase,
+  type DesktopControlPlaneCapabilityActivationMode,
+  type DesktopControlPlaneCapabilityUnavailableReason,
+  type DesktopControlPlaneRuntimeStatus,
+  type DesktopControlPlaneWarmupTriggerSource,
+} from "../../src/application/common/DesktopControlPlaneRuntimeContracts";
+
+export {
+  DesktopControlPlaneCapabilityPhases,
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
+  isDesktopControlPlaneRuntimeReady,
+  resolveDesktopControlPlaneRuntimeActivationState,
+  transitionDesktopControlPlaneCapabilityPhase,
+  transitionDesktopControlPlaneTransportPhase,
+};
 
 export interface DesktopStoragePaths {
   readonly appDataDirectory: string;
@@ -237,62 +263,35 @@ export interface DesktopConnectivityBridge {
   setOfflineMode(requestJson: string): Promise<string>;
 }
 
-export const DesktopPostLoginWarmupTriggerSources = Object.freeze({
-  explicitLogin: "explicit-login",
-  sessionRestore: "session-restore",
-  sessionRefresh: "session-refresh",
-  featureDemand: "feature-demand",
-  unknown: "unknown",
-});
+export const DesktopPostLoginWarmupTriggerSources = DesktopControlPlaneWarmupTriggerSources;
 
-export type DesktopPostLoginWarmupTriggerSource =
-  typeof DesktopPostLoginWarmupTriggerSources[keyof typeof DesktopPostLoginWarmupTriggerSources];
+export type DesktopPostLoginWarmupTriggerSource = DesktopControlPlaneWarmupTriggerSource;
 
 export interface DesktopPostLoginWarmupRequest {
   readonly triggerSource: DesktopPostLoginWarmupTriggerSource;
   readonly requestedAt?: string;
 }
 
-export const DesktopPostLoginRuntimeActivationModes = Object.freeze({
-  authSuccessWarmup: "auth-success-warmup",
-  lazyFeatureDemand: "lazy-feature-demand",
-});
+export const DesktopPostLoginRuntimeActivationModes = DesktopControlPlaneCapabilityActivationModes;
 
-export type DesktopPostLoginRuntimeActivationMode =
-  typeof DesktopPostLoginRuntimeActivationModes[keyof typeof DesktopPostLoginRuntimeActivationModes];
+export type DesktopPostLoginRuntimeActivationMode = DesktopControlPlaneCapabilityActivationMode;
 
 export const DesktopPostLoginRuntimeStates = Object.freeze({
-  unavailable: "unavailable",
-  warming: "warming",
-  ready: "ready",
-  failed: "failed",
+  preLogin: DesktopControlPlaneCapabilityPhases.preLogin,
+  unavailable: DesktopControlPlaneCapabilityPhases.preLogin,
+  warming: DesktopControlPlaneCapabilityPhases.warming,
+  ready: DesktopControlPlaneCapabilityPhases.ready,
+  failed: DesktopControlPlaneCapabilityPhases.failed,
 });
 
 export type DesktopPostLoginRuntimeState =
   typeof DesktopPostLoginRuntimeStates[keyof typeof DesktopPostLoginRuntimeStates];
 
-export const DesktopPostLoginRuntimeUnavailableReasons = Object.freeze({
-  preLogin: "pre-login",
-  loggedOut: "logged-out",
-  shuttingDown: "shutting-down",
-});
+export const DesktopPostLoginRuntimeUnavailableReasons = DesktopControlPlaneCapabilityUnavailableReasons;
 
-export type DesktopPostLoginRuntimeUnavailableReason =
-  typeof DesktopPostLoginRuntimeUnavailableReasons[keyof typeof DesktopPostLoginRuntimeUnavailableReasons];
+export type DesktopPostLoginRuntimeUnavailableReason = DesktopControlPlaneCapabilityUnavailableReason;
 
-export interface DesktopPostLoginRuntimeStatus {
-  readonly state: DesktopPostLoginRuntimeState;
-  readonly updatedAt: string;
-  readonly activationMode?: DesktopPostLoginRuntimeActivationMode;
-  readonly triggerSource?: DesktopPostLoginWarmupTriggerSource;
-  readonly requestedAt?: string;
-  readonly unavailableReason?: DesktopPostLoginRuntimeUnavailableReason;
-  readonly failure?: {
-    readonly message: string;
-    readonly failedAt: string;
-    readonly retryable: boolean;
-  };
-}
+export type DesktopPostLoginRuntimeStatus = DesktopControlPlaneRuntimeStatus;
 
 export interface DesktopRuntimeBootstrapBridge {
   isDeferredFeatureApiReady(): boolean;

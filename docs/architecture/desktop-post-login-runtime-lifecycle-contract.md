@@ -27,10 +27,16 @@ Contract surfaces:
 
 - runtime warmup trigger request: `DesktopPostLoginWarmupRequest`
 - runtime lifecycle status read model: `DesktopPostLoginRuntimeStatus`
-- runtime status states:
-  - `unavailable`
+- canonical runtime contract source: `src/application/common/DesktopControlPlaneRuntimeContracts.ts`
+- runtime capability phases:
+  - `pre-login`
   - `warming`
   - `ready`
+  - `failed`
+- runtime transport phases:
+  - `unavailable`
+  - `binding`
+  - `available`
   - `failed`
 - activation modes:
   - `auth-success-warmup`
@@ -243,6 +249,7 @@ Contract rule:
 - `isDeferredFeatureApiReady() === true` implies lifecycle `state === ready`.
 - renderer code that only needs binary readiness may continue using the boolean probe.
 - renderer code that needs warmup/failure visibility should use `getPostLoginRuntimeStatus()`.
+- runtime readiness must be inferred from capability phase (`ready`), not from transport listener existence alone.
 
 ### Deferred feature API guard behavior
 

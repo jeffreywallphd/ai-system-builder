@@ -1,26 +1,34 @@
 import { describe, expect, it } from "bun:test";
 import {
+  DesktopControlPlaneHostIdentities,
+  DesktopControlPlaneTransportPhases,
   DesktopPostLoginRuntimeUnavailableReasons,
   DesktopPostLoginWarmupTriggerSources,
 } from "../../shared/DesktopContracts";
 import { createDesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRuntimeStatusStore";
 
 describe("createDesktopPostLoginRuntimeStatusStore", () => {
-  it("tracks unavailable -> warming -> ready -> failed transitions with existing contract semantics", () => {
+  it("tracks pre-login -> warming -> ready -> failed capability transitions with explicit transport status", () => {
     let tick = 0;
     const store = createDesktopPostLoginRuntimeStatusStore({
       nowIsoString: () => `2026-04-11T00:00:0${tick++}.000Z`,
     });
 
-    expect(store.getStatus()).toEqual({
-      state: "unavailable",
+    expect(store.getStatus()).toMatchObject({
+      host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+      state: "pre-login",
+      capabilityPhase: "pre-login",
       unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
       updatedAt: "2026-04-11T00:00:00.000Z",
+      transport: {
+        phase: DesktopControlPlaneTransportPhases.unavailable,
+      },
     });
 
     store.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
-    expect(store.getStatus()).toEqual({
-      state: "unavailable",
+    expect(store.getStatus()).toMatchObject({
+      state: "pre-login",
+      capabilityPhase: "pre-login",
       unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.shuttingDown,
       updatedAt: "2026-04-11T00:00:01.000Z",
     });
@@ -29,8 +37,9 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: "2026-04-11T10:00:00.000Z",
     });
-    expect(store.getStatus()).toEqual({
+    expect(store.getStatus()).toMatchObject({
       state: "warming",
+      capabilityPhase: "warming",
       activationMode: "lazy-feature-demand",
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: "2026-04-11T10:00:00.000Z",
@@ -38,13 +47,13 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
     });
 
     store.markReady();
-    expect(store.getStatus()).toEqual({
+    expect(store.getStatus()).toMatchObject({
       state: "ready",
+      capabilityPhase: "ready",
       activationMode: "lazy-feature-demand",
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: "2026-04-11T10:00:00.000Z",
       updatedAt: "2026-04-11T00:00:03.000Z",
-      failure: undefined,
     });
 
     store.markFailed(
@@ -54,8 +63,9 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       },
       new Error("boom"),
     );
-    expect(store.getStatus()).toEqual({
+    expect(store.getStatus()).toMatchObject({
       state: "failed",
+      capabilityPhase: "failed",
       activationMode: "auth-success-warmup",
       triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
       requestedAt: "2026-04-11T10:01:00.000Z",
@@ -64,6 +74,25 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
         message: "boom",
         failedAt: "2026-04-11T00:00:05.000Z",
         retryable: true,
+      },
+    });
+  });
+
+  it("tracks transport lifecycle independently of capability readiness", () => {
+    let tick = 0;
+    const store = createDesktopPostLoginRuntimeStatusStore({
+      nowIsoString: () => `2026-04-11T00:00:0${tick++}.000Z`,
+    });
+    store.markTransportBinding({ boundPort: 4120, reason: "bind-start" });
+    store.markTransportAvailable({ boundAddress: "127.0.0.1:4120", boundPort: 4120, reason: "bind-ready" });
+
+    expect(store.getStatus()).toMatchObject({
+      state: "pre-login",
+      capabilityPhase: "pre-login",
+      transport: {
+        phase: DesktopControlPlaneTransportPhases.available,
+        boundAddress: "127.0.0.1:4120",
+        boundPort: 4120,
       },
     });
   });
