@@ -50,6 +50,11 @@ import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-ca
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { ListStaleSchedulingReservationsUseCase } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
 import { parseSchedulingAdminListStaleReservationsResponse } from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
+import {
+  createRuntimeFailedResponseContract,
+  createRuntimeUnavailableResponseContract,
+  createRuntimeWarmingResponseContract,
+} from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
 import { AuthoritativeRunQueryBackendApi } from "../AuthoritativeRunQueryBackendApi";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
@@ -1204,6 +1209,57 @@ describe("AuthoritativeRunQueryBackendApi", () => {
 
     expect(denied.ok).toBeFalse();
     expect(denied.error?.code).toBe("forbidden");
+  });
+
+  it("returns state-driven readiness for pre-login, warming, and failed lifecycle contracts without auth", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase(new InMemoryRunQueueReadRepository()),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      runRepository,
+      now: () => new Date("2026-04-13T10:01:00.000Z"),
+    });
+
+    const lifecycleCases = Object.freeze([
+      createRuntimeUnavailableResponseContract({
+        checkedAt: "2026-04-13T10:00:00.000Z",
+        updatedAt: "2026-04-13T10:00:00.000Z",
+        retryable: true,
+      }),
+      createRuntimeWarmingResponseContract({
+        checkedAt: "2026-04-13T10:00:01.000Z",
+        updatedAt: "2026-04-13T10:00:01.000Z",
+        warmupStartedAt: "2026-04-13T09:59:00.000Z",
+      }),
+      createRuntimeFailedResponseContract({
+        checkedAt: "2026-04-13T10:00:02.000Z",
+        updatedAt: "2026-04-13T10:00:02.000Z",
+        failure: Object.freeze({
+          code: "runtime-capability-activation-failed",
+          message: "Runtime activation failed.",
+          failedAt: "2026-04-13T10:00:02.000Z",
+          retryable: true,
+        }),
+      }),
+    ]);
+
+    for (const runtimeLifecycle of lifecycleCases) {
+      const response = await api.getExecutionReadiness({
+        workspaceId: "workspace-alpha",
+        authorization: {
+          actorUserIdentityId: "",
+          activeWorkspaceId: "workspace-alpha",
+        },
+        runtimeLifecycle,
+      });
+      expect(response.ok).toBeTrue();
+      expect(response.data?.readiness).toBe("unavailable");
+      expect(response.data?.readyForExecution).toBeFalse();
+      expect(response.data?.runtimeLifecycle?.state).toBe(runtimeLifecycle.state);
+      expect(response.data?.issues.length).toBeGreaterThan(0);
+    }
   });
 });
 

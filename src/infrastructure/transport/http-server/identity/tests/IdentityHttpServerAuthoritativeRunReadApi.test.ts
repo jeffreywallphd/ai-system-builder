@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import type { AuthoritativeRunQueryBackendApi } from "../../../../api/runs/AuthoritativeRunQueryBackendApi";
+import { RunOrchestrationTransportRoutes } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 
 const servers: Server[] = [];
 
@@ -147,6 +148,45 @@ class StubAuthoritativeRunQueryBackendApi {
 
   public async getExecutionReadiness(request: Readonly<Record<string, unknown>>) {
     this.lastExecutionReadinessRequest = request;
+    const runtimeLifecycle = request.runtimeLifecycle as { readonly state?: string; readonly checkedAt?: string } | undefined;
+    if (runtimeLifecycle && runtimeLifecycle.state && runtimeLifecycle.state !== "ready") {
+      return {
+        ok: true as const,
+        data: {
+          backendFamily: "adapter.image-manipulation.execution",
+          checkedAt: runtimeLifecycle.checkedAt ?? "2026-04-08T12:10:00.000Z",
+          readiness: "unavailable",
+          readyForExecution: false,
+          runtimeLifecycle,
+          message: `Runtime lifecycle is '${runtimeLifecycle.state}'.`,
+          capabilities: {
+            backendFamily: "adapter.image-manipulation.execution",
+            supportsProgressPolling: false,
+            supportsProgressStreaming: false,
+            supportsCancellation: false,
+            supportsOutputDiscovery: false,
+            supportedOperationKinds: [],
+            supportedTranslationContractVersions: [],
+          },
+          nodeAvailability: {
+            state: "unknown",
+            checkedAt: runtimeLifecycle.checkedAt ?? "2026-04-08T12:10:00.000Z",
+            candidateNodeCount: 0,
+            eligibleNodeCount: 0,
+            unavailableNodeCount: 0,
+            incompatibleNodeCount: 0,
+            topBlockingReasonCodes: [],
+            topTransientAvailabilityReasonCodes: [],
+            reasonCode: "runtime-lifecycle-unavailable",
+          },
+          issues: [{
+            code: "runtime-lifecycle-unavailable",
+            severity: "error",
+            message: `Runtime lifecycle is '${runtimeLifecycle.state}'.`,
+          }],
+        },
+      };
+    }
     return {
       ok: true as const,
       data: {
@@ -185,11 +225,15 @@ class StubAuthoritativeRunQueryBackendApi {
   }
 }
 
-async function startServer(runQueryBackend: StubAuthoritativeRunQueryBackendApi): Promise<string> {
+async function startServer(
+  runQueryBackend: StubAuthoritativeRunQueryBackendApi,
+  serverOptions: Partial<Parameters<typeof createIdentityHttpServer>[0]> = {},
+): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
     authoritativeRunQueryBackendApi: runQueryBackend as unknown as AuthoritativeRunQueryBackendApi,
+    ...serverOptions,
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -351,6 +395,75 @@ describe("IdentityHttpServer authoritative run read routes", () => {
     const body = await response.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("not-found");
+  });
+
+  it("keeps execution readiness reachable across pre-login, warming, failed, and ready lifecycle phases", async () => {
+    const backend = new StubAuthoritativeRunQueryBackendApi();
+    let lifecycleState: "pre-login" | "warming" | "failed" | "ready" = "pre-login";
+    const baseUrl = await startServer(backend, {
+      routeFamilyAvailability: Object.freeze({
+        isRouteFamilyAvailable: (routeFamilyId: string) => {
+          if (routeFamilyId !== "run-read") {
+            return true;
+          }
+          return lifecycleState === "ready";
+        },
+        resolveRouteFamilyAvailability: (routeFamilyId: string) => Object.freeze({
+          routeFamilyId,
+          capabilityId: "deferred-runtime-features",
+          state: lifecycleState,
+          available: lifecycleState === "ready",
+        }),
+      }),
+    });
+
+    const preLoginResponse = await fetch(
+      `${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`,
+    );
+    expect(preLoginResponse.status).toBe(200);
+    const preLoginBody = await preLoginResponse.json();
+    expect(preLoginBody.ok).toBe(true);
+    expect(preLoginBody.data.runtimeLifecycle.state).toBe("unavailable");
+    expect(backend.lastExecutionReadinessRequest?.runtimeLifecycle).toBeDefined();
+
+    lifecycleState = "warming";
+    const warmingResponse = await fetch(
+      `${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`,
+    );
+    expect(warmingResponse.status).toBe(200);
+    const warmingBody = await warmingResponse.json();
+    expect(warmingBody.ok).toBe(true);
+    expect(warmingBody.data.runtimeLifecycle.state).toBe("warming");
+
+    lifecycleState = "failed";
+    const failedResponse = await fetch(
+      `${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`,
+    );
+    expect(failedResponse.status).toBe(200);
+    const failedBody = await failedResponse.json();
+    expect(failedBody.ok).toBe(true);
+    expect(failedBody.data.runtimeLifecycle.state).toBe("failed");
+
+    lifecycleState = "ready";
+    const unauthenticatedReadyResponse = await fetch(
+      `${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`,
+    );
+    expect(unauthenticatedReadyResponse.status).toBe(401);
+
+    const token = await registerAndLogin(baseUrl, "runtime.authoritative.read.lifecycle.1");
+    const readyResponse = await fetch(
+      `${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(readyResponse.status).toBe(200);
+    const readyBody = await readyResponse.json();
+    expect(readyBody.ok).toBe(true);
+    expect(readyBody.data.readiness).toBe("degraded");
+    expect(readyBody.data.runtimeLifecycle).toBeUndefined();
   });
 });
 

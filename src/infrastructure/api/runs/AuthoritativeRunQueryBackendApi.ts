@@ -44,6 +44,10 @@ import type {
   SchedulingAdminListStaleReservationsResponse,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import type { RunLifecycleState } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import type {
+  RuntimeAvailabilityResponseContract,
+  RuntimeUnavailableLifecycleResponseContract,
+} from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
 import {
   SharedApiErrorCodes,
   type SharedApiResponseEnvelope,
@@ -98,6 +102,7 @@ export interface AuthoritativeRunStatusRequest extends AuthoritativeRunDetailReq
 export interface AuthoritativeExecutionReadinessRequest {
   readonly workspaceId: string;
   readonly authorization: AuthoritativeRunQueryAuthorizationContext;
+  readonly runtimeLifecycle?: RuntimeUnavailableLifecycleResponseContract;
   readonly systemId?: string;
   readonly operationKind?: string;
   readonly translationContractVersion?: string;
@@ -294,6 +299,35 @@ export class AuthoritativeRunQueryBackendApi {
         markers: Object.freeze(["invalid-request"]),
       });
       return this.invalidRequest("workspaceId is required.");
+    }
+
+    if (request.runtimeLifecycle && request.runtimeLifecycle.state !== "ready") {
+      const lifecycleReadiness = this.buildRuntimeLifecycleExecutionReadinessResponse(request.runtimeLifecycle);
+      await this.recordObservability({
+        event: "run.orchestration.query.get-execution-readiness.completed",
+        operation: "query.get-execution-readiness",
+        outcome: "success",
+        severity: "warn",
+        workspaceId,
+        details: Object.freeze({
+          backendFamily: lifecycleReadiness.backendFamily,
+          readiness: lifecycleReadiness.readiness,
+          runtimeLifecycleState: request.runtimeLifecycle.state,
+          operationKind: request.operationKind,
+          translationContractVersion: request.translationContractVersion,
+        }),
+        counters: Object.freeze({
+          readiness_issues_total: lifecycleReadiness.issues.length,
+        }),
+        markers: Object.freeze([
+          `readiness:${lifecycleReadiness.readiness}`,
+          `runtime-lifecycle:${request.runtimeLifecycle.state}`,
+        ]),
+      });
+      return Object.freeze({
+        ok: true,
+        data: lifecycleReadiness,
+      });
     }
 
     const actorUserIdentityId = request.authorization.actorUserIdentityId.trim();
@@ -852,6 +886,70 @@ export class AuthoritativeRunQueryBackendApi {
     });
 
     return deriveAuthorizationResponseAccessLevel(decision.decision) !== AuthorizationResponseAccessLevels.deny;
+  }
+
+  private buildRuntimeLifecycleExecutionReadinessResponse(
+    runtimeLifecycle: RuntimeUnavailableLifecycleResponseContract,
+  ): ExecutionReadinessReadResponse {
+    const checkedAt = runtimeLifecycle.checkedAt;
+    const primaryMessage = runtimeLifecycle.state === "failed"
+      ? runtimeLifecycle.failure.message
+      : runtimeLifecycle.blockingReasons[0]?.message ?? `Runtime lifecycle is '${runtimeLifecycle.state}'.`;
+
+    return Object.freeze({
+      backendFamily: "adapter.image-manipulation.execution",
+      checkedAt,
+      readiness: "unavailable" as const,
+      readyForExecution: false,
+      runtimeLifecycle: runtimeLifecycle as RuntimeAvailabilityResponseContract,
+      message: primaryMessage,
+      capabilities: Object.freeze({
+        backendFamily: "adapter.image-manipulation.execution",
+        supportsProgressPolling: false,
+        supportsProgressStreaming: false,
+        supportsCancellation: false,
+        supportsOutputDiscovery: false,
+        supportedOperationKinds: Object.freeze([]),
+        supportedTranslationContractVersions: Object.freeze([]),
+      }),
+      nodeAvailability: Object.freeze({
+        state: "unknown" as const,
+        checkedAt,
+        candidateNodeCount: 0,
+        eligibleNodeCount: 0,
+        unavailableNodeCount: 0,
+        incompatibleNodeCount: 0,
+        topBlockingReasonCodes: Object.freeze(runtimeLifecycle.blockingReasons.map((reason) => reason.code)),
+        topTransientAvailabilityReasonCodes: Object.freeze([]),
+        reasonCode: this.mapRuntimeLifecycleReasonCode(runtimeLifecycle),
+      }),
+      issues: Object.freeze([
+        ...runtimeLifecycle.blockingReasons.map((reason) => Object.freeze({
+          code: reason.code,
+          severity: "error" as const,
+          message: reason.message,
+        })),
+        ...(runtimeLifecycle.state === "failed"
+          ? [Object.freeze({
+            code: runtimeLifecycle.failure.code,
+            severity: "error" as const,
+            message: runtimeLifecycle.failure.message,
+          })]
+          : []),
+      ]),
+      diagnostics: Object.freeze({
+        runtimeLifecycleState: runtimeLifecycle.state,
+      }),
+    });
+  }
+
+  private mapRuntimeLifecycleReasonCode(
+    runtimeLifecycle: RuntimeUnavailableLifecycleResponseContract,
+  ): string {
+    if (runtimeLifecycle.state === "failed") {
+      return runtimeLifecycle.failure.code;
+    }
+    return runtimeLifecycle.blockingReasons[0]?.code ?? "runtime-lifecycle-unavailable";
   }
 
   private invalidRequest(message: string): SharedApiResponseEnvelope<never> {
