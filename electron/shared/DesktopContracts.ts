@@ -15,6 +15,7 @@ import {
   transitionDesktopControlPlaneCapabilityPhase,
   transitionDesktopControlPlaneTransportPhase,
   type DesktopControlPlaneCapabilityActivationMode,
+  type DesktopControlPlaneCapabilityPhase,
   type DesktopControlPlaneCapabilityUnavailableReason,
   type DesktopControlPlaneRuntimeStatus,
   type DesktopControlPlaneWarmupTriggerSource,
@@ -79,7 +80,12 @@ export type DesktopAuthBootstrapRuntimeConfig =
     | "workflowIndexDatabasePath"
     | "desktopStorage"
     | "desktopPythonRuntime"
-  >;
+  >
+  & {
+    readonly controlPlaneBaseUrl: string;
+    readonly controlPlaneCapabilityPhase: DesktopControlPlaneCapabilityPhase;
+    readonly identityApiBaseUrl?: string;
+  };
 
 export interface DesktopAuthBootstrapContext {
   readonly runtimeConfig: DesktopAuthBootstrapRuntimeConfig;

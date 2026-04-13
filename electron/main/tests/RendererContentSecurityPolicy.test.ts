@@ -62,6 +62,32 @@ describe("createRendererContentSecurityPolicy", () => {
     expect(policy).not.toContain("://bad");
   });
 
+  it("prefers stable control-plane base URL when provided", () => {
+    const policy = createRendererContentSecurityPolicy({
+      rendererDevUrl: "http://localhost:5174/",
+      runtimeConfig: {
+        runtimeMode: "desktop-development",
+        hostKind: "desktop",
+        lifecycleStage: "development",
+        distributionTarget: "electron",
+        rendererDeliveryMode: "dev-server",
+        workflowRepositoryMode: "filesystem-indexed",
+        workflowExecutorMode: "strategy",
+        nodeCatalogMode: "registered",
+        uiSettingsPersistenceMode: "local-storage",
+        installedModelCatalogMode: "browser-local-storage",
+        seedStarterNode: true,
+        isProductionMode: false,
+        modelInstallDirectory: "dev/models",
+        controlPlaneBaseUrl: "http://127.0.0.1:56610",
+        identityApiBaseUrl: "http://127.0.0.1:56609",
+      },
+    });
+
+    expect(policy).toContain("http://127.0.0.1:56610");
+    expect(policy).not.toContain("http://127.0.0.1:56609");
+  });
+
   it("does not include dev renderer origin for packaged assets mode and still allows desktop deferred runtime loopback endpoints", () => {
     const policy = createRendererContentSecurityPolicy({
       rendererDevUrl: "http://localhost:5174/",

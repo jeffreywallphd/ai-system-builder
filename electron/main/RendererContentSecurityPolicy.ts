@@ -61,7 +61,7 @@ function resolveHttpOrigins(options: RendererContentSecurityPolicyOptions): Read
     return [...origins];
   }
 
-  const identityOrigin = normalizeOrigin(runtimeConfig.identityApiBaseUrl);
+  const identityOrigin = normalizeOrigin(runtimeConfig.controlPlaneBaseUrl ?? runtimeConfig.identityApiBaseUrl);
   if (identityOrigin) {
     origins.add(identityOrigin);
   }

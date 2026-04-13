@@ -16,6 +16,15 @@ Desktop startup now follows one control-plane host composition path for the full
 - Electron main no longer composes an auth-minimal host for pre-login and then replaces it with another host after login.
 - renderer-facing transport remains continuously bound; post-login work activates capabilities in place through explicit runtime state transitions.
 
+## Story 1.1.6 implementation update
+
+Desktop bootstrap runtime config now separates stable control-plane transport addressing from capability lifecycle readiness:
+
+- `runtimeConfig.controlPlaneBaseUrl` carries the persistent renderer-facing control-plane base URL across pre-login bootstrap and post-login warmup.
+- `runtimeConfig.controlPlaneCapabilityPhase` carries bootstrap-time capability lifecycle semantics (`pre-login` during auth-shell bootstrap, then post-login lifecycle phase from runtime status during warmup composition).
+- `runtimeConfig.identityApiBaseUrl` remains as a compatibility alias for existing auth client call sites, but no longer represents full runtime readiness.
+- renderer and main bootstrap consumers now prefer `controlPlaneBaseUrl` and use dedicated runtime lifecycle contracts (`getPostLoginRuntimeStatus()`) for readiness decisions.
+
 ## Current implementation (A.1.2)
 
 `electron/main/main.ts` now uses explicit startup phases:

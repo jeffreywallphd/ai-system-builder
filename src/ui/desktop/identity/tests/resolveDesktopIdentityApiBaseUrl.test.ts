@@ -12,6 +12,20 @@ describe("resolveDesktopIdentityApiBaseUrl", () => {
       aiLoomDesktop: {
         bootstrap: {
           runtimeConfig: {
+            controlPlaneBaseUrl: "http://127.0.0.1:8788/",
+          },
+        },
+      },
+    } as unknown as Window;
+
+    expect(resolveDesktopIdentityApiBaseUrl()).toBe("http://127.0.0.1:8788");
+  });
+
+  it("falls back to legacy identityApiBaseUrl when control-plane field is absent", () => {
+    (globalThis as typeof globalThis & { window?: Window }).window = {
+      aiLoomDesktop: {
+        bootstrap: {
+          runtimeConfig: {
             identityApiBaseUrl: "http://127.0.0.1:8788/",
           },
         },

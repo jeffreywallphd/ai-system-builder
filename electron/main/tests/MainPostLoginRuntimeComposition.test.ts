@@ -24,7 +24,7 @@ describe("electron main post-login runtime composition", () => {
     expect(bootstrapperSource).toContain("const serviceSupervisor = new DesktopServiceSupervisor(");
     expect(bootstrapperSource).toContain("await serviceSupervisor.start()");
     expect(mainSource).not.toContain("promoteControlPlaneRuntimeForPostLogin");
-    expect(mainSource).toContain("connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl)");
+    expect(mainSource).toContain("connectivityRuntimeController.startMonitoring(authShell.controlPlaneBaseUrl)");
   });
 
   it("keeps legacy eager bootstrap entrypoint removed", () => {

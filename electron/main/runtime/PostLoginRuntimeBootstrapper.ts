@@ -21,7 +21,7 @@ const DesktopServiceSupervisorPort = 8790;
 
 export type AuthShellBootstrapResult = {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
-  readonly identityApiBaseUrl: string;
+  readonly controlPlaneBaseUrl: string;
 };
 
 export type PostLoginRuntimeBootstrapper = {
@@ -119,7 +119,7 @@ export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntim
   }
 
   async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, bootstrapStartedAt: number): Promise<PostLoginRuntimeComposition> {
-    const { storagePaths, identityApiBaseUrl } = authShell;
+    const { storagePaths, controlPlaneBaseUrl } = authShell;
     const storageDatabase = params.getStorageDatabase();
     if (!storageDatabase) {
       throw new Error("Desktop storage database is unavailable for post-login runtime bootstrap.");
@@ -182,7 +182,9 @@ export function createPostLoginRuntimeBootstrapper(params: CreatePostLoginRuntim
       });
     const runtimeConfig = AppRuntimeConfig.fromValues({
       ...baseRuntimeConfig.toValues(),
-      identityApiBaseUrl,
+      controlPlaneBaseUrl,
+      controlPlaneCapabilityPhase: params.postLoginRuntimeStatusStore.getStatus().capabilityPhase,
+      identityApiBaseUrl: controlPlaneBaseUrl,
     });
     params.buildBootstrapContext({
       runtimeConfig,
