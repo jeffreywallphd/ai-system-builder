@@ -401,6 +401,12 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
     }
   }
 
+  public async retrieveSecretPlaintextForRuntime(
+    request: RetrieveSecretPlaintextRequest,
+  ): Promise<SecretServiceResult<RetrieveSecretPlaintextResult>> {
+    return this.execute(request);
+  }
+
   private async emitOperation(
     outcome: keyof typeof SecretOperationalOutcomes,
     input: {
@@ -525,4 +531,3 @@ function resolveReasonCode(
   }
   return "operation-outcome";
 }
-
