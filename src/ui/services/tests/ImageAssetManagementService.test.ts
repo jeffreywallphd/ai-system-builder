@@ -11,7 +11,7 @@ describe("ImageAssetManagementService", () => {
   it("uploads a source image through create, content upload, and finalize", async () => {
     const fetchMock = mock(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.endsWith("/api/v1/image-assets")) {
+      if (url.includes("/api/v1/image-assets?workspaceId=workspace-1")) {
         return {
           json: async () => ({
             ok: true,
@@ -28,7 +28,7 @@ describe("ImageAssetManagementService", () => {
           }),
         } as Response;
       }
-      if (url.endsWith("/content")) {
+      if (url.includes("/content?workspaceId=workspace-1")) {
         return {
           json: async () => ({ ok: true, data: { uploadSessionId: "upload-session-1" } }),
         } as Response;
@@ -52,12 +52,14 @@ describe("ImageAssetManagementService", () => {
     expect(uploaded.ok).toBeTrue();
     expect(uploaded.data?.assetId).toBe("asset:image:uploaded-1");
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/api/v1/image-assets?workspaceId=workspace-1");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/content?workspaceId=workspace-1");
   });
 
   it("accepts gif uploads for source images", async () => {
     const fetchMock = mock(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.endsWith("/api/v1/image-assets")) {
+      if (url.includes("/api/v1/image-assets?workspaceId=workspace-1")) {
         return {
           json: async () => ({
             ok: true,
