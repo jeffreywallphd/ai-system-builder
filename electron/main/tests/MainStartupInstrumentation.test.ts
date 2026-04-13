@@ -7,6 +7,10 @@ const dependencyActivatorSource = fs.readFileSync(
   path.resolve(process.cwd(), "electron/main/runtime/PostLoginRuntimeDependencyActivator.ts"),
   "utf8",
 );
+const activationServiceSource = fs.readFileSync(
+  path.resolve(process.cwd(), "electron/main/runtime/PostLoginRuntimeActivationService.ts"),
+  "utf8",
+);
 const deferredRuntimeSource = fs.readFileSync(path.resolve(process.cwd(), "electron/main/DeferredDesktopFeatureRuntime.ts"), "utf8");
 
 describe("desktop startup instrumentation coverage", () => {
@@ -26,5 +30,16 @@ describe("desktop startup instrumentation coverage", () => {
     expect(deferredRuntimeSource).toContain("workflow-persistence-ready");
     expect(deferredRuntimeSource).toContain("studio-shell-backend-api-ready");
     expect(deferredRuntimeSource).toContain("system-runtime-backend-api-ready");
+  });
+
+  it("emits structured activation diagnostics for stage boundaries, durations, and failure causes", () => {
+    expect(dependencyActivatorSource).toContain("desktop.post-login-activation.stage.started");
+    expect(dependencyActivatorSource).toContain("desktop.post-login-activation.stage.completed");
+    expect(dependencyActivatorSource).toContain("desktop.post-login-activation.stage.blocked");
+    expect(dependencyActivatorSource).toContain("summarizeActivationError(error)");
+    expect(activationServiceSource).toContain("desktop.post-login-activation.warmup.started");
+    expect(activationServiceSource).toContain("desktop.post-login-activation.warmup.ready");
+    expect(activationServiceSource).toContain("desktop.post-login-activation.warmup.failed");
+    expect(activationServiceSource).toContain("blockingStageId: resolveBlockingActivationStageId()");
   });
 });

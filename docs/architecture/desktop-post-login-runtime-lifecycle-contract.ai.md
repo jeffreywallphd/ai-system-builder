@@ -333,6 +333,30 @@ Desktop control-plane host startup now composes runtime route families at initia
   - `electron/main/tests/PostLoginRuntimeActivationService.test.ts` initial recoverable failure followed by successful explicit retry.
   - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` non-retryable failure metadata projection.
 
+## Story 1.3.7 startup and activation diagnostics
+
+- Post-login activation now emits structured startup diagnostics for each activation stage boundary with consistent `[ai-loom][startup]` event fields.
+- Stage diagnostics now cover:
+  - `desktop.post-login-activation.stage.started`
+  - `desktop.post-login-activation.stage.completed`
+  - `desktop.post-login-activation.stage.blocked`
+- Warmup lifecycle diagnostics now cover:
+  - `desktop.post-login-activation.warmup.requested`
+  - `desktop.post-login-activation.warmup.started`
+  - `desktop.post-login-activation.warmup.ready`
+  - `desktop.post-login-activation.warmup.failed`
+  - `desktop.post-login-activation.warmup.joined-inflight`
+  - `desktop.post-login-activation.warmup.ignored-ready`
+- Stage completion and failure diagnostics include `durationMs`, `startedAt`, and `endedAt` so activation timing regressions can be measured directly from logs.
+- Stage start diagnostics include `dependencies` and `blockingDependency`, and blocked diagnostics include `errorName`, `errorMessage`, and optional `errorCause` so blocking dependency and failure cause are explicit.
+- Warmup failure diagnostics include `retryable`, `preserveControlPlaneListener`, and `blockingStageId` so operators can distinguish recoverable activation-stage failures from fatal activation failures.
+- Canonical implementation seams:
+  - `electron/main/runtime/PostLoginActivationDiagnostics.ts`
+  - `electron/main/runtime/PythonRuntimeResolutionActivationStage.ts`
+  - `electron/main/runtime/ServiceSupervisorActivationStage.ts`
+  - `electron/main/runtime/PostLoginRuntimeDependencyActivator.ts`
+  - `electron/main/runtime/PostLoginRuntimeActivationService.ts`
+
 ## Story 1.2.8 route-level no-connection-refusal startup regression coverage
 
 - Runtime startup regression coverage now explicitly protects route-level listener continuity during capability transitions.

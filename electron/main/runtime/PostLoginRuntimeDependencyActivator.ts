@@ -18,6 +18,10 @@ import type { DesktopOperationalEventLogger } from "../DesktopOperationalEventLo
 import type { DesktopPythonRuntimeInfo } from "../../shared/DesktopContracts";
 import { resolvePythonRuntimeActivationStage } from "./PythonRuntimeResolutionActivationStage";
 import { startServiceSupervisorActivationStage } from "./ServiceSupervisorActivationStage";
+import {
+  logPostLoginActivationDiagnostic,
+  summarizeActivationError,
+} from "./PostLoginActivationDiagnostics";
 
 const DesktopServiceSupervisorPort = 8790;
 
@@ -114,7 +118,18 @@ export function createPostLoginRuntimeDependencyActivator(
 
   function registerDeferredFeatureIpc(register: () => void): void {
     const deferredFeatureRegistrationStartedAt = logInitializationStart(DesktopStartupPhases.deferredFeatureRegistration);
+    const startedAtIso = new Date(deferredFeatureRegistrationStartedAt).toISOString();
     params.postLoginRuntimeStatusStore.markDeferredFeatureIpcRegistrationRunning();
+    logPostLoginActivationDiagnostic({
+      payload: {
+        event: "desktop.post-login-activation.stage.started",
+        stageId: "deferred-feature-ipc-registration",
+        startedAt: startedAtIso,
+        blockingDependency: "deferred-feature-ipc",
+        dependencies: Object.freeze(["deferred-feature-runtime-container", "deferred-feature-providers", "deferred-feature-ipc"]),
+        detail: "Registering deferred feature IPC domains.",
+      },
+    });
     try {
       if (!params.isDeferredFeatureIpcRegistered()) {
         register();
@@ -124,9 +139,35 @@ export function createPostLoginRuntimeDependencyActivator(
         detail: "Deferred feature IPC domains are registered and renderer bridges can bind.",
       });
       params.postLoginRuntimeStatusStore.markReady();
+      const endedAt = Date.now();
+      logPostLoginActivationDiagnostic({
+        payload: {
+          event: "desktop.post-login-activation.stage.completed",
+          stageId: "deferred-feature-ipc-registration",
+          startedAt: startedAtIso,
+          endedAt: new Date(endedAt).toISOString(),
+          durationMs: Math.max(0, endedAt - deferredFeatureRegistrationStartedAt),
+          blockingDependency: "deferred-feature-ipc",
+          detail: "Deferred feature IPC domains are registered and renderer bridges can bind.",
+        },
+      });
       logInitializationMemory(DesktopStartupPhases.deferredFeatureRegistration, "ready");
     } catch (error) {
+      const endedAt = Date.now();
+      const summarizedError = summarizeActivationError(error);
       params.postLoginRuntimeStatusStore.markDeferredFeatureIpcRegistrationBlocked(error);
+      logPostLoginActivationDiagnostic({
+        level: "error",
+        payload: {
+          event: "desktop.post-login-activation.stage.blocked",
+          stageId: "deferred-feature-ipc-registration",
+          startedAt: startedAtIso,
+          endedAt: new Date(endedAt).toISOString(),
+          durationMs: Math.max(0, endedAt - deferredFeatureRegistrationStartedAt),
+          blockingDependency: "deferred-feature-ipc",
+          ...summarizedError,
+        },
+      });
       throw error;
     } finally {
       logInitializationEnd(DesktopStartupPhases.deferredFeatureRegistration, deferredFeatureRegistrationStartedAt);
@@ -201,6 +242,18 @@ export function createPostLoginRuntimeDependencyActivator(
     });
 
     params.postLoginRuntimeStatusStore.markDeferredFeatureRuntimeCompositionRunning();
+    const deferredRuntimeCompositionStartedAt = Date.now();
+    const deferredRuntimeCompositionStartedAtIso = new Date(deferredRuntimeCompositionStartedAt).toISOString();
+    logPostLoginActivationDiagnostic({
+      payload: {
+        event: "desktop.post-login-activation.stage.started",
+        stageId: "deferred-feature-runtime-composition",
+        startedAt: deferredRuntimeCompositionStartedAtIso,
+        blockingDependency: "deferred-feature-runtime-container",
+        dependencies: Object.freeze(["desktop-storage", "python-runtime", "runtime-supervisor", "deferred-feature-runtime-container"]),
+        detail: "Composing deferred desktop feature runtime container.",
+      },
+    });
     const featureRuntime = await Promise.resolve().then(async () => {
       const createDeferredDesktopFeatureRuntime = await ensureDeferredDesktopFeatureRuntimeFactory();
       return createDeferredDesktopFeatureRuntime({
@@ -210,12 +263,38 @@ export function createPostLoginRuntimeDependencyActivator(
         observabilityLogger: params.getOperationalLogger(),
       });
     }).catch((error) => {
+      const endedAt = Date.now();
+      const summarizedError = summarizeActivationError(error);
       params.postLoginRuntimeStatusStore.markDeferredFeatureRuntimeCompositionBlocked(error);
+      logPostLoginActivationDiagnostic({
+        level: "error",
+        payload: {
+          event: "desktop.post-login-activation.stage.blocked",
+          stageId: "deferred-feature-runtime-composition",
+          startedAt: deferredRuntimeCompositionStartedAtIso,
+          endedAt: new Date(endedAt).toISOString(),
+          durationMs: Math.max(0, endedAt - deferredRuntimeCompositionStartedAt),
+          blockingDependency: "deferred-feature-runtime-container",
+          ...summarizedError,
+        },
+      });
       throw error;
     });
     params.setDeferredFeatureRuntime(featureRuntime);
     params.postLoginRuntimeStatusStore.markDeferredFeatureRuntimeCompositionReady({
       detail: "Deferred feature runtime container is composed and ready for provider wiring.",
+    });
+    const deferredRuntimeCompositionEndedAt = Date.now();
+    logPostLoginActivationDiagnostic({
+      payload: {
+        event: "desktop.post-login-activation.stage.completed",
+        stageId: "deferred-feature-runtime-composition",
+        startedAt: deferredRuntimeCompositionStartedAtIso,
+        endedAt: new Date(deferredRuntimeCompositionEndedAt).toISOString(),
+        durationMs: Math.max(0, deferredRuntimeCompositionEndedAt - deferredRuntimeCompositionStartedAt),
+        blockingDependency: "deferred-feature-runtime-container",
+        detail: "Deferred feature runtime container is composed and ready for provider wiring.",
+      },
     });
     logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready", bootstrapStartedAt);
     logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready");
@@ -235,6 +314,18 @@ export function createPostLoginRuntimeDependencyActivator(
       const runtimeComposition = await composePostLoginRuntimeDependencies(authShell, bootstrapStartedAt);
       const { storagePaths, runtimeConfig, pythonRuntime, featureRuntime } = runtimeComposition;
       params.postLoginRuntimeStatusStore.markDeferredFeatureProviderSetupRunning();
+      const providerSetupStartedAt = Date.now();
+      const providerSetupStartedAtIso = new Date(providerSetupStartedAt).toISOString();
+      logPostLoginActivationDiagnostic({
+        payload: {
+          event: "desktop.post-login-activation.stage.started",
+          stageId: "deferred-feature-provider-setup",
+          startedAt: providerSetupStartedAtIso,
+          blockingDependency: "deferred-feature-providers",
+          dependencies: Object.freeze(["deferred-feature-runtime-container", "deferred-feature-providers"]),
+          detail: "Configuring deferred feature runtime providers.",
+        },
+      });
       const providers = await Promise.resolve().then(() => {
         const agentRuntimeProvider = createDesktopAgentRuntimeProvider({
           storagePaths,
@@ -250,7 +341,21 @@ export function createPostLoginRuntimeDependencyActivator(
           canonicalRegistryRuntimeProvider,
         });
       }).catch((error) => {
+        const endedAt = Date.now();
+        const summarizedError = summarizeActivationError(error);
         params.postLoginRuntimeStatusStore.markDeferredFeatureProviderSetupBlocked(error);
+        logPostLoginActivationDiagnostic({
+          level: "error",
+          payload: {
+            event: "desktop.post-login-activation.stage.blocked",
+            stageId: "deferred-feature-provider-setup",
+            startedAt: providerSetupStartedAtIso,
+            endedAt: new Date(endedAt).toISOString(),
+            durationMs: Math.max(0, endedAt - providerSetupStartedAt),
+            blockingDependency: "deferred-feature-providers",
+            ...summarizedError,
+          },
+        });
         throw error;
       });
       const { agentRuntimeProvider, canonicalRegistryRuntimeProvider } = providers;
@@ -258,6 +363,18 @@ export function createPostLoginRuntimeDependencyActivator(
       params.setCanonicalRegistryRuntimeProvider(canonicalRegistryRuntimeProvider);
       params.postLoginRuntimeStatusStore.markDeferredFeatureProviderSetupReady({
         detail: "Deferred feature runtime providers are configured for studio, registry, and agent domains.",
+      });
+      const providerSetupEndedAt = Date.now();
+      logPostLoginActivationDiagnostic({
+        payload: {
+          event: "desktop.post-login-activation.stage.completed",
+          stageId: "deferred-feature-provider-setup",
+          startedAt: providerSetupStartedAtIso,
+          endedAt: new Date(providerSetupEndedAt).toISOString(),
+          durationMs: Math.max(0, providerSetupEndedAt - providerSetupStartedAt),
+          blockingDependency: "deferred-feature-providers",
+          detail: "Deferred feature runtime providers are configured for studio, registry, and agent domains.",
+        },
       });
       registerDeferredFeatureIpc(() => {
         const onDemand = createOnDemandFeatureCompositionPaths({

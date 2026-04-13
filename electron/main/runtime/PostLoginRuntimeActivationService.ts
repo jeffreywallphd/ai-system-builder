@@ -10,6 +10,10 @@ import {
   type AuthShellBootstrapResult,
 } from "./PostLoginRuntimeDependencyActivator";
 import { ServiceSupervisorActivationStageError } from "./ServiceSupervisorActivationStage";
+import {
+  logPostLoginActivationDiagnostic,
+  summarizeActivationError,
+} from "./PostLoginActivationDiagnostics";
 
 type CreatePostLoginRuntimeActivationServiceParams = {
   readonly postLoginRuntimeStatusStore: DesktopPostLoginRuntimeStatusStore;
@@ -65,14 +69,44 @@ export function createPostLoginRuntimeActivationService(
     });
   }
 
+  function resolveBlockingActivationStageId(): string | undefined {
+    const blockedStage = params
+      .postLoginRuntimeStatusStore
+      .getStatus()
+      .activationStages
+      ?.find((stage) => stage.state === "blocked");
+    return blockedStage?.stageId;
+  }
+
   async function startPostLoginWarmup(request: DesktopPostLoginWarmupRequest): Promise<void> {
     console.info(`[ai-loom] Post-login warmup requested (${formatPostLoginWarmupRequestLog(request)}).`);
+    logPostLoginActivationDiagnostic({
+      payload: {
+        event: "desktop.post-login-activation.warmup.requested",
+        triggerSource: request.triggerSource,
+        requestedAt: request.requestedAt,
+      },
+    });
     if (runtimeActivationState === "ready") {
       console.info("[ai-loom] Post-login warmup request ignored because runtime is already ready.");
+      logPostLoginActivationDiagnostic({
+        payload: {
+          event: "desktop.post-login-activation.warmup.ignored-ready",
+          triggerSource: request.triggerSource,
+          requestedAt: request.requestedAt,
+        },
+      });
       return;
     }
     if (postLoginActivationPromise) {
       console.info("[ai-loom] Post-login warmup request joined in-flight warmup.");
+      logPostLoginActivationDiagnostic({
+        payload: {
+          event: "desktop.post-login-activation.warmup.joined-inflight",
+          triggerSource: request.triggerSource,
+          requestedAt: request.requestedAt,
+        },
+      });
       await postLoginActivationPromise;
       return;
     }
@@ -87,6 +121,8 @@ export function createPostLoginRuntimeActivationService(
     }
 
     runtimeActivationState = "activating";
+    const warmupStartedAt = Date.now();
+    const warmupStartedAtIso = new Date(warmupStartedAt).toISOString();
     console.info(
       `[ai-loom] Post-login warmup will activate capabilities on persistent control-plane host (${controlPlaneRuntime.address}).`,
     );
@@ -100,14 +136,43 @@ export function createPostLoginRuntimeActivationService(
     params.connectivityRuntimeController.startMonitoring(authShell.controlPlaneBaseUrl);
     console.info("[ai-loom] Starting post-login desktop runtime warmup.");
     logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
+    logPostLoginActivationDiagnostic({
+      payload: {
+        event: "desktop.post-login-activation.warmup.started",
+        startedAt: warmupStartedAtIso,
+        triggerSource: request.triggerSource,
+        requestedAt: request.requestedAt,
+        detail: "Warmup accepted and deferred runtime capability activation started.",
+        dependencies: Object.freeze([
+          "python-runtime",
+          "runtime-supervisor",
+          "deferred-feature-runtime-container",
+          "deferred-feature-providers",
+          "deferred-feature-ipc",
+        ]),
+      },
+    });
 
     postLoginActivationPromise = Promise.resolve().then(() => params.activateRuntimeDependencies(authShell));
     try {
       await postLoginActivationPromise;
+      const warmupEndedAt = Date.now();
       runtimeActivationState = "ready";
       postLoginActivationPromise = undefined;
       console.info("[ai-loom] Post-login desktop runtime warmup completed.");
+      logPostLoginActivationDiagnostic({
+        payload: {
+          event: "desktop.post-login-activation.warmup.ready",
+          startedAt: warmupStartedAtIso,
+          endedAt: new Date(warmupEndedAt).toISOString(),
+          durationMs: Math.max(0, warmupEndedAt - warmupStartedAt),
+          triggerSource: request.triggerSource,
+          requestedAt: request.requestedAt,
+          activationMode: params.postLoginRuntimeStatusStore.getStatus().activationMode,
+        },
+      });
     } catch (error) {
+      const warmupEndedAt = Date.now();
       postLoginActivationPromise = undefined;
       runtimeActivationState = "idle";
       const failureDisposition = resolveFailureDisposition(error);
@@ -125,6 +190,24 @@ export function createPostLoginRuntimeActivationService(
           error,
         );
       }
+      const summarizedError = summarizeActivationError(error);
+      logPostLoginActivationDiagnostic({
+        level: "error",
+        payload: {
+          event: "desktop.post-login-activation.warmup.failed",
+          startedAt: warmupStartedAtIso,
+          endedAt: new Date(warmupEndedAt).toISOString(),
+          durationMs: Math.max(0, warmupEndedAt - warmupStartedAt),
+          triggerSource: request.triggerSource,
+          requestedAt: request.requestedAt,
+          activationMode: params.postLoginRuntimeStatusStore.getStatus().activationMode,
+          retryable: failureDisposition.retryable,
+          preserveControlPlaneListener: failureDisposition.preserveControlPlaneListener,
+          blockingDependency: "post-login-runtime-activation",
+          blockingStageId: resolveBlockingActivationStageId(),
+          ...summarizedError,
+        },
+      });
       throw error;
     }
   }
