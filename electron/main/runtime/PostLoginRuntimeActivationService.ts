@@ -6,6 +6,7 @@ import type { DesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRunt
 import type { DesktopConnectivityRuntimeController } from "../DesktopConnectivityRuntimeController";
 import { logInitializationMemory } from "../InitializationLogging";
 import type { AuthShellBootstrapResult } from "./PostLoginRuntimeDependencyActivator";
+import { ServiceSupervisorActivationStageError } from "./ServiceSupervisorActivationStage";
 
 type CreatePostLoginRuntimeActivationServiceParams = {
   readonly postLoginRuntimeStatusStore: DesktopPostLoginRuntimeStatusStore;
@@ -83,10 +84,16 @@ export function createPostLoginRuntimeActivationService(
       postLoginActivationPromise = undefined;
       runtimeActivationState = "idle";
       params.postLoginRuntimeStatusStore.markFailed(request, error);
-      if (!params.isDesktopRuntimeDisposing()) {
+      const keepControlPlaneListenerBound = error instanceof ServiceSupervisorActivationStageError;
+      if (!params.isDesktopRuntimeDisposing() && !keepControlPlaneListenerBound) {
         console.error("Post-login desktop runtime activation failed", error);
         await params.disposeDesktopRuntimeResources();
         params.exitProcess(1);
+      } else if (keepControlPlaneListenerBound) {
+        console.error(
+          "Post-login desktop runtime activation failed during service supervisor startup; preserving control-plane listener.",
+          error,
+        );
       }
       throw error;
     }

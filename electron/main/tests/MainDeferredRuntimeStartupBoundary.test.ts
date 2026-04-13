@@ -72,9 +72,10 @@ describe("electron main deferred runtime startup boundary", () => {
   });
   it("keeps python runtime resolution and service supervisor startup in post-login runtime composition", () => {
     expect(dependencyActivatorSource).toContain("async function composePostLoginRuntimeDependencies(");
-    expect(dependencyActivatorSource).toContain("resolveDesktopPythonRuntime(");
+    expect(dependencyActivatorSource).toContain("resolvePythonRuntimeActivationStage(");
     expect(dependencyActivatorSource).toContain("const serviceSupervisor = new DesktopServiceSupervisor(");
-    expect(dependencyActivatorSource).toContain("await serviceSupervisor.start()");
+    expect(dependencyActivatorSource).toContain("startServiceSupervisorActivationStage({");
+    expect(dependencyActivatorSource).toContain("postLoginRuntimeStatusStore: params.postLoginRuntimeStatusStore");
   });
 
   it("keeps workflow/studio/system backend activation on-demand via deferred runtime container", () => {

@@ -283,6 +283,17 @@ Desktop control-plane host startup now composes runtime route families at initia
   - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` stage transition/read-model coverage.
   - `src/infrastructure/transport/http-server/identity/tests/RuntimeCapabilityGuardMiddleware.test.ts` stage-aware blocking diagnostics.
 
+## Story 1.3.4 service supervisor activation stage
+
+- Service supervisor startup is now an explicit post-login activation stage owned by `electron/main/runtime/ServiceSupervisorActivationStage.ts`.
+- Stage lifecycle reporting is surfaced through `DesktopPostLoginRuntimeStatus.activationStages` with explicit `pending` -> `running` -> `ready|blocked` transitions for `service-supervisor-startup`.
+- Supervisor readiness now records explicit stage detail including both `baseUrl` and `runtimeBaseUrl`.
+- Supervisor startup failures now flow through runtime lifecycle failure state while preserving the already-bound control-plane listener transport.
+- Regression coverage now includes:
+  - `electron/main/tests/ServiceSupervisorActivationStage.test.ts` for supervisor-ready and supervisor-blocked startup behavior.
+  - `electron/main/tests/PostLoginRuntimeActivationService.test.ts` listener-preservation behavior when supervisor startup fails.
+  - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` service-supervisor stage read-model coverage.
+
 ## Story 1.2.8 route-level no-connection-refusal startup regression coverage
 
 - Runtime startup regression coverage now explicitly protects route-level listener continuity during capability transitions.
