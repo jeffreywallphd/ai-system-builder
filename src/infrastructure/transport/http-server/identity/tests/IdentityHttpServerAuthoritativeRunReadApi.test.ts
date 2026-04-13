@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import type { AuthoritativeRunQueryBackendApi } from "../../../../api/runs/AuthoritativeRunQueryBackendApi";
+import type { AuthoritativeRunSubmissionBackendApi } from "../../../../api/runs/AuthoritativeRunSubmissionBackendApi";
 import { RunOrchestrationTransportRoutes } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 
 const servers: Server[] = [];
@@ -220,6 +221,46 @@ class StubAuthoritativeRunQueryBackendApi {
           severity: "error",
           message: "Translation contract version '2.0.0' is not supported.",
         }],
+      },
+    };
+  }
+}
+
+class StubAuthoritativeRunSubmissionBackendApi {
+  public async submitRun(request: Readonly<Record<string, unknown>>) {
+    return {
+      ok: true as const,
+      data: {
+        run: {
+          contractVersion: "run-orchestration-transport/v1",
+          runId: "run:submission:1",
+          workflowId: String(request.workflowId ?? "workflow:submission:1"),
+          workspaceId: String(request.workspaceId ?? "workspace-alpha"),
+          source: "api" as const,
+          state: "submitted" as const,
+          assignmentStatus: "unassigned" as const,
+          executionOutcome: "none" as const,
+          submittedAt: "2026-04-13T12:00:00.000Z",
+          updatedAt: "2026-04-13T12:00:00.000Z",
+          submission: {
+            submittedByActorId: "user:submission",
+          },
+          assignment: {
+            status: "unassigned" as const,
+          },
+          execution: {
+            outcome: "none" as const,
+          },
+          retry: {
+            attempt: 1,
+            maxAttempts: 1,
+          },
+        },
+        mutation: {
+          changed: true,
+          mutationId: "mutation:submission:1",
+          occurredAt: "2026-04-13T12:00:00.000Z",
+        },
       },
     };
   }
@@ -464,6 +505,95 @@ describe("IdentityHttpServer authoritative run read routes", () => {
     expect(readyBody.ok).toBe(true);
     expect(readyBody.data.readiness).toBe("degraded");
     expect(readyBody.data.runtimeLifecycle).toBeUndefined();
+  });
+
+  it("regression: runtime readiness and submission routes do not connection-refuse during pre-login and warmup", async () => {
+    const queryBackend = new StubAuthoritativeRunQueryBackendApi();
+    const submissionBackend = new StubAuthoritativeRunSubmissionBackendApi();
+    let lifecycleState: "pre-login" | "warming" | "ready" = "pre-login";
+    const baseUrl = await startServer(queryBackend, {
+      authoritativeRunSubmissionBackendApi: submissionBackend as unknown as AuthoritativeRunSubmissionBackendApi,
+      routeFamilyAvailability: Object.freeze({
+        isRouteFamilyAvailable: (routeFamilyId: string) => {
+          if (routeFamilyId !== "run-read" && routeFamilyId !== "run-submission") {
+            return true;
+          }
+          return lifecycleState === "ready";
+        },
+        resolveRouteFamilyAvailability: (routeFamilyId: string) => Object.freeze({
+          routeFamilyId,
+          capabilityId: "deferred-runtime-features",
+          state: lifecycleState,
+          available: lifecycleState === "ready",
+        }),
+      }),
+    });
+
+    const assertNoConnectionRefusal = async (request: () => Promise<Response>): Promise<Response> => {
+      try {
+        return await request();
+      } catch (error) {
+        throw new Error(
+          `Expected stable listener continuity during runtime startup transition, but request threw: ${String(error)}`,
+        );
+      }
+    };
+
+    const preLoginReadinessResponse = await assertNoConnectionRefusal(() =>
+      fetch(`${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`)
+    );
+    expect(preLoginReadinessResponse.status).toBe(200);
+    const preLoginReadinessBody = await preLoginReadinessResponse.json();
+    expect(preLoginReadinessBody.ok).toBe(true);
+    expect(preLoginReadinessBody.data.runtimeLifecycle.state).toBe("unavailable");
+
+    const preLoginSubmissionResponse = await assertNoConnectionRefusal(() =>
+      fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          runtimeTarget: {
+            systemId: "system:startup-transition",
+            versionId: "version:1",
+            async: true,
+          },
+        }),
+      })
+    );
+    expect(preLoginSubmissionResponse.status).toBe(503);
+    const preLoginSubmissionBody = await preLoginSubmissionResponse.json();
+    expect(preLoginSubmissionBody.runtime.state).toBe("unavailable");
+
+    lifecycleState = "warming";
+
+    const warmingReadinessResponse = await assertNoConnectionRefusal(() =>
+      fetch(`${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`)
+    );
+    expect(warmingReadinessResponse.status).toBe(200);
+    const warmingReadinessBody = await warmingReadinessResponse.json();
+    expect(warmingReadinessBody.ok).toBe(true);
+    expect(warmingReadinessBody.data.runtimeLifecycle.state).toBe("warming");
+
+    const warmingSubmissionResponse = await assertNoConnectionRefusal(() =>
+      fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          runtimeTarget: {
+            systemId: "system:startup-transition",
+            versionId: "version:1",
+            async: true,
+          },
+        }),
+      })
+    );
+    expect(warmingSubmissionResponse.status).toBe(503);
+    const warmingSubmissionBody = await warmingSubmissionResponse.json();
+    expect(warmingSubmissionBody.runtime.state).toBe("warming");
   });
 });
 

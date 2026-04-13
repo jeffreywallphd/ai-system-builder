@@ -261,6 +261,16 @@ Desktop control-plane host startup now composes runtime route families at initia
 - Runtime capability guard mapping now derives diagnostics from those lifecycle snapshots so responses identify whether blocking is caused by auth/session phase, capability activation warmup, runtime supervisor failure, or control-plane transport state.
 - Execution readiness state-driven bypass surfaces the same typed lifecycle diagnostics in both `runtimeLifecycle` and readiness-level diagnostics, preserving observability without leaking internal error internals.
 
+## Story 1.2.8 route-level no-connection-refusal startup regression coverage
+
+- Runtime startup regression coverage now explicitly protects route-level listener continuity during capability transitions.
+- Integration coverage asserts runtime endpoints return structured lifecycle payloads during startup transitions instead of socket-level connection refusal.
+- Coverage scope includes:
+  - execution readiness route (`GET /api/v1/runtime/execution/readiness`),
+  - runtime submission route (`POST /api/v1/runtime/runs/start`).
+- Pre-login and warming requests must continue to receive canonical lifecycle-aware HTTP responses (`200` readiness payloads and guarded `503` unavailable payloads) while the same control-plane listener remains reachable.
+- Regression intent is encoded in test naming so failures clearly indicate listener continuity or runtime route-registration regressions.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,
