@@ -32,7 +32,15 @@ export const AuthoritativeServerRequiredRouteFamilyIds = Object.freeze([
   "run-execution-update",
 ]);
 
-export function composeAuthoritativeServerApiRouteRegistrationPlan(): AuthoritativeApiRouteRegistrationPlan {
+export interface ComposeAuthoritativeServerApiRouteRegistrationPlanOptions {
+  readonly includeRuntimeRouteFamilies?: boolean;
+}
+
+export function composeAuthoritativeServerApiRouteRegistrationPlan(
+  options?: ComposeAuthoritativeServerApiRouteRegistrationPlanOptions,
+): AuthoritativeApiRouteRegistrationPlan {
+  const includeRuntimeRouteFamilies = options?.includeRuntimeRouteFamilies ?? false;
+
   return composeAuthoritativeApiRouteRegistrationPlan({
     backendAvailability: Object.freeze({
       [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
@@ -49,12 +57,18 @@ export function composeAuthoritativeServerApiRouteRegistrationPlan(): Authoritat
       [AuthoritativeApiRouteBackendKeys.storageManagement]: true,
       [AuthoritativeApiRouteBackendKeys.assetManagement]: true,
       [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: true,
-      [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
+      [AuthoritativeApiRouteBackendKeys.systemRuntime]: includeRuntimeRouteFamilies,
       [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
       [AuthoritativeApiRouteBackendKeys.runRead]: true,
       [AuthoritativeApiRouteBackendKeys.runMutation]: true,
       [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: true,
     }),
+  });
+}
+
+export function composeDesktopAuthoritativeServerApiRouteRegistrationPlan(): AuthoritativeApiRouteRegistrationPlan {
+  return composeAuthoritativeServerApiRouteRegistrationPlan({
+    includeRuntimeRouteFamilies: true,
   });
 }
 

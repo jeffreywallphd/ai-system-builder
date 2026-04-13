@@ -258,6 +258,15 @@ Contract intent:
 - one authoritative listener identity remains stable for the desktop session while capabilities warm and fail/retry,
 - regression coverage fails if stop-and-rebind behavior returns to warmup paths.
 
+## Story 1.2.2 runtime route-family registration continuity
+
+Desktop control-plane host startup now keeps runtime route families registered from initial bind:
+
+- `electron/main/main.ts` now passes `composeDesktopAuthoritativeServerApiRouteRegistrationPlan()` into authoritative host bootstrap.
+- runtime route-family registration no longer depends on post-login host replacement.
+- pre-login and warming requests are still blocked by capability-state checks (stateful unavailable responses) until post-login warmup activates deferred runtime capabilities.
+- non-desktop startup paths continue using `composeAuthoritativeServerApiRouteRegistrationPlan()` defaults unless they explicitly opt in.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)

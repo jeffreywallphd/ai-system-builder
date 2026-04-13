@@ -15,7 +15,7 @@ Pin down which authoritative route families are truly needed before desktop logi
 - Pre-login minimal route-family requirement: `identity-auth` only.
 - Every currently startup-required family in `AuthoritativeServerRequiredRouteFamilyIds` is classified.
 - Non-auth control-plane families are classified as `optional/on-demand` for post-login or feature-triggered startup.
-- `system-runtime` is explicitly called out as `not relevant to the desktop pre-login path` (not currently required by startup coverage assertion).
+- `system-runtime` remains not required by pre-login startup coverage assertion, but desktop host startup now keeps it registered behind deferred capability gating.
 
 ## Evidence baseline used
 
@@ -58,10 +58,10 @@ Pin down which authoritative route families are truly needed before desktop logi
   - `run-mutation`
   - `image-run-api`
   - `run-execution-update`
-- `not relevant to desktop pre-login path`
   - `system-runtime`
 
 ## Refactor direction
 
 - Auth-minimal pre-login route registration assertion should require only `identity-auth`.
 - Keep workspace actor-context hydration as an identity-backend dependency for `/api/v1/identity/session/context`, without forcing pre-login workspace route-family registration.
+- Keep desktop authoritative host route registration continuous from startup by composing `composeDesktopAuthoritativeServerApiRouteRegistrationPlan()` and relying on lifecycle capability checks for deferred runtime families.

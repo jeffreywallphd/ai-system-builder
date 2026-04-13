@@ -39,6 +39,7 @@ import type { DeferredDesktopFeatureRuntime } from "./DeferredDesktopFeatureRunt
 import { startAuthoritativeServerHostAssembly } from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
 import type { AuthoritativeServerHostRuntimeHandle } from "../../src/hosts/server/AuthoritativeServerCompositionRoot";
 import { AuthoritativeServerCapabilityIds } from "../../src/hosts/server/AuthoritativeServerCapabilityActivation";
+import { composeDesktopAuthoritativeServerApiRouteRegistrationPlan } from "../../src/hosts/server/AuthoritativeServerApiRouteComposition";
 import { createDesktopWindowManager } from "./DesktopWindowManager";
 import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
 import type { DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
@@ -314,6 +315,9 @@ async function ensureDesktopControlPlaneHostBound(params: {
       },
       env: process.env,
       logger: desktopOperationalEventLogger,
+    },
+    bootstrap: {
+      composeApiRouteRegistrationPlan: composeDesktopAuthoritativeServerApiRouteRegistrationPlan,
     },
     boot: {
       startupReason: "electron-main-authoritative-server-host-startup",

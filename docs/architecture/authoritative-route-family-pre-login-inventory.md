@@ -72,7 +72,7 @@ Important implementation note: `GET /api/v1/identity/session/context` currently 
 | `run-mutation` | yes | optional/on-demand | Run cancel/control mutations are feature runtime behavior after auth, not login path. |
 | `image-run-api` | yes | optional/on-demand | Image-run aliases are feature/studio oriented, not needed for login/session bootstrap. |
 | `run-execution-update` | yes | optional/on-demand | Execution update ingestion is orchestration control-plane behavior, unrelated to pre-login auth. |
-| `system-runtime` | no | not relevant to the desktop pre-login path | Not currently required by startup coverage assertion. Catalog family exists, but `composeAuthoritativeServerApiRouteRegistrationPlan()` sets system runtime backend availability false and pre-login auth shell does not rely on this family. |
+| `system-runtime` | no | optional/on-demand | Not currently required by startup coverage assertion. Desktop startup now uses `composeDesktopAuthoritativeServerApiRouteRegistrationPlan()` so the family stays registered from host bind, but pre-login requests remain capability-gated until post-login warmup activates deferred runtime capabilities. |
 
 ## Minimal pre-login set and defer list
 
@@ -113,3 +113,11 @@ Pre-login auth-minimal route registration target:
 4. workspace actor-context data dependency for `GET /api/v1/identity/session/context` remains fulfilled as an identity-backend responsibility, without forcing `workspace-administration` route family registration pre-login.
 
 This inventory is the implementation map for narrowing `AuthoritativeServerRequiredRouteFamilyIds` in the auth-minimal startup path.
+
+## Story 1.2.2 desktop route-registration continuity update
+
+Desktop control-plane startup now registers runtime route families from initial host bind without post-login host replacement:
+
+- `electron/main/main.ts` composes the authoritative host with `composeDesktopAuthoritativeServerApiRouteRegistrationPlan()`.
+- this preserves transport continuity while keeping lifecycle-aware capability gating as the guardrail for pre-login/unready runtime requests.
+- non-desktop entrypoints keep the default `composeAuthoritativeServerApiRouteRegistrationPlan()` behavior, so scope does not broaden unintentionally.
