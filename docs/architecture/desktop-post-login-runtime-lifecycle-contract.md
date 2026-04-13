@@ -170,7 +170,7 @@ Deferred runtime lifecycle observability now includes explicit startup timing an
 
 - pre-login/auth shell critical-path checkpoints:
   - auth shell phase instrumentation remains in `desktop-startup.pre-login-auth-shell-bootstrap`.
-  - auth-minimal host readiness phase now includes startup-memory checkpoints at `start` and `ready`.
+  - authoritative control-plane host readiness phase now includes startup-memory checkpoints at `start` and `ready`.
 - renderer first-window readiness checkpoints:
   - `desktop-startup.main-window-creation` checkpoint: `first-window-ready-to-show`.
   - `desktop-startup.host-bootstrap` checkpoint: `renderer-first-window-ready`.

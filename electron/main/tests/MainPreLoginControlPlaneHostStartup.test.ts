@@ -18,7 +18,7 @@ describe("electron main pre-login control-plane host startup", () => {
     expect(mainSource).toContain("bind-once");
   });
 
-  it("does not call auth-minimal host startup in pre-login bootstrap", () => {
+  it("keeps legacy auth-minimal host startup removed from pre-login bootstrap", () => {
     expect(authShellSource).not.toContain("startAuthMinimalServerHostAssembly");
     expect(mainSource).not.toContain("auth-minimal");
   });
