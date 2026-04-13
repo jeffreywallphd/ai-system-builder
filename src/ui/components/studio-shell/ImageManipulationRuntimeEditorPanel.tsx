@@ -247,10 +247,22 @@ function isDesktopDeferredFeatureApiReady(): boolean {
     return true;
   }
   const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
-  if (!runtimeBridge?.isDeferredFeatureApiReady) {
+  if (!runtimeBridge?.isDeferredFeatureApiReady && !runtimeBridge?.getPostLoginRuntimeStatus) {
     return true;
   }
+  const status = runtimeBridge.getPostLoginRuntimeStatus?.();
+  if (status) {
+    return status.state === "ready";
+  }
   return runtimeBridge.isDeferredFeatureApiReady();
+}
+
+function getDesktopDeferredFeatureRuntimeState(): string | undefined {
+  if (typeof window === "undefined" || !window.aiLoomDesktop) {
+    return undefined;
+  }
+  const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
+  return runtimeBridge?.getPostLoginRuntimeStatus?.().state;
 }
 
 function isDeferredFeatureApiUnavailable(errorCode: string | undefined): boolean {
@@ -1695,6 +1707,7 @@ export function ImageManipulationRuntimeEditorPanel({
     imageAssets: true,
     executionReadiness: true,
   }));
+  const [desktopDeferredRuntimeState, setDesktopDeferredRuntimeState] = useState<string | undefined>(() => getDesktopDeferredFeatureRuntimeState());
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
@@ -1702,6 +1715,32 @@ export function ImageManipulationRuntimeEditorPanel({
     () => groupRecentImageAssetsByContinuityWindow(recentImageAssets),
     [recentImageAssets],
   );
+  const isDesktopFeatureApiReady = useMemo(() => {
+    if (desktopDeferredRuntimeState) {
+      return desktopDeferredRuntimeState === "ready";
+    }
+    return isDesktopDeferredFeatureApiReady();
+  }, [desktopDeferredRuntimeState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.aiLoomDesktop) {
+      setDesktopDeferredRuntimeState(undefined);
+      return;
+    }
+    const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
+    if (!runtimeBridge?.getPostLoginRuntimeStatus) {
+      setDesktopDeferredRuntimeState(undefined);
+      return;
+    }
+    const refreshState = () => {
+      setDesktopDeferredRuntimeState(runtimeBridge.getPostLoginRuntimeStatus().state);
+    };
+    refreshState();
+    const intervalId = window.setInterval(refreshState, 900);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     setSelection(datasetBindingService.createSelectionStateFromHydration({
@@ -1823,7 +1862,7 @@ export function ImageManipulationRuntimeEditorPanel({
     setIsCheckingExecutionReadiness(true);
     setExecutionReadinessError(undefined);
     setExecutionReadinessErrorCode(undefined);
-    if (!deferredFeatureApiAvailability.executionReadiness) {
+    if (!isDesktopFeatureApiReady || !deferredFeatureApiAvailability.executionReadiness) {
       setExecutionReadiness(undefined);
       setIsCheckingExecutionReadiness(false);
       return Promise.resolve();
@@ -1995,7 +2034,7 @@ export function ImageManipulationRuntimeEditorPanel({
           actorUserIdentityId
           && workspaceId
           && sessionToken
-          && isDesktopDeferredFeatureApiReady()
+          && isDesktopFeatureApiReady
           && deferredFeatureApiAvailability.generatedResults
         ) {
           const listed = await generatedResults.listGeneratedResults({
@@ -2084,7 +2123,7 @@ export function ImageManipulationRuntimeEditorPanel({
       !actorUserIdentityId
       || !workspaceId
       || !sessionToken
-      || !isDesktopDeferredFeatureApiReady()
+      || !isDesktopFeatureApiReady
       || !deferredFeatureApiAvailability.imageAssets
     ) {
       setRecentImageAssets(Object.freeze([]));
@@ -2155,7 +2194,7 @@ export function ImageManipulationRuntimeEditorPanel({
       !actorUserIdentityId
       || !workspaceId
       || !sessionToken
-      || !isDesktopDeferredFeatureApiReady()
+      || !isDesktopFeatureApiReady
       || !deferredFeatureApiAvailability.imageAssets
     ) {
       setImageLibraryAssets(Object.freeze([]));
@@ -2398,7 +2437,7 @@ export function ImageManipulationRuntimeEditorPanel({
     const request = actorUserIdentityId
       && workspaceId
       && sessionToken
-      && isDesktopDeferredFeatureApiReady()
+      && isDesktopFeatureApiReady
       && deferredFeatureApiAvailability.generatedResults
       ? generatedResults.listGeneratedResults({
         actorUserIdentityId,
@@ -2469,11 +2508,11 @@ export function ImageManipulationRuntimeEditorPanel({
 
   useEffect(() => {
     void loadRunHistory();
-  }, [draft?.draftId, actorUserIdentityId, workspaceId, sessionToken, runtimeWorkflowAssetId]);
+  }, [draft?.draftId, actorUserIdentityId, workspaceId, sessionToken, isDesktopFeatureApiReady, runtimeWorkflowAssetId]);
 
   useEffect(() => {
     void loadRecentAssets();
-  }, [actorUserIdentityId, workspaceId, sessionToken]);
+  }, [actorUserIdentityId, workspaceId, sessionToken, isDesktopFeatureApiReady]);
 
   useEffect(() => {
     void loadRecentSystems();
@@ -2484,11 +2523,11 @@ export function ImageManipulationRuntimeEditorPanel({
       search: appliedImageLibrarySearch,
       offset: 0,
     });
-  }, [actorUserIdentityId, workspaceId, sessionToken, appliedImageLibrarySearch]);
+  }, [actorUserIdentityId, workspaceId, sessionToken, isDesktopFeatureApiReady, appliedImageLibrarySearch]);
 
   useEffect(() => {
     void refreshExecutionReadiness();
-  }, [deferredFeatureApiAvailability.executionReadiness, runtimeWorkflowAssetId, sessionToken]);
+  }, [deferredFeatureApiAvailability.executionReadiness, isDesktopFeatureApiReady, runtimeWorkflowAssetId, sessionToken]);
 
   useEffect(() => {
     if (!selectedHistoryRunId) {
@@ -2505,6 +2544,7 @@ export function ImageManipulationRuntimeEditorPanel({
       || !actorUserIdentityId
       || !workspaceId
       || !sessionToken
+      || !isDesktopFeatureApiReady
       || !deferredFeatureApiAvailability.generatedResults
     ) {
       setSelectedGeneratedResultDetail(undefined);
@@ -2573,6 +2613,7 @@ export function ImageManipulationRuntimeEditorPanel({
     actorUserIdentityId,
     deferredFeatureApiAvailability.generatedResults,
     generatedResults,
+    isDesktopFeatureApiReady,
     selectedOutputItem,
     sessionToken,
     workspaceId,
@@ -2865,7 +2906,7 @@ export function ImageManipulationRuntimeEditorPanel({
     if (!selectedOutputItem || !draft?.draftId) {
       return;
     }
-    if (actorUserIdentityId && workspaceId && sessionToken && deferredFeatureApiAvailability.generatedResults) {
+    if (actorUserIdentityId && workspaceId && sessionToken && isDesktopFeatureApiReady && deferredFeatureApiAvailability.generatedResults) {
       setIsResultQuickActionPending(targetDatasetBindingId === "input-image-dataset" ? "source" : "reference");
       try {
         const [original, detail] = await Promise.all([
@@ -2964,7 +3005,7 @@ export function ImageManipulationRuntimeEditorPanel({
       const outputRecordId = resolveRunOutputRecordId(run);
       if (outputRecordId) {
         let loadedRunOutputs = false;
-        if (actorUserIdentityId && workspaceId && sessionToken && deferredFeatureApiAvailability.generatedResults) {
+        if (actorUserIdentityId && workspaceId && sessionToken && isDesktopFeatureApiReady && deferredFeatureApiAvailability.generatedResults) {
           const byRun = await generatedResults.listGeneratedResultsByRun({
             actorUserIdentityId,
             workspaceId,
