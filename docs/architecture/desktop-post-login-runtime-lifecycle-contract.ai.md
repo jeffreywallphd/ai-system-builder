@@ -11,11 +11,29 @@ Story: C.1.3
 ## Canonical boundary
 - `DesktopPostLoginRuntimeLifecycle`
 - canonical runtime contract source: `src/application/common/DesktopControlPlaneRuntimeContracts.ts`
+- canonical shared runtime availability response contracts: `src/shared/contracts/runtime/RuntimeAvailabilityResponseContracts.ts`
 - trigger request: `DesktopPostLoginWarmupRequest`
 - status read model: `DesktopPostLoginRuntimeStatus`
 - capability phases: `pre-login`, `warming`, `ready`, `failed`
 - transport phases: `unavailable`, `binding`, `available`, `failed`
 - activation modes: `auth-success-warmup`, `lazy-feature-demand`
+
+## Story 1.2.1 runtime availability response contracts
+
+Shared runtime lifecycle response shapes now define explicit stateful payloads for both readiness and guarded runtime endpoint contracts without coupling callers to transport outages:
+
+- canonical lifecycle states:
+  - `unavailable`
+  - `warming`
+  - `ready`
+  - `failed`
+- readiness endpoints can return `RuntimeReadinessResponseContract` with a `runtime` lifecycle payload.
+- guarded runtime endpoints can return `RuntimeGuardedEndpointUnavailableResponseContract` with endpoint identity + blocked lifecycle state.
+- contracts include:
+  - machine-readable blocking reason codes,
+  - retryability and optional retry timing,
+  - ISO timestamps (`checkedAt`, `updatedAt`, and state-specific timestamps),
+  - optional diagnostics metadata for desktop-local troubleshooting.
 
 ## Layer responsibilities
 - main (`electron/main`):

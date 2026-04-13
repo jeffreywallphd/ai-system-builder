@@ -28,6 +28,7 @@ Contract surfaces:
 - runtime warmup trigger request: `DesktopPostLoginWarmupRequest`
 - runtime lifecycle status read model: `DesktopPostLoginRuntimeStatus`
 - canonical runtime contract source: `src/application/common/DesktopControlPlaneRuntimeContracts.ts`
+- canonical shared runtime availability response contracts: `src/shared/contracts/runtime/RuntimeAvailabilityResponseContracts.ts`
 - runtime capability phases:
   - `pre-login`
   - `warming`
@@ -41,6 +42,23 @@ Contract surfaces:
 - activation modes:
   - `auth-success-warmup`
   - `lazy-feature-demand`
+
+## Story 1.2.1 runtime availability response contracts
+
+Shared runtime lifecycle response shapes now define explicit stateful payloads for readiness and guarded runtime endpoint contracts so callers do not depend on transport outages to infer capability state.
+
+- canonical lifecycle states:
+  - `unavailable`
+  - `warming`
+  - `ready`
+  - `failed`
+- readiness endpoints can return `RuntimeReadinessResponseContract` with a `runtime` lifecycle payload.
+- guarded runtime endpoints can return `RuntimeGuardedEndpointUnavailableResponseContract` with endpoint identity + blocked lifecycle state.
+- contracts include:
+  - machine-readable blocking reason codes,
+  - retryability and optional retry timing,
+  - ISO timestamps (`checkedAt`, `updatedAt`, and state-specific timestamps),
+  - optional diagnostics metadata for desktop-local troubleshooting.
 
 ## Responsibility Split
 

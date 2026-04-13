@@ -11,6 +11,7 @@ import type {
   RuntimeSdkStartExecutionResponse,
 } from "@infrastructure/api/system-runtime/sdk/PublicExternalRuntimeSdkContract";
 import type { SharedApiMutationResult } from "@shared/contracts/api/SharedApiContractPrimitives";
+import type { RuntimeAvailabilityResponseContract } from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
 import {
   type ExecutionReadinessNodeAvailabilitySummary,
   RunOrchestrationTransportRoutes,
@@ -25,6 +26,7 @@ import {
 
 export type * from "@infrastructure/api/system-runtime/sdk/PublicExternalRuntimeSdkContract";
 export type * from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+export type * from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
 
 export const SystemRuntimeTransportRoutes = Object.freeze({
   startRun: RunOrchestrationTransportRoutes.submitRun,
@@ -117,6 +119,7 @@ export interface RuntimeExecutionReadinessResponse {
   readonly checkedAt: string;
   readonly readiness: "ready" | "degraded" | "unavailable";
   readonly readyForExecution: boolean;
+  readonly runtimeLifecycle?: RuntimeAvailabilityResponseContract;
   readonly message?: string;
   readonly capabilities: {
     readonly backendFamily: string;
