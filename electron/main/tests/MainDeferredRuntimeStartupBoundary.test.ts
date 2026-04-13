@@ -53,6 +53,8 @@ describe("electron main deferred runtime startup boundary", () => {
     expect(stopIndex).toBeGreaterThan(-1);
     expect(startIndex).toBeGreaterThan(-1);
     expect(stopIndex).toBeLessThan(startIndex);
+    expect(mainSource).toContain("const previousRuntimePort = previousRuntime.port;");
+    expect(mainSource).toContain("port: previousRuntimePort,");
   });
   it("keeps python runtime resolution and service supervisor startup in post-login runtime composition", () => {
     expect(bootstrapperSource).toContain("async function composePostLoginRuntime(");
