@@ -118,7 +118,6 @@ let canonicalRegistryRuntimeProvider: CanonicalRegistryRuntimeProvider | undefin
 let desktopOperationalEventLogger: DesktopOperationalEventLogger | undefined;
 let authIpcRegistered = false;
 let deferredFeatureIpcRegistered = false;
-let deferredFeatureIpcReady = false;
 let isDesktopRuntimeDisposing = false;
 let authShellBootstrapResult: AuthShellBootstrapResult | undefined;
 const postLoginRuntimeStatusStore = createDesktopPostLoginRuntimeStatusStore();
@@ -231,8 +230,6 @@ function registerAuthIpc(): void {
         storageDatabase?.removeItem(key);
       },
     },
-    // Reports deferred-feature IPC readiness to control renderer feature gating.
-    isDeferredFeatureIpcReady: () => deferredFeatureIpcReady,
     // Returns lifecycle status of post-login runtime warmup.
     getPostLoginRuntimeStatus: () => postLoginRuntimeStatusStore.getStatus(),
     // Handles explicit renderer requests to start post-login warmup.
@@ -422,9 +419,6 @@ const postLoginRuntimeDependencyActivator = createPostLoginRuntimeDependencyActi
   setCanonicalRegistryRuntimeProvider: (provider) => {
     canonicalRegistryRuntimeProvider = provider;
   },
-  markDeferredFeatureIpcReady: () => {
-    deferredFeatureIpcReady = true;
-  },
   isDeferredFeatureIpcRegistered: () => deferredFeatureIpcRegistered,
   markDeferredFeatureIpcRegistered: () => {
     deferredFeatureIpcRegistered = true;
@@ -476,9 +470,6 @@ runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({
   clearBootstrapContext: () => {
     bootstrapContext = undefined;
     rendererContentSecurityPolicyRuntimeConfig = undefined;
-  },
-  resetDeferredFeatureIpcReadiness: () => {
-    deferredFeatureIpcReady = false;
   },
   resetWarmupStarted: () => {
     postLoginRuntimeActivationService.resetWarmupStarted();

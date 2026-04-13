@@ -29,6 +29,13 @@ describe("electron main post-login runtime composition", () => {
     expect(dependencyActivatorSource).toContain("const serviceSupervisor = new DesktopServiceSupervisor(");
     expect(dependencyActivatorSource).toContain("startServiceSupervisorActivationStage({");
     expect(dependencyActivatorSource).toContain("postLoginRuntimeStatusStore: params.postLoginRuntimeStatusStore");
+    expect(dependencyActivatorSource).toContain("markDeferredFeatureRuntimeCompositionRunning()");
+    expect(dependencyActivatorSource).toContain("markDeferredFeatureRuntimeCompositionReady({");
+    expect(dependencyActivatorSource).toContain("markDeferredFeatureProviderSetupRunning()");
+    expect(dependencyActivatorSource).toContain("markDeferredFeatureProviderSetupReady({");
+    expect(dependencyActivatorSource).toContain("markDeferredFeatureIpcRegistrationRunning()");
+    expect(dependencyActivatorSource).toContain("markDeferredFeatureIpcRegistrationReady({");
+    expect(dependencyActivatorSource).toContain("postLoginRuntimeStatusStore.markReady()");
     expect(activationServiceSource).toContain("controlPlaneRuntime.activateCapabilities(");
     expect(activationServiceSource).toContain("AuthoritativeServerCapabilityIds.deferredRuntimeFeatures");
     expect(mainSource).not.toContain("promoteControlPlaneRuntimeForPostLogin");

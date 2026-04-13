@@ -41,7 +41,6 @@ describe("DesktopRuntimeDisposalCoordinator", () => {
       },
     };
     let bootstrapContextCleared = false;
-    let deferredIpcReset = false;
     let warmupReset = false;
     let authShellCleared = false;
     let deferredFactoryCleared = false;
@@ -88,9 +87,6 @@ describe("DesktopRuntimeDisposalCoordinator", () => {
       clearBootstrapContext: () => {
         bootstrapContextCleared = true;
       },
-      resetDeferredFeatureIpcReadiness: () => {
-        deferredIpcReset = true;
-      },
       resetWarmupStarted: () => {
         warmupReset = true;
       },
@@ -125,7 +121,6 @@ describe("DesktopRuntimeDisposalCoordinator", () => {
     expect(agentRuntimeProvider).toBeUndefined();
     expect(canonicalRegistryRuntimeProvider).toBeUndefined();
     expect(bootstrapContextCleared).toBeTrue();
-    expect(deferredIpcReset).toBeTrue();
     expect(warmupReset).toBeTrue();
     expect(authShellCleared).toBeTrue();
     expect(deferredFactoryCleared).toBeTrue();

@@ -23,7 +23,6 @@ type RuntimeDisposalStateAccessors = {
   readonly getCanonicalRegistryRuntimeProvider: () => CanonicalRegistryRuntimeProvider | undefined;
   readonly setCanonicalRegistryRuntimeProvider: (provider: CanonicalRegistryRuntimeProvider | undefined) => void;
   readonly clearBootstrapContext: () => void;
-  readonly resetDeferredFeatureIpcReadiness: () => void;
   readonly resetWarmupStarted: () => void;
   readonly clearAuthShellBootstrapResult: () => void;
   readonly clearDeferredRuntimeFactoryCache: () => void;
@@ -63,7 +62,6 @@ export function createDesktopRuntimeDisposalCoordinator(
     params.setServiceSupervisor(undefined);
     params.setControlPlaneServerRuntime(undefined);
     params.clearBootstrapContext();
-    params.resetDeferredFeatureIpcReadiness();
     params.resetWarmupStarted();
     params.clearAuthShellBootstrapResult();
     params.postLoginRuntimeStatusStore.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.preLogin);

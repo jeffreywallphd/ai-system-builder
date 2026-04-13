@@ -20,7 +20,6 @@ export type RegisterAuthBootstrapIpcParams = {
     readonly setItem: (key: string, value: string) => void;
     readonly removeItem: (key: string) => void;
   };
-  readonly isDeferredFeatureIpcReady: () => boolean;
   readonly getPostLoginRuntimeStatus: () => DesktopPostLoginRuntimeStatus;
   readonly startPostLoginWarmup: (request: DesktopPostLoginWarmupRequest) => Promise<void>;
   readonly connectivity: {
@@ -79,7 +78,7 @@ export function registerAuthBootstrapIpc(params: RegisterAuthBootstrapIpcParams)
     event.returnValue = true;
   });
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady, (event) => {
-    event.returnValue = params.isDeferredFeatureIpcReady();
+    event.returnValue = params.getPostLoginRuntimeStatus().state === "ready";
   });
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.postLoginRuntimeStatus, (event) => {
     event.returnValue = params.getPostLoginRuntimeStatus();

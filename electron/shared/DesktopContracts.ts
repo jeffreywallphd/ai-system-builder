@@ -289,6 +289,9 @@ export type DesktopPostLoginRuntimeActivationMode = DesktopControlPlaneCapabilit
 export const DesktopPostLoginActivationStageIds = Object.freeze({
   pythonRuntimeResolution: "python-runtime-resolution",
   serviceSupervisorStartup: "service-supervisor-startup",
+  deferredFeatureRuntimeComposition: "deferred-feature-runtime-composition",
+  deferredFeatureProviderSetup: "deferred-feature-provider-setup",
+  deferredFeatureIpcRegistration: "deferred-feature-ipc-registration",
 });
 
 export type DesktopPostLoginActivationStageId =
