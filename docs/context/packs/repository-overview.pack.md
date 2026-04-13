@@ -79,13 +79,11 @@
 - `context-system-foundations`: use with this pack when changing context contracts, routing maps, governance assets, or pack metadata.
 - `runtime-and-host`: prefer for runtime, desktop, host startup, and lifecycle implementation or diagnostics tasks.
 - Use canonical architecture docs and ADRs for deep authority (`docs/architecture/README.md`, `docs/adr/README.md`).
-- Follow-on context-pack needs (to be authored separately, not expanded here):
-  - transport and API boundary discipline
-  - control-plane composition and startup assembly discipline
-  - security material and trust hardening
-  - persistence and migration governance
-  - observability and readiness diagnostics
-  - development-mode and deployment-profile governance
+- Use targeted follow-on packs when operational seams are in scope:
+  - `startup-and-host-promotion`
+  - `transport-and-runtime-availability`
+  - `observability-and-readiness`
+  - `storage-persistence-and-materialization`
 
 ## Retrieval Order
 

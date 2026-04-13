@@ -201,6 +201,7 @@
         "repository-overview",
         "architecture-core",
         "runtime-and-host",
+        "startup-and-host-promotion",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -219,7 +220,8 @@
         "doc-architecture-domain-runtime-host-surfaces-overview",
         "doc-architecture-domain-core-platform-and-composition-overview",
         "doc-architecture-domain-and-application-core",
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-context-pack-startup-and-host-promotion"
       ]
     },
     {
@@ -248,6 +250,8 @@
         "repository-overview",
         "architecture-core",
         "runtime-and-host",
+        "transport-and-runtime-availability",
+        "observability-and-readiness",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -265,7 +269,9 @@
         "doc-operations-secret-health-diagnostics",
         "doc-operations-security-policy-configuration",
         "doc-architecture-domain-runtime-host-surfaces-overview",
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-observability-and-readiness"
       ]
     },
     {
@@ -341,6 +347,8 @@
         "repository-overview",
         "architecture-core",
         "runtime-and-host",
+        "transport-and-runtime-availability",
+        "storage-persistence-and-materialization",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
@@ -354,7 +362,9 @@
         "docs/architecture/secrets-foundation.md"
       ],
       "relatedDocRecordIds": [
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-storage-persistence-and-materialization"
       ]
     },
     {

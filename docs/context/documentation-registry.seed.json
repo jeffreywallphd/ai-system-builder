@@ -2109,6 +2109,139 @@
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-context-pack-startup-and-host-promotion",
+      "path": "docs/context/packs/startup-and-host-promotion.pack.md",
+      "aiPath": "docs/context/packs/startup-and-host-promotion.pack.ai.md",
+      "title": "Startup and Host Promotion Context Pack",
+      "docType": "ai-context",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "supplemental",
+      "summary": "Focused pack for startup phase boundaries, host-promotion sequencing, and control-plane authority preservation.",
+      "keywords": [
+        "startup host promotion pack",
+        "pre-login post-login boundary",
+        "host lifecycle sequencing",
+        "control-plane authority"
+      ],
+      "relatedCodePaths": [
+        "src/hosts/bootstrap",
+        "src/hosts/lifecycle",
+        "electron/main/runtime"
+      ],
+      "relatedRecordIds": [
+        "doc-context-pack-runtime-and-host",
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-architecture-domain-runtime-host-surfaces-overview"
+      ],
+      "relatedDocs": [
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/architecture/post-login-runtime-deferral-boundary.md",
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md"
+      ],
+      "owner": "team:runtime-platform",
+      "lastReviewed": "2026-04-13"
+    },
+    {
+      "recordId": "doc-context-pack-transport-and-runtime-availability",
+      "path": "docs/context/packs/transport-and-runtime-availability.pack.md",
+      "aiPath": "docs/context/packs/transport-and-runtime-availability.pack.ai.md",
+      "title": "Transport and Runtime Availability Context Pack",
+      "docType": "ai-context",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "supplemental",
+      "summary": "Focused pack for deferred API readiness gating, transport lifecycle contracts, and explicit degraded runtime truthfulness.",
+      "keywords": [
+        "transport runtime availability pack",
+        "deferred api readiness",
+        "runtime gated endpoints",
+        "degraded fallback truthfulness"
+      ],
+      "relatedCodePaths": [
+        "src/shared/contracts/runtime/RuntimeAvailabilityResponseContracts.ts",
+        "src/infrastructure/transport/http-server/identity",
+        "src/ui/runtime"
+      ],
+      "relatedRecordIds": [
+        "doc-context-pack-runtime-and-host",
+        "doc-architecture-domain-api-and-transport-surfaces-overview"
+      ],
+      "relatedDocs": [
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/architecture/unified-api-authoritative-surface.md",
+        "docs/unified-api-observability-troubleshooting.md"
+      ],
+      "owner": "team:runtime-platform",
+      "lastReviewed": "2026-04-13"
+    },
+    {
+      "recordId": "doc-context-pack-observability-and-readiness",
+      "path": "docs/context/packs/observability-and-readiness.pack.md",
+      "aiPath": "docs/context/packs/observability-and-readiness.pack.ai.md",
+      "title": "Observability and Readiness Context Pack",
+      "docType": "ai-context",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "supplemental",
+      "summary": "Focused pack for readiness checkpoints, structured diagnostics, correlation, and redaction-safe observability behavior.",
+      "keywords": [
+        "observability readiness pack",
+        "startup checkpoints",
+        "runtime diagnostics truthfulness",
+        "redaction correlation contracts"
+      ],
+      "relatedCodePaths": [
+        "src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts",
+        "src/ui/shared/api/SharedApiClient.ts",
+        "src/shared/contracts/runtime/RuntimeAvailabilityResponseContracts.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-runtime-and-host"
+      ],
+      "relatedDocs": [
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md",
+        "docs/unified-api-observability-troubleshooting.md"
+      ],
+      "owner": "team:runtime-platform",
+      "lastReviewed": "2026-04-13"
+    },
+    {
+      "recordId": "doc-context-pack-storage-persistence-and-materialization",
+      "path": "docs/context/packs/storage-persistence-and-materialization.pack.md",
+      "aiPath": "docs/context/packs/storage-persistence-and-materialization.pack.ai.md",
+      "title": "Storage, Persistence, and Materialization Context Pack",
+      "docType": "ai-context",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "supplemental",
+      "summary": "Focused pack for canonical durable storage, persistence verification, and materialization truth across runtime features.",
+      "keywords": [
+        "storage persistence materialization pack",
+        "durable storage truth",
+        "persistence verification",
+        "lineage and materialization"
+      ],
+      "relatedCodePaths": [
+        "src/domain/storage",
+        "src/infrastructure/persistence/storage",
+        "src/infrastructure/persistence/generated-results"
+      ],
+      "relatedRecordIds": [
+        "doc-adr-003-storage-as-managed-platform-resource",
+        "doc-architecture-domain-workspace-storage-and-assets-overview"
+      ],
+      "relatedDocs": [
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/architecture/storage-persistence-contracts.md",
+        "docs/architecture/generated-result-authoritative-persistence-preview-lineage-posture.md"
+      ],
+      "owner": "team:storage-platform",
+      "lastReviewed": "2026-04-13"
     }
   ],
   "discoveryIndex": {
@@ -2180,7 +2313,11 @@
         "doc-context-pack-identity-and-security",
         "doc-context-pack-repository-overview",
         "doc-context-pack-runtime-and-host",
-        "doc-context-pack-studio-and-system-composition"
+        "doc-context-pack-studio-and-system-composition",
+        "doc-context-pack-startup-and-host-promotion",
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-observability-and-readiness",
+        "doc-context-pack-storage-persistence-and-materialization"
       ]
     },
     "byStatus": {
@@ -2235,7 +2372,11 @@
         "doc-contributors-documentation-quality-tooling-maintenance-guide",
         "doc-contributors-documentation-quality-exceptions-and-escape-hatches-guide",
         "doc-contributors-documentation-quality-monitoring-and-feedback-guide",
-        "doc-contributors-documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide"
+        "doc-contributors-documentation-quality-rollout-boundaries-and-follow-on-opportunities-guide",
+        "doc-context-pack-startup-and-host-promotion",
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-observability-and-readiness",
+        "doc-context-pack-storage-persistence-and-materialization"
       ],
       "deprecated": [],
       "superseded": [
@@ -2294,7 +2435,11 @@
         "doc-operations-security-policy-configuration",
         "doc-operations-secret-health-diagnostics",
         "doc-operations-workspace-administration",
-        "doc-operations-storage-administration"
+        "doc-operations-storage-administration",
+        "doc-context-pack-startup-and-host-promotion",
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-observability-and-readiness",
+        "doc-context-pack-storage-persistence-and-materialization"
       ],
       "decision-records": [
         "doc-adr-001-single-authoritative-control-plane",
@@ -2375,7 +2520,11 @@
         "doc-context-pack-identity-and-security",
         "doc-context-pack-repository-overview",
         "doc-context-pack-runtime-and-host",
-        "doc-context-pack-studio-and-system-composition"
+        "doc-context-pack-studio-and-system-composition",
+        "doc-context-pack-startup-and-host-promotion",
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-observability-and-readiness",
+        "doc-context-pack-storage-persistence-and-materialization"
       ],
       "historical": [
         "doc-baseline-documentation-migration-baseline",
@@ -2393,7 +2542,8 @@
         "doc-context-pack-architecture-core",
         "doc-adr-001-single-authoritative-control-plane",
         "doc-architecture-domain-runtime-host-surfaces-overview",
-        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples",
+        "doc-context-pack-startup-and-host-promotion"
       ],
       "feature-decomposition": [
         "doc-architecture-domain-and-application-core",
@@ -2408,7 +2558,9 @@
         "doc-architecture-domain-and-application-core",
         "doc-architecture-layers-and-boundaries",
         "doc-context-pack-runtime-and-host",
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-storage-persistence-and-materialization"
       ],
       "migration-refactor": [
         "doc-context-pack-documentation-refactor",
@@ -2423,7 +2575,10 @@
         "doc-operations-node-bootstrap-identity",
         "doc-architecture-domain-runtime-host-surfaces-overview",
         "doc-adr-001-single-authoritative-control-plane",
-        "doc-contributors-documentation-index-assisted-discovery-worked-examples"
+        "doc-contributors-documentation-index-assisted-discovery-worked-examples",
+        "doc-context-pack-startup-and-host-promotion",
+        "doc-context-pack-transport-and-runtime-availability",
+        "doc-context-pack-observability-and-readiness"
       ],
       "ui-studio": [
         "doc-context-pack-studio-and-system-composition",

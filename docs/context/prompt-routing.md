@@ -50,6 +50,10 @@ Use the smallest context set that can still produce a correct answer:
 
 - Start with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then category-specific domain packs, then `context-system-foundations`) and the mapping's `relatedDocPaths`.
 - For runtime/host/desktop/startup tasks, insert `runtime-and-host` after `architecture-core` and before `context-system-foundations`.
+- For startup sequencing, host-promotion, and pre-login/post-login boundary tasks, insert `startup-and-host-promotion` after `runtime-and-host`.
+- For deferred API readiness, transport lifecycle, and degraded-runtime truthfulness tasks, insert `transport-and-runtime-availability` after `runtime-and-host` (or after `startup-and-host-promotion` when both apply).
+- For readiness checkpoint, diagnostic redaction/correlation, and observability-contract tasks, insert `observability-and-readiness` after runtime availability context.
+- For durable storage authority, persistence verification, and file/materialization truth tasks, insert `storage-persistence-and-materialization` before `context-system-foundations`.
 - For identity/authentication/authorization/trust/secrets-sensitive tasks, insert `identity-and-security` after `architecture-core` and before `context-system-foundations`.
 - For Studio Shell and System Studio composition tasks, insert `studio-and-system-composition` after `architecture-core` and before `context-system-foundations`.
 - Add ADR references only when decisions materially constrain implementation outcomes (for example control-plane authority, trust boundary enforcement, or studio/system authority).
@@ -106,6 +110,7 @@ Use when reviewing boundaries, host composition seams, or contract implications.
 
 Primary docs:
 - `docs/context/packs/runtime-and-host.pack.md`
+- `docs/context/packs/startup-and-host-promotion.pack.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/architecture/worker-host-assembly.md`
@@ -134,6 +139,9 @@ Use for behavior-changing code work with tests and docs alignment.
 
 Primary docs:
 - `docs/context/packs/runtime-and-host.pack.md`
+- `docs/context/packs/startup-and-host-promotion.pack.md`
+- `docs/context/packs/transport-and-runtime-availability.pack.md`
+- `docs/context/packs/storage-persistence-and-materialization.pack.md`
 - `docs/architecture/workflow-execution-and-tools.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/contributors/docs-foundation-validation.md`
@@ -161,6 +169,9 @@ Use for regressions, startup failures, and root-cause work.
 
 Primary docs:
 - `docs/context/packs/runtime-and-host.pack.md`
+- `docs/context/packs/startup-and-host-promotion.pack.md`
+- `docs/context/packs/transport-and-runtime-availability.pack.md`
+- `docs/context/packs/observability-and-readiness.pack.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/unified-api-observability-troubleshooting.md`
@@ -289,12 +300,13 @@ Routing inputs:
 - `requestedOutcomes`: `boundary-review`, `contract-impact-summary`, `recommended-change-plan`
 
 Expected context assembly:
-- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `startup-and-host-promotion`, `context-system-foundations`
 - Ordered docs:
-1. `docs/architecture/authoritative-server-host-assembly.md`
-2. `docs/architecture/desktop-host-assembly.md`
-3. `docs/architecture/worker-host-assembly.md`
-4. `docs/architecture/studio-handoff-contract.md`
+1. `docs/context/packs/startup-and-host-promotion.pack.md`
+2. `docs/architecture/authoritative-server-host-assembly.md`
+3. `docs/architecture/desktop-host-assembly.md`
+4. `docs/architecture/worker-host-assembly.md`
+5. `docs/architecture/studio-handoff-contract.md`
 
 Explicit exclusions:
 - stale baseline snapshots superseded by current architecture references
@@ -314,11 +326,13 @@ Routing inputs:
 - `requestedOutcomes`: `root-cause`, `minimal-fix`, `regression-test`
 
 Expected context assembly:
-- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `transport-and-runtime-availability`, `observability-and-readiness`, `context-system-foundations`
 - Ordered docs:
-1. `docs/architecture/authoritative-server-host-assembly.md`
-2. `docs/architecture/desktop-host-assembly.md`
-3. `docs/unified-api-observability-troubleshooting.md`
+1. `docs/context/packs/transport-and-runtime-availability.pack.md`
+2. `docs/context/packs/observability-and-readiness.pack.md`
+3. `docs/architecture/authoritative-server-host-assembly.md`
+4. `docs/architecture/desktop-host-assembly.md`
+5. `docs/unified-api-observability-troubleshooting.md`
 
 Explicit exclusions:
 - feature decomposition planning docs unless triage reveals planning-rooted contract gaps
@@ -338,11 +352,13 @@ Routing inputs:
 - `requestedOutcomes`: `minimal-safe-runtime-fix`, `targeted-regression-tests`, `contract-aligned-doc-update`
 
 Expected context assembly:
-- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `transport-and-runtime-availability`, `storage-persistence-and-materialization`, `context-system-foundations`
 - Ordered docs:
-1. `docs/architecture/host-bootstrap-pipeline.md`
-2. `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
-3. `docs/architecture/desktop-auth-first-startup-boundary.md`
+1. `docs/context/packs/transport-and-runtime-availability.pack.md`
+2. `docs/context/packs/storage-persistence-and-materialization.pack.md`
+3. `docs/architecture/host-bootstrap-pipeline.md`
+4. `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
+5. `docs/architecture/desktop-auth-first-startup-boundary.md`
 
 Explicit exclusions:
 - `docs/ui/README.md` (UI guidance is not primary authority for startup runtime composition)

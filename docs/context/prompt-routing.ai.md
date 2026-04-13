@@ -49,6 +49,10 @@ Rationale:
 
 - Begin with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then category-specific domain packs, then `context-system-foundations`) and mapping `relatedDocPaths`.
 - For runtime/host/desktop/startup tasks, insert `runtime-and-host` after `architecture-core` and before `context-system-foundations`.
+- For startup sequencing, host-promotion, and pre-login/post-login boundary tasks, insert `startup-and-host-promotion` after `runtime-and-host`.
+- For deferred API readiness, transport lifecycle, and degraded-runtime truthfulness tasks, insert `transport-and-runtime-availability` after `runtime-and-host` (or after `startup-and-host-promotion` when both apply).
+- For readiness checkpoints, diagnostic redaction/correlation, and observability-contract tasks, insert `observability-and-readiness` after runtime availability context.
+- For durable storage authority, persistence verification, and file/materialization truth tasks, insert `storage-persistence-and-materialization` before `context-system-foundations`.
 - For identity/authentication/authorization/trust/secrets-sensitive tasks, insert `identity-and-security` after `architecture-core` and before `context-system-foundations`.
 - For Studio Shell/System Studio composition tasks, insert `studio-and-system-composition` after `architecture-core` and before `context-system-foundations`.
 - Add ADR references only when decision history materially constrains the requested implementation outcome.
@@ -102,6 +106,7 @@ Use this order:
 ### `architecture-review`
 Primary docs:
 - `docs/context/packs/runtime-and-host.pack.ai.md`
+- `docs/context/packs/startup-and-host-promotion.pack.ai.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/architecture/worker-host-assembly.md`
@@ -120,6 +125,9 @@ Primary surfaces:
 ### `coding-implementation`
 Primary docs:
 - `docs/context/packs/runtime-and-host.pack.ai.md`
+- `docs/context/packs/startup-and-host-promotion.pack.ai.md`
+- `docs/context/packs/transport-and-runtime-availability.pack.ai.md`
+- `docs/context/packs/storage-persistence-and-materialization.pack.ai.md`
 - `docs/architecture/workflow-execution-and-tools.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/contributors/docs-foundation-validation.md`
@@ -136,6 +144,9 @@ Primary surfaces:
 ### `diagnostics`
 Primary docs:
 - `docs/context/packs/runtime-and-host.pack.ai.md`
+- `docs/context/packs/startup-and-host-promotion.pack.ai.md`
+- `docs/context/packs/transport-and-runtime-availability.pack.ai.md`
+- `docs/context/packs/observability-and-readiness.pack.ai.md`
 - `docs/architecture/authoritative-server-host-assembly.md`
 - `docs/architecture/desktop-host-assembly.md`
 - `docs/unified-api-observability-troubleshooting.md`
@@ -209,34 +220,39 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Review server/desktop/worker host boundary changes before implementation."
 - Category: `architecture-review`
 - Inputs: `src/hosts`, `src/application`, `docs/architecture`, `dev/tests/HostCompositionArchitectureGuardrails.test.ts`
-- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `startup-and-host-promotion`, `context-system-foundations`
 - Ordered docs:
-1. `docs/architecture/authoritative-server-host-assembly.md`
-2. `docs/architecture/desktop-host-assembly.md`
-3. `docs/architecture/worker-host-assembly.md`
-4. `docs/architecture/studio-handoff-contract.md`
+1. `docs/context/packs/startup-and-host-promotion.pack.ai.md`
+2. `docs/architecture/authoritative-server-host-assembly.md`
+3. `docs/architecture/desktop-host-assembly.md`
+4. `docs/architecture/worker-host-assembly.md`
+5. `docs/architecture/studio-handoff-contract.md`
 - Exclude stale historical baselines and unrelated UI-only docs when host contracts are the primary surface.
 
 ### Example D: Runtime troubleshooting for startup regression
 - Task request: "Investigate authoritative host startup regression and produce a minimal safe fix."
 - Category: `diagnostics`
 - Inputs: `src/hosts`, `src/infrastructure/runtime`, `dev/tests/HostDevelopmentStartupScripts.test.ts`
-- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `transport-and-runtime-availability`, `observability-and-readiness`, `context-system-foundations`
 - Ordered docs:
-1. `docs/architecture/authoritative-server-host-assembly.md`
-2. `docs/architecture/desktop-host-assembly.md`
-3. `docs/unified-api-observability-troubleshooting.md`
+1. `docs/context/packs/transport-and-runtime-availability.pack.ai.md`
+2. `docs/context/packs/observability-and-readiness.pack.ai.md`
+3. `docs/architecture/authoritative-server-host-assembly.md`
+4. `docs/architecture/desktop-host-assembly.md`
+5. `docs/unified-api-observability-troubleshooting.md`
 - Exclude feature-planning docs and broad refactor narratives unless reproduction evidence requires them.
 
 ### Example F: Runtime-host implementation for startup readiness
 - Task request: "Implement a host-startup readiness fix for desktop post-login runtime initialization with targeted regression coverage."
 - Category: `coding-implementation`
 - Inputs: `src/hosts/desktop`, `src/hosts/bootstrap`, `electron/main/runtime`, `dev/tests/HostDevelopmentStartupScripts.test.ts`
-- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `runtime-and-host`, `transport-and-runtime-availability`, `storage-persistence-and-materialization`, `context-system-foundations`
 - Ordered docs:
-1. `docs/architecture/host-bootstrap-pipeline.md`
-2. `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
-3. `docs/architecture/desktop-auth-first-startup-boundary.md`
+1. `docs/context/packs/transport-and-runtime-availability.pack.ai.md`
+2. `docs/context/packs/storage-persistence-and-materialization.pack.ai.md`
+3. `docs/architecture/host-bootstrap-pipeline.md`
+4. `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
+5. `docs/architecture/desktop-auth-first-startup-boundary.md`
 - Exclude UI-only docs and unrelated security-foundation docs unless runtime-host evidence requires them.
 
 ### Example E: Studio/System interaction-flow update
