@@ -41,6 +41,7 @@
 - [Feature 1 Documentation Foundation Completion Handoff](./feature-1-documentation-foundation-handoff.md)
 - [Domain and Application Core Historical Evolution](./architecture/core-platform-and-composition/domain-and-application-core-historical-evolution.md)
 - [Desktop Runtime and Hosts Historical Evolution](./architecture/runtime-host-surfaces/desktop-runtime-and-hosts-historical-evolution.md)
+- [Desktop Control-Plane Host Promotion Baseline (Story 1.1.1)](./architecture/runtime-host-surfaces/desktop-control-plane-host-promotion-baseline-1.1.1.md)
 - [Entrypoint Host Composition Migration (Story 12.4.1) Baseline](./architecture/runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.md)
 - [Development and Test Startup Host Migration (Story 12.4.2) Baseline](./architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.md)
 - [Host Composition Extension Guardrails (Story 12.4.3) Baseline](./architecture/runtime-host-surfaces/host-composition-extension-guardrails-12.4.3.md)

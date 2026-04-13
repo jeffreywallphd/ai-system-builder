@@ -40,6 +40,7 @@ related_code_paths:
 ## Start Here
 - [Domain and Application Core Historical Evolution](./core-platform-and-composition/domain-and-application-core-historical-evolution.ai.md)
 - [Desktop Runtime and Hosts Historical Evolution](./runtime-host-surfaces/desktop-runtime-and-hosts-historical-evolution.ai.md)
+- [Desktop Control-Plane Host Promotion Baseline (Story 1.1.1)](./runtime-host-surfaces/desktop-control-plane-host-promotion-baseline-1.1.1.ai.md)
 - [Entrypoint Host Composition Migration (Story 12.4.1) Baseline](./runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.ai.md)
 - [Development and Test Startup Host Migration (Story 12.4.2) Baseline](./runtime-host-surfaces/development-host-startup-model-12.4.2.ai.md)
 - [Host Composition Extension Guardrails (Story 12.4.3) Baseline](./runtime-host-surfaces/host-composition-extension-guardrails-12.4.3.ai.md)
