@@ -4,10 +4,12 @@ import { ReferenceImageSystemTemplate } from "@application/system-studio/Referen
 import ImageManipulationRuntimeEditorPanel, {
   buildImageRunFailureRecoveryGuidance,
   buildImageRunLaunchPrecheckState,
+  ExecutionReadinessLifecycleActions,
   formatAssetFileSize,
   groupRecentImageAssetsByContinuityWindow,
   ImageRunFailureRecoveryActionIds,
   resolveNextGalleryPreviewRoleByKey,
+  resolveExecutionReadinessLifecycleAction,
   resolveImageRunFailureRecoveryActionPlan,
   resolveLinkedRunForSelectedOutput,
   resolveCollectionLoadingMessage,
@@ -155,6 +157,36 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       isPersistingRunResult: false,
       isRefreshingAfterRun: false,
     })).toContain("Retrieving");
+  });
+
+  it("routes readiness checks through runtime lifecycle activation before querying backend readiness", () => {
+    expect(resolveExecutionReadinessLifecycleAction({
+      sessionToken: undefined,
+      runtimeLifecycleReady: false,
+      hasRuntimeLifecycleBridge: true,
+      executionReadinessFeatureAvailable: true,
+    })).toBe(ExecutionReadinessLifecycleActions.blockUnauthorized);
+
+    expect(resolveExecutionReadinessLifecycleAction({
+      sessionToken: "session-token",
+      runtimeLifecycleReady: false,
+      hasRuntimeLifecycleBridge: true,
+      executionReadinessFeatureAvailable: true,
+    })).toBe(ExecutionReadinessLifecycleActions.activateRuntime);
+
+    expect(resolveExecutionReadinessLifecycleAction({
+      sessionToken: "session-token",
+      runtimeLifecycleReady: true,
+      hasRuntimeLifecycleBridge: true,
+      executionReadinessFeatureAvailable: true,
+    })).toBe(ExecutionReadinessLifecycleActions.queryReadiness);
+
+    expect(resolveExecutionReadinessLifecycleAction({
+      sessionToken: "session-token",
+      runtimeLifecycleReady: true,
+      hasRuntimeLifecycleBridge: false,
+      executionReadinessFeatureAvailable: false,
+    })).toBe(ExecutionReadinessLifecycleActions.skipFeatureUnavailable);
   });
 
   it("flags refresh-needed state only when authoritative surfaces are no longer actively loading", () => {

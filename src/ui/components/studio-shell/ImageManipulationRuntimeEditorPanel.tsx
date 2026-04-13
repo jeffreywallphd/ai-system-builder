@@ -247,6 +247,34 @@ function isDeferredFeatureApiUnavailable(errorCode: string | undefined): boolean
   return errorCode === "not-found";
 }
 
+export const ExecutionReadinessLifecycleActions = Object.freeze({
+  queryReadiness: "query-readiness",
+  activateRuntime: "activate-runtime",
+  blockUnauthorized: "block-unauthorized",
+  skipFeatureUnavailable: "skip-feature-unavailable",
+});
+
+export type ExecutionReadinessLifecycleAction =
+  typeof ExecutionReadinessLifecycleActions[keyof typeof ExecutionReadinessLifecycleActions];
+
+export function resolveExecutionReadinessLifecycleAction(input: {
+  readonly sessionToken?: string;
+  readonly runtimeLifecycleReady: boolean;
+  readonly hasRuntimeLifecycleBridge: boolean;
+  readonly executionReadinessFeatureAvailable: boolean;
+}): ExecutionReadinessLifecycleAction {
+  if (!input.sessionToken) {
+    return ExecutionReadinessLifecycleActions.blockUnauthorized;
+  }
+  if (!input.executionReadinessFeatureAvailable) {
+    return ExecutionReadinessLifecycleActions.skipFeatureUnavailable;
+  }
+  if (input.hasRuntimeLifecycleBridge && !input.runtimeLifecycleReady) {
+    return ExecutionReadinessLifecycleActions.activateRuntime;
+  }
+  return ExecutionReadinessLifecycleActions.queryReadiness;
+}
+
 function mergeHydratedSelectionWithPersistedSession(input: {
   readonly hydratedSelection: {
     readonly selectedDatasetBindingId?: string;
@@ -1692,6 +1720,7 @@ export function ImageManipulationRuntimeEditorPanel({
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
+  const runtimeActivationRequestRef = useRef<Promise<void> | undefined>(undefined);
   const recentImageAssetGroups = useMemo(
     () => groupRecentImageAssetsByContinuityWindow(recentImageAssets),
     [recentImageAssets],
@@ -1808,21 +1837,50 @@ export function ImageManipulationRuntimeEditorPanel({
   const runtimeWorkflowAssetVersionId = hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateVersionId
     ?? ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId;
 
+  const ensureRuntimeLifecycleActivated = (): Promise<void> => {
+    if (runtimeActivationRequestRef.current) {
+      return runtimeActivationRequestRef.current;
+    }
+    const request = desktopRuntimeLifecycle.retry()
+      .catch((error) => {
+        console.warn("Unable to activate runtime lifecycle before readiness check.", error);
+      })
+      .finally(() => {
+        runtimeActivationRequestRef.current = undefined;
+      });
+    runtimeActivationRequestRef.current = request;
+    return request;
+  };
+
   const refreshExecutionReadiness = (): Promise<void> => {
-    if (!sessionToken) {
+    const lifecycleAction = resolveExecutionReadinessLifecycleAction({
+      sessionToken,
+      runtimeLifecycleReady: isDesktopFeatureApiReady,
+      hasRuntimeLifecycleBridge: desktopRuntimeLifecycle.hasRuntimeBridge,
+      executionReadinessFeatureAvailable: deferredFeatureApiAvailability.executionReadiness,
+    });
+    if (lifecycleAction === ExecutionReadinessLifecycleActions.blockUnauthorized) {
       setExecutionReadiness(undefined);
       setExecutionReadinessError("Sign in to check execution environment availability.");
       setExecutionReadinessErrorCode("unauthorized");
       return Promise.resolve();
     }
+    if (lifecycleAction === ExecutionReadinessLifecycleActions.skipFeatureUnavailable) {
+      setExecutionReadiness(undefined);
+      setExecutionReadinessError(undefined);
+      setExecutionReadinessErrorCode(undefined);
+      return Promise.resolve();
+    }
+    if (lifecycleAction === ExecutionReadinessLifecycleActions.activateRuntime) {
+      setExecutionReadiness(undefined);
+      setExecutionReadinessError(undefined);
+      setExecutionReadinessErrorCode(undefined);
+      return ensureRuntimeLifecycleActivated().then(() => undefined);
+    }
+
     setIsCheckingExecutionReadiness(true);
     setExecutionReadinessError(undefined);
     setExecutionReadinessErrorCode(undefined);
-    if (!isDesktopFeatureApiReady || !deferredFeatureApiAvailability.executionReadiness) {
-      setExecutionReadiness(undefined);
-      setIsCheckingExecutionReadiness(false);
-      return Promise.resolve();
-    }
     return runtimeOperations.getExecutionReadiness({
       systemId: runtimeWorkflowAssetId,
     }).then((response) => {
@@ -2483,7 +2541,13 @@ export function ImageManipulationRuntimeEditorPanel({
 
   useEffect(() => {
     void refreshExecutionReadiness();
-  }, [deferredFeatureApiAvailability.executionReadiness, isDesktopFeatureApiReady, runtimeWorkflowAssetId, sessionToken]);
+  }, [
+    deferredFeatureApiAvailability.executionReadiness,
+    desktopRuntimeLifecycle.hasRuntimeBridge,
+    isDesktopFeatureApiReady,
+    runtimeWorkflowAssetId,
+    sessionToken,
+  ]);
 
   useEffect(() => {
     if (!selectedHistoryRunId) {

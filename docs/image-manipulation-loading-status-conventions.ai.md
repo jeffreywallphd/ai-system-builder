@@ -11,6 +11,7 @@ Use this as the implementation contract for operational UX feedback in the image
 ## Required behavior
 - Use authoritative state for lifecycle updates.
 - Avoid stagnant generic loading indicators.
+- Route readiness checks through renderer runtime lifecycle state; if lifecycle is not ready, request activation and defer readiness transport calls until ready.
 - Keep users informed across:
   - asset collection loading,
   - readiness checks,
@@ -48,6 +49,7 @@ Use this as the implementation contract for operational UX feedback in the image
 - Do not hide advisory uncertainty under success framing.
 - Keep primary copy non-technical; place codes/counts/reason details in optional advanced details.
 - Avoid UI-local outage guessing: use readiness issues, readiness state, and node-availability reason codes from authoritative contracts.
+- Do not issue readiness traffic solely because a base URL exists; desktop runtime-capability readiness must come from lifecycle status.
 - If loading settles with unresolved surface errors, show a refresh-needed/recovery-needed state with a direct recovery action.
 - Recovery actions remain authoritative (studio/runtime API paths) and must not depend on local filesystem path assumptions.
 

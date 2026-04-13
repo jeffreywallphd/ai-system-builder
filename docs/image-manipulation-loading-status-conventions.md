@@ -15,6 +15,7 @@ This note defines UX conventions for operational feedback in the image manipulat
 - Prefer specific progress context over generic spinners.
 - Show what is happening now and what data surface is being refreshed.
 - Keep transitions visible between run launch, monitoring, result retrieval, persistence, and review refresh.
+- Route execution-readiness checks through runtime lifecycle state; when lifecycle is not ready, request activation first and defer readiness calls.
 
 ## Implemented conventions
 - Contextual loading copy:
@@ -50,4 +51,5 @@ This note defines UX conventions for operational feedback in the image manipulat
 - Completion is only shown after result persistence and post-run refresh complete.
 - Degraded and warning states continue to surface backend advisories instead of masking them.
 - Outage/degraded/no-eligible-node messaging is derived from authoritative readiness contracts (readiness state, issues, node-availability reason codes), not UI-local inference.
+- The panel must not issue readiness traffic only because a runtime base URL is configured; desktop runtime readiness comes from lifecycle state.
 - Recovery actions in this surface do not call backend adapters directly and do not rely on filesystem path state; they must preserve authoritative run/result/asset identity.
