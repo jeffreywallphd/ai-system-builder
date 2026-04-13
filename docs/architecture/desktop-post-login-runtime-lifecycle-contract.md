@@ -327,6 +327,17 @@ Contract intent:
   - `electron/main/runtime/PostLoginRuntimeDependencyActivator.ts`
   - `electron/main/runtime/PostLoginRuntimeActivationService.ts`
 
+## Story 1.3.8 activation lifecycle and retry integration coverage
+
+- Integration coverage now verifies deferred runtime route behavior across a full activation lifecycle with retry on the same bound listener identity.
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthoritativeRunReadApi.test.ts` now covers:
+  - `pre-login` -> `warming` -> `failed` -> `warming` (explicit retry) -> `ready` lifecycle progression,
+  - readiness route lifecycle projection (`GET /api/v1/runtime/execution/readiness`) at each state,
+  - guarded submission route lifecycle projection (`POST /api/v1/runtime/runs/start`) while unavailable and successful submission once ready/authenticated.
+- Regression intent:
+  - runtime lifecycle state transitions must continue to surface as explicit HTTP lifecycle payloads (not socket-level outages),
+  - activation failure and retry must preserve listener reachability and lifecycle-aware route semantics until runtime reaches `ready`.
+
 ## Story 1.2.2 runtime route-family registration continuity
 
 Desktop control-plane host startup now keeps runtime route families registered from initial bind:
