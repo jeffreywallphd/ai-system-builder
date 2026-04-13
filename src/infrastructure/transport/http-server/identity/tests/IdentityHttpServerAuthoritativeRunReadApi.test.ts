@@ -595,5 +595,123 @@ describe("IdentityHttpServer authoritative run read routes", () => {
     const warmingSubmissionBody = await warmingSubmissionResponse.json();
     expect(warmingSubmissionBody.runtime.state).toBe("warming");
   });
+
+  it("keeps runtime routes listener-stable through failed activation and explicit retry to ready", async () => {
+    const queryBackend = new StubAuthoritativeRunQueryBackendApi();
+    const submissionBackend = new StubAuthoritativeRunSubmissionBackendApi();
+    let lifecycleState: "pre-login" | "warming" | "failed" | "ready" = "pre-login";
+    const baseUrl = await startServer(queryBackend, {
+      authoritativeRunSubmissionBackendApi: submissionBackend as unknown as AuthoritativeRunSubmissionBackendApi,
+      routeFamilyAvailability: Object.freeze({
+        isRouteFamilyAvailable: (routeFamilyId: string) => {
+          if (routeFamilyId !== "run-read" && routeFamilyId !== "run-submission") {
+            return true;
+          }
+          return lifecycleState === "ready";
+        },
+        resolveRouteFamilyAvailability: (routeFamilyId: string) => Object.freeze({
+          routeFamilyId,
+          capabilityId: "deferred-runtime-features",
+          state: lifecycleState,
+          available: lifecycleState === "ready",
+        }),
+      }),
+    });
+
+    const assertNoConnectionRefusal = async (request: () => Promise<Response>): Promise<Response> => {
+      try {
+        return await request();
+      } catch (error) {
+        throw new Error(
+          `Expected stable listener continuity during activation/retry lifecycle, but request threw: ${String(error)}`,
+        );
+      }
+    };
+
+    const requestReadiness = async (): Promise<unknown> => {
+      const response = await assertNoConnectionRefusal(() =>
+        fetch(`${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`)
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.ok).toBe(true);
+      return body;
+    };
+
+    const requestSubmission = async (token?: string): Promise<unknown> => {
+      const response = await assertNoConnectionRefusal(() =>
+        fetch(`${baseUrl}/api/v1/runtime/runs/start?workspaceId=workspace-alpha`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...(token ? { authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            runtimeTarget: {
+              systemId: "system:activation-lifecycle",
+              versionId: "version:1",
+              async: true,
+            },
+          }),
+        })
+      );
+      const body = await response.json();
+      return Object.freeze({ status: response.status, body });
+    };
+
+    const preLoginReadiness = await requestReadiness() as { readonly data: { readonly runtimeLifecycle: { readonly state: string } } };
+    expect(preLoginReadiness.data.runtimeLifecycle.state).toBe("unavailable");
+    const preLoginSubmission = await requestSubmission() as { readonly status: number; readonly body: { readonly runtime: { readonly state: string } } };
+    expect(preLoginSubmission.status).toBe(503);
+    expect(preLoginSubmission.body.runtime.state).toBe("unavailable");
+
+    lifecycleState = "warming";
+    const warmingReadiness = await requestReadiness() as { readonly data: { readonly runtimeLifecycle: { readonly state: string } } };
+    expect(warmingReadiness.data.runtimeLifecycle.state).toBe("warming");
+    const warmingSubmission = await requestSubmission() as { readonly status: number; readonly body: { readonly runtime: { readonly state: string } } };
+    expect(warmingSubmission.status).toBe(503);
+    expect(warmingSubmission.body.runtime.state).toBe("warming");
+
+    lifecycleState = "failed";
+    const failedReadiness = await requestReadiness() as { readonly data: { readonly runtimeLifecycle: { readonly state: string } } };
+    expect(failedReadiness.data.runtimeLifecycle.state).toBe("failed");
+    const failedSubmission = await requestSubmission() as { readonly status: number; readonly body: { readonly runtime: { readonly state: string } } };
+    expect(failedSubmission.status).toBe(503);
+    expect(failedSubmission.body.runtime.state).toBe("failed");
+
+    lifecycleState = "warming";
+    const retryWarmingReadiness = await requestReadiness() as { readonly data: { readonly runtimeLifecycle: { readonly state: string } } };
+    expect(retryWarmingReadiness.data.runtimeLifecycle.state).toBe("warming");
+    const retryWarmingSubmission = await requestSubmission() as { readonly status: number; readonly body: { readonly runtime: { readonly state: string } } };
+    expect(retryWarmingSubmission.status).toBe(503);
+    expect(retryWarmingSubmission.body.runtime.state).toBe("warming");
+
+    lifecycleState = "ready";
+    const readyUnauthenticatedReadiness = await assertNoConnectionRefusal(() =>
+      fetch(`${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`)
+    );
+    expect(readyUnauthenticatedReadiness.status).toBe(401);
+    const token = await registerAndLogin(baseUrl, "runtime.authoritative.read.retry.ready.1");
+
+    const readyReadinessResponse = await assertNoConnectionRefusal(() =>
+      fetch(`${baseUrl}${RunOrchestrationTransportRoutes.getExecutionReadiness}?workspaceId=workspace-alpha`, {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    expect(readyReadinessResponse.status).toBe(200);
+    const readyReadinessBody = await readyReadinessResponse.json();
+    expect(readyReadinessBody.ok).toBe(true);
+    expect(readyReadinessBody.data.runtimeLifecycle).toBeUndefined();
+
+    const readySubmission = await requestSubmission(token) as {
+      readonly status: number;
+      readonly body: { readonly ok: boolean; readonly data: { readonly run: { readonly state: string } } };
+    };
+    expect(readySubmission.status).toBe(200);
+    expect(readySubmission.body.ok).toBe(true);
+    expect(readySubmission.body.data.run.state).toBe("submitted");
+  });
 });
 
