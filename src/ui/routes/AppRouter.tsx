@@ -302,11 +302,15 @@ export default function AppRouter({
     ],
     [authNotice, devLoginEnabled, handleAuthenticated, handleLogout, isAuthenticated]
   );
-  const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
+  const router = useMemo(() => createBrowserRouter([...routes], {
+    future: {
+      v7_startTransition: true,
+    },
+  }), [routes]);
 
   return (
     <Suspense fallback={<AppRouterLoadingFallback />}>
-      <RouterProvider router={router} />
+      <RouterProvider router={router} future={{ v7_startTransition: true }} />
     </Suspense>
   );
 }
