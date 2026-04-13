@@ -17,6 +17,7 @@ import type { DesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRunt
 import type { DesktopOperationalEventLogger } from "../DesktopOperationalEventLogger";
 import type { DesktopPythonRuntimeInfo } from "../../shared/DesktopContracts";
 import { resolvePythonRuntimeActivationStage } from "./PythonRuntimeResolutionActivationStage";
+import { startServiceSupervisorActivationStage } from "./ServiceSupervisorActivationStage";
 
 const DesktopServiceSupervisorPort = 8790;
 
@@ -154,15 +155,11 @@ export function createPostLoginRuntimeDependencyActivator(
       pythonRuntimeBaseUrl: process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100",
     });
     params.setServiceSupervisor(serviceSupervisor);
-    const supervisorStartAt = logInitializationStart("desktop-startup.post-login-service-supervisor-start");
-    console.info("[ai-loom][startup] Starting desktop local service supervisor for post-login runtime.");
-    await serviceSupervisor.start();
-    logInitializationEnd("desktop-startup.post-login-service-supervisor-start", supervisorStartAt);
-    console.info(
-      `[ai-loom][startup] Desktop local service supervisor ready (baseUrl=${serviceSupervisor.baseUrl}, runtimeBaseUrl=${serviceSupervisor.runtimeBaseUrl}).`,
-    );
-    logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "local-service-supervisor-ready", bootstrapStartedAt);
-    logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "local-service-supervisor-ready");
+    await startServiceSupervisorActivationStage({
+      serviceSupervisor,
+      postLoginRuntimeStatusStore: params.postLoginRuntimeStatusStore,
+      bootstrapStartedAt,
+    });
 
     const baseRuntimeConfig = params.isPackaged
       ? AppRuntimeConfig.forDesktopProduction({

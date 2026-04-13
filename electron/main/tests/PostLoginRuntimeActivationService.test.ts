@@ -3,6 +3,7 @@ import type { DesktopPostLoginWarmupRequest } from "../../shared/DesktopContract
 import { DesktopPostLoginWarmupTriggerSources } from "../../shared/DesktopContracts";
 import { createPostLoginRuntimeActivationService } from "../runtime/PostLoginRuntimeActivationService";
 import type { AuthShellBootstrapResult } from "../runtime/PostLoginRuntimeDependencyActivator";
+import { ServiceSupervisorActivationStageError } from "../runtime/ServiceSupervisorActivationStage";
 
 function createWarmupRequest(overrides?: Partial<DesktopPostLoginWarmupRequest>): DesktopPostLoginWarmupRequest {
   return Object.freeze({
@@ -279,6 +280,54 @@ describe("PostLoginRuntimeActivationService", () => {
     await expect(service.startPostLoginWarmup(createWarmupRequest())).rejects.toThrow("runtime activation failed");
     expect(operations.filter((entry) => entry === "dependencies:activate")).toHaveLength(2);
     expect(operations.filter((entry) => entry === "status:failed")).toHaveLength(2);
+    expect(operations).not.toContain("runtime:dispose");
+    expect(operations).not.toContain("process:exit");
+  });
+
+  it("preserves control-plane listener resources when supervisor startup stage fails", async () => {
+    const operations: string[] = [];
+    const failure = new ServiceSupervisorActivationStageError("Desktop service supervisor startup failed.");
+
+    const service = createPostLoginRuntimeActivationService({
+      postLoginRuntimeStatusStore: {
+        markWarming: () => operations.push("status:warming"),
+        markFailed: () => operations.push("status:failed"),
+      } as never,
+      connectivityRuntimeController: {
+        startMonitoring: () => operations.push("connectivity:start"),
+      } as never,
+      getAuthShellBootstrapResult: () => Object.freeze({
+        storagePaths: {
+          appDataDirectory: "app",
+          storageDirectory: "storage",
+          databasePath: "db",
+          runtimeDirectory: "runtime",
+          logsDirectory: "logs",
+          modelsDirectory: "models",
+          assetsDirectory: "assets",
+        },
+        controlPlaneBaseUrl: "http://127.0.0.1:8111",
+      }),
+      getControlPlaneServerRuntime: () => ({
+        address: "127.0.0.1:8111",
+        activateCapabilities: () => operations.push("control-plane:activate-capabilities"),
+      }) as never,
+      activateRuntimeDependencies: async () => {
+        operations.push("dependencies:activate");
+        throw failure;
+      },
+      disposeDesktopRuntimeResources: async () => {
+        operations.push("runtime:dispose");
+      },
+      isDesktopRuntimeDisposing: () => false,
+      exitProcess: () => {
+        operations.push("process:exit");
+      },
+    });
+
+    await expect(service.startPostLoginWarmup(createWarmupRequest())).rejects.toBe(failure);
+
+    expect(operations).toContain("status:failed");
     expect(operations).not.toContain("runtime:dispose");
     expect(operations).not.toContain("process:exit");
   });

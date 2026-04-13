@@ -36,6 +36,13 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
         updatedAt: "2026-04-11T00:00:00.000Z",
         detail: "Python runtime resolution has not started.",
       },
+      {
+        stageId: "service-supervisor-startup",
+        state: "pending",
+        blockingReadiness: true,
+        updatedAt: "2026-04-11T00:00:01.000Z",
+        detail: "Service supervisor startup has not started.",
+      },
     ]);
 
     store.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
@@ -50,6 +57,12 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
           state: "pending",
           blockingReadiness: true,
           detail: "Python runtime resolution has not started.",
+        },
+        {
+          stageId: "service-supervisor-startup",
+          state: "pending",
+          blockingReadiness: true,
+          detail: "Service supervisor startup has not started.",
         },
       ],
     });
@@ -73,10 +86,21 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
           blockingReadiness: true,
           detail: "Resolving desktop Python runtime.",
         },
+        {
+          stageId: "service-supervisor-startup",
+          state: "pending",
+          blockingReadiness: true,
+          detail: "Service supervisor startup has not started.",
+        },
       ],
     });
 
     store.markPythonRuntimeResolutionReady({ detail: "mode=development-local, available=true" });
+    store.markServiceSupervisorStartupRunning();
+    store.markServiceSupervisorStartupReady({
+      baseUrl: "http://127.0.0.1:8790",
+      runtimeBaseUrl: "http://127.0.0.1:8100",
+    });
     store.markReady();
     expect(store.getStatus()).toMatchObject({
       state: "ready",
@@ -91,6 +115,12 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
           state: "ready",
           blockingReadiness: false,
           detail: "mode=development-local, available=true",
+        },
+        {
+          stageId: "service-supervisor-startup",
+          state: "ready",
+          blockingReadiness: false,
+          detail: "baseUrl=http://127.0.0.1:8790, runtimeBaseUrl=http://127.0.0.1:8100",
         },
       ],
     });
@@ -214,6 +244,44 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
           blockingReadiness: true,
           detail: "Desktop Python runtime resolution failed.",
           errorMessage: "python-runtime-missing",
+        },
+        {
+          stageId: "service-supervisor-startup",
+          state: "pending",
+          blockingReadiness: true,
+          detail: "Service supervisor startup has not started.",
+        },
+      ],
+    });
+  });
+
+  it("marks service supervisor startup as blocked when stage startup fails", () => {
+    const store = createDesktopPostLoginRuntimeStatusStore({
+      nowIsoString: createTickClock(),
+    });
+
+    store.markWarming({
+      triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
+      requestedAt: "2026-04-11T12:01:00.000Z",
+    });
+    store.markServiceSupervisorStartupRunning();
+    store.markServiceSupervisorStartupBlocked(new Error("supervisor-entrypoint-missing"));
+
+    expect(store.getStatus()).toMatchObject({
+      capabilityPhase: "warming",
+      activationStages: [
+        {
+          stageId: "python-runtime-resolution",
+          state: "pending",
+          blockingReadiness: true,
+          detail: "Python runtime resolution has not started.",
+        },
+        {
+          stageId: "service-supervisor-startup",
+          state: "blocked",
+          blockingReadiness: true,
+          detail: "Desktop service supervisor startup failed.",
+          errorMessage: "supervisor-entrypoint-missing",
         },
       ],
     });

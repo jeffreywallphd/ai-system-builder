@@ -29,6 +29,9 @@ export type DesktopPostLoginRuntimeStatusStore = {
   readonly markPythonRuntimeResolutionRunning: () => void;
   readonly markPythonRuntimeResolutionReady: (metadata?: { readonly detail?: string }) => void;
   readonly markPythonRuntimeResolutionBlocked: (error: unknown) => void;
+  readonly markServiceSupervisorStartupRunning: () => void;
+  readonly markServiceSupervisorStartupReady: (metadata?: { readonly baseUrl: string; readonly runtimeBaseUrl: string }) => void;
+  readonly markServiceSupervisorStartupBlocked: (error: unknown) => void;
   readonly markUnavailable: (reason: DesktopPostLoginRuntimeUnavailableReason) => void;
   readonly markWarming: (request: DesktopPostLoginWarmupRequest) => void;
   readonly markReady: () => void;
@@ -52,6 +55,13 @@ export function createDesktopPostLoginRuntimeStatusStore(
     updatedAt: clock.nowIsoString(),
     blockingReadiness: true,
     detail: "Python runtime resolution has not started.",
+  }));
+  stageStatuses.set(DesktopPostLoginActivationStageIds.serviceSupervisorStartup, Object.freeze({
+    stageId: DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
+    state: DesktopControlPlaneActivationStageStates.pending,
+    updatedAt: clock.nowIsoString(),
+    blockingReadiness: true,
+    detail: "Service supervisor startup has not started.",
   }));
   let transport = Object.freeze({
     phase: DesktopControlPlaneTransportPhases.unavailable,
@@ -116,6 +126,17 @@ export function createDesktopPostLoginRuntimeStatusStore(
       updatedAt: clock.nowIsoString(),
       blockingReadiness: true,
       detail: "Python runtime resolution has not started.",
+      errorMessage: undefined,
+    }));
+  };
+
+  const resetServiceSupervisorStartupStage = (): void => {
+    updateActivationStage(Object.freeze({
+      stageId: DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
+      state: DesktopControlPlaneActivationStageStates.pending,
+      updatedAt: clock.nowIsoString(),
+      blockingReadiness: true,
+      detail: "Service supervisor startup has not started.",
       errorMessage: undefined,
     }));
   };
@@ -241,8 +262,38 @@ export function createDesktopPostLoginRuntimeStatusStore(
         errorMessage: message,
       }));
     },
+    markServiceSupervisorStartupRunning() {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
+        state: DesktopControlPlaneActivationStageStates.running,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Starting desktop service supervisor.",
+      }));
+    },
+    markServiceSupervisorStartupReady(metadata) {
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
+        state: DesktopControlPlaneActivationStageStates.ready,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: false,
+        detail: `baseUrl=${metadata?.baseUrl ?? "unknown"}, runtimeBaseUrl=${metadata?.runtimeBaseUrl ?? "unknown"}`,
+      }));
+    },
+    markServiceSupervisorStartupBlocked(error) {
+      const message = error instanceof Error ? error.message : "Desktop service supervisor startup failed.";
+      updateActivationStage(Object.freeze({
+        stageId: DesktopPostLoginActivationStageIds.serviceSupervisorStartup,
+        state: DesktopControlPlaneActivationStageStates.blocked,
+        updatedAt: clock.nowIsoString(),
+        blockingReadiness: true,
+        detail: "Desktop service supervisor startup failed.",
+        errorMessage: message,
+      }));
+    },
     markUnavailable(reason) {
       resetPythonRuntimeResolutionStage();
+      resetServiceSupervisorStartupStage();
       applyCapabilityTransition("pre-login", "runtime-unavailable", {
         unavailableReason: reason,
       });
