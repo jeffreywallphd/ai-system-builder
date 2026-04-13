@@ -18,7 +18,8 @@ export async function requestDesktopPostLoginWarmup(
   triggerSource: DesktopPostLoginWarmupTriggerSource,
 ): Promise<void> {
   const runtimeBridge = window.aiLoomDesktop?.auth?.runtime ?? window.aiLoomDesktop?.runtime;
-  if (!runtimeBridge?.startPostLoginWarmup) {
+  const activateCapabilities = runtimeBridge?.activateCapabilities ?? runtimeBridge?.startPostLoginWarmup;
+  if (!activateCapabilities) {
     return;
   }
   if (warmupCompleted) {
@@ -34,7 +35,7 @@ export async function requestDesktopPostLoginWarmup(
   const request = createWarmupRequest(triggerSource);
   console.info(`[ai-loom] Requesting post-login warmup from '${request.triggerSource}'.`);
 
-  warmupRequest = runtimeBridge.startPostLoginWarmup(request)
+  warmupRequest = activateCapabilities(request)
     .then(() => {
       warmupCompleted = true;
       console.info(`[ai-loom] Post-login warmup acknowledged for '${request.triggerSource}'.`);

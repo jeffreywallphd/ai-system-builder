@@ -10,22 +10,32 @@ import {
 
 describe("desktop preload bridge composition", () => {
   it("keeps auth bootstrap and deferred feature namespaces explicitly separated", () => {
+    const runtimeStatus = {
+      host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
+      state: "pre-login" as const,
+      capabilityPhase: "pre-login" as const,
+      unavailableReason: "pre-login" as const,
+      updatedAt: "2026-04-11T00:00:00.000Z",
+      transport: {
+        phase: DesktopControlPlaneTransportPhases.available,
+        updatedAt: "2026-04-11T00:00:00.000Z",
+      },
+    };
     const authBootstrapSurface = Object.freeze({
+      bootstrapContext: Object.freeze({ environment: { isPackaged: false }, runtimeConfig: { controlPlaneBaseUrl: "http://127.0.0.1:8788", controlPlaneCapabilityPhase: "pre-login" } }),
       bootstrap: Object.freeze({ environment: { isPackaged: false } }),
+      controlPlane: Object.freeze({
+        baseUrl: "http://127.0.0.1:8788",
+        capabilityPhase: "pre-login",
+      }),
       storage: Object.freeze({ getItem: () => null, setItem: () => undefined, removeItem: () => undefined }),
       runtime: Object.freeze({
+        isCapabilityReady: () => false,
+        getLifecycleStatus: () => runtimeStatus,
+        getTransportStatus: () => runtimeStatus.transport,
+        activateCapabilities: async () => undefined,
         isDeferredFeatureApiReady: () => false,
-        getPostLoginRuntimeStatus: () => ({
-          host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
-          state: "pre-login",
-          capabilityPhase: "pre-login",
-          unavailableReason: "pre-login",
-          updatedAt: "2026-04-11T00:00:00.000Z",
-          transport: {
-            phase: DesktopControlPlaneTransportPhases.available,
-            updatedAt: "2026-04-11T00:00:00.000Z",
-          },
-        }),
+        getPostLoginRuntimeStatus: () => runtimeStatus,
         startPostLoginWarmup: async () => undefined,
       }),
     });
@@ -47,6 +57,8 @@ describe("desktop preload bridge composition", () => {
     });
 
     expect(bridge.auth.bootstrap).toBe(authBootstrapSurface.bootstrap);
+    expect(bridge.auth.bootstrapContext).toBe(authBootstrapSurface.bootstrapContext);
+    expect(bridge.auth.controlPlane.baseUrl).toBe("http://127.0.0.1:8788");
     expect(bridge.features.workflows).toBe(deferredFeatureSurface.workflows);
     expect(bridge.storage).toBe(authBootstrapSurface.storage);
     expect(bridge.registry).toBe(deferredFeatureSurface.registry);

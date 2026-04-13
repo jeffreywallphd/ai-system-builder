@@ -11,8 +11,8 @@ export const DeferredFeatureApiUnavailableCode = "AI_LOOM_DESKTOP_FEATURE_API_UN
 export const DeferredFeatureApiUnavailableDetail = "Desktop feature APIs are unavailable until post-login runtime initialization completes.";
 
 export interface DeferredFeatureGuardDependencies {
-  isDeferredFeatureApiReady(): boolean;
-  getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus;
+  isCapabilityReady(): boolean;
+  getRuntimeLifecycleStatus(): DesktopPostLoginRuntimeStatus;
   startDeferredFeatureWarmupOnDemand(): void;
 }
 
@@ -51,9 +51,9 @@ export function createDeferredBridgeGuards(deps: DeferredFeatureGuardDependencie
   function guardDeferredSyncGroup<TGroup extends SyncBridgeGroup>(groupName: string, group: TGroup): TGroup {
     const entries = Object.entries(group).map(([methodName, method]) => {
       const guarded: SyncBridgeMethod = (...args: ReadonlyArray<any>) => {
-        if (!deps.isDeferredFeatureApiReady()) {
+        if (!deps.isCapabilityReady()) {
           deps.startDeferredFeatureWarmupOnDemand();
-          throw createDeferredFeatureUnavailableError(`${groupName}.${methodName}`, deps.getPostLoginRuntimeStatus);
+          throw createDeferredFeatureUnavailableError(`${groupName}.${methodName}`, deps.getRuntimeLifecycleStatus);
         }
         return method(...args);
       };
@@ -65,9 +65,9 @@ export function createDeferredBridgeGuards(deps: DeferredFeatureGuardDependencie
   function guardDeferredAsyncGroup<TGroup extends AsyncBridgeGroup>(groupName: string, group: TGroup): TGroup {
     const entries = Object.entries(group).map(([methodName, method]) => {
       const guarded: AsyncBridgeMethod = (...args: ReadonlyArray<any>) => {
-        if (!deps.isDeferredFeatureApiReady()) {
+        if (!deps.isCapabilityReady()) {
           deps.startDeferredFeatureWarmupOnDemand();
-          return Promise.reject(createDeferredFeatureUnavailableError(`${groupName}.${methodName}`, deps.getPostLoginRuntimeStatus));
+          return Promise.reject(createDeferredFeatureUnavailableError(`${groupName}.${methodName}`, deps.getRuntimeLifecycleStatus));
         }
         return method(...args);
       };

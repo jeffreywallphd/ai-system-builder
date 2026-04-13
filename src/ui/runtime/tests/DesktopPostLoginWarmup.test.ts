@@ -50,13 +50,13 @@ describe("requestDesktopPostLoginWarmup", () => {
   });
 
   it("uses auth-scoped runtime bridge when available", async () => {
-    const startPostLoginWarmup = mock((_request: unknown) => Promise.resolve());
+    const activateCapabilities = mock((_request: unknown) => Promise.resolve());
     (globalThis as { window: Window }).window = {
       aiLoomDesktop: {
         auth: {
           runtime: {
-            isDeferredFeatureApiReady: () => false,
-            getPostLoginRuntimeStatus: () => {
+            isCapabilityReady: () => false,
+            getLifecycleStatus: () => {
               const updatedAt = new Date().toISOString();
               return {
                 host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
@@ -70,13 +70,20 @@ describe("requestDesktopPostLoginWarmup", () => {
                 },
               };
             },
-            startPostLoginWarmup,
+            activateCapabilities,
+            isDeferredFeatureApiReady: () => false,
+            getPostLoginRuntimeStatus: () => {
+              throw new Error("legacy lifecycle getter should not be used when official getter is present");
+            },
+            startPostLoginWarmup: () => {
+              throw new Error("legacy warmup trigger should not be used when official trigger is present");
+            },
           },
         },
       },
     } as unknown as Window;
 
     await requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.explicitLogin);
-    expect(startPostLoginWarmup).toHaveBeenCalledTimes(1);
+    expect(activateCapabilities).toHaveBeenCalledTimes(1);
   });
 });

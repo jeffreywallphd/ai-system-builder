@@ -11,7 +11,7 @@ interface WorkflowPersistenceStatus {
 
 export interface WorkflowsBridgeDependencies {
   ipcRenderer: DesktopIpcRendererLike;
-  isDeferredFeatureApiReady(): boolean;
+  isCapabilityReady(): boolean;
   startDeferredFeatureWarmupOnDemand(): void;
 }
 
@@ -33,7 +33,7 @@ export function createWorkflowsBridge(deps: WorkflowsBridgeDependencies) {
       return deps.ipcRenderer.sendSync("ai-loom-desktop-workflows:exists", id) as boolean;
     },
     getWorkflowPersistenceStatus() {
-      if (!deps.isDeferredFeatureApiReady()) {
+      if (!deps.isCapabilityReady()) {
         deps.startDeferredFeatureWarmupOnDemand();
         return Object.freeze({
           provider: "desktop-runtime-deferred",

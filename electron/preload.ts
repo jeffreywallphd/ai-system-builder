@@ -29,9 +29,9 @@ const bootstrap = ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap);
 let deferredFeatureDemandWarmupRequest: Promise<void> | undefined;
 
 /**
- * Reports whether post-login deferred feature IPC endpoints are currently registered in the main process.
+ * Reports whether post-login runtime capabilities are ready for deferred feature access.
  */
-function isDeferredFeatureApiReady(): boolean {
+function isRuntimeCapabilityReady(): boolean {
   try {
     return ipcRenderer.sendSync(DesktopBootstrapIpcChannels.deferredFeatureApiReady) === true;
   } catch {
@@ -42,12 +42,16 @@ function isDeferredFeatureApiReady(): boolean {
 /**
  * Fetches the current post-login runtime status from the main process, with a safe fallback when sync IPC is unavailable.
  */
-function getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus {
+function getRuntimeLifecycleStatus(): DesktopPostLoginRuntimeStatus {
   try {
     return ipcRenderer.sendSync(DesktopBootstrapIpcChannels.postLoginRuntimeStatus) as DesktopPostLoginRuntimeStatus;
   } catch {
     return createFallbackPostLoginRuntimeStatus();
   }
+}
+
+function getRuntimeTransportStatus(): DesktopPostLoginRuntimeStatus["transport"] {
+  return getRuntimeLifecycleStatus().transport;
 }
 
 /**
@@ -75,9 +79,13 @@ function startDeferredFeatureWarmupOnDemand(): void {
     });
 }
 
+function activateRuntimeCapabilities(request?: DesktopPostLoginWarmupRequest): Promise<void> {
+  return ipcRenderer.invoke(DesktopBootstrapIpcChannels.startPostLoginWarmup, request) as Promise<void>;
+}
+
 const { guardDeferredSyncGroup, guardDeferredAsyncGroup } = createDeferredBridgeGuards({
-  isDeferredFeatureApiReady,
-  getPostLoginRuntimeStatus,
+  isCapabilityReady: isRuntimeCapabilityReady,
+  getRuntimeLifecycleStatus,
   startDeferredFeatureWarmupOnDemand,
 });
 
@@ -86,7 +94,7 @@ const secretsBridge = createSecretsBridge({ ipcRenderer });
 const connectivityBridge = createConnectivityBridge({ ipcRenderer });
 const workflowsBridge = createWorkflowsBridge({
   ipcRenderer,
-  isDeferredFeatureApiReady,
+  isCapabilityReady: isRuntimeCapabilityReady,
   startDeferredFeatureWarmupOnDemand,
 });
 const executionRunsBridge = createExecutionRunsBridge({ ipcRenderer });
@@ -98,17 +106,24 @@ const registryBridge = createRegistryBridge({ ipcRenderer });
 const agentsBridge = createAgentsBridge({ ipcRenderer });
 
 const authBootstrapSurface = Object.freeze({
+  bootstrapContext: bootstrap,
   bootstrap,
+  controlPlane: Object.freeze({
+    baseUrl: bootstrap.runtimeConfig.controlPlaneBaseUrl,
+    capabilityPhase: bootstrap.runtimeConfig.controlPlaneCapabilityPhase,
+  }),
   storage: storageBridge,
   secrets: secretsBridge,
   connectivity: connectivityBridge,
   runtime: Object.freeze({
-    isDeferredFeatureApiReady,
-    getPostLoginRuntimeStatus,
-    // Allows renderer-auth surfaces to explicitly trigger post-login warmup with optional caller metadata.
-    startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest) {
-      return ipcRenderer.invoke(DesktopBootstrapIpcChannels.startPostLoginWarmup, request) as Promise<void>;
-    },
+    isCapabilityReady: isRuntimeCapabilityReady,
+    getLifecycleStatus: getRuntimeLifecycleStatus,
+    getTransportStatus: getRuntimeTransportStatus,
+    activateCapabilities: activateRuntimeCapabilities,
+    // Temporary compatibility aliases while renderer callers migrate to explicit lifecycle naming.
+    isDeferredFeatureApiReady: isRuntimeCapabilityReady,
+    getPostLoginRuntimeStatus: getRuntimeLifecycleStatus,
+    startPostLoginWarmup: activateRuntimeCapabilities,
   }),
 });
 

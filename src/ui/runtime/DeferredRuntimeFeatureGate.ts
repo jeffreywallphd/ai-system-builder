@@ -28,7 +28,7 @@ export function useDeferredRuntimeFeatureGate(pathname: string): DeferredRuntime
   const runtimeBridge = useMemo(() => resolveDesktopRuntimeBridge(), []);
   const isGatePath = useMemo(() => isDeferredRuntimeGatePath(pathname), [pathname]);
   const [runtimeStatus, setRuntimeStatus] = useState<DesktopPostLoginRuntimeStatus | undefined>(() => (
-    runtimeBridge?.getPostLoginRuntimeStatus()
+    resolveRuntimeLifecycleStatus(runtimeBridge)
   ));
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -37,7 +37,7 @@ export function useDeferredRuntimeFeatureGate(pathname: string): DeferredRuntime
       setRuntimeStatus(undefined);
       return;
     }
-    setRuntimeStatus(runtimeBridge.getPostLoginRuntimeStatus());
+    setRuntimeStatus(resolveRuntimeLifecycleStatus(runtimeBridge));
   }, [isGatePath, runtimeBridge]);
 
   useEffect(() => {
@@ -147,6 +147,15 @@ function resolveDesktopRuntimeBridge(): DesktopRuntimeBootstrapBridge | undefine
     return undefined;
   }
   return window.aiLoomDesktop?.auth?.runtime ?? window.aiLoomDesktop?.runtime;
+}
+
+function resolveRuntimeLifecycleStatus(
+  bridge: DesktopRuntimeBootstrapBridge | undefined,
+): DesktopPostLoginRuntimeStatus | undefined {
+  if (!bridge) {
+    return undefined;
+  }
+  return bridge.getLifecycleStatus?.() ?? bridge.getPostLoginRuntimeStatus?.();
 }
 
 function createRuntimeDiagnosticDetails(status: DesktopPostLoginRuntimeStatus): string {

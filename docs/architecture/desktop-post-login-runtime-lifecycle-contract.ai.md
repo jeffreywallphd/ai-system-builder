@@ -110,6 +110,32 @@ Compatibility constraint:
 
 - legacy root aliases can remain temporarily for compatibility, but new renderer integration should consume `auth` and `features` namespaces as the authoritative contract.
 
+## Story 1.4.1 desktop bootstrap and runtime bridge contract clarification
+
+Desktop preload/runtime contracts now expose explicit bootstrap and lifecycle surfaces so stable transport identity is not conflated with deferred capability readiness:
+
+- `window.aiLoomDesktop.auth.bootstrapContext`
+  - explicit auth/bootstrap context payload for renderer bootstrap consumers.
+  - `auth.bootstrap` remains as temporary compatibility alias.
+- `window.aiLoomDesktop.auth.controlPlane`
+  - explicit stable control-plane bootstrap identity (`baseUrl`, bootstrap `capabilityPhase`).
+  - meant for stable transport/bootstrap addressing, not deferred feature readiness decisions.
+- `window.aiLoomDesktop.auth.runtime` official lifecycle methods:
+  - `isCapabilityReady()`
+  - `getLifecycleStatus()`
+  - `getTransportStatus()`
+  - `activateCapabilities(request?)`
+- temporary runtime compatibility aliases retained:
+  - `isDeferredFeatureApiReady()`
+  - `getPostLoginRuntimeStatus()`
+  - `startPostLoginWarmup(request?)`
+
+Contract intent:
+
+- control-plane transport/bootstrap identity stays stable and explicit via `auth.controlPlane` + lifecycle `transport` status,
+- deferred capability readiness remains lifecycle-state driven (`capabilityPhase/state`) instead of transport/socket assumptions,
+- renderer integrations should migrate to official lifecycle naming while compatibility aliases remain temporary.
+
 ## Status/readiness exposure
 - status channel:
   - `ai-loom-desktop-runtime:get-post-login-runtime-status`
