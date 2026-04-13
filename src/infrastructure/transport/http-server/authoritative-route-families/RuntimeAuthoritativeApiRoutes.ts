@@ -47,7 +47,8 @@ export const RunMutationAuthoritativeApiRouteFamily = Object.freeze({
   domain: AuthoritativeApiRouteDomains.runtime,
   description: "Authoritative run mutation endpoints for cancellation/retry orchestration intents.",
   routePrefixes: Object.freeze([
-    "/api/v1/runtime/runs",
+    "/api/v1/runtime/runs/{runId}/cancel",
+    "/api/v1/runtime/runs/{runId}/retry",
   ]),
   requiredBackendKeys: Object.freeze([
     AuthoritativeApiRouteBackendKeys.runMutation,
@@ -59,7 +60,7 @@ export const RunExecutionUpdateAuthoritativeApiRouteFamily = Object.freeze({
   domain: AuthoritativeApiRouteDomains.runtime,
   description: "Authoritative node-ingested run execution heartbeat/progress/lifecycle update endpoint.",
   routePrefixes: Object.freeze([
-    "/api/v1/runtime/runs",
+    "/api/v1/runtime/runs/{runId}/lifecycle",
   ]),
   requiredBackendKeys: Object.freeze([
     AuthoritativeApiRouteBackendKeys.nodeTrust,
