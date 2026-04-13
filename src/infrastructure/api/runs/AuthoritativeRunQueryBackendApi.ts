@@ -31,7 +31,9 @@ import type {
   IAuthoritativeRunPersistenceRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
+import { WorkspaceMembershipStatuses, WorkspaceRoles } from "@domain/workspaces/WorkspaceDomain";
 import type {
   RunDetail,
   ExecutionReadinessReadResponse,
@@ -118,6 +120,7 @@ export interface AuthoritativeRunQueryBackendApiDependencies {
   readonly queueRepository?: IRunOrchestrationQueuePersistenceRepository;
   readonly auditEventRepository?: IPlatformAuditEventRepository;
   readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly workspaceAuthorizationReadRepository?: IWorkspaceAuthorizationReadRepository;
   readonly observability?: RunOrchestrationObservability;
   readonly now?: () => Date;
 }
@@ -858,9 +861,6 @@ export class AuthoritativeRunQueryBackendApi {
   private async isWorkspaceRunReadAllowed(
     authorization: AuthoritativeRunQueryAuthorizationContext,
   ): Promise<boolean> {
-    if (!this.dependencies.authorizationDecisionEvaluator) {
-      return true;
-    }
     const actorUserIdentityId = authorization.actorUserIdentityId.trim();
     if (!actorUserIdentityId) {
       return false;
@@ -868,6 +868,10 @@ export class AuthoritativeRunQueryBackendApi {
     const workspaceId = authorization.activeWorkspaceId.trim();
     if (!workspaceId) {
       return false;
+    }
+
+    if (!this.dependencies.authorizationDecisionEvaluator) {
+      return true;
     }
 
     const decision = await this.dependencies.authorizationDecisionEvaluator.evaluateDecision({
@@ -885,7 +889,41 @@ export class AuthoritativeRunQueryBackendApi {
       asOf: this.now().toISOString(),
     });
 
-    return deriveAuthorizationResponseAccessLevel(decision.decision) !== AuthorizationResponseAccessLevels.deny;
+    if (deriveAuthorizationResponseAccessLevel(decision.decision) !== AuthorizationResponseAccessLevels.deny) {
+      return true;
+    }
+
+    return this.isWorkspaceReadinessVisibleViaWorkspaceAuthority({
+      workspaceId,
+      actorUserIdentityId,
+      asOf: this.now().toISOString(),
+    });
+  }
+
+  private async isWorkspaceReadinessVisibleViaWorkspaceAuthority(input: {
+    readonly workspaceId: string;
+    readonly actorUserIdentityId: string;
+    readonly asOf?: string;
+  }): Promise<boolean> {
+    if (!this.dependencies.workspaceAuthorizationReadRepository) {
+      return false;
+    }
+    const snapshot = await this.dependencies.workspaceAuthorizationReadRepository.getWorkspaceAuthorizationSnapshot({
+      workspaceId: input.workspaceId,
+      userIdentityId: input.actorUserIdentityId,
+      asOf: input.asOf,
+    });
+    if (!snapshot) {
+      return false;
+    }
+
+    const hasActiveMembership = snapshot.isWorkspaceOwner
+      || snapshot.membership?.status === WorkspaceMembershipStatuses.active;
+    const isWorkspaceAdminOrOwner = snapshot.isWorkspaceOwner
+      || snapshot.effectiveRoles.includes(WorkspaceRoles.owner)
+      || snapshot.effectiveRoles.includes(WorkspaceRoles.admin);
+
+    return hasActiveMembership && isWorkspaceAdminOrOwner;
   }
 
   private buildRuntimeLifecycleExecutionReadinessResponse(

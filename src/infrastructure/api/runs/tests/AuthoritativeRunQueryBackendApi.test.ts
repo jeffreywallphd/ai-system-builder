@@ -49,6 +49,7 @@ import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAutho
 import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { ListStaleSchedulingReservationsUseCase } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import { parseSchedulingAdminListStaleReservationsResponse } from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
 import {
   RuntimeAvailabilityBlockingDependencyCategories,
@@ -287,6 +288,16 @@ class InMemoryAuthorizationRepositories
     _query: AuthorizationResourcePolicyMetadataListQuery,
   ): Promise<ReadonlyArray<AuthorizationResourcePolicyMetadata>> {
     return Object.freeze([...this.resourceMetadata.values()]);
+  }
+}
+
+class InMemoryWorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizationReadRepository {
+  public snapshot: Awaited<ReturnType<IWorkspaceAuthorizationReadRepository["getWorkspaceAuthorizationSnapshot"]>> = undefined;
+
+  public async getWorkspaceAuthorizationSnapshot(
+    _query: Parameters<IWorkspaceAuthorizationReadRepository["getWorkspaceAuthorizationSnapshot"]>[0],
+  ): Promise<Awaited<ReturnType<IWorkspaceAuthorizationReadRepository["getWorkspaceAuthorizationSnapshot"]>>> {
+    return this.snapshot;
   }
 }
 
@@ -1212,6 +1223,131 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     expect(denied.error?.code).toBe("forbidden");
   });
 
+  it("allows readiness visibility for workspace owners when policy role grants are missing", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const authRepositories = new InMemoryAuthorizationRepositories();
+    const workspaceAuthorizationReadRepository = new InMemoryWorkspaceAuthorizationReadRepository();
+    workspaceAuthorizationReadRepository.snapshot = Object.freeze({
+      workspace: {
+        id: "workspace-alpha",
+        slug: "workspace-alpha",
+        displayName: "Workspace Alpha",
+        status: "active",
+        ownership: {
+          workspaceId: "workspace-alpha",
+          ownerUserId: "user-owner",
+          visibility: "team",
+          createdBy: "user-owner",
+          lastModifiedBy: "user-owner",
+          createdAt: "2026-04-09T10:00:00.000Z",
+          lastModifiedAt: "2026-04-09T10:00:00.000Z",
+        },
+      },
+      membership: {
+        id: "membership-owner",
+        workspaceId: "workspace-alpha",
+        userIdentityId: "user-owner",
+        status: "active",
+        createdAt: "2026-04-09T10:00:00.000Z",
+        updatedAt: "2026-04-09T10:00:00.000Z",
+        createdBy: "user-owner",
+        lastModifiedBy: "user-owner",
+      },
+      activeRoleAssignments: Object.freeze([]),
+      effectiveRoles: Object.freeze(["owner"]),
+      isWorkspaceOwner: true,
+    });
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: authRepositories,
+      sharingGrantReadRepository: authRepositories,
+      resourcePolicyMetadataReadRepository: authRepositories,
+      clock: { now: () => new Date("2026-04-09T10:01:00.000Z") },
+    });
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase(new InMemoryRunQueueReadRepository()),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      runRepository,
+      authorizationDecisionEvaluator: evaluator,
+      workspaceAuthorizationReadRepository,
+      now: () => new Date("2026-04-09T10:01:00.000Z"),
+    });
+
+    const response = await api.getExecutionReadiness({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-owner",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+
+    expect(response.ok).toBeTrue();
+  });
+
+  it("keeps readiness visibility denied for non-admin members when policy role grants are missing", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const authRepositories = new InMemoryAuthorizationRepositories();
+    const workspaceAuthorizationReadRepository = new InMemoryWorkspaceAuthorizationReadRepository();
+    workspaceAuthorizationReadRepository.snapshot = Object.freeze({
+      workspace: {
+        id: "workspace-alpha",
+        slug: "workspace-alpha",
+        displayName: "Workspace Alpha",
+        status: "active",
+        ownership: {
+          workspaceId: "workspace-alpha",
+          ownerUserId: "user-owner",
+          visibility: "team",
+          createdBy: "user-owner",
+          lastModifiedBy: "user-owner",
+          createdAt: "2026-04-09T10:00:00.000Z",
+          lastModifiedAt: "2026-04-09T10:00:00.000Z",
+        },
+      },
+      membership: {
+        id: "membership-member",
+        workspaceId: "workspace-alpha",
+        userIdentityId: "user-member",
+        status: "active",
+        createdAt: "2026-04-09T10:00:00.000Z",
+        updatedAt: "2026-04-09T10:00:00.000Z",
+        createdBy: "user-owner",
+        lastModifiedBy: "user-owner",
+      },
+      activeRoleAssignments: Object.freeze([]),
+      effectiveRoles: Object.freeze(["member"]),
+      isWorkspaceOwner: false,
+    });
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: authRepositories,
+      sharingGrantReadRepository: authRepositories,
+      resourcePolicyMetadataReadRepository: authRepositories,
+      clock: { now: () => new Date("2026-04-09T10:01:00.000Z") },
+    });
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase(new InMemoryRunQueueReadRepository()),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      runRepository,
+      authorizationDecisionEvaluator: evaluator,
+      workspaceAuthorizationReadRepository,
+      now: () => new Date("2026-04-09T10:01:00.000Z"),
+    });
+
+    const denied = await api.getExecutionReadiness({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-member",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+
+    expect(denied.ok).toBeFalse();
+    expect(denied.error?.code).toBe("forbidden");
+  });
+
   it("returns state-driven readiness for pre-login, warming, and failed lifecycle contracts without auth", async () => {
     const runRepository = new InMemoryRunRepository();
     const api = new AuthoritativeRunQueryBackendApi({
@@ -1288,4 +1424,3 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     }
   });
 });
-
