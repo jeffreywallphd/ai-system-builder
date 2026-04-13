@@ -3,27 +3,33 @@ import fs from "node:fs";
 import path from "node:path";
 
 const mainSource = fs.readFileSync(path.resolve(process.cwd(), "electron/main/main.ts"), "utf8");
-const bootstrapperSource = fs.readFileSync(
-  path.resolve(process.cwd(), "electron/main/runtime/PostLoginRuntimeBootstrapper.ts"),
+const dependencyActivatorSource = fs.readFileSync(
+  path.resolve(process.cwd(), "electron/main/runtime/PostLoginRuntimeDependencyActivator.ts"),
+  "utf8",
+);
+const activationServiceSource = fs.readFileSync(
+  path.resolve(process.cwd(), "electron/main/runtime/PostLoginRuntimeActivationService.ts"),
   "utf8",
 );
 
-function extractFunctionSource(startMarker: string, endMarker: string): string {
-  const start = mainSource.indexOf(startMarker);
-  const end = mainSource.indexOf(endMarker);
+function extractFunctionSource(source: string, startMarker: string, endMarker: string): string {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
   if (start < 0 || end <= start) {
     return "";
   }
-  return mainSource.slice(start, end);
+  return source.slice(start, end);
 }
 
 const bootstrapAuthShellSource = extractFunctionSource(
+  mainSource,
   "async function bootstrapAuthShell()",
-  "const postLoginRuntimeBootstrapper = createPostLoginRuntimeBootstrapper({",
+  "const postLoginRuntimeDependencyActivator = createPostLoginRuntimeDependencyActivator({",
 );
 const warmupEntrySource = extractFunctionSource(
-  "async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupRequest): Promise<void> {",
-  "registerDesktopAppLifecycle({",
+  activationServiceSource,
+  "async function startPostLoginWarmup(request: DesktopPostLoginWarmupRequest): Promise<void> {",
+  "  return Object.freeze({",
 );
 
 describe("electron main deferred runtime startup boundary", () => {
@@ -65,21 +71,21 @@ describe("electron main deferred runtime startup boundary", () => {
     expect(mainSource).toContain("authoritative-host-bind-ready");
   });
   it("keeps python runtime resolution and service supervisor startup in post-login runtime composition", () => {
-    expect(bootstrapperSource).toContain("async function composePostLoginRuntime(");
-    expect(bootstrapperSource).toContain("resolveDesktopPythonRuntime(");
-    expect(bootstrapperSource).toContain("const serviceSupervisor = new DesktopServiceSupervisor(");
-    expect(bootstrapperSource).toContain("await serviceSupervisor.start()");
+    expect(dependencyActivatorSource).toContain("async function composePostLoginRuntimeDependencies(");
+    expect(dependencyActivatorSource).toContain("resolveDesktopPythonRuntime(");
+    expect(dependencyActivatorSource).toContain("const serviceSupervisor = new DesktopServiceSupervisor(");
+    expect(dependencyActivatorSource).toContain("await serviceSupervisor.start()");
   });
 
   it("keeps workflow/studio/system backend activation on-demand via deferred runtime container", () => {
-    expect(bootstrapperSource).toContain("function createOnDemandFeatureCompositionPaths(");
-    expect(bootstrapperSource).toContain("getWorkflowPersistence: () => params.featureRuntime.ensureWorkflowPersistence()");
-    expect(bootstrapperSource).toContain("getExecutionHistory: () => params.featureRuntime.ensureExecutionHistory()");
-    expect(bootstrapperSource).toContain("getWorkflowRunHistory: () => params.featureRuntime.ensureWorkflowRunHistory()");
-    expect(bootstrapperSource).toContain("getStudioShellBackendApi: () => params.featureRuntime.ensureStudioShellBackendApi()");
-    expect(bootstrapperSource).toContain("getSystemStudioBackendApi: () => params.featureRuntime.ensureSystemStudioBackendApi()");
-    expect(bootstrapperSource).toContain("getSystemRuntimeBackendApi: () => params.featureRuntime.ensureSystemRuntimeBackendApi()");
-    expect(bootstrapperSource).toContain("getCanonicalRegistryRuntime: () => params.canonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime()");
-    expect(bootstrapperSource).toContain("getAgentStudioBackendApi: () => params.agentRuntimeProvider.ensureAgentStudioBackendApi()");
+    expect(dependencyActivatorSource).toContain("function createOnDemandFeatureCompositionPaths(");
+    expect(dependencyActivatorSource).toContain("getWorkflowPersistence: () => params.featureRuntime.ensureWorkflowPersistence()");
+    expect(dependencyActivatorSource).toContain("getExecutionHistory: () => params.featureRuntime.ensureExecutionHistory()");
+    expect(dependencyActivatorSource).toContain("getWorkflowRunHistory: () => params.featureRuntime.ensureWorkflowRunHistory()");
+    expect(dependencyActivatorSource).toContain("getStudioShellBackendApi: () => params.featureRuntime.ensureStudioShellBackendApi()");
+    expect(dependencyActivatorSource).toContain("getSystemStudioBackendApi: () => params.featureRuntime.ensureSystemStudioBackendApi()");
+    expect(dependencyActivatorSource).toContain("getSystemRuntimeBackendApi: () => params.featureRuntime.ensureSystemRuntimeBackendApi()");
+    expect(dependencyActivatorSource).toContain("getCanonicalRegistryRuntime: () => params.canonicalRegistryRuntimeProvider.ensureCanonicalRegistryRuntime()");
+    expect(dependencyActivatorSource).toContain("getAgentStudioBackendApi: () => params.agentRuntimeProvider.ensureAgentStudioBackendApi()");
   });
 });

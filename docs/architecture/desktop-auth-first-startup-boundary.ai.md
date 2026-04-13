@@ -326,7 +326,7 @@ Result: login-critical pre-window startup avoids both eager runtime object graph
 Desktop connectivity monitoring is now deferred out of pre-login startup:
 
 - `bootstrapAuthShell()` no longer starts `DesktopConnectivityStateService` monitoring.
-- connectivity monitoring startup is now tied to the first accepted post-login warmup request in `ensurePostLoginWarmupStarted(...)`.
+- connectivity monitoring startup is now tied to the first accepted post-login warmup request in `PostLoginRuntimeActivationService.startPostLoginWarmup(...)`.
 - auth/bootstrap connectivity IPC now returns a controlled pre-warmup fallback (`connecting`) with explicit deferred-monitoring detail until post-login warmup starts.
 - pre-warmup offline-mode toggle requests return the same controlled deferred fallback payload instead of attempting to emulate post-login connectivity behavior.
 - runtime disposal now explicitly stops deferred connectivity monitoring before clearing runtime state, preserving deterministic shutdown/logout teardown behavior.

@@ -214,7 +214,7 @@ Persistent authoritative host runtime now includes explicit internal capability 
   - `identity-bootstrap` remains available pre-login for identity/session bootstrap routes,
   - `deferred-runtime-features` remains pending until post-login warmup activation.
 - `IdentityServerHost` now composes this activation service and passes route-family availability checks into `createIdentityHttpServer(...)` so deferred route families can remain unavailable while the HTTP listener stays bound.
-- `electron/main/main.ts` now explicitly activates deferred runtime capabilities on the already-bound authoritative host in `ensurePostLoginWarmupStarted(...)`.
+- `electron/main/runtime/PostLoginRuntimeActivationService.ts` now explicitly activates deferred runtime capabilities on the already-bound authoritative host in `startPostLoginWarmup(...)`.
 
 Result: runtime feature availability transitions without rebinding or replacing the renderer-facing host transport.
 
@@ -331,7 +331,7 @@ Result: the pre-login critical path no longer pays eager module-load cost for st
 Desktop connectivity monitoring startup is now moved out of pre-login bootstrap:
 
 - `bootstrapAuthShell()` no longer starts `DesktopConnectivityStateService` monitoring.
-- connectivity monitoring now starts only when `ensurePostLoginWarmupStarted(...)` accepts the first post-login warmup request.
+- connectivity monitoring now starts only when `PostLoginRuntimeActivationService.startPostLoginWarmup(...)` accepts the first post-login warmup request.
 - auth/bootstrap connectivity IPC keeps returning a controlled fallback state before warmup starts:
   - state remains `connecting`
   - detail is explicit that connectivity monitoring is deferred to post-login warmup.
