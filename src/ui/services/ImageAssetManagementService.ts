@@ -110,10 +110,14 @@ export class ImageAssetManagementService {
     console.log(" ");
     console.log("------------------------------------------------------");
 
-    const created = await this.requestJson<CreateImageAssetApiResponse>("POST", ImageAssetTransportRoutes.createImageAsset, {
+    const created = await this.requestJson<CreateImageAssetApiResponse>(
+      "POST",
+      this.withWorkspaceQuery(ImageAssetTransportRoutes.createImageAsset, workspaceId),
+      {
       sessionToken: request.sessionToken,
       body: createRequest,
-    });
+      },
+    );
 
     console.log("------------------------------------------------------");
     console.log(" ");
@@ -126,7 +130,8 @@ export class ImageAssetManagementService {
       return created as ImageAssetManagementApiResponse<{ readonly assetId: string }>;
     }
 
-    const uploadContentResponse = await this.fetchImplementation(`${this.baseUrl}${created.data.upload.uploadEndpoint}`, {
+    const uploadContentPath = this.withWorkspaceQuery(created.data.upload.uploadEndpoint, workspaceId);
+    const uploadContentResponse = await this.fetchImplementation(`${this.baseUrl}${uploadContentPath}`, {
       method: created.data.upload.uploadMethod,
       headers: {
         authorization: `Bearer ${request.sessionToken}`,
@@ -139,7 +144,10 @@ export class ImageAssetManagementService {
       return uploaded as ImageAssetManagementApiResponse<{ readonly assetId: string }>;
     }
 
-    const completePath = `/api/v1/image-assets/${encodeURIComponent(created.data.asset.assetId)}/uploads/${encodeURIComponent(created.data.upload.uploadSessionId)}/complete`;
+    const completePath = this.withWorkspaceQuery(
+      `/api/v1/image-assets/${encodeURIComponent(created.data.asset.assetId)}/uploads/${encodeURIComponent(created.data.upload.uploadSessionId)}/complete`,
+      workspaceId,
+    );
     const completed = await this.requestJson<unknown>("POST", completePath, {
       sessionToken: request.sessionToken,
       body: Object.freeze({
@@ -299,6 +307,11 @@ export class ImageAssetManagementService {
   private normalizeRequiredIdentifier(value: string | undefined): string | undefined {
     const normalized = value?.trim();
     return normalized && normalized.length > 0 ? normalized : undefined;
+  }
+
+  private withWorkspaceQuery(path: string, workspaceId: string): string {
+    const separator = path.includes("?") ? "&" : "?";
+    return `${path}${separator}workspaceId=${encodeURIComponent(workspaceId)}`;
   }
   private normalizeMediaType(value: string): CreateImageAssetApiRequest["mediaType"] | undefined {
     if (value === "image/png" || value === "image/jpeg" || value === "image/gif" || value === "image/webp") {
