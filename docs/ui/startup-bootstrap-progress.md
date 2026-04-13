@@ -129,3 +129,20 @@ Tests:
 - `src/ui/runtime/tests/DesktopRuntimeDiagnosticsModel.test.ts`
 - `src/ui/components/execution/tests/DesktopRuntimeDiagnosticsPanel.test.tsx`
 - `src/ui/pages/tests/SettingsPage.test.ts`
+
+## Desktop runtime startup UX regression coverage (Story 1.4.8)
+
+Desktop runtime startup/login/runtime flows now have integration-focused regression coverage that locks in renderer-visible behavior from startup warmup through runtime-ready activation.
+
+Expected behavior under desktop startup:
+
+1. **Pre-login**: runtime-backed APIs remain unavailable and return explicit authenticated-session requirements.
+2. **Post-login warmup**: renderer-facing runtime calls stay lifecycle-gated and report lifecycle-state unavailability (`AI_LOOM_DESKTOP_FEATURE_API_UNAVAILABLE`) instead of transport/socket refusal errors.
+3. **Post-activation ready**: once post-login activation completes, image manipulation execution-readiness checks and runtime realtime subscriptions become usable without reconnect-by-error recovery paths.
+
+Regression anchors:
+
+- `src/ui/runtime/tests/DesktopRuntimeStartupUxRegression.test.ts`
+  - validates image manipulation readiness flow from pre-login -> warming -> ready,
+  - validates runtime realtime subscription behavior during warmup and after activation,
+  - asserts startup messaging does not regress to `ECONNREFUSED` / connection-refused wording.
