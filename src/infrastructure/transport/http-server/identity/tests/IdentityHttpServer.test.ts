@@ -426,6 +426,18 @@ describe("IdentityHttpServer", () => {
       }),
     });
     expect(blockedResponse.status).toBe(503);
+    const blockedBody = await blockedResponse.json() as {
+      readonly endpoint?: string;
+      readonly requestId?: string;
+      readonly runtime?: {
+        readonly state?: string;
+        readonly contractVersion?: string;
+      };
+    };
+    expect(blockedBody.endpoint).toBe("/api/v1/runtime/runs/start");
+    expect(blockedBody.requestId?.length).toBeGreaterThan(0);
+    expect(blockedBody.runtime?.contractVersion).toBe("runtime-availability-response/v1");
+    expect(blockedBody.runtime?.state).toBe("warming");
 
     capabilityActivation.activateCapabilities({
       capabilityIds: [AuthoritativeServerCapabilityIds.deferredRuntimeFeatures],
@@ -452,6 +464,7 @@ describe("IdentityHttpServer", () => {
       && entry.path === "/api/v1/runtime/runs/start"
     ));
     expect(unavailableEvent).toBeDefined();
+    expect(unavailableEvent?.details?.runtimeState).toBe("warming");
   });
 
   it("starts with explicit modular route registration plans in deterministic order", async () => {

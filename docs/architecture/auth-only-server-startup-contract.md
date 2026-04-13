@@ -38,6 +38,12 @@ Non-auth capability families remain unavailable until post-login lifecycle activ
 - Transport continuity is preserved across login state changes; warmup does not stop/rebind the listener.
 - Post-login warmup activates deferred runtime capabilities through explicit capability activation (`activateCapabilities(...)`) instead of host replacement.
 
+## Runtime capability guard behavior
+
+- Runtime route families (`system-runtime`, `run-submission`, `run-read`, `run-mutation`, `run-execution-update`, `image-run-api`) are guarded by one centralized backend capability guard at the identity HTTP transport boundary.
+- When deferred runtime capability state is not ready, guarded endpoints return canonical lifecycle contracts (`runtime-availability-response/v1`) using explicit `unavailable`, `warming`, or `failed` state responses instead of transport-level outages.
+- Once capability state becomes available, the same handlers execute normally with no per-handler lifecycle branching.
+
 ## Required outputs to Electron main
 
 - host `address` used to derive `controlPlaneBaseUrl` / `identityApiBaseUrl`

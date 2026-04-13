@@ -379,6 +379,7 @@ import {
 } from "./route-families/RunRouteFamilyHandlers";
 import { createWorkspaceRouteFamilyHandler } from "./route-families/WorkspaceRouteFamilyHandler";
 import { buildIdentityHttpRouteCompositionLogDetails } from "./middleware/request-observability";
+import { evaluateRuntimeCapabilityGuard } from "./middleware/runtime-capability-guard";
 import {
   CORRELATION_ID_HEADER,
   REQUEST_ID_HEADER,
@@ -3207,7 +3208,13 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           const availabilityDetails = routeFamilyAvailability.resolveRouteFamilyAvailability?.(
             matchedRouteFamily.routeFamilyId,
           );
-          const unavailableResponse = buildRouteFamilyCapabilityUnavailableResponse({
+          const runtimeCapabilityGuard = evaluateRuntimeCapabilityGuard({
+            endpoint: path,
+            requestId,
+            routeFamilyId: matchedRouteFamily.routeFamilyId,
+            availability: availabilityDetails,
+          });
+          const unavailableResponse = runtimeCapabilityGuard.response ?? buildRouteFamilyCapabilityUnavailableResponse({
             routeFamilyId: matchedRouteFamily.routeFamilyId,
             capabilityId: availabilityDetails?.capabilityId,
           });
@@ -3222,6 +3229,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               routeFamilyId: matchedRouteFamily.routeFamilyId,
               capabilityId: availabilityDetails?.capabilityId,
               capabilityState: availabilityDetails?.state,
+              runtimeState: runtimeCapabilityGuard.runtimeState,
             }),
           }));
           return;
