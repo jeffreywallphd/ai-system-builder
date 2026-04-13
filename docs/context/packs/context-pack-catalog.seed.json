@@ -319,6 +319,43 @@
       ]
     },
     {
+      "id": "image-manipulation-system",
+      "title": "Image Manipulation System Pack",
+      "purpose": "Focused context for image upload, selection, and run-lifecycle behavior in the image manipulation studio.",
+      "domain": "studio-system-composition",
+      "owner": "team:studio-experience",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/image-manipulation-system.pack.md",
+      "aiDocPath": "docs/context/packs/image-manipulation-system.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/architecture/image-manipulation-studio-interaction-model.md",
+        "docs/architecture/image-workflow-system-definition-layer.md",
+        "docs/architecture/image-system-domain-foundation.md",
+        "docs/architecture/studio-handoff-contract.md",
+        "docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md"
+      ],
+      "relatedCodePaths": [
+        "src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx",
+        "src/ui/components/assets/image-system/ImageUploadPanel.tsx",
+        "src/ui/services/ImageAssetManagementService.ts",
+        "src/ui/runtime/ImageManipulationRuntimeDatasetBindingService.ts"
+      ],
+      "tags": [
+        "image-manipulation",
+        "studio-shell",
+        "image-assets",
+        "ui-studio"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-13"
+      },
+      "relatedDocRecordIds": [
+        "doc-context-pack-studio-and-system-composition",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership"
+      ]
+    },
+    {
       "id": "startup-and-host-promotion",
       "title": "Startup and Host Promotion Pack",
       "purpose": "Focused context for control-plane startup sequencing, auth-minimal/post-login boundaries, and host-promotion lifecycle discipline.",

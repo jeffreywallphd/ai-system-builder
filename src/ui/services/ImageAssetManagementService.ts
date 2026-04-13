@@ -69,6 +69,16 @@ export class ImageAssetManagementService {
       return this.failed("invalid-request", "This image type is not supported.");
     }
 
+    const workspaceId = this.normalizeRequiredIdentifier(request.workspaceId);
+    if (!workspaceId) {
+      return this.failed("invalid-request", "A workspace must be selected before uploading images.");
+    }
+
+    const actorUserIdentityId = this.normalizeRequiredIdentifier(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed("invalid-request", "You must be signed in before uploading images.");
+    }
+
     console.log("------------------------------------------------------");
     console.log(" ");
     console.log("Incoming Request:");
@@ -78,9 +88,9 @@ export class ImageAssetManagementService {
 
     const fingerprint = await this.computeSha256Digest(request.file);
     const createRequest: CreateImageAssetApiRequest = Object.freeze({
-      actorUserIdentityId: request.actorUserIdentityId,
-      workspaceId: request.workspaceId,
-      ownerUserIdentityId: request.actorUserIdentityId,
+      actorUserIdentityId,
+      workspaceId,
+      ownerUserIdentityId: actorUserIdentityId,
       originKind: "uploaded-source",
       visibility: "workspace",
       mediaType: mimeType,
@@ -133,8 +143,8 @@ export class ImageAssetManagementService {
     const completed = await this.requestJson<unknown>("POST", completePath, {
       sessionToken: request.sessionToken,
       body: Object.freeze({
-        actorUserIdentityId: request.actorUserIdentityId,
-        workspaceId: request.workspaceId,
+        actorUserIdentityId,
+        workspaceId,
         assetId: created.data.asset.assetId,
         uploadSessionId: created.data.upload.uploadSessionId,
         finalizedMediaType: mimeType,
@@ -285,6 +295,11 @@ export class ImageAssetManagementService {
     };
   }
 
+
+  private normalizeRequiredIdentifier(value: string | undefined): string | undefined {
+    const normalized = value?.trim();
+    return normalized && normalized.length > 0 ? normalized : undefined;
+  }
   private normalizeMediaType(value: string): CreateImageAssetApiRequest["mediaType"] | undefined {
     if (value === "image/png" || value === "image/jpeg" || value === "image/gif" || value === "image/webp") {
       return value;

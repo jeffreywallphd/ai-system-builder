@@ -350,6 +350,39 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       },
       initialCapabilityState: undefined,
     })).toBe("workspace:first");
+    expect(resolveWorkspaceIdFromSession({
+      userIdentityId: "user-1",
+      username: "alice",
+      providerId: "provider:local-password",
+      sessionId: "session-1",
+      sessionToken: "token-1",
+      sessionTokenType: "Bearer",
+      sessionIssuedAt: "2026-04-12T00:00:00.000Z",
+      sessionExpiresAt: "2026-04-12T23:59:59.000Z",
+      workspaceContext: {
+        requestedWorkspaceId: "   ",
+        resolvedWorkspaceId: undefined,
+        workspaces: Object.freeze([
+          {
+            workspaceId: "  workspace:trimmed  ",
+            slug: "workspace-trimmed",
+            displayName: "Workspace Trimmed",
+            status: "active",
+            visibility: "private",
+            membershipStatus: "active",
+            effectiveRoles: Object.freeze(["member"]),
+            canAdministrate: false,
+            isWorkspaceOwner: false,
+          },
+        ]),
+      },
+      initialCapabilityState: {
+        workspaceId: " ",
+        effectiveRoles: Object.freeze([]),
+        canAdministrate: false,
+        isWorkspaceOwner: false,
+      },
+    })).toBe("workspace:trimmed");
   });
 
   it("builds selection confirmation copy from selected source/reference asset metadata", () => {
