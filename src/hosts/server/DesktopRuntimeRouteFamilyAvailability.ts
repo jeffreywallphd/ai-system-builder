@@ -1,15 +1,20 @@
 import type {
   DesktopControlPlaneCapabilityPhase,
   DesktopControlPlaneRuntimeStatus,
+  DesktopControlPlaneTransportPhase,
 } from "@application/common/DesktopControlPlaneRuntimeContracts";
 import {
   AuthoritativeServerCapabilityIds,
   type AuthoritativeServerCapabilityActivationService,
+  type AuthoritativeServerRouteFamilyRuntimeLifecycleSnapshot,
   type AuthoritativeServerRouteFamilyAvailability,
 } from "./AuthoritativeServerCapabilityActivation";
 
 export interface DesktopRuntimeLifecycleStatusProvider {
-  readonly getStatus: () => Pick<DesktopControlPlaneRuntimeStatus, "capabilityPhase">;
+  readonly getStatus: () => Pick<
+    DesktopControlPlaneRuntimeStatus,
+    "capabilityPhase" | "activationMode" | "triggerSource" | "unavailableReason" | "failure" | "transport"
+  >;
 }
 
 export interface AuthoritativeServerRouteFamilyAvailabilityService {
@@ -24,6 +29,27 @@ function normalizeCapabilityPhase(value: string | undefined): DesktopControlPlan
   return "pre-login";
 }
 
+function normalizeTransportPhase(value: string | undefined): DesktopControlPlaneTransportPhase | undefined {
+  if (value === "available" || value === "binding" || value === "unavailable" || value === "failed") {
+    return value;
+  }
+  return undefined;
+}
+
+function buildRuntimeLifecycleSnapshot(
+  status: ReturnType<DesktopRuntimeLifecycleStatusProvider["getStatus"]>,
+): AuthoritativeServerRouteFamilyRuntimeLifecycleSnapshot {
+  return Object.freeze({
+    capabilityPhase: normalizeCapabilityPhase(status.capabilityPhase),
+    transportPhase: normalizeTransportPhase(status.transport?.phase),
+    activationMode: status.activationMode?.trim() ? status.activationMode : undefined,
+    triggerSource: status.triggerSource?.trim() ? status.triggerSource : undefined,
+    unavailableReason: status.unavailableReason?.trim() ? status.unavailableReason : undefined,
+    hasFailure: Boolean(status.failure),
+    failureRetryable: status.failure?.retryable,
+  });
+}
+
 function resolveRuntimeLifecycleAvailability(input: {
   readonly routeFamilyAvailability: AuthoritativeServerRouteFamilyAvailability;
   readonly runtimeStatusProvider?: DesktopRuntimeLifecycleStatusProvider;
@@ -36,10 +62,12 @@ function resolveRuntimeLifecycleAvailability(input: {
     return routeFamilyAvailability;
   }
 
-  const capabilityPhase = normalizeCapabilityPhase(input.runtimeStatusProvider.getStatus().capabilityPhase);
+  const runtimeStatus = input.runtimeStatusProvider.getStatus();
+  const capabilityPhase = normalizeCapabilityPhase(runtimeStatus.capabilityPhase);
   return Object.freeze({
     ...routeFamilyAvailability,
     state: capabilityPhase,
+    runtimeLifecycle: buildRuntimeLifecycleSnapshot(runtimeStatus),
     available: capabilityPhase === "ready",
   });
 }

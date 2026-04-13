@@ -20,6 +20,8 @@ describe("runtime capability guard middleware", () => {
     expect(decision.response?.runtime.state).toBe("warming");
     expect(decision.response?.endpoint).toBe("/api/v1/runtime/runs/start");
     expect(decision.response?.runtime.blockingReasons[0]?.code).toBe("capability-warmup-in-progress");
+    expect(decision.response?.runtime.diagnostics?.blockingDependencyCategory).toBe("capability-activation");
+    expect(decision.response?.runtime.diagnostics?.lifecyclePhase).toBe("pending");
   });
 
   it("returns canonical failed responses for failed runtime route-family availability", () => {
@@ -40,6 +42,7 @@ describe("runtime capability guard middleware", () => {
     expect(decision.response?.runtime.state).toBe("failed");
     if (decision.response?.runtime.state === "failed") {
       expect(decision.response.runtime.failure.code).toBe("runtime-capability-activation-failed");
+      expect(decision.response.runtime.diagnostics?.blockingDependencyCategory).toBe("capability-activation");
     }
   });
 
@@ -76,6 +79,7 @@ describe("runtime capability guard middleware", () => {
     expect(systemRuntimeDecision.blocked).toBeTrue();
     expect(systemRuntimeDecision.response?.runtime.state).toBe("unavailable");
     expect(systemRuntimeDecision.response?.runtime.blockingReasons[0]?.code).toBe("authentication-required");
+    expect(systemRuntimeDecision.response?.runtime.diagnostics?.blockingDependencyCategory).toBe("authentication");
 
     const imageRunDecision = evaluateRuntimeCapabilityGuard({
       endpoint: "/api/v1/image-systems/system-1/runs",
@@ -92,5 +96,55 @@ describe("runtime capability guard middleware", () => {
     expect(imageRunDecision.blocked).toBeTrue();
     expect(imageRunDecision.response?.runtime.state).toBe("warming");
     expect(imageRunDecision.response?.runtime.blockingReasons[0]?.code).toBe("capability-warmup-in-progress");
+  });
+
+  it("classifies control-plane transport failures as transport blocking diagnostics", () => {
+    const decision = evaluateRuntimeCapabilityGuard({
+      endpoint: "/api/v1/runtime/runs/start",
+      requestId: "request-transport-failure",
+      routeFamilyId: "run-submission",
+      checkedAt: "2026-04-13T12:04:00.000Z",
+      availability: Object.freeze({
+        routeFamilyId: "run-submission",
+        capabilityId: "deferred-runtime-features",
+        state: "failed",
+        runtimeLifecycle: Object.freeze({
+          capabilityPhase: "failed",
+          transportPhase: "failed",
+          hasFailure: true,
+          failureRetryable: true,
+        }),
+        available: false,
+      }),
+    });
+
+    expect(decision.blocked).toBeTrue();
+    expect(decision.response?.runtime.diagnostics?.blockingDependencyCategory).toBe("control-plane-transport");
+    expect(decision.response?.runtime.diagnostics?.transportPhase).toBe("failed");
+  });
+
+  it("classifies runtime supervisor failures when lifecycle reports a capability failure", () => {
+    const decision = evaluateRuntimeCapabilityGuard({
+      endpoint: "/api/v1/runtime/runs/start",
+      requestId: "request-supervisor-failure",
+      routeFamilyId: "run-submission",
+      checkedAt: "2026-04-13T12:05:00.000Z",
+      availability: Object.freeze({
+        routeFamilyId: "run-submission",
+        capabilityId: "deferred-runtime-features",
+        state: "failed",
+        runtimeLifecycle: Object.freeze({
+          capabilityPhase: "failed",
+          transportPhase: "available",
+          hasFailure: true,
+          failureRetryable: true,
+        }),
+        available: false,
+      }),
+    });
+
+    expect(decision.blocked).toBeTrue();
+    expect(decision.response?.runtime.state).toBe("failed");
+    expect(decision.response?.runtime.diagnostics?.blockingDependencyCategory).toBe("runtime-supervisor");
   });
 });

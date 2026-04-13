@@ -14,6 +14,7 @@ import {
   type RunSubmissionRequest,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import {
+  RuntimeAvailabilityBlockingDependencyCategories,
   RuntimeAvailabilityResponseContractVersions,
   RuntimeAvailabilityStates,
 } from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
@@ -512,6 +513,28 @@ const RuntimeAvailabilityFailureDetailSchema = z.object({
   retryAfterMs: z.number().int().min(0).optional(),
 }).strict();
 
+const RuntimeAvailabilityLifecycleDiagnosticsSchema = z.object({
+  lifecycleState: z.enum([
+    RuntimeAvailabilityStates.unavailable,
+    RuntimeAvailabilityStates.warming,
+    RuntimeAvailabilityStates.ready,
+    RuntimeAvailabilityStates.failed,
+  ]),
+  blockingDependencyCategory: z.enum([
+    RuntimeAvailabilityBlockingDependencyCategories.authentication,
+    RuntimeAvailabilityBlockingDependencyCategories.capabilityActivation,
+    RuntimeAvailabilityBlockingDependencyCategories.runtimeSupervisor,
+    RuntimeAvailabilityBlockingDependencyCategories.controlPlaneTransport,
+    RuntimeAvailabilityBlockingDependencyCategories.unknown,
+  ]),
+  retryable: z.boolean(),
+  summary: z.string().trim().min(1).max(2000).optional(),
+  routeFamilyId: z.string().trim().min(1).max(256).optional(),
+  capabilityId: z.string().trim().min(1).max(256).optional(),
+  lifecyclePhase: z.string().trim().min(1).max(128).optional(),
+  transportPhase: z.string().trim().min(1).max(128).optional(),
+}).strict();
+
 const RuntimeAvailabilityResponseSchema = z.object({
   contractVersion: z.literal(RuntimeAvailabilityResponseContractVersions.v1),
   state: z.enum([
@@ -527,7 +550,7 @@ const RuntimeAvailabilityResponseSchema = z.object({
   warmupStartedAt: TimestampSchema.optional(),
   readyAt: TimestampSchema.optional(),
   failure: RuntimeAvailabilityFailureDetailSchema.optional(),
-  diagnostics: z.record(z.string(), z.unknown()).optional(),
+  diagnostics: RuntimeAvailabilityLifecycleDiagnosticsSchema.optional(),
 }).strict();
 
 export const ExecutionReadinessReadResponseSchema = z.object({

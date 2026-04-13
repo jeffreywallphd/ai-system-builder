@@ -1078,6 +1078,15 @@ export interface IdentityHttpServerOptions {
       readonly routeFamilyId: string;
       readonly capabilityId?: string;
       readonly state?: string;
+      readonly runtimeLifecycle?: Readonly<{
+        readonly capabilityPhase: string;
+        readonly transportPhase?: string;
+        readonly activationMode?: string;
+        readonly triggerSource?: string;
+        readonly unavailableReason?: string;
+        readonly hasFailure?: boolean;
+        readonly failureRetryable?: boolean;
+      }>;
       readonly available: boolean;
     }>;
   };

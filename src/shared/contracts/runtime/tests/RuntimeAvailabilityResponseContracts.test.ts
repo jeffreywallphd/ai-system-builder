@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  RuntimeAvailabilityBlockingDependencyCategories,
   RuntimeAvailabilityBlockingReasonCodes,
   RuntimeAvailabilityResponseContractError,
   RuntimeAvailabilityStates,
@@ -54,6 +55,14 @@ describe("RuntimeAvailabilityResponseContracts", () => {
 
     const failed = createRuntimeFailedResponseContract({
       checkedAt: "2026-04-13T10:03:00.000Z",
+      diagnostics: {
+        lifecycleState: RuntimeAvailabilityStates.failed,
+        blockingDependencyCategory: RuntimeAvailabilityBlockingDependencyCategories.runtimeSupervisor,
+        retryable: true,
+        summary: "The runtime supervisor reported a deferred activation failure.",
+        capabilityId: "deferred-runtime-features",
+        routeFamilyId: "run-read",
+      },
       failure: {
         code: "runtime-bootstrap-timeout",
         message: "Timed out while waiting for runtime bootstrap readiness.",
@@ -66,6 +75,8 @@ describe("RuntimeAvailabilityResponseContracts", () => {
     expect(failed.state).toBe(RuntimeAvailabilityStates.failed);
     expect(failed.failure.retryAfterMs).toBe(5000);
     expect(failed.blockingReasons[0]?.code).toBe(RuntimeAvailabilityBlockingReasonCodes.runtimeInitializationFailed);
+    expect(failed.diagnostics?.blockingDependencyCategory).toBe("runtime-supervisor");
+    expect(failed.diagnostics?.summary).toBe("The runtime supervisor reported a deferred activation failure.");
   });
 
   it("builds guarded endpoint unavailable responses and rejects invalid payloads", () => {

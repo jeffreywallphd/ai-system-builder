@@ -157,6 +157,16 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
           retryable: true,
         }],
         warmupStartedAt: "2026-04-08T12:09:59.000Z",
+        diagnostics: {
+          lifecycleState: "warming",
+          blockingDependencyCategory: "capability-activation",
+          retryable: true,
+          summary: "Deferred runtime activation is currently warming.",
+          routeFamilyId: "run-read",
+          capabilityId: "deferred-runtime-features",
+          lifecyclePhase: "warming",
+          transportPhase: "available",
+        },
       },
       message: "Execution backend is reachable but incompatible.",
       capabilities: {
@@ -192,6 +202,7 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
     });
     expect(response.readiness).toBe("degraded");
     expect(response.runtimeLifecycle?.state).toBe("warming");
+    expect(response.runtimeLifecycle?.diagnostics?.blockingDependencyCategory).toBe("capability-activation");
     expect(response.issues[0]?.severity).toBe("error");
   });
 

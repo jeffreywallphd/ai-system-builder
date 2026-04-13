@@ -35,6 +35,28 @@ export const RuntimeAvailabilityBlockingReasonCodes = Object.freeze({
 export type RuntimeAvailabilityBlockingReasonCode =
   typeof RuntimeAvailabilityBlockingReasonCodes[keyof typeof RuntimeAvailabilityBlockingReasonCodes];
 
+export const RuntimeAvailabilityBlockingDependencyCategories = Object.freeze({
+  authentication: "authentication",
+  capabilityActivation: "capability-activation",
+  runtimeSupervisor: "runtime-supervisor",
+  controlPlaneTransport: "control-plane-transport",
+  unknown: "unknown",
+} as const);
+
+export type RuntimeAvailabilityBlockingDependencyCategory =
+  typeof RuntimeAvailabilityBlockingDependencyCategories[keyof typeof RuntimeAvailabilityBlockingDependencyCategories];
+
+export interface RuntimeAvailabilityLifecycleDiagnostics {
+  readonly lifecycleState: RuntimeAvailabilityState;
+  readonly blockingDependencyCategory: RuntimeAvailabilityBlockingDependencyCategory;
+  readonly retryable: boolean;
+  readonly summary?: string;
+  readonly routeFamilyId?: string;
+  readonly capabilityId?: string;
+  readonly lifecyclePhase?: string;
+  readonly transportPhase?: string;
+}
+
 export interface RuntimeAvailabilityBlockingReason {
   readonly code: RuntimeAvailabilityBlockingReasonCode;
   readonly message: string;
@@ -58,7 +80,7 @@ interface RuntimeAvailabilityResponseBase {
   readonly updatedAt: string;
   readonly retryable: boolean;
   readonly blockingReasons: ReadonlyArray<RuntimeAvailabilityBlockingReason>;
-  readonly diagnostics?: Readonly<Record<string, unknown>>;
+  readonly diagnostics?: RuntimeAvailabilityLifecycleDiagnostics;
 }
 
 export interface RuntimeUnavailableResponseContract extends RuntimeAvailabilityResponseBase {
@@ -151,16 +173,46 @@ function normalizeBlockingReasons(
   return Object.freeze(reasons.map((reason) => normalizeBlockingReason(reason)));
 }
 
+function normalizeOptionalText(
+  value: string | undefined,
+): string | undefined {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function normalizeLifecycleDiagnostics(
+  diagnostics: RuntimeAvailabilityLifecycleDiagnostics | undefined,
+): RuntimeAvailabilityLifecycleDiagnostics | undefined {
+  if (!diagnostics) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    lifecycleState: diagnostics.lifecycleState,
+    blockingDependencyCategory: diagnostics.blockingDependencyCategory,
+    retryable: diagnostics.retryable,
+    summary: normalizeOptionalText(diagnostics.summary),
+    routeFamilyId: normalizeOptionalText(diagnostics.routeFamilyId),
+    capabilityId: normalizeOptionalText(diagnostics.capabilityId),
+    lifecyclePhase: normalizeOptionalText(diagnostics.lifecyclePhase),
+    transportPhase: normalizeOptionalText(diagnostics.transportPhase),
+  });
+}
+
 function createBaseAvailabilityResponse(input: {
   readonly state: RuntimeAvailabilityState;
   readonly checkedAt?: string;
   readonly updatedAt?: string;
   readonly retryable: boolean;
   readonly blockingReasons?: ReadonlyArray<RuntimeAvailabilityBlockingReason>;
-  readonly diagnostics?: Readonly<Record<string, unknown>>;
+  readonly diagnostics?: RuntimeAvailabilityLifecycleDiagnostics;
 }): RuntimeAvailabilityResponseBase {
   const checkedAt = normalizeIsoTimestamp(input.checkedAt ?? new Date().toISOString(), "Runtime availability checkedAt");
   const updatedAt = normalizeIsoTimestamp(input.updatedAt ?? checkedAt, "Runtime availability updatedAt");
+  const diagnostics = normalizeLifecycleDiagnostics(input.diagnostics);
   return Object.freeze({
     contractVersion: RuntimeAvailabilityResponseContractVersions.v1,
     state: input.state,
@@ -168,8 +220,11 @@ function createBaseAvailabilityResponse(input: {
     updatedAt,
     retryable: input.retryable,
     blockingReasons: normalizeBlockingReasons(input.blockingReasons),
-    diagnostics: input.diagnostics
-      ? Object.freeze({ ...input.diagnostics })
+    diagnostics: diagnostics
+      ? Object.freeze({
+        ...diagnostics,
+        lifecycleState: input.state,
+      })
       : undefined,
   });
 }
@@ -179,7 +234,7 @@ export function createRuntimeUnavailableResponseContract(input?: {
   readonly updatedAt?: string;
   readonly blockingReasons?: ReadonlyArray<RuntimeAvailabilityBlockingReason>;
   readonly retryable?: boolean;
-  readonly diagnostics?: Readonly<Record<string, unknown>>;
+  readonly diagnostics?: RuntimeAvailabilityLifecycleDiagnostics;
 }): RuntimeUnavailableResponseContract {
   return Object.freeze({
     ...createBaseAvailabilityResponse({
@@ -200,7 +255,7 @@ export function createRuntimeWarmingResponseContract(input?: {
   readonly warmupStartedAt?: string;
   readonly blockingReasons?: ReadonlyArray<RuntimeAvailabilityBlockingReason>;
   readonly retryable?: boolean;
-  readonly diagnostics?: Readonly<Record<string, unknown>>;
+  readonly diagnostics?: RuntimeAvailabilityLifecycleDiagnostics;
 }): RuntimeWarmingResponseContract {
   const blockingReasons = input?.blockingReasons ?? Object.freeze([Object.freeze({
     code: RuntimeAvailabilityBlockingReasonCodes.capabilityWarmupInProgress,
@@ -228,7 +283,7 @@ export function createRuntimeReadyResponseContract(input?: {
   readonly checkedAt?: string;
   readonly updatedAt?: string;
   readonly readyAt?: string;
-  readonly diagnostics?: Readonly<Record<string, unknown>>;
+  readonly diagnostics?: RuntimeAvailabilityLifecycleDiagnostics;
 }): RuntimeReadyResponseContract {
   const base = createBaseAvailabilityResponse({
     state: RuntimeAvailabilityStates.ready,
@@ -249,7 +304,7 @@ export function createRuntimeFailedResponseContract(input: {
   readonly checkedAt?: string;
   readonly updatedAt?: string;
   readonly blockingReasons?: ReadonlyArray<RuntimeAvailabilityBlockingReason>;
-  readonly diagnostics?: Readonly<Record<string, unknown>>;
+  readonly diagnostics?: RuntimeAvailabilityLifecycleDiagnostics;
   readonly failure: RuntimeAvailabilityFailureDetail;
 }): RuntimeFailedResponseContract {
   const failure = Object.freeze({

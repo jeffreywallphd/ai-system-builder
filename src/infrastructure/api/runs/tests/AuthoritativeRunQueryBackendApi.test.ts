@@ -51,6 +51,7 @@ import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAu
 import { ListStaleSchedulingReservationsUseCase } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
 import { parseSchedulingAdminListStaleReservationsResponse } from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
 import {
+  RuntimeAvailabilityBlockingDependencyCategories,
   createRuntimeFailedResponseContract,
   createRuntimeUnavailableResponseContract,
   createRuntimeWarmingResponseContract,
@@ -1227,15 +1228,36 @@ describe("AuthoritativeRunQueryBackendApi", () => {
         checkedAt: "2026-04-13T10:00:00.000Z",
         updatedAt: "2026-04-13T10:00:00.000Z",
         retryable: true,
+        diagnostics: {
+          lifecycleState: "unavailable",
+          blockingDependencyCategory: RuntimeAvailabilityBlockingDependencyCategories.authentication,
+          retryable: true,
+          summary: "Authentication is required.",
+          lifecyclePhase: "pre-login",
+        },
       }),
       createRuntimeWarmingResponseContract({
         checkedAt: "2026-04-13T10:00:01.000Z",
         updatedAt: "2026-04-13T10:00:01.000Z",
         warmupStartedAt: "2026-04-13T09:59:00.000Z",
+        diagnostics: {
+          lifecycleState: "warming",
+          blockingDependencyCategory: RuntimeAvailabilityBlockingDependencyCategories.capabilityActivation,
+          retryable: true,
+          summary: "Deferred runtime activation is warming.",
+          lifecyclePhase: "warming",
+        },
       }),
       createRuntimeFailedResponseContract({
         checkedAt: "2026-04-13T10:00:02.000Z",
         updatedAt: "2026-04-13T10:00:02.000Z",
+        diagnostics: {
+          lifecycleState: "failed",
+          blockingDependencyCategory: RuntimeAvailabilityBlockingDependencyCategories.runtimeSupervisor,
+          retryable: true,
+          summary: "Runtime supervisor activation failed.",
+          lifecyclePhase: "failed",
+        },
         failure: Object.freeze({
           code: "runtime-capability-activation-failed",
           message: "Runtime activation failed.",
@@ -1258,6 +1280,10 @@ describe("AuthoritativeRunQueryBackendApi", () => {
       expect(response.data?.readiness).toBe("unavailable");
       expect(response.data?.readyForExecution).toBeFalse();
       expect(response.data?.runtimeLifecycle?.state).toBe(runtimeLifecycle.state);
+      expect(response.data?.runtimeLifecycle?.diagnostics?.blockingDependencyCategory).toBeDefined();
+      expect(response.data?.diagnostics?.blockingDependencyCategory).toBe(
+        response.data?.runtimeLifecycle?.diagnostics?.blockingDependencyCategory,
+      );
       expect(response.data?.issues.length).toBeGreaterThan(0);
     }
   });
