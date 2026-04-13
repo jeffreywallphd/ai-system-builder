@@ -236,4 +236,66 @@ describe("AppRuntimeConfig", () => {
     expect(config.controlPlaneBaseUrl).toBe("http://127.0.0.1:8788");
     expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
   });
+
+  it("prefers explicit bootstrapContext when resolving desktop runtime defaults", () => {
+    const globalWithDesktop = (globalThis as typeof globalThis & {
+      aiLoomDesktop?: {
+        auth?: {
+          bootstrapContext?: {
+            runtimeConfig: {
+              runtimeMode: "desktop-production";
+              hostKind: "desktop";
+              lifecycleStage: "production";
+              distributionTarget: "electron";
+              rendererDeliveryMode: "packaged-assets";
+              workflowRepositoryMode: "filesystem-indexed";
+              workflowExecutorMode: "strategy";
+              nodeCatalogMode: "registered";
+              uiSettingsPersistenceMode: "desktop-sqlite";
+              installedModelCatalogMode: "desktop-sqlite";
+              seedStarterNode: false;
+              isProductionMode: true;
+              controlPlaneBaseUrl: string;
+              controlPlaneCapabilityPhase: "pre-login";
+              identityApiBaseUrl: string;
+              modelInstallDirectory: string;
+            };
+          };
+        };
+      };
+    });
+    const previousDesktopBootstrap = globalWithDesktop.aiLoomDesktop;
+    try {
+      globalWithDesktop.aiLoomDesktop = {
+        auth: {
+          bootstrapContext: {
+            runtimeConfig: {
+              runtimeMode: "desktop-production",
+              hostKind: "desktop",
+              lifecycleStage: "production",
+              distributionTarget: "electron",
+              rendererDeliveryMode: "packaged-assets",
+              workflowRepositoryMode: "filesystem-indexed",
+              workflowExecutorMode: "strategy",
+              nodeCatalogMode: "registered",
+              uiSettingsPersistenceMode: "desktop-sqlite",
+              installedModelCatalogMode: "desktop-sqlite",
+              seedStarterNode: false,
+              isProductionMode: true,
+              controlPlaneBaseUrl: "http://127.0.0.1:9001",
+              controlPlaneCapabilityPhase: "pre-login",
+              identityApiBaseUrl: "http://127.0.0.1:9001",
+              modelInstallDirectory: "/tmp/ai-loom/models",
+            },
+          },
+        },
+      };
+
+      const config = AppRuntimeConfig.resolveDefault();
+      expect(config.controlPlaneBaseUrl).toBe("http://127.0.0.1:9001");
+      expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:9001");
+    } finally {
+      globalWithDesktop.aiLoomDesktop = previousDesktopBootstrap;
+    }
+  });
 });

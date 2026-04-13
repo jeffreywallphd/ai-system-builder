@@ -247,14 +247,14 @@ function isDesktopDeferredFeatureApiReady(): boolean {
     return true;
   }
   const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
-  if (!runtimeBridge?.isDeferredFeatureApiReady && !runtimeBridge?.getPostLoginRuntimeStatus) {
+  if (!runtimeBridge?.isCapabilityReady && !runtimeBridge?.isDeferredFeatureApiReady && !runtimeBridge?.getLifecycleStatus && !runtimeBridge?.getPostLoginRuntimeStatus) {
     return true;
   }
-  const status = runtimeBridge.getPostLoginRuntimeStatus?.();
+  const status = runtimeBridge.getLifecycleStatus?.() ?? runtimeBridge.getPostLoginRuntimeStatus?.();
   if (status) {
     return status.state === "ready";
   }
-  return runtimeBridge.isDeferredFeatureApiReady();
+  return runtimeBridge.isCapabilityReady?.() ?? runtimeBridge.isDeferredFeatureApiReady();
 }
 
 function getDesktopDeferredFeatureRuntimeState(): string | undefined {
@@ -262,7 +262,7 @@ function getDesktopDeferredFeatureRuntimeState(): string | undefined {
     return undefined;
   }
   const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
-  return runtimeBridge?.getPostLoginRuntimeStatus?.().state;
+  return (runtimeBridge?.getLifecycleStatus?.() ?? runtimeBridge?.getPostLoginRuntimeStatus?.())?.state;
 }
 
 function isDeferredFeatureApiUnavailable(errorCode: string | undefined): boolean {
@@ -1728,12 +1728,12 @@ export function ImageManipulationRuntimeEditorPanel({
       return;
     }
     const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
-    if (!runtimeBridge?.getPostLoginRuntimeStatus) {
+    if (!runtimeBridge?.getLifecycleStatus && !runtimeBridge?.getPostLoginRuntimeStatus) {
       setDesktopDeferredRuntimeState(undefined);
       return;
     }
     const refreshState = () => {
-      setDesktopDeferredRuntimeState(runtimeBridge.getPostLoginRuntimeStatus().state);
+      setDesktopDeferredRuntimeState((runtimeBridge.getLifecycleStatus?.() ?? runtimeBridge.getPostLoginRuntimeStatus?.())?.state);
     };
     refreshState();
     const intervalId = window.setInterval(refreshState, 900);

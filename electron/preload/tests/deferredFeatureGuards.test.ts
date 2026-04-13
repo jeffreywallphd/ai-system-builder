@@ -15,8 +15,8 @@ describe("deferred preload guards", () => {
   it("throws/rejects unavailable errors and triggers warmup when runtime is not ready", async () => {
     let warmups = 0;
     const guards = createDeferredBridgeGuards({
-      isDeferredFeatureApiReady: () => false,
-      getPostLoginRuntimeStatus: () => ({
+      isCapabilityReady: () => false,
+      getRuntimeLifecycleStatus: () => ({
         host: DesktopControlPlaneHostIdentities.desktopSessionControlPlane,
         state: DesktopPostLoginRuntimeStates.preLogin,
         capabilityPhase: DesktopPostLoginRuntimeStates.preLogin,

@@ -30,7 +30,7 @@ describe("createWorkflowsBridge", () => {
     let warmups = 0;
     const bridge = createWorkflowsBridge({
       ipcRenderer,
-      isDeferredFeatureApiReady: () => false,
+      isCapabilityReady: () => false,
       startDeferredFeatureWarmupOnDemand: () => {
         warmups += 1;
       },
@@ -48,7 +48,7 @@ describe("createWorkflowsBridge", () => {
     const { ipcRenderer, calls } = createIpcRendererStub();
     const bridge = createWorkflowsBridge({
       ipcRenderer,
-      isDeferredFeatureApiReady: () => true,
+      isCapabilityReady: () => true,
       startDeferredFeatureWarmupOnDemand: () => {
         throw new Error("should not warmup");
       },

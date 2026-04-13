@@ -318,17 +318,32 @@ export type DesktopPostLoginRuntimeUnavailableReason = DesktopControlPlaneCapabi
 
 export type DesktopPostLoginRuntimeStatus = DesktopControlPlaneRuntimeStatus;
 
-export interface DesktopRuntimeBootstrapBridge {
+export interface DesktopRuntimeLifecycleBridge {
+  isCapabilityReady(): boolean;
+  getLifecycleStatus(): DesktopPostLoginRuntimeStatus;
+  getTransportStatus(): DesktopPostLoginRuntimeStatus["transport"];
+  activateCapabilities(request?: DesktopPostLoginWarmupRequest): Promise<void>;
+
+  // Temporary compatibility aliases while renderer call sites migrate to explicit lifecycle naming.
   isDeferredFeatureApiReady(): boolean;
   getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus;
   startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest): Promise<void>;
 }
 
+export type DesktopRuntimeBootstrapBridge = DesktopRuntimeLifecycleBridge;
+
+export interface DesktopControlPlaneBootstrapBridge {
+  readonly baseUrl: string;
+  readonly capabilityPhase: DesktopControlPlaneCapabilityPhase;
+}
+
 export interface DesktopAuthBootstrapBridge {
+  readonly bootstrapContext: DesktopBootstrapContext;
   readonly bootstrap: DesktopBootstrapContext;
+  readonly controlPlane: DesktopControlPlaneBootstrapBridge;
   readonly storage: DesktopKeyValueStorageBridge;
   readonly secrets?: DesktopMcpSecretBridge;
-  readonly runtime?: DesktopRuntimeBootstrapBridge;
+  readonly runtime?: DesktopRuntimeLifecycleBridge;
   readonly connectivity?: DesktopConnectivityBridge;
 }
 

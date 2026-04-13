@@ -21,6 +21,25 @@ describe("resolveDesktopIdentityApiBaseUrl", () => {
     expect(resolveDesktopIdentityApiBaseUrl()).toBe("http://127.0.0.1:8788");
   });
 
+  it("prefers explicit control-plane bridge base URL when available", () => {
+    (globalThis as typeof globalThis & { window?: Window }).window = {
+      aiLoomDesktop: {
+        auth: {
+          controlPlane: {
+            baseUrl: "http://127.0.0.1:9001/",
+          },
+        },
+        bootstrap: {
+          runtimeConfig: {
+            controlPlaneBaseUrl: "http://127.0.0.1:8788/",
+          },
+        },
+      },
+    } as unknown as Window;
+
+    expect(resolveDesktopIdentityApiBaseUrl()).toBe("http://127.0.0.1:9001");
+  });
+
   it("falls back to legacy identityApiBaseUrl when control-plane field is absent", () => {
     (globalThis as typeof globalThis & { window?: Window }).window = {
       aiLoomDesktop: {

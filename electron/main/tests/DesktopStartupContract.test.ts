@@ -61,6 +61,11 @@ describe("desktop startup boot contract", () => {
     expect(preloadSource).toContain("createDesktopBridge({");
     expect(preloadSource).toContain("authBootstrapSurface: authBootstrapSurface");
     expect(preloadSource).toContain("deferredFeatureSurface");
+    expect(preloadSource).toContain("bootstrapContext: bootstrap");
+    expect(preloadSource).toContain("controlPlane: Object.freeze({");
+    expect(preloadSource).toContain("isCapabilityReady: isRuntimeCapabilityReady");
+    expect(preloadSource).toContain("getLifecycleStatus: getRuntimeLifecycleStatus");
+    expect(preloadSource).toContain("activateCapabilities: activateRuntimeCapabilities");
     expect(preloadSource).toContain("DesktopPostLoginWarmupTriggerSources.featureDemand");
   });
 
