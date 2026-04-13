@@ -31,6 +31,7 @@ export interface UseRendererRuntimeLifecycleOptions {
 
 export interface RendererRuntimeLifecycleState {
   readonly status?: DesktopPostLoginRuntimeStatus;
+  readonly hasRuntimeBridge: boolean;
   readonly isReady: boolean;
   readonly isRetrying: boolean;
   readonly refresh: () => void;
@@ -98,13 +99,18 @@ export function useRendererRuntimeLifecycle(
   const [status, setStatus] = useState<DesktopPostLoginRuntimeStatus | undefined>(() => (
     enabled ? service.getStatus() : undefined
   ));
+  const [hasRuntimeBridge, setHasRuntimeBridge] = useState<boolean>(() => (
+    enabled ? Boolean(service.getRuntimeBridge()) : false
+  ));
   const [isRetrying, setIsRetrying] = useState(false);
 
   const refresh = useCallback(() => {
     if (!enabled) {
       setStatus(undefined);
+      setHasRuntimeBridge(false);
       return;
     }
+    setHasRuntimeBridge(Boolean(service.getRuntimeBridge()));
     setStatus(service.getStatus());
   }, [enabled, service]);
 
@@ -149,6 +155,7 @@ export function useRendererRuntimeLifecycle(
 
   return Object.freeze({
     status,
+    hasRuntimeBridge,
     isReady: service.isReady(status),
     isRetrying,
     refresh,
