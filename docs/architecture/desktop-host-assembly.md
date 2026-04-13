@@ -53,8 +53,11 @@ Electron main now executes through the desktop host assembly and supplies host-o
 - renderer content security policy installation
 - initial window creation
 - graceful host stop and local runtime resource disposal
+- single control-plane host composition across pre-login and post-login phases
 
 Renderer CSP now pre-authorizes loopback deferred-runtime endpoints (`http://127.0.0.1:8790` service supervisor and `http://127.0.0.1:8100` python runtime) for desktop host modes so post-login runtime warmup calls are not blocked by pre-login document policy while still remaining loopback-scoped.
+
+Desktop session transport continuity now uses one authoritative host instance for the full app session. Post-login warmup activates runtime capabilities in place and does not replace or rebind the renderer-facing HTTP listener.
 
 ## Testing
 

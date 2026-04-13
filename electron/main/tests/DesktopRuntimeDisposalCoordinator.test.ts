@@ -10,9 +10,9 @@ describe("DesktopRuntimeDisposalCoordinator", () => {
     let postLoginBootstrapPromise: Promise<void> | undefined = Promise.resolve().then(() => {
       events.push("bootstrap-settled");
     });
-    const authMinimalServerRuntime = {
+    const controlPlaneServerRuntime = {
       stop: async () => {
-        events.push("auth-minimal-stop");
+        events.push("control-plane-stop");
       },
     };
     const serviceSupervisor = {
@@ -68,8 +68,8 @@ describe("DesktopRuntimeDisposalCoordinator", () => {
       setPostLoginBootstrapPromise: (promise) => {
         postLoginBootstrapPromise = promise;
       },
-      getAuthMinimalServerRuntime: () => authMinimalServerRuntime as never,
-      setAuthMinimalServerRuntime: () => undefined,
+      getControlPlaneServerRuntime: () => controlPlaneServerRuntime as never,
+      setControlPlaneServerRuntime: () => undefined,
       getServiceSupervisor: () => serviceSupervisor as never,
       setServiceSupervisor: () => undefined,
       getStorageDatabase: () => storageDatabase as never,
@@ -113,7 +113,7 @@ describe("DesktopRuntimeDisposalCoordinator", () => {
       "connectivity-start",
       "bootstrap-settled",
       "connectivity-stop",
-      "auth-minimal-stop",
+      "control-plane-stop",
       "service-supervisor-stop",
       "storage-dispose",
       "deferred-runtime-dispose",

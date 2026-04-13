@@ -2,7 +2,7 @@ import { DesktopPostLoginRuntimeUnavailableReasons } from "../../shared/DesktopC
 import type { DesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRuntimeStatusStore";
 import type { DesktopConnectivityRuntimeController } from "../DesktopConnectivityRuntimeController";
 import type { DesktopServiceSupervisor } from "../DesktopServiceSupervisor";
-import type { AuthMinimalServerHostRuntimeHandle } from "../../../src/hosts/server/AuthMinimalServerHostEntrypoint";
+import type { AuthoritativeServerHostRuntimeHandle } from "../../../src/hosts/server/AuthoritativeServerCompositionRoot";
 import type { DeferredDesktopFeatureRuntime } from "../DeferredDesktopFeatureRuntime";
 import type { DesktopAgentRuntimeProvider } from "./DesktopAgentRuntimeProvider";
 import type { CanonicalRegistryRuntimeProvider } from "./CanonicalRegistryRuntimeProvider";
@@ -11,8 +11,8 @@ import type { DesktopStorageDatabase } from "../../../src/infrastructure/desktop
 type RuntimeDisposalStateAccessors = {
   readonly getPostLoginBootstrapPromise: () => Promise<void> | undefined;
   readonly setPostLoginBootstrapPromise: (promise: Promise<void> | undefined) => void;
-  readonly getAuthMinimalServerRuntime: () => AuthMinimalServerHostRuntimeHandle | undefined;
-  readonly setAuthMinimalServerRuntime: (runtime: AuthMinimalServerHostRuntimeHandle | undefined) => void;
+  readonly getControlPlaneServerRuntime: () => AuthoritativeServerHostRuntimeHandle | undefined;
+  readonly setControlPlaneServerRuntime: (runtime: AuthoritativeServerHostRuntimeHandle | undefined) => void;
   readonly getServiceSupervisor: () => DesktopServiceSupervisor | undefined;
   readonly setServiceSupervisor: (runtime: DesktopServiceSupervisor | undefined) => void;
   readonly getStorageDatabase: () => DesktopStorageDatabase | undefined;
@@ -50,7 +50,7 @@ export function createDesktopRuntimeDisposalCoordinator(
     params.setPostLoginBootstrapPromise(undefined);
     await pendingPostLoginBootstrap?.catch(() => undefined);
     params.connectivityRuntimeController.stopMonitoring();
-    await params.getAuthMinimalServerRuntime()?.stop();
+    await params.getControlPlaneServerRuntime()?.stop();
     await params.getServiceSupervisor()?.stop();
     params.getStorageDatabase()?.dispose();
     params.getDeferredFeatureRuntime()?.dispose();
@@ -61,7 +61,7 @@ export function createDesktopRuntimeDisposalCoordinator(
     params.setCanonicalRegistryRuntimeProvider(undefined);
     params.clearDeferredRuntimeFactoryCache();
     params.setServiceSupervisor(undefined);
-    params.setAuthMinimalServerRuntime(undefined);
+    params.setControlPlaneServerRuntime(undefined);
     params.clearBootstrapContext();
     params.resetDeferredFeatureIpcReadiness();
     params.resetWarmupStarted();

@@ -8,6 +8,14 @@ Story: A.1.2-A.1.3, A.2.1-A.2.3, A.3.1-A.3.3
 
 Define the startup split so Electron can render the login-capable window from a minimal auth bootstrap path, then move broader runtime initialization behind login or lazy feature demand.
 
+## Story 1.1.3 implementation update
+
+Desktop startup now follows one control-plane host composition path for the full desktop session:
+
+- pre-login bootstrap and post-login warmup both use the same authoritative server host runtime started during `bootstrapAuthShell()`.
+- Electron main no longer composes an auth-minimal host for pre-login and then replaces it with another host after login.
+- renderer-facing transport remains continuously bound; post-login work activates capabilities in place through explicit runtime state transitions.
+
 ## Current implementation (A.1.2)
 
 `electron/main/main.ts` now uses explicit startup phases:
@@ -396,6 +404,6 @@ Not required pre-login:
 ## Major work to move off critical path
 
 - full desktop runtime bootstrap before window creation,
-- broad authoritative host startup as a startup gate (replaced by auth-minimal host startup path),
+- host replacement during login transition (removed in favor of one authoritative host across the desktop session),
 - bulk preload IPC registration unrelated to auth,
 - repository/backend composition for workflow/studio/runtime features before login render.

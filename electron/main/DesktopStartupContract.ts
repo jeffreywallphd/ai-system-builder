@@ -39,7 +39,7 @@ export const DesktopPostLoginWarmupSequence = Object.freeze([
 
 export const PreLoginAuthShellInitializers = Object.freeze([
   "desktop-storage-auth-shell-pre-login",
-  "auth-minimal-identity-host",
+  "authoritative-control-plane-host",
   "auth-bootstrap-ipc",
 ]);
 

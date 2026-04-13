@@ -35,11 +35,8 @@ import {
 import { createDesktopPostLoginRuntimeStatusStore } from "./DesktopPostLoginRuntimeStatusStore";
 import { createDesktopConnectivityRuntimeController } from "./DesktopConnectivityRuntimeController";
 import type { DeferredDesktopFeatureRuntime } from "./DeferredDesktopFeatureRuntime";
-import {
-  startAuthMinimalServerHostAssembly,
-  type AuthMinimalServerHostRuntimeHandle,
-} from "../../src/hosts/server/AuthMinimalServerHostEntrypoint";
 import { startAuthoritativeServerHostAssembly } from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
+import type { AuthoritativeServerHostRuntimeHandle } from "../../src/hosts/server/AuthoritativeServerCompositionRoot";
 import { createDesktopWindowManager } from "./DesktopWindowManager";
 import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
 import type { DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
@@ -109,7 +106,7 @@ function installRendererContentSecurityPolicy(): void {
 
 let storageDatabase: DesktopStorageDatabase | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
-let authMinimalServerRuntime: AuthMinimalServerHostRuntimeHandle | undefined;
+let controlPlaneServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
 let bootstrapContext: DesktopAuthBootstrapContext | undefined;
 let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
@@ -297,13 +294,13 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "storage-ready");
 
     const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
-    const authMinimalHostStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
+    const controlPlaneHostStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
     logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "start");
-    console.info("[ai-loom][startup] Starting auth-minimal identity host for pre-login bootstrap.");
+    console.info("[ai-loom][startup] Starting authoritative control-plane host for desktop session bootstrap.");
     postLoginRuntimeStatusStore.markTransportBinding({
-      reason: "auth-minimal-host-bind-start",
+      reason: "authoritative-host-bind-start",
     });
-    authMinimalServerRuntime = await startAuthMinimalServerHostAssembly({
+    controlPlaneServerRuntime = await startAuthoritativeServerHostAssembly({
       hostOptions: {
         databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
         cors: {
@@ -315,22 +312,22 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
         logger: desktopOperationalEventLogger,
       },
       boot: {
-        startupReason: "electron-main-auth-minimal-server-host-startup",
+        startupReason: "electron-main-authoritative-server-host-startup",
         environment: process.env,
       },
     });
-    logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, authMinimalHostStartAt);
-    console.info(`[ai-loom][startup] Auth-minimal identity host ready at ${authMinimalServerRuntime.address}.`);
+    logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, controlPlaneHostStartAt);
+    console.info(`[ai-loom][startup] Authoritative control-plane host ready at ${controlPlaneServerRuntime.address}.`);
     postLoginRuntimeStatusStore.markTransportAvailable({
-      boundAddress: authMinimalServerRuntime.address,
-      boundPort: authMinimalServerRuntime.port,
-      reason: "auth-minimal-host-bind-ready",
+      boundAddress: controlPlaneServerRuntime.address,
+      boundPort: controlPlaneServerRuntime.port,
+      reason: "authoritative-host-bind-ready",
     });
     logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "ready");
     logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready", authShellStartedAt);
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready");
     const identityApiBaseUrl = assertSecureTransportEndpoint(
-      `http://${authMinimalServerRuntime.address}`,
+      `http://${controlPlaneServerRuntime.address}`,
       resolveHostSecureTransportConfig({
         hostKind: HostSecureTransportKinds.desktop,
         hostAddress: "127.0.0.1",
@@ -398,9 +395,9 @@ const runtimeDisposalCoordinator = createDesktopRuntimeDisposalCoordinator({
   setPostLoginBootstrapPromise: (promise) => {
     postLoginBootstrapPromise = promise;
   },
-  getAuthMinimalServerRuntime: () => authMinimalServerRuntime,
-  setAuthMinimalServerRuntime: (runtime) => {
-    authMinimalServerRuntime = runtime;
+  getControlPlaneServerRuntime: () => controlPlaneServerRuntime,
+  setControlPlaneServerRuntime: (runtime) => {
+    controlPlaneServerRuntime = runtime;
   },
   getServiceSupervisor: () => serviceSupervisor,
   setServiceSupervisor: (supervisor) => {
@@ -468,15 +465,12 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     throw new Error("Auth-shell bootstrap context is unavailable for post-login warmup.");
   }
 
-  const runtimeAuthShell = await promoteControlPlaneRuntimeForPostLogin(authShell);
-  authShellBootstrapResult = runtimeAuthShell;
-
   postLoginWarmupStarted = true;
   postLoginRuntimeStatusStore.markWarming(request);
-  connectivityRuntimeController.startMonitoring(runtimeAuthShell.identityApiBaseUrl);
+  connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
-  postLoginBootstrapPromise = postLoginRuntimeBootstrapper.bootstrap(runtimeAuthShell);
+  postLoginBootstrapPromise = postLoginRuntimeBootstrapper.bootstrap(authShell);
   try {
     await postLoginBootstrapPromise;
     console.info("[ai-loom] Post-login desktop runtime warmup completed.");
@@ -491,70 +485,6 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     postLoginWarmupStarted = false;
     throw error;
   }
-}
-
-/**
- * Replaces the pre-login auth-minimal identity host with the full authoritative control-plane host for post-login runtime features.
- */
-async function promoteControlPlaneRuntimeForPostLogin(
-  authShell: AuthShellBootstrapResult,
-): Promise<AuthShellBootstrapResult> {
-  if (!authMinimalServerRuntime) {
-    return authShell;
-  }
-
-  const previousRuntime = authMinimalServerRuntime;
-  const previousRuntimePort = previousRuntime.port;
-  const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
-  postLoginRuntimeStatusStore.markTransportBinding({
-    boundAddress: previousRuntime.address,
-    boundPort: previousRuntime.port,
-    reason: "authoritative-host-promotion-bind-start",
-  });
-  // Stop the auth-minimal host before authoritative promotion so both hosts never contend for the same identity SQLite database.
-  await previousRuntime.stop();
-  authMinimalServerRuntime = undefined;
-
-  const upgradedRuntime = await startAuthoritativeServerHostAssembly({
-    hostOptions: {
-      databasePath: path.join(authShell.storagePaths.storageDirectory, "identity", "identity.sqlite"),
-      port: previousRuntimePort,
-      cors: {
-        allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
-        allowLoopbackOrigins: true,
-        allowNullOrigin: isPackaged,
-      },
-      env: process.env,
-      logger: desktopOperationalEventLogger,
-    },
-    boot: {
-      startupReason: "electron-main-authoritative-server-host-post-login-upgrade",
-      environment: process.env,
-    },
-  }).catch((error) => {
-    postLoginRuntimeStatusStore.markTransportFailed(error, {
-      boundPort: previousRuntimePort,
-    });
-    throw error;
-  });
-  authMinimalServerRuntime = upgradedRuntime;
-  postLoginRuntimeStatusStore.markTransportAvailable({
-    boundAddress: upgradedRuntime.address,
-    boundPort: upgradedRuntime.port,
-    reason: "authoritative-host-promotion-bind-ready",
-  });
-  const identityApiBaseUrl = assertSecureTransportEndpoint(
-    `http://${upgradedRuntime.address}`,
-    resolveHostSecureTransportConfig({
-      hostKind: HostSecureTransportKinds.desktop,
-      hostAddress: "127.0.0.1",
-    }),
-  );
-  console.info(`[ai-loom][startup] Upgraded control-plane host to authoritative route scope at ${upgradedRuntime.address}.`);
-  return Object.freeze({
-    ...authShell,
-    identityApiBaseUrl,
-  });
 }
 
 registerDesktopAppLifecycle({

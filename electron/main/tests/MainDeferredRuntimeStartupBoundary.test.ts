@@ -41,20 +41,18 @@ describe("electron main deferred runtime startup boundary", () => {
   });
 
   it("starts connectivity monitoring only when post-login warmup is accepted", () => {
-    expect(warmupEntrySource).toContain("promoteControlPlaneRuntimeForPostLogin(authShell)");
-    expect(warmupEntrySource).toContain("connectivityRuntimeController.startMonitoring(runtimeAuthShell.identityApiBaseUrl)");
+    expect(warmupEntrySource).toContain("connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl)");
     expect(warmupEntrySource).not.toContain("bootstrapAuthShell");
   });
 
 
-  it("stops auth-minimal host before authoritative upgrade to avoid SQLite lock contention", () => {
-    const stopIndex = mainSource.indexOf("await previousRuntime.stop();");
-    const startIndex = mainSource.indexOf("await startAuthoritativeServerHostAssembly({");
-    expect(stopIndex).toBeGreaterThan(-1);
-    expect(startIndex).toBeGreaterThan(-1);
-    expect(stopIndex).toBeLessThan(startIndex);
-    expect(mainSource).toContain("const previousRuntimePort = previousRuntime.port;");
-    expect(mainSource).toContain("port: previousRuntimePort,");
+  it("keeps a single authoritative host composition path and removes host promotion handoff", () => {
+    expect(mainSource).not.toContain("promoteControlPlaneRuntimeForPostLogin");
+    expect(mainSource).not.toContain("startAuthMinimalServerHostAssembly");
+    expect(mainSource).not.toContain("authoritative-host-promotion-bind-start");
+    expect(mainSource).not.toContain("authoritative-host-promotion-bind-ready");
+    expect(mainSource).toContain("authoritative-host-bind-start");
+    expect(mainSource).toContain("authoritative-host-bind-ready");
   });
   it("keeps python runtime resolution and service supervisor startup in post-login runtime composition", () => {
     expect(bootstrapperSource).toContain("async function composePostLoginRuntime(");
