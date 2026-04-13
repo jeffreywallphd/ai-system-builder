@@ -1,19 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   DesktopPostLoginRuntimeStates,
   DesktopPostLoginRuntimeUnavailableReasons,
   type DesktopPostLoginRuntimeStatus,
-  type DesktopRuntimeBootstrapBridge,
 } from "../../../electron/shared/DesktopContracts";
 import {
   createLoadingState,
   toDisconnectedState,
   type SurfacePresentationState,
 } from "../shared/components/presentation-state";
-import {
-  DesktopPostLoginWarmupTriggerSources,
-  requestDesktopPostLoginWarmup,
-} from "./DesktopPostLoginWarmup";
+import { useRendererRuntimeLifecycle } from "./RendererRuntimeLifecycleService";
 
 const DeferredRuntimeUnavailableCode = "AI_LOOM_DESKTOP_FEATURE_API_UNAVAILABLE";
 const GatePollingIntervalMs = 900;
@@ -25,56 +21,17 @@ export interface DeferredRuntimeFeatureGateState {
 }
 
 export function useDeferredRuntimeFeatureGate(pathname: string): DeferredRuntimeFeatureGateState {
-  const runtimeBridge = useMemo(() => resolveDesktopRuntimeBridge(), []);
   const isGatePath = useMemo(() => isDeferredRuntimeGatePath(pathname), [pathname]);
-  const [runtimeStatus, setRuntimeStatus] = useState<DesktopPostLoginRuntimeStatus | undefined>(() => (
-    resolveRuntimeLifecycleStatus(runtimeBridge)
-  ));
-  const [isRetrying, setIsRetrying] = useState(false);
-
-  const refreshStatus = useCallback(() => {
-    if (!runtimeBridge || !isGatePath) {
-      setRuntimeStatus(undefined);
-      return;
-    }
-    setRuntimeStatus(resolveRuntimeLifecycleStatus(runtimeBridge));
-  }, [isGatePath, runtimeBridge]);
-
-  useEffect(() => {
-    if (!runtimeBridge || !isGatePath) {
-      setRuntimeStatus(undefined);
-      return;
-    }
-    refreshStatus();
-    void requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.featureDemand);
-  }, [isGatePath, refreshStatus, runtimeBridge]);
-
-  useEffect(() => {
-    if (!runtimeBridge || !isGatePath) {
-      return;
-    }
-    const interval = window.setInterval(() => {
-      refreshStatus();
-    }, GatePollingIntervalMs);
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [isGatePath, refreshStatus, runtimeBridge]);
-
-  const retry = useCallback(async () => {
-    setIsRetrying(true);
-    try {
-      await requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.featureDemand);
-      refreshStatus();
-    } finally {
-      setIsRetrying(false);
-    }
-  }, [refreshStatus]);
+  const runtimeLifecycle = useRendererRuntimeLifecycle({
+    enabled: isGatePath,
+    activateOnMount: true,
+    pollIntervalMs: GatePollingIntervalMs,
+  });
 
   return Object.freeze({
-    surfaceState: buildDeferredRuntimeGateState(runtimeStatus),
-    isRetrying,
-    retry,
+    surfaceState: buildDeferredRuntimeGateState(runtimeLifecycle.status),
+    isRetrying: runtimeLifecycle.isRetrying,
+    retry: runtimeLifecycle.retry,
   });
 }
 
@@ -140,22 +97,6 @@ export function buildDeferredRuntimeGateState(
     ),
     details: createRuntimeDiagnosticDetails(status),
   });
-}
-
-function resolveDesktopRuntimeBridge(): DesktopRuntimeBootstrapBridge | undefined {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-  return window.aiLoomDesktop?.auth?.runtime ?? window.aiLoomDesktop?.runtime;
-}
-
-function resolveRuntimeLifecycleStatus(
-  bridge: DesktopRuntimeBootstrapBridge | undefined,
-): DesktopPostLoginRuntimeStatus | undefined {
-  if (!bridge) {
-    return undefined;
-  }
-  return bridge.getLifecycleStatus?.() ?? bridge.getPostLoginRuntimeStatus?.();
 }
 
 function createRuntimeDiagnosticDetails(status: DesktopPostLoginRuntimeStatus): string {

@@ -496,3 +496,29 @@ Contract intent:
 - control-plane transport/bootstrap identity stays stable and explicit via `auth.controlPlane` + lifecycle `transport` status,
 - deferred capability readiness remains lifecycle-state driven (`capabilityPhase/state`) instead of transport/socket assumptions,
 - renderer integrations should migrate to official lifecycle naming while compatibility aliases remain temporary.
+
+## Story 1.4.2 central renderer runtime lifecycle service
+
+Renderer lifecycle awareness is now centralized in one reusable service/hook so feature surfaces do not each implement local polling and warmup timing logic:
+
+- canonical renderer lifecycle service:
+  - `src/ui/runtime/RendererRuntimeLifecycleService.ts`
+- canonical shared hook:
+  - `useRendererRuntimeLifecycle(...)`
+
+Contract behavior:
+
+- status source remains `window.aiLoomDesktop.auth.runtime` with legacy fallback to `window.aiLoomDesktop.runtime`.
+- lifecycle state surfaces remain explicit (`pre-login`, `warming`, `ready`, `failed`).
+- activation and retry flow through one warmup trigger path (`requestDesktopPostLoginWarmup(...)`) with configurable trigger source.
+- readiness is derived from lifecycle state when available, with compatibility fallback to readiness probes when only legacy bridge methods exist.
+
+Consumer alignment:
+
+- `src/ui/runtime/DeferredRuntimeFeatureGate.ts` now consumes the shared service/hook instead of owning separate bridge polling logic.
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx` now consumes the shared service/hook instead of custom local runtime polling/readiness helpers.
+
+Result:
+
+- runtime lifecycle polling and retry semantics are canonicalized in renderer runtime infrastructure,
+- feature surfaces reuse one lifecycle contract and avoid duplicated lifecycle timing assumptions.
