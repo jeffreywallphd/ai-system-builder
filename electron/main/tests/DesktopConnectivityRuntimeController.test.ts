@@ -65,10 +65,10 @@ describe("createDesktopConnectivityRuntimeController", () => {
           operations.push("stop");
         },
       }),
-      createConnectivityProbePort: (identityApiBaseUrl, lookupToken) => {
-        operations.push(`probe:${identityApiBaseUrl}`);
+      createConnectivityProbePort: (controlPlaneBaseUrl, lookupToken) => {
+        operations.push(`probe:${controlPlaneBaseUrl}`);
         operations.push(`token:${lookupToken("auth-token")}`);
-        return { identityApiBaseUrl };
+        return { controlPlaneBaseUrl };
       },
       lookupToken: (key) => (key === "auth-token" ? "abc123" : null),
       nowIsoString: () => "2026-04-11T00:00:00.000Z",

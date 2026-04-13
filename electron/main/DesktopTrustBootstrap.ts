@@ -86,14 +86,14 @@ export function resolveDesktopIdentityTransportTrustBootstrap(readStorageItem: (
   });
 }
 
-export function createDesktopConnectivityProbePort(identityApiBaseUrl: string, readStorageItem: (key: string) => string | null): DesktopConnectivityProbePort {
+export function createDesktopConnectivityProbePort(controlPlaneBaseUrl: string, readStorageItem: (key: string) => string | null): DesktopConnectivityProbePort {
   return Object.freeze({
     probe: async () => {
       const trustBootstrap = resolveDesktopIdentityTransportTrustBootstrap(readStorageItem);
       const trustEnforcement = trustBootstrap?.enforcement ?? "optional";
       const trustPrerequisites = evaluateTrustPrerequisites(trustBootstrap);
       const trustedSession = resolveTrustedSessionAvailability(readStorageItem, trustEnforcement);
-      const transport = await probeTransportReachability(identityApiBaseUrl);
+      const transport = await probeTransportReachability(controlPlaneBaseUrl);
       return Object.freeze({
         transportReachable: transport.transportReachable,
         transportTransientFailure: transport.transportTransientFailure,
@@ -208,11 +208,11 @@ function resolveTrustedSessionAvailability(readStorageItem: (key: string) => str
   }
 }
 
-async function probeTransportReachability(identityApiBaseUrl: string): Promise<{ readonly transportReachable: boolean; readonly transportTransientFailure?: boolean; readonly transportDetail?: string }> {
+async function probeTransportReachability(controlPlaneBaseUrl: string): Promise<{ readonly transportReachable: boolean; readonly transportTransientFailure?: boolean; readonly transportDetail?: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CONNECTIVITY_PROBE_TIMEOUT_MS);
   try {
-    const response = await fetch(identityApiBaseUrl, { method: "GET", cache: "no-store", signal: controller.signal });
+    const response = await fetch(controlPlaneBaseUrl, { method: "GET", cache: "no-store", signal: controller.signal });
     return Object.freeze({ transportReachable: true, transportTransientFailure: false, transportDetail: `Authoritative server probe responded with HTTP ${response.status}.` });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown connectivity probe error.";

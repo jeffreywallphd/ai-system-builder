@@ -14,6 +14,7 @@ import type {
   DesktopPythonRuntimeInfo,
   DesktopStoragePaths,
 } from "../../../electron/shared/DesktopContracts";
+import type { DesktopControlPlaneCapabilityPhase } from "../../application/common/DesktopControlPlaneRuntimeContracts";
 
 export type WorkflowRepositoryMode = "browser-storage" | "filesystem-indexed" | "memory";
 export type WorkflowExecutorMode = "scaffold" | "strategy";
@@ -36,6 +37,8 @@ export interface AppRuntimeConfigValues {
   readonly isProductionMode: boolean;
   readonly devSyncBaseUrl?: string;
   readonly devSyncToken?: string;
+  readonly controlPlaneBaseUrl?: string;
+  readonly controlPlaneCapabilityPhase?: DesktopControlPlaneCapabilityPhase;
   readonly identityApiBaseUrl?: string;
   readonly modelInstallDirectory: string;
   readonly serviceSupervisorBaseUrl?: string;
@@ -57,7 +60,8 @@ interface DesktopConfigOptions {
 
 interface DesktopAuthShellConfigOptions {
   readonly storage: DesktopStoragePaths;
-  readonly identityApiBaseUrl?: string;
+  readonly controlPlaneBaseUrl?: string;
+  readonly controlPlaneCapabilityPhase?: DesktopControlPlaneCapabilityPhase;
 }
 
 export class AppRuntimeConfig {
@@ -75,6 +79,8 @@ export class AppRuntimeConfig {
   public readonly isProductionMode: boolean;
   public readonly devSyncBaseUrl?: string;
   public readonly devSyncToken?: string;
+  public readonly controlPlaneBaseUrl?: string;
+  public readonly controlPlaneCapabilityPhase?: DesktopControlPlaneCapabilityPhase;
   public readonly identityApiBaseUrl?: string;
   public readonly modelInstallDirectory: string;
   public readonly serviceSupervisorBaseUrl?: string;
@@ -100,7 +106,9 @@ export class AppRuntimeConfig {
     this.isProductionMode = values.isProductionMode;
     this.devSyncBaseUrl = values.devSyncBaseUrl?.trim() || undefined;
     this.devSyncToken = values.devSyncToken?.trim() || undefined;
-    this.identityApiBaseUrl = values.identityApiBaseUrl?.trim() || undefined;
+    this.controlPlaneBaseUrl = values.controlPlaneBaseUrl?.trim() || values.identityApiBaseUrl?.trim() || undefined;
+    this.controlPlaneCapabilityPhase = values.controlPlaneCapabilityPhase;
+    this.identityApiBaseUrl = values.identityApiBaseUrl?.trim() || this.controlPlaneBaseUrl;
     this.modelInstallDirectory = values.modelInstallDirectory.trim();
     this.serviceSupervisorBaseUrl = values.serviceSupervisorBaseUrl?.trim() || undefined;
     this.serviceSupervisorPort = values.serviceSupervisorPort;
@@ -139,6 +147,8 @@ export class AppRuntimeConfig {
       isProductionMode: this.isProductionMode,
       devSyncBaseUrl: this.devSyncBaseUrl,
       devSyncToken: this.devSyncToken,
+      controlPlaneBaseUrl: this.controlPlaneBaseUrl,
+      controlPlaneCapabilityPhase: this.controlPlaneCapabilityPhase,
       identityApiBaseUrl: this.identityApiBaseUrl,
       modelInstallDirectory: this.modelInstallDirectory,
       serviceSupervisorBaseUrl: this.serviceSupervisorBaseUrl,
@@ -200,6 +210,8 @@ export class AppRuntimeConfig {
       isProductionMode: values.isProductionMode ?? profile.lifecycleStage === "production",
       devSyncBaseUrl: values.devSyncBaseUrl,
       devSyncToken: values.devSyncToken,
+      controlPlaneBaseUrl: values.controlPlaneBaseUrl,
+      controlPlaneCapabilityPhase: values.controlPlaneCapabilityPhase,
       identityApiBaseUrl: values.identityApiBaseUrl,
       modelInstallDirectory: values.modelInstallDirectory,
       serviceSupervisorBaseUrl: values.serviceSupervisorBaseUrl,
@@ -223,7 +235,7 @@ export class AppRuntimeConfig {
     const modelInstallDirectory =
       AppRuntimeConfig.readEnvVariable("VITE_MODEL_INSTALL_DIRECTORY") ||
       "dev/models";
-    const identityApiBaseUrl = AppRuntimeConfig.readEnvVariable("VITE_IDENTITY_API_BASE_URL")
+    const controlPlaneBaseUrl = AppRuntimeConfig.readEnvVariable("VITE_IDENTITY_API_BASE_URL")
       || `http://${AppRuntimeConfig.readEnvVariable("AI_LOOM_BROWSER_IDENTITY_HOST") || "127.0.0.1"}:${AppRuntimeConfig.readEnvVariable("AI_LOOM_BROWSER_IDENTITY_PORT") || "8788"}`;
 
     return new AppRuntimeConfig(AppRuntimeConfig.createValues(runtimeMode, {
@@ -235,7 +247,8 @@ export class AppRuntimeConfig {
       seedStarterNode: true,
       devSyncBaseUrl,
       devSyncToken,
-      identityApiBaseUrl,
+      controlPlaneBaseUrl,
+      identityApiBaseUrl: controlPlaneBaseUrl,
       modelInstallDirectory,
       workflowStorageDirectory: "dev/workflow-data/workflows",
       workflowIndexDatabasePath: profile.supportsLocalWorkspaceFilesystem
@@ -252,6 +265,8 @@ export class AppRuntimeConfig {
       uiSettingsPersistenceMode: "local-storage",
       installedModelCatalogMode: "browser-local-storage",
       seedStarterNode: true,
+      controlPlaneBaseUrl: undefined,
+      controlPlaneCapabilityPhase: undefined,
       identityApiBaseUrl: undefined,
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
@@ -272,7 +287,9 @@ export class AppRuntimeConfig {
       uiSettingsPersistenceMode: "local-storage",
       installedModelCatalogMode: "browser-local-storage",
       seedStarterNode: true,
-      identityApiBaseUrl: options.identityApiBaseUrl,
+      controlPlaneBaseUrl: options.controlPlaneBaseUrl,
+      controlPlaneCapabilityPhase: options.controlPlaneCapabilityPhase,
+      identityApiBaseUrl: options.controlPlaneBaseUrl,
       modelInstallDirectory: options.storage.modelsDirectory,
       desktopStorage: options.storage,
     }));
@@ -286,6 +303,8 @@ export class AppRuntimeConfig {
       uiSettingsPersistenceMode: "desktop-sqlite",
       installedModelCatalogMode: "desktop-sqlite",
       seedStarterNode: false,
+      controlPlaneBaseUrl: undefined,
+      controlPlaneCapabilityPhase: undefined,
       identityApiBaseUrl: undefined,
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
@@ -306,7 +325,9 @@ export class AppRuntimeConfig {
       uiSettingsPersistenceMode: "desktop-sqlite",
       installedModelCatalogMode: "desktop-sqlite",
       seedStarterNode: false,
-      identityApiBaseUrl: options.identityApiBaseUrl,
+      controlPlaneBaseUrl: options.controlPlaneBaseUrl,
+      controlPlaneCapabilityPhase: options.controlPlaneCapabilityPhase,
+      identityApiBaseUrl: options.controlPlaneBaseUrl,
       modelInstallDirectory: options.storage.modelsDirectory,
       desktopStorage: options.storage,
     }));
@@ -357,7 +378,9 @@ function expandDesktopBootstrapRuntimeConfig(
     isProductionMode: values.isProductionMode,
     devSyncBaseUrl: values.devSyncBaseUrl,
     devSyncToken: values.devSyncToken,
-    identityApiBaseUrl: values.identityApiBaseUrl,
+    controlPlaneBaseUrl: values.controlPlaneBaseUrl ?? values.identityApiBaseUrl,
+    controlPlaneCapabilityPhase: values.controlPlaneCapabilityPhase,
+    identityApiBaseUrl: values.identityApiBaseUrl ?? values.controlPlaneBaseUrl,
     modelInstallDirectory: values.modelInstallDirectory,
     serviceSupervisorBaseUrl: "serviceSupervisorBaseUrl" in values ? values.serviceSupervisorBaseUrl : undefined,
     serviceSupervisorPort: "serviceSupervisorPort" in values ? values.serviceSupervisorPort : undefined,

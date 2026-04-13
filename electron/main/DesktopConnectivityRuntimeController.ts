@@ -21,7 +21,7 @@ type DesktopConnectivityService = {
 
 type DesktopConnectivityRuntimeControllerDependencies = {
   readonly createConnectivityStateService: () => DesktopConnectivityService;
-  readonly createConnectivityProbePort: (identityApiBaseUrl: string, lookupToken: (key: string) => string | null) => unknown;
+  readonly createConnectivityProbePort: (controlPlaneBaseUrl: string, lookupToken: (key: string) => string | null) => unknown;
   readonly lookupToken: (key: string) => string | null;
   readonly nowIsoString?: () => string;
 };
@@ -30,7 +30,7 @@ export type DesktopConnectivityRuntimeController = {
   readonly createDeferredConnectivityState: (detail?: string) => DeferredConnectivityState;
   readonly getConnectivityStateForAuthBootstrapIpc: () => string;
   readonly setConnectivityOfflineModeForAuthBootstrapIpc: (requestJson: string) => string;
-  readonly startMonitoring: (identityApiBaseUrl: string) => void;
+  readonly startMonitoring: (controlPlaneBaseUrl: string) => void;
   readonly stopMonitoring: () => void;
   readonly isMonitoringStarted: () => boolean;
 };
@@ -71,7 +71,7 @@ export function createDesktopConnectivityRuntimeController(
       const state = connectivityStateService.setDeliberateOfflineMode(request.active === true, request.detail);
       return JSON.stringify(state);
     },
-    startMonitoring(identityApiBaseUrl: string) {
+    startMonitoring(controlPlaneBaseUrl: string) {
       if (monitoringStarted) {
         return;
       }
@@ -79,7 +79,7 @@ export function createDesktopConnectivityRuntimeController(
         connectivityStateService = dependencies.createConnectivityStateService();
       }
       connectivityStateService.startMonitoring(
-        dependencies.createConnectivityProbePort(identityApiBaseUrl, (key) => dependencies.lookupToken(key)),
+        dependencies.createConnectivityProbePort(controlPlaneBaseUrl, (key) => dependencies.lookupToken(key)),
         { intervalMs: 3_000 },
       );
       monitoringStarted = true;

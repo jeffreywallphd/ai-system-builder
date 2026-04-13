@@ -26,6 +26,7 @@ describe("AppRuntimeConfig", () => {
     expect(config.isProductionMode).toBe(false);
     expect(config.devSyncBaseUrl).toBe("http://192.168.1.100:8787");
     expect(config.devSyncToken).toBe("ai-loom-dev-sync");
+    expect(config.controlPlaneBaseUrl).toBe("http://127.0.0.1:8788");
     expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
     expect(config.isDevSyncEnabled).toBe(true);
     expect(config.modelInstallDirectory).toBe("dev/models");
@@ -86,11 +87,14 @@ describe("AppRuntimeConfig", () => {
         modelsDirectory: "/tmp/ai-loom/models",
         assetsDirectory: "/tmp/ai-loom/assets",
       },
-      identityApiBaseUrl: "http://127.0.0.1:8788",
+      controlPlaneBaseUrl: "http://127.0.0.1:8788",
+      controlPlaneCapabilityPhase: "pre-login",
     });
 
     expect(config.runtimeMode).toBe(AppRuntimeModes.desktopProduction);
     expect(config.modelInstallDirectory).toBe("/tmp/ai-loom/models");
+    expect(config.controlPlaneBaseUrl).toBe("http://127.0.0.1:8788");
+    expect(config.controlPlaneCapabilityPhase).toBe("pre-login");
     expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
     expect(config.serviceSupervisorBaseUrl).toBeUndefined();
     expect(config.serviceSupervisorPort).toBeUndefined();
@@ -118,6 +122,7 @@ describe("AppRuntimeConfig", () => {
       };
 
       const config = AppRuntimeConfig.forDevelopment();
+      expect(config.controlPlaneBaseUrl).toBe("http://127.0.0.1:8788");
       expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
     } finally {
       globalWithWindow.window = previousWindow;
@@ -142,6 +147,8 @@ describe("AppRuntimeConfig", () => {
               installedModelCatalogMode: "desktop-sqlite";
               seedStarterNode: false;
               isProductionMode: true;
+              controlPlaneBaseUrl: string;
+              controlPlaneCapabilityPhase: "pre-login";
               identityApiBaseUrl: string;
               modelInstallDirectory: string;
             };
@@ -161,6 +168,8 @@ describe("AppRuntimeConfig", () => {
             installedModelCatalogMode: "desktop-sqlite";
             seedStarterNode: false;
             isProductionMode: true;
+            controlPlaneBaseUrl: string;
+            controlPlaneCapabilityPhase: "pre-login";
             identityApiBaseUrl: string;
             modelInstallDirectory: string;
           };
@@ -185,6 +194,8 @@ describe("AppRuntimeConfig", () => {
               installedModelCatalogMode: "desktop-sqlite",
               seedStarterNode: false,
               isProductionMode: true,
+              controlPlaneBaseUrl: "http://127.0.0.1:8788",
+              controlPlaneCapabilityPhase: "pre-login",
               identityApiBaseUrl: "http://127.0.0.1:8788",
               modelInstallDirectory: "/tmp/ai-loom/models",
             },
@@ -194,11 +205,35 @@ describe("AppRuntimeConfig", () => {
 
       const config = AppRuntimeConfig.resolveDefault();
       expect(config.runtimeMode).toBe(AppRuntimeModes.desktopProduction);
+      expect(config.controlPlaneBaseUrl).toBe("http://127.0.0.1:8788");
+      expect(config.controlPlaneCapabilityPhase).toBe("pre-login");
       expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
       expect(config.serviceSupervisorBaseUrl).toBeUndefined();
       expect(config.pythonRuntimeBaseUrl).toBeUndefined();
     } finally {
       globalWithDesktop.aiLoomDesktop = previousDesktopBootstrap;
     }
+  });
+
+  it("maps legacy desktop bootstrap identityApiBaseUrl to control-plane base URL", () => {
+    const config = AppRuntimeConfig.fromValues({
+      runtimeMode: "desktop-production",
+      hostKind: "desktop",
+      lifecycleStage: "production",
+      distributionTarget: "electron",
+      rendererDeliveryMode: "packaged-assets",
+      workflowRepositoryMode: "filesystem-indexed",
+      workflowExecutorMode: "strategy",
+      nodeCatalogMode: "registered",
+      uiSettingsPersistenceMode: "desktop-sqlite",
+      installedModelCatalogMode: "desktop-sqlite",
+      seedStarterNode: false,
+      isProductionMode: true,
+      identityApiBaseUrl: "http://127.0.0.1:8788",
+      modelInstallDirectory: "/tmp/ai-loom/models",
+    });
+
+    expect(config.controlPlaneBaseUrl).toBe("http://127.0.0.1:8788");
+    expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
   });
 });

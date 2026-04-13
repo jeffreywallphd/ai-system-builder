@@ -21,6 +21,7 @@ import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type {
   DesktopAuthBootstrapContext,
   DesktopAuthBootstrapRuntimeConfig,
+  DesktopControlPlaneCapabilityPhase,
   DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
 import { createRendererContentSecurityPolicyResolver } from "./RendererContentSecurityPolicy";
@@ -181,6 +182,11 @@ function buildBootstrapContext(params: {
  * Projects full runtime config values to the reduced auth-bootstrap runtime contract exposed before post-login warmup.
  */
 function projectDesktopAuthBootstrapRuntimeConfig(values: AppRuntimeConfigValues): DesktopAuthBootstrapRuntimeConfig {
+  const controlPlaneBaseUrl = values.controlPlaneBaseUrl ?? values.identityApiBaseUrl;
+  if (!controlPlaneBaseUrl) {
+    throw new Error("Desktop bootstrap runtime config requires a control-plane base URL.");
+  }
+  const controlPlaneCapabilityPhase = values.controlPlaneCapabilityPhase ?? "pre-login";
   return Object.freeze({
     runtimeMode: values.runtimeMode,
     hostKind: values.hostKind,
@@ -196,7 +202,9 @@ function projectDesktopAuthBootstrapRuntimeConfig(values: AppRuntimeConfigValues
     isProductionMode: values.isProductionMode,
     devSyncBaseUrl: values.devSyncBaseUrl,
     devSyncToken: values.devSyncToken,
-    identityApiBaseUrl: values.identityApiBaseUrl,
+    controlPlaneBaseUrl,
+    controlPlaneCapabilityPhase,
+    identityApiBaseUrl: values.identityApiBaseUrl ?? controlPlaneBaseUrl,
     modelInstallDirectory: values.modelInstallDirectory,
   });
 }
@@ -356,21 +364,24 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     });
     logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready", authShellStartedAt);
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready");
-    const identityApiBaseUrl = assertSecureTransportEndpoint(
+    const controlPlaneBaseUrl = assertSecureTransportEndpoint(
       `http://${controlPlaneRuntime.address}`,
       resolveHostSecureTransportConfig({
         hostKind: HostSecureTransportKinds.desktop,
         hostAddress: "127.0.0.1",
       }),
     );
+    const controlPlaneCapabilityPhase: DesktopControlPlaneCapabilityPhase = "pre-login";
     const runtimeConfig = isPackaged
       ? AppRuntimeConfig.forDesktopProductionAuthShell({
         storage: storagePaths,
-        identityApiBaseUrl,
+        controlPlaneBaseUrl,
+        controlPlaneCapabilityPhase,
       })
       : AppRuntimeConfig.forDesktopDevelopmentAuthShell({
         storage: storagePaths,
-        identityApiBaseUrl,
+        controlPlaneBaseUrl,
+        controlPlaneCapabilityPhase,
       });
     buildBootstrapContext({
       runtimeConfig,
@@ -381,7 +392,7 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "auth-bootstrap-ipc-ready");
     return Object.freeze({
       storagePaths,
-      identityApiBaseUrl,
+      controlPlaneBaseUrl,
     });
   } finally {
     logInitializationEnd(DesktopStartupPhases.preLoginAuthShellBootstrap, authShellStartedAt);
@@ -507,7 +518,7 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     activatedAt: request.requestedAt,
   });
   postLoginRuntimeStatusStore.markWarming(request);
-  connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl);
+  connectivityRuntimeController.startMonitoring(authShell.controlPlaneBaseUrl);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
   postLoginBootstrapPromise = postLoginRuntimeBootstrapper.bootstrap(authShell);
