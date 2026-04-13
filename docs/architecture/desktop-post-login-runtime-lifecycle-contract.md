@@ -219,6 +219,27 @@ Story C.3.6 further extracts runtime lifecycle machinery from the Electron compo
 - shutdown/disposal sequencing and state reset details now live in `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`.
 - `electron/main/main.ts` now primarily composes dependencies and delegates warmup/disposal orchestration to those modules.
 
+## Story C.3.7 continuous listener availability regression coverage
+
+Runtime lifecycle regression coverage now explicitly guards continuous control-plane listener availability across capability-state transitions:
+
+- `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` now verifies transport identity continuity (`boundAddress` and `boundPort`) across:
+  - `pre-login`
+  - `warming`
+  - `ready`
+  - `failed`
+- `electron/main/tests/MainPreLoginControlPlaneHostStartup.test.ts` now verifies bind-once host reuse semantics remain explicit in `ensureDesktopControlPlaneHostBound(...)`:
+  - persisted runtime reuse branch remains in place,
+  - bind-start and bind-ready reasons remain explicit,
+  - reuse reason (`authoritative-host-bind-reused`) remains explicit.
+- `electron/main/tests/MainDeferredRuntimeStartupBoundary.test.ts` now verifies post-login warmup capability activation does not perform listener rebinding by asserting warmup flow excludes transport rebinding markers and bind/start entrypoints.
+
+Contract intent:
+
+- capability transitions are not treated as transport outages,
+- one authoritative listener identity remains stable for the desktop session while capabilities warm and fail/retry,
+- regression coverage fails if stop-and-rebind behavior returns to warmup paths.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)

@@ -49,8 +49,11 @@ describe("electron main deferred runtime startup boundary", () => {
     expect(warmupEntrySource).toContain("persistent control-plane host");
     expect(warmupEntrySource).toContain("controlPlaneRuntime.activateCapabilities(");
     expect(warmupEntrySource).toContain("AuthoritativeServerCapabilityIds.deferredRuntimeFeatures");
+    expect(warmupEntrySource).not.toContain("ensureDesktopControlPlaneHostBound(");
     expect(warmupEntrySource).not.toContain("startAuthoritativeServerHostAssembly");
     expect(warmupEntrySource).not.toContain("markTransportBinding");
+    expect(warmupEntrySource).not.toContain("markTransportAvailable");
+    expect(warmupEntrySource).not.toContain("markTransportUnavailable");
   });
 
   it("keeps a single authoritative host composition path and removes host promotion handoff", () => {
