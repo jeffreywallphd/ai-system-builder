@@ -41,6 +41,7 @@ Non-auth capability families remain unavailable until post-login lifecycle activ
 ## Runtime capability guard behavior
 
 - Runtime route families (`system-runtime`, `run-submission`, `run-read`, `run-mutation`, `run-execution-update`, `image-run-api`) are guarded by one centralized backend capability guard at the identity HTTP transport boundary.
+- In desktop startup, guarded route-family availability resolves from one lifecycle source: the post-login runtime status store capability phase (`pre-login`, `warming`, `ready`, `failed`) passed into server-host composition as a runtime lifecycle status provider.
 - When deferred runtime capability state is not ready, guarded endpoints return canonical lifecycle contracts (`runtime-availability-response/v1`) using explicit `unavailable`, `warming`, or `failed` state responses instead of transport-level outages.
 - Once capability state becomes available, the same handlers execute normally with no per-handler lifecycle branching.
 

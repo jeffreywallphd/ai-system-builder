@@ -227,6 +227,12 @@ Desktop control-plane host startup now composes runtime route families at initia
 - lifecycle-aware capability gating continues to block deferred runtime families before activation with explicit unavailable responses.
 - non-desktop startup paths keep default route-plan behavior unless they explicitly request runtime route-family inclusion.
 
+## Story 1.2.4 backend runtime-state authority wiring
+
+- Backend runtime capability guarding now reads desktop lifecycle state from the same post-login runtime status store used by auth IPC (`postLoginRuntimeStatusStore.getStatus()`).
+- Authoritative server host composition projects that status source into route-family availability resolution so runtime guarded families evaluate availability from `capabilityPhase` (`pre-login` -> `warming` -> `ready` -> `failed`) instead of a duplicate backend-only lifecycle model.
+- Capability activation remains the registration/ownership seam for deferred route families, while lifecycle gating state is now sourced from the authoritative desktop runtime lifecycle contract.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,
