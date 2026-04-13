@@ -315,6 +315,9 @@ async function ensureDesktopControlPlaneHostBound(params: {
       },
       env: process.env,
       logger: desktopOperationalEventLogger,
+      desktopRuntimeLifecycleStatusProvider: {
+        getStatus: () => postLoginRuntimeStatusStore.getStatus(),
+      },
     },
     bootstrap: {
       composeApiRouteRegistrationPlan: composeDesktopAuthoritativeServerApiRouteRegistrationPlan,

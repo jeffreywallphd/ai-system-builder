@@ -267,6 +267,12 @@ Desktop control-plane host startup now keeps runtime route families registered f
 - pre-login and warming requests are still blocked by capability-state checks (stateful unavailable responses) until post-login warmup activates deferred runtime capabilities.
 - non-desktop startup paths continue using `composeAuthoritativeServerApiRouteRegistrationPlan()` defaults unless they explicitly opt in.
 
+## Story 1.2.4 backend runtime-state authority wiring
+
+- Backend runtime capability guarding now reads desktop lifecycle state from the same post-login runtime status store used by auth IPC (`postLoginRuntimeStatusStore.getStatus()`).
+- Authoritative server host composition projects that status source into route-family availability resolution so runtime guarded families evaluate availability from `capabilityPhase` (`pre-login` -> `warming` -> `ready` -> `failed`) instead of a duplicate backend-only lifecycle model.
+- Capability activation remains the registration/ownership seam for deferred route families, while lifecycle gating state is now sourced from the authoritative desktop runtime lifecycle contract.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)

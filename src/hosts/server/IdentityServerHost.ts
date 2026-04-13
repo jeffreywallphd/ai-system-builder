@@ -249,6 +249,10 @@ import {
   type AuthoritativeServerCapabilityActivationService,
   type AuthoritativeServerCapabilityActivationSnapshot,
 } from "./AuthoritativeServerCapabilityActivation";
+import {
+  createAuthoritativeServerRouteFamilyAvailabilityService,
+  type DesktopRuntimeLifecycleStatusProvider,
+} from "./DesktopRuntimeRouteFamilyAvailability";
 import { composeAuthoritativeServerApiRouteRegistrationPlan } from "./AuthoritativeServerApiRouteComposition";
 
 export interface IdentityServerHostOptions {
@@ -277,6 +281,7 @@ export interface IdentityServerHostOptions {
   readonly startupTracer?: StartupTracer;
   readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
   readonly capabilityActivation?: AuthoritativeServerCapabilityActivationService;
+  readonly desktopRuntimeLifecycleStatusProvider?: DesktopRuntimeLifecycleStatusProvider;
 }
 
 export interface IdentityServerHost {
@@ -571,6 +576,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   if (!routeFamilyCapabilityActivation) {
     throw new Error("Authoritative server capability activation service could not be composed.");
   }
+  const routeFamilyAvailabilityService = createAuthoritativeServerRouteFamilyAvailabilityService({
+    capabilityActivation: routeFamilyCapabilityActivation,
+    runtimeStatusProvider: options.desktopRuntimeLifecycleStatusProvider,
+  });
 
   const server = createIdentityHttpServer({
     backendApi,
@@ -594,10 +603,8 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceAdministrationBackendApi,
     routeRegistrationPlan: options.routeRegistrationPlan,
     routeFamilyAvailability: Object.freeze({
-      isRouteFamilyAvailable: (routeFamilyId: string) => routeFamilyCapabilityActivation.isRouteFamilyAvailable(routeFamilyId),
-      resolveRouteFamilyAvailability: (routeFamilyId: string) => (
-        routeFamilyCapabilityActivation.resolveRouteFamilyAvailability(routeFamilyId)
-      ),
+      isRouteFamilyAvailable: (routeFamilyId: string) => routeFamilyAvailabilityService.isRouteFamilyAvailable(routeFamilyId),
+      resolveRouteFamilyAvailability: (routeFamilyId: string) => routeFamilyAvailabilityService.resolveRouteFamilyAvailability(routeFamilyId),
     }),
     cors: options.cors,
     logger: options.logger,
