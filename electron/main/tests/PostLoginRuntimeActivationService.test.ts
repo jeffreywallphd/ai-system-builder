@@ -123,7 +123,117 @@ describe("PostLoginRuntimeActivationService", () => {
     expect(operations.filter((entry) => entry === "status:warming")).toHaveLength(1);
   });
 
-  it("marks failure and resets warmup-started state when dependency activation fails", async () => {
+  it("joins concurrent activation requests across login, restore, refresh, and feature-demand triggers", async () => {
+    const operations: string[] = [];
+    let resolveActivation: (() => void) | undefined;
+    const pendingActivation = new Promise<void>((resolve) => {
+      resolveActivation = resolve;
+    });
+
+    const service = createPostLoginRuntimeActivationService({
+      postLoginRuntimeStatusStore: {
+        markWarming: () => operations.push("status:warming"),
+        markFailed: () => operations.push("status:failed"),
+      } as never,
+      connectivityRuntimeController: {
+        startMonitoring: () => operations.push("connectivity:start"),
+      } as never,
+      getAuthShellBootstrapResult: () => Object.freeze({
+        storagePaths: {
+          appDataDirectory: "app",
+          storageDirectory: "storage",
+          databasePath: "db",
+          runtimeDirectory: "runtime",
+          logsDirectory: "logs",
+          modelsDirectory: "models",
+          assetsDirectory: "assets",
+        },
+        controlPlaneBaseUrl: "http://127.0.0.1:8111",
+      }),
+      getControlPlaneServerRuntime: () => ({
+        address: "127.0.0.1:8111",
+        activateCapabilities: () => operations.push("control-plane:activate-capabilities"),
+      }) as never,
+      activateRuntimeDependencies: async () => {
+        operations.push("dependencies:activate");
+        await pendingActivation;
+      },
+      disposeDesktopRuntimeResources: async () => {
+        operations.push("runtime:dispose");
+      },
+      isDesktopRuntimeDisposing: () => false,
+      exitProcess: () => {
+        throw new Error("exit should not be called");
+      },
+    });
+
+    const requests = [
+      createWarmupRequest({ triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin }),
+      createWarmupRequest({ triggerSource: DesktopPostLoginWarmupTriggerSources.sessionRestore }),
+      createWarmupRequest({ triggerSource: DesktopPostLoginWarmupTriggerSources.sessionRefresh }),
+      createWarmupRequest({ triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand }),
+    ];
+    const activations = requests.map((request) => service.startPostLoginWarmup(request));
+
+    resolveActivation?.();
+    await Promise.all(activations);
+
+    expect(operations.filter((entry) => entry === "dependencies:activate")).toHaveLength(1);
+    expect(operations.filter((entry) => entry === "control-plane:activate-capabilities")).toHaveLength(1);
+    expect(operations.filter((entry) => entry === "status:warming")).toHaveLength(1);
+    expect(operations.filter((entry) => entry === "connectivity:start")).toHaveLength(1);
+  });
+
+  it("is idempotent after readiness and ignores repeated activation requests", async () => {
+    const operations: string[] = [];
+
+    const service = createPostLoginRuntimeActivationService({
+      postLoginRuntimeStatusStore: {
+        markWarming: () => operations.push("status:warming"),
+        markFailed: () => operations.push("status:failed"),
+      } as never,
+      connectivityRuntimeController: {
+        startMonitoring: () => operations.push("connectivity:start"),
+      } as never,
+      getAuthShellBootstrapResult: () => Object.freeze({
+        storagePaths: {
+          appDataDirectory: "app",
+          storageDirectory: "storage",
+          databasePath: "db",
+          runtimeDirectory: "runtime",
+          logsDirectory: "logs",
+          modelsDirectory: "models",
+          assetsDirectory: "assets",
+        },
+        controlPlaneBaseUrl: "http://127.0.0.1:8111",
+      }),
+      getControlPlaneServerRuntime: () => ({
+        address: "127.0.0.1:8111",
+        activateCapabilities: () => operations.push("control-plane:activate-capabilities"),
+      }) as never,
+      activateRuntimeDependencies: async () => {
+        operations.push("dependencies:activate");
+      },
+      disposeDesktopRuntimeResources: async () => {
+        operations.push("runtime:dispose");
+      },
+      isDesktopRuntimeDisposing: () => false,
+      exitProcess: () => {
+        throw new Error("exit should not be called");
+      },
+    });
+
+    await service.startPostLoginWarmup(createWarmupRequest({ triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin }));
+    await service.startPostLoginWarmup(createWarmupRequest({ triggerSource: DesktopPostLoginWarmupTriggerSources.sessionRefresh }));
+    await service.startPostLoginWarmup(createWarmupRequest({ triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand }));
+
+    expect(operations.filter((entry) => entry === "dependencies:activate")).toHaveLength(1);
+    expect(operations.filter((entry) => entry === "control-plane:activate-capabilities")).toHaveLength(1);
+    expect(operations.filter((entry) => entry === "status:warming")).toHaveLength(1);
+    expect(operations.filter((entry) => entry === "connectivity:start")).toHaveLength(1);
+  });
+
+  it("marks failure and resets activation state when dependency activation fails", async () => {
     const operations: string[] = [];
     const failure = new Error("runtime activation failed");
 

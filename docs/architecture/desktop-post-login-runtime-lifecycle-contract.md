@@ -102,9 +102,10 @@ Renderer triggers `startPostLoginWarmup(...)` after successful auth/session rest
 Main behavior:
 
 1. if warmup is already in flight, join existing promise (no duplicate bootstrap).
-2. if warmup already started/completed, ignore duplicate start requests.
+2. if runtime activation is already `ready`, ignore duplicate start requests (idempotent steady state).
 3. otherwise set lifecycle state to `warming` with activation mode `auth-success-warmup`.
 4. execute post-login runtime bootstrap.
+5. if activation fails, return activation state to retryable idle.
 
 ### 2. Lazy feature-demand trigger
 
@@ -259,6 +260,13 @@ Contract intent:
 - capability transitions are not treated as transport outages,
 - one authoritative listener identity remains stable for the desktop session while capabilities warm and fail/retry,
 - regression coverage fails if stop-and-rebind behavior returns to warmup paths.
+
+## Story 1.3.2 activation idempotency and join semantics
+
+- `PostLoginRuntimeActivationService` now models activation with explicit states (`idle`, `activating`, `ready`) instead of inferring state from transport continuity.
+- Concurrent warmup requests from `explicit-login`, `session-restore`, `session-refresh`, and `feature-demand` all join one in-flight activation promise.
+- After activation reaches `ready`, repeated warmup requests are no-ops and must not re-run capability activation, connectivity monitor startup, or runtime dependency activation.
+- Activation failure returns the service to `idle`, allowing subsequent warmup requests to retry without replacing the control-plane listener.
 
 ## Story 1.2.2 runtime route-family registration continuity
 
