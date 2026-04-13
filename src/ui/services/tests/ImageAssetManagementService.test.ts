@@ -93,6 +93,28 @@ describe("ImageAssetManagementService", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("rejects upload requests when workspace id is blank after normalization", async () => {
+    const fetchMock = mock(async () => ({
+      json: async () => ({ ok: true }),
+    }) as Response);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const service = new ImageAssetManagementService("http://identity.local");
+    const file = new File([new Uint8Array([1, 2, 3])], "photo.png", { type: "image/png" });
+
+    const uploaded = await service.uploadStudioSourceImage({
+      file,
+      actorUserIdentityId: "user-1",
+      workspaceId: "   ",
+      sessionToken: "token-1",
+    });
+
+    expect(uploaded.ok).toBeFalse();
+    expect(uploaded.error?.code).toBe("invalid-request");
+    expect(uploaded.error?.message).toContain("workspace");
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
   it("lists recent uploaded image assets for the current actor", async () => {
     const fetchMock = mock(async () => ({
       json: async () => ({

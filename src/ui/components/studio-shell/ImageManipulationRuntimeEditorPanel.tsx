@@ -193,14 +193,24 @@ function toDirectoryPath(filePath: string | undefined): string | undefined {
   return filePath.slice(0, separatorIndex);
 }
 
+function normalizeNonEmptyString(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
 export function resolveWorkspaceIdFromSession(session: IdentityAuthPersistedSession | undefined): string | undefined {
   if (!session) {
     return undefined;
   }
-  return session.workspaceContext?.resolvedWorkspaceId
-    ?? session.workspaceContext?.requestedWorkspaceId
-    ?? session.initialCapabilityState?.workspaceId
-    ?? session.workspaceContext?.workspaces.find((workspace) => workspace.workspaceId.trim().length > 0)?.workspaceId;
+  const directWorkspaceId = normalizeNonEmptyString(session.workspaceContext?.resolvedWorkspaceId)
+    ?? normalizeNonEmptyString(session.workspaceContext?.requestedWorkspaceId)
+    ?? normalizeNonEmptyString(session.initialCapabilityState?.workspaceId);
+  if (directWorkspaceId) {
+    return directWorkspaceId;
+  }
+  return session.workspaceContext?.workspaces
+    .map((workspace) => normalizeNonEmptyString(workspace.workspaceId))
+    .find((workspaceId) => workspaceId !== undefined);
 }
 
 export function isPersistedReferenceUploadReady(input: {
@@ -3656,7 +3666,8 @@ export function ImageManipulationRuntimeEditorPanel({
               console.log(" ");
               console.log("------------------------------------------------------");
 
-              if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+              const normalizedWorkspaceId = normalizeNonEmptyString(workspaceId);
+              if (!actorUserIdentityId || !normalizedWorkspaceId || !sessionToken) {
                 console.log("------------------------------------------------------");
                 console.log(" ");
                 console.log("Identity not confirmed");
@@ -3694,7 +3705,7 @@ export function ImageManipulationRuntimeEditorPanel({
                   const uploaded = await imageAssets.uploadStudioSourceImage({
                     file,
                     actorUserIdentityId,
-                    workspaceId,
+                    workspaceId: normalizedWorkspaceId,
                     sessionToken,
                   });
                   console.log("------------------------------------------------------");
@@ -3711,7 +3722,7 @@ export function ImageManipulationRuntimeEditorPanel({
                   setUploadProgressStage("processing");
                   const metadata = await imageAssets.getImageAsset({
                     assetId: uploaded.data.assetId,
-                    workspaceId,
+                    workspaceId: normalizedWorkspaceId,
                     sessionToken,
                   });
                   if (!metadata.ok || !metadata.data) {
