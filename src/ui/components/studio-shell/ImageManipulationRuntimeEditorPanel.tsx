@@ -96,6 +96,7 @@ import {
   mapGeneratedResultToOutputGalleryItem,
   mapGeneratedResultsToRunHistory,
 } from "./image-manipulation/GeneratedResultGalleryHistoryAdapter";
+import type { IdentityAuthPersistedSession } from "../../shared/identity/IdentityAuthSessionStore";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "gif", "webp"]),
@@ -191,6 +192,25 @@ function toDirectoryPath(filePath: string | undefined): string | undefined {
   return filePath.slice(0, separatorIndex);
 }
 
+export function resolveWorkspaceIdFromSession(session: IdentityAuthPersistedSession | undefined): string | undefined {
+  if (!session) {
+    return undefined;
+  }
+  return session.workspaceContext?.resolvedWorkspaceId
+    ?? session.workspaceContext?.requestedWorkspaceId
+    ?? session.initialCapabilityState?.workspaceId
+    ?? session.workspaceContext?.workspaces.find((workspace) => workspace.workspaceId.trim().length > 0)?.workspaceId;
+}
+
+export function isPersistedReferenceUploadReady(input: {
+  readonly storedFilePath?: string;
+  readonly persistence: {
+    readonly storedFilePathProduced: boolean;
+  };
+}): boolean {
+  return Boolean(input.storedFilePath && input.persistence.storedFilePathProduced);
+}
+
 const galleryPreviewRoleOrder: ReadonlyArray<ImageManipulationSelectionRole> = Object.freeze([
   "output",
   "source",
@@ -220,6 +240,33 @@ export function resolveNextGalleryPreviewRoleByKey(input: {
     return galleryPreviewRoleOrder[nextIndex];
   }
   return undefined;
+}
+
+function isDesktopDeferredFeatureApiReady(): boolean {
+  if (typeof window === "undefined" || !window.aiLoomDesktop) {
+    return true;
+  }
+  const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
+  if (!runtimeBridge?.isDeferredFeatureApiReady && !runtimeBridge?.getPostLoginRuntimeStatus) {
+    return true;
+  }
+  const status = runtimeBridge.getPostLoginRuntimeStatus?.();
+  if (status) {
+    return status.state === "ready";
+  }
+  return runtimeBridge.isDeferredFeatureApiReady();
+}
+
+function getDesktopDeferredFeatureRuntimeState(): string | undefined {
+  if (typeof window === "undefined" || !window.aiLoomDesktop) {
+    return undefined;
+  }
+  const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
+  return runtimeBridge?.getPostLoginRuntimeStatus?.().state;
+}
+
+function isDeferredFeatureApiUnavailable(errorCode: string | undefined): boolean {
+  return errorCode === "not-found";
 }
 
 function mergeHydratedSelectionWithPersistedSession(input: {
@@ -1655,6 +1702,12 @@ export function ImageManipulationRuntimeEditorPanel({
   const [executionReadinessError, setExecutionReadinessError] = useState<string | undefined>();
   const [executionReadinessErrorCode, setExecutionReadinessErrorCode] = useState<string | undefined>();
   const [isCheckingExecutionReadiness, setIsCheckingExecutionReadiness] = useState(false);
+  const [deferredFeatureApiAvailability, setDeferredFeatureApiAvailability] = useState(() => Object.freeze({
+    generatedResults: true,
+    imageAssets: true,
+    executionReadiness: true,
+  }));
+  const [desktopDeferredRuntimeState, setDesktopDeferredRuntimeState] = useState<string | undefined>(() => getDesktopDeferredFeatureRuntimeState());
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
@@ -1662,6 +1715,32 @@ export function ImageManipulationRuntimeEditorPanel({
     () => groupRecentImageAssetsByContinuityWindow(recentImageAssets),
     [recentImageAssets],
   );
+  const isDesktopFeatureApiReady = useMemo(() => {
+    if (desktopDeferredRuntimeState) {
+      return desktopDeferredRuntimeState === "ready";
+    }
+    return isDesktopDeferredFeatureApiReady();
+  }, [desktopDeferredRuntimeState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.aiLoomDesktop) {
+      setDesktopDeferredRuntimeState(undefined);
+      return;
+    }
+    const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
+    if (!runtimeBridge?.getPostLoginRuntimeStatus) {
+      setDesktopDeferredRuntimeState(undefined);
+      return;
+    }
+    const refreshState = () => {
+      setDesktopDeferredRuntimeState(runtimeBridge.getPostLoginRuntimeStatus().state);
+    };
+    refreshState();
+    const intervalId = window.setInterval(refreshState, 900);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     setSelection(datasetBindingService.createSelectionStateFromHydration({
@@ -1783,10 +1862,26 @@ export function ImageManipulationRuntimeEditorPanel({
     setIsCheckingExecutionReadiness(true);
     setExecutionReadinessError(undefined);
     setExecutionReadinessErrorCode(undefined);
+    if (!isDesktopFeatureApiReady || !deferredFeatureApiAvailability.executionReadiness) {
+      setExecutionReadiness(undefined);
+      setIsCheckingExecutionReadiness(false);
+      return Promise.resolve();
+    }
     return runtimeOperations.getExecutionReadiness({
       systemId: runtimeWorkflowAssetId,
     }).then((response) => {
       if (!response.ok || !response.data) {
+        if (isDeferredFeatureApiUnavailable(response.error?.code)) {
+          setDeferredFeatureApiAvailability((current) => (
+            current.executionReadiness
+              ? Object.freeze({ ...current, executionReadiness: false })
+              : current
+          ));
+          setExecutionReadiness(undefined);
+          setExecutionReadinessError(undefined);
+          setExecutionReadinessErrorCode(undefined);
+          return;
+        }
         const recovery = resolveRuntimeOperationRecovery({
           code: response.error?.code,
           fallbackMessage: "Execution environment availability could not be confirmed.",
@@ -1866,7 +1961,7 @@ export function ImageManipulationRuntimeEditorPanel({
   });
   const session = useMemo(() => authSessionStore.getSession(), [authSessionStore]);
   const actorUserIdentityId = session?.userIdentityId;
-  const workspaceId = session?.workspaceContext?.resolvedWorkspaceId ?? session?.initialCapabilityState?.workspaceId;
+  const workspaceId = resolveWorkspaceIdFromSession(session);
   const sessionToken = session?.sessionToken;
 
   const activeGallery = useMemo(() => {
@@ -1935,7 +2030,13 @@ export function ImageManipulationRuntimeEditorPanel({
 
     const request = datasetBindingId === "output-image-dataset"
       ? (async () => {
-        if (actorUserIdentityId && workspaceId && sessionToken) {
+        if (
+          actorUserIdentityId
+          && workspaceId
+          && sessionToken
+          && isDesktopFeatureApiReady
+          && deferredFeatureApiAvailability.generatedResults
+        ) {
           const listed = await generatedResults.listGeneratedResults({
             actorUserIdentityId,
             workspaceId,
@@ -1945,6 +2046,19 @@ export function ImageManipulationRuntimeEditorPanel({
             sessionToken,
           });
           if (!listed.ok || !listed.data) {
+            if (isDeferredFeatureApiUnavailable(listed.error?.code)) {
+              setDeferredFeatureApiAvailability((current) => (
+                current.generatedResults
+                  ? Object.freeze({ ...current, generatedResults: false })
+                  : current
+              ));
+              return studioShell.listReferenceImageOutputs({
+                studioId: context.studioId,
+                draftId: draft.draftId,
+                limit: 24,
+                offset: 0,
+              });
+            }
             return {
               ok: false,
               error: listed.error,
@@ -2005,7 +2119,13 @@ export function ImageManipulationRuntimeEditorPanel({
   };
 
   const loadRecentAssets = (): Promise<ReadonlyArray<RecentStudioImageAsset>> => {
-    if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+    if (
+      !actorUserIdentityId
+      || !workspaceId
+      || !sessionToken
+      || !isDesktopFeatureApiReady
+      || !deferredFeatureApiAvailability.imageAssets
+    ) {
       setRecentImageAssets(Object.freeze([]));
       setRecentImageAssetsError(undefined);
       return Promise.resolve(Object.freeze([]));
@@ -2019,6 +2139,16 @@ export function ImageManipulationRuntimeEditorPanel({
       limit: 8,
     }).then((response) => {
       if (!response.ok || !response.data) {
+        if (isDeferredFeatureApiUnavailable(response.error?.code)) {
+          setDeferredFeatureApiAvailability((current) => (
+            current.imageAssets
+              ? Object.freeze({ ...current, imageAssets: false })
+              : current
+          ));
+          setRecentImageAssets(Object.freeze([]));
+          setRecentImageAssetsError(undefined);
+          return Object.freeze([]);
+        }
         setRecentImageAssets(Object.freeze([]));
         setRecentImageAssetsError("We couldn't load your recently used images.");
         return Object.freeze([]);
@@ -2060,7 +2190,13 @@ export function ImageManipulationRuntimeEditorPanel({
     readonly search?: string;
     readonly offset?: number;
   }): Promise<ReadonlyArray<ImageLibraryStudioImageAsset>> => {
-    if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+    if (
+      !actorUserIdentityId
+      || !workspaceId
+      || !sessionToken
+      || !isDesktopFeatureApiReady
+      || !deferredFeatureApiAvailability.imageAssets
+    ) {
       setImageLibraryAssets(Object.freeze([]));
       setImageLibraryError(undefined);
       setImageLibraryHasMore(false);
@@ -2088,6 +2224,20 @@ export function ImageManipulationRuntimeEditorPanel({
       offset,
     }).then((response) => {
       if (!response.ok || !response.data) {
+        if (isDeferredFeatureApiUnavailable(response.error?.code)) {
+          setDeferredFeatureApiAvailability((current) => (
+            current.imageAssets
+              ? Object.freeze({ ...current, imageAssets: false })
+              : current
+          ));
+          setImageLibraryError(undefined);
+          if (!append) {
+            setImageLibraryAssets(Object.freeze([]));
+            setImageLibraryHasMore(false);
+            setImageLibraryOffset(0);
+          }
+          return Object.freeze([]);
+        }
         setImageLibraryError("We couldn't load your image library right now.");
         if (!append) {
           setImageLibraryAssets(Object.freeze([]));
@@ -2284,7 +2434,11 @@ export function ImageManipulationRuntimeEditorPanel({
     }
     setIsLoadingRunHistory(true);
     setRunHistoryError(undefined);
-    const request = actorUserIdentityId && workspaceId && sessionToken
+    const request = actorUserIdentityId
+      && workspaceId
+      && sessionToken
+      && isDesktopFeatureApiReady
+      && deferredFeatureApiAvailability.generatedResults
       ? generatedResults.listGeneratedResults({
         actorUserIdentityId,
         workspaceId,
@@ -2294,6 +2448,19 @@ export function ImageManipulationRuntimeEditorPanel({
         sessionToken,
       }).then((response) => {
         if (!response.ok || !response.data) {
+          if (isDeferredFeatureApiUnavailable(response.error?.code)) {
+            setDeferredFeatureApiAvailability((current) => (
+              current.generatedResults
+                ? Object.freeze({ ...current, generatedResults: false })
+                : current
+            ));
+            return studioShell.listReferenceImageRunHistory({
+              studioId: context.studioId,
+              draftId: draft.draftId,
+              limit: 20,
+              offset: 0,
+            });
+          }
           return {
             ok: false,
             error: response.error,
@@ -2341,11 +2508,11 @@ export function ImageManipulationRuntimeEditorPanel({
 
   useEffect(() => {
     void loadRunHistory();
-  }, [draft?.draftId, actorUserIdentityId, workspaceId, sessionToken, runtimeWorkflowAssetId]);
+  }, [draft?.draftId, actorUserIdentityId, workspaceId, sessionToken, isDesktopFeatureApiReady, runtimeWorkflowAssetId]);
 
   useEffect(() => {
     void loadRecentAssets();
-  }, [actorUserIdentityId, workspaceId, sessionToken]);
+  }, [actorUserIdentityId, workspaceId, sessionToken, isDesktopFeatureApiReady]);
 
   useEffect(() => {
     void loadRecentSystems();
@@ -2356,11 +2523,11 @@ export function ImageManipulationRuntimeEditorPanel({
       search: appliedImageLibrarySearch,
       offset: 0,
     });
-  }, [actorUserIdentityId, workspaceId, sessionToken, appliedImageLibrarySearch]);
+  }, [actorUserIdentityId, workspaceId, sessionToken, isDesktopFeatureApiReady, appliedImageLibrarySearch]);
 
   useEffect(() => {
     void refreshExecutionReadiness();
-  }, [runtimeWorkflowAssetId, sessionToken]);
+  }, [deferredFeatureApiAvailability.executionReadiness, isDesktopFeatureApiReady, runtimeWorkflowAssetId, sessionToken]);
 
   useEffect(() => {
     if (!selectedHistoryRunId) {
@@ -2372,7 +2539,14 @@ export function ImageManipulationRuntimeEditorPanel({
   }, [runHistory, selectedHistoryRunId]);
 
   useEffect(() => {
-    if (!selectedOutputItem || !actorUserIdentityId || !workspaceId || !sessionToken) {
+    if (
+      !selectedOutputItem
+      || !actorUserIdentityId
+      || !workspaceId
+      || !sessionToken
+      || !isDesktopFeatureApiReady
+      || !deferredFeatureApiAvailability.generatedResults
+    ) {
       setSelectedGeneratedResultDetail(undefined);
       setSelectedGeneratedResultLineage(undefined);
       setSelectedGeneratedResultError(undefined);
@@ -2402,8 +2576,26 @@ export function ImageManipulationRuntimeEditorPanel({
       setSelectedGeneratedResultDetail(detail.ok ? detail.data : undefined);
       setSelectedGeneratedResultLineage(lineage.ok ? lineage.data : undefined);
       if (!detail.ok) {
+        if (isDeferredFeatureApiUnavailable(detail.error?.code)) {
+          setDeferredFeatureApiAvailability((current) => (
+            current.generatedResults
+              ? Object.freeze({ ...current, generatedResults: false })
+              : current
+          ));
+          setSelectedGeneratedResultError(undefined);
+          return;
+        }
         setSelectedGeneratedResultError(detail.error?.message ?? "Result detail is unavailable.");
       } else if (!lineage.ok) {
+        if (isDeferredFeatureApiUnavailable(lineage.error?.code)) {
+          setDeferredFeatureApiAvailability((current) => (
+            current.generatedResults
+              ? Object.freeze({ ...current, generatedResults: false })
+              : current
+          ));
+          setSelectedGeneratedResultError(undefined);
+          return;
+        }
         setSelectedGeneratedResultError(lineage.error?.message ?? "Lineage detail is unavailable.");
       } else {
         setSelectedGeneratedResultError(undefined);
@@ -2417,7 +2609,15 @@ export function ImageManipulationRuntimeEditorPanel({
     return () => {
       cancelled = true;
     };
-  }, [actorUserIdentityId, generatedResults, selectedOutputItem, sessionToken, workspaceId]);
+  }, [
+    actorUserIdentityId,
+    deferredFeatureApiAvailability.generatedResults,
+    generatedResults,
+    isDesktopFeatureApiReady,
+    selectedOutputItem,
+    sessionToken,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     if (activeRunId) {
@@ -2706,7 +2906,7 @@ export function ImageManipulationRuntimeEditorPanel({
     if (!selectedOutputItem || !draft?.draftId) {
       return;
     }
-    if (actorUserIdentityId && workspaceId && sessionToken) {
+    if (actorUserIdentityId && workspaceId && sessionToken && isDesktopFeatureApiReady && deferredFeatureApiAvailability.generatedResults) {
       setIsResultQuickActionPending(targetDatasetBindingId === "input-image-dataset" ? "source" : "reference");
       try {
         const [original, detail] = await Promise.all([
@@ -2722,6 +2922,21 @@ export function ImageManipulationRuntimeEditorPanel({
             sessionToken,
           }),
         ]);
+        if (
+          isDeferredFeatureApiUnavailable(original.error?.code)
+          || isDeferredFeatureApiUnavailable(detail.error?.code)
+        ) {
+          setDeferredFeatureApiAvailability((current) => (
+            current.generatedResults
+              ? Object.freeze({ ...current, generatedResults: false })
+              : current
+          ));
+          await chainRecordForReuse({
+            sourceRecordId: selectedOutputItem.image.recordId,
+            targetDatasetBindingId,
+          });
+          return;
+        }
         if (!original.ok || !original.data) {
           setStatusMessage(original.error?.message ?? "Couldn't reuse this result.");
           return;
@@ -2790,7 +3005,7 @@ export function ImageManipulationRuntimeEditorPanel({
       const outputRecordId = resolveRunOutputRecordId(run);
       if (outputRecordId) {
         let loadedRunOutputs = false;
-        if (actorUserIdentityId && workspaceId && sessionToken) {
+        if (actorUserIdentityId && workspaceId && sessionToken && isDesktopFeatureApiReady && deferredFeatureApiAvailability.generatedResults) {
           const byRun = await generatedResults.listGeneratedResultsByRun({
             actorUserIdentityId,
             workspaceId,
@@ -2799,7 +3014,13 @@ export function ImageManipulationRuntimeEditorPanel({
             offset: 0,
             sessionToken,
           });
-          if (byRun.ok && byRun.data) {
+          if (isDeferredFeatureApiUnavailable(byRun.error?.code)) {
+            setDeferredFeatureApiAvailability((current) => (
+              current.generatedResults
+                ? Object.freeze({ ...current, generatedResults: false })
+                : current
+            ));
+          } else if (byRun.ok && byRun.data) {
             const previewPayloadByAssetId = new Map<string, Awaited<ReturnType<typeof generatedResults.requestGeneratedResultPreview>>["data"]>();
             await Promise.all(byRun.data.items.map(async (item) => {
               if (item.preview.state !== "preview-available") {
@@ -3374,26 +3595,70 @@ export function ImageManipulationRuntimeEditorPanel({
             resolvedPreviewPathsByFileName={uploadedPreviewPathsByFileName}
             configuredSavePath={uploadSavePathHint}
             onUploadRequested={(event) => {
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("Upload Requested...");
+              console.log(" ");
+              console.log("------------------------------------------------------");
               const file = event.files[0];
               if (!file) {
                 return;
               }
+
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("File received...");
+              console.log(" ");
+              console.log("------------------------------------------------------");
+
               if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+                console.log("------------------------------------------------------");
+                console.log(" ");
+                console.log("Identity not confirmed");
+                console.log(actorUserIdentityId);
+                console.log(workspaceId);
+                console.log(sessionToken);
+                console.log(" ");
+                console.log("------------------------------------------------------");
                 setStatusMessage("Sign in to upload images.");
                 return;
               }
+
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("Identity confirmed");
+              console.log(" ");
+              console.log("------------------------------------------------------");
+
               setStatusMessage(undefined);
               setUploadedPreviewPathsByFileName(Object.freeze({}));
               setIsUploading(true);
               setUploadProgressStage("uploading");
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("Preparing to encode...");
+              console.log(" ");
+              console.log("------------------------------------------------------");
               void encodeFileBase64(file)
                 .then(async (payloadBase64) => {
+                  console.log("------------------------------------------------------");
+                  console.log(" ");
+                  console.log("Uploading...");
+                  console.log(" ");
+                  console.log("------------------------------------------------------");
                   const uploaded = await imageAssets.uploadStudioSourceImage({
                     file,
                     actorUserIdentityId,
                     workspaceId,
                     sessionToken,
                   });
+                  console.log("------------------------------------------------------");
+                  console.log(" ");
+                  console.log("Uploaded:");
+                  console.log(uploaded);
+                  console.log(" ");
+                  console.log("------------------------------------------------------");
+
                   if (!uploaded.ok || !uploaded.data) {
                     setStatusMessage(uploaded.error?.message ?? "We couldn't upload this photo.");
                     return undefined;
@@ -3426,6 +3691,10 @@ export function ImageManipulationRuntimeEditorPanel({
                     setStatusMessage("We couldn't upload this photo.");
                     return undefined;
                   }
+                  if (!isPersistedReferenceUploadReady(response.data)) {
+                    setStatusMessage("Photo upload could not be persisted. Please try again.");
+                    return undefined;
+                  }
                   setDatasetInstanceId(response.data.datasetInstanceId);
                   setSelection((current) => setRoleSelection(current, {
                     role: "source",
@@ -3437,11 +3706,9 @@ export function ImageManipulationRuntimeEditorPanel({
                     response.data.configuredUploadRootPath
                     ?? toDirectoryPath(response.data.storedFilePath),
                   );
-                  if (response.data.storedFilePath) {
-                    setUploadedPreviewPathsByFileName(Object.freeze({
-                      [file.name]: response.data.storedFilePath,
-                    }));
-                  }
+                  setUploadedPreviewPathsByFileName(Object.freeze({
+                    [file.name]: response.data.storedFilePath,
+                  }));
                   return response.data.recordId;
                 })
                 .then((preferredSourceRecordId) => Promise.all([

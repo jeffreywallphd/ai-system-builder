@@ -39,6 +39,7 @@ import {
   startAuthMinimalServerHostAssembly,
   type AuthMinimalServerHostRuntimeHandle,
 } from "../../src/hosts/server/AuthMinimalServerHostEntrypoint";
+import { startAuthoritativeServerHostAssembly } from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
 import { createDesktopWindowManager } from "./DesktopWindowManager";
 import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
 import type { DesktopAgentRuntimeProvider } from "./runtime/DesktopAgentRuntimeProvider";
@@ -459,12 +460,15 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     throw new Error("Auth-shell bootstrap context is unavailable for post-login warmup.");
   }
 
+  const runtimeAuthShell = await promoteControlPlaneRuntimeForPostLogin(authShell);
+  authShellBootstrapResult = runtimeAuthShell;
+
   postLoginWarmupStarted = true;
   postLoginRuntimeStatusStore.markWarming(request);
-  connectivityRuntimeController.startMonitoring(authShell.identityApiBaseUrl);
+  connectivityRuntimeController.startMonitoring(runtimeAuthShell.identityApiBaseUrl);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
-  postLoginBootstrapPromise = postLoginRuntimeBootstrapper.bootstrap(authShell);
+  postLoginBootstrapPromise = postLoginRuntimeBootstrapper.bootstrap(runtimeAuthShell);
   try {
     await postLoginBootstrapPromise;
     console.info("[ai-loom] Post-login desktop runtime warmup completed.");
@@ -479,6 +483,55 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     postLoginWarmupStarted = false;
     throw error;
   }
+}
+
+/**
+ * Replaces the pre-login auth-minimal identity host with the full authoritative control-plane host for post-login runtime features.
+ */
+async function promoteControlPlaneRuntimeForPostLogin(
+  authShell: AuthShellBootstrapResult,
+): Promise<AuthShellBootstrapResult> {
+  if (!authMinimalServerRuntime) {
+    return authShell;
+  }
+
+  const previousRuntime = authMinimalServerRuntime;
+  const previousRuntimePort = previousRuntime.port;
+  const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
+  // Stop the auth-minimal host before authoritative promotion so both hosts never contend for the same identity SQLite database.
+  await previousRuntime.stop();
+  authMinimalServerRuntime = undefined;
+
+  const upgradedRuntime = await startAuthoritativeServerHostAssembly({
+    hostOptions: {
+      databasePath: path.join(authShell.storagePaths.storageDirectory, "identity", "identity.sqlite"),
+      port: previousRuntimePort,
+      cors: {
+        allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
+        allowLoopbackOrigins: true,
+        allowNullOrigin: isPackaged,
+      },
+      env: process.env,
+      logger: desktopOperationalEventLogger,
+    },
+    boot: {
+      startupReason: "electron-main-authoritative-server-host-post-login-upgrade",
+      environment: process.env,
+    },
+  });
+  authMinimalServerRuntime = upgradedRuntime;
+  const identityApiBaseUrl = assertSecureTransportEndpoint(
+    `http://${upgradedRuntime.address}`,
+    resolveHostSecureTransportConfig({
+      hostKind: HostSecureTransportKinds.desktop,
+      hostAddress: "127.0.0.1",
+    }),
+  );
+  console.info(`[ai-loom][startup] Upgraded control-plane host to authoritative route scope at ${upgradedRuntime.address}.`);
+  return Object.freeze({
+    ...authShell,
+    identityApiBaseUrl,
+  });
 }
 
 registerDesktopAppLifecycle({

@@ -216,4 +216,25 @@ describe("ImageAssetManagementService", () => {
     expect(listed.data?.pagination.hasMore).toBeTrue();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("returns a structured error when list requests fail before receiving a response", async () => {
+    const fetchMock = mock(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const service = new ImageAssetManagementService("http://127.0.0.1:51037");
+    const listed = await service.listImageLibraryImageAssets({
+      actorUserIdentityId: "user-1",
+      workspaceId: "workspace-1",
+      sessionToken: "token-1",
+      limit: 12,
+      offset: 0,
+    });
+
+    expect(listed.ok).toBeFalse();
+    expect(listed.error?.code).toBe("temporarily-unavailable");
+    expect(listed.error?.message).toBe("Unable to reach the image service.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

@@ -10,6 +10,7 @@ import type {
   ImageAssetManagementApiResponse,
   ListImageAssetMetadataApiResponse,
 } from "@infrastructure/api/image-assets/sdk/PublicImageAssetManagementApiContract";
+import { bindSafeFetch } from "@application/runtime/RuntimeDiagnostics";
 import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
@@ -55,9 +56,11 @@ export interface ImageAssetOriginalContent {
 
 export class ImageAssetManagementService {
   private readonly baseUrl: string;
+  private readonly fetchImplementation: typeof fetch;
 
   public constructor(baseUrl: string = resolveImageAssetApiBaseUrl()) {
     this.baseUrl = baseUrl;
+    this.fetchImplementation = bindSafeFetch(fetch);
   }
 
   public async uploadStudioSourceImage(request: UploadStudioImageAssetRequest): Promise<ImageAssetManagementApiResponse<{ readonly assetId: string }>> {
@@ -65,6 +68,13 @@ export class ImageAssetManagementService {
     if (!mimeType) {
       return this.failed("invalid-request", "This image type is not supported.");
     }
+
+    console.log("------------------------------------------------------");
+    console.log(" ");
+    console.log("Incoming Request:");
+    console.log(request);
+    console.log(" ");
+    console.log("------------------------------------------------------");
 
     const fingerprint = await this.computeSha256Digest(request.file);
     const createRequest: CreateImageAssetApiRequest = Object.freeze({
@@ -83,15 +93,30 @@ export class ImageAssetManagementService {
       }),
     });
 
+    console.log("------------------------------------------------------");
+    console.log(" ");
+    console.log("Configured Request:");
+    console.log(createRequest);
+    console.log(" ");
+    console.log("------------------------------------------------------");
+
     const created = await this.requestJson<CreateImageAssetApiResponse>("POST", ImageAssetTransportRoutes.createImageAsset, {
       sessionToken: request.sessionToken,
       body: createRequest,
     });
+
+    console.log("------------------------------------------------------");
+    console.log(" ");
+    console.log("Response:");
+    console.log(created);
+    console.log(" ");
+    console.log("------------------------------------------------------");
+
     if (!created.ok || !created.data) {
       return created as ImageAssetManagementApiResponse<{ readonly assetId: string }>;
     }
 
-    const uploadContentResponse = await fetch(`${this.baseUrl}${created.data.upload.uploadEndpoint}`, {
+    const uploadContentResponse = await this.fetchImplementation(`${this.baseUrl}${created.data.upload.uploadEndpoint}`, {
       method: created.data.upload.uploadMethod,
       headers: {
         authorization: `Bearer ${request.sessionToken}`,
@@ -225,12 +250,17 @@ export class ImageAssetManagementService {
     readonly sessionToken: string;
   }): Promise<ImageAssetManagementApiResponse<ImageAssetOriginalContent>> {
     const route = ImageAssetTransportRoutes.getOriginalContent.replace(":assetId", encodeURIComponent(input.assetId));
-    const response = await fetch(`${this.baseUrl}${route}?workspaceId=${encodeURIComponent(input.workspaceId)}`, {
-      method: "GET",
-      headers: {
-        authorization: `Bearer ${input.sessionToken}`,
-      },
-    });
+    let response: Response;
+    try {
+      response = await this.fetchImplementation(`${this.baseUrl}${route}?workspaceId=${encodeURIComponent(input.workspaceId)}`, {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${input.sessionToken}`,
+        },
+      });
+    } catch {
+      return this.failed("temporarily-unavailable", "Image content could not be loaded.");
+    }
     if (!response.ok) {
       try {
         return await response.json() as ImageAssetManagementApiResponse<ImageAssetOriginalContent>;
@@ -306,15 +336,24 @@ export class ImageAssetManagementService {
       readonly body?: unknown;
     },
   ): Promise<ImageAssetManagementApiResponse<TData>> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        authorization: `Bearer ${options.sessionToken}`,
-        ...(options.body === undefined ? {} : { "content-type": "application/json" }),
-      },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    });
-    return await response.json() as ImageAssetManagementApiResponse<TData>;
+    let response: Response;
+    try {
+      response = await this.fetchImplementation(`${this.baseUrl}${path}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${options.sessionToken}`,
+          ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+        },
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      });
+    } catch {
+      return this.failed("temporarily-unavailable", "Unable to reach the image service.");
+    }
+    try {
+      return await response.json() as ImageAssetManagementApiResponse<TData>;
+    } catch {
+      return this.failed("internal", "Image service returned an invalid response.");
+    }
   }
 
   private failed(code: ImageAssetManagementApiError["code"], message: string): ImageAssetManagementApiResponse<never> {

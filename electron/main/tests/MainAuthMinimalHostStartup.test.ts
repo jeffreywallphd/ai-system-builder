@@ -17,7 +17,7 @@ describe("electron main pre-login host startup", () => {
   });
 
   it("does not call full authoritative server host startup in pre-login bootstrap", () => {
-    expect(mainSource).not.toContain("startAuthoritativeServerHostAssembly");
+    expect(authShellSource).not.toContain("startAuthoritativeServerHostAssembly");
   });
 
   it("does not resolve python runtime or start service supervisor in pre-login bootstrap", () => {

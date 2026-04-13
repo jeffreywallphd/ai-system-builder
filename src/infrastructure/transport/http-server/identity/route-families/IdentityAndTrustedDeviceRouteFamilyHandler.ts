@@ -131,6 +131,17 @@ export function createIdentityAndTrustedDeviceRouteFamilyHandler(deps: Record<st
               }
             }
 
+            const workspaceCreationApi = options.workspaceAdministrationBackendApi
+              ?? options.sessionContextWorkspaceApi;
+            if (workspaces.length === 0 && workspaceCreationApi?.createWorkspace) {
+              workspaces = await ensureDefaultWorkspaceForAuthenticatedSession({
+                workspaceAdministrationBackendApi: workspaceCreationApi,
+                actorUserIdentityId: context.principal.userIdentityId,
+                username: context.principal.username,
+                existingWorkspaces: workspaces,
+              });
+            }
+
             const resolvedWorkspaceId = resolveSessionActorContextWorkspaceId(requestedWorkspaceId, workspaces);
             const sessionAssuranceLevel = normalizeSessionAssuranceLevel(
               context.session.deviceTrustContext?.sessionAssuranceLevel,
@@ -1025,4 +1036,115 @@ export function createIdentityAndTrustedDeviceRouteFamilyHandler(deps: Record<st
   };
 }
 
+async function ensureDefaultWorkspaceForAuthenticatedSession(input: {
+  readonly workspaceAdministrationBackendApi: {
+    createWorkspace(request: {
+      readonly actorUserIdentityId: string;
+      readonly slug: string;
+      readonly displayName: string;
+      readonly visibility: "private";
+      readonly status: "active";
+    }): Promise<{
+      readonly ok: boolean;
+      readonly data?: {
+        readonly workspace: {
+          readonly workspaceId: string;
+          readonly slug: string;
+          readonly displayName: string;
+          readonly status: string;
+          readonly visibility: string;
+          readonly actorAccess: {
+            readonly membershipStatus?: string;
+            readonly effectiveRoles: ReadonlyArray<string>;
+            readonly canAdministrate: boolean;
+            readonly isWorkspaceOwner: boolean;
+          };
+        };
+      };
+    }>;
+  };
+  readonly actorUserIdentityId: string;
+  readonly username?: string;
+  readonly existingWorkspaces: ReadonlyArray<{
+    readonly workspaceId: string;
+    readonly slug: string;
+    readonly displayName: string;
+    readonly status: string;
+    readonly visibility: string;
+    readonly membershipStatus?: string;
+    readonly effectiveRoles: ReadonlyArray<string>;
+    readonly canAdministrate: boolean;
+    readonly isWorkspaceOwner: boolean;
+  }>;
+}): Promise<ReadonlyArray<{
+  readonly workspaceId: string;
+  readonly slug: string;
+  readonly displayName: string;
+  readonly status: string;
+  readonly visibility: string;
+  readonly membershipStatus?: string;
+  readonly effectiveRoles: ReadonlyArray<string>;
+  readonly canAdministrate: boolean;
+  readonly isWorkspaceOwner: boolean;
+}>> {
+  const baseSlug = buildDefaultWorkspaceSlug(input.username, input.actorUserIdentityId);
+  const baseDisplayName = buildDefaultWorkspaceDisplayName(input.username);
+  const attempts = [baseSlug, `${baseSlug}-${Date.now().toString(36).slice(-4)}`];
+  for (let index = 0; index < attempts.length; index += 1) {
+    const slug = attempts[index];
+    const created = await input.workspaceAdministrationBackendApi.createWorkspace({
+      actorUserIdentityId: input.actorUserIdentityId,
+      slug,
+      displayName: baseDisplayName,
+      visibility: "private",
+      status: "active",
+    });
+    if (created.ok && created.data?.workspace) {
+      return Object.freeze([
+        Object.freeze({
+          workspaceId: created.data.workspace.workspaceId,
+          slug: created.data.workspace.slug,
+          displayName: created.data.workspace.displayName,
+          status: created.data.workspace.status,
+          visibility: created.data.workspace.visibility,
+          membershipStatus: created.data.workspace.actorAccess.membershipStatus,
+          effectiveRoles: Object.freeze([...created.data.workspace.actorAccess.effectiveRoles]),
+          canAdministrate: created.data.workspace.actorAccess.canAdministrate,
+          isWorkspaceOwner: created.data.workspace.actorAccess.isWorkspaceOwner,
+        }),
+      ]);
+    }
+  }
+  return input.existingWorkspaces;
+}
 
+function buildDefaultWorkspaceSlug(username: string | undefined, actorUserIdentityId: string): string {
+  const usernameToken = normalizeWorkspaceSlugToken(username);
+  if (usernameToken) {
+    return `${usernameToken}-workspace`;
+  }
+  const identityToken = normalizeWorkspaceSlugToken(actorUserIdentityId) ?? "default-workspace";
+  return `${identityToken}-workspace`;
+}
+
+function buildDefaultWorkspaceDisplayName(username: string | undefined): string {
+  const normalized = normalizeDisplayNameToken(username);
+  if (!normalized) {
+    return "My Workspace";
+  }
+  return `${normalized}'s Workspace`;
+}
+
+function normalizeWorkspaceSlugToken(value: string | undefined): string | undefined {
+  const normalized = (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+  return normalized.length > 0 ? normalized.slice(0, 42) : undefined;
+}
+
+function normalizeDisplayNameToken(value: string | undefined): string | undefined {
+  const normalized = (value ?? "").trim();
+  return normalized.length > 0 ? normalized : undefined;
+}

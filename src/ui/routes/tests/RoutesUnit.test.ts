@@ -95,7 +95,8 @@ describe("ui/routes unit coverage", () => {
     const source = readSource("src/ui/routes/AppRouter.tsx");
 
     expect(source).toContain("createBrowserRouter");
-    expect(source).toContain("<RouterProvider router={router} />");
+    expect(source).toContain("<RouterProvider router={router} future={{ v7_startTransition: true }} />");
+    expect(source).toContain("v7_startTransition: true");
     expect(source).toContain("<Suspense fallback={<AppRouterLoadingFallback />}>");
     expect(source).toContain('const BuildPage = lazy(async () => await import("../pages/BuildPage"));');
     expect(source).toContain("<ProtectedRoute");
