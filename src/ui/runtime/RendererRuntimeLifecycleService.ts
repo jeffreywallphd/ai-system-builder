@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DesktopPostLoginRuntimeStates,
   DesktopPostLoginWarmupTriggerSources,
@@ -9,6 +9,13 @@ import {
 import { requestDesktopPostLoginWarmup } from "./DesktopPostLoginWarmup";
 
 const DefaultPollingIntervalMs = 900;
+const MinBackoffPollingIntervalMs = 250;
+const ReadyPollingIntervalMs = 2200;
+const UnavailablePollingIntervalMs = 1400;
+const FailedPollingBaseIntervalMs = 900;
+const FailedPollingMaxIntervalMs = 7000;
+const WarmingPollingMaxIntervalMs = 2600;
+const BackoffMultiplier = 1.6;
 
 export interface RendererRuntimeLifecycleService {
   readonly getRuntimeBridge: () => DesktopRuntimeBootstrapBridge | undefined;
@@ -70,6 +77,61 @@ export function resolveRendererRuntimeReadiness(input: {
   return input.bridge.isCapabilityReady?.() ?? input.bridge.isDeferredFeatureApiReady();
 }
 
+export function resolveRendererRuntimeRefreshStateKey(
+  status: DesktopPostLoginRuntimeStatus | undefined,
+): string {
+  if (!status) {
+    return "none";
+  }
+  const stageStateKey = status.activationStages
+    ?.map((stage) => `${stage.stageId}:${stage.state}:${stage.blockingReadiness ? "blocking" : "non-blocking"}`)
+    .join(",");
+  const failureKey = status.failure
+    ? `${status.failure.retryable === false ? "non-retryable" : "retryable"}:${status.failure.message ?? ""}`
+    : "none";
+  return [
+    status.state,
+    status.capabilityPhase,
+    status.unavailableReason ?? "none",
+    status.transport.phase,
+    stageStateKey ?? "none",
+    failureKey,
+  ].join("|");
+}
+
+export function resolveRendererRuntimeRefreshIntervalMs(input: {
+  readonly status: DesktopPostLoginRuntimeStatus | undefined;
+  readonly stableRefreshCount: number;
+  readonly defaultPollingIntervalMs?: number;
+}): number {
+  const defaultPollingIntervalMs = input.defaultPollingIntervalMs ?? DefaultPollingIntervalMs;
+  if (!input.status) {
+    return Math.max(defaultPollingIntervalMs, UnavailablePollingIntervalMs);
+  }
+
+  if (input.status.state === DesktopPostLoginRuntimeStates.ready) {
+    return ReadyPollingIntervalMs;
+  }
+
+  if (input.status.state === DesktopPostLoginRuntimeStates.warming) {
+    const raw = Math.max(
+      defaultPollingIntervalMs,
+      MinBackoffPollingIntervalMs * Math.pow(BackoffMultiplier, input.stableRefreshCount),
+    );
+    return Math.min(WarmingPollingMaxIntervalMs, Math.round(raw));
+  }
+
+  if (input.status.state === DesktopPostLoginRuntimeStates.failed) {
+    const raw = Math.max(
+      FailedPollingBaseIntervalMs,
+      defaultPollingIntervalMs * Math.pow(BackoffMultiplier, input.stableRefreshCount),
+    );
+    return Math.min(FailedPollingMaxIntervalMs, Math.round(raw));
+  }
+
+  return Math.max(defaultPollingIntervalMs, UnavailablePollingIntervalMs);
+}
+
 export function createRendererRuntimeLifecycleService(
   options: CreateRendererRuntimeLifecycleServiceOptions = {},
 ): RendererRuntimeLifecycleService {
@@ -103,55 +165,98 @@ export function useRendererRuntimeLifecycle(
     enabled ? Boolean(service.getRuntimeBridge()) : false
   ));
   const [isRetrying, setIsRetrying] = useState(false);
+  const stableRefreshCountRef = useRef(0);
+  const previousRefreshStateKeyRef = useRef<string>(resolveRendererRuntimeRefreshStateKey(status));
 
-  const refresh = useCallback(() => {
+  const refreshRuntimeSnapshot = useCallback((resetBackoff: boolean) => {
     if (!enabled) {
       setStatus(undefined);
       setHasRuntimeBridge(false);
+      stableRefreshCountRef.current = 0;
+      previousRefreshStateKeyRef.current = resolveRendererRuntimeRefreshStateKey(undefined);
       return;
     }
-    setHasRuntimeBridge(Boolean(service.getRuntimeBridge()));
-    setStatus(service.getStatus());
+    const nextBridge = service.getRuntimeBridge();
+    const nextStatus = service.getStatus();
+    setHasRuntimeBridge(Boolean(nextBridge));
+    const nextKey = resolveRendererRuntimeRefreshStateKey(nextStatus);
+    if (resetBackoff || previousRefreshStateKeyRef.current !== nextKey) {
+      stableRefreshCountRef.current = 0;
+    } else {
+      stableRefreshCountRef.current += 1;
+    }
+    previousRefreshStateKeyRef.current = nextKey;
+    setStatus(nextStatus);
   }, [enabled, service]);
+
+  const refresh = useCallback(() => {
+    refreshRuntimeSnapshot(true);
+  }, [refreshRuntimeSnapshot]);
 
   useEffect(() => {
     if (!enabled) {
       setStatus(undefined);
       return;
     }
-    refresh();
-  }, [enabled, refresh]);
+    refreshRuntimeSnapshot(true);
+  }, [enabled, refreshRuntimeSnapshot]);
 
   useEffect(() => {
     if (!enabled || !activateOnMount) {
       return;
     }
     void service.activate(triggerSource).finally(() => {
-      refresh();
+      refreshRuntimeSnapshot(true);
     });
-  }, [activateOnMount, enabled, refresh, service, triggerSource]);
+  }, [activateOnMount, enabled, refreshRuntimeSnapshot, service, triggerSource]);
 
   useEffect(() => {
     if (!enabled || !service.getRuntimeBridge()) {
       return;
     }
-    const interval = window.setInterval(() => {
-      refresh();
-    }, pollIntervalMs);
+    const interval = resolveRendererRuntimeRefreshIntervalMs({
+      status,
+      stableRefreshCount: stableRefreshCountRef.current,
+      defaultPollingIntervalMs: pollIntervalMs,
+    });
+    const timer = window.setTimeout(() => {
+      refreshRuntimeSnapshot(false);
+    }, interval);
     return () => {
-      window.clearInterval(interval);
+      window.clearTimeout(timer);
     };
-  }, [enabled, pollIntervalMs, refresh, service]);
+  }, [enabled, pollIntervalMs, refreshRuntimeSnapshot, service, status]);
+
+  useEffect(() => {
+    if (!enabled || !hasRuntimeBridge || typeof window === "undefined") {
+      return;
+    }
+    const handleFocus = () => {
+      refreshRuntimeSnapshot(true);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshRuntimeSnapshot(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [enabled, hasRuntimeBridge, refreshRuntimeSnapshot]);
 
   const retry = useCallback(async () => {
     setIsRetrying(true);
     try {
       await service.activate(triggerSource);
-      refresh();
+      refreshRuntimeSnapshot(true);
     } finally {
       setIsRetrying(false);
     }
-  }, [refresh, service, triggerSource]);
+  }, [refreshRuntimeSnapshot, service, triggerSource]);
 
   return Object.freeze({
     status,

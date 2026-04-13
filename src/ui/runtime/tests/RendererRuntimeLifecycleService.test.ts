@@ -8,6 +8,8 @@ import {
 } from "../../../../electron/shared/DesktopContracts";
 import {
   createRendererRuntimeLifecycleService,
+  resolveRendererRuntimeRefreshIntervalMs,
+  resolveRendererRuntimeRefreshStateKey,
   resolveRendererRuntimeBridge,
   resolveRendererRuntimeReadiness,
   resolveRendererRuntimeStatus,
@@ -95,5 +97,55 @@ describe("RendererRuntimeLifecycleService", () => {
 
     expect(requestWarmup).toHaveBeenNthCalledWith(1, DesktopPostLoginWarmupTriggerSources.featureDemand);
     expect(requestWarmup).toHaveBeenNthCalledWith(2, DesktopPostLoginWarmupTriggerSources.sessionRestore);
+  });
+
+  it("builds refresh-state keys from lifecycle semantics instead of timestamp churn", () => {
+    const first = createStatus("warming");
+    const second = {
+      ...createStatus("warming"),
+      updatedAt: "2026-04-12T09:35:00.000Z",
+      transport: {
+        phase: DesktopControlPlaneTransportPhases.available,
+        updatedAt: "2026-04-12T09:35:00.000Z",
+      },
+    } as DesktopPostLoginRuntimeStatus;
+
+    expect(resolveRendererRuntimeRefreshStateKey(first)).toBe(resolveRendererRuntimeRefreshStateKey(second));
+  });
+
+  it("uses lifecycle-aware refresh intervals with bounded warming/failed backoff", () => {
+    const warmingEarly = resolveRendererRuntimeRefreshIntervalMs({
+      status: createStatus("warming"),
+      stableRefreshCount: 0,
+      defaultPollingIntervalMs: 900,
+    });
+    const warmingSteady = resolveRendererRuntimeRefreshIntervalMs({
+      status: createStatus("warming"),
+      stableRefreshCount: 6,
+      defaultPollingIntervalMs: 900,
+    });
+    const failedEarly = resolveRendererRuntimeRefreshIntervalMs({
+      status: createStatus("failed"),
+      stableRefreshCount: 0,
+      defaultPollingIntervalMs: 900,
+    });
+    const failedSteady = resolveRendererRuntimeRefreshIntervalMs({
+      status: createStatus("failed"),
+      stableRefreshCount: 10,
+      defaultPollingIntervalMs: 900,
+    });
+    const ready = resolveRendererRuntimeRefreshIntervalMs({
+      status: createStatus("ready"),
+      stableRefreshCount: 10,
+      defaultPollingIntervalMs: 900,
+    });
+
+    expect(warmingEarly).toBe(900);
+    expect(warmingSteady).toBeGreaterThan(warmingEarly);
+    expect(warmingSteady).toBeLessThanOrEqual(2600);
+    expect(failedEarly).toBe(900);
+    expect(failedSteady).toBeGreaterThan(failedEarly);
+    expect(failedSteady).toBeLessThanOrEqual(7000);
+    expect(ready).toBe(2200);
   });
 });

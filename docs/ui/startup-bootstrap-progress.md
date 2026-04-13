@@ -52,3 +52,16 @@ Diagnostics shown in UI state details are sourced from backend lifecycle payload
 
 - `src/ui/runtime/tests/DeferredRuntimeFeatureGate.test.ts`
 - `src/ui/components/execution/tests/McpRuntimeStatusPanel.test.tsx`
+
+## Runtime lifecycle refresh and backoff behavior (Story 1.4.5)
+
+Renderer lifecycle refresh now follows explicit runtime lifecycle state instead of constant blind polling:
+
+1. **Warming/failed**: polling uses bounded backoff so repeated unchanged startup/failure snapshots do not spam readiness requests.
+2. **Ready**: polling cadence is reduced to a slower steady-state interval.
+3. **Targeted refreshes**: lifecycle refresh is forced on explicit user-driven signals (manual refresh/retry, window focus, visible-tab return) so UI remains responsive.
+
+Implementation anchors:
+
+- `src/ui/runtime/RendererRuntimeLifecycleService.ts`
+- `src/ui/runtime/tests/RendererRuntimeLifecycleService.test.ts`
