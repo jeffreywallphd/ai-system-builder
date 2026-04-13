@@ -39,6 +39,11 @@ export function createIdentityAndTrustedDeviceRouteFamilyHandler(deps: Record<st
   const RevokeSessionRequestSchema = d.RevokeSessionRequestSchema;
 
   return async ({ request, response, requestId, logger, path, method }): Promise<IdentityHttpRouteFamilyHandlerResult> => {
+      console.log("------------------------------------------------------");
+      console.log(" ");
+      console.log("Identity route accessed...");
+      console.log(" ");
+      console.log("------------------------------------------------------");
       if (request.method === "POST" && path === "/api/v1/identity/register") {
         await handleRegister(request, response, requestId, options.backendApi, logger, maxBodyBytes);
         return;
@@ -52,6 +57,11 @@ export function createIdentityAndTrustedDeviceRouteFamilyHandler(deps: Record<st
         return;
       }
       if (request.method === "GET" && path === "/api/v1/identity/session") {
+        console.log("------------------------------------------------------");
+        console.log(" ");
+        console.log("Accessing session endpoint...");
+        console.log(" ");
+        console.log("------------------------------------------------------");
         await requireAuthenticatedSession(
           request,
           response,
@@ -80,6 +90,11 @@ export function createIdentityAndTrustedDeviceRouteFamilyHandler(deps: Record<st
         return;
       }
       if (request.method === "GET" && path === "/api/v1/identity/session/context") {
+        console.log("------------------------------------------------------");
+        console.log(" ");
+        console.log("Accessing session/context endpoint...");
+        console.log(" ");
+        console.log("------------------------------------------------------");
         await requireAuthenticatedSession(
           request,
           response,
@@ -130,14 +145,51 @@ export function createIdentityAndTrustedDeviceRouteFamilyHandler(deps: Record<st
                 })));
               }
             }
+
+            console.log("------------------------------------------------------");
+            console.log(" ");
+            console.log("Preparing workplace checks...");
+             console.log(workspaces);
+            console.log(" ");
+            console.log("------------------------------------------------------");
+
+
+            console.log("------------------------------------------------------");
+            console.log(" ");
+            console.log("Has workspace admin backend api?");
+             console.log(options.workspaceAdministrationBackendApi);
+            console.log(" ");
+            console.log("------------------------------------------------------");
+
             if (workspaces.length === 0 && options.workspaceAdministrationBackendApi) {
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("Workplace doesn't exist...");
+              console.log(workspaces);
+              console.log(" ");
+              console.log("------------------------------------------------------");
+
               workspaces = await ensureDefaultWorkspaceForAuthenticatedSession({
                 workspaceAdministrationBackendApi: options.workspaceAdministrationBackendApi,
                 actorUserIdentityId: context.principal.userIdentityId,
                 username: context.principal.username,
                 existingWorkspaces: workspaces,
               });
+
+              console.log("------------------------------------------------------");
+              console.log(" ");
+              console.log("Default workplace created.");
+              console.log(workspaces);
+              console.log(" ");
+              console.log("------------------------------------------------------");
             }
+
+            console.log("------------------------------------------------------");
+            console.log(" ");
+            console.log("Workplace should exist");
+            console.log(workspaces);
+            console.log(" ");
+            console.log("------------------------------------------------------");
 
             const resolvedWorkspaceId = resolveSessionActorContextWorkspaceId(requestedWorkspaceId, workspaces);
             const sessionAssuranceLevel = normalizeSessionAssuranceLevel(
