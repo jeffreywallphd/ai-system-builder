@@ -46,6 +46,14 @@ describe("electron main deferred runtime startup boundary", () => {
     expect(warmupEntrySource).not.toContain("bootstrapAuthShell");
   });
 
+
+  it("stops auth-minimal host before authoritative upgrade to avoid SQLite lock contention", () => {
+    const stopIndex = mainSource.indexOf("await previousRuntime.stop();");
+    const startIndex = mainSource.indexOf("await startAuthoritativeServerHostAssembly({");
+    expect(stopIndex).toBeGreaterThan(-1);
+    expect(startIndex).toBeGreaterThan(-1);
+    expect(stopIndex).toBeLessThan(startIndex);
+  });
   it("keeps python runtime resolution and service supervisor startup in post-login runtime composition", () => {
     expect(bootstrapperSource).toContain("async function composePostLoginRuntime(");
     expect(bootstrapperSource).toContain("resolveDesktopPythonRuntime(");

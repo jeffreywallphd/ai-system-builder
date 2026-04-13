@@ -497,6 +497,10 @@ async function promoteControlPlaneRuntimeForPostLogin(
 
   const previousRuntime = authMinimalServerRuntime;
   const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
+  // Stop the auth-minimal host before authoritative promotion so both hosts never contend for the same identity SQLite database.
+  await previousRuntime.stop();
+  authMinimalServerRuntime = undefined;
+
   const upgradedRuntime = await startAuthoritativeServerHostAssembly({
     hostOptions: {
       databasePath: path.join(authShell.storagePaths.storageDirectory, "identity", "identity.sqlite"),
@@ -513,7 +517,6 @@ async function promoteControlPlaneRuntimeForPostLogin(
       environment: process.env,
     },
   });
-  await previousRuntime.stop();
   authMinimalServerRuntime = upgradedRuntime;
   const identityApiBaseUrl = assertSecureTransportEndpoint(
     `http://${upgradedRuntime.address}`,
