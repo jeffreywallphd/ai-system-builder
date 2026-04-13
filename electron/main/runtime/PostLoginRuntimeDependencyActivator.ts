@@ -2,7 +2,6 @@ import process from "node:process";
 import { InitializeProductionStorageUseCase } from "../../../src/application/runtime/InitializeProductionStorageUseCase";
 import { ProductionStorageInitializationScopes } from "../../../src/application/runtime/interfaces/IProductionStorageInitializer";
 import { resolveDesktopStoragePaths } from "../../../src/infrastructure/desktop/DesktopAppPaths";
-import { resolveDesktopPythonRuntime } from "../../../src/infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig, type AppRuntimeConfigValues } from "../../../src/infrastructure/config/AppRuntimeConfig";
 import type { LaunchSystemRuntimeWindowReadModel } from "../../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { DesktopServiceSupervisor } from "../DesktopServiceSupervisor";
@@ -16,6 +15,8 @@ import { createCanonicalRegistryRuntimeProvider, type CanonicalRegistryRuntimePr
 import type { DesktopStorageDatabase } from "../../../src/infrastructure/desktop/DesktopStorageDatabase";
 import type { DesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRuntimeStatusStore";
 import type { DesktopOperationalEventLogger } from "../DesktopOperationalEventLogger";
+import type { DesktopPythonRuntimeInfo } from "../../shared/DesktopContracts";
+import { resolvePythonRuntimeActivationStage } from "./PythonRuntimeResolutionActivationStage";
 
 const DesktopServiceSupervisorPort = 8790;
 
@@ -54,7 +55,7 @@ type CreatePostLoginRuntimeDependencyActivatorParams = {
 type PostLoginRuntimeComposition = {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
   readonly runtimeConfig: AppRuntimeConfig;
-  readonly pythonRuntime: ReturnType<typeof resolveDesktopPythonRuntime>;
+  readonly pythonRuntime: DesktopPythonRuntimeInfo;
   readonly featureRuntime: DeferredDesktopFeatureRuntime;
 };
 
@@ -130,20 +131,13 @@ export function createPostLoginRuntimeDependencyActivator(
       throw new Error("Desktop storage database is unavailable for post-login runtime activation.");
     }
 
-    const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-startup.post-login-python-runtime-resolve");
-    console.info("[ai-loom][startup] Resolving desktop Python runtime for post-login warmup.");
-    const pythonRuntime = resolveDesktopPythonRuntime({
+    const pythonRuntime = resolvePythonRuntimeActivationStage({
       isPackaged: params.isPackaged,
       repoRoot: params.repoRoot,
-      resourcesPath: process.resourcesPath,
       storagePaths,
+      postLoginRuntimeStatusStore: params.postLoginRuntimeStatusStore,
+      bootstrapStartedAt,
     });
-    logInitializationEnd("desktop-startup.post-login-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
-    console.info(
-      `[ai-loom][startup] Desktop Python runtime resolved (mode=${pythonRuntime.mode}, available=${pythonRuntime.isAvailable}).`,
-    );
-    logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved", bootstrapStartedAt);
-    logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved");
 
     await new InitializeProductionStorageUseCase(storageDatabase).execute({
       scope: ProductionStorageInitializationScopes.fullRuntime,

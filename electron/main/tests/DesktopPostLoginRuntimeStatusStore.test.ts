@@ -7,11 +7,15 @@ import {
 } from "../../shared/DesktopContracts";
 import { createDesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRuntimeStatusStore";
 
+function createTickClock() {
+  let tick = 0;
+  return () => `2026-04-11T00:00:${String(tick++).padStart(2, "0")}.000Z`;
+}
+
 describe("createDesktopPostLoginRuntimeStatusStore", () => {
   it("tracks pre-login -> warming -> ready -> failed capability transitions with explicit transport status", () => {
-    let tick = 0;
     const store = createDesktopPostLoginRuntimeStatusStore({
-      nowIsoString: () => `2026-04-11T00:00:0${tick++}.000Z`,
+      nowIsoString: createTickClock(),
     });
 
     expect(store.getStatus()).toMatchObject({
@@ -19,33 +23,60 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       state: "pre-login",
       capabilityPhase: "pre-login",
       unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
-      updatedAt: "2026-04-11T00:00:00.000Z",
+      updatedAt: "2026-04-11T00:00:02.000Z",
       transport: {
         phase: DesktopControlPlaneTransportPhases.unavailable,
       },
     });
+    expect(store.getStatus().activationStages).toEqual([
+      {
+        stageId: "python-runtime-resolution",
+        state: "pending",
+        blockingReadiness: true,
+        updatedAt: "2026-04-11T00:00:00.000Z",
+        detail: "Python runtime resolution has not started.",
+      },
+    ]);
 
     store.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
     expect(store.getStatus()).toMatchObject({
       state: "pre-login",
       capabilityPhase: "pre-login",
       unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.shuttingDown,
-      updatedAt: "2026-04-11T00:00:01.000Z",
+      updatedAt: "2026-04-11T00:00:05.000Z",
+      activationStages: [
+        {
+          stageId: "python-runtime-resolution",
+          state: "pending",
+          blockingReadiness: true,
+          detail: "Python runtime resolution has not started.",
+        },
+      ],
     });
 
     store.markWarming({
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: "2026-04-11T10:00:00.000Z",
     });
+    store.markPythonRuntimeResolutionRunning();
     expect(store.getStatus()).toMatchObject({
       state: "warming",
       capabilityPhase: "warming",
       activationMode: "lazy-feature-demand",
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: "2026-04-11T10:00:00.000Z",
-      updatedAt: "2026-04-11T00:00:02.000Z",
+      updatedAt: "2026-04-11T00:00:08.000Z",
+      activationStages: [
+        {
+          stageId: "python-runtime-resolution",
+          state: "running",
+          blockingReadiness: true,
+          detail: "Resolving desktop Python runtime.",
+        },
+      ],
     });
 
+    store.markPythonRuntimeResolutionReady({ detail: "mode=development-local, available=true" });
     store.markReady();
     expect(store.getStatus()).toMatchObject({
       state: "ready",
@@ -53,7 +84,15 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       activationMode: "lazy-feature-demand",
       triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
       requestedAt: "2026-04-11T10:00:00.000Z",
-      updatedAt: "2026-04-11T00:00:03.000Z",
+      updatedAt: "2026-04-11T00:00:11.000Z",
+      activationStages: [
+        {
+          stageId: "python-runtime-resolution",
+          state: "ready",
+          blockingReadiness: false,
+          detail: "mode=development-local, available=true",
+        },
+      ],
     });
 
     store.markFailed(
@@ -69,19 +108,18 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
       activationMode: "auth-success-warmup",
       triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
       requestedAt: "2026-04-11T10:01:00.000Z",
-      updatedAt: "2026-04-11T00:00:04.000Z",
+      updatedAt: "2026-04-11T00:00:12.000Z",
       failure: {
         message: "boom",
-        failedAt: "2026-04-11T00:00:05.000Z",
+        failedAt: "2026-04-11T00:00:13.000Z",
         retryable: true,
       },
     });
   });
 
   it("tracks transport lifecycle independently of capability readiness", () => {
-    let tick = 0;
     const store = createDesktopPostLoginRuntimeStatusStore({
-      nowIsoString: () => `2026-04-11T00:00:0${tick++}.000Z`,
+      nowIsoString: createTickClock(),
     });
     store.markTransportBinding({ boundPort: 4120, reason: "bind-start" });
     store.markTransportAvailable({ boundAddress: "127.0.0.1:4120", boundPort: 4120, reason: "bind-ready" });
@@ -98,9 +136,8 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
   });
 
   it("keeps the same bound transport identity through pre-login, warming, ready, and failed transitions", () => {
-    let tick = 0;
     const store = createDesktopPostLoginRuntimeStatusStore({
-      nowIsoString: () => `2026-04-11T00:00:0${tick++}.000Z`,
+      nowIsoString: createTickClock(),
     });
 
     store.markTransportBinding({ boundAddress: "127.0.0.1:4220", boundPort: 4220, reason: "bind-start" });
@@ -153,6 +190,32 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
         message: "Post-login runtime warmup failed.",
         retryable: true,
       },
+    });
+  });
+
+  it("marks python runtime resolution as blocked when stage resolution fails", () => {
+    const store = createDesktopPostLoginRuntimeStatusStore({
+      nowIsoString: createTickClock(),
+    });
+
+    store.markWarming({
+      triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
+      requestedAt: "2026-04-11T12:00:00.000Z",
+    });
+    store.markPythonRuntimeResolutionRunning();
+    store.markPythonRuntimeResolutionBlocked(new Error("python-runtime-missing"));
+
+    expect(store.getStatus()).toMatchObject({
+      capabilityPhase: "warming",
+      activationStages: [
+        {
+          stageId: "python-runtime-resolution",
+          state: "blocked",
+          blockingReadiness: true,
+          detail: "Desktop Python runtime resolution failed.",
+          errorMessage: "python-runtime-missing",
+        },
+      ],
     });
   });
 });

@@ -1,11 +1,13 @@
 import type {
   DesktopControlPlaneCapabilityPhase,
+  DesktopControlPlaneActivationStageStatus,
   DesktopControlPlaneRuntimeStatus,
   DesktopControlPlaneTransportPhase,
 } from "@application/common/DesktopControlPlaneRuntimeContracts";
 import {
   AuthoritativeServerCapabilityIds,
   type AuthoritativeServerCapabilityActivationService,
+  type AuthoritativeServerRuntimeActivationStageSnapshot,
   type AuthoritativeServerRouteFamilyRuntimeLifecycleSnapshot,
   type AuthoritativeServerRouteFamilyAvailability,
 } from "./AuthoritativeServerCapabilityActivation";
@@ -13,7 +15,7 @@ import {
 export interface DesktopRuntimeLifecycleStatusProvider {
   readonly getStatus: () => Pick<
     DesktopControlPlaneRuntimeStatus,
-    "capabilityPhase" | "activationMode" | "triggerSource" | "unavailableReason" | "failure" | "transport"
+    "capabilityPhase" | "activationMode" | "triggerSource" | "unavailableReason" | "failure" | "transport" | "activationStages"
   >;
 }
 
@@ -36,6 +38,21 @@ function normalizeTransportPhase(value: string | undefined): DesktopControlPlane
   return undefined;
 }
 
+function normalizeActivationStages(
+  value: ReadonlyArray<DesktopControlPlaneActivationStageStatus> | undefined,
+): ReadonlyArray<AuthoritativeServerRuntimeActivationStageSnapshot> | undefined {
+  if (!value || value.length < 1) {
+    return undefined;
+  }
+  return Object.freeze(value.map((stage) => Object.freeze({
+    stageId: stage.stageId,
+    state: stage.state,
+    blockingReadiness: stage.blockingReadiness,
+    detail: stage.detail?.trim() ? stage.detail : undefined,
+    errorMessage: stage.errorMessage?.trim() ? stage.errorMessage : undefined,
+  })));
+}
+
 function buildRuntimeLifecycleSnapshot(
   status: ReturnType<DesktopRuntimeLifecycleStatusProvider["getStatus"]>,
 ): AuthoritativeServerRouteFamilyRuntimeLifecycleSnapshot {
@@ -47,6 +64,7 @@ function buildRuntimeLifecycleSnapshot(
     unavailableReason: status.unavailableReason?.trim() ? status.unavailableReason : undefined,
     hasFailure: Boolean(status.failure),
     failureRetryable: status.failure?.retryable,
+    activationStages: normalizeActivationStages(status.activationStages),
   });
 }
 

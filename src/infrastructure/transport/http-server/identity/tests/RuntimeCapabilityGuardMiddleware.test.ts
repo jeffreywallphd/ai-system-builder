@@ -12,6 +12,15 @@ describe("runtime capability guard middleware", () => {
         routeFamilyId: "run-submission",
         capabilityId: "deferred-runtime-features",
         state: "pending",
+        runtimeLifecycle: Object.freeze({
+          capabilityPhase: "warming",
+          activationStages: Object.freeze([Object.freeze({
+            stageId: "python-runtime-resolution",
+            state: "running",
+            blockingReadiness: true,
+            detail: "Resolving desktop Python runtime.",
+          })]),
+        }),
         available: false,
       }),
     });
@@ -20,7 +29,10 @@ describe("runtime capability guard middleware", () => {
     expect(decision.response?.runtime.state).toBe("warming");
     expect(decision.response?.endpoint).toBe("/api/v1/runtime/runs/start");
     expect(decision.response?.runtime.blockingReasons[0]?.code).toBe("capability-warmup-in-progress");
+    expect(decision.response?.runtime.blockingReasons[0]?.message).toBe("Resolving desktop Python runtime.");
     expect(decision.response?.runtime.diagnostics?.blockingDependencyCategory).toBe("capability-activation");
+    expect(decision.response?.runtime.diagnostics?.blockingActivationStageId).toBe("python-runtime-resolution");
+    expect(decision.response?.runtime.diagnostics?.blockingActivationStageState).toBe("running");
     expect(decision.response?.runtime.diagnostics?.lifecyclePhase).toBe("pending");
   });
 
@@ -34,6 +46,16 @@ describe("runtime capability guard middleware", () => {
         routeFamilyId: "run-read",
         capabilityId: "deferred-runtime-features",
         state: "failed",
+        runtimeLifecycle: Object.freeze({
+          capabilityPhase: "failed",
+          activationStages: Object.freeze([Object.freeze({
+            stageId: "python-runtime-resolution",
+            state: "blocked",
+            blockingReadiness: true,
+            detail: "Desktop Python runtime resolution failed.",
+            errorMessage: "python executable not found",
+          })]),
+        }),
         available: false,
       }),
     });
@@ -42,7 +64,9 @@ describe("runtime capability guard middleware", () => {
     expect(decision.response?.runtime.state).toBe("failed");
     if (decision.response?.runtime.state === "failed") {
       expect(decision.response.runtime.failure.code).toBe("runtime-capability-activation-failed");
+      expect(decision.response.runtime.failure.message).toContain("python executable not found");
       expect(decision.response.runtime.diagnostics?.blockingDependencyCategory).toBe("capability-activation");
+      expect(decision.response.runtime.diagnostics?.blockingActivationStageId).toBe("python-runtime-resolution");
     }
   });
 
