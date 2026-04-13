@@ -1058,7 +1058,8 @@ export interface IdentityHttpServerOptions {
   readonly executionNodeManagementBackendApi?: ExecutionNodeManagementBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
   readonly workspaceAdministrationBackendApi?: WorkspaceAdministrationBackendApi;
-  readonly sessionContextWorkspaceApi?: Pick<WorkspaceAdministrationBackendApi, "listWorkspaces">;
+  readonly sessionContextWorkspaceApi?: Pick<WorkspaceAdministrationBackendApi, "listWorkspaces">
+    & Partial<Pick<WorkspaceAdministrationBackendApi, "createWorkspace">>;
   readonly logger?: IdentityHttpServerLogger;
   readonly maxBodyBytes?: number;
   readonly serverFactory?: IdentityHttpServerFactory;

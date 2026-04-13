@@ -52,13 +52,20 @@ import {
   WorkspaceAdministrationQueryService,
   type WorkspaceListItemDto,
 } from "@application/workspaces/use-cases/WorkspaceAdministrationQueryService";
+import {
+  CreateWorkspaceUseCase,
+  WorkspaceCreationErrorCodes,
+} from "@application/workspaces/use-cases/CreateWorkspaceUseCase";
 import type { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import {
   WorkspaceAdministrationApiErrorCodes,
+  type CreateWorkspaceAdministrationApiRequest,
+  type CreateWorkspaceAdministrationApiResponse,
   type ListWorkspaceAdministrationWorkspacesApiRequest,
   type ListWorkspaceAdministrationWorkspacesApiResponse,
   type WorkspaceAdministrationApiResponse,
 } from "@shared/contracts/workspaces/WorkspaceTransportContracts";
+import { WorkspaceIdNamespaces } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   composeServerSecretService,
   type ServerComposedSecretService,
@@ -156,13 +163,34 @@ function parseOptionalCsvList(value: string | undefined): ReadonlyArray<string> 
 
 function createSessionContextWorkspaceApi(
   workspaceRepository: AuthMinimalPersistentPlatformServices["workspaceRepository"],
-): Pick<WorkspaceAdministrationBackendApi, "listWorkspaces"> {
+): Pick<WorkspaceAdministrationBackendApi, "listWorkspaces">
+  & Pick<WorkspaceAdministrationBackendApi, "createWorkspace"> {
   const queryService = new WorkspaceAdministrationQueryService({
     workspaceRepository,
     membershipRepository: workspaceRepository,
     roleAssignmentRepository: workspaceRepository,
     invitationRepository: workspaceRepository,
     authorizationReadRepository: workspaceRepository,
+  });
+  const createWorkspaceUseCase = new CreateWorkspaceUseCase({
+    workspaceRepository,
+    membershipRepository: workspaceRepository,
+    roleAssignmentRepository: workspaceRepository,
+    transactionManager: workspaceRepository,
+    idGenerator: Object.freeze({
+      nextId(namespace) {
+        if (namespace === WorkspaceIdNamespaces.workspace) {
+          return `${WorkspaceIdNamespaces.workspace}:${randomUUID()}`;
+        }
+        if (namespace === WorkspaceIdNamespaces.workspaceMembership) {
+          return `${WorkspaceIdNamespaces.workspaceMembership}:${randomUUID()}`;
+        }
+        return `${WorkspaceIdNamespaces.workspaceRoleAssignment}:${randomUUID()}`;
+      },
+    }),
+    clock: Object.freeze({
+      now: () => new Date(),
+    }),
   });
 
   return Object.freeze({
@@ -199,6 +227,64 @@ function createSessionContextWorkspaceApi(
         data: Object.freeze({
           workspaces: Object.freeze(outcome.value.workspaces.map((workspace) => toWorkspaceAdminListItem(workspace))),
           pagination: outcome.value.pagination,
+        }),
+      });
+    },
+    async createWorkspace(
+      request: CreateWorkspaceAdministrationApiRequest,
+    ): Promise<WorkspaceAdministrationApiResponse<CreateWorkspaceAdministrationApiResponse>> {
+      const outcome = await createWorkspaceUseCase.execute({
+        actorUserIdentityId: request.actorUserIdentityId,
+        slug: request.slug,
+        displayName: request.displayName,
+        description: request.description,
+        visibility: request.visibility,
+        status: request.status,
+      });
+
+      if (!outcome.ok) {
+        const errorCode = outcome.error.code === WorkspaceCreationErrorCodes.invalidRequest
+          ? WorkspaceAdministrationApiErrorCodes.invalidRequest
+          : outcome.error.code === WorkspaceCreationErrorCodes.duplicate
+            ? WorkspaceAdministrationApiErrorCodes.conflict
+            : outcome.error.code === WorkspaceCreationErrorCodes.forbidden
+              ? WorkspaceAdministrationApiErrorCodes.forbidden
+              : WorkspaceAdministrationApiErrorCodes.invalidRequest;
+        return Object.freeze({
+          ok: false,
+          error: Object.freeze({
+            code: errorCode,
+            message: outcome.error.message,
+          }),
+        });
+      }
+
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          workspace: Object.freeze({
+            workspaceId: outcome.value.workspace.id,
+            slug: outcome.value.workspace.slug,
+            displayName: outcome.value.workspace.displayName,
+            description: outcome.value.workspace.description,
+            status: outcome.value.workspace.status,
+            ownerUserIdentityId: outcome.value.workspace.ownerUserId,
+            visibility: outcome.value.workspace.visibility,
+            createdAt: outcome.value.workspace.createdAt,
+            lastModifiedAt: outcome.value.workspace.lastModifiedAt,
+            actorAccess: Object.freeze({
+              membershipStatus: outcome.value.creatorMembership.status,
+              effectiveRoles: Object.freeze([outcome.value.creatorRoleAssignment.role]),
+              canAdministrate: true,
+              isWorkspaceOwner: true,
+              capabilities: Object.freeze({
+                canManageWorkspaceSettings: true,
+                canManageMembers: true,
+                canManageInvitations: true,
+                canManageRoles: true,
+              }),
+            }),
+          }),
         }),
       });
     },
