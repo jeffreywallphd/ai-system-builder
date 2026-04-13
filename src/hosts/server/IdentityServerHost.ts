@@ -243,6 +243,13 @@ import type {
 import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
 import { createStartupTracer, type StartupSpan, type StartupTracer } from "@hosts/bootstrap/startupTracer";
 import type { SecurityMaterialStartupValidationResult } from "@application/security/services/SecurityMaterialStartupValidationPipeline";
+import {
+  createDefaultAuthoritativeServerCapabilityActivationService,
+  type AuthoritativeServerCapabilityActivationRequest,
+  type AuthoritativeServerCapabilityActivationService,
+  type AuthoritativeServerCapabilityActivationSnapshot,
+} from "./AuthoritativeServerCapabilityActivation";
+import { composeAuthoritativeServerApiRouteRegistrationPlan } from "./AuthoritativeServerApiRouteComposition";
 
 export interface IdentityServerHostOptions {
   readonly databasePath: string;
@@ -269,6 +276,7 @@ export interface IdentityServerHostOptions {
   readonly runExecutionAdapters?: AuthoritativeRunExecutionAdapterRegistration;
   readonly startupTracer?: StartupTracer;
   readonly startupSecurityMaterialValidation?: SecurityMaterialStartupValidationResult;
+  readonly capabilityActivation?: AuthoritativeServerCapabilityActivationService;
 }
 
 export interface IdentityServerHost {
@@ -276,6 +284,10 @@ export interface IdentityServerHost {
   readonly address: string;
   readonly secretService: ServerComposedSecretService;
   readonly platformSecretConsumers: ServerPlatformSecretConsumers;
+  readonly activateCapabilities?: (
+    request: AuthoritativeServerCapabilityActivationRequest,
+  ) => AuthoritativeServerCapabilityActivationSnapshot;
+  readonly getCapabilityActivationSnapshot?: () => AuthoritativeServerCapabilityActivationSnapshot;
   close(): Promise<void>;
 }
 
@@ -341,6 +353,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   let imageMediaComposition:
     | ReturnType<typeof composeServerImageMediaCompositionModule>
     | undefined;
+  let capabilityActivation: AuthoritativeServerCapabilityActivationService | undefined;
   try {
     const auditDiagnosticsPlatformComposition = await runStartupStepSpan({
       tracer: startupTracer,
@@ -541,6 +554,23 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     protectedSecretStore,
   });
   const enableDevLoginRoute = resolveIdentityDevLoginRouteEnabled(env);
+  capabilityActivation = options.capabilityActivation ?? createDefaultAuthoritativeServerCapabilityActivationService({
+    routeRegistrationPlan: options.routeRegistrationPlan ?? composeAuthoritativeServerApiRouteRegistrationPlan(),
+    onTransition: (transition) => {
+      options.logger?.info(Object.freeze({
+        event: "authoritative-server.capability-activation.transition",
+        capabilityId: transition.capabilityId,
+        from: transition.from,
+        to: transition.to,
+        occurredAt: transition.occurredAt,
+        reason: transition.reason,
+      }));
+    },
+  });
+  const routeFamilyCapabilityActivation = capabilityActivation;
+  if (!routeFamilyCapabilityActivation) {
+    throw new Error("Authoritative server capability activation service could not be composed.");
+  }
 
   const server = createIdentityHttpServer({
     backendApi,
@@ -563,6 +593,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceBackendApi,
     workspaceAdministrationBackendApi,
     routeRegistrationPlan: options.routeRegistrationPlan,
+    routeFamilyAvailability: Object.freeze({
+      isRouteFamilyAvailable: (routeFamilyId: string) => routeFamilyCapabilityActivation.isRouteFamilyAvailable(routeFamilyId),
+      resolveRouteFamilyAvailability: (routeFamilyId: string) => (
+        routeFamilyCapabilityActivation.resolveRouteFamilyAvailability(routeFamilyId)
+      ),
+    }),
     cors: options.cors,
     logger: options.logger,
     secureTransport: Object.freeze({
@@ -604,13 +640,19 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const platformSecretConsumers = new ServerPlatformSecretConsumers(
     secretService.runtimeSecretConsumptionAdapters,
   );
+  const capabilityActivationService = capabilityActivation;
+  if (!capabilityActivationService) {
+    throw new Error("Authoritative server capability activation service is unavailable.");
+  }
 
   return Object.freeze({
     port: addressInfo.port,
     address: `${addressInfo.address}:${addressInfo.port}`,
     secretService,
     platformSecretConsumers,
-      close: () => new Promise<void>((resolve, reject) => {
+    activateCapabilities: (request) => capabilityActivationService.activateCapabilities(request),
+    getCapabilityActivationSnapshot: () => capabilityActivationService.getSnapshot(),
+    close: () => new Promise<void>((resolve, reject) => {
         server.close((error) => {
           imageMediaComposition?.dispose();
           if (ownsPersistentPlatformServices) {

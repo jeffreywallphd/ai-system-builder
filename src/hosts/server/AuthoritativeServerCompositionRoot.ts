@@ -24,6 +24,10 @@ import {
   type IdentityServerHost,
   type IdentityServerHostOptions,
 } from "./IdentityServerHost";
+import type {
+  AuthoritativeServerCapabilityActivationRequest,
+  AuthoritativeServerCapabilityActivationSnapshot,
+} from "./AuthoritativeServerCapabilityActivation";
 import {
   createHostLifecycleCoordinator,
 } from "../lifecycle/HostLifecycleCoordinator";
@@ -89,6 +93,10 @@ export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle 
   readonly address: string;
   readonly startupCorrelationId?: string;
   readonly transitionHistory: ReadonlyArray<HostLifecycleTransition>;
+  readonly activateCapabilities: (
+    request: AuthoritativeServerCapabilityActivationRequest,
+  ) => AuthoritativeServerCapabilityActivationSnapshot;
+  readonly getCapabilityActivationSnapshot: () => AuthoritativeServerCapabilityActivationSnapshot | undefined;
 }
 
 export interface AuthoritativeServerCompositionRootOptions {
@@ -336,6 +344,19 @@ export function createAuthoritativeServerCompositionRoot(
           });
         };
 
+        const activateCapabilities = (
+          request: AuthoritativeServerCapabilityActivationRequest,
+        ): AuthoritativeServerCapabilityActivationSnapshot => {
+          if (!activeHost.activateCapabilities) {
+            throw new Error("Authoritative server runtime host does not expose capability activation.");
+          }
+          return activeHost.activateCapabilities(request);
+        };
+
+        const getCapabilityActivationSnapshot = (): AuthoritativeServerCapabilityActivationSnapshot | undefined => {
+          return activeHost.getCapabilityActivationSnapshot?.();
+        };
+
         return Object.freeze({
           host: boot.host,
           runtimeMetadata: resolvedRuntimeMetadata,
@@ -354,6 +375,8 @@ export function createAuthoritativeServerCompositionRoot(
           get transitionHistory() {
             return lifecycle.transitionHistory as ReadonlyArray<HostLifecycleTransition>;
           },
+          activateCapabilities,
+          getCapabilityActivationSnapshot,
           stop,
         });
       } catch (error) {

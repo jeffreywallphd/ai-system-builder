@@ -38,6 +38,7 @@ import {
   type AuthoritativeServerSecurityStageOutput,
 } from "../AuthoritativeServerBootstrapStageContracts";
 import { createAuthoritativeServerSecurityBootstrapStage } from "../AuthoritativeServerSecurityBootstrapStage";
+import { AuthoritativeServerCapabilityIds } from "../AuthoritativeServerCapabilityActivation";
 
 class CapturingStartupSpanLogger implements StartupSpanLogger {
   public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
@@ -145,6 +146,62 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(closed).toBeTrue();
     expect(runtime.phase).toBe("stopped");
     expect(runtime.lifecycleEvents?.some((event) => event.type === "shutdown-completed")).toBeTrue();
+  });
+
+  it("exposes capability activation plumbing on the composed authoritative runtime handle", async () => {
+    const activationCalls: Array<Readonly<Record<string, unknown>>> = [];
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 4101,
+        address: "127.0.0.1:4101",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        activateCapabilities: (request) => {
+          activationCalls.push(request as Readonly<Record<string, unknown>>);
+          return Object.freeze({
+            capturedAt: request.activatedAt ?? "2026-04-13T12:00:00.000Z",
+            capabilities: Object.freeze([]),
+            routeFamilyAvailability: Object.freeze({}),
+            transitions: Object.freeze([]),
+          });
+        },
+        getCapabilityActivationSnapshot: () => Object.freeze({
+          capturedAt: "2026-04-13T12:00:00.000Z",
+          capabilities: Object.freeze([]),
+          routeFamilyAvailability: Object.freeze({ "identity-auth": true }),
+          transitions: Object.freeze([]),
+        }),
+        close: async () => {},
+      }),
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-capability-activation-handle-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+    const runtime = await root.compose(boot);
+
+    const beforeActivationSnapshot = runtime.getCapabilityActivationSnapshot();
+    expect(beforeActivationSnapshot?.routeFamilyAvailability["identity-auth"]).toBeTrue();
+
+    runtime.activateCapabilities({
+      capabilityIds: [AuthoritativeServerCapabilityIds.deferredRuntimeFeatures],
+      reason: "test-activation",
+      activatedAt: "2026-04-13T12:05:00.000Z",
+    });
+
+    expect(activationCalls).toEqual([{
+      capabilityIds: [AuthoritativeServerCapabilityIds.deferredRuntimeFeatures],
+      reason: "test-activation",
+      activatedAt: "2026-04-13T12:05:00.000Z",
+    }]);
+
+    await runtime.stop();
   });
 
   it("rejects non-authoritative hosts for authoritative composition root", async () => {

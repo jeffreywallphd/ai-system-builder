@@ -47,6 +47,8 @@ describe("electron main deferred runtime startup boundary", () => {
 
   it("activates post-login capabilities on the already-bound control-plane host without rebinding", () => {
     expect(warmupEntrySource).toContain("persistent control-plane host");
+    expect(warmupEntrySource).toContain("controlPlaneRuntime.activateCapabilities(");
+    expect(warmupEntrySource).toContain("AuthoritativeServerCapabilityIds.deferredRuntimeFeatures");
     expect(warmupEntrySource).not.toContain("startAuthoritativeServerHostAssembly");
     expect(warmupEntrySource).not.toContain("markTransportBinding");
   });
