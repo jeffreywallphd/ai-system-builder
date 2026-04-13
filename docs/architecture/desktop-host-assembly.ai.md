@@ -24,6 +24,9 @@
   - renderer CSP setup
   - main-window creation
   - graceful stop/disposal
+- Electron main-process control-plane transport now follows a single composition path for the full desktop session:
+  - pre-login and post-login use the same authoritative server host runtime
+  - post-login warmup activates additional runtime capabilities without rebinding or replacing the renderer-facing HTTP listener
 
 ## Tests
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`

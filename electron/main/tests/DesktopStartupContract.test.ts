@@ -45,9 +45,9 @@ describe("desktop startup boot contract", () => {
       "system-runtime-backend-api",
       "desktop-connectivity-monitor",
     ]);
-    expect(PreLoginAuthShellInitializers).toContain("auth-minimal-identity-host");
+    expect(PreLoginAuthShellInitializers).toContain("authoritative-control-plane-host");
     expect(PreLoginAuthShellInitializers).not.toContain("desktop-connectivity-monitor");
-    expect(PreLoginAuthShellInitializers).not.toContain("authoritative-identity-host");
+    expect(PreLoginAuthShellInitializers).not.toContain("auth-minimal-identity-host");
   });
 
   it("requires auth bootstrap channels used by preload sync bootstrap", () => {

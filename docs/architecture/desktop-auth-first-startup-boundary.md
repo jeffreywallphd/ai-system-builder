@@ -8,6 +8,14 @@ Story: A.1.2-A.1.3, A.2.1-A.2.3, A.3.1-A.3.3
 
 Define an explicit Electron startup boundary so the first login-capable window is created from a minimal auth bootstrap surface, with non-auth runtime moved to post-login or deferred feature initialization.
 
+## Story 1.1.3 single desktop host composition path
+
+Desktop startup now uses one control-plane host composition path for the full desktop session:
+
+- `bootstrapAuthShell()` starts the authoritative server host for pre-login transport.
+- post-login warmup no longer replaces the pre-login host with a second host instance.
+- renderer-facing transport stays continuously bound while post-login capabilities activate through runtime lifecycle state.
+
 ## Current startup behavior (as implemented in A.1.2)
 
 `electron/main/main.ts` now uses explicit startup phase entrypoints:
@@ -415,14 +423,14 @@ Not required for pre-login auth bootstrap:
 Primary over-scope in current startup:
 
 - Full desktop runtime bootstrap before window creation (`bootstrapDesktopRuntime()` gate).
-- Broad authoritative server host startup before first render (replaced by `startAuthMinimalServerHostAssembly(...)` auth-minimal startup).
+- Host replacement during login-phase transition (removed; one authoritative host now serves pre-login and post-login).
 - Full preload bridge exposure on startup (`electron/preload.ts`) regardless of login/auth phase.
 - Feature IPC registrations and repository composition that are unrelated to login/session validation.
 
 Boundary target for authoritative server startup:
 
-- pre-login should depend on an auth-minimal authoritative identity surface only;
-- broader authoritative capabilities should start in post-login warmup or feature-specific demand paths.
+- pre-login and post-login use the same authoritative control-plane host transport;
+- broader capabilities still activate in post-login warmup or feature-specific demand paths.
 
 ## Proposed implementation map for follow-on stories
 
