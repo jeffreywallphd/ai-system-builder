@@ -17,6 +17,8 @@ const ensureBoundSource = ensureBoundStart >= 0 && ensureBoundEnd > ensureBoundS
 describe("electron main pre-login control-plane host startup", () => {
   it("starts authoritative server host assembly for pre-login bootstrap", () => {
     expect(mainSource).toContain("startAuthoritativeServerHostAssembly");
+    expect(mainSource).toContain("composeDesktopAuthoritativeServerApiRouteRegistrationPlan");
+    expect(mainSource).toContain("composeApiRouteRegistrationPlan: composeDesktopAuthoritativeServerApiRouteRegistrationPlan");
     expect(mainSource).toContain("electron-main-authoritative-server-host-startup");
     expect(mainSource).toContain("Starting authoritative control-plane host with bind-once desktop lifecycle");
     expect(mainSource).toContain("Authoritative control-plane host ready at");

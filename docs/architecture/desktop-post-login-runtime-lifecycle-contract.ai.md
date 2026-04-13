@@ -218,6 +218,15 @@ Contract intent:
 - the desktop session retains one authoritative listener identity while runtime capabilities warm and fail/retry,
 - tests fail if stop-and-rebind behavior is introduced into warmup pathways.
 
+## Story 1.2.2 runtime route-family registration continuity
+
+Desktop control-plane host startup now composes runtime route families at initial host bind instead of relying on post-login host replacement:
+
+- `electron/main/main.ts` uses `composeDesktopAuthoritativeServerApiRouteRegistrationPlan()` when bootstrapping the authoritative host.
+- runtime route-family registration remains continuous across pre-login, warming, and ready phases.
+- lifecycle-aware capability gating continues to block deferred runtime families before activation with explicit unavailable responses.
+- non-desktop startup paths keep default route-plan behavior unless they explicitly request runtime route-family inclusion.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,
