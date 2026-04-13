@@ -106,6 +106,7 @@ export function composeServerRunOrchestrationCompositionModule(
     runRepository: input.persistentPlatformServices.platformPersistenceRepository,
     auditEventRepository: input.persistentPlatformServices.platformPersistenceRepository,
     authorizationDecisionEvaluator: input.authorizationDecisionEvaluator,
+    workspaceAuthorizationReadRepository: input.persistentPlatformServices.workspaceRepository,
     observability: input.runOrchestrationObservability,
     now: () => input.workspaceClock.now(),
   });
