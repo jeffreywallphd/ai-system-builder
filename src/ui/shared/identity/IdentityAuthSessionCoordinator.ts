@@ -134,7 +134,23 @@ export class IdentityAuthSessionCoordinator {
         reason: IdentitySessionUnauthenticatedReason.missingSession,
       });
     }
-    return this.resolveActiveSession(options);
+    const result = await this.resolveActiveSession(options);
+    if (
+      result.status === IdentitySessionBootstrapStatus.unauthenticated
+      && result.reason === IdentitySessionUnauthenticatedReason.contextUnavailable
+      && result.error?.retryable
+      && (result.error.code === IdentitySessionBootstrapErrorCodes.identityContextUnavailable
+        || result.error.code === IdentitySessionBootstrapErrorCodes.transportUnavailable)
+    ) {
+      const persistedSession = this.sessionStore.getSession();
+      if (persistedSession) {
+        return Object.freeze({
+          status: IdentitySessionBootstrapStatus.authenticated,
+          session: persistedSession,
+        });
+      }
+    }
+    return result;
   }
 
   private async resolveActiveSession(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {

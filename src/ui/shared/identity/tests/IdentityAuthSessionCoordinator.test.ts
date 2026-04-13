@@ -246,6 +246,46 @@ describe("IdentityAuthSessionCoordinator", () => {
     }
   });
 
+  it("retains authenticated state during refresh when actor context is temporarily unavailable", async () => {
+    const store = createSessionStore();
+    const session = createSession();
+    store.saveSession(session);
+    const coordinator = new IdentityAuthSessionCoordinator(store, {
+      resolveAuthenticatedSession: async () => ({
+        ok: true,
+        data: {
+          principal: {
+            userIdentityId: "user-1",
+            username: "alice",
+          },
+          session: {
+            sessionId: "identity-session:1",
+            providerId: "provider:local-password",
+            providerSubject: "alice",
+            accessChannel: "desktop",
+            issuedAt: "2026-04-04T20:00:00.000Z",
+            expiresAt: "2026-04-05T20:00:00.000Z",
+          },
+        },
+      }),
+      resolveSessionActorContext: async () => ({
+        ok: false,
+        error: {
+          code: "internal",
+          message: "temporarily unavailable",
+          retryable: true,
+        },
+      }),
+    });
+
+    const result = await coordinator.refreshIfAuthenticated();
+    expect(result.status).toBe(IdentitySessionBootstrapStatus.authenticated);
+    if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+      expect(result.session.sessionToken).toBe(session.sessionToken);
+    }
+    expect(store.hasSession()).toBeTrue();
+  });
+
   it("reuses in-flight bootstrap work for concurrent callers", async () => {
     const store = createSessionStore();
     store.saveSession(createSession());
