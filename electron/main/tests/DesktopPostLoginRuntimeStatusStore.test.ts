@@ -97,6 +97,53 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
     });
   });
 
+  it("keeps the same bound transport identity through pre-login, warming, ready, and failed transitions", () => {
+    let tick = 0;
+    const store = createDesktopPostLoginRuntimeStatusStore({
+      nowIsoString: () => `2026-04-11T00:00:0${tick++}.000Z`,
+    });
+
+    store.markTransportBinding({ boundAddress: "127.0.0.1:4220", boundPort: 4220, reason: "bind-start" });
+    store.markTransportAvailable({ boundAddress: "127.0.0.1:4220", boundPort: 4220, reason: "bind-ready" });
+
+    store.markWarming({
+      triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
+      requestedAt: "2026-04-11T10:05:00.000Z",
+    });
+    const warming = store.getStatus();
+    expect(warming.capabilityPhase).toBe("warming");
+    expect(warming.transport).toMatchObject({
+      phase: DesktopControlPlaneTransportPhases.available,
+      boundAddress: "127.0.0.1:4220",
+      boundPort: 4220,
+    });
+
+    store.markReady();
+    const ready = store.getStatus();
+    expect(ready.capabilityPhase).toBe("ready");
+    expect(ready.transport).toMatchObject({
+      phase: DesktopControlPlaneTransportPhases.available,
+      boundAddress: "127.0.0.1:4220",
+      boundPort: 4220,
+    });
+
+    store.markFailed(
+      {
+        triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
+        requestedAt: "2026-04-11T10:06:00.000Z",
+      },
+      new Error("warmup-failed"),
+    );
+    const failed = store.getStatus();
+    expect(failed.capabilityPhase).toBe("failed");
+    expect(failed.transport).toMatchObject({
+      phase: DesktopControlPlaneTransportPhases.available,
+      boundAddress: "127.0.0.1:4220",
+      boundPort: 4220,
+    });
+    expect(failed.host).toEqual(DesktopControlPlaneHostIdentities.desktopSessionControlPlane);
+  });
+
   it("uses the default failure message for unknown errors", () => {
     const store = createDesktopPostLoginRuntimeStatusStore({ nowIsoString: () => "2026-04-11T00:00:00.000Z" });
     store.markFailed({ triggerSource: DesktopPostLoginWarmupTriggerSources.unknown }, "nope");

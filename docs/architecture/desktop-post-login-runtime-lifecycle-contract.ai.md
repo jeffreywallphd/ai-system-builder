@@ -180,6 +180,26 @@ The deferred runtime lifecycle contract now includes explicit regression guardra
 - Runtime teardown/reset sequencing internals are now centralized in `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`.
 - `electron/main/main.ts` remains the composition root that decides when warmup/disposal runs, while delegating lifecycle implementation details to those dedicated modules.
 
+## Story C.3.7 continuous listener availability regression coverage
+
+- Runtime lifecycle regression coverage now explicitly protects continuous control-plane listener availability across capability-state transitions.
+- `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` now verifies transport identity continuity (`boundAddress`/`boundPort`) across:
+  - `pre-login`
+  - `warming`
+  - `ready`
+  - `failed`
+- `electron/main/tests/MainPreLoginControlPlaneHostStartup.test.ts` now verifies bind-once host reuse semantics remain explicit in `ensureDesktopControlPlaneHostBound(...)` via:
+  - persisted runtime reuse path,
+  - bind-start/bind-ready transition reasons,
+  - reuse transition reason (`authoritative-host-bind-reused`).
+- `electron/main/tests/MainDeferredRuntimeStartupBoundary.test.ts` now verifies post-login warmup capability activation does not trigger listener rebinding by asserting warmup flow excludes transport rebinding markers and bind/start entrypoints.
+
+Contract intent:
+
+- capability lifecycle transitions must not be modeled as transport outages,
+- the desktop session retains one authoritative listener identity while runtime capabilities warm and fail/retry,
+- tests fail if stop-and-rebind behavior is introduced into warmup pathways.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,
