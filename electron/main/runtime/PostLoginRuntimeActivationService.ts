@@ -28,8 +28,10 @@ export type PostLoginRuntimeActivationService = {
 export function createPostLoginRuntimeActivationService(
   params: CreatePostLoginRuntimeActivationServiceParams,
 ): PostLoginRuntimeActivationService {
+  type RuntimeActivationState = "idle" | "activating" | "ready";
+
   let postLoginActivationPromise: Promise<void> | undefined;
-  let warmupStarted = false;
+  let runtimeActivationState: RuntimeActivationState = "idle";
 
   function formatPostLoginWarmupRequestLog(request: DesktopPostLoginWarmupRequest): string {
     return `source=${request.triggerSource}${request.requestedAt ? ` requestedAt=${request.requestedAt}` : ""}`;
@@ -37,13 +39,13 @@ export function createPostLoginRuntimeActivationService(
 
   async function startPostLoginWarmup(request: DesktopPostLoginWarmupRequest): Promise<void> {
     console.info(`[ai-loom] Post-login warmup requested (${formatPostLoginWarmupRequestLog(request)}).`);
+    if (runtimeActivationState === "ready") {
+      console.info("[ai-loom] Post-login warmup request ignored because runtime is already ready.");
+      return;
+    }
     if (postLoginActivationPromise) {
       console.info("[ai-loom] Post-login warmup request joined in-flight warmup.");
       await postLoginActivationPromise;
-      return;
-    }
-    if (warmupStarted) {
-      console.info("[ai-loom] Post-login warmup request ignored because warmup was already started.");
       return;
     }
 
@@ -56,7 +58,7 @@ export function createPostLoginRuntimeActivationService(
       throw new Error("Desktop control-plane host is unavailable for post-login warmup.");
     }
 
-    warmupStarted = true;
+    runtimeActivationState = "activating";
     console.info(
       `[ai-loom] Post-login warmup will activate capabilities on persistent control-plane host (${controlPlaneRuntime.address}).`,
     );
@@ -71,19 +73,21 @@ export function createPostLoginRuntimeActivationService(
     console.info("[ai-loom] Starting post-login desktop runtime warmup.");
     logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
 
-    postLoginActivationPromise = params.activateRuntimeDependencies(authShell);
+    postLoginActivationPromise = Promise.resolve().then(() => params.activateRuntimeDependencies(authShell));
     try {
       await postLoginActivationPromise;
+      runtimeActivationState = "ready";
+      postLoginActivationPromise = undefined;
       console.info("[ai-loom] Post-login desktop runtime warmup completed.");
     } catch (error) {
       postLoginActivationPromise = undefined;
+      runtimeActivationState = "idle";
       params.postLoginRuntimeStatusStore.markFailed(request, error);
       if (!params.isDesktopRuntimeDisposing()) {
         console.error("Post-login desktop runtime activation failed", error);
         await params.disposeDesktopRuntimeResources();
         params.exitProcess(1);
       }
-      warmupStarted = false;
       throw error;
     }
   }
@@ -95,7 +99,8 @@ export function createPostLoginRuntimeActivationService(
       postLoginActivationPromise = promise;
     },
     resetWarmupStarted: () => {
-      warmupStarted = false;
+      runtimeActivationState = "idle";
+      postLoginActivationPromise = undefined;
     },
   });
 }

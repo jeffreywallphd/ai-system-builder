@@ -65,9 +65,10 @@ Shared runtime lifecycle response shapes now define explicit stateful payloads f
 
 Main trigger semantics:
 1. join if warmup already in flight,
-2. ignore if warmup already started/completed,
+2. ignore if runtime activation is already `ready` (idempotent steady state),
 3. otherwise transition to `warming` with activation mode derived from trigger,
-4. bootstrap post-login runtime once and reuse the same in-flight promise.
+4. bootstrap post-login runtime once and reuse the same in-flight promise,
+5. reset activation to retryable idle only on failure.
 
 ## Story C.2.2 runtime infrastructure boundary
 
@@ -219,6 +220,13 @@ Contract intent:
 - capability lifecycle transitions must not be modeled as transport outages,
 - the desktop session retains one authoritative listener identity while runtime capabilities warm and fail/retry,
 - tests fail if stop-and-rebind behavior is introduced into warmup pathways.
+
+## Story 1.3.2 activation idempotency and join semantics
+
+- `PostLoginRuntimeActivationService` now uses explicit activation states (`idle`, `activating`, `ready`) instead of implicit socket-lifecycle assumptions.
+- Concurrent warmup requests always join one in-flight activation promise regardless of trigger source (`explicit-login`, `session-restore`, `session-refresh`, `feature-demand`).
+- Once activation reaches `ready`, repeated warmup requests are explicit no-ops and must not re-activate capabilities, restart connectivity monitoring, or restart dependency activation.
+- On activation failure, state returns to `idle` so subsequent warmup requests can retry through the same lifecycle contract.
 
 ## Story 1.2.2 runtime route-family registration continuity
 
