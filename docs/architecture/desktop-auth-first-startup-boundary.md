@@ -150,29 +150,28 @@ Regression checks now codify the boot contract in main-process tests:
 
 This allows developers to distinguish slow pre-login auth-shell startup from slower post-login warmup directly from logs.
 
-## Story B.2.1 auth-minimal host startup path
+## Story B.2.1 authoritative bind-once host startup path
 
-Pre-login server startup now uses a dedicated auth-minimal server entrypoint:
+Pre-login server startup uses one authoritative control-plane server entrypoint for the desktop session lifecycle:
 
-- `src/hosts/server/AuthMinimalServerHostEntrypoint.ts`
-- `startAuthMinimalServerHostAssembly(...)` from `electron/main/main.ts`
+- `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
+- `startAuthoritativeServerHostAssembly(...)` from `electron/main/main.ts`
 
-The auth-minimal path preserves host lifecycle/startup pipeline behavior while narrowing pre-login startup to auth-critical route registration and persistence composition needed for desktop identity/session bootstrap.
+This keeps pre-login identity/session bootstrap and post-login runtime warmup on one persistent renderer-facing transport instead of startup-time host replacement.
 
-## Story B.3.1 auth-minimal host integration in Electron main
+## Story B.3.1 bind-once host lifecycle integration in Electron main
 
-Electron pre-login startup now explicitly identifies auth-minimal host usage in startup diagnostics and contracts:
+Electron startup now encodes bind-once host lifecycle semantics in diagnostics and control flow:
 
-- `electron/main/main.ts` pre-login startup logs now emit auth-minimal host start/ready messages.
-- `bootstrapAuthShell()` keeps deriving `identityApiBaseUrl` from the auth-minimal host runtime address (`http://{address}`) so renderer auth/bootstrap flows keep the same API base URL contract.
-- pre-login runtime handle naming in Electron main now uses auth-minimal host terminology (`AuthMinimalServerHostRuntimeHandle` / `authMinimalServerRuntime`) instead of authoritative naming.
-- shutdown/disposal continues stopping the auth-minimal host through the existing pre-login cleanup path (`disposeDesktopRuntimeResources()`).
+- `bootstrapAuthShell()` starts the authoritative control-plane host once and derives `identityApiBaseUrl` from that persistent runtime address (`http://{address}`).
+- post-login warmup activates capabilities on the already-bound host and does not stop/restart the renderer-facing HTTP listener during auth success, session restore, or deferred warmup.
+- shutdown/disposal still stops the authoritative host through the existing cleanup path (`disposeDesktopRuntimeResources()`).
 
 Regression safeguards for this boundary now include:
 
-- startup contract pre-login initializer naming now encodes `auth-minimal-identity-host`,
-- tests assert Electron main starts `startAuthMinimalServerHostAssembly(...)`,
-- tests assert Electron main does not call `startAuthoritativeServerHostAssembly(...)` in the pre-login path.
+- startup logs explicitly call out bind-once authoritative host startup/readiness,
+- tests assert warmup path does not include host promotion or rebind semantics,
+- tests assert Electron main does not call auth-minimal startup or host-promotion flow.
 
 ## Story B.3.2 trusted-device and session-bootstrap preservation on auth-minimal host
 

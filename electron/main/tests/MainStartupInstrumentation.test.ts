@@ -10,7 +10,7 @@ const bootstrapperSource = fs.readFileSync(
 const deferredRuntimeSource = fs.readFileSync(path.resolve(process.cwd(), "electron/main/DeferredDesktopFeatureRuntime.ts"), "utf8");
 
 describe("desktop startup instrumentation coverage", () => {
-  it("keeps explicit pre-login, auth-minimal host, first-window, and post-login warmup checkpoints", () => {
+  it("keeps explicit pre-login, authoritative control-plane host, first-window, and post-login warmup checkpoints", () => {
     expect(mainSource).toContain("DesktopStartupPhases.preLoginAuthShellBootstrap");
     expect(mainSource).toContain("DesktopStartupPhases.identityAuthHostReadiness");
     expect(mainSource).toContain("first-window-ready-to-show");
