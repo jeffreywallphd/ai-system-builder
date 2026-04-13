@@ -284,6 +284,25 @@ Contract intent:
 - Deferred IPC readiness now aligns with backend/runtime lifecycle semantics by deriving boolean readiness from the same lifecycle status channel (`state === ready`) instead of a detached flag.
 - Stage-specific failures now mark `blocked` stage state before warmup failure propagates.
 
+## Story 1.3.6 retryable failed activation state
+
+- Post-login activation failure handling now distinguishes recoverable dependency failures from fatal activation failures.
+- Recoverable dependency activation failures now:
+  - transition runtime lifecycle state to `failed`,
+  - preserve bound control-plane listener transport continuity,
+  - mark `failure.retryable: true`,
+  - clean up partially activated deferred runtime artifacts so a subsequent explicit warmup request can retry cleanly.
+- Fatal activation failures now:
+  - transition runtime lifecycle state to `failed`,
+  - mark `failure.retryable: false`,
+  - preserve existing safety behavior by disposing desktop runtime resources and exiting the process.
+- Explicit retry contract:
+  - retry continues to flow through `startPostLoginWarmup(...)` using the same warmup trigger channel,
+  - failed+retryable state remains visible through runtime status probes and renderer gating until retry succeeds.
+- Regression coverage now includes:
+  - `electron/main/tests/PostLoginRuntimeActivationService.test.ts` initial recoverable failure followed by successful explicit retry.
+  - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` non-retryable failure metadata projection.
+
 ## Story 1.2.2 runtime route-family registration continuity
 
 Desktop control-plane host startup now keeps runtime route families registered from initial bind:

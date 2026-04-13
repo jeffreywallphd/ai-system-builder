@@ -5,7 +5,10 @@ import { DesktopStartupPhases } from "../DesktopStartupContract";
 import type { DesktopPostLoginRuntimeStatusStore } from "../DesktopPostLoginRuntimeStatusStore";
 import type { DesktopConnectivityRuntimeController } from "../DesktopConnectivityRuntimeController";
 import { logInitializationMemory } from "../InitializationLogging";
-import type { AuthShellBootstrapResult } from "./PostLoginRuntimeDependencyActivator";
+import {
+  FatalPostLoginRuntimeActivationError,
+  type AuthShellBootstrapResult,
+} from "./PostLoginRuntimeDependencyActivator";
 import { ServiceSupervisorActivationStageError } from "./ServiceSupervisorActivationStage";
 
 type CreatePostLoginRuntimeActivationServiceParams = {
@@ -14,6 +17,7 @@ type CreatePostLoginRuntimeActivationServiceParams = {
   readonly getAuthShellBootstrapResult: () => AuthShellBootstrapResult | undefined;
   readonly getControlPlaneServerRuntime: () => AuthoritativeServerHostRuntimeHandle | undefined;
   readonly activateRuntimeDependencies: (authShell: AuthShellBootstrapResult) => Promise<void>;
+  readonly cleanupRuntimeDependenciesAfterFailure: () => Promise<void>;
   readonly disposeDesktopRuntimeResources: () => Promise<void>;
   readonly isDesktopRuntimeDisposing: () => boolean;
   readonly exitProcess: (code: number) => void;
@@ -30,12 +34,35 @@ export function createPostLoginRuntimeActivationService(
   params: CreatePostLoginRuntimeActivationServiceParams,
 ): PostLoginRuntimeActivationService {
   type RuntimeActivationState = "idle" | "activating" | "ready";
+  type ActivationFailureDisposition = {
+    readonly retryable: boolean;
+    readonly preserveControlPlaneListener: boolean;
+  };
 
   let postLoginActivationPromise: Promise<void> | undefined;
   let runtimeActivationState: RuntimeActivationState = "idle";
 
   function formatPostLoginWarmupRequestLog(request: DesktopPostLoginWarmupRequest): string {
     return `source=${request.triggerSource}${request.requestedAt ? ` requestedAt=${request.requestedAt}` : ""}`;
+  }
+
+  function resolveFailureDisposition(error: unknown): ActivationFailureDisposition {
+    if (error instanceof FatalPostLoginRuntimeActivationError) {
+      return Object.freeze({
+        retryable: false,
+        preserveControlPlaneListener: false,
+      });
+    }
+    if (error instanceof ServiceSupervisorActivationStageError) {
+      return Object.freeze({
+        retryable: true,
+        preserveControlPlaneListener: true,
+      });
+    }
+    return Object.freeze({
+      retryable: true,
+      preserveControlPlaneListener: true,
+    });
   }
 
   async function startPostLoginWarmup(request: DesktopPostLoginWarmupRequest): Promise<void> {
@@ -83,15 +110,18 @@ export function createPostLoginRuntimeActivationService(
     } catch (error) {
       postLoginActivationPromise = undefined;
       runtimeActivationState = "idle";
-      params.postLoginRuntimeStatusStore.markFailed(request, error);
-      const keepControlPlaneListenerBound = error instanceof ServiceSupervisorActivationStageError;
-      if (!params.isDesktopRuntimeDisposing() && !keepControlPlaneListenerBound) {
+      const failureDisposition = resolveFailureDisposition(error);
+      params.postLoginRuntimeStatusStore.markFailed(request, error, {
+        retryable: failureDisposition.retryable,
+      });
+      if (!params.isDesktopRuntimeDisposing() && !failureDisposition.retryable) {
         console.error("Post-login desktop runtime activation failed", error);
         await params.disposeDesktopRuntimeResources();
         params.exitProcess(1);
-      } else if (keepControlPlaneListenerBound) {
+      } else if (!params.isDesktopRuntimeDisposing() && failureDisposition.preserveControlPlaneListener) {
+        await params.cleanupRuntimeDependenciesAfterFailure();
         console.error(
-          "Post-login desktop runtime activation failed during service supervisor startup; preserving control-plane listener.",
+          "Post-login desktop runtime activation failed in retryable mode; preserving control-plane listener for explicit retry.",
           error,
         );
       }

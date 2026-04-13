@@ -252,6 +252,22 @@ describe("createDesktopPostLoginRuntimeStatusStore", () => {
     });
   });
 
+  it("records non-retryable failure metadata when runtime activation classifies a fatal failure", () => {
+    const store = createDesktopPostLoginRuntimeStatusStore({ nowIsoString: () => "2026-04-11T00:00:00.000Z" });
+    store.markFailed(
+      { triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin },
+      new Error("fatal-runtime-activation"),
+      { retryable: false },
+    );
+    expect(store.getStatus()).toMatchObject({
+      state: "failed",
+      failure: {
+        message: "fatal-runtime-activation",
+        retryable: false,
+      },
+    });
+  });
+
   it("marks python runtime resolution as blocked when stage resolution fails", () => {
     const store = createDesktopPostLoginRuntimeStatusStore({
       nowIsoString: createTickClock(),

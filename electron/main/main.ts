@@ -436,6 +436,7 @@ const postLoginRuntimeActivationService = createPostLoginRuntimeActivationServic
   getAuthShellBootstrapResult: () => authShellBootstrapResult,
   getControlPlaneServerRuntime: () => controlPlaneServerRuntime,
   activateRuntimeDependencies: (authShell) => postLoginRuntimeDependencyActivator.activateDependencies(authShell),
+  cleanupRuntimeDependenciesAfterFailure: () => runtimeDisposalCoordinator.cleanupPostLoginRuntimeActivationArtifacts(),
   disposeDesktopRuntimeResources: () => runtimeDisposalCoordinator.disposeDesktopRuntimeResources(),
   isDesktopRuntimeDisposing: () => isDesktopRuntimeDisposing,
   exitProcess: (code) => app.exit(code),

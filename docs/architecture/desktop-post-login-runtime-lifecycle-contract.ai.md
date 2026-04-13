@@ -314,6 +314,25 @@ Desktop control-plane host startup now composes runtime route families at initia
   - `electron/main/tests/DesktopStartupContract.test.ts` ordering coverage for the expanded activation-stage sequence.
   - `electron/main/tests/MainPostLoginRuntimeComposition.test.ts` orchestration-structure coverage for deferred stage transitions in the activator.
 
+## Story 1.3.6 retryable failed activation state
+
+- Post-login activation failure handling now distinguishes recoverable dependency failures from fatal activation failures.
+- Recoverable dependency activation failures now:
+  - transition runtime lifecycle state to `failed`,
+  - preserve bound control-plane listener transport continuity,
+  - mark `failure.retryable: true`,
+  - clean up partially activated deferred runtime artifacts so a subsequent explicit warmup request can retry cleanly.
+- Fatal activation failures now:
+  - transition runtime lifecycle state to `failed`,
+  - mark `failure.retryable: false`,
+  - preserve existing safety behavior by disposing desktop runtime resources and exiting the process.
+- Explicit retry contract:
+  - retry continues to flow through `startPostLoginWarmup(...)` using the same warmup trigger channel,
+  - failed+retryable state remains visible through runtime status probes and renderer gating until retry succeeds.
+- Regression coverage now includes:
+  - `electron/main/tests/PostLoginRuntimeActivationService.test.ts` initial recoverable failure followed by successful explicit retry.
+  - `electron/main/tests/DesktopPostLoginRuntimeStatusStore.test.ts` non-retryable failure metadata projection.
+
 ## Story 1.2.8 route-level no-connection-refusal startup regression coverage
 
 - Runtime startup regression coverage now explicitly protects route-level listener continuity during capability transitions.

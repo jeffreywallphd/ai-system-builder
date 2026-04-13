@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { DesktopPostLoginWarmupRequest } from "../../shared/DesktopContracts";
 import { DesktopPostLoginWarmupTriggerSources } from "../../shared/DesktopContracts";
 import { createPostLoginRuntimeActivationService } from "../runtime/PostLoginRuntimeActivationService";
-import type { AuthShellBootstrapResult } from "../runtime/PostLoginRuntimeDependencyActivator";
+import { FatalPostLoginRuntimeActivationError, type AuthShellBootstrapResult } from "../runtime/PostLoginRuntimeDependencyActivator";
 import { ServiceSupervisorActivationStageError } from "../runtime/ServiceSupervisorActivationStage";
 
 function createWarmupRequest(overrides?: Partial<DesktopPostLoginWarmupRequest>): DesktopPostLoginWarmupRequest {
@@ -50,6 +50,9 @@ describe("PostLoginRuntimeActivationService", () => {
       getControlPlaneServerRuntime: () => controlPlaneRuntime as never,
       activateRuntimeDependencies: async () => {
         operations.push("dependencies:activate");
+      },
+      cleanupRuntimeDependenciesAfterFailure: async () => {
+        operations.push("runtime:cleanup-failed-activation");
       },
       disposeDesktopRuntimeResources: async () => {
         operations.push("runtime:dispose");
@@ -105,6 +108,9 @@ describe("PostLoginRuntimeActivationService", () => {
         operations.push("dependencies:activate");
         await pendingActivation;
       },
+      cleanupRuntimeDependenciesAfterFailure: async () => {
+        operations.push("runtime:cleanup-failed-activation");
+      },
       disposeDesktopRuntimeResources: async () => {
         operations.push("runtime:dispose");
       },
@@ -158,6 +164,9 @@ describe("PostLoginRuntimeActivationService", () => {
       activateRuntimeDependencies: async () => {
         operations.push("dependencies:activate");
         await pendingActivation;
+      },
+      cleanupRuntimeDependenciesAfterFailure: async () => {
+        operations.push("runtime:cleanup-failed-activation");
       },
       disposeDesktopRuntimeResources: async () => {
         operations.push("runtime:dispose");
@@ -215,6 +224,9 @@ describe("PostLoginRuntimeActivationService", () => {
       activateRuntimeDependencies: async () => {
         operations.push("dependencies:activate");
       },
+      cleanupRuntimeDependenciesAfterFailure: async () => {
+        operations.push("runtime:cleanup-failed-activation");
+      },
       disposeDesktopRuntimeResources: async () => {
         operations.push("runtime:dispose");
       },
@@ -266,6 +278,9 @@ describe("PostLoginRuntimeActivationService", () => {
         operations.push("dependencies:activate");
         throw failure;
       },
+      cleanupRuntimeDependenciesAfterFailure: async () => {
+        operations.push("runtime:cleanup-failed-activation");
+      },
       disposeDesktopRuntimeResources: async () => {
         operations.push("runtime:dispose");
       },
@@ -280,6 +295,7 @@ describe("PostLoginRuntimeActivationService", () => {
     await expect(service.startPostLoginWarmup(createWarmupRequest())).rejects.toThrow("runtime activation failed");
     expect(operations.filter((entry) => entry === "dependencies:activate")).toHaveLength(2);
     expect(operations.filter((entry) => entry === "status:failed")).toHaveLength(2);
+    expect(operations.filter((entry) => entry === "runtime:cleanup-failed-activation")).toHaveLength(2);
     expect(operations).not.toContain("runtime:dispose");
     expect(operations).not.toContain("process:exit");
   });
@@ -316,6 +332,9 @@ describe("PostLoginRuntimeActivationService", () => {
         operations.push("dependencies:activate");
         throw failure;
       },
+      cleanupRuntimeDependenciesAfterFailure: async () => {
+        operations.push("runtime:cleanup-failed-activation");
+      },
       disposeDesktopRuntimeResources: async () => {
         operations.push("runtime:dispose");
       },
@@ -328,7 +347,129 @@ describe("PostLoginRuntimeActivationService", () => {
     await expect(service.startPostLoginWarmup(createWarmupRequest())).rejects.toBe(failure);
 
     expect(operations).toContain("status:failed");
+    expect(operations).toContain("runtime:cleanup-failed-activation");
     expect(operations).not.toContain("runtime:dispose");
     expect(operations).not.toContain("process:exit");
+  });
+
+  it("allows explicit retry after a recoverable activation failure and succeeds on the next attempt", async () => {
+    const operations: string[] = [];
+    let attempts = 0;
+    const failure = new Error("temporary runtime activation failure");
+
+    const service = createPostLoginRuntimeActivationService({
+      postLoginRuntimeStatusStore: {
+        markWarming: () => operations.push("status:warming"),
+        markFailed: (
+          _request: DesktopPostLoginWarmupRequest,
+          _error: unknown,
+          metadata?: { readonly retryable?: boolean },
+        ) => operations.push(`status:failed:retryable=${String(metadata?.retryable)}`),
+      } as never,
+      connectivityRuntimeController: {
+        startMonitoring: () => operations.push("connectivity:start"),
+      } as never,
+      getAuthShellBootstrapResult: () => Object.freeze({
+        storagePaths: {
+          appDataDirectory: "app",
+          storageDirectory: "storage",
+          databasePath: "db",
+          runtimeDirectory: "runtime",
+          logsDirectory: "logs",
+          modelsDirectory: "models",
+          assetsDirectory: "assets",
+        },
+        controlPlaneBaseUrl: "http://127.0.0.1:8111",
+      }),
+      getControlPlaneServerRuntime: () => ({
+        address: "127.0.0.1:8111",
+        activateCapabilities: () => operations.push("control-plane:activate-capabilities"),
+      }) as never,
+      activateRuntimeDependencies: async () => {
+        attempts += 1;
+        operations.push(`dependencies:activate:${attempts}`);
+        if (attempts === 1) {
+          throw failure;
+        }
+      },
+      cleanupRuntimeDependenciesAfterFailure: async () => {
+        operations.push("runtime:cleanup-failed-activation");
+      },
+      disposeDesktopRuntimeResources: async () => {
+        operations.push("runtime:dispose");
+      },
+      isDesktopRuntimeDisposing: () => false,
+      exitProcess: () => {
+        operations.push("process:exit");
+      },
+    });
+
+    await expect(service.startPostLoginWarmup(createWarmupRequest())).rejects.toThrow("temporary runtime activation failure");
+    await expect(service.startPostLoginWarmup(createWarmupRequest())).resolves.toBeUndefined();
+
+    expect(operations).toContain("status:failed:retryable=true");
+    expect(operations).toContain("runtime:cleanup-failed-activation");
+    expect(operations).not.toContain("runtime:dispose");
+    expect(operations).not.toContain("process:exit");
+    expect(operations.filter((entry) => entry.startsWith("dependencies:activate:"))).toEqual([
+      "dependencies:activate:1",
+      "dependencies:activate:2",
+    ]);
+  });
+
+  it("treats fatal activation failures as non-retryable and exits after cleanup", async () => {
+    const operations: string[] = [];
+    const failure = new FatalPostLoginRuntimeActivationError("fatal activation failure");
+
+    const service = createPostLoginRuntimeActivationService({
+      postLoginRuntimeStatusStore: {
+        markWarming: () => operations.push("status:warming"),
+        markFailed: (
+          _request: DesktopPostLoginWarmupRequest,
+          _error: unknown,
+          metadata?: { readonly retryable?: boolean },
+        ) => operations.push(`status:failed:retryable=${String(metadata?.retryable)}`),
+      } as never,
+      connectivityRuntimeController: {
+        startMonitoring: () => operations.push("connectivity:start"),
+      } as never,
+      getAuthShellBootstrapResult: () => Object.freeze({
+        storagePaths: {
+          appDataDirectory: "app",
+          storageDirectory: "storage",
+          databasePath: "db",
+          runtimeDirectory: "runtime",
+          logsDirectory: "logs",
+          modelsDirectory: "models",
+          assetsDirectory: "assets",
+        },
+        controlPlaneBaseUrl: "http://127.0.0.1:8111",
+      }),
+      getControlPlaneServerRuntime: () => ({
+        address: "127.0.0.1:8111",
+        activateCapabilities: () => operations.push("control-plane:activate-capabilities"),
+      }) as never,
+      activateRuntimeDependencies: async () => {
+        operations.push("dependencies:activate");
+        throw failure;
+      },
+      cleanupRuntimeDependenciesAfterFailure: async () => {
+        operations.push("runtime:cleanup-failed-activation");
+      },
+      disposeDesktopRuntimeResources: async () => {
+        operations.push("runtime:dispose");
+      },
+      isDesktopRuntimeDisposing: () => false,
+      exitProcess: () => {
+        operations.push("process:exit");
+      },
+    });
+
+    await expect(service.startPostLoginWarmup(createWarmupRequest())).rejects.toBe(failure);
+
+    expect(operations).toContain("status:failed:retryable=false");
+    expect(operations).toContain("runtime:dispose");
+    expect(operations).toContain("process:exit");
+    expect(operations).not.toContain("runtime:cleanup-failed-activation");
   });
 });
