@@ -165,6 +165,7 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       runtimeLifecycleReady: false,
       hasRuntimeLifecycleBridge: true,
       executionReadinessFeatureAvailable: true,
+      executionReadinessAccessDenied: false,
     })).toBe(ExecutionReadinessLifecycleActions.blockUnauthorized);
 
     expect(resolveExecutionReadinessLifecycleAction({
@@ -172,6 +173,7 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       runtimeLifecycleReady: false,
       hasRuntimeLifecycleBridge: true,
       executionReadinessFeatureAvailable: true,
+      executionReadinessAccessDenied: false,
     })).toBe(ExecutionReadinessLifecycleActions.activateRuntime);
 
     expect(resolveExecutionReadinessLifecycleAction({
@@ -179,6 +181,7 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       runtimeLifecycleReady: true,
       hasRuntimeLifecycleBridge: true,
       executionReadinessFeatureAvailable: true,
+      executionReadinessAccessDenied: false,
     })).toBe(ExecutionReadinessLifecycleActions.queryReadiness);
 
     expect(resolveExecutionReadinessLifecycleAction({
@@ -186,7 +189,16 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       runtimeLifecycleReady: true,
       hasRuntimeLifecycleBridge: false,
       executionReadinessFeatureAvailable: false,
+      executionReadinessAccessDenied: false,
     })).toBe(ExecutionReadinessLifecycleActions.skipFeatureUnavailable);
+
+    expect(resolveExecutionReadinessLifecycleAction({
+      sessionToken: "session-token",
+      runtimeLifecycleReady: true,
+      hasRuntimeLifecycleBridge: true,
+      executionReadinessFeatureAvailable: true,
+      executionReadinessAccessDenied: true,
+    })).toBe(ExecutionReadinessLifecycleActions.blockUnauthorized);
   });
 
   it("flags refresh-needed state only when authoritative surfaces are no longer actively loading", () => {

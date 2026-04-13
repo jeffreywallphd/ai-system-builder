@@ -247,6 +247,10 @@ function isDeferredFeatureApiUnavailable(errorCode: string | undefined): boolean
   return errorCode === "not-found";
 }
 
+function isExecutionReadinessAccessDenied(errorCode: string | undefined): boolean {
+  return errorCode === "forbidden" || errorCode === "unauthorized";
+}
+
 export const ExecutionReadinessLifecycleActions = Object.freeze({
   queryReadiness: "query-readiness",
   activateRuntime: "activate-runtime",
@@ -262,8 +266,9 @@ export function resolveExecutionReadinessLifecycleAction(input: {
   readonly runtimeLifecycleReady: boolean;
   readonly hasRuntimeLifecycleBridge: boolean;
   readonly executionReadinessFeatureAvailable: boolean;
+  readonly executionReadinessAccessDenied: boolean;
 }): ExecutionReadinessLifecycleAction {
-  if (!input.sessionToken) {
+  if (!input.sessionToken || input.executionReadinessAccessDenied) {
     return ExecutionReadinessLifecycleActions.blockUnauthorized;
   }
   if (!input.executionReadinessFeatureAvailable) {
@@ -1707,6 +1712,7 @@ export function ImageManipulationRuntimeEditorPanel({
   const [executionReadiness, setExecutionReadiness] = useState<RuntimeExecutionReadinessResponse | undefined>();
   const [executionReadinessError, setExecutionReadinessError] = useState<string | undefined>();
   const [executionReadinessErrorCode, setExecutionReadinessErrorCode] = useState<string | undefined>();
+  const [executionReadinessAccessDenied, setExecutionReadinessAccessDenied] = useState(false);
   const [isCheckingExecutionReadiness, setIsCheckingExecutionReadiness] = useState(false);
   const [deferredFeatureApiAvailability, setDeferredFeatureApiAvailability] = useState(() => Object.freeze({
     generatedResults: true,
@@ -1858,11 +1864,17 @@ export function ImageManipulationRuntimeEditorPanel({
       runtimeLifecycleReady: isDesktopFeatureApiReady,
       hasRuntimeLifecycleBridge: desktopRuntimeLifecycle.hasRuntimeBridge,
       executionReadinessFeatureAvailable: deferredFeatureApiAvailability.executionReadiness,
+      executionReadinessAccessDenied,
     });
     if (lifecycleAction === ExecutionReadinessLifecycleActions.blockUnauthorized) {
       setExecutionReadiness(undefined);
-      setExecutionReadinessError("Sign in to check execution environment availability.");
-      setExecutionReadinessErrorCode("unauthorized");
+      if (executionReadinessAccessDenied && sessionToken) {
+        setExecutionReadinessError("Your current session is not authorized to view execution readiness.");
+        setExecutionReadinessErrorCode("forbidden");
+      } else {
+        setExecutionReadinessError("Sign in to check execution environment availability.");
+        setExecutionReadinessErrorCode("unauthorized");
+      }
       return Promise.resolve();
     }
     if (lifecycleAction === ExecutionReadinessLifecycleActions.skipFeatureUnavailable) {
@@ -1896,6 +1908,13 @@ export function ImageManipulationRuntimeEditorPanel({
           setExecutionReadinessErrorCode(undefined);
           return;
         }
+        if (isExecutionReadinessAccessDenied(response.error?.code)) {
+          setExecutionReadiness(undefined);
+          setExecutionReadinessAccessDenied(true);
+          setExecutionReadinessError("Your current session is not authorized to view execution readiness.");
+          setExecutionReadinessErrorCode(response.error?.code);
+          return;
+        }
         const recovery = resolveRuntimeOperationRecovery({
           code: response.error?.code,
           fallbackMessage: "Execution environment availability could not be confirmed.",
@@ -1906,6 +1925,7 @@ export function ImageManipulationRuntimeEditorPanel({
         setExecutionReadinessErrorCode(response.error?.code);
         return;
       }
+      setExecutionReadinessAccessDenied(false);
       setExecutionReadiness(response.data);
       setExecutionReadinessError(undefined);
       setExecutionReadinessErrorCode(undefined);
@@ -2542,12 +2562,17 @@ export function ImageManipulationRuntimeEditorPanel({
   useEffect(() => {
     void refreshExecutionReadiness();
   }, [
+    executionReadinessAccessDenied,
     deferredFeatureApiAvailability.executionReadiness,
     desktopRuntimeLifecycle.hasRuntimeBridge,
     isDesktopFeatureApiReady,
     runtimeWorkflowAssetId,
     sessionToken,
   ]);
+
+  useEffect(() => {
+    setExecutionReadinessAccessDenied(false);
+  }, [actorUserIdentityId, sessionToken, workspaceId, runtimeWorkflowAssetId]);
 
   useEffect(() => {
     if (!selectedHistoryRunId) {
