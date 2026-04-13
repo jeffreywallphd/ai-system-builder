@@ -20,7 +20,9 @@ import { WorkspaceAuthorizationPolicyReadAdapter } from "../WorkspaceAuthorizati
 class InMemoryWorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizationReadRepository {
   public workspace: Workspace;
   public membershipStatus = WorkspaceMembershipStatuses.active;
-  public readonly roleAssignments = [createWorkspaceRoleAssignment({
+  public includeMembership = true;
+  public isWorkspaceOwner = true;
+  public roleAssignments = [createWorkspaceRoleAssignment({
     id: "workspace-role-assignment:owner",
     workspaceId: "workspace:alpha",
     userIdentityId: "user:owner",
@@ -48,18 +50,20 @@ class InMemoryWorkspaceAuthorizationReadRepository implements IWorkspaceAuthoriz
   ): Promise<WorkspaceAuthorizationSnapshot | undefined> {
     return Object.freeze({
       workspace: this.workspace,
-      membership: createWorkspaceMembership({
-        id: "workspace-membership:owner",
-        workspaceId: this.workspace.id,
-        userIdentityId: "user:owner",
-        status: this.membershipStatus,
-        joinedAt: "2026-04-05T10:00:00.000Z",
-        createdBy: "user:owner",
-        now: new Date("2026-04-05T10:00:00.000Z"),
-      }),
+      membership: this.includeMembership
+        ? createWorkspaceMembership({
+          id: "workspace-membership:owner",
+          workspaceId: this.workspace.id,
+          userIdentityId: "user:owner",
+          status: this.membershipStatus,
+          joinedAt: "2026-04-05T10:00:00.000Z",
+          createdBy: "user:owner",
+          now: new Date("2026-04-05T10:00:00.000Z"),
+        })
+        : undefined,
       activeRoleAssignments: Object.freeze([...this.roleAssignments]),
-      effectiveRoles: Object.freeze([WorkspaceRoles.owner]),
-      isWorkspaceOwner: true,
+      effectiveRoles: Object.freeze(this.isWorkspaceOwner ? [WorkspaceRoles.owner] : []),
+      isWorkspaceOwner: this.isWorkspaceOwner,
     });
   }
 }
@@ -87,7 +91,9 @@ describe("WorkspaceAuthorizationPolicyReadAdapter", () => {
 
   it("returns no grants when workspace membership is not active", async () => {
     const readRepository = new InMemoryWorkspaceAuthorizationReadRepository();
-    readRepository.membershipStatus = WorkspaceMembershipStatuses.suspended;
+    readRepository.includeMembership = false;
+    readRepository.isWorkspaceOwner = false;
+    readRepository.roleAssignments = [];
     const adapter = new WorkspaceAuthorizationPolicyReadAdapter({
       workspaceAuthorizationReadRepository: readRepository,
     });
@@ -103,5 +109,26 @@ describe("WorkspaceAuthorizationPolicyReadAdapter", () => {
     expect(snapshot.roleAssignments).toEqual([]);
     expect(snapshot.permissionGrants).toEqual([]);
   });
-});
 
+  it("includes effective owner role grants even when membership records are missing", async () => {
+    const readRepository = new InMemoryWorkspaceAuthorizationReadRepository();
+    readRepository.includeMembership = false;
+    readRepository.roleAssignments = [];
+    const adapter = new WorkspaceAuthorizationPolicyReadAdapter({
+      workspaceAuthorizationReadRepository: readRepository,
+    });
+
+    const snapshot = await adapter.getActorRoleGrantSnapshot({
+      actor: {
+        actorUserIdentityId: "user:owner",
+        activeWorkspaceId: "workspace:alpha",
+      },
+      asOf: "2026-04-05T10:30:00.000Z",
+    });
+
+    expect(snapshot.roleAssignments).toHaveLength(1);
+    expect(snapshot.roleAssignments[0]?.roleKey).toBe("owner");
+    expect(snapshot.roleAssignments[0]?.id).toContain("synthetic-role-assignment");
+    expect(snapshot.permissionGrants).toEqual([]);
+  });
+});

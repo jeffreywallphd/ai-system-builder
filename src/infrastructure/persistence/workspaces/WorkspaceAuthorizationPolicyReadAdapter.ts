@@ -39,7 +39,9 @@ export class WorkspaceAuthorizationPolicyReadAdapter
       userIdentityId: actorUserIdentityId,
       asOf: query.asOf,
     });
-    if (!snapshot || snapshot.membership?.status !== WorkspaceMembershipStatuses.active) {
+    const hasActiveMembership = snapshot?.membership?.status === WorkspaceMembershipStatuses.active;
+    const hasOwnerOverride = Boolean(snapshot?.isWorkspaceOwner);
+    if (!snapshot || (!hasActiveMembership && !hasOwnerOverride)) {
       return emptyRoleGrantSnapshot();
     }
 
@@ -55,6 +57,23 @@ export class WorkspaceAuthorizationPolicyReadAdapter
         assignedByUserIdentityId: assignment.assignedBy,
         assignedAt: assignment.assignedAt,
       }));
+    const assignedRoleKeys = new Set(roleAssignments.map((assignment) => assignment.roleKey));
+
+    for (const roleKey of snapshot.effectiveRoles) {
+      if (assignedRoleKeys.has(roleKey)) {
+        continue;
+      }
+      roleAssignments.push(createRoleAssignment({
+        id: `synthetic-role-assignment:${workspaceId}:${actorUserIdentityId}:${roleKey}`,
+        actorUserIdentityId,
+        roleKey,
+        scope: RoleAssignmentScopes.workspace,
+        workspaceId,
+        status: RoleAssignmentStatuses.active,
+        assignedByUserIdentityId: actorUserIdentityId,
+        assignedAt: snapshot.workspace.createdAt,
+      }));
+    }
 
     return Object.freeze({
       roleAssignments: Object.freeze(roleAssignments),
@@ -92,4 +111,3 @@ function emptyRoleGrantSnapshot(): AuthorizationActorRoleGrantSnapshot {
     permissionGrants: Object.freeze([]),
   });
 }
-
