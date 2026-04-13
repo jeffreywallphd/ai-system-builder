@@ -47,6 +47,7 @@ import {
   type RuntimeWindowSessionScope,
   type RuntimeWindowSessionState,
 } from "../../runtime/SystemRuntimeWindowSessionPersistenceService";
+import { useRendererRuntimeLifecycle } from "../../runtime/RendererRuntimeLifecycleService";
 import {
   buildRunProgressSnapshot,
   createIdleImageManipulationRunLifecycleState,
@@ -240,29 +241,6 @@ export function resolveNextGalleryPreviewRoleByKey(input: {
     return galleryPreviewRoleOrder[nextIndex];
   }
   return undefined;
-}
-
-function isDesktopDeferredFeatureApiReady(): boolean {
-  if (typeof window === "undefined" || !window.aiLoomDesktop) {
-    return true;
-  }
-  const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
-  if (!runtimeBridge?.isCapabilityReady && !runtimeBridge?.isDeferredFeatureApiReady && !runtimeBridge?.getLifecycleStatus && !runtimeBridge?.getPostLoginRuntimeStatus) {
-    return true;
-  }
-  const status = runtimeBridge.getLifecycleStatus?.() ?? runtimeBridge.getPostLoginRuntimeStatus?.();
-  if (status) {
-    return status.state === "ready";
-  }
-  return runtimeBridge.isCapabilityReady?.() ?? runtimeBridge.isDeferredFeatureApiReady();
-}
-
-function getDesktopDeferredFeatureRuntimeState(): string | undefined {
-  if (typeof window === "undefined" || !window.aiLoomDesktop) {
-    return undefined;
-  }
-  const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
-  return (runtimeBridge?.getLifecycleStatus?.() ?? runtimeBridge?.getPostLoginRuntimeStatus?.())?.state;
 }
 
 function isDeferredFeatureApiUnavailable(errorCode: string | undefined): boolean {
@@ -1707,7 +1685,10 @@ export function ImageManipulationRuntimeEditorPanel({
     imageAssets: true,
     executionReadiness: true,
   }));
-  const [desktopDeferredRuntimeState, setDesktopDeferredRuntimeState] = useState<string | undefined>(() => getDesktopDeferredFeatureRuntimeState());
+  const desktopRuntimeLifecycle = useRendererRuntimeLifecycle({
+    activateOnMount: true,
+    pollIntervalMs: 900,
+  });
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
@@ -1715,32 +1696,7 @@ export function ImageManipulationRuntimeEditorPanel({
     () => groupRecentImageAssetsByContinuityWindow(recentImageAssets),
     [recentImageAssets],
   );
-  const isDesktopFeatureApiReady = useMemo(() => {
-    if (desktopDeferredRuntimeState) {
-      return desktopDeferredRuntimeState === "ready";
-    }
-    return isDesktopDeferredFeatureApiReady();
-  }, [desktopDeferredRuntimeState]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.aiLoomDesktop) {
-      setDesktopDeferredRuntimeState(undefined);
-      return;
-    }
-    const runtimeBridge = window.aiLoomDesktop.auth?.runtime ?? window.aiLoomDesktop.runtime;
-    if (!runtimeBridge?.getLifecycleStatus && !runtimeBridge?.getPostLoginRuntimeStatus) {
-      setDesktopDeferredRuntimeState(undefined);
-      return;
-    }
-    const refreshState = () => {
-      setDesktopDeferredRuntimeState((runtimeBridge.getLifecycleStatus?.() ?? runtimeBridge.getPostLoginRuntimeStatus?.())?.state);
-    };
-    refreshState();
-    const intervalId = window.setInterval(refreshState, 900);
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, []);
+  const isDesktopFeatureApiReady = desktopRuntimeLifecycle.isReady;
 
   useEffect(() => {
     setSelection(datasetBindingService.createSelectionStateFromHydration({
