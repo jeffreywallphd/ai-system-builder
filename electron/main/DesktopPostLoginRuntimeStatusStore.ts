@@ -44,7 +44,7 @@ export type DesktopPostLoginRuntimeStatusStore = {
   readonly markUnavailable: (reason: DesktopPostLoginRuntimeUnavailableReason) => void;
   readonly markWarming: (request: DesktopPostLoginWarmupRequest) => void;
   readonly markReady: () => void;
-  readonly markFailed: (request: DesktopPostLoginWarmupRequest, error: unknown) => void;
+  readonly markFailed: (request: DesktopPostLoginWarmupRequest, error: unknown, metadata?: { readonly retryable?: boolean }) => void;
 };
 
 function resolveActivationMode(request: DesktopPostLoginWarmupRequest) {
@@ -469,7 +469,7 @@ export function createDesktopPostLoginRuntimeStatusStore(
         failure: undefined,
       });
     },
-    markFailed(request, error) {
+    markFailed(request, error, metadata) {
       const message = error instanceof Error ? error.message : "Post-login runtime warmup failed.";
       applyCapabilityTransition("failed", "runtime-failed", {
         activationMode: resolveActivationMode(request),
@@ -478,7 +478,7 @@ export function createDesktopPostLoginRuntimeStatusStore(
         failure: Object.freeze({
           message,
           failedAt: clock.nowIsoString(),
-          retryable: true,
+          retryable: metadata?.retryable ?? true,
         }),
       });
     },

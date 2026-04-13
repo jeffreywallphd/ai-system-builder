@@ -31,6 +31,13 @@ export type PostLoginRuntimeDependencyActivator = {
   readonly clearCachedFactory: () => void;
 };
 
+export class FatalPostLoginRuntimeActivationError extends Error {
+  constructor(message: string, readonly cause?: unknown) {
+    super(message);
+    this.name = "FatalPostLoginRuntimeActivationError";
+  }
+}
+
 type CreatePostLoginRuntimeDependencyActivatorParams = {
   readonly ipcMain: Electron.IpcMain;
   readonly isPackaged: boolean;
@@ -133,7 +140,9 @@ export function createPostLoginRuntimeDependencyActivator(
     const { storagePaths, controlPlaneBaseUrl } = authShell;
     const storageDatabase = params.getStorageDatabase();
     if (!storageDatabase) {
-      throw new Error("Desktop storage database is unavailable for post-login runtime activation.");
+      throw new FatalPostLoginRuntimeActivationError(
+        "Desktop storage database is unavailable for post-login runtime activation.",
+      );
     }
 
     const pythonRuntime = resolvePythonRuntimeActivationStage({

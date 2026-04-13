@@ -36,11 +36,25 @@ type CreateDesktopRuntimeDisposalCoordinatorParams = RuntimeDisposalStateAccesso
 
 export type DesktopRuntimeDisposalCoordinator = {
   readonly disposeDesktopRuntimeResources: () => Promise<void>;
+  readonly cleanupPostLoginRuntimeActivationArtifacts: () => Promise<void>;
 };
 
 export function createDesktopRuntimeDisposalCoordinator(
   params: CreateDesktopRuntimeDisposalCoordinatorParams,
 ): DesktopRuntimeDisposalCoordinator {
+  async function cleanupPostLoginRuntimeActivationArtifacts(): Promise<void> {
+    params.connectivityRuntimeController.stopMonitoring();
+    await params.getServiceSupervisor()?.stop();
+    params.getDeferredFeatureRuntime()?.dispose();
+    params.getAgentRuntimeProvider()?.dispose();
+    params.getCanonicalRegistryRuntimeProvider()?.dispose();
+    params.setDeferredFeatureRuntime(undefined);
+    params.setAgentRuntimeProvider(undefined);
+    params.setCanonicalRegistryRuntimeProvider(undefined);
+    params.clearDeferredRuntimeFactoryCache();
+    params.setServiceSupervisor(undefined);
+  }
+
   async function disposeDesktopRuntimeResources(): Promise<void> {
     params.setIsDisposing(true);
     params.postLoginRuntimeStatusStore.markUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
@@ -71,5 +85,6 @@ export function createDesktopRuntimeDisposalCoordinator(
 
   return Object.freeze({
     disposeDesktopRuntimeResources,
+    cleanupPostLoginRuntimeActivationArtifacts,
   });
 }
