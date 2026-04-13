@@ -128,9 +128,9 @@ Contract intent:
 
 The runtime lifecycle contract now includes explicit timing + memory checkpoints that separate critical-path startup from deferred/runtime-on-demand work:
 
-- pre-login/auth-minimal host:
+- pre-login/authoritative control-plane host:
   - auth-shell phase remains instrumented under `desktop-startup.pre-login-auth-shell-bootstrap`.
-  - auth-minimal host readiness now logs startup-memory at `start` and `ready` in `desktop-startup.identity-auth-host-readiness`.
+  - authoritative control-plane host readiness now logs startup-memory at `start` and `ready` in `desktop-startup.identity-auth-host-readiness`.
 - first-window readiness:
   - `desktop-startup.main-window-creation` now logs `first-window-ready-to-show`.
   - `desktop-startup.host-bootstrap` now logs `renderer-first-window-ready`.

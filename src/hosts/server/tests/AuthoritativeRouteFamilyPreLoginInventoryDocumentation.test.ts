@@ -40,7 +40,7 @@ describe("authoritative route family pre-login inventory documentation", () => {
     expect(doc).toContain("identity-auth");
   });
 
-  it("keeps architecture docs discoverable for auth-minimal route planning", () => {
+  it("keeps architecture docs discoverable for pre-login route planning", () => {
     const architectureReadme = readFileSync(architectureReadmePath, "utf8");
     const architectureReadmeAi = readFileSync(architectureReadmeAiPath, "utf8");
 

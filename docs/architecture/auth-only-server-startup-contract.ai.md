@@ -5,10 +5,13 @@ Epic: B.1
 Story: B.1.1
 
 ## Purpose
-- Define the exact server contract required before desktop login.
-- Lock the pre-login boundary so later auth-minimal host stories can implement directly.
+
+Define the server contract required before desktop login under the persistent control-plane model.
+
+This contract reflects the current startup path where Electron main binds the authoritative control-plane host once for the desktop session and exposes auth-critical behavior first, then activates broader capabilities during post-login warmup.
 
 ## Required pre-login server contract
+
 - Required identity route family: `identity-auth` (`/api/v1/identity/*`).
 - Required endpoints for renderer auth/session bootstrap:
   - `POST /api/v1/identity/login`
@@ -17,49 +20,35 @@ Story: B.1.1
   - `GET /api/v1/identity/session`
   - `GET /api/v1/identity/session/context`
 - Required trust/session behavior:
-  - honor desktop trusted-session requirement (`sessionTrustRequirement: "require-trusted"`)
+  - enforce desktop trusted-session requirements (`sessionTrustRequirement: "require-trusted"`)
   - validate trusted-device binding markers
   - return trust/session metadata consumed by renderer bootstrap
 - Required persistence responsibility:
   - identity account/credential/session state
-  - trusted-device + pairing state
-  - workspace actor-context read data needed by session-context hydration
+  - trusted-device and pairing state
+  - workspace actor-context data needed by session-context hydration
 
 ## Deferred from pre-login
-- Route families not required for login/session bootstrap and targeted for defer:
-  - `workspace-invitations`
-  - `workspace-administration` (management endpoints)
-  - `authorization-management`
-  - `deployment-policy-read`
-  - `deployment-policy-write`
-  - `audit-ledger`
-  - `node-trust`
-  - `execution-node-management`
-  - `security-certificate-operations`
-  - `security-secret-metadata`
-  - `storage-management`
-  - `asset-management`
-  - `image-asset-management`
-  - `run-submission`
-  - `run-read`
-  - `run-mutation`
-  - `image-run-api`
-  - `run-execution-update`
 
-## Current overreach called out
-- Pre-login desktop startup still boots full authoritative server assembly.
-- Startup currently composes full route-family coverage, broad persistence domains, and non-auth backends (workspace/admin, authorization, deployment, audit, node, storage, asset, runtime/run, certificate, secrets).
-- Startup also composes execution adapter infrastructure not required for login.
+Non-auth capability families remain unavailable until post-login lifecycle activation.
 
-## Required outputs from auth-minimal host to Electron main
-- host `address` to build `identityApiBaseUrl`
+## Current startup contract
+
+- Pre-login startup binds the authoritative control-plane host once (`startAuthoritativeServerHostAssembly(...)`).
+- Transport continuity is preserved across login state changes; warmup does not stop/rebind the listener.
+- Post-login warmup activates deferred runtime capabilities through explicit capability activation (`activateCapabilities(...)`) instead of host replacement.
+
+## Required outputs to Electron main
+
+- host `address` used to derive `controlPlaneBaseUrl` / `identityApiBaseUrl`
 - lifecycle stop handle
 - startup success/failure signal
 - optional startup diagnostics correlation id
 
 ## Boundary target
-- Pre-login: identity-auth + trusted-device/session-context only.
-- Post-login or on-demand: non-auth control-plane routes, services, persistence, and execution infrastructure.
+
+- Pre-login: identity/session bootstrap behavior available on the already-bound authoritative host.
+- Post-login: deferred runtime capabilities activated through lifecycle contracts, not socket handoff.
 
 ## Related ADRs
 
