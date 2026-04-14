@@ -32,6 +32,7 @@
   - `ui/`: shared-first UI plus thin platform-specific layers.
   - `testing/`: shared testing helpers/patterns by boundary.
 - Repository shape is intentionally restrained: not every folder should become a workspace/package.
+- Prefer contract family barrels (`modules/contracts/<family>`) as import surfaces; avoid deep internal contract paths.
 - Do not duplicate `src/`, `package.json`, and `tsconfig.json` across folders without clear build/isolation justification.
 
 ## Key Constraints

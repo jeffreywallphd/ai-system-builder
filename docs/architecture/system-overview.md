@@ -65,6 +65,8 @@ ai-system-builder/
 - `modules/contracts/`
   - Explicit boundary contracts (API, IPC, runtime integration contracts, etc.).
   - Shared language for cross-module communication.
+  - Import contracts through family-level entry points (`modules/contracts/<family>`) to keep boundaries explicit and refactor-safe.
+  - Root-level contracts exports are namespace-only by family; do not rely on a flattened catch-all surface.
   - Includes shared result/error contracts so boundaries reuse one success/failure vocabulary.
   - Includes shared operation identity helpers so transport/runtime/persistence families use a consistent operation naming pattern.
   - Includes typed configuration contracts for host, runtime, logging,

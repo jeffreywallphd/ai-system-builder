@@ -21,6 +21,7 @@
 
 - Maintain clean architecture direction: inner layers (domain/application) must not depend on outer infrastructure/host/UI layers.
 - Keep contracts explicit at boundaries; avoid embedding boundary semantics in ad hoc types.
+- Prefer `modules/contracts/<family>` imports and avoid deep contract file paths so family boundaries remain the public extension surface.
 - Treat API and IPC contract families as true transport specializations: compose from shared transport semantics and add only narrow transport-specific fields.
 - Keep operation identity consistent across transport/runtime/persistence via shared helper patterns (lowercase dotted operation names).
 - Keep operation identity transport-neutral; avoid embedding transport namespace into operation names.

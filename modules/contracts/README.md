@@ -11,3 +11,10 @@ Current contract families include:
 - `host` context metadata
 - `logging` vocabulary
 - `config` typed configuration concerns
+
+## Public Surface Discipline
+
+- Import contracts from family barrels (`modules/contracts/<family>`), not deep
+  internal files.
+- The root contracts entry (`modules/contracts`) exposes family namespaces only
+  so boundaries stay explicit instead of flattened.
