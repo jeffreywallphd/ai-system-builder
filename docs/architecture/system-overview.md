@@ -63,6 +63,8 @@ ai-system-builder/
   - Explicit boundary contracts (API, IPC, runtime integration contracts, etc.).
   - Shared language for cross-module communication.
   - Includes shared result/error contracts so boundaries reuse one success/failure vocabulary.
+  - Includes typed configuration contracts for host, runtime, logging,
+    persistence, and storage concerns.
 
 ### Infrastructure and edges
 

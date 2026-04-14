@@ -38,6 +38,8 @@ Rules:
 ## Shared logging contract vocabulary
 
 Shared contract types for logging live in `modules/contracts/logging`.
+Typed logging configuration shape (`LoggingConfig`) lives in
+`modules/contracts/config` and reuses the shared verbosity vocabulary.
 
 Canonical identifiers for contracts:
 
