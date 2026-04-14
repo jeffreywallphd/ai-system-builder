@@ -100,6 +100,20 @@ Async flows (`startExecutionAsync`, `pollExecution`) must preserve delegated sco
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
 
+## Runtime context-drift regression baseline (Story 1.3.2)
+
+Keep one composed-runtime regression suite that targets cross-layer drift risks:
+
+- actor active workspace differs from target/resource workspace,
+- resource workspace differs from caller-provided target workspace,
+- synthesized workspace-role fallback does not authorize across wrong scope,
+- read/list remains allowed while create/write remains denied for same actor/resource context,
+- workspace-capability checks are denied when role scope exists only in another workspace.
+
+Canonical suite:
+
+- `src/application/authorization/tests/AuthorizationRuntimeContextDriftRegression.test.ts`
+
 ## 9) Sharing management and reporting surfaces (Story 4.4.8 publication)
 
 Use these seams when adding new admin/user sharing capabilities:

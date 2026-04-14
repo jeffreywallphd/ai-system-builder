@@ -19,11 +19,26 @@ import { AuthorizationResourceFamilies } from "@domain/authorization/Authorizati
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
+  type AuthorizationRoleKey,
   RoleAssignmentScopes,
   RoleAssignmentStatuses,
   SharingPolicyModes,
 } from "@domain/authorization/AuthorizationDomain";
 import { WorkspaceAuthorizationRoleKeys } from "@domain/authorization/AuthorizationRoleDefinitions";
+import {
+  WorkspaceMembershipStatuses,
+  WorkspaceRoles,
+  createWorkspace,
+  createWorkspaceMembership,
+  createWorkspaceRoleAssignment,
+  type WorkspaceMembershipStatus,
+  type WorkspaceRole,
+} from "@domain/workspaces/WorkspaceDomain";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+import type {
+  WorkspaceAuthorizationSnapshot,
+  WorkspaceAuthorizationSnapshotQuery,
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 
 const FIXTURE_CLOCK = "2026-04-05T12:00:00.000Z";
 const FIXTURE_SEED_TIME = "2026-04-05T11:00:00.000Z";
@@ -64,6 +79,22 @@ export interface SeedAuthorizationResourceInput {
   readonly resourceId?: string;
 }
 
+export interface SeedWorkspaceRoleAssignmentInput {
+  readonly actorUserIdentityId: string;
+  readonly assignedByUserIdentityId: string;
+  readonly roleKey: AuthorizationRoleKey;
+  readonly workspaceId: string;
+}
+
+export interface SeedWorkspaceAuthorizationSnapshotInput {
+  readonly workspaceId: string;
+  readonly userIdentityId: string;
+  readonly ownerUserIdentityId?: string;
+  readonly effectiveRoles: ReadonlyArray<WorkspaceRole>;
+  readonly membershipStatus?: WorkspaceMembershipStatus;
+  readonly isWorkspaceOwner?: boolean;
+}
+
 export interface AuthorizationInvariantRuntimeFixture {
   readonly baseUrl: string;
   readonly workspaceId: string;
@@ -72,6 +103,8 @@ export interface AuthorizationInvariantRuntimeFixture {
   readonly participants: AuthorizationInvariantRuntimeParticipants;
   registerAndLogin(username: string, email: string): Promise<RuntimeInvariantActorSession>;
   seedWorkspaceAssetAuthorizationResource(input: SeedAuthorizationResourceInput): Promise<void>;
+  seedWorkspaceRoleAssignment(input: SeedWorkspaceRoleAssignmentInput): Promise<void>;
+  seedWorkspaceAuthorizationSnapshot(input: SeedWorkspaceAuthorizationSnapshotInput): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -79,6 +112,7 @@ interface RuntimeFixtureState {
   readonly rootDirectory: string;
   readonly server: Server;
   readonly authorizationAdapter: SqliteAuthorizationPersistenceAdapter;
+  readonly workspaceAuthorizationReadRepository: InMemoryWorkspaceAuthorizationReadRepository;
 }
 
 function createRuntimeParticipants(): AuthorizationInvariantRuntimeParticipants {
@@ -117,10 +151,79 @@ function closeServer(server: Server): Promise<void> {
   });
 }
 
+class InMemoryWorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizationReadRepository {
+  private readonly snapshots = new Map<string, WorkspaceAuthorizationSnapshot>();
+
+  public upsertSnapshot(input: SeedWorkspaceAuthorizationSnapshotInput): void {
+    const workspace = createWorkspace({
+      id: input.workspaceId,
+      slug: this.toWorkspaceSlug(input.workspaceId),
+      displayName: `Runtime Fixture ${input.workspaceId}`,
+      ownerUserId: input.ownerUserIdentityId ?? input.userIdentityId,
+      createdBy: input.ownerUserIdentityId ?? input.userIdentityId,
+      status: "active",
+      now: new Date(FIXTURE_SEED_TIME),
+    });
+
+    const membershipStatus = input.membershipStatus ?? WorkspaceMembershipStatuses.active;
+    const membership = createWorkspaceMembership({
+      id: `seed-membership:${input.workspaceId}:${input.userIdentityId}`,
+      workspaceId: input.workspaceId,
+      userIdentityId: input.userIdentityId,
+      status: membershipStatus,
+      invitedByUserId: input.ownerUserIdentityId ?? input.userIdentityId,
+      joinedAt: membershipStatus === WorkspaceMembershipStatuses.active ? FIXTURE_SEED_TIME : undefined,
+      createdBy: input.ownerUserIdentityId ?? input.userIdentityId,
+      now: new Date(FIXTURE_SEED_TIME),
+    });
+
+    const effectiveRoles = [...new Set(input.effectiveRoles)];
+    const activeRoleAssignments = effectiveRoles.map((role) => createWorkspaceRoleAssignment({
+      id: `seed-workspace-role:${input.workspaceId}:${input.userIdentityId}:${role}`,
+      workspaceId: input.workspaceId,
+      userIdentityId: input.userIdentityId,
+      role,
+      status: "active",
+      assignedBy: input.ownerUserIdentityId ?? input.userIdentityId,
+      assignedAt: FIXTURE_SEED_TIME,
+    }));
+
+    const isWorkspaceOwner = input.isWorkspaceOwner ?? effectiveRoles.includes(WorkspaceRoles.owner);
+
+    const snapshot: WorkspaceAuthorizationSnapshot = Object.freeze({
+      workspace,
+      membership,
+      activeRoleAssignments: Object.freeze(activeRoleAssignments),
+      effectiveRoles: Object.freeze(effectiveRoles),
+      isWorkspaceOwner,
+    });
+
+    this.snapshots.set(this.toSnapshotKey(input.workspaceId, input.userIdentityId), snapshot);
+  }
+
+  public async getWorkspaceAuthorizationSnapshot(
+    query: WorkspaceAuthorizationSnapshotQuery,
+  ): Promise<WorkspaceAuthorizationSnapshot | undefined> {
+    return this.snapshots.get(this.toSnapshotKey(query.workspaceId, query.userIdentityId));
+  }
+
+  private toSnapshotKey(workspaceId: string, userIdentityId: string): string {
+    return `${workspaceId}:${userIdentityId}`;
+  }
+
+  private toWorkspaceSlug(workspaceId: string): string {
+    return workspaceId.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "fixture-workspace";
+  }
+}
+
 function composeAuthorizationManagementBackendApi(
   adapter: SqliteAuthorizationPersistenceAdapter,
+  workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository,
 ): AuthorizationManagementBackendApi {
-  const readAdapter = new SqliteAuthorizationPolicyReadAdapter({ authorizationPersistenceAdapter: adapter });
+  const readAdapter = new SqliteAuthorizationPolicyReadAdapter({
+    authorizationPersistenceAdapter: adapter,
+    workspaceAuthorizationReadRepository,
+  });
   const mutationService = new AuthorizationPolicyMutationService({
     ports: {
       roleAssignmentPersistenceRepository: adapter,
@@ -197,7 +300,11 @@ async function startRuntimeFixtureState(): Promise<RuntimeFixtureState & { reado
   const identityHarness = await createIdentityAuthTestHarness();
   const rootDirectory = mkdtempSync(path.join(tmpdir(), "ai-loom-runtime-invariants-"));
   const authorizationAdapter = new SqliteAuthorizationPersistenceAdapter(path.join(rootDirectory, "authorization.sqlite"));
-  const authorizationManagementBackendApi = composeAuthorizationManagementBackendApi(authorizationAdapter);
+  const workspaceAuthorizationReadRepository = new InMemoryWorkspaceAuthorizationReadRepository();
+  const authorizationManagementBackendApi = composeAuthorizationManagementBackendApi(
+    authorizationAdapter,
+    workspaceAuthorizationReadRepository,
+  );
 
   const server = createIdentityHttpServer({
     backendApi: identityHarness.backendApi,
@@ -217,6 +324,7 @@ async function startRuntimeFixtureState(): Promise<RuntimeFixtureState & { reado
     rootDirectory,
     server,
     authorizationAdapter,
+    workspaceAuthorizationReadRepository,
     baseUrl: `http://127.0.0.1:${address.port}`,
   });
 }
@@ -361,6 +469,36 @@ async function seedWorkspaceAssetAuthorizationResource(
   });
 }
 
+async function seedWorkspaceRoleAssignment(
+  adapter: SqliteAuthorizationPersistenceAdapter,
+  input: SeedWorkspaceRoleAssignmentInput,
+): Promise<void> {
+  await adapter.upsertRoleAssignment({
+    record: {
+      id: `seed-runtime-role:${input.workspaceId}:${input.actorUserIdentityId}:${input.roleKey}`,
+      actorUserIdentityId: input.actorUserIdentityId,
+      roleKey: input.roleKey,
+      scope: RoleAssignmentScopes.workspace,
+      workspaceId: input.workspaceId,
+      status: RoleAssignmentStatuses.active,
+      assignedAt: FIXTURE_SEED_TIME,
+      assignedByUserIdentityId: input.assignedByUserIdentityId,
+      createdAt: FIXTURE_SEED_TIME,
+      createdBy: input.assignedByUserIdentityId,
+      lastModifiedAt: FIXTURE_SEED_TIME,
+      lastModifiedBy: input.assignedByUserIdentityId,
+      revision: 0,
+    },
+    mutation: {
+      operationKey: "seed-runtime-invariant-workspace-role",
+      context: {
+        actorUserIdentityId: input.assignedByUserIdentityId,
+        occurredAt: FIXTURE_SEED_TIME,
+      },
+    },
+  });
+}
+
 export async function createAuthorizationInvariantRuntimeFixture(
   options: {
     readonly workspaceId?: string;
@@ -389,6 +527,12 @@ export async function createAuthorizationInvariantRuntimeFixture(
         resourceType: input.resourceType ?? resourceType,
         resourceId: input.resourceId ?? resourceId,
       });
+    },
+    seedWorkspaceRoleAssignment: async (input: SeedWorkspaceRoleAssignmentInput) => {
+      await seedWorkspaceRoleAssignment(state.authorizationAdapter, input);
+    },
+    seedWorkspaceAuthorizationSnapshot: async (input: SeedWorkspaceAuthorizationSnapshotInput) => {
+      state.workspaceAuthorizationReadRepository.upsertSnapshot(input);
     },
     dispose: async () => {
       if (disposed) {

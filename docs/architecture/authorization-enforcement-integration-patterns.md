@@ -203,6 +203,20 @@ Use existing suites as templates:
 - `ReferenceImageOutputAuthorization.test.ts`
 - `IdentityHttpServerWorkspaceAdministration.test.ts`
 
+## 8.1) Runtime context-drift regression baseline (Story 1.3.2)
+
+When authorization behavior is refactored across route handlers, policy evaluators, and persistence adapters, keep one composed-runtime regression suite that explicitly covers:
+
+- actor active-workspace mismatch versus target/resource workspace,
+- resource workspace mismatch versus caller-provided target workspace,
+- synthesized workspace-role fallback scope mismatch (must not authorize),
+- read/list allowed while create/write remains denied for the same actor/resource context,
+- workspace-capability denial when role scope exists only in a different workspace.
+
+Canonical regression suite:
+
+- `src/application/authorization/tests/AuthorizationRuntimeContextDriftRegression.test.ts`
+
 ## 9) Sharing management and reporting surfaces (Story 4.4.8 publication)
 
 Use these seams when adding new admin/user sharing capabilities:
