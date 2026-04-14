@@ -1,0 +1,150 @@
+# Testing Standards
+
+## Purpose
+
+Tests in `ai-system-builder` protect meaningful behavior and architectural intent.
+
+They are not written to satisfy vanity coverage metrics or performative CI checks.
+
+## Testing strategy by layer
+
+## 1) Domain tests (unit-first)
+
+Domain logic must be tested directly and in isolation.
+
+Focus on:
+
+- invariants,
+- business rules,
+- state transitions,
+- value object/entity behavior.
+
+Domain tests should not require infrastructure frameworks, database clients, or transport setup.
+
+## 2) Application tests (use-case focused)
+
+Application use cases should be tested with controlled boundaries.
+
+Focus on:
+
+- orchestration behavior,
+- port interactions,
+- success/failure path handling,
+- policy decisions and error mapping at use-case level.
+
+Use test doubles for ports where appropriate; do not replace use-case tests with adapter-heavy integration flows.
+
+## 3) Adapter tests (focused integration)
+
+Adapters require focused integration tests against their real boundary behavior.
+
+Examples:
+
+- persistence adapters with Postgres integration coverage,
+- storage adapters with real filesystem/blob behavior (or faithful local substitutes),
+- transport adapters with request/response translation verification,
+- runtime adapters with protocol and error translation checks.
+
+Keep integration scope tight and purpose-driven.
+
+## 4) Host and transport boundary tests
+
+Hosts and transport boundaries should receive targeted integration tests for:
+
+- composition correctness,
+- startup/shutdown behavior,
+- boundary wiring correctness,
+- critical route/IPC to use-case delegation paths.
+
+Do not treat end-to-end host tests as substitutes for domain/application testing.
+
+## 5) UI tests
+
+UI tests should validate behavior that matters:
+
+- user-visible state transitions,
+- contract-driven interactions,
+- shared UI behavior reused across surfaces.
+
+Prefer focused component/integration tests over brittle snapshot-only approaches.
+
+## Required behavior coverage
+
+At minimum, tests should cover:
+
+- core business rules and invariants,
+- major use-case success and failure paths,
+- boundary translation behavior (transport/runtime/persistence/storage),
+- previously observed defect paths (regressions),
+- architecture-significant behavior called out in ADRs/architecture docs.
+
+## Regression test rule
+
+When fixing a bug, add a regression test when practical in the layer where the defect should have been caught.
+
+If no regression test is added, include explicit rationale in the PR.
+
+## Test naming and structure
+
+- Use explicit behavior-oriented test names.
+- Keep naming consistent with repository naming standards.
+- Recommended suffixes:
+  - `*.unit.test.ts`
+  - `*.integration.test.ts`
+  - `*.ui.test.tsx`
+
+Describe expected behavior and context in test titles; avoid vague names.
+
+## Mocking discipline
+
+Use mocks/stubs/fakes deliberately.
+
+Rules:
+
+- mock at architectural boundaries, not internal implementation details,
+- do not over-mock domain behavior that can be tested directly,
+- avoid brittle tests that assert private call sequences without behavioral value,
+- use representative fixture data tied to domain language.
+
+## Determinism and flake avoidance
+
+Tests must be deterministic and CI-suitable.
+
+Requirements:
+
+- control time/randomness with explicit seams,
+- isolate filesystem/network/process side effects,
+- ensure test order independence,
+- enforce reliable setup/teardown for shared resources,
+- avoid hidden external dependencies.
+
+Flaky tests are treated as defects and must be fixed or quarantined with a tracked follow-up.
+
+## CI suitability
+
+Test suites should be structured for predictable CI execution:
+
+- fast feedback for unit tests,
+- scoped integration runs for boundary confidence,
+- clear failure output that points to behavior regressions,
+- no reliance on local-only developer state.
+
+## Anti-patterns to avoid
+
+- Coverage-only tests with no behavioral assertion value.
+- Snapshot churn that obscures real regressions.
+- Tests that mirror implementation line-by-line instead of behavior.
+- Massive end-to-end suites used as a replacement for layered tests.
+- Asserting framework internals instead of system behavior.
+
+## Practical review checklist
+
+Before merging:
+
+- Are important business and boundary behaviors actually protected?
+- Do tests reflect architecture boundaries rather than collapsing them?
+- Is new behavior covered at the appropriate layer?
+- Is bug-fix regression coverage included when practical?
+- Are tests deterministic and CI-reliable?
+
+If any answer is “no”, test quality is insufficient.
