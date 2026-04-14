@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
+  AuthorizationDiagnosticProvenanceStages,
+  AuthorizationDiagnosticReasonCodes,
+  AuthorizationRuntimeAvailabilityReasonCodes,
   AuthorizationDenialProvenanceStages,
   AuthorizationDiagnosticContractError,
   AuthorizationDiagnosticMatchedSourceKinds,
@@ -34,8 +37,8 @@ describe("AuthorizationDiagnosticsContracts", () => {
         applicableScopeCount: 4,
       },
       matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
-      reasonCode: "no-effective-permission",
-      denialProvenanceStage: AuthorizationDenialProvenanceStages.evaluator,
+      reasonCode: AuthorizationDiagnosticReasonCodes.noEffectivePermission,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.evaluatorResolution,
       runtimeAvailability: {
         affectedByRuntimeAvailability: true,
         degraded: true,
@@ -64,7 +67,7 @@ describe("AuthorizationDiagnosticsContracts", () => {
       target: {
         kind: AuthorizationDiagnosticTargetKinds.unresolved,
       },
-      reasonCode: "authorization-evaluation-invalid-context",
+      reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
       denialProvenanceStage: AuthorizationDenialProvenanceStages.route,
     })).toThrow(AuthorizationDiagnosticContractError);
   });
@@ -77,7 +80,7 @@ describe("AuthorizationDiagnosticsContracts", () => {
       target: {
         kind: AuthorizationDiagnosticTargetKinds.resourceInstance,
       },
-      reasonCode: "authorization-evaluation-invalid-context",
+      reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
       denialProvenanceStage: AuthorizationDenialProvenanceStages.api,
     })).toThrow("target.targetIdentifier is required");
   });
@@ -90,7 +93,7 @@ describe("AuthorizationDiagnosticsContracts", () => {
       target: {
         kind: AuthorizationDiagnosticTargetKinds.workspaceCapability,
       },
-      reasonCode: "authorization-evaluation-invalid-context",
+      reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
       denialProvenanceStage: AuthorizationDenialProvenanceStages.useCase,
     })).toThrow("target.targetWorkspaceId is required");
   });
@@ -106,7 +109,7 @@ describe("AuthorizationDiagnosticsContracts", () => {
       counts: {
         roleAssignmentCount: -1,
       },
-      reasonCode: "authorization-evaluation-invalid-context",
+      reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
       denialProvenanceStage: AuthorizationDenialProvenanceStages.adapter,
     })).toThrow("roleAssignmentCount must be a non-negative finite number");
 
@@ -117,7 +120,7 @@ describe("AuthorizationDiagnosticsContracts", () => {
       target: {
         kind: AuthorizationDiagnosticTargetKinds.unresolved,
       },
-      reasonCode: "authorization-evaluation-invalid-context",
+      reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
       denialProvenanceStage: AuthorizationDenialProvenanceStages.adapter,
       extensions: {
         invalid: "value",
@@ -133,12 +136,28 @@ describe("AuthorizationDiagnosticsContracts", () => {
       target: {
         kind: AuthorizationDiagnosticTargetKinds.unresolved,
       },
-      reasonCode: "runtime-gate-blocked",
+      reasonCode: AuthorizationRuntimeAvailabilityReasonCodes.runtimeGateBlocked,
       denialProvenanceStage: AuthorizationDenialProvenanceStages.runtimeReadiness,
       runtimeAvailability: {
         affectedByRuntimeAvailability: true,
         degraded: true,
       },
     })).toThrow("marked as affected must include runtime state");
+  });
+
+  it("accepts canonical transport-mapping provenance stage and reason code values", () => {
+    const diagnostic = createAuthorizationDiagnosticRecord({
+      correlation: {
+        requestId: "req-transport",
+      },
+      target: {
+        kind: AuthorizationDiagnosticTargetKinds.unresolved,
+      },
+      reasonCode: AuthorizationDiagnosticReasonCodes.transportDenied,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.transportMapping,
+    });
+
+    expect(diagnostic.reasonCode).toBe(AuthorizationDiagnosticReasonCodes.transportDenied);
+    expect(diagnostic.denialProvenanceStage).toBe(AuthorizationDiagnosticProvenanceStages.transportMapping);
   });
 });

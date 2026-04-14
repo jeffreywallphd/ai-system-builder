@@ -13,6 +13,11 @@
 import type {
   AuthorizationResourceFamily,
 } from "@domain/authorization/AuthorizationPermissionCatalog";
+import {
+  AuthorizationDecisionDenialReasonCodes,
+  AuthorizationDecisionReasonCodes,
+  type AuthorizationDecisionReasonCode,
+} from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
 
 export interface AuthorizationActorReference {
   readonly actorUserIdentityId?: string;
@@ -155,10 +160,10 @@ export type AuthorizationPolicyEvaluationTarget =
   | AuthorizationWorkspaceCapabilityEvaluationTarget;
 
 export const AuthorizationPolicyDecisionDenialReasons = Object.freeze({
-  resourcePolicyMetadataNotFound: "resource-policy-metadata-not-found",
-  explicitDenyPermissionGrant: "explicit-deny-permission-grant",
+  resourcePolicyMetadataNotFound: AuthorizationDecisionDenialReasonCodes.resourcePolicyMetadataNotFound,
+  explicitDenyPermissionGrant: AuthorizationDecisionDenialReasonCodes.explicitDenyPermissionGrant,
   insufficientPermissions: "insufficient-permissions",
-  invalidEvaluationContext: "invalid-evaluation-context",
+  invalidEvaluationContext: AuthorizationDecisionDenialReasonCodes.invalidEvaluationContext,
 });
 
 export type AuthorizationPolicyDecisionDenialReason =
@@ -176,7 +181,7 @@ export interface AuthorizationPolicyDecision {
   readonly isAllowed: boolean;
   readonly outcome: Extract<PolicyDecision["outcome"], "allow" | "deny">;
   readonly requiredPermissionKey: PermissionKey;
-  readonly reasonCode: string;
+  readonly reasonCode: AuthorizationDecisionReasonCode | string;
   readonly reason: string;
   readonly denialReason?: AuthorizationPolicyDecisionDenialReason;
   readonly evaluatedAt: string;
@@ -184,6 +189,8 @@ export interface AuthorizationPolicyDecision {
   readonly matchedPermissionGrantIds: ReadonlyArray<string>;
   readonly matchedSharingGrantIds: ReadonlyArray<string>;
 }
+
+export const AuthorizationPolicyDecisionReasonCodes = AuthorizationDecisionReasonCodes;
 
 export interface AuthorizationPolicyDecisionEvaluationRequest {
   readonly actor: AuthorizationActorReference;

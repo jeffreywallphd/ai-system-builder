@@ -1,4 +1,5 @@
 import type { AuthorizationPolicyDecision } from "../contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationDecisionReasonCodes } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
 
 export const AuthorizationResponseAccessLevels = Object.freeze({
   deny: "deny",
@@ -22,15 +23,15 @@ export interface AuthorizationAwareResponse<TValue> {
 }
 
 const FullAccessReasonCodes = new Set([
-  "owner-override",
-  "matched-sharing-grant",
-  "matched-permission-grant",
+  AuthorizationDecisionReasonCodes.ownerOverride,
+  AuthorizationDecisionReasonCodes.matchedSharingGrant,
+  AuthorizationDecisionReasonCodes.matchedPermissionGrant,
 ]);
 
 const PartialAccessReasonCodes = new Set([
-  "matched-role-grant",
-  "visibility-workspace-member",
-  "visibility-published",
+  AuthorizationDecisionReasonCodes.matchedRoleGrant,
+  AuthorizationDecisionReasonCodes.visibilityWorkspaceMember,
+  AuthorizationDecisionReasonCodes.visibilityPublished,
 ]);
 
 const DefaultMaskValue = "[REDACTED]";

@@ -15,6 +15,7 @@ Use this file when adding any new read/write/download/operational capability tha
 - `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
 - `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/application/authorization/use-cases/AuthorizationResponseRedaction.ts`
+- `src/shared/contracts/authorization/AuthorizationDiagnosticCatalogs.ts`
 - `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
 - `src/ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
@@ -241,11 +242,29 @@ Reference docs:
 - `docs/architecture/authorization-feature-4-final-baseline.md`
 - `docs/authorization-sharing-management-and-access-review.md`
 
-## 10) Canonical authorization diagnostic contract (Story 2.1.1)
+## 10) Canonical authorization diagnostic contract (Stories 2.1.1 and 2.1.2)
 
 Use `createAuthorizationDiagnosticRecord(...)` from
 `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
 for machine-readable denial and cross-layer failure provenance.
+
+Use `src/shared/contracts/authorization/AuthorizationDiagnosticCatalogs.ts`
+as the canonical catalog for diagnostic reason codes and provenance stages.
+
+Reason-code catalog usage:
+
+- `AuthorizationDecisionReasonCodes`: authorization decision outcomes from evaluator/use-case layers.
+- `AuthorizationDecisionDenialReasonCodes`: denial-focused policy interpretation values (`explicit-deny-permission-grant`, `scope-mismatch`, `insufficient-permissions`).
+- `AuthorizationRuntimeAvailabilityReasonCodes`: unavailable/degraded readiness intersections (`runtime-gate-blocked`, runtime blocking reason-code mappings).
+- `AuthorizationTransportMappingReasonCodes`: transport/adapter mapping outcomes (`transport-denied`, `transport-mapping-failed`, `permission-entry-missing`).
+- `AuthorizationDiagnosticReasonCodes`: consolidated catalog accepted by the shared diagnostic contract.
+
+Provenance-stage usage:
+
+- Use `AuthorizationDiagnosticProvenanceStages` to assign stable stage attribution, not ad hoc stage strings.
+- Route/API/transport mapping: `route`, `api`, `transport-mapping`.
+- Evaluation pipeline: `actor-snapshot`, `permission-snapshot`, `scope-filtering`, `evaluator-resolution`, `final-decision-emission`.
+- Cross-layer failure localization: `adapter-failure`, `runtime-readiness`, `use-case`, `adapter`.
 
 Field expectations by lifecycle stage:
 
