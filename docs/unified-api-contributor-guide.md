@@ -97,6 +97,44 @@ Reference: `docs/architecture/domains/api-and-transport-surfaces/references/http
 4. No prohibited pattern was introduced.
 5. Docs were updated (both `.md` and `.ai.md` where applicable).
 
+## Permission-sensitive invariant coverage workflow
+
+Use the shared invariant framework as default proof for permission-sensitive behavior changes.
+
+When invariant coverage is required:
+
+1. A change modifies or adds authorization checks, role/permission mapping, sharing semantics, or deny reason behavior.
+2. A change modifies workspace target/resource scope semantics, capability target semantics, or scope applicability logic.
+3. A change modifies transport route-family behavior where runtime-composed allow/deny behavior must remain aligned with policy evaluation.
+4. A change adds a new permissioned feature family or extends an existing one with new capability keys.
+
+Run coverage in normal workflows:
+
+1. Full workflow (docs lint + tests): `npm test`
+2. Targeted invariant loop: `npm run test:unit -- src/testing/invariants/tests src/application/authorization/tests/*InvariantCoverage.test.ts`
+
+How to add a new feature family adapter or scenario:
+
+1. Add or update the family adapter in `src/application/authorization/tests/*InvariantCoverageTestSupport.ts` (or a new family-specific support file).
+2. Add baseline scenario expectations with `buildAuthorizationBaselineScenarioBuilders()` when the new behavior should inherit shared baseline semantics.
+3. Add family scenarios in `src/application/authorization/tests/*InvariantCoverage.test.ts` with explicit decision/runtime expectation metadata.
+4. For composed runtime proof, add scenarios using `createAuthorizationInvariantRuntimeFixture(...)` in `*RuntimeComposedInvariantCoverage.test.ts`.
+5. Keep scenario setup reusable by extending `src/testing/invariants/fixtures.ts` or `src/testing/invariants/composedRuntimeFixtures.ts` instead of duplicating setup.
+
+Choosing test scope:
+
+1. Use invariant tests when asserting cross-system authorization truth (policy intent, workspace scope semantics, capability/resource target semantics, and stable allow/deny outcomes).
+2. Use integration tests when validating route payload shape, HTTP status translation, middleware composition order, or transport serialization concerns.
+3. Use lower-level unit tests when validating isolated domain/application logic that does not need composed policy/runtime proof.
+
+Permission-sensitive PR expectations:
+
+1. Include invariant scenarios for all new or changed allow and deny paths.
+2. Include at least one scope-mismatch or cross-workspace denial scenario when scope semantics are touched.
+3. Include runtime-composed invariant coverage when transport route-family behavior or composed authorization wiring changes.
+4. Document why invariant coverage is not needed when only non-permissioned behavior changes.
+5. Keep fixture/helper additions reusable across feature families; avoid one-off ad hoc setup in individual tests.
+
 ## Observability requirements for transport changes
 
 1. Emit structured transport events (request/upgrade/route failure/realtime failure) with `requestId`.

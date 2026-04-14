@@ -53,6 +53,44 @@ related_code_paths:
 5. Route-specific bypasses around shared auth/workspace/node trust middleware.
 6. Route-local status/error-envelope behavior that bypasses `IdentityHttpServerErrorTranslation.ts`.
 
+## Permission-sensitive invariant adoption
+
+Use shared invariant coverage as the default proof surface for permission-sensitive work.
+
+When invariant tests are required:
+
+1. authorization policy behavior changes (allow/deny semantics, reason codes, role/permission mapping, sharing semantics)
+2. workspace target/resource scope applicability changes
+3. route-family behavior changes that can alter composed runtime authorization outcomes
+4. net-new permissioned capability keys or feature-family authorization paths
+
+Standard workflow commands:
+
+1. full repository workflow: `npm test`
+2. targeted invariant loop: `npm run test:unit -- src/testing/invariants/tests src/application/authorization/tests/*InvariantCoverage.test.ts`
+
+How to add adapter/scenario coverage:
+
+1. add/update family adapter logic in `src/application/authorization/tests/*InvariantCoverageTestSupport.ts`
+2. reuse baseline scenario builders from `src/testing/invariants/authorizationBaselineScenarios.ts` when baseline semantics apply
+3. add family scenarios in `src/application/authorization/tests/*InvariantCoverage.test.ts` with explicit decision/runtime expectation metadata
+4. add composed runtime proof in `*RuntimeComposedInvariantCoverage.test.ts` using `createAuthorizationInvariantRuntimeFixture(...)`
+5. keep setup reusable by extending shared fixture helpers in `src/testing/invariants/fixtures.ts` and `src/testing/invariants/composedRuntimeFixtures.ts`
+
+Choose test level intentionally:
+
+1. invariant tests: cross-system permission truth and policy/scope/runtime outcome consistency
+2. integration tests: route payload/status translation and middleware composition behavior
+3. lower-level unit tests: isolated domain/application logic without composed authorization/runtime requirements
+
+Permission-sensitive PR checklist:
+
+1. include invariant scenarios for changed allow and deny outcomes
+2. include scope mismatch/cross-workspace denial coverage when scope semantics are touched
+3. include runtime-composed invariants when route-family wiring or runtime-composed authorization behavior changes
+4. explain any permission-sensitive change that intentionally omits invariant coverage
+5. prefer reusable fixtures/helpers over scenario-local setup duplication
+
 ## Migration reminders
 
 - Preload protected shortcuts: converge to authoritative HTTP/WSS.
