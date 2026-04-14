@@ -1,12 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 
 import type { LoggingPort } from "../logging.port";
 
-describe("logging port", () => {
-  it("accepts shared structured log events as the logging seam contract", async () => {
-    const log = vi.fn();
+describe("LoggingPort", () => {
+  it("keeps a narrow seam with only the log operation", () => {
+    expectTypeOf<keyof LoggingPort>().toEqualTypeOf<"log">();
+  });
+
+  it("requires shared StructuredLogEvent input and supports async adapters", async () => {
+    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const port: LoggingPort = { log };
 
     const event: StructuredLogEvent = {
@@ -21,5 +25,6 @@ describe("logging port", () => {
     await port.log(event);
 
     expect(log).toHaveBeenCalledWith(event);
+    expectTypeOf<Parameters<LoggingPort["log"]>[0]>().toExtend<StructuredLogEvent>();
   });
 });

@@ -10,6 +10,7 @@ Required outcome: meaningful failures, slowdowns, and boundary issues must be di
 
 - Use structured logging (machine-parseable key/value fields), not ad hoc free-text logging.
 - Use a common logging contract across modules instead of mixed styles.
+- Application orchestration emits logs through `modules/application/ports/logging` (`LoggingPort`) rather than calling adapter/logger libraries directly.
 - Log boundary events and significant transitions, not every internal line.
 - Include enough context to correlate events across host, transport, application, runtime, and persistence boundaries.
 
