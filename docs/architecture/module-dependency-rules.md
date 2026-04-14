@@ -64,6 +64,8 @@ Contract families must compose, not fork:
 - Treat `modules/contracts/transport` as the shared transport envelope and operation base.
 - Keep API and IPC contracts as specializations over that shared base.
 - Keep operation identity and IPC channel derivation helper-driven rather than ad hoc string assembly.
+- Import contract symbols via family barrels (`modules/contracts/<family>`) rather than deep file paths to internal contract files.
+- Do not depend on flattened catch-all root contract exports; family boundaries are the stable public surface.
 
 ## 4) Adapters (`modules/adapters`)
 
