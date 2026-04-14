@@ -44,6 +44,11 @@ contracts under `modules/contracts/host`.
 
 - Keep host context limited to host identity/kind plus lightweight boundary
   metadata.
+- Keep host identity ids normalized and serialization-friendly (trimmed non-empty
+  string when present).
+- Keep metadata JSON-serializable (plain objects, arrays, and primitive values).
+- Keep metadata semantics host-neutral and intentionally small; do not introduce
+  auth/session/request/response/window/framework semantics.
 - Keep framework objects (`BrowserWindow`, Express request/response, etc.) out
   of host context contracts.
 - Keep session/auth modeling out of host context unless explicitly introduced by
