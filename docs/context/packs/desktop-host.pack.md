@@ -24,6 +24,8 @@
 - Preload and IPC are transport/boundary mechanics, not business logic layers.
 - Keep business policy and use-case orchestration in application/domain, not `main`/preload/IPC glue.
 - Desktop host code should compose adapters and lifecycle behavior, then delegate inward.
+- Pass inward host metadata through `modules/contracts/host` host-context shapes,
+  not Electron-specific objects.
 - Electron-specific assumptions must not leak into shared application/domain contracts.
 
 ## Key Constraints

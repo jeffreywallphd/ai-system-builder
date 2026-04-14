@@ -6,3 +6,4 @@ export * from "./ipc";
 export * from "./runtime";
 export * from "./storage";
 export * from "./persistence";
+export * from "./host";

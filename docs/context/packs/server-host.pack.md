@@ -24,6 +24,8 @@
 - Keep internal application contracts distinct from HTTP-specific request/response details.
 - Route/controller code must stay thin and delegate use-case behavior inward.
 - Server host composition is separate from transport adaptation.
+- Pass host metadata inward via `modules/contracts/host` host-context contracts,
+  not HTTP framework objects.
 - `apps/web-thin-client` is a thin surface over server capabilities, not assumed full parity from day one.
 
 ## Key Constraints
