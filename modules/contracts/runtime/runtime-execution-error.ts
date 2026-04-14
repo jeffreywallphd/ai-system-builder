@@ -5,6 +5,7 @@ import {
   createContractError,
 } from "../shared";
 import type { RuntimeExecutionDiagnostic } from "./runtime-execution-diagnostic";
+import type { RuntimeOperation } from "./runtime-operation";
 import type { RuntimeTarget } from "./runtime-target";
 
 export type RuntimeExecutionFailurePhase =
@@ -25,7 +26,7 @@ export type RuntimeExecutionFailureDetails = ContractErrorDetails & {
 export interface RuntimeExecutionError<
   TDetails extends RuntimeExecutionFailureDetails = RuntimeExecutionFailureDetails,
 > extends ContractError<TDetails> {
-  operation: string;
+  operation: RuntimeOperation;
   executionId: string;
   target: RuntimeTarget;
 }
@@ -33,7 +34,7 @@ export interface RuntimeExecutionError<
 export function createRuntimeExecutionError<
   TDetails extends RuntimeExecutionFailureDetails = RuntimeExecutionFailureDetails,
 >(
-  operation: string,
+  operation: RuntimeOperation,
   executionId: string,
   target: RuntimeTarget,
   code: ContractErrorCode,

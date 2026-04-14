@@ -1,5 +1,6 @@
 import type { ContractBoundaryContext } from "../shared";
 import type { RuntimeExecutionDiagnostic } from "./runtime-execution-diagnostic";
+import type { RuntimeOperation } from "./runtime-operation";
 import type { RuntimeTarget } from "./runtime-target";
 
 export type RuntimeExecutionEventMetadata = Readonly<Record<string, unknown>>;
@@ -9,7 +10,7 @@ export interface RuntimeExecutionEventEnvelope<
 > extends ContractBoundaryContext {
   type: "started" | "progress" | "output" | "completed";
   timestamp: string;
-  operation: string;
+  operation: RuntimeOperation;
   executionId: string;
   target: RuntimeTarget;
   sequence: number;
@@ -59,7 +60,7 @@ export type RuntimeExecutionEvent<
 export function createRuntimeExecutionProgressEvent<
   TMetadata extends RuntimeExecutionEventMetadata = RuntimeExecutionEventMetadata,
 >(
-  operation: string,
+  operation: RuntimeOperation,
   executionId: string,
   target: RuntimeTarget,
   stage: string,

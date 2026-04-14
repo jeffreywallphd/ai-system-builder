@@ -107,6 +107,22 @@ Contracts must communicate boundary usage explicitly.
 
 Do not mix unrelated boundaries in a single generic `contracts.ts` file.
 
+## Operation identity naming
+
+Operation identifiers used in contract families must follow a shared format.
+
+- Use lowercase dot-separated segments with at least two segments.
+- Segment characters are limited to `a-z`, `0-9`, and internal hyphen (`-`).
+- Prefer operation helpers (`create...Operation` / `normalize...Operation`) from contract families over ad hoc string assembly.
+
+Examples:
+
+- `workspace.create`
+- `runtime.tool.run`
+- `project-run.retry`
+
+Avoid unconstrained operation strings such as `WorkspaceCreate`, `workspace_create`, or single-segment names like `workspace`.
+
 ## UI component and hook naming
 
 - React components: `PascalCase` (`ProjectListPanel.tsx`).

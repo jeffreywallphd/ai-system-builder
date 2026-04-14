@@ -10,6 +10,7 @@ import {
   type RuntimeExecutionError,
   type RuntimeExecutionFailureDetails,
 } from "./runtime-execution-error";
+import type { RuntimeOperation } from "./runtime-operation";
 import type { RuntimeTarget } from "./runtime-target";
 
 export type RuntimeExecutionResultMetadata = Readonly<Record<string, unknown>>;
@@ -24,7 +25,7 @@ export interface RuntimeExecutionSuccessValue<TOutput = unknown> {
 export interface RuntimeExecutionEnvelope<
   TMetadata extends RuntimeExecutionResultMetadata = RuntimeExecutionResultMetadata,
 > extends ContractBoundaryContext {
-  operation: string;
+  operation: RuntimeOperation;
   executionId: string;
   target: RuntimeTarget;
   metadata?: TMetadata;
@@ -56,7 +57,7 @@ export function createRuntimeExecutionSuccessResult<
   TOutput,
   TMetadata extends RuntimeExecutionResultMetadata = RuntimeExecutionResultMetadata,
 >(
-  operation: string,
+  operation: RuntimeOperation,
   executionId: string,
   target: RuntimeTarget,
   output: TOutput,

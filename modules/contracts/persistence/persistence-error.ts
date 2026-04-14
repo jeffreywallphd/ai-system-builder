@@ -4,6 +4,7 @@ import type {
   ContractErrorDetails,
 } from "../shared";
 import { createContractError } from "../shared";
+import type { PersistenceOperation } from "./persistence-operation";
 import type { PersistenceRecordReference } from "./persistence-record-reference";
 
 export type PersistenceFailureDetails = ContractErrorDetails;
@@ -11,14 +12,14 @@ export type PersistenceFailureDetails = ContractErrorDetails;
 export interface PersistenceError<
   TDetails extends PersistenceFailureDetails = PersistenceFailureDetails,
 > extends ContractError<TDetails> {
-  operation: string;
+  operation: PersistenceOperation;
   record?: PersistenceRecordReference;
 }
 
 export function createPersistenceError<
   TDetails extends PersistenceFailureDetails = PersistenceFailureDetails,
 >(
-  operation: string,
+  operation: PersistenceOperation,
   code: ContractErrorCode,
   message: string,
   options?: {

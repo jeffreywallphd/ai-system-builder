@@ -66,6 +66,7 @@ ai-system-builder/
   - Explicit boundary contracts (API, IPC, runtime integration contracts, etc.).
   - Shared language for cross-module communication.
   - Includes shared result/error contracts so boundaries reuse one success/failure vocabulary.
+  - Includes shared operation identity helpers so transport/runtime/persistence families use a consistent operation naming pattern.
   - Includes typed configuration contracts for host, runtime, logging,
     persistence, and storage concerns.
 
@@ -116,6 +117,7 @@ Transport technologies are adapters, not application definitions.
 - Express is the default server API transport adapter.
 - Electron IPC is the desktop transport boundary.
 - API and IPC contracts are transport specializations that compose from shared transport request/response/error semantics.
+- Transport operation identifiers follow the shared operation identity helper pattern (lowercase dotted segments) to reduce ad hoc naming drift.
 - Business rules must stay in domain/application layers, not in route handlers or IPC handlers.
 
 ## Persistence and storage posture
