@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   ImageAssetAccessActions,
   ImageAssetAuthorizationContractError,
@@ -73,7 +74,7 @@ describe("ImageAssetAuthorizationContracts", () => {
     expect(request.target.kind).toBe("workspace-capability");
     if (request.target.kind === "workspace-capability") {
       expect(request.target.workspaceId).toBe("workspace-alpha");
-      expect(request.target.capabilityResourceType).toBe(ImageAssetAuthorizationResourceType);
+      expect(request.target.capabilityResourceType).toBe(AuthorizationResourceFamilies.asset);
     }
   });
 
