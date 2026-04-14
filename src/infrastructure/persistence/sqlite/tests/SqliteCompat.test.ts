@@ -70,7 +70,7 @@ describe("SqliteCompat", () => {
     expect((database as FakeBetterSqlite3Database).databasePath).toBe(databasePath);
   });
 
-  it("retries better-sqlite3 from module-directory node_modules before sqlite fallbacks", () => {
+  it("retries better-sqlite3 from node_modules build/Release-first paths before sqlite fallbacks", () => {
     const databasePath = "/tmp/missing-better-sqlite3.sqlite";
     const requestedModules: string[] = [];
 
@@ -82,8 +82,10 @@ describe("SqliteCompat", () => {
     ).toThrow("Cannot load module: bun:sqlite");
 
     expect(requestedModules[0]).toBe("better-sqlite3");
-    expect(requestedModules[1]).toContain(`${path.sep}node_modules${path.sep}better-sqlite3`);
-    expect(requestedModules.slice(2)).toEqual(["node:sqlite", "bun:sqlite"]);
+    expect(requestedModules[1]).toContain(`${path.sep}node_modules${path.sep}better-sqlite3${path.sep}build${path.sep}Release${path.sep}better_sqlite3.node`);
+    expect(requestedModules[2]).toContain(`${path.sep}node_modules${path.sep}better-sqlite3${path.sep}Release${path.sep}better_sqlite3.node`);
+    expect(requestedModules[3]).toContain(`${path.sep}node_modules${path.sep}better-sqlite3`);
+    expect(requestedModules.slice(4)).toEqual(["node:sqlite", "bun:sqlite"]);
   });
 
 });
