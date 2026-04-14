@@ -14,6 +14,10 @@ import {
   createSharingGrant,
 } from "@domain/authorization/AuthorizationDomain";
 import { EffectivePermissionResolutionService } from "../use-cases/EffectivePermissionResolutionService";
+import {
+  extractAuthorizationDiagnosticCorrelationId,
+  requireAuthorizationDiagnosticEvent,
+} from "./AuthorizationDiagnosticRegressionTestSupport";
 
 const evaluationAsOf = "2026-04-05T16:00:00.000Z";
 
@@ -420,20 +424,14 @@ describe("EffectivePermissionResolutionService", () => {
     });
 
     expect(result.decision.outcome).toBe("deny");
-    const diagnosticEvent = diagnosticsLogger.events.find((event) => event.event === "authorization.scope-filtering.diagnostic");
-    expect(diagnosticEvent).toBeDefined();
-
-    const diagnostic = diagnosticEvent?.details?.diagnostic as {
-      readonly denialProvenanceStage: string;
-      readonly reasonCode: string;
-      readonly counts: { readonly roleAssignmentCount?: number; readonly permissionGrantCount?: number; readonly applicableScopeCount?: number };
-      readonly extensions?: Readonly<Record<string, unknown>>;
-      readonly correlation: { readonly correlationId?: string };
-    };
+    const diagnostic = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.scope-filtering.diagnostic",
+    );
 
     expect(diagnostic.denialProvenanceStage).toBe("scope-filtering");
     expect(diagnostic.reasonCode).toBe("scope-mismatch");
-    expect(diagnostic.correlation.correlationId).toBe("scope-filtering-correlation-1");
+    expect(extractAuthorizationDiagnosticCorrelationId(diagnostic)).toBe("scope-filtering-correlation-1");
     expect(diagnostic.counts.roleAssignmentCount).toBe(1);
     expect(diagnostic.counts.permissionGrantCount).toBe(1);
     expect(diagnostic.counts.applicableScopeCount).toBe(0);
