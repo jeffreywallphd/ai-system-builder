@@ -62,6 +62,18 @@ export const AuthorizationTransportMappingReasonCodes = Object.freeze({
 export type AuthorizationTransportMappingReasonCode =
   typeof AuthorizationTransportMappingReasonCodes[keyof typeof AuthorizationTransportMappingReasonCodes];
 
+export const AuthorizationAdapterFailureReasonCodes = Object.freeze({
+  repositoryLookupFailed: "authorization-repository-lookup-failed",
+  unexpectedEmptyResult: "authorization-repository-unexpected-empty-result",
+  dependencyResolutionFailed: "authorization-dependency-resolution-failed",
+  adapterTimeout: "authorization-adapter-timeout",
+  adapterUnavailable: "authorization-adapter-unavailable",
+  persistenceMappingFailed: "authorization-persistence-mapping-failed",
+} as const);
+
+export type AuthorizationAdapterFailureReasonCode =
+  typeof AuthorizationAdapterFailureReasonCodes[keyof typeof AuthorizationAdapterFailureReasonCodes];
+
 export const AuthorizationContextResolutionReasonCodes = Object.freeze({
   contextSnapshotCaptured: "context-snapshot-captured",
   workspaceContextResolved: "workspace-context-resolved",
@@ -80,6 +92,7 @@ export const AuthorizationDiagnosticReasonCodes = Object.freeze({
   ...AuthorizationDecisionReasonCodes,
   ...AuthorizationRuntimeAvailabilityReasonCodes,
   ...AuthorizationTransportMappingReasonCodes,
+  ...AuthorizationAdapterFailureReasonCodes,
   ...AuthorizationContextResolutionReasonCodes,
 } as const);
 

@@ -10,6 +10,7 @@
 } from "@domain/authorization/AuthorizationDomain";
 import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
+  AuthorizationActorRoleGrantSnapshot,
   AuthorizationPolicyDecision,
   AuthorizationPolicyDecisionDebugDetails,
   AuthorizationPolicyDecisionEvaluationRequest,
@@ -22,6 +23,7 @@ import {
   AuthorizationPolicyEvaluationTargetKinds,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import {
+  AuthorizationAdapterFailureReasonCodes,
   AuthorizationDecisionReasonCodes,
   AuthorizationDiagnosticProvenanceStages,
 } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
@@ -193,13 +195,61 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           asOf: request.asOf,
         }),
       });
-      const roleGrantSnapshot = await this.dependencies.roleGrantReadRepository.getActorRoleGrantSnapshot({
-        actor: request.actor,
-        resource: request.target.kind === AuthorizationPolicyEvaluationTargetKinds.resourceInstance
-          ? request.target.resource
-          : undefined,
-        asOf: request.asOf,
-      });
+      let roleGrantSnapshot: Awaited<ReturnType<IAuthorizationRoleGrantReadRepository["getActorRoleGrantSnapshot"]>>;
+      try {
+        roleGrantSnapshot = await this.dependencies.roleGrantReadRepository.getActorRoleGrantSnapshot({
+          actor: request.actor,
+          resource: request.target.kind === AuthorizationPolicyEvaluationTargetKinds.resourceInstance
+            ? request.target.resource
+            : undefined,
+          asOf: request.asOf,
+        });
+      } catch (error) {
+        this.emitAdapterFailureDiagnostic({
+          request,
+          actorUserIdentityId,
+          diagnosticCorrelationId,
+          requiredPermissionKey,
+          targetSummary: this.resolveTargetSummary(request),
+          repositoryOperation: "role-grant-snapshot",
+          repositoryName: "roleGrantReadRepository",
+          error,
+          evidenceMissing: Object.freeze([
+            AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+            AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+            AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+            AuthorizationDiagnosticEvidenceKinds.upstreamFailure,
+          ]),
+        });
+        throw error;
+      }
+      if (
+        !roleGrantSnapshot
+        || !Array.isArray((roleGrantSnapshot as Partial<AuthorizationActorRoleGrantSnapshot>).roleAssignments)
+        || !Array.isArray((roleGrantSnapshot as Partial<AuthorizationActorRoleGrantSnapshot>).permissionGrants)
+      ) {
+        this.emitAdapterFailureDiagnostic({
+          request,
+          actorUserIdentityId,
+          diagnosticCorrelationId,
+          requiredPermissionKey,
+          targetSummary: this.resolveTargetSummary(request),
+          repositoryOperation: "role-grant-snapshot",
+          repositoryName: "roleGrantReadRepository",
+          reasonCode: AuthorizationAdapterFailureReasonCodes.unexpectedEmptyResult,
+          error: new Error("Authorization role snapshot repository returned an unexpected empty or malformed result."),
+          evidenceMissing: Object.freeze([
+            AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+            AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+            AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+            AuthorizationDiagnosticEvidenceKinds.upstreamFailure,
+          ]),
+          extensions: Object.freeze({
+            "authorization.adapter-failure.unexpected-empty-result": true,
+          }),
+        });
+        throw new Error("Authorization role snapshot repository returned an unexpected empty or malformed result.");
+      }
       this.logInfo({
         event: "auth.decision.role-snapshot.result",
         details: Object.freeze({
@@ -224,10 +274,29 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
       });
 
       if (request.target.kind === AuthorizationPolicyEvaluationTargetKinds.resourceInstance) {
-        const resourcePolicyMetadata = await this.dependencies.resourcePolicyMetadataReadRepository.findResourcePolicyMetadata({
-          resource: request.target.resource,
-          asOf: request.asOf,
-        });
+        let resourcePolicyMetadata: Awaited<ReturnType<IAuthorizationResourcePolicyMetadataReadRepository["findResourcePolicyMetadata"]>>;
+        try {
+          resourcePolicyMetadata = await this.dependencies.resourcePolicyMetadataReadRepository.findResourcePolicyMetadata({
+            resource: request.target.resource,
+            asOf: request.asOf,
+          });
+        } catch (error) {
+          this.emitAdapterFailureDiagnostic({
+            request,
+            actorUserIdentityId,
+            diagnosticCorrelationId,
+            requiredPermissionKey,
+            targetSummary: this.resolveTargetSummary(request),
+            repositoryOperation: "resource-policy-metadata-lookup",
+            repositoryName: "resourcePolicyMetadataReadRepository",
+            error,
+            evidenceMissing: Object.freeze([
+              AuthorizationDiagnosticEvidenceKinds.resourcePolicyUnavailable,
+              AuthorizationDiagnosticEvidenceKinds.upstreamFailure,
+            ]),
+          });
+          throw error;
+        }
 
         const matchedWorkspaceIds = collectWorkspaceIdsFromAuthorizationInputs({
           roleAssignments: roleGrantSnapshot.roleAssignments,
@@ -300,10 +369,60 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           return result;
         }
 
-        const sharingGrantRecords = await this.dependencies.sharingGrantReadRepository.listSharingGrants({
-          resource: request.target.resource,
-          asOf: request.asOf,
-        });
+        let sharingGrantRecords: Awaited<ReturnType<IAuthorizationSharingGrantReadRepository["listSharingGrants"]>>;
+        try {
+          sharingGrantRecords = await this.dependencies.sharingGrantReadRepository.listSharingGrants({
+            resource: request.target.resource,
+            asOf: request.asOf,
+          });
+        } catch (error) {
+          this.emitAdapterFailureDiagnostic({
+            request,
+            actorUserIdentityId,
+            diagnosticCorrelationId,
+            requiredPermissionKey,
+            targetSummary: Object.freeze({
+              targetWorkspaceId: resourcePolicyMetadata.workspaceId,
+              targetIdentifier: resourcePolicyMetadata.resourceId,
+              targetResourceType: resourcePolicyMetadata.resourceType,
+              targetResourceFamily: request.target.resource.resourceFamily,
+            }),
+            repositoryOperation: "sharing-grants-lookup",
+            repositoryName: "sharingGrantReadRepository",
+            error,
+            evidenceMissing: Object.freeze([
+              AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+              AuthorizationDiagnosticEvidenceKinds.upstreamFailure,
+            ]),
+          });
+          throw error;
+        }
+        if (!Array.isArray(sharingGrantRecords)) {
+          this.emitAdapterFailureDiagnostic({
+            request,
+            actorUserIdentityId,
+            diagnosticCorrelationId,
+            requiredPermissionKey,
+            targetSummary: Object.freeze({
+              targetWorkspaceId: resourcePolicyMetadata.workspaceId,
+              targetIdentifier: resourcePolicyMetadata.resourceId,
+              targetResourceType: resourcePolicyMetadata.resourceType,
+              targetResourceFamily: request.target.resource.resourceFamily,
+            }),
+            repositoryOperation: "sharing-grants-lookup",
+            repositoryName: "sharingGrantReadRepository",
+            reasonCode: AuthorizationAdapterFailureReasonCodes.unexpectedEmptyResult,
+            error: new Error("Authorization sharing grant repository returned an unexpected empty or malformed result."),
+            evidenceMissing: Object.freeze([
+              AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+              AuthorizationDiagnosticEvidenceKinds.upstreamFailure,
+            ]),
+            extensions: Object.freeze({
+              "authorization.adapter-failure.unexpected-empty-result": true,
+            }),
+          });
+          throw new Error("Authorization sharing grant repository returned an unexpected empty or malformed result.");
+        }
         this.emitPermissionSnapshotDiagnostic({
           request,
           actorUserIdentityId,
@@ -563,6 +682,83 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
       });
       return result;
     }
+  }
+
+  private emitAdapterFailureDiagnostic(input: {
+    readonly request: AuthorizationPolicyDecisionEvaluationRequest;
+    readonly actorUserIdentityId?: string;
+    readonly diagnosticCorrelationId: string;
+    readonly requiredPermissionKey: string;
+    readonly targetSummary: {
+      readonly targetWorkspaceId?: string;
+      readonly targetIdentifier: string;
+      readonly targetResourceType: string;
+      readonly targetResourceFamily?: AuthorizationResourceFamily;
+    };
+    readonly repositoryOperation: string;
+    readonly repositoryName: string;
+    readonly error: unknown;
+    readonly reasonCode?: string;
+    readonly evidenceMissing?: ReadonlyArray<string>;
+    readonly extensions?: Readonly<Record<string, unknown>>;
+  }): void {
+    const classification = classifyAuthorizationAdapterFailure({
+      error: input.error,
+      overrideReasonCode: input.reasonCode,
+    });
+    const errorMessage = normalizeErrorMessage(input.error);
+
+    this.emitDiagnosticSafely({
+      stage: AuthorizationDiagnosticProvenanceStages.adapterFailure,
+      request: input.request,
+      diagnosticCorrelationId: input.diagnosticCorrelationId,
+      result: this.toResult({
+        request: input.request,
+        decision: createDeniedDecision({
+          evaluatedAt: normalizeOptional(input.request.asOf) ?? this.clock.now().toISOString(),
+          requiredPermissionKey: input.requiredPermissionKey,
+          reasonCode: AuthorizationDecisionReasonCodes.invalidEvaluationContext,
+          reason: "Authorization evaluation context could not be resolved.",
+          denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
+        }),
+      }),
+      sourceKind: EffectivePermissionResolutionSourceKinds.none,
+      evidenceMissing: input.evidenceMissing,
+      emit: () => emitAuthorizationDiagnosticRecord({
+        logger: this.diagnosticsLogger,
+        event: "authorization.adapter-failure.diagnostic",
+        outcome: AuthorizationDiagnosticOutcomes.observed,
+        reasonCode: classification.reasonCode,
+        denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.adapterFailure,
+        correlationId: input.diagnosticCorrelationId,
+        actorIdentityId: input.actorUserIdentityId,
+        actorActiveWorkspaceId: normalizeOptional(input.request.actor.activeWorkspaceId),
+        requiredPermissionKey: input.requiredPermissionKey,
+        target: Object.freeze({
+          targetKind: input.request.target.kind,
+          targetIdentifier: input.targetSummary.targetIdentifier,
+          targetWorkspaceId: input.targetSummary.targetWorkspaceId,
+          targetResourceFamily: input.targetSummary.targetResourceFamily,
+          targetResourceType: input.targetSummary.targetResourceType,
+        }),
+        evidence: input.evidenceMissing
+          ? Object.freeze({
+            missing: input.evidenceMissing,
+          })
+          : undefined,
+        extensions: Object.freeze({
+          "authorization.adapter-failure.repository-operation": input.repositoryOperation,
+          "authorization.adapter-failure.repository-name": input.repositoryName,
+          "authorization.adapter-failure.error-name": resolveErrorName(input.error),
+          "authorization.adapter-failure.error-message": errorMessage,
+          "authorization.adapter-failure.dependency-resolution-problem": classification.dependencyResolutionProblem,
+          "authorization.adapter-failure.timeout-detected": classification.timeoutDetected,
+          "authorization.adapter-failure.unavailable-detected": classification.unavailableDetected,
+          "authorization.adapter-failure.mapping-failure-detected": classification.mappingFailureDetected,
+          ...(input.extensions ?? {}),
+        }),
+      }),
+    });
   }
 
   private emitPermissionSnapshotDiagnostic(input: {
@@ -943,6 +1139,110 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
       debug: input.debug,
     });
   }
+}
+
+function classifyAuthorizationAdapterFailure(input: {
+  readonly error: unknown;
+  readonly overrideReasonCode?: string;
+}): {
+  readonly reasonCode: string;
+  readonly dependencyResolutionProblem: boolean;
+  readonly timeoutDetected: boolean;
+  readonly unavailableDetected: boolean;
+  readonly mappingFailureDetected: boolean;
+} {
+  if (input.overrideReasonCode) {
+    return Object.freeze({
+      reasonCode: input.overrideReasonCode,
+      dependencyResolutionProblem: input.overrideReasonCode === AuthorizationAdapterFailureReasonCodes.dependencyResolutionFailed,
+      timeoutDetected: input.overrideReasonCode === AuthorizationAdapterFailureReasonCodes.adapterTimeout,
+      unavailableDetected: input.overrideReasonCode === AuthorizationAdapterFailureReasonCodes.adapterUnavailable,
+      mappingFailureDetected: input.overrideReasonCode === AuthorizationAdapterFailureReasonCodes.persistenceMappingFailed,
+    });
+  }
+
+  const message = normalizeErrorMessage(input.error).toLowerCase();
+  const dependencyResolutionProblem = isDependencyResolutionFailureMessage(message);
+  const timeoutDetected = isTimeoutFailureMessage(message);
+  const unavailableDetected = isUnavailableFailureMessage(message);
+  const mappingFailureDetected = isPersistenceMappingFailureMessage(message);
+
+  if (dependencyResolutionProblem) {
+    return Object.freeze({
+      reasonCode: AuthorizationAdapterFailureReasonCodes.dependencyResolutionFailed,
+      dependencyResolutionProblem,
+      timeoutDetected,
+      unavailableDetected,
+      mappingFailureDetected,
+    });
+  }
+  if (timeoutDetected) {
+    return Object.freeze({
+      reasonCode: AuthorizationAdapterFailureReasonCodes.adapterTimeout,
+      dependencyResolutionProblem,
+      timeoutDetected,
+      unavailableDetected,
+      mappingFailureDetected,
+    });
+  }
+  if (unavailableDetected) {
+    return Object.freeze({
+      reasonCode: AuthorizationAdapterFailureReasonCodes.adapterUnavailable,
+      dependencyResolutionProblem,
+      timeoutDetected,
+      unavailableDetected,
+      mappingFailureDetected,
+    });
+  }
+  if (mappingFailureDetected) {
+    return Object.freeze({
+      reasonCode: AuthorizationAdapterFailureReasonCodes.persistenceMappingFailed,
+      dependencyResolutionProblem,
+      timeoutDetected,
+      unavailableDetected,
+      mappingFailureDetected,
+    });
+  }
+
+  return Object.freeze({
+    reasonCode: AuthorizationAdapterFailureReasonCodes.repositoryLookupFailed,
+    dependencyResolutionProblem,
+    timeoutDetected,
+    unavailableDetected,
+    mappingFailureDetected,
+  });
+}
+
+function resolveErrorName(error: unknown): string {
+  if (error instanceof Error) {
+    const normalized = error.name.trim();
+    return normalized || "Error";
+  }
+  return "UnknownError";
+}
+
+function normalizeErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const normalized = error.message.trim();
+    return normalized || "authorization-adapter-failure";
+  }
+  return "authorization-adapter-failure";
+}
+
+function isTimeoutFailureMessage(message: string): boolean {
+  return /\b(timeout|timed out|etimedout|econnreset|ehostunreach)\b/i.test(message);
+}
+
+function isUnavailableFailureMessage(message: string): boolean {
+  return /\b(unavailable|temporarily unavailable|refused|offline|unreachable|dependency unavailable)\b/i.test(message);
+}
+
+function isDependencyResolutionFailureMessage(message: string): boolean {
+  return /\b(cannot read properties of undefined|cannot read property|is not a function|dependency|not configured|missing dependency)\b/i.test(message);
+}
+
+function isPersistenceMappingFailureMessage(message: string): boolean {
+  return /\b(persisted .* (missing|invalid)|malformed|mapping)\b/i.test(message);
 }
 
 function normalizeOptional(value?: string): string | undefined {

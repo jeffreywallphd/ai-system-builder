@@ -204,6 +204,14 @@ Story 2.2.3 evaluator-resolution and final-decision requirements:
 - Add source/target summaries in namespaced `extensions` keys when extra disambiguation is needed (for example workspace matches, synthesized fallback flags, visibility fallback flags).
 - Keep diagnostic emission best-effort and non-authoritative for control flow: if downstream mapping/projection fails, preserve the core authorization decision and emit a bounded diagnostics-pipeline failure marker.
 
+Story 2.2.4 adapter and repository failure provenance requirements:
+
+- Emit `adapter-failure` diagnostics when authorization evidence retrieval fails at repository/adapter boundaries (role snapshot lookup, resource metadata lookup, sharing grants lookup).
+- Classify boundary failures with stable machine-readable reason codes for repository lookup failures, unexpected empty/malformed results, dependency-resolution failures, timeout/unavailable conditions, and persistence-to-authorization mapping failures.
+- Reuse the same decision correlation id so `adapter-failure` diagnostics can be joined with `permission-snapshot`, `scope-filtering`, `evaluator-resolution`, and `final-decision-emission`.
+- Keep infrastructure and composition failures distinguishable from policy denials: emit adapter-failure provenance alongside final decision diagnostics instead of collapsing failures into opaque unauthorized/forbidden-only interpretation.
+- Capture boundary metadata in namespaced extensions (`authorization.adapter-failure.*`) to localize failing repository operation, dependency class, and failure mode without introducing route-local ad hoc error taxonomies.
+
 Extension rules:
 
 - Use `extensions` for story/team-specific metadata only.

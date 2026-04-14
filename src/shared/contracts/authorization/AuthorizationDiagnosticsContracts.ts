@@ -11,6 +11,7 @@ import {
   isKnownAuthorizationDiagnosticReasonCode,
 } from "./AuthorizationDiagnosticCatalogs";
 export {
+  AuthorizationAdapterFailureReasonCodes,
   AuthorizationDecisionDenialReasonCodes,
   AuthorizationDecisionReasonCodes,
   AuthorizationDiagnosticProvenanceStages,
@@ -21,6 +22,7 @@ export {
   isKnownAuthorizationDiagnosticReasonCode,
 } from "./AuthorizationDiagnosticCatalogs";
 export type {
+  AuthorizationAdapterFailureReasonCode,
   AuthorizationContextResolutionReasonCode,
   AuthorizationDecisionDenialReasonCode,
   AuthorizationDecisionReasonCode,
