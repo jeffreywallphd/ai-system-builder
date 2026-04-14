@@ -35,6 +35,18 @@ Rules:
 - redaction/privacy standards apply at all levels,
 - production defaults should favor signal over volume.
 
+## Shared logging contract vocabulary
+
+Shared contract types for logging live in `modules/contracts/logging`.
+
+Canonical identifiers for contracts:
+
+- `LogLevel`: `trace`, `debug`, `info`, `warn`, `error`, `fatal`.
+- `LogVerbosity`: `minimal`, `normal`, `verbose`, `trace`.
+- `StructuredLogEvent`: stable envelope fields for `event`, `message`, `component`, correlation context (`correlationId`, `requestId`), and optional diagnostics (`host`, `operation`, `useCase`, `outcome`, `data`, `durationMs`, `error`).
+
+Contract and adapter implementations should keep these field names and identifiers stable so logs remain comparable across hosts, transports, and runtime/persistence/storage boundaries.
+
 ## Minimum useful fields for important logs
 
 For startup, boundary, and failure logs, include at minimum where applicable:
