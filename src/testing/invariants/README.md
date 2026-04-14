@@ -87,6 +87,38 @@ The assertion helpers are designed to accept currently available result fields a
 4. Register the adapter in `InvariantAdapterRegistry` and execute with `executeAndAssertInvariantScenario`.
 5. Keep family-specific details in adapters, not in shared harness contracts.
 
+## Workflow Integration
+
+The invariant suite is part of normal repository test flows:
+
+1. full default workflow: `npm test` (runs docs lint + `test:unit`)
+2. targeted invariant workflow: `npm run test:unit -- src/testing/invariants/tests src/application/authorization/tests/*InvariantCoverage.test.ts`
+
+Use the targeted command for local iteration on permission-sensitive changes, then run full `npm test` before review.
+
+## When Invariant Coverage Is Expected
+
+Add or update invariant scenarios when a change affects any of the following:
+
+1. authorization allow/deny behavior, reason codes, or policy source semantics
+2. workspace target/resource scope applicability rules
+3. capability-to-feature-family permission mapping behavior
+4. runtime-composed authorization behavior through route-family composition
+
+## Test Selection Guidance
+
+1. use invariant tests for cross-system truth: policy intent + workspace semantics + capability rules + observed runtime outcomes
+2. use integration tests for transport mapping, payload shape, status translation, and middleware composition behavior
+3. use lower-level unit tests for isolated domain/application logic that does not require composed policy/runtime proof
+
+## Permission-Sensitive PR Checklist
+
+1. include invariant scenarios covering both changed allow and deny paths
+2. include scope-mismatch or cross-workspace denial scenarios when scope behavior changes
+3. include runtime-composed invariant scenarios when route-family wiring or runtime authorization composition changes
+4. keep adapters/scenarios fixture-driven and reusable across feature families
+5. state explicitly in the PR description when invariant coverage is intentionally not required
+
 ## Runtime-Composed Fixture Pattern
 
 - Use `createAuthorizationInvariantRuntimeFixture(...)` when a scenario should prove live composed behavior across transport route families, identity session handling, and policy-backed persistence wiring.
@@ -100,3 +132,4 @@ The assertion helpers are designed to accept currently available result fields a
 - Keep adapter behavior family-local; shared module should stay orchestration-only.
 - Prefer metadata assertions tied to stable policy/runtime invariants instead of internal implementation details.
 - Keep actor context, target context, and resource context distinct so tests can assert workspace-aligned and mismatch paths explicitly.
+

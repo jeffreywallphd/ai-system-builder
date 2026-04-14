@@ -107,6 +107,12 @@ npm test
 npm run test:unit
 ```
 
+- Permission-sensitive invariant fast loop:
+
+```bash
+npm run test:unit -- src/testing/invariants/tests src/application/authorization/tests/*InvariantCoverage.test.ts
+```
+
 - Local pre-PR verification (typecheck + docs checks):
 
 ```bash

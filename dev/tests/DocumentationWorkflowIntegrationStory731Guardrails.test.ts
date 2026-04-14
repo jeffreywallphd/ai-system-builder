@@ -41,5 +41,11 @@ describe("story 7.3.1 documentation workflow integration guardrails", () => {
       expect(content).toContain("npm run validate");
       expect(content).toContain("npm run validate:ci");
     }
+
+    for (const content of [foundationGuide, foundationGuideAi]) {
+      expect(content).toContain(
+        "npm run test:unit -- src/testing/invariants/tests src/application/authorization/tests/*InvariantCoverage.test.ts",
+      );
+    }
   });
 });
