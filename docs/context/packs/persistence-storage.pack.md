@@ -27,6 +27,7 @@
 - Persistence operation names should stay helper-driven and transport-neutral (`lowercase.dot.segments` with no `api.`/`ipc.` prefixes).
 - When persistence contracts include a record reference, operation identity should target that record type (`<recordType>.<action>[.<qualifier>...]`).
 - Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
+- Storage key creation/normalization should flow through shared storage key helpers to prevent per-operation key-shape drift.
 - Metadata records and file/blob content are different concerns and should stay separated.
 - Application logic should depend on persistence/storage ports and contracts, not direct DB/filesystem details.
 - AppData/server filesystem roots are deployment details, not architecture boundaries.

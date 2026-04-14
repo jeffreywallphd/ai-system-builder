@@ -9,6 +9,7 @@ import {
   createHasArtifactSuccessResult,
   createRetrieveArtifactRequest,
   createRetrieveArtifactSuccessResult,
+  createStoreArtifactFailureResult,
   createStoreArtifactRequest,
   createStoreArtifactSuccessResult,
 } from ".";
@@ -17,8 +18,9 @@ describe("storage contracts", () => {
   it("creates store requests with artifact descriptors and boundary context", () => {
     const request = createStoreArtifactRequest(new Uint8Array([1, 2, 3]), {
       descriptor: {
-        key: "artifacts/report-1",
+        key: " artifacts/report-1 ",
         mediaType: "application/pdf",
+        sizeBytes: 3,
         checksum: {
           algorithm: "sha256",
           value: "abc123",
@@ -36,6 +38,7 @@ describe("storage contracts", () => {
       descriptor: {
         key: "artifacts/report-1",
         mediaType: "application/pdf",
+        sizeBytes: 3,
         checksum: {
           algorithm: "sha256",
           value: "abc123",
@@ -51,9 +54,27 @@ describe("storage contracts", () => {
     });
   });
 
+  it("rejects empty artifact keys for key-based storage lookups and descriptors", () => {
+    expect(() => createRetrieveArtifactRequest("   ")).toThrow(
+      'Storage artifact key must be a non-empty, trimmed string key that remains path-agnostic. Received "   ".',
+    );
+    expect(() => createDeleteArtifactRequest("")).toThrow(
+      'Storage artifact key must be a non-empty, trimmed string key that remains path-agnostic. Received "".',
+    );
+    expect(() =>
+      createStoreArtifactRequest(new Uint8Array([1]), {
+        descriptor: {
+          key: " ",
+        },
+      }),
+    ).toThrow(
+      'Storage artifact key must be a non-empty, trimmed string key that remains path-agnostic. Received " ".',
+    );
+  });
+
   it("creates retrieve and has responses without persistence-record leakage", () => {
     const descriptor = {
-      key: "artifacts/image-1",
+      key: " artifacts/image-1 ",
       mediaType: "image/png",
       sizeBytes: 128,
       checksum: {
@@ -76,7 +97,10 @@ describe("storage contracts", () => {
     expect(retrieveResult).toEqual({
       ok: true,
       value: {
-        descriptor,
+        descriptor: {
+          ...descriptor,
+          key: "artifacts/image-1",
+        },
         content: new Uint8Array([9, 8, 7]),
       },
       requestId: "req-2",
@@ -92,7 +116,10 @@ describe("storage contracts", () => {
       ok: true,
       value: {
         exists: true,
-        descriptor,
+        descriptor: {
+          ...descriptor,
+          key: "artifacts/image-1",
+        },
       },
       requestId: undefined,
       correlationId: "corr-2",
@@ -149,11 +176,11 @@ describe("storage contracts", () => {
   });
 
   it("creates explicit lookup requests for retrieve and existence checks", () => {
-    const retrieveRequest = createRetrieveArtifactRequest("artifacts/output-1", {
+    const retrieveRequest = createRetrieveArtifactRequest(" artifacts/output-1 ", {
       requestId: "req-4",
       correlationId: "corr-4",
     });
-    const hasRequest = createHasArtifactRequest("artifacts/output-1", {
+    const hasRequest = createHasArtifactRequest(" artifacts/output-1 ", {
       requestId: "req-4",
     });
 
@@ -171,7 +198,7 @@ describe("storage contracts", () => {
 
   it("creates store success responses with artifact descriptor metadata", () => {
     const result = createStoreArtifactSuccessResult({
-      key: "artifacts/new-file",
+      key: " artifacts/new-file ",
       mediaType: "text/plain",
       sizeBytes: 12,
       checksum: {
@@ -192,6 +219,34 @@ describe("storage contracts", () => {
         },
       },
       requestId: undefined,
+      correlationId: undefined,
+    });
+  });
+
+  it("creates store failure responses with shared contract error semantics", () => {
+    const error = createContractError("unavailable", "Storage backend unavailable", {
+      details: {
+        adapter: "memory",
+      },
+      correlationId: "corr-6",
+    });
+
+    const failure = createStoreArtifactFailureResult(error, {
+      requestId: "req-6",
+    });
+
+    expect(failure).toEqual({
+      ok: false,
+      error: {
+        code: "unavailable",
+        message: "Storage backend unavailable",
+        details: {
+          adapter: "memory",
+        },
+        requestId: undefined,
+        correlationId: "corr-6",
+      },
+      requestId: "req-6",
       correlationId: undefined,
     });
   });

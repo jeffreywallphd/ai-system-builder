@@ -1,7 +1,8 @@
 import type { ContractBoundaryContext } from "../shared";
+import { normalizeStorageArtifactKey, type StorageArtifactKey } from "./storage-artifact-key";
 
 export interface DeleteArtifactRequest extends ContractBoundaryContext {
-  key: string;
+  key: StorageArtifactKey;
 }
 
 export function createDeleteArtifactRequest(
@@ -9,7 +10,7 @@ export function createDeleteArtifactRequest(
   options?: ContractBoundaryContext,
 ): DeleteArtifactRequest {
   return {
-    key,
+    key: normalizeStorageArtifactKey(key),
     requestId: options?.requestId,
     correlationId: options?.correlationId,
   };

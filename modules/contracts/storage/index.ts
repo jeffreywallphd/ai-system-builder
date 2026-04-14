@@ -1,3 +1,4 @@
+export * from "./storage-artifact-key";
 export * from "./storage-object-descriptor";
 export * from "./store-artifact-request";
 export * from "./store-artifact-result";

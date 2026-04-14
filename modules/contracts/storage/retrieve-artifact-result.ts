@@ -6,9 +6,10 @@ import {
   createFailureResult,
   createSuccessResult,
 } from "../shared";
-import type {
-  StorageObjectDescriptor,
-  StorageObjectMetadata,
+import {
+  normalizeStorageObjectDescriptor,
+  type StorageObjectDescriptor,
+  type StorageObjectMetadata,
 } from "./storage-object-descriptor";
 
 export interface RetrieveArtifactValue<
@@ -35,7 +36,7 @@ export function createRetrieveArtifactSuccessResult<
 ): RetrieveArtifactResult<TContent, ContractErrorDetails, TMetadata> {
   return createSuccessResult(
     {
-      descriptor,
+      descriptor: normalizeStorageObjectDescriptor(descriptor),
       content,
     },
     context,

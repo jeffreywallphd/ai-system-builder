@@ -6,9 +6,10 @@ import {
   createFailureResult,
   createSuccessResult,
 } from "../shared";
-import type {
-  StorageObjectDescriptor,
-  StorageObjectMetadata,
+import {
+  normalizeStorageObjectDescriptor,
+  type StorageObjectDescriptor,
+  type StorageObjectMetadata,
 } from "./storage-object-descriptor";
 
 export type StoreArtifactResult<
@@ -22,7 +23,7 @@ export function createStoreArtifactSuccessResult<
   descriptor: StorageObjectDescriptor<TMetadata>,
   context?: ContractBoundaryContext,
 ): StoreArtifactResult<ContractErrorDetails, TMetadata> {
-  return createSuccessResult(descriptor, context);
+  return createSuccessResult(normalizeStorageObjectDescriptor(descriptor), context);
 }
 
 export function createStoreArtifactFailureResult<
