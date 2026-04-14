@@ -19,12 +19,20 @@ import {
   type WorkspaceAuthorizationRoleKey,
   isWorkspaceAuthorizationRoleKey,
 } from "@domain/authorization/AuthorizationRoleDefinitions";
-import { AuthorizationDecisionReasonCodes } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
+import {
+  AuthorizationDecisionReasonCodes,
+  AuthorizationDiagnosticProvenanceStages,
+} from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
+import { AuthorizationDiagnosticOutcomes } from "@shared/contracts/authorization/AuthorizationDiagnosticsContracts";
 import type {
   AuthorizationPolicyEvaluatorRequest,
   AuthorizationPolicyEvaluatorResult,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import type { IAuthorizationPolicyEvaluator } from "../ports/IAuthorizationPolicyEvaluator";
+import {
+  collectWorkspaceIdsFromAuthorizationInputs,
+  emitAuthorizationDiagnosticRecord,
+} from "./AuthorizationDecisionDiagnostics";
 
 export const EffectivePermissionResolutionSourceKinds = Object.freeze({
   explicitDeny: "explicit-deny",
@@ -42,6 +50,16 @@ export type EffectivePermissionResolutionSourceKind =
 export interface EffectivePermissionResolution {
   readonly decision: PolicyDecision;
   readonly sourceKind: EffectivePermissionResolutionSourceKind;
+  readonly scopeFiltering?: Readonly<{
+    readonly applicableScopeCount: number;
+    readonly nonApplicableScopeCount: number;
+    readonly roleAssignmentApplicableCount: number;
+    readonly roleAssignmentNonApplicableCount: number;
+    readonly permissionGrantApplicableCount: number;
+    readonly permissionGrantNonApplicableCount: number;
+    readonly matchedWorkspaceIds: ReadonlyArray<string>;
+    readonly visibilityFallbackUsed: boolean;
+  }>;
 }
 
 export interface ResolveEffectivePermissionsRequest {
@@ -107,23 +125,101 @@ export class EffectivePermissionResolutionService
     const evaluationInstant = toEvaluationInstant(request.asOf, this.clock.now());
     const requiredPermissionKey = request.requiredPermissionKey;
 
-    const applicableRoleAssignments = request.actor.roleAssignments.filter((assignment) => (
+    const activeRoleAssignments = request.actor.roleAssignments.filter((assignment) => (
       isRoleAssignmentActiveAt(assignment, evaluationInstant)
-      && this.matchesRoleAssignmentScope(assignment, request.resource)
+    ));
+    const applicableRoleAssignments = activeRoleAssignments.filter((assignment) => (
+      this.matchesRoleAssignmentScope(assignment, request.resource)
     ));
 
-    const matchingPermissionGrants = request.actor.permissionGrants.filter((grant) => (
+    const activePermissionGrants = request.actor.permissionGrants.filter((grant) => (
       isPermissionGrantActiveAt(grant, evaluationInstant)
-      && this.matchesPermissionGrantScope(grant, request.resource)
-      && grant.permissionKey === requiredPermissionKey
     ));
+    const applicablePermissionGrants = activePermissionGrants.filter((grant) => (
+      this.matchesPermissionGrantScope(grant, request.resource)
+    ));
+    const matchingPermissionGrants = applicablePermissionGrants.filter((grant) => (
+      grant.permissionKey === requiredPermissionKey
+    ));
+
+    const roleAssignmentNonApplicableCount = activeRoleAssignments.length - applicableRoleAssignments.length;
+    const permissionGrantNonApplicableCount = activePermissionGrants.length - applicablePermissionGrants.length;
+    const applicableScopeCount = applicableRoleAssignments.length + applicablePermissionGrants.length;
+    const nonApplicableScopeCount = roleAssignmentNonApplicableCount + permissionGrantNonApplicableCount;
+    const matchedWorkspaceIds = collectWorkspaceIdsFromAuthorizationInputs({
+      roleAssignments: applicableRoleAssignments,
+      permissionGrants: applicablePermissionGrants,
+      resourceWorkspaceId: request.resource.workspaceId,
+    });
+
+    const emitScopeFilteringDiagnostic = (input: {
+      readonly reasonCode: string;
+      readonly visibilityFallbackUsed: boolean;
+    }): void => {
+      const correlationId = normalizeOptional(request.diagnosticContext?.correlationId)
+        ?? createResolverCorrelationId({
+          requiredPermissionKey,
+          resourceType: request.resource.resourceType,
+          resourceId: request.resource.resourceId,
+          workspaceId: request.resource.workspaceId,
+          asOf: request.asOf,
+        });
+      emitAuthorizationDiagnosticRecord({
+        logger: this.diagnosticsLogger,
+        event: "authorization.scope-filtering.diagnostic",
+        outcome: AuthorizationDiagnosticOutcomes.observed,
+        reasonCode: input.reasonCode,
+        denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.scopeFiltering,
+        correlationId,
+        requestId: normalizeOptional(request.diagnosticContext?.requestId),
+        actorIdentityId: request.actor.actorUserIdentityId,
+        actorActiveWorkspaceId: request.actor.activeWorkspaceId,
+        requiredPermissionKey,
+        target: Object.freeze({
+          targetKind: request.diagnosticContext?.targetKind ?? "resource-instance",
+          targetIdentifier: normalizeOptional(request.diagnosticContext?.targetIdentifier) ?? request.resource.resourceId,
+          targetWorkspaceId: normalizeOptional(request.diagnosticContext?.targetWorkspaceId) ?? request.resource.workspaceId,
+          targetResourceFamily: request.diagnosticContext?.targetResourceFamily,
+          targetResourceType: normalizeOptional(request.diagnosticContext?.targetResourceType) ?? request.resource.resourceType,
+        }),
+        counts: Object.freeze({
+          roleAssignmentCount: request.actor.roleAssignments.length,
+          permissionGrantCount: request.actor.permissionGrants.length,
+          sharingGrantCount: request.resource.sharingGrants.length,
+          applicableScopeCount,
+        }),
+        extensions: Object.freeze({
+          "authorization.scope-filtering.applicable-role-assignment-count": applicableRoleAssignments.length,
+          "authorization.scope-filtering.non-applicable-role-assignment-count": roleAssignmentNonApplicableCount,
+          "authorization.scope-filtering.applicable-permission-grant-count": applicablePermissionGrants.length,
+          "authorization.scope-filtering.non-applicable-permission-grant-count": permissionGrantNonApplicableCount,
+          "authorization.scope-filtering.non-applicable-scope-count": nonApplicableScopeCount,
+          "authorization.scope-filtering.scope-mismatch-detected": nonApplicableScopeCount > 0,
+          "authorization.scope-filtering.no-applicable-scope": applicableScopeCount === 0,
+          "authorization.scope-filtering.matched-workspace-ids": matchedWorkspaceIds,
+          "authorization.scope-filtering.synthesized-fallback-used": request.diagnosticContext?.synthesizedFallbackUsed === true,
+          "authorization.scope-filtering.visibility-fallback-used": input.visibilityFallbackUsed,
+        }),
+      });
+    };
+
+    const scopeFiltering = Object.freeze({
+      applicableScopeCount,
+      nonApplicableScopeCount,
+      roleAssignmentApplicableCount: applicableRoleAssignments.length,
+      roleAssignmentNonApplicableCount,
+      permissionGrantApplicableCount: applicablePermissionGrants.length,
+      permissionGrantNonApplicableCount,
+      matchedWorkspaceIds,
+      visibilityFallbackUsed: false,
+    });
 
     const deniedPermissionGrantIds = matchingPermissionGrants
       .filter((grant) => grant.effect === PermissionEffects.deny)
       .map((grant) => grant.id);
 
     if (deniedPermissionGrantIds.length > 0) {
-      return this.toResolution(
+      const resolution = this.toResolution(
         requiredPermissionKey,
         request.asOf,
         PolicyDecisionOutcomes.deny,
@@ -133,21 +229,38 @@ export class EffectivePermissionResolutionService
         {
           matchedPermissionGrantIds: deniedPermissionGrantIds,
         },
+        scopeFiltering,
       );
+      emitScopeFilteringDiagnostic({
+        reasonCode: nonApplicableScopeCount > 0
+          ? AuthorizationDecisionReasonCodes.scopeMismatch
+          : "authorization.scope-filtering.applicable-scopes",
+        visibilityFallbackUsed: false,
+      });
+      return resolution;
     }
 
     const isOwner = !!request.actor.actorUserIdentityId
       && request.actor.actorUserIdentityId === request.resource.ownerUserIdentityId;
 
     if (isOwner) {
-      return this.toResolution(
+      const resolution = this.toResolution(
         requiredPermissionKey,
         request.asOf,
         PolicyDecisionOutcomes.allow,
         EffectivePermissionResolutionSourceKinds.ownerOverride,
         AuthorizationDecisionReasonCodes.ownerOverride,
         "The actor owns the resource and owner override applies.",
+        undefined,
+        scopeFiltering,
       );
+      emitScopeFilteringDiagnostic({
+        reasonCode: nonApplicableScopeCount > 0
+          ? AuthorizationDecisionReasonCodes.scopeMismatch
+          : "authorization.scope-filtering.applicable-scopes",
+        visibilityFallbackUsed: false,
+      });
+      return resolution;
     }
 
     const matchedRoleAssignmentIds = applicableRoleAssignments
@@ -155,7 +268,7 @@ export class EffectivePermissionResolutionService
       .map((assignment) => assignment.id);
 
     if (matchedRoleAssignmentIds.length > 0) {
-      return this.toResolution(
+      const resolution = this.toResolution(
         requiredPermissionKey,
         request.asOf,
         PolicyDecisionOutcomes.allow,
@@ -165,7 +278,15 @@ export class EffectivePermissionResolutionService
         {
           matchedRoleAssignmentIds,
         },
+        scopeFiltering,
       );
+      emitScopeFilteringDiagnostic({
+        reasonCode: nonApplicableScopeCount > 0
+          ? AuthorizationDecisionReasonCodes.scopeMismatch
+          : "authorization.scope-filtering.applicable-scopes",
+        visibilityFallbackUsed: false,
+      });
+      return resolution;
     }
 
     const allowedPermissionGrantIds = matchingPermissionGrants
@@ -173,7 +294,7 @@ export class EffectivePermissionResolutionService
       .map((grant) => grant.id);
 
     if (allowedPermissionGrantIds.length > 0) {
-      return this.toResolution(
+      const resolution = this.toResolution(
         requiredPermissionKey,
         request.asOf,
         PolicyDecisionOutcomes.allow,
@@ -183,7 +304,15 @@ export class EffectivePermissionResolutionService
         {
           matchedPermissionGrantIds: allowedPermissionGrantIds,
         },
+        scopeFiltering,
       );
+      emitScopeFilteringDiagnostic({
+        reasonCode: nonApplicableScopeCount > 0
+          ? AuthorizationDecisionReasonCodes.scopeMismatch
+          : "authorization.scope-filtering.applicable-scopes",
+        visibilityFallbackUsed: false,
+      });
+      return resolution;
     }
 
     const matchedSharingGrantIds = request.resource.sharingGrants
@@ -193,7 +322,7 @@ export class EffectivePermissionResolutionService
       .map((grant) => grant.id);
 
     if (matchedSharingGrantIds.length > 0) {
-      return this.toResolution(
+      const resolution = this.toResolution(
         requiredPermissionKey,
         request.asOf,
         PolicyDecisionOutcomes.allow,
@@ -203,7 +332,15 @@ export class EffectivePermissionResolutionService
         {
           matchedSharingGrantIds,
         },
+        scopeFiltering,
       );
+      emitScopeFilteringDiagnostic({
+        reasonCode: nonApplicableScopeCount > 0
+          ? AuthorizationDecisionReasonCodes.scopeMismatch
+          : "authorization.scope-filtering.applicable-scopes",
+        visibilityFallbackUsed: false,
+      });
+      return resolution;
     }
 
     const action = toPermissionAction(requiredPermissionKey);
@@ -213,25 +350,49 @@ export class EffectivePermissionResolutionService
         && !!request.resource.workspaceId
         && hasWorkspaceMembershipContext(applicableRoleAssignments, request.resource.workspaceId)
       ) {
-        return this.toResolution(
+        const resolution = this.toResolution(
           requiredPermissionKey,
           request.asOf,
           PolicyDecisionOutcomes.allow,
           EffectivePermissionResolutionSourceKinds.visibilityRule,
           AuthorizationDecisionReasonCodes.visibilityWorkspaceMember,
           "Workspace visibility allows read/list for active workspace members.",
+          undefined,
+          Object.freeze({
+            ...scopeFiltering,
+            visibilityFallbackUsed: true,
+          }),
         );
+        emitScopeFilteringDiagnostic({
+          reasonCode: nonApplicableScopeCount > 0
+            ? AuthorizationDecisionReasonCodes.scopeMismatch
+            : "authorization.scope-filtering.applicable-scopes",
+          visibilityFallbackUsed: true,
+        });
+        return resolution;
       }
 
       if (request.resource.visibility === ResourceVisibilities.published) {
-        return this.toResolution(
+        const resolution = this.toResolution(
           requiredPermissionKey,
           request.asOf,
           PolicyDecisionOutcomes.allow,
           EffectivePermissionResolutionSourceKinds.visibilityRule,
           AuthorizationDecisionReasonCodes.visibilityPublished,
           "Published visibility allows read/list access.",
+          undefined,
+          Object.freeze({
+            ...scopeFiltering,
+            visibilityFallbackUsed: true,
+          }),
         );
+        emitScopeFilteringDiagnostic({
+          reasonCode: nonApplicableScopeCount > 0
+            ? AuthorizationDecisionReasonCodes.scopeMismatch
+            : "authorization.scope-filtering.applicable-scopes",
+          visibilityFallbackUsed: true,
+        });
+        return resolution;
       }
     }
 
@@ -242,7 +403,17 @@ export class EffectivePermissionResolutionService
       EffectivePermissionResolutionSourceKinds.none,
       AuthorizationDecisionReasonCodes.noEffectivePermission,
       "No role grant, owner override, sharing grant, or visibility rule allowed the permission.",
+      undefined,
+      scopeFiltering,
     );
+    emitScopeFilteringDiagnostic({
+      reasonCode: applicableScopeCount === 0 && nonApplicableScopeCount > 0
+        ? AuthorizationDecisionReasonCodes.scopeMismatch
+        : applicableScopeCount === 0
+          ? "authorization.scope-filtering.no-applicable-scopes"
+          : "authorization.scope-filtering.applicable-scopes",
+      visibilityFallbackUsed: false,
+    });
     this.diagnosticsLogger.info({
       event: "auth.permission-resolution.denied.no-effective-permission",
       details: Object.freeze({
@@ -364,9 +535,11 @@ export class EffectivePermissionResolutionService
       readonly matchedPermissionGrantIds?: ReadonlyArray<string>;
       readonly matchedSharingGrantIds?: ReadonlyArray<string>;
     },
+    scopeFiltering?: EffectivePermissionResolution["scopeFiltering"],
   ): EffectivePermissionResolution {
     return Object.freeze({
       sourceKind,
+      scopeFiltering,
       decision: createPolicyDecision({
         outcome,
         requiredPermissionKey,
@@ -389,6 +562,23 @@ function toEvaluationInstant(asOf: string | undefined, fallback: Date): Date {
 
   const parsed = new Date(normalizedAsOf);
   return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
+
+function normalizeOptional(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function createResolverCorrelationId(input: {
+  readonly requiredPermissionKey: string;
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly workspaceId?: string;
+  readonly asOf?: string;
+}): string {
+  const workspaceId = normalizeOptional(input.workspaceId) ?? "workspace-unresolved";
+  const asOf = normalizeOptional(input.asOf) ?? "as-of-now";
+  return `${input.requiredPermissionKey}:${input.resourceType}:${input.resourceId}:${workspaceId}:${asOf}`;
 }
 
 function isRoleAssignmentActiveAt(roleAssignment: RoleAssignment, asOf: Date): boolean {

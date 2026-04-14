@@ -310,6 +310,64 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
     expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.role-snapshot.query");
     expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.workspace-capability.evaluate");
     expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.completed");
+
+    const permissionSnapshotEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "authorization.permission-snapshot.diagnostic"
+    ));
+    const scopeFilteringEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "authorization.scope-filtering.diagnostic"
+    ));
+    const finalDecisionEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "authorization.final-decision.diagnostic"
+    ));
+    const completedEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "auth.decision.completed"
+      && typeof event.details?.diagnosticCorrelationId === "string"
+    ));
+
+    expect(permissionSnapshotEvent).toBeDefined();
+    expect(scopeFilteringEvent).toBeDefined();
+    expect(finalDecisionEvent).toBeDefined();
+    expect(completedEvent).toBeDefined();
+
+    const permissionSnapshot = permissionSnapshotEvent?.details?.diagnostic as {
+      readonly denialProvenanceStage: string;
+      readonly target: { readonly kind: string; readonly targetWorkspaceId?: string };
+      readonly counts: { readonly roleAssignmentCount?: number; readonly permissionGrantCount?: number };
+      readonly extensions?: Readonly<Record<string, unknown>>;
+      readonly correlation: { readonly correlationId?: string };
+    };
+    const scopeFiltering = scopeFilteringEvent?.details?.diagnostic as {
+      readonly denialProvenanceStage: string;
+      readonly counts: { readonly applicableScopeCount?: number };
+      readonly extensions?: Readonly<Record<string, unknown>>;
+      readonly correlation: { readonly correlationId?: string };
+    };
+    const finalDecision = finalDecisionEvent?.details?.diagnostic as {
+      readonly denialProvenanceStage: string;
+      readonly counts: { readonly applicableScopeCount?: number };
+      readonly correlation: { readonly correlationId?: string };
+    };
+
+    expect(permissionSnapshot.denialProvenanceStage).toBe("permission-snapshot");
+    expect(permissionSnapshot.target.kind).toBe("workspace-capability");
+    expect(permissionSnapshot.target.targetWorkspaceId).toBe("workspace-alpha");
+    expect(permissionSnapshot.counts.roleAssignmentCount).toBe(1);
+    expect(permissionSnapshot.counts.permissionGrantCount).toBe(0);
+    expect(permissionSnapshot.extensions?.["authorization.permission-snapshot.synthesized-fallback-used"]).toBe(true);
+
+    expect(scopeFiltering.denialProvenanceStage).toBe("scope-filtering");
+    expect(scopeFiltering.counts.applicableScopeCount).toBeGreaterThanOrEqual(1);
+    expect(scopeFiltering.extensions?.["authorization.scope-filtering.visibility-fallback-used"]).toBe(false);
+
+    expect(finalDecision.denialProvenanceStage).toBe("final-decision-emission");
+    expect(finalDecision.counts.applicableScopeCount).toBeGreaterThanOrEqual(1);
+
+    const correlationId = permissionSnapshot.correlation.correlationId;
+    expect(correlationId).toBeDefined();
+    expect(scopeFiltering.correlation.correlationId).toBe(correlationId);
+    expect(finalDecision.correlation.correlationId).toBe(correlationId);
+    expect(completedEvent?.details?.diagnosticCorrelationId).toBe(correlationId);
   });
 
   it("uses workspace visibility fallback for read/list when actor has workspace membership context", async () => {
