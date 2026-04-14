@@ -17,7 +17,7 @@ import {
   createRoleAssignment,
 } from "@domain/authorization/AuthorizationDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
-import { WorkspaceMembershipStatuses } from "@domain/workspaces/WorkspaceDomain";
+import { WorkspaceMembershipStatuses, WorkspaceRoles } from "@domain/workspaces/WorkspaceDomain";
 import type { SqliteAuthorizationPersistenceAdapter } from "./SqliteAuthorizationPersistenceAdapter";
 import {
   ConsolePersistenceDiagnosticsLogger,
@@ -159,7 +159,12 @@ export class SqliteAuthorizationPolicyReadAdapter
       .filter((assignment) => assignment.scope === RoleAssignmentScopes.workspace && assignment.workspaceId === input.activeWorkspaceId)
       .map((assignment) => assignment.roleKey));
 
-    const synthesized = workspaceSnapshot.effectiveRoles
+    const effectiveRoleKeys = new Set(workspaceSnapshot.effectiveRoles);
+    if (hasWorkspaceOwnerOverride) {
+      effectiveRoleKeys.add(WorkspaceRoles.owner);
+    }
+
+    const synthesized = [...effectiveRoleKeys]
       .filter((roleKey) => !existingRoleKeys.has(roleKey))
       .map((roleKey) => createRoleAssignment({
         id: `synthetic-role-assignment:${input.activeWorkspaceId}:${input.actorUserIdentityId}:${roleKey}`,

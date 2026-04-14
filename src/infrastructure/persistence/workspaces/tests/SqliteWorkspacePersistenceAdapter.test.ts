@@ -195,6 +195,58 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
     adapter.dispose();
   });
 
+  it("treats ownership metadata as authoritative for workspace-owner authorization snapshot fallback", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-workspace-owner-fallback-"));
+    createdRoots.push(root);
+    const adapter = new SqliteWorkspacePersistenceAdapter(path.join(root, "workspace.sqlite"));
+
+    const workspace = await adapter.saveWorkspace(createWorkspace({
+      id: "workspace:alpha",
+      slug: "team-alpha",
+      displayName: "Team Alpha",
+      ownerUserId: "user:owner",
+      createdBy: "user:owner",
+      status: WorkspaceStatuses.active,
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+    await adapter.saveMembership(createWorkspaceMembership({
+      id: "membership:alpha-owner",
+      workspaceId: workspace.id,
+      userIdentityId: "user:owner",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T12:00:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+
+    const ownerRoleAssignment = await adapter.saveRoleAssignment(createWorkspaceRoleAssignment({
+      id: "role-assignment:alpha-owner",
+      workspaceId: workspace.id,
+      userIdentityId: "user:owner",
+      role: WorkspaceRoles.owner,
+      assignedBy: "user:owner",
+      assignedAt: "2026-04-05T12:00:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+    await adapter.saveRoleAssignment(revokeWorkspaceRoleAssignment(ownerRoleAssignment, {
+      actorUserId: "user:owner",
+      now: new Date("2026-04-05T12:30:00.000Z"),
+    }));
+
+    const snapshot = await adapter.getWorkspaceAuthorizationSnapshot({
+      workspaceId: workspace.id,
+      userIdentityId: "user:owner",
+      asOf: "2026-04-05T13:00:00.000Z",
+    });
+
+    expect(snapshot?.isWorkspaceOwner).toBe(true);
+    expect(snapshot?.effectiveRoles).toContain(WorkspaceRoles.owner);
+    expect(snapshot?.activeRoleAssignments).toHaveLength(0);
+
+    adapter.dispose();
+  });
+
   it("persists update mutations for workspace, membership, invitation, and role assignment records", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-src-workspace-updates-"));
     createdRoots.push(root);
@@ -490,4 +542,3 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
     adapter.dispose();
   });
 });
-

@@ -828,8 +828,12 @@ export class SqliteWorkspacePersistenceAdapter
       userIdentityId: query.userIdentityId,
       statuses: [WorkspaceRoleAssignmentStatuses.active],
     });
+    const isWorkspaceOwner = workspace.ownership.ownerUserId === query.userIdentityId;
     const effectiveRoles = Object.freeze([
-      ...new Set(activeRoleAssignments.map((assignment) => assignment.role)),
+      ...new Set([
+        ...activeRoleAssignments.map((assignment) => assignment.role),
+        ...(isWorkspaceOwner ? [WorkspaceRoles.owner] : []),
+      ]),
     ]);
 
     const snapshot = Object.freeze({
@@ -837,7 +841,7 @@ export class SqliteWorkspacePersistenceAdapter
       membership,
       activeRoleAssignments,
       effectiveRoles,
-      isWorkspaceOwner: effectiveRoles.includes(WorkspaceRoles.owner),
+      isWorkspaceOwner,
     });
     this.diagnosticsLogger.info({
       type: "persistence-diagnostic",

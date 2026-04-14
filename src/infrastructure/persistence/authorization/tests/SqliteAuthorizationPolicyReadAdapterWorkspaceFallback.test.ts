@@ -25,9 +25,14 @@ afterEach(() => {
 const createdRoots: string[] = [];
 
 class StubWorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizationReadRepository {
+  public includeEffectiveOwnerRole = true;
+
   public async getWorkspaceAuthorizationSnapshot(
     query: WorkspaceAuthorizationSnapshotQuery,
   ): Promise<WorkspaceAuthorizationSnapshot | undefined> {
+    const effectiveRoles = this.includeEffectiveOwnerRole
+      ? [WorkspaceRoles.owner]
+      : [];
     return Object.freeze({
       workspace: createWorkspace({
         workspaceId: query.workspaceId,
@@ -47,7 +52,7 @@ class StubWorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizatio
         updatedAt: "2026-04-10T00:00:00.000Z",
       }),
       activeRoleAssignments: Object.freeze([]),
-      effectiveRoles: Object.freeze([WorkspaceRoles.owner]),
+      effectiveRoles: Object.freeze(effectiveRoles),
       isWorkspaceOwner: true,
     });
   }
@@ -59,6 +64,43 @@ describe("SqliteAuthorizationPolicyReadAdapter workspace membership fallback", (
     createdRoots.push(root);
     const authorizationPersistenceAdapter = new SqliteAuthorizationPersistenceAdapter(path.join(root, "authorization.sqlite"));
     const workspaceAuthorizationReadRepository = new StubWorkspaceAuthorizationReadRepository();
+    const readAdapter = new SqliteAuthorizationPolicyReadAdapter({
+      authorizationPersistenceAdapter,
+      workspaceAuthorizationReadRepository,
+    });
+
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: readAdapter,
+      sharingGrantReadRepository: readAdapter,
+      resourcePolicyMetadataReadRepository: readAdapter,
+    });
+
+    const decision = await evaluator.evaluateDecision({
+      actor: {
+        actorUserIdentityId: "user:owner",
+        activeWorkspaceId: "workspace:alpha",
+      },
+      requiredPermissionKey: "asset.create",
+      target: {
+        kind: "workspace-capability",
+        workspaceId: "workspace:alpha",
+        capabilityResourceType: AuthorizationResourceFamilies.asset,
+      },
+      asOf: "2026-04-10T00:05:00.000Z",
+    });
+
+    expect(decision.decision.isAllowed).toBeTrue();
+    expect(decision.decision.reasonCode).toBe("matched-role-grant");
+
+    authorizationPersistenceAdapter.dispose();
+  });
+
+  it("synthesizes owner role grants when workspace owner override is true but effective roles omit owner", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-auth-policy-read-owner-override-"));
+    createdRoots.push(root);
+    const authorizationPersistenceAdapter = new SqliteAuthorizationPersistenceAdapter(path.join(root, "authorization.sqlite"));
+    const workspaceAuthorizationReadRepository = new StubWorkspaceAuthorizationReadRepository();
+    workspaceAuthorizationReadRepository.includeEffectiveOwnerRole = false;
     const readAdapter = new SqliteAuthorizationPolicyReadAdapter({
       authorizationPersistenceAdapter,
       workspaceAuthorizationReadRepository,
