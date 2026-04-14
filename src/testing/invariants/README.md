@@ -43,6 +43,25 @@ This module provides a shared baseline for cross-system invariant testing:
   - run scenario against resolved adapter with fixed evaluation timestamp.
 - `executeAndAssertInvariantScenario(...)`
   - run + assert expected outcome/metadata using shared assertions.
+- `assertAuthorizationDecisionAllowed(...)` and `assertAuthorizationDecisionDenied(...)`
+  - canonical allow/deny assertions with readable drift messages for authorization-sensitive stories.
+- `assertInvariantExecution(...)`
+  - canonical assertion entry point that validates outcome plus decision/runtime metadata, including reason code, source kind, target kind, scope, matched/unmatched identifiers, and decision provenance when supplied.
+
+## Canonical Authorization Expectation Fields
+
+Use these on `scenario.expectation.decision` to assert architecture-level truth beyond raw allow/deny:
+
+- `reasonCode`, `denialReason`, `requiredPermissionKey`
+- `sourceKind` (for example role grant vs sharing grant vs no-effective-permission)
+- `targetKind` (resource vs capability target semantics)
+- `scope`:
+  - `isApplicable`, `scopeKind`, `workspaceId`, `resourceFamily`, `resourceType`, `resourceId`
+- `matchedRoleAssignmentIds`, `matchedPermissionGrantIds`, `matchedSharingGrantIds`
+- `unmatchedRoleAssignmentIds`, `unmatchedPermissionGrantIds`, `unmatchedSharingGrantIds`
+- `provenance` (key/value diagnostics fields emitted by adapters or deeper policy layers)
+
+The assertion helpers are designed to accept currently available result fields and absorb richer decision diagnostics over time.
 
 ## Extension Workflow
 
