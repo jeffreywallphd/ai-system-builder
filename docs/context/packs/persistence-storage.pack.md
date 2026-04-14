@@ -23,6 +23,7 @@
 
 - Postgres is the default persistence target for structured durable application data.
 - Storage is a separate concern for files, blobs, uploads, exports, generated artifacts, and temp workspace content.
+- Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
 - Metadata records and file/blob content are different concerns and should stay separated.
 - Application logic should depend on persistence/storage ports and contracts, not direct DB/filesystem details.
 - AppData/server filesystem roots are deployment details, not architecture boundaries.
