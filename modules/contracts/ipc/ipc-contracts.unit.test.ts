@@ -40,9 +40,13 @@ describe("ipc contracts", () => {
   });
 
   it("creates an ipc request that preserves transport operation identity", () => {
-    const request = createIpcRequest(
-      "desktop.workspace.create.request",
+    const channel = createIpcChannel(
       "workspace.create",
+      "desktop.workspace.create.request",
+    );
+
+    const request = createIpcRequest(
+      channel,
       { name: "alpha" },
       {
         requestId: "req-400",
@@ -62,9 +66,13 @@ describe("ipc contracts", () => {
   });
 
   it("creates ipc error and failure response envelopes with channel context", () => {
-    const error = createIpcError(
-      "desktop.workspace.create.request",
+    const channel = createIpcChannel(
       "workspace.create",
+      "desktop.workspace.create.request",
+    );
+
+    const error = createIpcError(
+      channel,
       "validation",
       "Workspace name is required",
       {
@@ -99,9 +107,13 @@ describe("ipc contracts", () => {
   });
 
   it("creates ipc success responses without preload or electron-specific fields", () => {
-    const response = createIpcSuccessResponse(
-      "desktop.workspace.create.response",
+    const channel = createIpcChannel(
       "workspace.create",
+      "desktop.workspace.create.response",
+    );
+
+    const response = createIpcSuccessResponse(
+      channel,
       { workspaceId: "ws-9" },
       {
         requestId: "req-402",
