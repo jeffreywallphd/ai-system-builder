@@ -1,0 +1,53 @@
+# Context Pack: Testing
+
+- Pack name: `testing`
+
+## Purpose
+
+- Provide focused testing expectations that protect behavior and architecture without low-value test bloat.
+
+## Use When
+
+- Implementation tasks with meaningful behavior changes.
+- Bug-fix tasks.
+- Refactors that risk behavior drift.
+- Adapter/host/runtime/transport changes needing targeted integration confidence.
+
+## Do Not Use When
+
+- Tasks that cannot affect runtime behavior (for example pure wording-only docs edits).
+- Requests limited to architecture discussion with no code/test impact.
+
+## Core Guidance
+
+- Test meaningful behavior, not implementation trivia.
+- Test domain logic directly with unit-level isolation.
+- Test application use cases with controlled boundaries (ports/test doubles).
+- Give adapters focused integration coverage for real boundary translation/behavior.
+- Add targeted host/transport integration tests for wiring, composition, and delegation correctness.
+- Add regression tests for bug fixes when practical in the layer where defect should be caught.
+- Keep tests deterministic, CI-suitable, and non-flaky; avoid performative coverage-only tests.
+
+## Key Constraints
+
+- Do not use broad end-to-end suites as substitutes for layered testing.
+- Avoid over-mocking internal details; mock boundaries deliberately.
+- If regression coverage is not added for a bug fix, document clear rationale.
+
+## Canonical Source Docs
+
+- `docs/standards/testing-standards.md` — repository-wide testing strategy and anti-patterns.
+- `docs/standards/naming-standards.md` — test file naming and behavior-oriented naming guidance.
+- `docs/standards/coding-standards.md` — boundary-safe design that drives test layering.
+- `docs/architecture/module-dependency-rules.md` — layer boundaries that testing should reinforce.
+
+## Common Over-Inclusions to Avoid
+
+- Pulling detailed host/runtime packs when not needed for current test scope.
+- Requiring exhaustive integration coverage for simple domain-only changes.
+- Asserting framework internals instead of observable behavior.
+
+## Prompt Assembly Notes
+
+- Typical set: `index` + `testing`.
+- Add one scope-specific pack (`runtime`, `desktop-host`, `server-host`, or `architecture`) based on impacted boundaries.
