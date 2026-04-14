@@ -31,6 +31,8 @@
 
 - This pack is a routing baseline, not a second source of truth.
 - Canonical rules remain in ADR, architecture, and standards docs.
+- This pack is never sufficient by itself for architecture-, standards-, structure-, or boundary-changing work.
+- If pack summaries conflict with ADRs/architecture/standards docs, canonical docs win.
 - Prompt builders must add only targeted companion packs (not all packs by default).
 
 ## Canonical Source Docs
@@ -54,4 +56,5 @@
 
 - Always include this pack first.
 - Add only the smallest set of specialized packs required by the task.
+- When a task affects canonical rules or boundaries, read and update the relevant canonical docs directly.
 - Typical order: `index` → task-specific pack(s) → targeted canonical doc links when needed.

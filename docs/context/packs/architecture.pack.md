@@ -31,6 +31,8 @@
 
 - Business logic belongs in domain/application, not route handlers, IPC handlers, or host bootstrap code.
 - Transport/framework specifics must stay in adapters.
+- Before changing boundaries, dependency rules, cross-layer responsibilities, or architectural ownership, read the referenced canonical architecture docs and ADRs directly.
+- This pack supports implementation, but does not replace canonical architectural guidance.
 - Changes to architectural boundaries require canonical doc updates and often ADR updates.
 
 ## Canonical Source Docs
@@ -54,4 +56,4 @@
 ## Prompt Assembly Notes
 
 - Typical set: `index` → `repository-overview` (optional) → `architecture`.
-- Add one specialized pack (`runtime`, `desktop-host`, `server-host`, `logging`, `testing`) based on concrete task scope.
+- Add one specialized pack (`runtime`, `desktop-host`, `server-host`, `logging`, `testing`, `persistence-storage`) based on concrete task scope.
