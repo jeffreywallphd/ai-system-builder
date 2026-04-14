@@ -17,6 +17,14 @@ import { EffectivePermissionResolutionService } from "../use-cases/EffectivePerm
 
 const evaluationAsOf = "2026-04-05T16:00:00.000Z";
 
+class RecordingDiagnosticsLogger {
+  public readonly events: Array<{ readonly event: string; readonly details?: Readonly<Record<string, unknown>> }> = [];
+
+  public info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void {
+    this.events.push(event);
+  }
+}
+
 describe("EffectivePermissionResolutionService", () => {
   const service = new EffectivePermissionResolutionService({
     clock: {
@@ -359,6 +367,79 @@ describe("EffectivePermissionResolutionService", () => {
       "allow",
       "allow",
     ]);
+  });
+
+  it("emits scope-filtering diagnostics that distinguish applicable vs non-applicable scope evidence", () => {
+    const diagnosticsLogger = new RecordingDiagnosticsLogger();
+    const diagnosticsService = new EffectivePermissionResolutionService({
+      clock: {
+        now: () => new Date(evaluationAsOf),
+      },
+      diagnosticsLogger,
+    });
+
+    const actor = createActorContext({
+      actorUserIdentityId: "user-mismatch",
+      roleAssignments: [
+        createRoleAssignment({
+          id: "role-wrong-workspace-1",
+          actorUserIdentityId: "user-mismatch",
+          roleKey: "member",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-beta",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-01T00:00:00.000Z",
+        }),
+      ],
+      permissionGrants: [
+        createPermissionGrant({
+          id: "grant-wrong-workspace-1",
+          permissionKey: "asset.read",
+          effect: PermissionEffects.allow,
+          scope: PermissionGrantScopes.workspace,
+          workspaceId: "workspace-beta",
+          grantedByUserIdentityId: "user-owner",
+          grantedAt: "2026-04-01T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const result = diagnosticsService.resolvePermission({
+      actor,
+      resource: workspaceVisibleResource,
+      requiredPermissionKey: "asset.read",
+      asOf: evaluationAsOf,
+      diagnosticContext: Object.freeze({
+        correlationId: "scope-filtering-correlation-1",
+        targetKind: "resource-instance",
+        targetIdentifier: "asset-002",
+        targetWorkspaceId: "workspace-alpha",
+        targetResourceType: "asset",
+        targetResourceFamily: "asset",
+      }),
+    });
+
+    expect(result.decision.outcome).toBe("deny");
+    const diagnosticEvent = diagnosticsLogger.events.find((event) => event.event === "authorization.scope-filtering.diagnostic");
+    expect(diagnosticEvent).toBeDefined();
+
+    const diagnostic = diagnosticEvent?.details?.diagnostic as {
+      readonly denialProvenanceStage: string;
+      readonly reasonCode: string;
+      readonly counts: { readonly roleAssignmentCount?: number; readonly permissionGrantCount?: number; readonly applicableScopeCount?: number };
+      readonly extensions?: Readonly<Record<string, unknown>>;
+      readonly correlation: { readonly correlationId?: string };
+    };
+
+    expect(diagnostic.denialProvenanceStage).toBe("scope-filtering");
+    expect(diagnostic.reasonCode).toBe("scope-mismatch");
+    expect(diagnostic.correlation.correlationId).toBe("scope-filtering-correlation-1");
+    expect(diagnostic.counts.roleAssignmentCount).toBe(1);
+    expect(diagnostic.counts.permissionGrantCount).toBe(1);
+    expect(diagnostic.counts.applicableScopeCount).toBe(0);
+    expect(diagnostic.extensions?.["authorization.scope-filtering.non-applicable-scope-count"]).toBe(2);
+    expect(diagnostic.extensions?.["authorization.scope-filtering.scope-mismatch-detected"]).toBe(true);
+    expect(diagnostic.extensions?.["authorization.scope-filtering.no-applicable-scope"]).toBe(true);
   });
 });
 

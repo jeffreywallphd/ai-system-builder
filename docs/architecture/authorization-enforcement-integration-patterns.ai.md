@@ -187,6 +187,15 @@ Optional (recommended once evaluation context is available):
 - `counts.applicableScopeCount`
 - `matchedSourceKind`
 
+Story 2.2.2 stage-local instrumentation requirements:
+
+- `permission-snapshot` diagnostics must capture retrieved evidence counts before scope filtering (`roleAssignmentCount`, `permissionGrantCount`, `sharingGrantCount`, `sharingPolicyMetadataCount`) and include target/workspace linkage.
+- `scope-filtering` diagnostics must distinguish retrieved inputs from scope-applicable inputs using canonical counts + namespaced extension fields for non-applicable scope evidence.
+- Include matched workspace evidence (`extensions` such as `authorization.*.matched-workspace-ids`) for both snapshot and scope-filtering stages so workspace divergence is localizable.
+- Mark synthesized fallback usage when a target context is synthesized (for example workspace-capability synthetic resource contexts) and preserve that marker through final decision emission correlation.
+- Emit explicit empty-result/failure markers in `extensions` (for example missing resource policy metadata, no applicable scope, scope mismatch detected) rather than omitting intermediate evidence silently.
+- Reuse one correlation id across `permission-snapshot`, `scope-filtering`, and `final-decision-emission` diagnostics so intermediate stages can be deterministically correlated to the final decision event.
+
 Extension rules:
 
 - Use `extensions` for story/team-specific metadata only.

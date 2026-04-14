@@ -117,6 +117,7 @@ export interface AuthorizationPolicyEvaluatorRequest {
   readonly resource: ResourcePolicyContext;
   readonly requiredPermissionKey: PermissionKey;
   readonly asOf?: string;
+  readonly diagnosticContext?: AuthorizationPolicyEvaluationDiagnosticContext;
 }
 
 export interface AuthorizationPolicyEvaluatorResult {
@@ -134,6 +135,17 @@ export interface AuthorizationPolicyEvaluationResolvedContext {
 export interface AuthorizationPolicyEvaluationDecisionDto {
   readonly decision: PolicyDecision;
   readonly resolvedContext: AuthorizationPolicyEvaluationResolvedContext;
+}
+
+export interface AuthorizationPolicyEvaluationDiagnosticContext {
+  readonly correlationId?: string;
+  readonly requestId?: string;
+  readonly targetKind?: AuthorizationPolicyEvaluationTargetKind;
+  readonly targetIdentifier?: string;
+  readonly targetWorkspaceId?: string;
+  readonly targetResourceFamily?: AuthorizationResourceFamily;
+  readonly targetResourceType?: string;
+  readonly synthesizedFallbackUsed?: boolean;
 }
 
 export const AuthorizationPolicyEvaluationTargetKinds = Object.freeze({
