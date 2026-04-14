@@ -37,6 +37,15 @@ Keeping these separate avoids common coupling failures:
 - treating Electron IPC handlers as the business layer,
 - mixing lifecycle concerns with request translation concerns.
 
+## Shared transport contract core and specialization
+
+Transport adapters should share a transport-neutral contract core under `modules/contracts/transport`.
+
+- The shared core defines generic transport request/response/error envelopes.
+- API (HTTP) and IPC contracts can specialize this core for their transport needs.
+- Specialization must not change application-facing operation identity and result/error semantics.
+- Transport-specific mechanics (HTTP status/headers or IPC channel registration details) remain in adapter-level contracts and implementations.
+
 ## Supported operating modes
 
 The architecture is designed to support:
