@@ -69,6 +69,9 @@ ai-system-builder/
   - Includes shared operation identity helpers so transport/runtime/persistence families use a consistent operation naming pattern.
   - Includes typed configuration contracts for host, runtime, logging,
     persistence, and storage concerns.
+  - Keeps `SystemConfig` as a shallow composition convenience only; concern-specific
+    config families remain the source of typed rules and must not degrade into a
+    generic settings bag.
 
 ### Infrastructure and edges
 
