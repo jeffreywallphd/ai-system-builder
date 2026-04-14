@@ -15,6 +15,7 @@ Use this file when adding any new read/write/download/operational capability tha
 - `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
 - `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/application/authorization/use-cases/AuthorizationResponseRedaction.ts`
+- `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
 - `src/ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
 - `src/infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
@@ -239,6 +240,40 @@ Reference docs:
 
 - `docs/architecture/authorization-feature-4-final-baseline.md`
 - `docs/authorization-sharing-management-and-access-review.md`
+
+## 10) Canonical authorization diagnostic contract (Story 2.1.1)
+
+Use `createAuthorizationDiagnosticRecord(...)` from
+`src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
+for machine-readable denial and cross-layer failure provenance.
+
+Field expectations by lifecycle stage:
+
+- Always required:
+  - `correlation.requestId` or `correlation.correlationId`
+  - `target.kind`
+  - `reasonCode`
+  - `denialProvenanceStage`
+- Required when applicable:
+  - `target.targetIdentifier` for `target.kind="resource-instance"`
+  - `target.targetWorkspaceId` for `target.kind="workspace-capability"`
+  - `requiredPermissionKey` once permission resolution is attempted (`use-case`, `evaluator`, `adapter` stages)
+  - `runtimeAvailability` metadata when denial is affected by readiness/dependency state
+- Optional but strongly recommended for evaluator/use-case diagnostics:
+  - `actor.actorIdentityId`
+  - `actor.actorActiveWorkspaceId`
+  - `counts.roleAssignmentCount`
+  - `counts.permissionGrantCount`
+  - `counts.sharingGrantCount`
+  - `counts.sharingPolicyMetadataCount`
+  - `counts.applicableScopeCount`
+  - `matchedSourceKind`
+
+Extension rules:
+
+- Put story/team-specific metadata under `extensions`.
+- Use namespaced extension keys (for example `team.feature`) so new fields do not collide with the canonical schema.
+- Do not replace canonical fields with extension-only equivalents; extensions are additive.
 
 ## Related ADRs
 

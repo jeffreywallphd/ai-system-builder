@@ -17,6 +17,7 @@ Goal: prevent bypasses and keep all policy checks centralized.
 - `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
 - `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/application/authorization/use-cases/AuthorizationResponseRedaction.ts`
+- `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
 - `src/ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
 
@@ -136,6 +137,42 @@ Reference docs:
 
 - `docs/architecture/authorization-feature-4-final-baseline.md`
 - `docs/authorization-sharing-management-and-access-review.md`
+
+## 10) Canonical authorization diagnostics (Story 2.1.1)
+
+Use `createAuthorizationDiagnosticRecord(...)` from
+`src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts` as the shared machine-readable schema for authorization denials and cross-layer failure provenance.
+
+Required fields:
+
+- `correlation.requestId` or `correlation.correlationId`
+- `target.kind`
+- `reasonCode`
+- `denialProvenanceStage`
+
+Required when applicable:
+
+- `target.targetIdentifier` for `target.kind="resource-instance"`
+- `target.targetWorkspaceId` for `target.kind="workspace-capability"`
+- `requiredPermissionKey` once permission evaluation is attempted (`use-case`, `evaluator`, `adapter`)
+- `runtimeAvailability` diagnostics when readiness/dependency state affects authorization behavior
+
+Optional (recommended once evaluation context is available):
+
+- `actor.actorIdentityId`
+- `actor.actorActiveWorkspaceId`
+- `counts.roleAssignmentCount`
+- `counts.permissionGrantCount`
+- `counts.sharingGrantCount`
+- `counts.sharingPolicyMetadataCount`
+- `counts.applicableScopeCount`
+- `matchedSourceKind`
+
+Extension rules:
+
+- Use `extensions` for story/team-specific metadata only.
+- Keep extension keys namespaced (for example `team.feature`) to avoid collisions.
+- Treat extensions as additive; canonical fields remain the shared contract authority.
 
 ## Related ADRs
 
