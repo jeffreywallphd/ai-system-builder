@@ -416,6 +416,7 @@ export class AuthorizationManagementBackendApi {
     request: AuthorizationAccessStateApiRequest,
   ): Promise<AuthorizationManagementApiResponse<never> | undefined> {
     const permissionsToCheck = [`${request.resource.resourceFamily}.share`, `${request.resource.resourceFamily}.manage`];
+    let lastDeniedReasonCode: string | undefined;
 
     for (const permission of permissionsToCheck) {
       const decision = await this.dependencies.decisionEvaluator.evaluateDecision({
@@ -434,9 +435,14 @@ export class AuthorizationManagementBackendApi {
       if (decision.decision.isAllowed) {
         return undefined;
       }
+      lastDeniedReasonCode = decision.decision.reasonCode;
     }
 
-    return this.failed(AuthorizationManagementApiErrorCodes.forbidden, "Actor is not authorized to inspect access state.");
+    return this.failed(
+      AuthorizationManagementApiErrorCodes.forbidden,
+      "Actor is not authorized to inspect access state.",
+      lastDeniedReasonCode,
+    );
   }
 
   private async assertWorkspaceReportReadAuthorized(
@@ -462,7 +468,11 @@ export class AuthorizationManagementBackendApi {
       return undefined;
     }
 
-    return this.failed(AuthorizationManagementApiErrorCodes.forbidden, "Actor is not authorized to inspect workspace authorization reporting.");
+    return this.failed(
+      AuthorizationManagementApiErrorCodes.forbidden,
+      "Actor is not authorized to inspect workspace authorization reporting.",
+      decision.decision.reasonCode,
+    );
   }
 
   private failedFromAdministrationOutcome(

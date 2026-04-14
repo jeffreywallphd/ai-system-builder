@@ -171,6 +171,7 @@ describe("AuthorizationManagementBackendApi", () => {
     expect(deniedAccessRead.ok).toBeFalse();
     if (!deniedAccessRead.ok) {
       expect(deniedAccessRead.error?.code).toBe("forbidden");
+      expect(typeof deniedAccessRead.error?.reasonCode).toBe("string");
     }
   });
 
@@ -384,6 +385,7 @@ describe("AuthorizationManagementBackendApi", () => {
     expect(report.ok).toBeFalse();
     if (!report.ok) {
       expect(report.error?.code).toBe("forbidden");
+      expect(typeof report.error?.reasonCode).toBe("string");
     }
   });
 

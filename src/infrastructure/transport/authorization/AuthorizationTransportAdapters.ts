@@ -14,6 +14,10 @@ export interface AuthorizationTransportErrorBody {
     readonly message: string;
     readonly reasonCode?: string;
     readonly denialReason?: AuthorizationTransportFailure["denialReason"];
+    readonly requestId?: string;
+    readonly correlationId?: string;
+    readonly availabilityState?: AuthorizationTransportFailure["availabilityState"];
+    readonly diagnostic?: AuthorizationTransportFailure["publicDiagnostic"];
   };
 }
 
@@ -128,6 +132,9 @@ function toHttpStatusCode(code: AuthorizationTransportFailure["code"]): number {
   if (code === AuthorizationTransportFailureCodes.invalidRequest) {
     return 400;
   }
+  if (code === AuthorizationTransportFailureCodes.temporarilyUnavailable) {
+    return 503;
+  }
   return 500;
 }
 
@@ -140,6 +147,9 @@ function toWebSocketCloseCode(code: AuthorizationTransportFailure["code"]): numb
   }
   if (code === AuthorizationTransportFailureCodes.invalidRequest) {
     return 4400;
+  }
+  if (code === AuthorizationTransportFailureCodes.temporarilyUnavailable) {
+    return 1013;
   }
   return 1011;
 }
@@ -156,6 +166,10 @@ function toErrorBody(failure: AuthorizationTransportFailure): AuthorizationTrans
       message: failure.message,
       reasonCode: failure.reasonCode,
       denialReason: failure.denialReason,
+      requestId: failure.requestId,
+      correlationId: failure.correlationId,
+      availabilityState: failure.availabilityState,
+      diagnostic: failure.publicDiagnostic,
     }),
   });
 }

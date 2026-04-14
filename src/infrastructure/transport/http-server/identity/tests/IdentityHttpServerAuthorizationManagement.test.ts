@@ -149,6 +149,12 @@ describe("IdentityHttpServer authorization management routes", () => {
       }),
     });
     expect(deniedGrant.status).toBe(403);
+    const deniedGrantBody = await deniedGrant.json();
+    expect(deniedGrantBody.ok).toBe(false);
+    expect(deniedGrantBody.error.code).toBe("forbidden");
+    expect(typeof deniedGrantBody.error.reasonCode).toBe("string");
+    expect((deniedGrant.headers.get("x-correlation-id") ?? "").length).toBeGreaterThan(0);
+    expect(deniedGrantBody.error.correlationId).toBe(deniedGrant.headers.get("x-correlation-id"));
 
     const invalidVisibility = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-1/visibility`, {
       method: "PATCH",
@@ -268,6 +274,7 @@ describe("IdentityHttpServer authorization management routes", () => {
     const body = await reportResponse.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("forbidden");
+    expect(typeof body.error.reasonCode).toBe("string");
   });
 
   it("runs an end-to-end visibility and explicit-sharing precedence lifecycle across transport boundaries", async () => {

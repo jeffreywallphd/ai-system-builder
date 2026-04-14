@@ -10,11 +10,31 @@ import {
 } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
+import {
+  AuthorizationContextResolutionReasonCodes,
+  AuthorizationRuntimeAvailabilityReasonCodes,
+  AuthorizationTransportMappingReasonCodes,
+} from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
+import {
+  AuthorizationDiagnosticEmissionSurfaces,
+  AuthorizationDiagnosticEvidenceKinds,
+  AuthorizationDiagnosticMatchedSourceKinds,
+  AuthorizationDiagnosticOutcomes,
+  AuthorizationDiagnosticProvenanceStages,
+  AuthorizationDiagnosticTargetKinds,
+  createAuthorizationDiagnosticRecord,
+  isKnownAuthorizationDiagnosticReasonCode,
+  projectAuthorizationDiagnosticRecord,
+  type AuthorizationDiagnosticOutcome,
+  type AuthorizationDiagnosticReasonCode,
+  type AuthorizationDiagnosticRecord,
+} from "@shared/contracts/authorization/AuthorizationDiagnosticsContracts";
 
 export const AuthorizationTransportFailureCodes = Object.freeze({
   unauthorized: "unauthorized",
   forbidden: "forbidden",
   invalidRequest: "invalid-request",
+  temporarilyUnavailable: "temporarily-unavailable",
   internal: "internal",
 });
 
@@ -26,6 +46,11 @@ export interface AuthorizationTransportFailure {
   readonly message: string;
   readonly reasonCode?: string;
   readonly denialReason?: AuthorizationPolicyDecisionDenialReason;
+  readonly requestId?: string;
+  readonly correlationId?: string;
+  readonly availabilityState?: "degraded" | "unavailable";
+  readonly diagnostic?: AuthorizationDiagnosticRecord;
+  readonly publicDiagnostic?: AuthorizationDiagnosticRecord;
 }
 
 export interface AuthorizationTransportGuardAllowed {
@@ -65,6 +90,8 @@ export interface AuthorizationTransportRequirement<TContext> {
   readonly target: AuthorizationTransportRequirementTarget<TContext>;
   readonly asOf?: ContextValueResolver<TContext, string | undefined>;
   readonly includeDebugDetails?: boolean;
+  readonly requestId?: ContextValueResolver<TContext, string | undefined>;
+  readonly correlationId?: ContextValueResolver<TContext, string | undefined>;
 }
 
 export interface AuthorizationTransportPolicyGuardDependencies<TContext> {
@@ -79,6 +106,8 @@ export class AuthorizationTransportPolicyGuard<TContext> {
     context: TContext,
     requirement: AuthorizationTransportRequirement<TContext>,
   ): Promise<AuthorizationTransportGuardResult> {
+    const requestId = this.resolveOptionalString(context, requirement.requestId);
+    const correlationId = this.resolveOptionalString(context, requirement.correlationId);
     try {
       const actor = this.dependencies.resolveActor(context);
       const actorUserIdentityId = normalizeOptional(actor?.actorUserIdentityId);
@@ -89,6 +118,12 @@ export class AuthorizationTransportPolicyGuard<TContext> {
           message: "Actor identity context is required for authorization.",
           reasonCode: "authorization-evaluation-invalid-actor",
           denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
+        }, {
+          context,
+          requirement,
+          requestId,
+          correlationId,
+          actorUserIdentityId,
         });
       }
 
@@ -99,6 +134,12 @@ export class AuthorizationTransportPolicyGuard<TContext> {
           message: "Authorization requirement requiredPermissionKey is missing.",
           reasonCode: "authorization-evaluation-invalid-permission-key",
           denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
+        }, {
+          context,
+          requirement,
+          requestId,
+          correlationId,
+          actorUserIdentityId: actorUserIdentityId ?? actorServiceId,
         });
       }
 
@@ -112,7 +153,14 @@ export class AuthorizationTransportPolicyGuard<TContext> {
         requiredPermissionKey,
       });
       if (!request.ok) {
-        return this.denied(request.failure);
+        return this.denied(request.failure, {
+          context,
+          requirement,
+          requestId,
+          correlationId,
+          actorUserIdentityId: actorUserIdentityId ?? actorServiceId,
+          requiredPermissionKey,
+        });
       }
 
       const result = await this.dependencies.decisionEvaluator.evaluateDecision(request.request);
@@ -124,11 +172,31 @@ export class AuthorizationTransportPolicyGuard<TContext> {
         });
       }
 
-      return this.denied(this.mapDeniedDecision(result));
+      return this.denied(this.mapDeniedDecision(result), {
+        context,
+        requirement,
+        requestId,
+        correlationId,
+        actorUserIdentityId: actorUserIdentityId ?? actorServiceId,
+        requiredPermissionKey,
+      });
     } catch (error) {
+      const normalizedErrorMessage = normalizeErrorMessage(error);
+      const transientFailure = /temporarily unavailable|timeout|timed out|unreachable|unavailable|retry/i.test(normalizedErrorMessage);
       return this.denied({
-        code: AuthorizationTransportFailureCodes.internal,
+        code: transientFailure
+          ? AuthorizationTransportFailureCodes.temporarilyUnavailable
+          : AuthorizationTransportFailureCodes.internal,
         message: normalizeErrorMessage(error),
+        reasonCode: transientFailure
+          ? AuthorizationTransportMappingReasonCodes.adapterUnavailable
+          : AuthorizationTransportMappingReasonCodes.transportMappingFailed,
+        availabilityState: transientFailure ? "unavailable" : undefined,
+      }, {
+        context,
+        requirement,
+        requestId,
+        correlationId,
       });
     }
   }
@@ -213,6 +281,17 @@ export class AuthorizationTransportPolicyGuard<TContext> {
   }
 
   private mapDeniedDecision(result: AuthorizationPolicyDecisionEvaluationResult): AuthorizationTransportFailure {
+    if (isRuntimeAvailabilityReasonCode(result.decision.reasonCode)) {
+      return Object.freeze({
+        code: AuthorizationTransportFailureCodes.temporarilyUnavailable,
+        message: result.decision.reason,
+        reasonCode: result.decision.reasonCode,
+        denialReason: result.decision.denialReason,
+        availabilityState: result.decision.reasonCode === AuthorizationRuntimeAvailabilityReasonCodes.runtimeDegraded
+          ? "degraded"
+          : "unavailable",
+      });
+    }
     if (
       result.decision.denialReason === AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext
       && result.decision.reasonCode.includes("invalid-actor")
@@ -267,7 +346,80 @@ export class AuthorizationTransportPolicyGuard<TContext> {
     return normalizeOptional(value);
   }
 
-  private denied(failure: AuthorizationTransportFailure): AuthorizationTransportGuardDenied {
+  private denied(
+    failure: Omit<AuthorizationTransportFailure, "diagnostic" | "publicDiagnostic">,
+    context: {
+      readonly context: TContext;
+      readonly requirement: AuthorizationTransportRequirement<TContext>;
+      readonly requestId?: string;
+      readonly correlationId?: string;
+      readonly actorUserIdentityId?: string;
+      readonly requiredPermissionKey?: string;
+    },
+  ): AuthorizationTransportGuardDenied {
+    const diagnosticCorrelationId = resolveDiagnosticCorrelationId({
+      explicitCorrelationId: context.correlationId,
+      requestId: context.requestId,
+      actorUserIdentityId: context.actorUserIdentityId,
+      requiredPermissionKey: context.requiredPermissionKey
+        ?? this.resolveRequiredString(context.context, context.requirement.requiredPermissionKey, "requiredPermissionKey")
+        ?? "authorization.invalid",
+      target: context.requirement.target,
+      context: context.context,
+    });
+    const transportTarget = resolveTransportDiagnosticTarget({
+      target: context.requirement.target,
+      context: context.context,
+    });
+    const reasonCode = resolveTransportFailureReasonCode(failure);
+    const outcome = resolveTransportFailureOutcome(failure);
+    const runtimeAvailability = failure.code === AuthorizationTransportFailureCodes.temporarilyUnavailable
+      ? Object.freeze({
+        affectedByRuntimeAvailability: true,
+        degraded: failure.availabilityState === "degraded",
+        blockingReasonCodes: failure.reasonCode ? Object.freeze([failure.reasonCode]) : undefined,
+        detail: failure.message,
+      })
+      : undefined;
+
+    const diagnostic = createAuthorizationDiagnosticRecord({
+      outcome,
+      correlation: Object.freeze({
+        requestId: context.requestId,
+        correlationId: diagnosticCorrelationId,
+      }),
+      actor: Object.freeze({
+        actorIdentityId: context.actorUserIdentityId,
+      }),
+      target: transportTarget,
+      requiredPermissionKey: context.requiredPermissionKey
+        ?? this.resolveRequiredString(context.context, context.requirement.requiredPermissionKey, "requiredPermissionKey")
+        ?? "authorization.invalid",
+      matchedSourceKind: outcome === AuthorizationDiagnosticOutcomes.deny
+        ? AuthorizationDiagnosticMatchedSourceKinds.none
+        : undefined,
+      reasonCode,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.transportMapping,
+      runtimeAvailability,
+      evidence: Object.freeze({
+        missing: Object.freeze([
+          AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+        ]),
+      }),
+      extensions: Object.freeze({
+        "authorization.transport.failure-code.public": failure.code,
+        "authorization.transport.availability-state.public": failure.availabilityState,
+      }),
+    });
+    const publicDiagnostic = projectAuthorizationDiagnosticRecord(diagnostic, {
+      surface: AuthorizationDiagnosticEmissionSurfaces.external,
+      includeIdentifiers: false,
+      secretSensitiveSurface: true,
+      adminSensitiveSurface: true,
+    });
+
     return Object.freeze({
       ok: false,
       failure: Object.freeze({
@@ -275,9 +427,133 @@ export class AuthorizationTransportPolicyGuard<TContext> {
         message: failure.message,
         reasonCode: failure.reasonCode,
         denialReason: failure.denialReason,
+        requestId: context.requestId,
+        correlationId: diagnosticCorrelationId,
+        availabilityState: failure.availabilityState,
+        diagnostic,
+        publicDiagnostic,
       }),
     });
   }
+}
+
+function resolveDiagnosticCorrelationId<TContext>(input: {
+  readonly explicitCorrelationId?: string;
+  readonly requestId?: string;
+  readonly actorUserIdentityId?: string;
+  readonly requiredPermissionKey: string;
+  readonly target: AuthorizationTransportRequirementTarget<TContext>;
+  readonly context: TContext;
+}): string {
+  const explicit = normalizeOptional(input.explicitCorrelationId);
+  if (explicit) {
+    return explicit;
+  }
+  const requestId = normalizeOptional(input.requestId);
+  if (requestId) {
+    return requestId;
+  }
+
+  const actor = normalizeOptional(input.actorUserIdentityId) ?? "anonymous";
+  if (input.target.kind === AuthorizationPolicyEvaluationTargetKinds.resourceInstance) {
+    const resourceType = normalizeOptional(resolveContextValue(input.context, input.target.resourceType)) ?? "resource";
+    const resourceId = normalizeOptional(resolveContextValue(input.context, input.target.resourceId)) ?? "resource-id";
+    return `${actor}:${input.requiredPermissionKey}:resource:${resourceType}:${resourceId}`;
+  }
+
+  const workspaceId = normalizeOptional(resolveContextValue(input.context, input.target.workspaceId)) ?? "workspace";
+  const capabilityResourceType = normalizeOptional(resolveContextValue(input.context, input.target.capabilityResourceType)) ?? "capability";
+  return `${actor}:${input.requiredPermissionKey}:workspace:${workspaceId}:${capabilityResourceType}`;
+}
+
+function resolveTransportDiagnosticTarget<TContext>(input: {
+  readonly target: AuthorizationTransportRequirementTarget<TContext>;
+  readonly context: TContext;
+}): {
+  readonly kind: "resource-instance" | "workspace-capability" | "unresolved";
+  readonly targetIdentifier?: string;
+  readonly targetWorkspaceId?: string;
+  readonly targetResourceFamily?: AuthorizationResourceFamily;
+  readonly targetResourceType?: string;
+} {
+  if (input.target.kind === AuthorizationPolicyEvaluationTargetKinds.resourceInstance) {
+    const resourceId = normalizeOptional(resolveContextValue(input.context, input.target.resourceId));
+    const resourceType = normalizeOptional(resolveContextValue(input.context, input.target.resourceType));
+    if (!resourceId) {
+      return Object.freeze({
+        kind: AuthorizationDiagnosticTargetKinds.unresolved,
+      });
+    }
+    return Object.freeze({
+      kind: AuthorizationDiagnosticTargetKinds.resourceInstance,
+      targetIdentifier: resourceId,
+      targetResourceFamily: resolveContextValue(input.context, input.target.resourceFamily),
+      targetResourceType: resourceType,
+    });
+  }
+
+  const workspaceId = normalizeOptional(resolveContextValue(input.context, input.target.workspaceId));
+  const capabilityResourceType = normalizeOptional(resolveContextValue(input.context, input.target.capabilityResourceType));
+  if (!workspaceId) {
+    return Object.freeze({
+      kind: AuthorizationDiagnosticTargetKinds.unresolved,
+    });
+  }
+  return Object.freeze({
+    kind: AuthorizationDiagnosticTargetKinds.workspaceCapability,
+    targetIdentifier: capabilityResourceType ? `workspace-capability:${workspaceId}:${capabilityResourceType}` : undefined,
+    targetWorkspaceId: workspaceId,
+    targetResourceType: capabilityResourceType,
+  });
+}
+
+function resolveTransportFailureOutcome(
+  failure: Pick<AuthorizationTransportFailure, "code" | "availabilityState">,
+): AuthorizationDiagnosticOutcome {
+  if (failure.code === AuthorizationTransportFailureCodes.temporarilyUnavailable) {
+    return failure.availabilityState === "degraded"
+      ? AuthorizationDiagnosticOutcomes.degraded
+      : AuthorizationDiagnosticOutcomes.unavailable;
+  }
+  return AuthorizationDiagnosticOutcomes.deny;
+}
+
+function resolveTransportFailureReasonCode(
+  failure: Pick<AuthorizationTransportFailure, "reasonCode" | "code">,
+): AuthorizationDiagnosticReasonCode {
+  if (failure.reasonCode && isKnownAuthorizationDiagnosticReasonCode(failure.reasonCode)) {
+    return failure.reasonCode;
+  }
+
+  if (failure.code === AuthorizationTransportFailureCodes.unauthorized) {
+    return AuthorizationContextResolutionReasonCodes.actorContextMissing;
+  }
+  if (failure.code === AuthorizationTransportFailureCodes.invalidRequest) {
+    return AuthorizationTransportMappingReasonCodes.permissionEntryMissing;
+  }
+  if (failure.code === AuthorizationTransportFailureCodes.forbidden) {
+    return AuthorizationTransportMappingReasonCodes.transportDenied;
+  }
+  if (failure.code === AuthorizationTransportFailureCodes.temporarilyUnavailable) {
+    return AuthorizationRuntimeAvailabilityReasonCodes.runtimeGateBlocked;
+  }
+  return AuthorizationTransportMappingReasonCodes.transportMappingFailed;
+}
+
+function isRuntimeAvailabilityReasonCode(value: string): value is AuthorizationDiagnosticReasonCode {
+  return Object.values(AuthorizationRuntimeAvailabilityReasonCodes).includes(
+    value as typeof AuthorizationRuntimeAvailabilityReasonCodes[keyof typeof AuthorizationRuntimeAvailabilityReasonCodes],
+  );
+}
+
+function resolveContextValue<TContext, TValue>(
+  context: TContext,
+  resolver: ContextValueResolver<TContext, TValue>,
+): TValue {
+  if (typeof resolver === "function") {
+    return (resolver as (value: TContext) => TValue)(context);
+  }
+  return resolver;
 }
 
 function normalizeOptional(value: string | undefined): string | undefined {

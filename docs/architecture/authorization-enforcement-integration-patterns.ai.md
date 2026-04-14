@@ -258,6 +258,32 @@ Contributor guidance:
 - Prefer canonical reason codes/provenance stages and explicit missing-evidence markers over ad hoc strings.
 - Keep deny-by-default behavior: when upstream evaluation evidence is missing, emit a deny/unavailable diagnostic with explicit missing markers.
 
+## 12) Transport and API diagnostic mapping baseline (Story 2.3.1)
+
+When shaping authorization denial/error responses across transport and backend API seams:
+
+- keep route handlers non-authoritative for authorization semantics,
+- preserve correlation id continuity (`x-request-id`, `x-correlation-id`, envelope `error.correlationId`),
+- preserve canonical reason semantics (`reasonCode` from policy decisions),
+- keep public diagnostics redacted and externally projected only,
+- distinguish authorization-deny from runtime availability degradation/unavailability.
+
+Transport mapping expectations:
+
+- HTTP:
+  - `unauthorized` -> `401`
+  - `forbidden` -> `403`
+  - `invalid-request` -> `400`
+  - `temporarily-unavailable` -> `503`
+  - `internal` -> `500`
+- WebSocket:
+  - `unauthorized` -> `4401`
+  - `forbidden` -> `4403`
+  - `invalid-request` -> `4400`
+  - `temporarily-unavailable` -> `1013`
+  - `internal` -> `1011`
+- Emit canonical diagnostic records at `transport-mapping` provenance stage and project external diagnostics for public payloads.
+
 ## Related ADRs
 
 - `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`
