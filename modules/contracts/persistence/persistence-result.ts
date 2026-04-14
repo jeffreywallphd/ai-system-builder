@@ -9,7 +9,10 @@ import type {
   PersistenceError,
   PersistenceFailureDetails,
 } from "./persistence-error";
-import type { PersistenceOperation } from "./persistence-operation";
+import {
+  assertPersistenceOperationMatchesRecord,
+  type PersistenceOperation,
+} from "./persistence-operation";
 import type { PersistenceRecordReference } from "./persistence-record-reference";
 
 export interface PersistenceResultEnvelope extends ContractBoundaryContext {
@@ -41,6 +44,10 @@ export function createPersistenceSuccessResult<TValue>(
     record?: PersistenceRecordReference;
   },
 ): PersistenceSuccessResult<TValue> {
+  if (options?.record !== undefined) {
+    assertPersistenceOperationMatchesRecord(operation, options.record);
+  }
+
   const result = createSuccessResult(value, {
     requestId: options?.requestId,
     correlationId: options?.correlationId,

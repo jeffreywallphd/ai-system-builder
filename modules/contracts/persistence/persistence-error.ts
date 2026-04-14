@@ -4,7 +4,10 @@ import type {
   ContractErrorDetails,
 } from "../shared";
 import { createContractError } from "../shared";
-import type { PersistenceOperation } from "./persistence-operation";
+import {
+  assertPersistenceOperationMatchesRecord,
+  type PersistenceOperation,
+} from "./persistence-operation";
 import type { PersistenceRecordReference } from "./persistence-record-reference";
 
 export type PersistenceFailureDetails = ContractErrorDetails;
@@ -29,6 +32,10 @@ export function createPersistenceError<
     record?: PersistenceRecordReference;
   },
 ): PersistenceError<TDetails> {
+  if (options?.record !== undefined) {
+    assertPersistenceOperationMatchesRecord(operation, options.record);
+  }
+
   return {
     ...createContractError(code, message, {
       details: options?.details,
