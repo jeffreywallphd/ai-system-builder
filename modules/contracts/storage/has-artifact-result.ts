@@ -6,9 +6,10 @@ import {
   createFailureResult,
   createSuccessResult,
 } from "../shared";
-import type {
-  StorageObjectDescriptor,
-  StorageObjectMetadata,
+import {
+  normalizeStorageObjectDescriptor,
+  type StorageObjectDescriptor,
+  type StorageObjectMetadata,
 } from "./storage-object-descriptor";
 
 export interface HasArtifactValue<
@@ -36,7 +37,9 @@ export function createHasArtifactSuccessResult<
   return createSuccessResult(
     {
       exists,
-      descriptor: options?.descriptor,
+      descriptor: options?.descriptor
+        ? normalizeStorageObjectDescriptor(options.descriptor)
+        : undefined,
     },
     {
       requestId: options?.requestId,

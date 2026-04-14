@@ -1,7 +1,8 @@
 import type { ContractBoundaryContext } from "../shared";
+import { normalizeStorageArtifactKey, type StorageArtifactKey } from "./storage-artifact-key";
 
 export interface RetrieveArtifactRequest extends ContractBoundaryContext {
-  key: string;
+  key: StorageArtifactKey;
 }
 
 export function createRetrieveArtifactRequest(
@@ -9,7 +10,7 @@ export function createRetrieveArtifactRequest(
   options?: ContractBoundaryContext,
 ): RetrieveArtifactRequest {
   return {
-    key,
+    key: normalizeStorageArtifactKey(key),
     requestId: options?.requestId,
     correlationId: options?.correlationId,
   };

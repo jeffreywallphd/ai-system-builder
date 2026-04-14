@@ -1,7 +1,8 @@
 import type { ContractBoundaryContext } from "../shared";
-import type {
-  StorageObjectDescriptorInput,
-  StorageObjectMetadata,
+import {
+  normalizeStorageObjectDescriptorInput,
+  type StorageObjectDescriptorInput,
+  type StorageObjectMetadata,
 } from "./storage-object-descriptor";
 
 export interface StoreArtifactRequest<
@@ -26,7 +27,7 @@ export function createStoreArtifactRequest<
   },
 ): StoreArtifactRequest<TContent, TMetadata> {
   return {
-    descriptor: options?.descriptor ?? {},
+    descriptor: normalizeStorageObjectDescriptorInput(options?.descriptor),
     content,
     overwrite: options?.overwrite,
     requestId: options?.requestId,
