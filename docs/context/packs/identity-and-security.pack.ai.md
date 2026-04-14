@@ -24,12 +24,14 @@
 - Preserve trusted-device and node-trust cryptographic trust establishment/revocation semantics.
 - Never expose secrets/protected values in logs, telemetry, or API payloads beyond approved redacted metadata.
 - Keep least-privilege and role/permission checks explicit on security-sensitive routes and mutations.
+- Keep authorization diagnostics canonical: reason/provenance catalogs, cross-layer correlation continuity, and external redaction boundaries.
 
 ## Authoritative Docs
 
 - `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
 - `docs/architecture/authorization-foundation.ai.md`
 - `docs/architecture/authorization-enforcement-integration-patterns.ai.md`
+- `docs/unified-api-observability-troubleshooting.ai.md`
 - `docs/architecture/trusted-device-foundation.ai.md`
 - `docs/architecture/transport-security-foundation.ai.md`
 - `docs/architecture/secrets-foundation.ai.md`

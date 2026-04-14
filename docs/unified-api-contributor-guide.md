@@ -135,6 +135,48 @@ Permission-sensitive PR expectations:
 4. Document why invariant coverage is not needed when only non-permissioned behavior changes.
 5. Keep fixture/helper additions reusable across feature families; avoid one-off ad hoc setup in individual tests.
 
+## Authorization diagnostics extension workflow
+
+Use this workflow whenever a change can alter authorization deny outcomes, cross-layer failure provenance, or public authorization error diagnostics.
+
+Canonical contracts and catalogs:
+
+1. Schema and redaction/projection contract: `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
+2. Canonical reason-code and provenance-stage catalogs: `src/shared/contracts/authorization/AuthorizationDiagnosticCatalogs.ts`
+3. Integration and extension guidance: `docs/architecture/authorization-enforcement-integration-patterns.md`
+
+Where diagnostics are emitted:
+
+1. Route/API boundary mapping: `src/infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
+2. Use-case/evaluator emission helpers: `src/application/authorization/use-cases/AuthorizationDecisionDiagnostics.ts`
+3. Policy evaluator decisive and adapter-failure stages: `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
+4. Transport status/envelope mapping and correlation continuity: `src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts`
+
+How to add diagnostics for a new permissioned feature:
+
+1. Reuse a catalog reason code when semantics already exist; otherwise add a stable namespaced reason code.
+2. Emit `createAuthorizationDiagnosticRecord(...)` at the stage where evidence is known (`permission-snapshot`, `scope-filtering`, `evaluator-resolution`, `adapter-failure`, or `transport-mapping`).
+3. Keep one correlation value across all stages for one decision path using request/correlation headers and evaluator correlation helpers.
+4. Include explicit `evidence.missing` markers when upstream evidence is unavailable; do not omit missing evidence silently.
+5. Project external diagnostics with `projectAuthorizationDiagnosticRecord(...)`; do not expose actor IDs, target identifiers, or identifier arrays on external surfaces.
+
+Interpretation guardrails for contributors:
+
+1. Correlation IDs answer "which events belong to this denial across layers?"
+2. Reason codes answer "what specific policy or boundary condition caused this outcome?"
+3. Provenance stages answer "where in the stack did the condition become authoritative?"
+4. Extension keys stay namespaced (`team.feature`) and never replace canonical fields.
+
+Required verification for authorization-sensitive changes:
+
+1. Contract-level diagnostics coverage: `src/shared/contracts/authorization/tests/AuthorizationDiagnosticsContracts.test.ts`
+2. Evaluator-stage and adapter-failure provenance coverage: `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
+3. Transport mapping and response posture coverage: `src/infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
+4. Invariant and composed integration proof when behavior spans route/API/use-case/evaluator boundaries:
+   - `src/testing/invariants/tests`
+   - `src/application/authorization/tests/*InvariantCoverage.test.ts`
+   - `src/application/authorization/tests/AuthorizationRuntimeContextDriftRegression.test.ts`
+
 ## Observability requirements for transport changes
 
 1. Emit structured transport events (request/upgrade/route failure/realtime failure) with `requestId`.

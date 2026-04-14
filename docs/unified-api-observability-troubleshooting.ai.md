@@ -59,6 +59,52 @@ Shared client transport diagnostics are emitted by `src/ui/shared/api/SharedApiC
 4. Follow event sequence and status codes.
 5. Confirm redaction remains intact.
 
+## Authorization denial triage flow
+
+Use when a request is denied and you must localize failure provenance across route, API, use-case, evaluator, and adapter seams.
+
+Canonical contracts:
+
+1. schema + projection/redaction boundaries: `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
+2. reason/provenance catalogs: `src/shared/contracts/authorization/AuthorizationDiagnosticCatalogs.ts`
+3. integration baseline: `docs/architecture/authorization-enforcement-integration-patterns.md`
+
+Where diagnostics are emitted:
+
+1. route/API/transport mapping:
+   - `src/infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
+   - `src/infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
+   - `src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts`
+2. permission/evaluator stages:
+   - `src/application/authorization/use-cases/AuthorizationDecisionDiagnostics.ts`
+   - `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
+3. adapter/repository failures:
+   - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
+
+Interpretation sequence:
+
+1. start from response `error.correlationId` or `x-correlation-id`
+2. gather same-correlation events and order by stage:
+   - `permission-snapshot` -> `scope-filtering` -> `evaluator-resolution` -> `final-decision-emission`
+   - include `adapter-failure` and `transport-mapping` when present
+3. use `reasonCode` to classify policy denials (`no-effective-permission`, `scope-mismatch`) versus boundary failures (`authorization-repository-lookup-failed`, `authorization-adapter-timeout`, `transport-denied`)
+4. first stage with stable deny/failure is the owning failure boundary
+5. use `evidence.missing` + counts to distinguish missing upstream evidence from complete policy-deny evidence
+
+Security boundary expectations:
+
+1. external diagnostics stay projected/redacted (no actor IDs, target identifiers, or identifier arrays)
+2. secret-sensitive/admin-sensitive surfaces also suppress permission keys and sensitive target metadata
+3. extension values are sanitized; only `.public`/`:public` extensions are externally retained
+
+Invariant relationship:
+
+1. invariant suites prove policy truth under scope/workspace permutations:
+   - `src/testing/invariants/tests`
+   - `src/application/authorization/tests/*InvariantCoverage.test.ts`
+2. composed runtime regression proves cross-layer provenance continuity:
+   - `src/application/authorization/tests/AuthorizationRuntimeContextDriftRegression.test.ts`
+
 ## Story 14.3.8 readiness checks
 
 - Cross-surface parity regression:
