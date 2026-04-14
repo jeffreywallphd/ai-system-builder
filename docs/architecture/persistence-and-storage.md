@@ -15,6 +15,17 @@ Postgres is the default persistence adapter target for structured records.
 
 This establishes a default operational direction for schema/migrations and relational data handling, without forcing every module to know Postgres specifics.
 
+## Shared persistence contract baseline
+
+The shared persistence contract vocabulary under `modules/contracts/persistence` is intentionally:
+
+- record-oriented (structured durable data references and operation scope),
+- result-oriented (persistence operation envelope with shared success/failure semantics),
+- identity-explicit (record references by logical type plus stable record id),
+- implementation-neutral (no ORM, SQL builder, or driver-specific contract leakage).
+
+This keeps Postgres as the default adapter direction without coupling application/domain boundaries to Postgres-specific APIs.
+
 ## What belongs in persistence
 
 Examples:
