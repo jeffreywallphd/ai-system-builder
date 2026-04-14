@@ -106,6 +106,10 @@ Do not add libraries to avoid writing small amounts of clear code.
 - Do not hardcode environment-specific values.
 - Do not commit secrets, tokens, credentials, or private keys.
 - Validate required configuration at startup boundaries.
+- Keep config contracts typed and concern-specific; do not collapse unrelated
+  concerns into a generic options/settings bag.
+- Keep grouped config envelopes as composition conveniences only; concern-level
+  contracts remain the canonical place for validation and naming rules.
 
 Application/domain logic should depend on typed configuration inputs, not direct `process.env` reads scattered across layers.
 
