@@ -21,6 +21,8 @@
 
 - Maintain clean architecture direction: inner layers (domain/application) must not depend on outer infrastructure/host/UI layers.
 - Keep contracts explicit at boundaries; avoid embedding boundary semantics in ad hoc types.
+- Use `modules/contracts/host` for thin host-aware context metadata instead of
+  passing framework-native objects inward.
 - Treat hosts (desktop/server) and transport (IPC/HTTP) as separate concerns.
 - Preserve shared-first UI: reusable components in shared UI, thin platform-specific layers.
 - Follow TypeScript-first runtime posture; external runtimes are adapter extensions, not architecture centers.

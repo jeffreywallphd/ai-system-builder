@@ -37,6 +37,18 @@ Keeping these separate avoids common coupling failures:
 - treating Electron IPC handlers as the business layer,
 - mixing lifecycle concerns with request translation concerns.
 
+## Host context contract boundary
+
+When host-aware metadata must cross into inner layers, use the thin host context
+contracts under `modules/contracts/host`.
+
+- Keep host context limited to host identity/kind plus lightweight boundary
+  metadata.
+- Keep framework objects (`BrowserWindow`, Express request/response, etc.) out
+  of host context contracts.
+- Keep session/auth modeling out of host context unless explicitly introduced by
+  a separate decision.
+
 ## Shared transport contract core and specialization
 
 Transport adapters should share a transport-neutral contract core under `modules/contracts/transport`.
