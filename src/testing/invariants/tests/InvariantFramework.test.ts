@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   InvariantAdapterRegistry,
   InvariantFeatureFamilies,
+  buildAlignedInvariantWorkspaceRelationshipFixture,
   composeInvariantFixtures,
   executeAndAssertInvariantScenario,
   executeInvariantScenario,
@@ -83,6 +84,21 @@ describe("Invariant framework harness", () => {
       Object.freeze({ region: "us-east" }),
       (current) => Object.freeze({ ...current, mode: "integration" }),
     );
+    const contexts = buildAlignedInvariantWorkspaceRelationshipFixture({
+      actor: Object.freeze({
+        actorUserIdentityId: "user-collab",
+      }),
+      activeWorkspace: Object.freeze({
+        workspaceId: "workspace-alpha",
+        ownerUserIdentityId: "user-owner",
+      }),
+      resource: Object.freeze({
+        resourceFamily: "asset",
+        resourceType: "asset",
+        resourceId: "asset:shared:1",
+        ownerUserIdentityId: "user-owner",
+      }),
+    });
 
     const registry = new InvariantAdapterRegistry()
       .register(new AssetInvariantAdapter())
@@ -93,21 +109,10 @@ describe("Invariant framework harness", () => {
       title: "collaborator can read explicitly shared asset",
       family: InvariantFeatureFamilies.asset,
       capability: "asset.read",
-      actor: Object.freeze({
-        actorUserIdentityId: "user-collab",
-        activeWorkspaceId: "workspace-alpha",
-      }),
-      workspace: Object.freeze({
-        workspaceId: "workspace-alpha",
-        ownerUserIdentityId: "user-owner",
-      }),
-      target: Object.freeze({
-        resourceFamily: "asset",
-        resourceType: "asset",
-        resourceId: "asset:shared:1",
-        workspaceId: "workspace-alpha",
-        ownerUserIdentityId: "user-owner",
-      }),
+      actor: contexts.actor,
+      workspace: contexts.activeWorkspace,
+      target: contexts.target,
+      resource: contexts.resource,
       input: Object.freeze({
         resourceVisibility: "shared",
       }),

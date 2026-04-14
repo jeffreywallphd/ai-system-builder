@@ -15,7 +15,7 @@ This module provides a shared baseline for cross-system invariant testing:
 ## Core Contracts
 
 - `InvariantScenarioDefinition<TInput>`
-  - scenario id/title, feature family, actor/workspace/target context, input, and expected outcome metadata.
+  - scenario id/title, feature family, actor/workspace/target context, optional resource context, input, and expected outcome metadata.
 - `InvariantFamilyAdapter<TInput, TResult>`
   - family-specific evaluator contract for assets, workflows, systems, runs, storage, secrets, and admin/deployment surfaces.
 - `InvariantExecutionResult`
@@ -25,6 +25,18 @@ This module provides a shared baseline for cross-system invariant testing:
 
 - `composeInvariantFixtures(...)`
   - deterministic fixture bag composition for shared setup across scenarios.
+- `buildInvariantActorContext(...)`
+  - canonical actor fixture builder with normalized identity/workspace fields.
+- `buildInvariantWorkspaceContext(...)`
+  - canonical workspace fixture builder for active/target/resource workspace contexts.
+- `buildInvariantResourceContext(...)`
+  - canonical resource fixture builder for resource-family/type/identifier scope.
+- `buildInvariantTargetContext(...)` and `buildCapabilityTargetContext(...)`
+  - canonical target fixture builders for concrete-resource targets and capability-only targets.
+- `buildInvariantWorkspaceRelationshipFixture(...)`
+  - composes aligned or divergent active-vs-target-vs-resource workspace relationships without ad hoc setup.
+- `normalizeInvariantIdentifier(...)` and `normalizeInvariantIdentifierMap(...)`
+  - shared identifier normalization helpers (trim + empty rejection) used by all context builders.
 - `InvariantAdapterRegistry`
   - explicit family-to-adapter registration with duplicate-family protection.
 - `executeInvariantScenario(...)`
@@ -35,7 +47,7 @@ This module provides a shared baseline for cross-system invariant testing:
 ## Extension Workflow
 
 1. Define a scenario with `InvariantScenarioDefinition` and include expectation metadata.
-2. Reuse or compose fixtures with `composeInvariantFixtures`.
+2. Reuse or compose fixtures with `composeInvariantFixtures` and context builders (`buildInvariant*Context`).
 3. Implement a family adapter that maps scenario input to real policy/runtime evaluation.
 4. Register the adapter in `InvariantAdapterRegistry` and execute with `executeAndAssertInvariantScenario`.
 5. Keep family-specific details in adapters, not in shared harness contracts.
@@ -45,3 +57,4 @@ This module provides a shared baseline for cross-system invariant testing:
 - Keep contracts explicit and typed; avoid adding a generic DSL layer.
 - Keep adapter behavior family-local; shared module should stay orchestration-only.
 - Prefer metadata assertions tied to stable policy/runtime invariants instead of internal implementation details.
+- Keep actor context, target context, and resource context distinct so tests can assert workspace-aligned and mismatch paths explicitly.
