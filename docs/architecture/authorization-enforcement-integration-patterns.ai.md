@@ -192,6 +192,45 @@ Extension rules:
 - Keep extension keys namespaced (for example `team.feature`) to avoid collisions.
 - Treat extensions as additive; canonical fields remain the shared contract authority.
 
+## 11) Emission completeness and redaction boundaries (Story 2.1.3)
+
+Use `createAuthorizationDiagnosticRecord(...)` and `projectAuthorizationDiagnosticRecord(...)` from
+`src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts` as the canonical emission policy.
+
+Outcome completeness rules:
+
+- `allow` and `deny` diagnostics must include `requiredPermissionKey`.
+- `allow` diagnostics must include `matchedSourceKind` that identifies an effective source (`owner-override`, `role-grant`, `permission-grant`, `sharing-grant`, or `visibility-rule`).
+- `deny` diagnostics must include `matchedSourceKind` (`none` is valid when nothing matched).
+- `unavailable` and `degraded` diagnostics must include `runtimeAvailability` with `affectedByRuntimeAvailability=true`.
+- Evaluator/use-case/final-decision stages must emit role/permission/sharing evidence by either:
+  - counts and/or identifier arrays, or
+  - explicit `evidence.missing` markers (for example `role-assignments-unavailable`) when upstream data is unavailable.
+
+Counts vs IDs emission rules:
+
+- Internal diagnostics may include identifier evidence (`evidence.roleAssignmentIds`, `evidence.permissionGrantIds`, `evidence.sharingGrantIds`) and are clamp-limited by policy options.
+- External/user-facing diagnostics must not include identifier evidence; emit counts only.
+- Missing intermediate data must be represented explicitly via `evidence.missing` rather than omitted silently.
+
+Redaction and sensitive boundary rules:
+
+- Runtime availability `detail` and extension values are sanitized for secret/path/token-like payloads.
+- External projection removes actor identity/workspace identifiers and target identifiers.
+- For admin-sensitive or secret-sensitive surfaces, external projection also removes `requiredPermissionKey`, sensitive target metadata, and extensions.
+- External extensions are opt-in and only retained when key suffix indicates public exposure (`.public` or `:public`), with value sanitization applied.
+
+Internal vs external surfaces:
+
+- `internal`: operational diagnostics for logs/telemetry/reconciliation paths; can include bounded identifier evidence.
+- `external`: response-safe payloads for clients/users; least-information posture by default.
+
+Contributor guidance:
+
+- Do not emit raw policy internals, secrets, credential material, or unbounded IDs in external responses.
+- Prefer canonical reason codes/provenance stages and explicit missing-evidence markers over ad hoc strings.
+- Keep deny-by-default behavior: when upstream evaluation evidence is missing, emit a deny/unavailable diagnostic with explicit missing markers.
+
 ## Related ADRs
 
 - `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`

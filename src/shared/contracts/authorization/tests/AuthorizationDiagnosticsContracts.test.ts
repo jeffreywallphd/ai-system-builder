@@ -1,19 +1,23 @@
 import { describe, expect, it } from "bun:test";
 import {
+  AuthorizationDiagnosticContractError,
+  AuthorizationDiagnosticEmissionSurfaces,
+  AuthorizationDiagnosticEvidenceKinds,
+  AuthorizationDiagnosticMatchedSourceKinds,
+  AuthorizationDiagnosticOutcomes,
   AuthorizationDiagnosticProvenanceStages,
   AuthorizationDiagnosticReasonCodes,
-  AuthorizationRuntimeAvailabilityReasonCodes,
-  AuthorizationDenialProvenanceStages,
-  AuthorizationDiagnosticContractError,
-  AuthorizationDiagnosticMatchedSourceKinds,
   AuthorizationDiagnosticTargetKinds,
+  AuthorizationRuntimeAvailabilityReasonCodes,
   createAuthorizationDiagnosticRecord,
+  projectAuthorizationDiagnosticRecord,
 } from "../AuthorizationDiagnosticsContracts";
 
 describe("AuthorizationDiagnosticsContracts", () => {
   it("creates canonical diagnostics for denied evaluator outcomes", () => {
     const diagnostic = createAuthorizationDiagnosticRecord({
       observedAt: "2026-04-13T10:00:00.000Z",
+      outcome: AuthorizationDiagnosticOutcomes.deny,
       correlation: {
         requestId: " req-1 ",
       },
@@ -63,65 +67,114 @@ describe("AuthorizationDiagnosticsContracts", () => {
 
   it("requires requestId or correlationId", () => {
     expect(() => createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
       correlation: {},
       target: {
         kind: AuthorizationDiagnosticTargetKinds.unresolved,
       },
+      requiredPermissionKey: "asset.read",
+      matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
+      evidence: {
+        missing: [
+          AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+        ],
+      },
       reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
-      denialProvenanceStage: AuthorizationDenialProvenanceStages.route,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.route,
     })).toThrow(AuthorizationDiagnosticContractError);
   });
 
   it("requires target identifiers for resource-instance targets", () => {
     expect(() => createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
       correlation: {
         requestId: "req-2",
       },
       target: {
         kind: AuthorizationDiagnosticTargetKinds.resourceInstance,
       },
+      requiredPermissionKey: "asset.read",
+      matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
+      evidence: {
+        missing: [
+          AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+        ],
+      },
       reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
-      denialProvenanceStage: AuthorizationDenialProvenanceStages.api,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.api,
     })).toThrow("target.targetIdentifier is required");
   });
 
   it("requires workspace id for workspace-capability targets", () => {
     expect(() => createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
       correlation: {
         correlationId: "corr-2",
       },
       target: {
         kind: AuthorizationDiagnosticTargetKinds.workspaceCapability,
       },
+      requiredPermissionKey: "system.manage",
+      matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
+      evidence: {
+        missing: [
+          AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+        ],
+      },
       reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
-      denialProvenanceStage: AuthorizationDenialProvenanceStages.useCase,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.useCase,
     })).toThrow("target.targetWorkspaceId is required");
   });
 
   it("rejects negative counters and invalid extension keys", () => {
     expect(() => createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
       correlation: {
         requestId: "req-3",
       },
       target: {
         kind: AuthorizationDiagnosticTargetKinds.unresolved,
       },
+      requiredPermissionKey: "asset.read",
+      matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
       counts: {
         roleAssignmentCount: -1,
       },
       reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
-      denialProvenanceStage: AuthorizationDenialProvenanceStages.adapter,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.adapter,
+      evidence: {
+        missing: [
+          AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+        ],
+      },
     })).toThrow("roleAssignmentCount must be a non-negative finite number");
 
     expect(() => createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
       correlation: {
         requestId: "req-4",
       },
       target: {
         kind: AuthorizationDiagnosticTargetKinds.unresolved,
       },
+      requiredPermissionKey: "asset.read",
+      matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
+      evidence: {
+        missing: [
+          AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+        ],
+      },
       reasonCode: AuthorizationDiagnosticReasonCodes.invalidEvaluationContext,
-      denialProvenanceStage: AuthorizationDenialProvenanceStages.adapter,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.adapter,
       extensions: {
         invalid: "value",
       },
@@ -130,6 +183,7 @@ describe("AuthorizationDiagnosticsContracts", () => {
 
   it("requires runtime evidence when runtime-affected diagnostics are declared", () => {
     expect(() => createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.degraded,
       correlation: {
         requestId: "req-5",
       },
@@ -137,7 +191,7 @@ describe("AuthorizationDiagnosticsContracts", () => {
         kind: AuthorizationDiagnosticTargetKinds.unresolved,
       },
       reasonCode: AuthorizationRuntimeAvailabilityReasonCodes.runtimeGateBlocked,
-      denialProvenanceStage: AuthorizationDenialProvenanceStages.runtimeReadiness,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.runtimeReadiness,
       runtimeAvailability: {
         affectedByRuntimeAvailability: true,
         degraded: true,
@@ -145,13 +199,89 @@ describe("AuthorizationDiagnosticsContracts", () => {
     })).toThrow("marked as affected must include runtime state");
   });
 
+  it("requires declared missing evidence when evaluator-stage counts are unavailable", () => {
+    expect(() => createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
+      correlation: {
+        requestId: "req-6",
+      },
+      target: {
+        kind: AuthorizationDiagnosticTargetKinds.unresolved,
+      },
+      requiredPermissionKey: "asset.read",
+      matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
+      reasonCode: AuthorizationDiagnosticReasonCodes.noEffectivePermission,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.evaluator,
+    })).toThrow("missing role-assignment evidence");
+  });
+
+  it("projects external diagnostics with redacted identifiers and summarized extension visibility", () => {
+    const diagnostic = createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
+      correlation: {
+        requestId: "req-7",
+      },
+      actor: {
+        actorIdentityId: "user-99",
+        actorActiveWorkspaceId: "workspace-zeta",
+      },
+      target: {
+        kind: AuthorizationDiagnosticTargetKinds.resourceInstance,
+        targetIdentifier: "asset:secret-1",
+        targetWorkspaceId: "workspace-zeta",
+        targetResourceFamily: "asset",
+        targetResourceType: "asset",
+      },
+      requiredPermissionKey: "asset.update",
+      matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
+      reasonCode: AuthorizationDiagnosticReasonCodes.noEffectivePermission,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.evaluatorResolution,
+      counts: {
+        roleAssignmentCount: 1,
+        permissionGrantCount: 0,
+        sharingGrantCount: 0,
+      },
+      evidence: {
+        roleAssignmentIds: ["role-1", "role-2"],
+        permissionGrantIds: ["grant-1"],
+        sharingGrantIds: ["sharing-1"],
+      },
+      extensions: {
+        "ops.note.public": "safe summary",
+        "ops.secret": "Bearer abc.def.ghi",
+      },
+    });
+
+    const external = projectAuthorizationDiagnosticRecord(diagnostic, {
+      surface: AuthorizationDiagnosticEmissionSurfaces.external,
+      maxIdentifierCount: 1,
+      secretSensitiveSurface: true,
+    });
+
+    expect(external.actor.actorIdentityId).toBeUndefined();
+    expect(external.target.targetIdentifier).toBeUndefined();
+    expect(external.requiredPermissionKey).toBeUndefined();
+    expect(external.evidence?.roleAssignmentIds).toBeUndefined();
+    expect(external.extensions).toBeUndefined();
+  });
+
   it("accepts canonical transport-mapping provenance stage and reason code values", () => {
     const diagnostic = createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
       correlation: {
         requestId: "req-transport",
       },
       target: {
         kind: AuthorizationDiagnosticTargetKinds.unresolved,
+      },
+      requiredPermissionKey: "asset.read",
+      matchedSourceKind: AuthorizationDiagnosticMatchedSourceKinds.none,
+      evidence: {
+        missing: [
+          AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+        ],
       },
       reasonCode: AuthorizationDiagnosticReasonCodes.transportDenied,
       denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.transportMapping,
