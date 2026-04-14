@@ -46,6 +46,13 @@ Canonical identifiers for contracts:
 - `LogLevel`: `trace`, `debug`, `info`, `warn`, `error`, `fatal`.
 - `LogVerbosity`: `minimal`, `normal`, `verbose`, `trace`.
 - `StructuredLogEvent`: stable envelope fields for `event`, `message`, `component`, correlation context (`correlationId`, `requestId`), and optional diagnostics (`host`, `operation`, `useCase`, `outcome`, `data`, `durationMs`, `error`).
+- `StructuredLogDiagnosticFields`: reusable subset of `StructuredLogEvent` used by specialized diagnostic contracts.
+
+Runtime-specific relationship rule:
+
+- `RuntimeExecutionDiagnostic` (in `modules/contracts/runtime`) must specialize `StructuredLogDiagnosticFields` instead of duplicating an independent runtime-only vocabulary.
+- Runtime diagnostic events must use the `runtime.*` namespace and remain directly mappable to `StructuredLogEvent`.
+- Runtime-specific fields should be additive and minimal (for example execution/stage context), not alternate level/verbosity/error semantics.
 
 Contract and adapter implementations should keep these field names and identifiers stable so logs remain comparable across hosts, transports, and runtime/persistence/storage boundaries.
 

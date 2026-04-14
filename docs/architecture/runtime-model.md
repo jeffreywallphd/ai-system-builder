@@ -59,6 +59,12 @@ Current baseline runtime contract family:
 - `modules/contracts/runtime/runtime-execution-event.ts` and `runtime-execution-diagnostic.ts` for optional progress/output/diagnostic streaming.
 - `modules/application/ports/runtime/runtime-execution.port.ts` as the application-facing runtime execution seam.
 
+Runtime diagnostic normalization rule:
+
+- `RuntimeExecutionDiagnostic` is a runtime specialization of shared structured logging vocabulary.
+- Runtime diagnostics use the shared level/verbosity/outcome/error semantics from `modules/contracts/logging`.
+- Runtime diagnostic event names use the `runtime.*` namespace and can be mechanically mapped to `StructuredLogEvent` without ad hoc field translation.
+
 This prevents feature teams from creating one-off runtime integration styles per feature.
 
 ## What is not finalized yet
