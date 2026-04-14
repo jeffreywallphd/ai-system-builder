@@ -1,11 +1,12 @@
 import {
   type ContractErrorDetails,
-  type ContractFailure,
-  type ContractSuccess,
-  createFailureResult,
-  createSuccessResult,
 } from "../shared";
-import type { TransportEnvelope } from "../transport";
+import {
+  createTransportFailureResponse,
+  createTransportSuccessResponse,
+  type TransportFailureResponse,
+  type TransportSuccessResponse,
+} from "../transport";
 import type { ApiError } from "./api-error";
 import type { ApiMetadata, ApiOperation } from "./api-operation";
 
@@ -13,14 +14,13 @@ export type ApiSuccessResponse<
   TPayload,
   TOperation extends ApiOperation = ApiOperation,
   TMetadata extends ApiMetadata = ApiMetadata,
-> = TransportEnvelope<TOperation, TMetadata> & ContractSuccess<TPayload>;
+> = TransportSuccessResponse<TPayload, TOperation, TMetadata>;
 
 export type ApiFailureResponse<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
   TOperation extends ApiOperation = ApiOperation,
   TMetadata extends ApiMetadata = ApiMetadata,
-> = Omit<ContractFailure<TDetails>, "error"> &
-  TransportEnvelope<TOperation, TMetadata> & {
+> = Omit<TransportFailureResponse<TDetails, TOperation, TMetadata>, "error"> & {
     error: ApiError<TDetails, TOperation, TMetadata>;
   };
 
@@ -46,16 +46,7 @@ export function createApiSuccessResponse<
     metadata?: TMetadata;
   },
 ): ApiSuccessResponse<TPayload, TOperation, TMetadata> {
-  const result = createSuccessResult(value, {
-    requestId: options?.requestId,
-    correlationId: options?.correlationId,
-  });
-
-  return {
-    ...result,
-    operation,
-    metadata: options?.metadata,
-  };
+  return createTransportSuccessResponse(operation, value, options);
 }
 
 export function createApiFailureResponse<
@@ -70,14 +61,10 @@ export function createApiFailureResponse<
     metadata?: TMetadata;
   },
 ): ApiFailureResponse<TDetails, TOperation, TMetadata> {
-  const result = createFailureResult(error, {
-    requestId: options?.requestId,
-    correlationId: options?.correlationId,
-  });
+  const response = createTransportFailureResponse(error, options);
 
   return {
-    ...result,
-    operation: error.operation,
-    metadata: options?.metadata ?? error.metadata,
+    ...response,
+    error,
   };
 }

@@ -21,6 +21,7 @@
 
 - Maintain clean architecture direction: inner layers (domain/application) must not depend on outer infrastructure/host/UI layers.
 - Keep contracts explicit at boundaries; avoid embedding boundary semantics in ad hoc types.
+- Treat API and IPC contract families as true transport specializations: compose from shared transport semantics and add only narrow transport-specific fields.
 - Use `modules/contracts/host` for thin host-aware context metadata instead of
   passing framework-native objects inward.
 - Treat hosts (desktop/server) and transport (IPC/HTTP) as separate concerns.
