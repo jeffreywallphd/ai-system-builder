@@ -51,6 +51,14 @@ Runtime interactions must be described by explicit contracts (via `modules/contr
 - expected result envelopes,
 - error categories and normalization expectations.
 
+Current baseline runtime contract family:
+
+- `modules/contracts/runtime/runtime-target.ts` for runtime kind/target selection.
+- `modules/contracts/runtime/runtime-execution-request.ts` for request envelope and execution options.
+- `modules/contracts/runtime/runtime-execution-result.ts` and `runtime-execution-error.ts` for shared success/failure envelopes.
+- `modules/contracts/runtime/runtime-execution-event.ts` and `runtime-execution-diagnostic.ts` for optional progress/output/diagnostic streaming.
+- `modules/application/ports/runtime/runtime-execution.port.ts` as the application-facing runtime execution seam.
+
 This prevents feature teams from creating one-off runtime integration styles per feature.
 
 ## What is not finalized yet
