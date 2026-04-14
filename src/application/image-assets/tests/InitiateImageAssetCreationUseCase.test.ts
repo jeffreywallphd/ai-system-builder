@@ -263,10 +263,12 @@ class StoragePolicyEvaluationPort implements IStoragePolicyEvaluationPort {
 
 class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolicyDecisionEvaluator {
   public allow = true;
+  public readonly requests: AuthorizationPolicyDecisionEvaluationRequest[] = [];
 
   async evaluateDecision(
     request: AuthorizationPolicyDecisionEvaluationRequest,
   ): Promise<AuthorizationPolicyDecisionEvaluationResult> {
+    this.requests.push(request);
     return {
       decision: {
         isAllowed: this.allow,
@@ -413,6 +415,14 @@ describe("InitiateImageAssetCreationUseCase", () => {
     expect(fixture.imageAssetRepository.records.get("image-asset:001")?.assetId).toBe("image-asset:001");
     expect(fixture.auditSink.events.at(-1)?.type).toBe("image-asset-creation-initiated");
     expect(fixture.auditSink.events.at(-1)?.outcome).toBe("success");
+    const authorizationRequest = fixture.authorizationPolicyDecisionEvaluator.requests.at(-1);
+    expect(authorizationRequest).toBeDefined();
+    expect(authorizationRequest?.requiredPermissionKey).toBe("asset.create");
+    expect(authorizationRequest?.target.kind).toBe("workspace-capability");
+    if (authorizationRequest?.target.kind === "workspace-capability") {
+      expect(authorizationRequest.target.workspaceId).toBe("workspace-alpha");
+      expect(authorizationRequest.target.capabilityResourceType).toBe("asset");
+    }
   });
 
   it("auto-selects an eligible storage instance when storageInstanceId is omitted", async () => {

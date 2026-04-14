@@ -279,7 +279,7 @@ export function toImageAssetPolicyDecisionEvaluationRequest(
       target: {
         kind: "workspace-capability",
         workspaceId,
-        capabilityResourceType: ImageAssetAuthorizationResourceType,
+        capabilityResourceType: AuthorizationResourceFamilies.asset,
       },
       asOf: normalizeTimestamp(input.asOf, "asOf"),
       includeDebugDetails: input.includeDebugDetails ?? false,
