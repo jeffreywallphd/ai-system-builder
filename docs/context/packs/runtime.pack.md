@@ -23,6 +23,7 @@
 - Use one orchestration model centered in application/domain design.
 - Use one runtime contract model for boundary consistency.
 - Support multiple runtimes through adapters (`modules/adapters/runtime/`), not feature-by-feature patterns.
+- Keep shared runtime vocabulary in `modules/contracts/runtime/` and keep adapter protocol specifics out of core contracts.
 - Keep runtime-specific mechanics out of domain/application logic.
 - Treat Python as an adapter path, not a co-equal architecture center.
 - Define or update runtime contracts before adding runtime-specific behavior.
