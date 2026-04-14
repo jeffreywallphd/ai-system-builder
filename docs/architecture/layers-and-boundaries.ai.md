@@ -29,6 +29,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - persistence ports: `IAgentRepository`, `IAgentExecutionSessionRepository`
   - infrastructure adapters: `SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`
   - SQLite opening now runs through a bounded compatibility seam (`src/infrastructure/filesystem/sqlite/SqliteCompat.ts`) so the same repository contract works across Node/Electron (`better-sqlite3`) and Bun (`bun:sqlite`) environments.
+  - desktop workflow persistence treats canonical workflow JSON files as durable truth and degrades to JSON-scan list/exists behavior when the SQLite index cannot initialize (for example missing `better-sqlite3` bindings), instead of failing Data Studio startup.
   - application use cases: CRUD + bounded configuration updates (`goals`, `policy`, `tools`, `memory`, `strategy`) plus whole-config validation (`AgentConfigurationValidationService`).
   - CRUD failure semantics are explicit inner-layer contracts (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so infrastructure transport mapping is type-based rather than string-matching.
   - `SqliteAgentRepository` deserialization now rehydrates snapshots through domain normalization, preserving full aggregate truth (including asset-native memory refs and planning/execution config) instead of raw cast-only JSON reads.
