@@ -16,6 +16,8 @@ import {
   type PermissionGrant,
   createRoleAssignment,
 } from "@domain/authorization/AuthorizationDomain";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+import { WorkspaceMembershipStatuses } from "@domain/workspaces/WorkspaceDomain";
 import type { SqliteAuthorizationPersistenceAdapter } from "./SqliteAuthorizationPersistenceAdapter";
 import {
   ConsolePersistenceDiagnosticsLogger,
@@ -24,6 +26,7 @@ import {
 
 export interface SqliteAuthorizationPolicyReadAdapterDependencies {
   readonly authorizationPersistenceAdapter: SqliteAuthorizationPersistenceAdapter;
+  readonly workspaceAuthorizationReadRepository?: IWorkspaceAuthorizationReadRepository;
   readonly diagnosticsLogger?: IPersistenceDiagnosticsLogger;
 }
 
@@ -99,6 +102,14 @@ export class SqliteAuthorizationPolicyReadAdapter
       assignedAt: record.assignedAt,
       revokedAt: record.revokedAt,
     }));
+
+    const synthesizedWorkspaceRoleAssignments = await this.resolveWorkspaceRoleAssignments({
+      actorUserIdentityId,
+      activeWorkspaceId: normalizeOptional(query.actor.activeWorkspaceId),
+      asOf: query.asOf,
+      existingRoleAssignments: roleAssignments,
+    });
+    roleAssignments.push(...synthesizedWorkspaceRoleAssignments);
     this.diagnosticsLogger.info({
       type: "persistence-diagnostic",
       level: "info",
@@ -120,6 +131,48 @@ export class SqliteAuthorizationPolicyReadAdapter
       roleAssignments: Object.freeze(roleAssignments),
       permissionGrants: Object.freeze([] as PermissionGrant[]),
     });
+  }
+
+
+  private async resolveWorkspaceRoleAssignments(input: {
+    readonly actorUserIdentityId: string;
+    readonly activeWorkspaceId?: string;
+    readonly asOf?: string;
+    readonly existingRoleAssignments: ReadonlyArray<ReturnType<typeof createRoleAssignment>>;
+  }): Promise<ReadonlyArray<ReturnType<typeof createRoleAssignment>>> {
+    if (!input.activeWorkspaceId || !this.dependencies.workspaceAuthorizationReadRepository) {
+      return Object.freeze([]);
+    }
+
+    const workspaceSnapshot = await this.dependencies.workspaceAuthorizationReadRepository.getWorkspaceAuthorizationSnapshot({
+      workspaceId: input.activeWorkspaceId,
+      userIdentityId: input.actorUserIdentityId,
+      asOf: input.asOf,
+    });
+    const hasActiveMembership = workspaceSnapshot?.membership?.status === WorkspaceMembershipStatuses.active;
+    const hasWorkspaceOwnerOverride = Boolean(workspaceSnapshot?.isWorkspaceOwner);
+    if (!workspaceSnapshot || (!hasActiveMembership && !hasWorkspaceOwnerOverride)) {
+      return Object.freeze([]);
+    }
+
+    const existingRoleKeys = new Set(input.existingRoleAssignments
+      .filter((assignment) => assignment.scope === RoleAssignmentScopes.workspace && assignment.workspaceId === input.activeWorkspaceId)
+      .map((assignment) => assignment.roleKey));
+
+    const synthesized = workspaceSnapshot.effectiveRoles
+      .filter((roleKey) => !existingRoleKeys.has(roleKey))
+      .map((roleKey) => createRoleAssignment({
+        id: `synthetic-role-assignment:${input.activeWorkspaceId}:${input.actorUserIdentityId}:${roleKey}`,
+        actorUserIdentityId: input.actorUserIdentityId,
+        roleKey,
+        scope: RoleAssignmentScopes.workspace,
+        workspaceId: input.activeWorkspaceId,
+        status: RoleAssignmentStatuses.active,
+        assignedByUserIdentityId: input.actorUserIdentityId,
+        assignedAt: workspaceSnapshot.workspace.createdAt,
+      }));
+
+    return Object.freeze(synthesized);
   }
 
   public async listSharingGrants(

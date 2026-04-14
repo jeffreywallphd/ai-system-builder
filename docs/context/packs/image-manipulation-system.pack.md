@@ -23,6 +23,8 @@
 - Workspace-scoped tenancy is required for image asset operations.
 - Transient UI state must not replace authoritative persisted image-asset truth.
 - Upload, metadata fetch, and post-upload orchestration must remain contract-driven.
+- Create/upload authorization for new image assets must evaluate workspace-scoped create capability (not persisted-resource owner override alone).
+- Read/list and create/upload permissions remain intentionally distinct; do not infer create rights from successful listing.
 
 ## Authoritative Docs
 
@@ -45,6 +47,7 @@
 
 - Submitting image upload requests without normalized workspace identity context.
 - Treating optional session fields as valid identifiers without normalization.
+- Applying persisted-resource owner override semantics to new-asset creation intents.
 - Duplicating upload orchestration logic in feature-local components.
 - Persisting debug-only request payload behavior as production contract.
 
