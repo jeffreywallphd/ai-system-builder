@@ -65,6 +65,17 @@ Separate boundaries keep policies clear and change safer.
 - Storage adapters implement artifact/file/blob behavior.
 - Hosts choose concrete adapter wiring per deployment mode.
 
+## Shared storage contract baseline
+
+The shared storage contract vocabulary under `modules/contracts/storage` is intentionally:
+
+- artifact-oriented (uploads, generated outputs, exports, temp workspace assets),
+- key-based (logical artifact identifiers rather than physical path assumptions),
+- metadata-aware (optional media type, size, checksum, and artifact metadata),
+- operation-scoped (`store`, `retrieve`, `has`, `delete` request/result contracts).
+
+This keeps storage responsibilities explicit and separate from persistence-record modeling.
+
 ## Not yet finalized
 
 The following are intentionally open:
