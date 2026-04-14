@@ -104,6 +104,18 @@ Minimum invariant expectations include:
 
 These tests belong near the contract families and should fail fast when drift is introduced.
 
+## Application ports anti-drift tests
+
+For application boundary seams with elevated drift risk (for example logging), add
+focused anti-drift tests in the corresponding family `tests` folder.
+
+Placement rule:
+
+- application port seam tests live in `modules/application/ports/<family>/tests/`.
+
+Keep these tests narrow and behavior/shape focused (port surface, shared contract
+alignment, and seam invariants), not adapter implementation detail tests.
+
 ## Regression test rule
 
 When fixing a bug, add a regression test when practical in the layer where the defect should have been caught.

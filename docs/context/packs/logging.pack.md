@@ -21,6 +21,7 @@
 ## Core Guidance
 
 - Use structured logs with stable fields; avoid ad hoc console text.
+- Keep application orchestration logging behind `modules/application/ports/logging` (`LoggingPort`) rather than direct logger-library calls.
 - Log meaningful boundary events and transitions (host, transport, runtime, persistence/storage boundaries).
 - Ensure startup and critical runtime flows are diagnosable without debugger-only context.
 - Break long operations into meaningful logged stages with per-stage and total duration.
