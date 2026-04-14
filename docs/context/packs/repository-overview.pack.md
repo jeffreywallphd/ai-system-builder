@@ -37,6 +37,8 @@
 ## Key Constraints
 
 - Preserve architectural boundaries first; package boundaries follow demonstrated need.
+- Use this pack for orientation, not as sole authority for repository-structure changes.
+- Structural changes must also consult `docs/adr/ADR-0001-repository-structure.md` and `docs/architecture/module-dependency-rules.md`.
 - Avoid folder growth that hides ownership (for example catch-all `common`/`misc` buckets).
 
 ## Canonical Source Docs

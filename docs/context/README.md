@@ -13,6 +13,7 @@ Canonical guidance lives in:
 - `docs/standards/` for canonical implementation and documentation rules.
 
 Context docs summarize and route that guidance for execution workflows. They do not replace canonical sources.
+If a context pack/template conflicts with ADRs, architecture docs, or standards docs, canonical docs take precedence.
 
 ## Folder Structure
 

@@ -25,6 +25,7 @@
 - Prompts/AI context are accelerators, not substitutes for canonical documentation.
 - Avoid duplicated guidance across docs when cross-references are sufficient.
 - Use context packs as routing aids and compact summaries, not as sole sources of truth.
+- If implementation changes documented behavior, structure, boundaries, or standards and canonical docs are not updated, the work is incomplete.
 - Mark what is decided versus intentionally not finalized.
 
 ## Key Constraints
@@ -49,4 +50,4 @@
 ## Prompt Assembly Notes
 
 - Typical set: `index` + `docs-standards`.
-- Add one scope-specific pack (`architecture`, `runtime`, `desktop-host`, `server-host`) based on the change surface.
+- Add one scope-specific pack (`architecture`, `runtime`, `desktop-host`, `server-host`, `persistence-storage`) based on the change surface.
