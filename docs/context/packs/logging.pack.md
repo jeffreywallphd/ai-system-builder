@@ -27,6 +27,7 @@
 - Make log levels/verbosity configurable via environment/configuration, without code edits.
 - Use `modules/contracts/config` (`LoggingConfig`) for typed verbosity configuration shapes.
 - Require runtime diagnostics (`modules/contracts/runtime`) to derive from shared structured logging semantics and map mechanically to `StructuredLogEvent`.
+- Keep runtime diagnostics in the `runtime.*` namespace and avoid alternate runtime-only event vocabularies.
 - Higher verbosity should increase detail while preserving structure, consistency, and redaction.
 - Avoid both log spam and low-signal logs; prioritize decision points, state transitions, anomalies, and outcomes.
 

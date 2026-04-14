@@ -22,6 +22,9 @@ At the same time, fully rejecting non-Node runtimes would unnecessarily block in
 - Runtime plurality is supported through explicit runtime contracts and adapter implementations.
 - Python and other non-Node runtimes are allowed as runtime adapters, not as co-equal architectural centers.
 - Runtime-specific behavior must remain in adapter boundaries and must not leak into application or domain design.
+- Runtime operation identity must use shared operation identity helpers (`lowercase.dot.segments`) to prevent per-adapter naming drift.
+- Runtime diagnostics must remain a specialization of shared logging diagnostics (`StructuredLogDiagnosticFields`) and be mechanically mappable to `StructuredLogEvent`.
+- Runtime diagnostic event names must stay in the `runtime.*` namespace; alternative runtime-only diagnostic vocabularies are out of bounds.
 
 Preferred implementation model:
 
@@ -57,6 +60,7 @@ A broad plugin system at this stage would be premature abstraction. The rebuild 
 - More coherent orchestration and use-case design across the system.
 - Runtime integrations stay possible without redefining core architecture.
 - Future runtime expansion can happen through contracts and adapters rather than by reshaping core layers.
+- Runtime diagnostics and structured logs stay aligned across host/transport/runtime boundaries.
 
 ### Negative
 
@@ -67,8 +71,9 @@ A broad plugin system at this stage would be premature abstraction. The rebuild 
 ## Follow-up Documentation or Implementation Needs
 
 - Keep `docs/architecture/runtime-model.md` aligned with this ADR as runtime contracts evolve.
-- Document initial runtime contract conventions in `docs/standards/` once baseline adapter patterns are implemented.
+- Keep runtime/logging normalization rules in `docs/standards/logging-standards.md` aligned with runtime contract evolution.
 - Add implementation guidance for runtime adapter testing under `modules/testing/` when the first external runtime adapter is introduced.
+- Maintain runtime contract invariant tests that protect operation identity and runtime-to-logging diagnostic mapping.
 - Record a follow-up ADR if runtime protocol details become stable enough to standardize (for example, process/session lifecycle and protocol envelope conventions).
 
 Note: exact runtime protocol details are intentionally still emerging and are not fixed by this ADR.

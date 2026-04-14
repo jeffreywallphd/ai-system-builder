@@ -30,6 +30,7 @@ Persistence family invariants:
 - persistence record references normalize record identity (`recordType`, `id`) at creation boundaries,
 - operation identity remains transport-neutral (no API/IPC namespace leakage),
 - when a persistence result/error includes a `record`, the operation must target that record type (`<recordType>.<action>[.<qualifier>...]`).
+- persistence family barrels should export persistence-only surfaces so consumers get a predictable family boundary.
 
 This keeps Postgres as the default adapter direction without coupling application/domain boundaries to Postgres-specific APIs.
 
@@ -92,6 +93,12 @@ The shared storage contract vocabulary under `modules/contracts/storage` is inte
 - metadata-aware (optional media type, size, checksum, and artifact metadata),
 - operation-scoped (`store`, `retrieve`, `has`, `delete` request/result contracts).
 
+Storage family invariants:
+
+- artifact identity is logical-key-first and path-agnostic; keys are normalized through shared storage key helpers.
+- storage request/result contracts stay artifact-operation-specific (`store`, `retrieve`, `has`, `delete`) and avoid persistence-style record semantics.
+- storage family barrels should export storage-only surfaces so artifact usage is predictable and mechanically discoverable.
+
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
 
 ## Not yet finalized
@@ -103,3 +110,12 @@ The following are intentionally open:
 - final conventions for linking persistence records to storage artifacts.
 
 Until formalized, contributors should keep persistence and storage concerns explicitly separated and document any interim conventions in ADRs/context docs.
+
+## Family invariant tests
+
+Contract-family tests should protect this boundary model directly:
+
+- persistence invariants (operation identity + record alignment + family exports),
+- storage invariants (key normalization + artifact operation shapes + family exports).
+
+If these invariants change, update canonical docs and context packs in the same change.

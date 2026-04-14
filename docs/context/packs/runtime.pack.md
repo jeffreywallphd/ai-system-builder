@@ -25,6 +25,8 @@
 - Support multiple runtimes through adapters (`modules/adapters/runtime/`), not feature-by-feature patterns.
 - Keep shared runtime vocabulary in `modules/contracts/runtime/` and keep adapter protocol specifics out of core contracts.
 - Keep runtime diagnostics as a strict specialization of shared logging vocabulary (not a parallel runtime-only diagnostics schema).
+- Keep runtime operation identity helper-driven (`lowercase.dot.segments`) to prevent per-adapter naming drift.
+- Keep runtime diagnostic mapping to `StructuredLogEvent` mechanical and stable across adapters.
 - Keep runtime-specific mechanics out of domain/application logic.
 - Treat Python as an adapter path, not a co-equal architecture center.
 - Define or update runtime contracts before adding runtime-specific behavior.
@@ -34,6 +36,7 @@
 - No runtime-specific leakage into core use-case or domain design.
 - Avoid ad hoc per-feature protocols and speculative runtime plugin frameworks.
 - Runtime protocol details that are not finalized must remain isolated and easy to evolve.
+- Maintain runtime contract invariant tests for operation identity and runtime/logging diagnostic alignment.
 
 ## Canonical Source Docs
 

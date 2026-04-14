@@ -28,6 +28,8 @@
 - Keep IPC channels operation-derived (`ipc.<operation>.<kind>`) via shared helpers.
 - Update canonical docs in the same change when documented behavior/architecture/standards change.
 - Use structured, meaningful logs with configurable verbosity and stage-level timing for long operations.
+- Keep runtime diagnostics as a strict specialization of shared structured logging contracts (`runtime.*` events, mechanical mapping).
+- Keep persistence and storage contract families mechanically distinct (record-aligned operations vs key-based artifact operations).
 - Add regression tests for meaningful bug fixes when practical; prioritize behavioral value and deterministic tests.
 
 ## Key Constraints

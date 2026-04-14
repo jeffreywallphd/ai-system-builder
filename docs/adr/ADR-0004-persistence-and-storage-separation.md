@@ -27,6 +27,9 @@ Key risk areas to avoid:
 - Storage concerns file/blob-style artifacts (uploads, generated files, images, exports, temporary workspaces, and similar assets).
 - Physical disk location does not remove the need for a storage abstraction.
 - Application logic depends on persistence and storage ports/contracts rather than concrete database or file-path details.
+- Persistence operation identity remains helper-driven and record-aligned (`<recordType>.<action>[.<qualifier>...]`) when a record reference is present.
+- Storage identity remains artifact-key-based and path-agnostic through shared key normalization helpers.
+- Persistence and storage contract barrels must export only family-owned surfaces; cross-family leakage is not allowed.
 
 This sets architectural roles without freezing all storage implementation specifics at this stage.
 
@@ -58,6 +61,7 @@ Burying storage inside runtime adapters would make artifact policies implicit an
 - Clear architectural home for artifact/file/blob concerns.
 - Better long-term flexibility to support multiple storage implementations without redefining application roles.
 - Cleaner operational reasoning around backups, retention, and data handling responsibilities.
+- More mechanical family boundaries with less room for naming/shape drift across persistence and storage adapters.
 
 ### Negative
 
@@ -70,6 +74,7 @@ Burying storage inside runtime adapters would make artifact policies implicit an
 - Keep `docs/architecture/persistence-and-storage.md` aligned with this ADR as implementations mature.
 - Document baseline persistence and storage port conventions in `docs/standards/` when first adapters are implemented.
 - Add guidance for linking persistence metadata to storage artifact identifiers without conflating roles.
+- Maintain family invariant tests that protect record-operation alignment, key normalization, and family export discipline.
 - Record a follow-up ADR when storage backend strategy is finalized beyond current defaults.
 
 Note: detailed storage backend and lifecycle policy specifics are intentionally not finalized by this ADR.

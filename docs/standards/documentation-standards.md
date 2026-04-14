@@ -56,6 +56,8 @@ Documentation updates are required in the same change set when any of the follow
 - dependency direction changes,
 - host/runtime/transport/persistence responsibilities change,
 - transport contract specialization rules, operation identity constraints, or IPC channel rules change,
+- runtime/logging diagnostic normalization rules change,
+- persistence/storage contract-family invariants or export discipline change,
 - behavior that docs currently describe is materially altered,
 - standards are added, tightened, or intentionally relaxed.
 
@@ -92,6 +94,8 @@ Use `docs/adr/template.md` and maintain ADR status (`proposed`, `accepted`, `sup
 - Context docs must not quietly introduce conflicting architecture or standards.
 
 If a context doc conflicts with an ADR/architecture/standard doc, fix the context doc or propose a canonical doc update first.
+
+When a canonical change affects context-pack guidance, update only the materially relevant packs in the same work item.
 
 ## Consistency and templates
 
