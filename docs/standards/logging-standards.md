@@ -53,6 +53,8 @@ Runtime-specific relationship rule:
 - `RuntimeExecutionDiagnostic` (in `modules/contracts/runtime`) must specialize `StructuredLogDiagnosticFields` instead of duplicating an independent runtime-only vocabulary.
 - Runtime diagnostic events must use the `runtime.*` namespace and remain directly mappable to `StructuredLogEvent`.
 - Runtime-specific fields should be additive and minimal (for example execution/stage context), not alternate level/verbosity/error semantics.
+- Runtime diagnostic mapping should stay mechanical (`mapRuntimeDiagnosticToStructuredLogEvent`) with no per-adapter field remapping conventions.
+- If runtime diagnostics need new shared semantics, evolve `modules/contracts/logging` first rather than forking runtime-only equivalents.
 
 Contract and adapter implementations should keep these field names and identifiers stable so logs remain comparable across hosts, transports, and runtime/persistence/storage boundaries.
 

@@ -65,6 +65,13 @@ Runtime diagnostic normalization rule:
 - Runtime diagnostics use the shared level/verbosity/outcome/error semantics from `modules/contracts/logging`.
 - Runtime diagnostic event names use the `runtime.*` namespace and can be mechanically mapped to `StructuredLogEvent` without ad hoc field translation.
 
+Runtime family normalization rules:
+
+- Runtime operation names must use shared operation identity formatting (`lowercase.dot.segments`) via runtime/shared helpers, not ad hoc string conventions.
+- Runtime diagnostics must be additive to logging contracts (for example `executionId` and `stage`) and must not redefine level/verbosity/error semantics.
+- Runtime contract exports must stay family-local (`modules/contracts/runtime/index.ts`) and avoid re-exporting non-runtime families.
+- Runtime contract tests must protect operation identity normalization and diagnostic-to-structured-log mapping behavior.
+
 This prevents feature teams from creating one-off runtime integration styles per feature.
 
 ## What is not finalized yet

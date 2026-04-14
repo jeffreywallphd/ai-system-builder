@@ -78,6 +78,20 @@ At minimum, tests should cover:
 - previously observed defect paths (regressions),
 - architecture-significant behavior called out in ADRs/architecture docs.
 
+## Contract family invariant tests
+
+For shared contract families, add or maintain invariant tests that protect canonical family rules.
+
+For runtime/logging/persistence/storage, minimum invariant expectations include:
+
+- operation identity normalization stays helper-driven and transport-neutral,
+- runtime diagnostics remain a specialization of shared logging diagnostics and map directly to structured logs,
+- persistence record references and record-targeted operations remain aligned,
+- storage identity remains key-based and path-agnostic,
+- family barrels export only family-owned contract surfaces.
+
+These tests belong near the contract families and should fail fast when drift is introduced.
+
 ## Regression test rule
 
 When fixing a bug, add a regression test when practical in the layer where the defect should have been caught.
