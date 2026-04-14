@@ -23,6 +23,8 @@
 - Workspace ID and actor identity must be normalized and non-empty for workspace-scoped calls.
 - Studio transient edits never override authoritative persisted image asset truth.
 - Upload create/content/finalize sequence stays contract-first.
+- Create/upload authorization for new image assets must evaluate workspace-scoped create capability (not persisted-resource owner override alone).
+- Read/list and create/upload permissions remain intentionally distinct; do not infer create rights from successful listing.
 
 ## Authoritative Docs
 
@@ -45,6 +47,7 @@
 
 - Sending upload create/finalize payloads with blank workspace IDs.
 - Assuming unresolved session context is safe for workspace-scoped operations.
+- Applying persisted-resource owner override semantics to new-asset creation intents.
 - Bypassing shared image asset service seams from UI components.
 - Keeping debug request logging in production behavior paths.
 

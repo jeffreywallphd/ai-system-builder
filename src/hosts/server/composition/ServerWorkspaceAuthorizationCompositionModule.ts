@@ -95,6 +95,7 @@ export function composeServerWorkspaceAuthorizationCompositionModule(
   });
   const authorizationPolicyReadAdapter = new SqliteAuthorizationPolicyReadAdapter({
     authorizationPersistenceAdapter: input.authorizationRepository,
+    workspaceAuthorizationReadRepository: input.workspaceRepository,
   });
   const authorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
     roleGrantReadRepository: authorizationPolicyReadAdapter,
