@@ -27,6 +27,7 @@
 - Persistence operation names should stay helper-driven and transport-neutral (`lowercase.dot.segments` with no `api.`/`ipc.` prefixes).
 - When persistence contracts include a record reference, operation identity should target that record type (`<recordType>.<action>[.<qualifier>...]`).
 - Keep persistence family exports scoped to persistence contracts only.
+- Keep application persistence-port seams operation-aware and record-oriented, with focused anti-drift tests in `modules/application/ports/persistence/tests/`.
 - Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
 - Storage key creation/normalization should flow through shared storage key helpers to prevent per-operation key-shape drift.
 - Keep storage family exports scoped to storage contracts only.
