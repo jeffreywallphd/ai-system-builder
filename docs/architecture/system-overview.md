@@ -58,6 +58,9 @@ ai-system-builder/
 - `modules/application/`
   - Use-case orchestration, policies, ports, and DTO-level behavior.
   - Coordinates domain logic and boundary contracts.
+  - Initial contract-backed ports are under `modules/application/ports` for
+    runtime execution, persistence records, artifact storage, structured
+    logging, and host context.
 
 - `modules/contracts/`
   - Explicit boundary contracts (API, IPC, runtime integration contracts, etc.).
