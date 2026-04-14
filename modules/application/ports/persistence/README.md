@@ -7,5 +7,13 @@ durable record operations.
 - save records through `SavePersistenceRecordRequest`
 - delete records through `DeletePersistenceRecordRequest`
 
+Each request carries both:
+
+- `operation: PersistenceOperation`
+- `record: PersistenceRecordReference`
+
+This keeps the application seam operation-aware and record-oriented, aligned
+to the persistence contracts family (`<recordType>.<action>[.<qualifier>...]`).
+
 This seam stays contract-driven and adapter-neutral; Postgres or other
 persistence details belong in adapter implementations.

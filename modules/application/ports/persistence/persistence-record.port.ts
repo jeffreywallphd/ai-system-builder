@@ -1,22 +1,24 @@
 import type {
+  PersistenceOperation,
   PersistenceRecordReference,
   PersistenceResult,
 } from "../../../contracts/persistence";
 import type { ContractBoundaryContext } from "../../../contracts/shared";
 
-export interface LoadPersistenceRecordRequest extends ContractBoundaryContext {
+export interface PersistenceRecordOperationRequest
+  extends ContractBoundaryContext {
+  operation: PersistenceOperation;
   record: PersistenceRecordReference;
 }
 
+export type LoadPersistenceRecordRequest = PersistenceRecordOperationRequest;
+
 export interface SavePersistenceRecordRequest<TValue = unknown>
-  extends ContractBoundaryContext {
-  record: PersistenceRecordReference;
+  extends PersistenceRecordOperationRequest {
   value: TValue;
 }
 
-export interface DeletePersistenceRecordRequest extends ContractBoundaryContext {
-  record: PersistenceRecordReference;
-}
+export type DeletePersistenceRecordRequest = PersistenceRecordOperationRequest;
 
 export interface PersistenceRecordPort {
   loadRecord<TValue = unknown>(
