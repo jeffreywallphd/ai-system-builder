@@ -2,6 +2,7 @@
 import {
   PermissionEffects,
   PermissionGrantScopes,
+  PolicyDecisionOutcomes,
   ResourceOwnershipScopes,
   ResourceVisibilities,
   RoleAssignmentScopes,
@@ -73,6 +74,15 @@ class RecordingDiagnosticsLogger {
 
   public info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void {
     this.events.push(event);
+  }
+}
+
+class ThrowOnFinalDecisionDiagnosticLogger extends RecordingDiagnosticsLogger {
+  public override info(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void {
+    if (event.event === "authorization.final-decision.diagnostic") {
+      throw new Error("final-decision-diagnostic-failed");
+    }
+    super.info(event);
   }
 }
 
@@ -320,6 +330,9 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
     const finalDecisionEvent = diagnosticsLogger.events.find((event) => (
       event.event === "authorization.final-decision.diagnostic"
     ));
+    const evaluatorResolutionEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "authorization.evaluator-resolution.diagnostic"
+    ));
     const completedEvent = diagnosticsLogger.events.find((event) => (
       event.event === "auth.decision.completed"
       && typeof event.details?.diagnosticCorrelationId === "string"
@@ -327,6 +340,7 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
 
     expect(permissionSnapshotEvent).toBeDefined();
     expect(scopeFilteringEvent).toBeDefined();
+    expect(evaluatorResolutionEvent).toBeDefined();
     expect(finalDecisionEvent).toBeDefined();
     expect(completedEvent).toBeDefined();
 
@@ -348,6 +362,13 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
       readonly counts: { readonly applicableScopeCount?: number };
       readonly correlation: { readonly correlationId?: string };
     };
+    const evaluatorResolution = evaluatorResolutionEvent?.details?.diagnostic as {
+      readonly denialProvenanceStage: string;
+      readonly reasonCode: string;
+      readonly matchedSourceKind?: string;
+      readonly counts: { readonly applicableScopeCount?: number };
+      readonly correlation: { readonly correlationId?: string };
+    };
 
     expect(permissionSnapshot.denialProvenanceStage).toBe("permission-snapshot");
     expect(permissionSnapshot.target.kind).toBe("workspace-capability");
@@ -360,14 +381,83 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
     expect(scopeFiltering.counts.applicableScopeCount).toBeGreaterThanOrEqual(1);
     expect(scopeFiltering.extensions?.["authorization.scope-filtering.visibility-fallback-used"]).toBe(false);
 
+    expect(evaluatorResolution.denialProvenanceStage).toBe("evaluator-resolution");
+    expect(evaluatorResolution.reasonCode).toBe("no-effective-permission");
+    expect(evaluatorResolution.matchedSourceKind).toBe("none");
+    expect(evaluatorResolution.counts.applicableScopeCount).toBeGreaterThanOrEqual(1);
+
     expect(finalDecision.denialProvenanceStage).toBe("final-decision-emission");
     expect(finalDecision.counts.applicableScopeCount).toBeGreaterThanOrEqual(1);
 
     const correlationId = permissionSnapshot.correlation.correlationId;
     expect(correlationId).toBeDefined();
     expect(scopeFiltering.correlation.correlationId).toBe(correlationId);
+    expect(evaluatorResolution.correlation.correlationId).toBe(correlationId);
     expect(finalDecision.correlation.correlationId).toBe(correlationId);
     expect(completedEvent?.details?.diagnosticCorrelationId).toBe(correlationId);
+  });
+
+  it("preserves decision outcome when final diagnostic emission fails", async () => {
+    const repositories = new InMemoryDecisionPolicyRepositories();
+    const diagnosticsLogger = new ThrowOnFinalDecisionDiagnosticLogger();
+    repositories.resourcePolicyMetadataByResourceKey.set(
+      toResourceKey("asset", "asset-member-allow-1"),
+      Object.freeze({
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-member-allow-1",
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-alpha",
+        visibility: ResourceVisibilities.private,
+        sharingPolicyMode: SharingPolicyModes.ownerOnly,
+        allowResharing: false,
+        isPublishedCapable: false,
+      }),
+    );
+    repositories.roleGrantSnapshot = Object.freeze({
+      roleAssignments: Object.freeze([
+        createRoleAssignment({
+          id: "role-member-allow-1",
+          actorUserIdentityId: "user-member",
+          roleKey: "member",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-01T00:00:00.000Z",
+        }),
+      ]),
+      permissionGrants: Object.freeze([]),
+    });
+
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: repositories,
+      sharingGrantReadRepository: repositories,
+      resourcePolicyMetadataReadRepository: repositories,
+      diagnosticsLogger,
+    });
+
+    const result = await evaluator.evaluateDecision({
+      actor: {
+        actorUserIdentityId: "user-member",
+      },
+      requiredPermissionKey: "asset.create",
+      target: {
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-member-allow-1",
+        },
+      },
+      asOf: evaluationAsOf,
+    });
+
+    expect(result.decision.outcome).toBe(PolicyDecisionOutcomes.allow);
+    expect(result.decision.reasonCode).toBe("matched-role-grant");
+    expect(diagnosticsLogger.events.map((event) => event.event)).toContain("authorization.evaluator-resolution.diagnostic");
+    expect(diagnosticsLogger.events.map((event) => event.event)).toContain("authorization.decision-diagnostic.emission-failed");
+    expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.completed");
   });
 
   it("uses workspace visibility fallback for read/list when actor has workspace membership context", async () => {

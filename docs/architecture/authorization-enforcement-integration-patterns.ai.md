@@ -196,6 +196,14 @@ Story 2.2.2 stage-local instrumentation requirements:
 - Emit explicit empty-result/failure markers in `extensions` (for example missing resource policy metadata, no applicable scope, scope mismatch detected) rather than omitting intermediate evidence silently.
 - Reuse one correlation id across `permission-snapshot`, `scope-filtering`, and `final-decision-emission` diagnostics so intermediate stages can be deterministically correlated to the final decision event.
 
+Story 2.2.3 evaluator-resolution and final-decision requirements:
+
+- Emit both `evaluator-resolution` and `final-decision-emission` diagnostics from the structured decision object used to produce the final authorization result; do not create a competing decision representation for diagnostics only.
+- Keep decisive-stage schema parity: `requiredPermissionKey`, `reasonCode`, `matchedSourceKind`, `denialProvenanceStage`, target context fields, and evidence/count fields must travel together.
+- Reuse the same correlation id used by `permission-snapshot` and `scope-filtering` so evaluator-resolution and final-decision events can be deterministically linked to earlier context/scope stages.
+- Add source/target summaries in namespaced `extensions` keys when extra disambiguation is needed (for example workspace matches, synthesized fallback flags, visibility fallback flags).
+- Keep diagnostic emission best-effort and non-authoritative for control flow: if downstream mapping/projection fails, preserve the core authorization decision and emit a bounded diagnostics-pipeline failure marker.
+
 Extension rules:
 
 - Use `extensions` for story/team-specific metadata only.

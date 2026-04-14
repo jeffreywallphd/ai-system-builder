@@ -25,7 +25,11 @@ import {
   AuthorizationDecisionReasonCodes,
   AuthorizationDiagnosticProvenanceStages,
 } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
-import { AuthorizationDiagnosticOutcomes } from "@shared/contracts/authorization/AuthorizationDiagnosticsContracts";
+import {
+  AuthorizationDiagnosticEvidenceKinds,
+  AuthorizationDiagnosticMatchedSourceKinds,
+  AuthorizationDiagnosticOutcomes,
+} from "@shared/contracts/authorization/AuthorizationDiagnosticsContracts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../ports/IAuthorizationPolicyDecisionEvaluator";
 import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../ports/IAuthorizationResourcePolicyMetadataReadRepository";
 import type { IAuthorizationRoleGrantReadRepository } from "../ports/IAuthorizationRoleGrantReadRepository";
@@ -91,40 +95,94 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
     });
 
     if (!actorUserIdentityId && !actorServiceId) {
-      return this.toResult({
+      const decision = createDeniedDecision({
+        evaluatedAt,
+        requiredPermissionKey: normalizePermissionKey(request.requiredPermissionKey) ?? "authorization.invalid",
+        reasonCode: AuthorizationDecisionReasonCodes.invalidActorContext,
+        reason: "Actor identity context is required for authorization evaluation.",
+        denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
+      });
+      const result = this.toResult({
         request,
-        decision: createDeniedDecision({
-          evaluatedAt,
-          requiredPermissionKey: normalizePermissionKey(request.requiredPermissionKey) ?? "authorization.invalid",
-          reasonCode: AuthorizationDecisionReasonCodes.invalidActorContext,
-          reason: "Actor identity context is required for authorization evaluation.",
-          denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
-        }),
+        decision,
         debug: request.includeDebugDetails
           ? createDebugDetails(request.target.kind, EffectivePermissionResolutionSourceKinds.none, 0, 0, 0)
           : undefined,
       });
+      this.emitDecisionDiagnostics({
+        request,
+        actorUserIdentityId,
+        diagnosticCorrelationId,
+        requiredPermissionKey: decision.requiredPermissionKey,
+        result,
+        sourceKind: EffectivePermissionResolutionSourceKinds.none,
+        roleAssignmentCount: 0,
+        permissionGrantCount: 0,
+        sharingGrantCount: 0,
+        targetSummary: this.resolveTargetSummary(request),
+        matchedWorkspaceIds: Object.freeze([]),
+        synthesizedFallbackUsed: request.target.kind === AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+      });
+      this.logInfo({
+        event: "auth.decision.completed",
+        details: Object.freeze({
+          diagnosticCorrelationId,
+          outcome: result.decision.isAllowed ? "allow" : "deny",
+          reasonCode: result.decision.reasonCode,
+          sourceKind: EffectivePermissionResolutionSourceKinds.none,
+          targetKind: request.target.kind,
+          requiredPermissionKey: decision.requiredPermissionKey,
+        }),
+      });
+      return result;
     }
 
     const requiredPermissionKey = normalizePermissionKey(request.requiredPermissionKey);
     if (!requiredPermissionKey) {
-      return this.toResult({
+      const decision = createDeniedDecision({
+        evaluatedAt,
+        requiredPermissionKey: "authorization.invalid",
+        reasonCode: AuthorizationDecisionReasonCodes.invalidPermissionKey,
+        reason: "The required permission key is invalid.",
+        denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
+      });
+      const result = this.toResult({
         request,
-        decision: createDeniedDecision({
-          evaluatedAt,
-          requiredPermissionKey: "authorization.invalid",
-          reasonCode: AuthorizationDecisionReasonCodes.invalidPermissionKey,
-          reason: "The required permission key is invalid.",
-          denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
-        }),
+        decision,
         debug: request.includeDebugDetails
           ? createDebugDetails(request.target.kind, EffectivePermissionResolutionSourceKinds.none, 0, 0, 0)
           : undefined,
       });
+      this.emitDecisionDiagnostics({
+        request,
+        actorUserIdentityId,
+        diagnosticCorrelationId,
+        requiredPermissionKey: decision.requiredPermissionKey,
+        result,
+        sourceKind: EffectivePermissionResolutionSourceKinds.none,
+        roleAssignmentCount: 0,
+        permissionGrantCount: 0,
+        sharingGrantCount: 0,
+        targetSummary: this.resolveTargetSummary(request),
+        matchedWorkspaceIds: Object.freeze([]),
+        synthesizedFallbackUsed: request.target.kind === AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+      });
+      this.logInfo({
+        event: "auth.decision.completed",
+        details: Object.freeze({
+          diagnosticCorrelationId,
+          outcome: result.decision.isAllowed ? "allow" : "deny",
+          reasonCode: result.decision.reasonCode,
+          sourceKind: EffectivePermissionResolutionSourceKinds.none,
+          targetKind: request.target.kind,
+          requiredPermissionKey: decision.requiredPermissionKey,
+        }),
+      });
+      return result;
     }
 
     try {
-      this.diagnosticsLogger.info({
+      this.logInfo({
         event: "auth.decision.role-snapshot.query",
         details: Object.freeze({
           targetKind: request.target.kind,
@@ -142,7 +200,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           : undefined,
         asOf: request.asOf,
       });
-      this.diagnosticsLogger.info({
+      this.logInfo({
         event: "auth.decision.role-snapshot.result",
         details: Object.freeze({
           roleAssignmentCount: roleGrantSnapshot.roleAssignments.length,
@@ -214,7 +272,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
               )
               : undefined,
           });
-          this.emitFinalDecisionDiagnostic({
+          this.emitDecisionDiagnostics({
             request,
             actorUserIdentityId,
             diagnosticCorrelationId,
@@ -224,14 +282,11 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
             roleAssignmentCount: roleGrantSnapshot.roleAssignments.length,
             permissionGrantCount: roleGrantSnapshot.permissionGrants.length,
             sharingGrantCount: 0,
-            targetWorkspaceId: undefined,
-            targetIdentifier: request.target.resource.resourceId,
-            targetResourceType: request.target.resource.resourceType,
-            targetResourceFamily: request.target.resource.resourceFamily,
+            targetSummary: this.resolveTargetSummary(request),
             matchedWorkspaceIds,
             synthesizedFallbackUsed: false,
           });
-          this.diagnosticsLogger.info({
+          this.logInfo({
             event: "auth.decision.completed",
             details: Object.freeze({
               diagnosticCorrelationId,
@@ -310,7 +365,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
             )
             : undefined,
         });
-        this.emitFinalDecisionDiagnostic({
+        this.emitDecisionDiagnostics({
           request,
           actorUserIdentityId,
           diagnosticCorrelationId,
@@ -321,15 +376,17 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           permissionGrantCount: roleGrantSnapshot.permissionGrants.length,
           sharingGrantCount: sharingGrantRecords.length,
           applicableScopeCount: resolution.scopeFiltering?.applicableScopeCount,
-          targetWorkspaceId: resourcePolicyMetadata.workspaceId,
-          targetIdentifier: resourcePolicyMetadata.resourceId,
-          targetResourceType: resourcePolicyMetadata.resourceType,
-          targetResourceFamily: request.target.resource.resourceFamily,
+          targetSummary: Object.freeze({
+            targetWorkspaceId: resourcePolicyMetadata.workspaceId,
+            targetIdentifier: resourcePolicyMetadata.resourceId,
+            targetResourceType: resourcePolicyMetadata.resourceType,
+            targetResourceFamily: request.target.resource.resourceFamily,
+          }),
           matchedWorkspaceIds: resolution.scopeFiltering?.matchedWorkspaceIds ?? matchedWorkspaceIds,
           synthesizedFallbackUsed: false,
           visibilityFallbackUsed: resolution.scopeFiltering?.visibilityFallbackUsed ?? false,
         });
-        this.diagnosticsLogger.info({
+        this.logInfo({
           event: "auth.decision.completed",
           details: Object.freeze({
             diagnosticCorrelationId,
@@ -396,7 +453,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           targetIdentifier: capabilityTargetIdentifier,
         }),
       });
-      this.diagnosticsLogger.info({
+      this.logInfo({
         event: "auth.decision.workspace-capability.evaluate",
         details: Object.freeze({
           diagnosticCorrelationId,
@@ -419,7 +476,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           )
           : undefined,
       });
-      this.emitFinalDecisionDiagnostic({
+      this.emitDecisionDiagnostics({
         request,
         actorUserIdentityId,
         diagnosticCorrelationId,
@@ -430,15 +487,17 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
         permissionGrantCount: roleGrantSnapshot.permissionGrants.length,
         sharingGrantCount: 0,
         applicableScopeCount: resolution.scopeFiltering?.applicableScopeCount,
-        targetWorkspaceId: workspaceId,
-        targetIdentifier: capabilityTargetIdentifier,
-        targetResourceType: capabilityResourceType,
-        targetResourceFamily: undefined,
+        targetSummary: Object.freeze({
+          targetWorkspaceId: workspaceId,
+          targetIdentifier: capabilityTargetIdentifier,
+          targetResourceType: capabilityResourceType,
+          targetResourceFamily: undefined,
+        }),
         matchedWorkspaceIds: resolution.scopeFiltering?.matchedWorkspaceIds ?? matchedWorkspaceIds,
         synthesizedFallbackUsed: true,
         visibilityFallbackUsed: resolution.scopeFiltering?.visibilityFallbackUsed ?? false,
       });
-      this.diagnosticsLogger.info({
+      this.logInfo({
         event: "auth.decision.completed",
         details: Object.freeze({
           diagnosticCorrelationId,
@@ -451,15 +510,16 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
       });
       return result;
     } catch {
-      return this.toResult({
+      const decision = createDeniedDecision({
+        evaluatedAt,
+        requiredPermissionKey,
+        reasonCode: AuthorizationDecisionReasonCodes.invalidEvaluationContext,
+        reason: "Authorization evaluation context could not be resolved.",
+        denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
+      });
+      const result = this.toResult({
         request,
-        decision: createDeniedDecision({
-          evaluatedAt,
-          requiredPermissionKey,
-          reasonCode: AuthorizationDecisionReasonCodes.invalidEvaluationContext,
-          reason: "Authorization evaluation context could not be resolved.",
-          denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
-        }),
+        decision,
         debug: request.includeDebugDetails
           ? createDebugDetails(
             request.target.kind,
@@ -470,6 +530,38 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
           )
           : undefined,
       });
+      this.emitDecisionDiagnostics({
+        request,
+        actorUserIdentityId,
+        diagnosticCorrelationId,
+        requiredPermissionKey,
+        result,
+        sourceKind: EffectivePermissionResolutionSourceKinds.none,
+        roleAssignmentCount: 0,
+        permissionGrantCount: 0,
+        sharingGrantCount: 0,
+        targetSummary: this.resolveTargetSummary(request),
+        matchedWorkspaceIds: Object.freeze([]),
+        synthesizedFallbackUsed: request.target.kind === AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+        evidenceMissing: Object.freeze([
+          AuthorizationDiagnosticEvidenceKinds.roleAssignmentsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.permissionGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.sharingGrantsUnavailable,
+          AuthorizationDiagnosticEvidenceKinds.upstreamFailure,
+        ]),
+      });
+      this.logInfo({
+        event: "auth.decision.completed",
+        details: Object.freeze({
+          diagnosticCorrelationId,
+          outcome: result.decision.isAllowed ? "allow" : "deny",
+          reasonCode: result.decision.reasonCode,
+          sourceKind: EffectivePermissionResolutionSourceKinds.none,
+          targetKind: request.target.kind,
+          requiredPermissionKey,
+        }),
+      });
+      return result;
     }
   }
 
@@ -490,45 +582,62 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
     readonly synthesizedFallbackUsed: boolean;
     readonly resourcePolicyMetadataMissing: boolean;
   }): void {
-    emitAuthorizationDiagnosticRecord({
-      logger: this.diagnosticsLogger,
-      event: "authorization.permission-snapshot.diagnostic",
-      outcome: AuthorizationDiagnosticOutcomes.observed,
-      reasonCode: input.resourcePolicyMetadataMissing
-        ? AuthorizationDecisionReasonCodes.resourcePolicyMetadataNotFound
-        : "authorization.permission-snapshot.captured",
-      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.permissionSnapshot,
-      correlationId: input.diagnosticCorrelationId,
-      actorIdentityId: input.actorUserIdentityId,
-      actorActiveWorkspaceId: normalizeOptional(input.request.actor.activeWorkspaceId),
-      requiredPermissionKey: input.requiredPermissionKey,
-      target: Object.freeze({
-        targetKind: input.request.target.kind,
-        targetIdentifier: input.targetIdentifier,
-        targetWorkspaceId: input.targetWorkspaceId,
-        targetResourceFamily: input.targetResourceFamily,
-        targetResourceType: input.targetResourceType,
-      }),
-      counts: Object.freeze({
-        roleAssignmentCount: input.roleAssignmentCount,
-        permissionGrantCount: input.permissionGrantCount,
-        sharingGrantCount: input.sharingGrantCount,
-        sharingPolicyMetadataCount: input.sharingPolicyMetadataCount,
-      }),
-      extensions: Object.freeze({
-        "authorization.permission-snapshot.retrieved-role-assignment-count": input.roleAssignmentCount,
-        "authorization.permission-snapshot.retrieved-permission-grant-count": input.permissionGrantCount,
-        "authorization.permission-snapshot.retrieved-sharing-grant-count": input.sharingGrantCount,
-        "authorization.permission-snapshot.retrieved-sharing-policy-metadata-count": input.sharingPolicyMetadataCount,
-        "authorization.permission-snapshot.empty-role-assignments": input.roleAssignmentCount === 0,
-        "authorization.permission-snapshot.empty-permission-grants": input.permissionGrantCount === 0,
-        "authorization.permission-snapshot.empty-sharing-grants": input.sharingGrantCount === 0,
-        "authorization.permission-snapshot.resource-policy-metadata-missing": input.resourcePolicyMetadataMissing,
-        "authorization.permission-snapshot.target-workspace-id": input.targetWorkspaceId,
-        "authorization.permission-snapshot.matched-workspace-ids": input.matchedWorkspaceIds,
-        "authorization.permission-snapshot.synthesized-fallback-used": input.synthesizedFallbackUsed,
-      }),
-    });
+    try {
+      emitAuthorizationDiagnosticRecord({
+        logger: this.diagnosticsLogger,
+        event: "authorization.permission-snapshot.diagnostic",
+        outcome: AuthorizationDiagnosticOutcomes.observed,
+        reasonCode: input.resourcePolicyMetadataMissing
+          ? AuthorizationDecisionReasonCodes.resourcePolicyMetadataNotFound
+          : "authorization.permission-snapshot.captured",
+        denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.permissionSnapshot,
+        correlationId: input.diagnosticCorrelationId,
+        actorIdentityId: input.actorUserIdentityId,
+        actorActiveWorkspaceId: normalizeOptional(input.request.actor.activeWorkspaceId),
+        requiredPermissionKey: input.requiredPermissionKey,
+        target: Object.freeze({
+          targetKind: input.request.target.kind,
+          targetIdentifier: input.targetIdentifier,
+          targetWorkspaceId: input.targetWorkspaceId,
+          targetResourceFamily: input.targetResourceFamily,
+          targetResourceType: input.targetResourceType,
+        }),
+        counts: Object.freeze({
+          roleAssignmentCount: input.roleAssignmentCount,
+          permissionGrantCount: input.permissionGrantCount,
+          sharingGrantCount: input.sharingGrantCount,
+          sharingPolicyMetadataCount: input.sharingPolicyMetadataCount,
+        }),
+        extensions: Object.freeze({
+          "authorization.permission-snapshot.retrieved-role-assignment-count": input.roleAssignmentCount,
+          "authorization.permission-snapshot.retrieved-permission-grant-count": input.permissionGrantCount,
+          "authorization.permission-snapshot.retrieved-sharing-grant-count": input.sharingGrantCount,
+          "authorization.permission-snapshot.retrieved-sharing-policy-metadata-count": input.sharingPolicyMetadataCount,
+          "authorization.permission-snapshot.empty-role-assignments": input.roleAssignmentCount === 0,
+          "authorization.permission-snapshot.empty-permission-grants": input.permissionGrantCount === 0,
+          "authorization.permission-snapshot.empty-sharing-grants": input.sharingGrantCount === 0,
+          "authorization.permission-snapshot.resource-policy-metadata-missing": input.resourcePolicyMetadataMissing,
+          "authorization.permission-snapshot.target-workspace-id": input.targetWorkspaceId,
+          "authorization.permission-snapshot.matched-workspace-ids": input.matchedWorkspaceIds,
+          "authorization.permission-snapshot.synthesized-fallback-used": input.synthesizedFallbackUsed,
+        }),
+      });
+    } catch (error) {
+      this.logInfo({
+        event: "authorization.decision-diagnostic.emission-failed",
+        details: Object.freeze({
+          stage: AuthorizationDiagnosticProvenanceStages.permissionSnapshot,
+          diagnosticCorrelationId: input.diagnosticCorrelationId,
+          targetKind: input.request.target.kind,
+          requiredPermissionKey: input.requiredPermissionKey,
+          reasonCode: input.resourcePolicyMetadataMissing
+            ? AuthorizationDecisionReasonCodes.resourcePolicyMetadataNotFound
+            : "authorization.permission-snapshot.captured",
+          sourceKind: "not-evaluated",
+          error: error instanceof Error ? error.message : "authorization-diagnostic-emission-failed",
+        }),
+      });
+    }
   }
 
   private emitFinalDecisionDiagnostic(input: {
@@ -542,49 +651,268 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
     readonly permissionGrantCount: number;
     readonly sharingGrantCount: number;
     readonly applicableScopeCount?: number;
+    readonly targetSummary: {
+      readonly targetWorkspaceId?: string;
+      readonly targetIdentifier: string;
+      readonly targetResourceType: string;
+      readonly targetResourceFamily?: AuthorizationResourceFamily;
+    };
+    readonly matchedWorkspaceIds: ReadonlyArray<string>;
+    readonly synthesizedFallbackUsed: boolean;
+    readonly visibilityFallbackUsed?: boolean;
+    readonly evidenceMissing?: ReadonlyArray<string>;
+  }): void {
+    this.emitDiagnosticSafely({
+      stage: AuthorizationDiagnosticProvenanceStages.finalDecisionEmission,
+      request: input.request,
+      diagnosticCorrelationId: input.diagnosticCorrelationId,
+      result: input.result,
+      sourceKind: input.sourceKind,
+      evidenceMissing: input.evidenceMissing,
+      emit: () => emitAuthorizationDiagnosticRecord({
+        logger: this.diagnosticsLogger,
+        event: "authorization.final-decision.diagnostic",
+        outcome: input.result.decision.outcome,
+        reasonCode: input.result.decision.reasonCode,
+        denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.finalDecisionEmission,
+        correlationId: input.diagnosticCorrelationId,
+        actorIdentityId: input.actorUserIdentityId,
+        actorActiveWorkspaceId: normalizeOptional(input.request.actor.activeWorkspaceId),
+        requiredPermissionKey: input.requiredPermissionKey,
+        matchedSourceKind: this.resolveDiagnosticMatchedSourceKind(input.result, input.sourceKind),
+        target: Object.freeze({
+          targetKind: input.request.target.kind,
+          targetIdentifier: input.targetSummary.targetIdentifier,
+          targetWorkspaceId: input.targetSummary.targetWorkspaceId,
+          targetResourceFamily: input.targetSummary.targetResourceFamily,
+          targetResourceType: input.targetSummary.targetResourceType,
+        }),
+        counts: Object.freeze({
+          roleAssignmentCount: input.roleAssignmentCount,
+          permissionGrantCount: input.permissionGrantCount,
+          sharingGrantCount: input.sharingGrantCount,
+          applicableScopeCount: input.applicableScopeCount,
+        }),
+        evidence: Object.freeze({
+          roleAssignmentIds: input.result.decision.matchedRoleAssignmentIds,
+          permissionGrantIds: input.result.decision.matchedPermissionGrantIds,
+          sharingGrantIds: input.result.decision.matchedSharingGrantIds,
+          missing: input.evidenceMissing,
+        }),
+        extensions: Object.freeze({
+          "authorization.final-decision.matched-workspace-ids": input.matchedWorkspaceIds,
+          "authorization.final-decision.synthesized-fallback-used": input.synthesizedFallbackUsed,
+          "authorization.final-decision.visibility-fallback-used": input.visibilityFallbackUsed === true,
+        }),
+      }),
+    });
+  }
+
+  private emitEvaluatorResolutionDiagnostic(input: {
+    readonly request: AuthorizationPolicyDecisionEvaluationRequest;
+    readonly actorUserIdentityId?: string;
+    readonly diagnosticCorrelationId: string;
+    readonly requiredPermissionKey: string;
+    readonly result: AuthorizationPolicyDecisionEvaluationResult;
+    readonly sourceKind: string;
+    readonly roleAssignmentCount: number;
+    readonly permissionGrantCount: number;
+    readonly sharingGrantCount: number;
+    readonly applicableScopeCount?: number;
+    readonly targetSummary: {
+      readonly targetWorkspaceId?: string;
+      readonly targetIdentifier: string;
+      readonly targetResourceType: string;
+      readonly targetResourceFamily?: AuthorizationResourceFamily;
+    };
+    readonly matchedWorkspaceIds: ReadonlyArray<string>;
+    readonly synthesizedFallbackUsed: boolean;
+    readonly visibilityFallbackUsed?: boolean;
+    readonly evidenceMissing?: ReadonlyArray<string>;
+  }): void {
+    this.emitDiagnosticSafely({
+      stage: AuthorizationDiagnosticProvenanceStages.evaluatorResolution,
+      request: input.request,
+      diagnosticCorrelationId: input.diagnosticCorrelationId,
+      result: input.result,
+      sourceKind: input.sourceKind,
+      evidenceMissing: input.evidenceMissing,
+      emit: () => emitAuthorizationDiagnosticRecord({
+        logger: this.diagnosticsLogger,
+        event: "authorization.evaluator-resolution.diagnostic",
+        outcome: input.result.decision.outcome,
+        reasonCode: input.result.decision.reasonCode,
+        denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.evaluatorResolution,
+        correlationId: input.diagnosticCorrelationId,
+        actorIdentityId: input.actorUserIdentityId,
+        actorActiveWorkspaceId: normalizeOptional(input.request.actor.activeWorkspaceId),
+        requiredPermissionKey: input.requiredPermissionKey,
+        matchedSourceKind: this.resolveDiagnosticMatchedSourceKind(input.result, input.sourceKind),
+        target: Object.freeze({
+          targetKind: input.request.target.kind,
+          targetIdentifier: input.targetSummary.targetIdentifier,
+          targetWorkspaceId: input.targetSummary.targetWorkspaceId,
+          targetResourceFamily: input.targetSummary.targetResourceFamily,
+          targetResourceType: input.targetSummary.targetResourceType,
+        }),
+        counts: Object.freeze({
+          roleAssignmentCount: input.roleAssignmentCount,
+          permissionGrantCount: input.permissionGrantCount,
+          sharingGrantCount: input.sharingGrantCount,
+          applicableScopeCount: input.applicableScopeCount,
+        }),
+        evidence: Object.freeze({
+          roleAssignmentIds: input.result.decision.matchedRoleAssignmentIds,
+          permissionGrantIds: input.result.decision.matchedPermissionGrantIds,
+          sharingGrantIds: input.result.decision.matchedSharingGrantIds,
+          missing: input.evidenceMissing,
+        }),
+        extensions: Object.freeze({
+          "authorization.evaluator-resolution.source-kind": input.sourceKind,
+          "authorization.evaluator-resolution.matched-workspace-ids": input.matchedWorkspaceIds,
+          "authorization.evaluator-resolution.synthesized-fallback-used": input.synthesizedFallbackUsed,
+          "authorization.evaluator-resolution.visibility-fallback-used": input.visibilityFallbackUsed === true,
+        }),
+      }),
+    });
+  }
+
+  private emitDecisionDiagnostics(input: {
+    readonly request: AuthorizationPolicyDecisionEvaluationRequest;
+    readonly actorUserIdentityId?: string;
+    readonly diagnosticCorrelationId: string;
+    readonly requiredPermissionKey: string;
+    readonly result: AuthorizationPolicyDecisionEvaluationResult;
+    readonly sourceKind: string;
+    readonly roleAssignmentCount: number;
+    readonly permissionGrantCount: number;
+    readonly sharingGrantCount: number;
+    readonly applicableScopeCount?: number;
+    readonly targetSummary: {
+      readonly targetWorkspaceId?: string;
+      readonly targetIdentifier: string;
+      readonly targetResourceType: string;
+      readonly targetResourceFamily?: AuthorizationResourceFamily;
+    };
+    readonly matchedWorkspaceIds: ReadonlyArray<string>;
+    readonly synthesizedFallbackUsed: boolean;
+    readonly visibilityFallbackUsed?: boolean;
+    readonly evidenceMissing?: ReadonlyArray<string>;
+  }): void {
+    this.emitEvaluatorResolutionDiagnostic(input);
+    this.emitFinalDecisionDiagnostic(input);
+  }
+
+  private resolveDiagnosticMatchedSourceKind(
+    result: AuthorizationPolicyDecisionEvaluationResult,
+    sourceKind: string,
+  ) {
+    const mapped = toAuthorizationDiagnosticMatchedSourceKind(sourceKind);
+    if (result.decision.outcome === PolicyDecisionOutcomes.deny) {
+      if (mapped === AuthorizationDiagnosticMatchedSourceKinds.notEvaluated) {
+        return AuthorizationDiagnosticMatchedSourceKinds.none;
+      }
+      return mapped;
+    }
+
+    if (
+      mapped === AuthorizationDiagnosticMatchedSourceKinds.ownerOverride
+      || mapped === AuthorizationDiagnosticMatchedSourceKinds.roleGrant
+      || mapped === AuthorizationDiagnosticMatchedSourceKinds.permissionGrant
+      || mapped === AuthorizationDiagnosticMatchedSourceKinds.sharingGrant
+      || mapped === AuthorizationDiagnosticMatchedSourceKinds.visibilityRule
+    ) {
+      return mapped;
+    }
+
+    if (result.decision.reasonCode === AuthorizationDecisionReasonCodes.ownerOverride) {
+      return AuthorizationDiagnosticMatchedSourceKinds.ownerOverride;
+    }
+    if (result.decision.reasonCode === AuthorizationDecisionReasonCodes.matchedRoleGrant) {
+      return AuthorizationDiagnosticMatchedSourceKinds.roleGrant;
+    }
+    if (result.decision.reasonCode === AuthorizationDecisionReasonCodes.matchedPermissionGrant) {
+      return AuthorizationDiagnosticMatchedSourceKinds.permissionGrant;
+    }
+    if (result.decision.reasonCode === AuthorizationDecisionReasonCodes.matchedSharingGrant) {
+      return AuthorizationDiagnosticMatchedSourceKinds.sharingGrant;
+    }
+    if (
+      result.decision.reasonCode === AuthorizationDecisionReasonCodes.visibilityWorkspaceMember
+      || result.decision.reasonCode === AuthorizationDecisionReasonCodes.visibilityPublished
+    ) {
+      return AuthorizationDiagnosticMatchedSourceKinds.visibilityRule;
+    }
+    if (result.decision.matchedRoleAssignmentIds.length > 0) {
+      return AuthorizationDiagnosticMatchedSourceKinds.roleGrant;
+    }
+    if (result.decision.matchedPermissionGrantIds.length > 0) {
+      return AuthorizationDiagnosticMatchedSourceKinds.permissionGrant;
+    }
+    if (result.decision.matchedSharingGrantIds.length > 0) {
+      return AuthorizationDiagnosticMatchedSourceKinds.sharingGrant;
+    }
+    return AuthorizationDiagnosticMatchedSourceKinds.notEvaluated;
+  }
+
+  private resolveTargetSummary(request: AuthorizationPolicyDecisionEvaluationRequest): {
     readonly targetWorkspaceId?: string;
     readonly targetIdentifier: string;
     readonly targetResourceType: string;
     readonly targetResourceFamily?: AuthorizationResourceFamily;
-    readonly matchedWorkspaceIds: ReadonlyArray<string>;
-    readonly synthesizedFallbackUsed: boolean;
-    readonly visibilityFallbackUsed?: boolean;
-  }): void {
-    emitAuthorizationDiagnosticRecord({
-      logger: this.diagnosticsLogger,
-      event: "authorization.final-decision.diagnostic",
-      outcome: input.result.decision.outcome,
-      reasonCode: input.result.decision.reasonCode,
-      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.finalDecisionEmission,
-      correlationId: input.diagnosticCorrelationId,
-      actorIdentityId: input.actorUserIdentityId,
-      actorActiveWorkspaceId: normalizeOptional(input.request.actor.activeWorkspaceId),
-      requiredPermissionKey: input.requiredPermissionKey,
-      matchedSourceKind: toAuthorizationDiagnosticMatchedSourceKind(input.sourceKind),
-      target: Object.freeze({
-        targetKind: input.request.target.kind,
-        targetIdentifier: input.targetIdentifier,
-        targetWorkspaceId: input.targetWorkspaceId,
-        targetResourceFamily: input.targetResourceFamily,
-        targetResourceType: input.targetResourceType,
-      }),
-      counts: Object.freeze({
-        roleAssignmentCount: input.roleAssignmentCount,
-        permissionGrantCount: input.permissionGrantCount,
-        sharingGrantCount: input.sharingGrantCount,
-        applicableScopeCount: input.applicableScopeCount,
-      }),
-      evidence: Object.freeze({
-        roleAssignmentIds: input.result.decision.matchedRoleAssignmentIds,
-        permissionGrantIds: input.result.decision.matchedPermissionGrantIds,
-        sharingGrantIds: input.result.decision.matchedSharingGrantIds,
-      }),
-      extensions: Object.freeze({
-        "authorization.final-decision.matched-workspace-ids": input.matchedWorkspaceIds,
-        "authorization.final-decision.synthesized-fallback-used": input.synthesizedFallbackUsed,
-        "authorization.final-decision.visibility-fallback-used": input.visibilityFallbackUsed === true,
-      }),
+  } {
+    if (request.target.kind === AuthorizationPolicyEvaluationTargetKinds.resourceInstance) {
+      return Object.freeze({
+        targetWorkspaceId: undefined,
+        targetIdentifier: request.target.resource.resourceId,
+        targetResourceType: request.target.resource.resourceType,
+        targetResourceFamily: request.target.resource.resourceFamily,
+      });
+    }
+
+    return Object.freeze({
+      targetWorkspaceId: request.target.workspaceId,
+      targetIdentifier: `workspace-capability:${request.target.workspaceId}:${request.target.capabilityResourceType}`,
+      targetResourceType: request.target.capabilityResourceType,
+      targetResourceFamily: undefined,
     });
+  }
+
+  private emitDiagnosticSafely(input: {
+    readonly stage: string;
+    readonly request: AuthorizationPolicyDecisionEvaluationRequest;
+    readonly diagnosticCorrelationId: string;
+    readonly result: AuthorizationPolicyDecisionEvaluationResult;
+    readonly sourceKind: string;
+    readonly evidenceMissing?: ReadonlyArray<string>;
+    readonly emit: () => void;
+  }): void {
+    try {
+      input.emit();
+    } catch (error) {
+      this.logInfo({
+        event: "authorization.decision-diagnostic.emission-failed",
+        details: Object.freeze({
+          stage: input.stage,
+          diagnosticCorrelationId: input.diagnosticCorrelationId,
+          targetKind: input.request.target.kind,
+          requiredPermissionKey: input.result.decision.requiredPermissionKey,
+          outcome: input.result.decision.outcome,
+          reasonCode: input.result.decision.reasonCode,
+          sourceKind: input.sourceKind,
+          evidenceMissing: input.evidenceMissing,
+          error: error instanceof Error ? error.message : "authorization-diagnostic-emission-failed",
+        }),
+      });
+    }
+  }
+
+  private logInfo(event: { readonly event: string; readonly details?: Readonly<Record<string, unknown>> }): void {
+    try {
+      this.diagnosticsLogger.info(event);
+    } catch {
+      // Diagnostic logging must not alter authorization outcomes.
+    }
   }
 
   private toSharingGrant(record: AuthorizationSharingGrantRecord) {
