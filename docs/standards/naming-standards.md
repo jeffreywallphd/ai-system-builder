@@ -121,6 +121,8 @@ Examples:
 - `runtime.tool.run`
 - `project-run.retry`
 
+Operation identity is transport-neutral. Do not prefix operation names with transport namespaces such as `api.` or `ipc.`.
+
 Avoid unconstrained operation strings such as `WorkspaceCreate`, `workspace_create`, or single-segment names like `workspace`.
 
 ## IPC channel naming

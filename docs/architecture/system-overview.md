@@ -117,7 +117,10 @@ Transport technologies are adapters, not application definitions.
 - Express is the default server API transport adapter.
 - Electron IPC is the desktop transport boundary.
 - API and IPC contracts are transport specializations that compose from shared transport request/response/error semantics.
+- API contracts keep shared transport envelopes intact; HTTP-only fields (status, headers, framework request/response objects) remain adapter concerns.
+- IPC contracts keep shared transport envelopes intact and add only operation-derived channel context.
 - Transport operation identifiers follow the shared operation identity helper pattern (lowercase dotted segments) to reduce ad hoc naming drift.
+- IPC channel identifiers must be derived from operation identity using `ipc.<operation>.<kind>` (`request`, `response`, `event`) to prevent channel/operation drift.
 - Business rules must stay in domain/application layers, not in route handlers or IPC handlers.
 
 ## Persistence and storage posture

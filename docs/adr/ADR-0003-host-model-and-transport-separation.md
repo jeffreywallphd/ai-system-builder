@@ -27,6 +27,10 @@ If this boundary is not explicit early, desktop and server implementations drift
 - Hosts own lifecycle, startup composition, and environment-specific wiring.
 - Transport adapters translate transport mechanisms into application contracts.
 - Hybrid operation is a later mode and must not force premature complexity into early implementation.
+- Shared transport request/response/error envelopes under `modules/contracts/transport` are the transport contract base.
+- API and IPC contracts are strict transport specializations: they must reuse shared transport operation and success/failure semantics rather than creating parallel contract families.
+- Operation identifiers are shared identities (`lowercase.dot.segments`) created/normalized through shared operation helpers.
+- IPC channel values are operation-derived (`ipc.<operation>.<kind>`) where `<kind>` is constrained to `request`, `response`, or `event`.
 
 Additional position:
 
@@ -60,6 +64,7 @@ Merging concerns obscures ownership boundaries and increases the risk that lifec
 - Host flexibility is preserved for desktop-only, server-only, and later hybrid operation.
 - Transport adapters can evolve (or be replaced) with less impact on core use cases.
 - Boundary discipline reduces drift into parallel architectures.
+- Operation/channel naming drift is constrained by shared helpers and channel derivation rules.
 
 ### Negative
 
@@ -70,6 +75,6 @@ Merging concerns obscures ownership boundaries and increases the risk that lifec
 ## Follow-up Documentation or Implementation Needs
 
 - Keep `docs/architecture/host-model.md` aligned with this ADR as host composition patterns are implemented.
-- Document transport adapter conventions (Express and Electron IPC) in `docs/standards/` once baseline implementations exist.
+- Keep transport specialization and operation/channel naming rules aligned across ADR, architecture docs, standards docs, and context packs.
 - Add guidance for composition root placement in `apps/desktop/` and `apps/server/` to prevent logic leakage into transport handlers.
 - Create a future ADR for hybrid synchronization/coordination once implementation planning begins.

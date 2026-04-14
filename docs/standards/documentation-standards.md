@@ -55,6 +55,7 @@ Documentation updates are required in the same change set when any of the follow
 - architectural boundary changes,
 - dependency direction changes,
 - host/runtime/transport/persistence responsibilities change,
+- transport contract specialization rules, operation identity constraints, or IPC channel rules change,
 - behavior that docs currently describe is materially altered,
 - standards are added, tightened, or intentionally relaxed.
 

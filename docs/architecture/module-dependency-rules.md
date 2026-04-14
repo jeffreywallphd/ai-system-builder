@@ -59,6 +59,11 @@ Preferred dependency flow is **outside-in at runtime, inside-out for source depe
 - Concrete adapter/framework dependencies.
 
 **Rule**: Contracts are stable cross-boundary language, not implementation containers.
+Contract families must compose, not fork:
+
+- Treat `modules/contracts/transport` as the shared transport envelope and operation base.
+- Keep API and IPC contracts as specializations over that shared base.
+- Keep operation identity and IPC channel derivation helper-driven rather than ad hoc string assembly.
 
 ## 4) Adapters (`modules/adapters`)
 
@@ -123,6 +128,8 @@ Preferred dependency flow is **outside-in at runtime, inside-out for source depe
 Avoid these patterns even if they "work":
 
 - Route or IPC handlers containing business decision trees.
+- API/IPC contract files recreating independent success/failure envelopes instead of specializing shared transport contracts.
+- Ad hoc operation or IPC channel strings that bypass shared normalization/derivation helpers.
 - Domain importing an ORM model, DB client, or host API.
 - UI calling DB or file APIs directly.
 - App-level scripts becoming permanent orchestration layers.

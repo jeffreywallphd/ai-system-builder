@@ -24,6 +24,8 @@
 - Avoid speculative abstraction, package proliferation, and folder/package duplication without concrete need.
 - Use role-revealing names; avoid vague catch-all naming for files, folders, and symbols.
 - Use shared operation identity helpers/patterns for contract operations (lowercase dotted names) to prevent ad hoc drift.
+- Treat API and IPC contracts as specializations of shared transport contracts, not parallel response/error systems.
+- Keep IPC channels operation-derived (`ipc.<operation>.<kind>`) via shared helpers.
 - Update canonical docs in the same change when documented behavior/architecture/standards change.
 - Use structured, meaningful logs with configurable verbosity and stage-level timing for long operations.
 - Add regression tests for meaningful bug fixes when practical; prioritize behavioral value and deterministic tests.
