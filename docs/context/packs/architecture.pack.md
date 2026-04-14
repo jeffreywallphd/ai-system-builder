@@ -23,6 +23,8 @@
 - Keep contracts explicit at boundaries; avoid embedding boundary semantics in ad hoc types.
 - Treat API and IPC contract families as true transport specializations: compose from shared transport semantics and add only narrow transport-specific fields.
 - Keep operation identity consistent across transport/runtime/persistence via shared helper patterns (lowercase dotted operation names).
+- Keep operation identity transport-neutral; avoid embedding transport namespace into operation names.
+- Keep IPC channels derived from operation identity (`ipc.<operation>.<kind>`) so channel and operation cannot drift independently.
 - Use `modules/contracts/host` for thin host-aware context metadata instead of
   passing framework-native objects inward.
 - Treat hosts (desktop/server) and transport (IPC/HTTP) as separate concerns.

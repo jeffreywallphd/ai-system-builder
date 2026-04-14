@@ -22,6 +22,8 @@
 - Server is a host model responsible for process lifecycle and composition.
 - Express is the default API transport adapter, not the application architecture center.
 - Keep internal application contracts distinct from HTTP-specific request/response details.
+- Keep API contracts as transport specializations over shared transport envelopes; do not create API-only success/failure families.
+- Keep operation identity transport-neutral (`workspace.create` style), with HTTP route details staying adapter-side.
 - Route/controller code must stay thin and delegate use-case behavior inward.
 - Server host composition is separate from transport adaptation.
 - Pass host metadata inward via `modules/contracts/host` host-context contracts,

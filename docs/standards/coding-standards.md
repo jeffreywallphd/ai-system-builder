@@ -14,6 +14,7 @@ Required behavior:
 
 - Keep domain and application free from infrastructure and framework details.
 - Keep transport mechanisms (Express, Electron IPC, etc.) inside adapter boundaries.
+- Keep API and IPC contract families as strict specializations of shared transport contracts; do not recreate parallel transport envelopes.
 - Keep host lifecycle/composition separate from transport translation.
 - Keep persistence and storage concerns separate.
 
@@ -129,6 +130,7 @@ When behavior changes, update or delete stale comments in the same change.
 - Infrastructure objects passed deep into domain/application.
 - Route/IPC handlers containing business policy.
 - Runtime adapters deciding business rules.
+- Ad hoc operation/channel string assembly that bypasses shared identity helpers.
 - UI directly binding to persistence/storage internals.
 - Unnecessary factories/registries/container indirection with no architectural payoff.
 
