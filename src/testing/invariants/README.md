@@ -19,6 +19,8 @@ This module provides a shared baseline for cross-system invariant testing:
 - Secret metadata feature-slice invariant coverage (shared framework): `src/application/authorization/tests/SecretAuthorizationInvariantCoverage.test.ts`
 - Admin/deployment capability invariant coverage (shared framework): `src/infrastructure/api/deployment/tests/WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService.test.ts`
 - Shared authorization slice adapter/test support: `src/application/authorization/tests/AuthorizationInvariantCoverageTestSupport.ts`
+- Shared runtime-composed invariant fixture support: `src/testing/invariants/composedRuntimeFixtures.ts`
+- Asset family runtime-composed invariant coverage: `src/application/authorization/tests/AssetAuthorizationRuntimeComposedInvariantCoverage.test.ts`
 
 ## Core Contracts
 
@@ -51,6 +53,8 @@ This module provides a shared baseline for cross-system invariant testing:
   - run scenario against resolved adapter with fixed evaluation timestamp.
 - `executeAndAssertInvariantScenario(...)`
   - run + assert expected outcome/metadata using shared assertions.
+- `createAuthorizationInvariantRuntimeFixture(...)`
+  - composed runtime fixture that boots `IdentityHttpServer` with real authorization-management wiring (policy evaluator + sqlite repositories/adapters) for runtime-backed invariants.
 - `assertAuthorizationDecisionAllowed(...)` and `assertAuthorizationDecisionDenied(...)`
   - canonical allow/deny assertions with readable drift messages for authorization-sensitive stories.
 - `assertInvariantExecution(...)`
@@ -82,6 +86,13 @@ The assertion helpers are designed to accept currently available result fields a
 3. Implement a family adapter that maps scenario input to real policy/runtime evaluation.
 4. Register the adapter in `InvariantAdapterRegistry` and execute with `executeAndAssertInvariantScenario`.
 5. Keep family-specific details in adapters, not in shared harness contracts.
+
+## Runtime-Composed Fixture Pattern
+
+- Use `createAuthorizationInvariantRuntimeFixture(...)` when a scenario should prove live composed behavior across transport route families, identity session handling, and policy-backed persistence wiring.
+- Keep fixture scope narrow: include only route-family dependencies needed for the invariant family under test.
+- Surface participating dependencies explicitly in test setup by asserting fixture `participants` metadata (evaluator, repositories, adapters, route-family id).
+- Use runtime-composed fixtures for high-value slices where isolated evaluator-only tests would miss composition drift.
 
 ## Guardrails
 
