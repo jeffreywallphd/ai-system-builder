@@ -7,43 +7,74 @@ import {
   createIpcFailureResponse,
   createIpcRequest,
   createIpcSuccessResponse,
+  isIpcChannelValueForOperation,
+  parseIpcChannelValue,
 } from ".";
 
 describe("ipc contracts", () => {
-  it("creates dotted channel values from role-revealing segments", () => {
-    const channel = createIpcChannelValue(
-      "desktop",
-      "workspace",
-      "create",
-      "request",
-    );
+  it("derives ipc channel values from operation identity and kind", () => {
+    const channel = createIpcChannelValue("workspace.create", "request");
 
-    expect(channel).toBe("desktop.workspace.create.request");
+    expect(channel).toBe("ipc.workspace.create.request");
   });
 
-  it("rejects empty channel segments so channels stay explicit and stable", () => {
-    expect(() => createIpcChannelValue("desktop", "   ")).toThrow(
-      "IPC channel segments must be non-empty strings.",
-    );
-  });
+  it("parses raw channel values into operation and channel kind", () => {
+    const parsed = parseIpcChannelValue(" ipc.workspace.create.response ");
 
-  it("creates a channel mapping without embedding ipc wiring details", () => {
-    const channel = createIpcChannel(
-      "workspace.create",
-      "desktop.workspace.create.request",
-    );
-
-    expect(channel).toEqual({
+    expect(parsed).toEqual({
       operation: "workspace.create",
-      value: "desktop.workspace.create.request",
+      kind: "response",
+      value: "ipc.workspace.create.response",
     });
   });
 
-  it("creates an ipc request that preserves transport operation identity", () => {
-    const channel = createIpcChannel(
-      "workspace.create",
-      "desktop.workspace.create.request",
+  it("rejects channel values that do not follow the constrained ipc format", () => {
+    expect(() => parseIpcChannelValue("desktop.workspace.create.request")).toThrow(
+      'IPC channel must use format "ipc.<operation>.<kind>"',
     );
+    expect(() => parseIpcChannelValue("ipc.workspace_create.request")).toThrow(
+      'IPC channel must use format "ipc.<operation>.<kind>"',
+    );
+    expect(() => parseIpcChannelValue("ipc.workspace.create.invalid")).toThrow(
+      'IPC channel must use format "ipc.<operation>.<kind>"',
+    );
+  });
+
+  it("creates a channel mapping with derived channel identity", () => {
+    const channel = createIpcChannel("workspace.create", "request");
+
+    expect(channel).toEqual({
+      operation: "workspace.create",
+      kind: "request",
+      value: "ipc.workspace.create.request",
+    });
+  });
+
+  it("checks channel-to-operation invariants for valid and drifted combinations", () => {
+    expect(
+      isIpcChannelValueForOperation(
+        "workspace.create",
+        "ipc.workspace.create.request",
+        "request",
+      ),
+    ).toBe(true);
+    expect(
+      isIpcChannelValueForOperation(
+        "workspace.delete",
+        "ipc.workspace.create.request",
+      ),
+    ).toBe(false);
+    expect(
+      isIpcChannelValueForOperation(
+        "workspace.create",
+        "ipc.workspace.create.response",
+        "request",
+      ),
+    ).toBe(false);
+  });
+
+  it("creates an ipc request that preserves transport operation identity", () => {
+    const channel = createIpcChannel("workspace.create", "request");
 
     const request = createIpcRequest(
       channel,
@@ -56,7 +87,7 @@ describe("ipc contracts", () => {
     );
 
     expect(request).toEqual({
-      channel: "desktop.workspace.create.request",
+      channel: "ipc.workspace.create.request",
       operation: "workspace.create",
       payload: { name: "alpha" },
       requestId: "req-400",
@@ -66,10 +97,7 @@ describe("ipc contracts", () => {
   });
 
   it("creates ipc error and failure response envelopes with channel context", () => {
-    const channel = createIpcChannel(
-      "workspace.create",
-      "desktop.workspace.create.request",
-    );
+    const channel = createIpcChannel("workspace.create", "request");
 
     const error = createIpcError(
       channel,
@@ -89,7 +117,7 @@ describe("ipc contracts", () => {
     expect(response).toEqual({
       ok: false,
       error: {
-        channel: "desktop.workspace.create.request",
+        channel: "ipc.workspace.create.request",
         operation: "workspace.create",
         code: "validation",
         message: "Workspace name is required",
@@ -98,7 +126,7 @@ describe("ipc contracts", () => {
         correlationId: undefined,
         metadata: { source: "desktop-host" },
       },
-      channel: "desktop.workspace.create.request",
+      channel: "ipc.workspace.create.request",
       operation: "workspace.create",
       requestId: "req-401",
       correlationId: "corr-401",
@@ -107,10 +135,7 @@ describe("ipc contracts", () => {
   });
 
   it("creates ipc success responses without preload or electron-specific fields", () => {
-    const channel = createIpcChannel(
-      "workspace.create",
-      "desktop.workspace.create.response",
-    );
+    const channel = createIpcChannel("workspace.create", "response");
 
     const response = createIpcSuccessResponse(
       channel,
@@ -125,7 +150,7 @@ describe("ipc contracts", () => {
       value: { workspaceId: "ws-9" },
       requestId: "req-402",
       correlationId: undefined,
-      channel: "desktop.workspace.create.response",
+      channel: "ipc.workspace.create.response",
       operation: "workspace.create",
       metadata: undefined,
     });

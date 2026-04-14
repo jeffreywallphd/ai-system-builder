@@ -15,6 +15,8 @@ adapter implementations, not in shared contracts.
 
 IPC channel semantics are intentionally narrow:
 
-- channel bindings pair `operation` with a dotted channel value
+- channel values are derived from operation identity using `ipc.<operation>.<kind>`
+- channel kind is constrained to `request`, `response`, or `event`
+- channel bindings pair `operation` with derived channel value and explicit kind
 - request/error/response factories take that binding so operation identity is not passed independently
 - success/failure result semantics are composed from `modules/contracts/transport`

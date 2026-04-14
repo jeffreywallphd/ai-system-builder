@@ -123,6 +123,25 @@ Examples:
 
 Avoid unconstrained operation strings such as `WorkspaceCreate`, `workspace_create`, or single-segment names like `workspace`.
 
+## IPC channel naming
+
+IPC channel identifiers must stay mechanically linked to operation identity.
+
+- Use `ipc.<operation>.<kind>` as the only supported channel format.
+- `<operation>` must be a valid operation identity from the shared operation helper rules.
+- `<kind>` must be one of: `request`, `response`, `event`.
+- Prefer IPC channel creation/parsing helpers over ad hoc channel string assembly.
+
+Examples:
+
+- `ipc.workspace.create.request`
+- `ipc.runtime.tool.run.response`
+
+Avoid channel values unrelated to operation identity such as:
+
+- `desktop.workspace.create.request`
+- `workspace.create.channel-a`
+
 ## UI component and hook naming
 
 - React components: `PascalCase` (`ProjectListPanel.tsx`).
