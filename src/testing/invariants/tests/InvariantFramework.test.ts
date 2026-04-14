@@ -175,7 +175,7 @@ describe("Invariant framework harness", () => {
         scenario,
         now: () => new Date(nowIso),
       }),
-    ).rejects.toThrow("expected outcome 'allow' but got 'deny'");
+    ).rejects.toThrow("expected authorization outcome 'allow' but observed 'deny'");
   });
 
   it("guards adapter registration and family lookup behavior", async () => {

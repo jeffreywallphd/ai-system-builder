@@ -62,10 +62,17 @@ export interface InvariantResourceContextInput {
 export interface InvariantExpectedDecisionMetadata {
   readonly reasonCode?: string;
   readonly denialReason?: string;
+  readonly sourceKind?: string;
+  readonly targetKind?: string;
   readonly requiredPermissionKey?: string;
+  readonly scope?: InvariantExpectedDecisionScope;
   readonly matchedRoleAssignmentIds?: ReadonlyArray<string>;
+  readonly unmatchedRoleAssignmentIds?: ReadonlyArray<string>;
   readonly matchedPermissionGrantIds?: ReadonlyArray<string>;
+  readonly unmatchedPermissionGrantIds?: ReadonlyArray<string>;
   readonly matchedSharingGrantIds?: ReadonlyArray<string>;
+  readonly unmatchedSharingGrantIds?: ReadonlyArray<string>;
+  readonly provenance?: Readonly<Record<string, string>>;
 }
 
 export interface InvariantExpectedRuntimeMetadata {
@@ -100,10 +107,35 @@ export interface InvariantScenarioDefinition<TInput = unknown> {
 export interface InvariantObservedDecisionMetadata {
   readonly reasonCode?: string;
   readonly denialReason?: string;
+  readonly sourceKind?: string;
+  readonly targetKind?: string;
   readonly requiredPermissionKey?: string;
+  readonly scope?: InvariantObservedDecisionScope;
   readonly matchedRoleAssignmentIds?: ReadonlyArray<string>;
+  readonly unmatchedRoleAssignmentIds?: ReadonlyArray<string>;
   readonly matchedPermissionGrantIds?: ReadonlyArray<string>;
+  readonly unmatchedPermissionGrantIds?: ReadonlyArray<string>;
   readonly matchedSharingGrantIds?: ReadonlyArray<string>;
+  readonly unmatchedSharingGrantIds?: ReadonlyArray<string>;
+  readonly provenance?: Readonly<Record<string, string>>;
+}
+
+export interface InvariantExpectedDecisionScope {
+  readonly isApplicable?: boolean;
+  readonly scopeKind?: string;
+  readonly workspaceId?: string;
+  readonly resourceFamily?: string;
+  readonly resourceType?: string;
+  readonly resourceId?: string;
+}
+
+export interface InvariantObservedDecisionScope {
+  readonly isApplicable?: boolean;
+  readonly scopeKind?: string;
+  readonly workspaceId?: string;
+  readonly resourceFamily?: string;
+  readonly resourceType?: string;
+  readonly resourceId?: string;
 }
 
 export interface InvariantObservedRuntimeMetadata {
