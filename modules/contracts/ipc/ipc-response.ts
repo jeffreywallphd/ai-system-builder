@@ -1,37 +1,32 @@
 import {
   type ContractErrorDetails,
-  type ContractFailure,
-  type ContractSuccess,
-  createFailureResult,
-  createSuccessResult,
 } from "../shared";
-import type { TransportEnvelope } from "../transport";
-import type { IpcChannelValue } from "./ipc-channel";
+import {
+  createTransportFailureResponse,
+  createTransportSuccessResponse,
+  type TransportFailureResponse,
+  type TransportSuccessResponse,
+} from "../transport";
+import type { IpcChannel, IpcChannelValue } from "./ipc-channel";
 import type { IpcError } from "./ipc-error";
 import type { IpcMetadata, IpcOperation } from "./ipc-operation";
-
-export interface IpcEnvelope<
-  TOperation extends IpcOperation = IpcOperation,
-  TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
-> extends TransportEnvelope<TOperation, TMetadata> {
-  channel: TChannel;
-}
 
 export type IpcSuccessResponse<
   TPayload,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
   TChannel extends IpcChannelValue = IpcChannelValue,
-> = IpcEnvelope<TOperation, TMetadata, TChannel> & ContractSuccess<TPayload>;
+> = TransportSuccessResponse<TPayload, TOperation, TMetadata> & {
+  channel: TChannel;
+};
 
 export type IpcFailureResponse<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
   TChannel extends IpcChannelValue = IpcChannelValue,
-> = Omit<ContractFailure<TDetails>, "error"> &
-  IpcEnvelope<TOperation, TMetadata, TChannel> & {
+> = Omit<TransportFailureResponse<TDetails, TOperation, TMetadata>, "error"> & {
+    channel: TChannel;
     error: IpcError<TDetails, TOperation, TMetadata, TChannel>;
   };
 
@@ -51,8 +46,7 @@ export function createIpcSuccessResponse<
   TMetadata extends IpcMetadata = IpcMetadata,
   TChannel extends IpcChannelValue = IpcChannelValue,
 >(
-  channel: TChannel,
-  operation: TOperation,
+  channel: IpcChannel<TOperation, TChannel>,
   value: TPayload,
   options?: {
     requestId?: string;
@@ -60,16 +54,11 @@ export function createIpcSuccessResponse<
     metadata?: TMetadata;
   },
 ): IpcSuccessResponse<TPayload, TOperation, TMetadata, TChannel> {
-  const result = createSuccessResult(value, {
-    requestId: options?.requestId,
-    correlationId: options?.correlationId,
-  });
+  const result = createTransportSuccessResponse(channel.operation, value, options);
 
   return {
     ...result,
-    channel,
-    operation,
-    metadata: options?.metadata,
+    channel: channel.value,
   };
 }
 
@@ -86,15 +75,11 @@ export function createIpcFailureResponse<
     metadata?: TMetadata;
   },
 ): IpcFailureResponse<TDetails, TOperation, TMetadata, TChannel> {
-  const result = createFailureResult(error, {
-    requestId: options?.requestId,
-    correlationId: options?.correlationId,
-  });
+  const result = createTransportFailureResponse(error, options);
 
   return {
     ...result,
     channel: error.channel,
-    operation: error.operation,
-    metadata: options?.metadata ?? error.metadata,
+    error,
   };
 }

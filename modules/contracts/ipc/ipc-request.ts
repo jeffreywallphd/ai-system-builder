@@ -2,7 +2,7 @@ import {
   createTransportRequest,
   type TransportRequest,
 } from "../transport";
-import type { IpcChannelValue } from "./ipc-channel";
+import type { IpcChannel, IpcChannelValue } from "./ipc-channel";
 import type { IpcMetadata, IpcOperation } from "./ipc-operation";
 
 export interface IpcRequest<
@@ -20,8 +20,7 @@ export function createIpcRequest<
   TMetadata extends IpcMetadata = IpcMetadata,
   TChannel extends IpcChannelValue = IpcChannelValue,
 >(
-  channel: TChannel,
-  operation: TOperation,
+  channel: IpcChannel<TOperation, TChannel>,
   payload: TPayload,
   options?: {
     requestId?: string;
@@ -30,7 +29,7 @@ export function createIpcRequest<
   },
 ): IpcRequest<TPayload, TOperation, TMetadata, TChannel> {
   return {
-    ...createTransportRequest(operation, payload, options),
-    channel,
+    ...createTransportRequest(channel.operation, payload, options),
+    channel: channel.value,
   };
 }

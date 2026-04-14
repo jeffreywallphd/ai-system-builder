@@ -56,6 +56,7 @@ Transport adapters should share a transport-neutral contract core under `modules
 - The shared core defines generic transport request/response/error envelopes.
 - API (HTTP) and IPC contracts can specialize this core for their transport needs.
 - Specialization must not change application-facing operation identity and result/error semantics.
+- IPC specialization should add only channel identity context; it must not recreate transport success/failure envelopes.
 - Transport-specific mechanics (HTTP status/headers or IPC channel registration details) remain in adapter-level contracts and implementations.
 
 ## Supported operating modes

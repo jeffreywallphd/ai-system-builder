@@ -22,6 +22,7 @@
 - Desktop is a host model, not the entire architecture.
 - Electron and Electron Forge are the desktop host/build tooling path.
 - Preload and IPC are transport/boundary mechanics, not business logic layers.
+- IPC contracts must remain transport specializations: reuse transport request/response/error semantics and add only channel identity context.
 - Keep business policy and use-case orchestration in application/domain, not `main`/preload/IPC glue.
 - Desktop host code should compose adapters and lifecycle behavior, then delegate inward.
 - Pass inward host metadata through `modules/contracts/host` host-context shapes,

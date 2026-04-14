@@ -7,8 +7,14 @@ This family keeps the contract surface thin:
 
 - channel naming/value shapes (`ipc-channel`)
 - operation and metadata aliases from transport core (`ipc-operation`)
-- IPC request/error/response envelopes that preserve transport-core semantics
+- channel-bound IPC request/error/response factories that preserve transport-core semantics
 
 These contracts are intentionally serialization-friendly and avoid preload,
 registration, or `ipcMain`/`ipcRenderer` mechanics. Those details belong in
 adapter implementations, not in shared contracts.
+
+IPC channel semantics are intentionally narrow:
+
+- channel bindings pair `operation` with a dotted channel value
+- request/error/response factories take that binding so operation identity is not passed independently
+- success/failure result semantics are composed from `modules/contracts/transport`

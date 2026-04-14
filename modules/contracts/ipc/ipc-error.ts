@@ -3,7 +3,7 @@ import {
   createTransportError,
   type TransportError,
 } from "../transport";
-import type { IpcChannelValue } from "./ipc-channel";
+import type { IpcChannel, IpcChannelValue } from "./ipc-channel";
 import type { IpcMetadata, IpcOperation } from "./ipc-operation";
 
 export interface IpcError<
@@ -21,8 +21,7 @@ export function createIpcError<
   TMetadata extends IpcMetadata = IpcMetadata,
   TChannel extends IpcChannelValue = IpcChannelValue,
 >(
-  channel: TChannel,
-  operation: TOperation,
+  channel: IpcChannel<TOperation, TChannel>,
   code: ContractErrorCode,
   message: string,
   options?: {
@@ -33,12 +32,12 @@ export function createIpcError<
   },
 ): IpcError<TDetails, TOperation, TMetadata, TChannel> {
   return {
-    ...createTransportError(operation, code, message, {
+    ...createTransportError(channel.operation, code, message, {
       details: options?.details,
       requestId: options?.requestId,
       correlationId: options?.correlationId,
       metadata: options?.metadata,
     }),
-    channel,
+    channel: channel.value,
   };
 }
