@@ -125,7 +125,41 @@ function loadBetterSqlite3ConstructorFromNodeModulesPath(moduleRequire: ModuleRe
     };
   }
 
-  return loadBetterSqlite3ConstructorById(moduleRequire, packageDirectory, "module-directory node_modules require");
+  const preferredNativeResolution = loadBetterSqlite3ConstructorById(
+    moduleRequire,
+    path.join(packageDirectory, "build", "Release", "better_sqlite3.node"),
+    "module-directory node_modules require (preferred build/Release binding)",
+  );
+  if (preferredNativeResolution.constructor) {
+    return preferredNativeResolution;
+  }
+
+  const releaseResolution = loadBetterSqlite3ConstructorById(
+    moduleRequire,
+    path.join(packageDirectory, "Release", "better_sqlite3.node"),
+    "module-directory node_modules require (Release binding fallback)",
+  );
+  if (releaseResolution.constructor) {
+    return releaseResolution;
+  }
+
+  const packageResolution = loadBetterSqlite3ConstructorById(
+    moduleRequire,
+    packageDirectory,
+    "module-directory node_modules require",
+  );
+  if (packageResolution.constructor) {
+    return packageResolution;
+  }
+
+  return {
+    constructor: undefined,
+    diagnostic: [
+      preferredNativeResolution.diagnostic,
+      releaseResolution.diagnostic,
+      packageResolution.diagnostic,
+    ].join(" "),
+  };
 }
 
 function findNodeModulePackageDirectory(startDirectory: string, moduleName: string): string | undefined {
