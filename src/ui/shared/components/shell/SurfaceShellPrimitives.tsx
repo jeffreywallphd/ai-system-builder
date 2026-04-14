@@ -135,6 +135,7 @@ function SurfaceRegionContainer({
   title,
   description,
   ariaLabel,
+  roleClassName,
   as,
   defaultAriaLabel,
 }: SurfaceRegionProps & {
