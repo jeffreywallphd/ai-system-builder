@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   KNOWN_RUNTIME_KINDS,
+  createRuntimeOperation,
   createRuntimeExecutionError,
   createRuntimeExecutionFailureResult,
   createRuntimeExecutionProgressEvent,
@@ -9,10 +10,19 @@ import {
   createRuntimeExecutionSuccessResult,
   createRuntimeTarget,
   isKnownRuntimeKind,
+  normalizeRuntimeOperation,
   resolveRuntimeKind,
 } from ".";
 
 describe("runtime contracts", () => {
+  it("normalizes and validates runtime operation identity naming", () => {
+    expect(createRuntimeOperation("assistant", "plan")).toBe("assistant.plan");
+    expect(normalizeRuntimeOperation(" Runtime.Tool.Run ")).toBe("runtime.tool.run");
+    expect(() => normalizeRuntimeOperation("tool_run")).toThrow(
+      "Operation identity must use lowercase dot-separated segments",
+    );
+  });
+
   it("exposes known runtime kinds while allowing future adapter kinds", () => {
     expect(KNOWN_RUNTIME_KINDS).toEqual(["node", "python"]);
     expect(isKnownRuntimeKind("node")).toBe(true);

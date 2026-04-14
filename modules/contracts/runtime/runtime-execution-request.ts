@@ -1,5 +1,6 @@
 import type { ContractBoundaryContext } from "../shared";
 import { createRuntimeTarget, type RuntimeTarget } from "./runtime-target";
+import type { RuntimeOperation } from "./runtime-operation";
 
 export type RuntimeExecutionMetadata = Readonly<Record<string, unknown>>;
 
@@ -15,7 +16,7 @@ export interface RuntimeExecutionRequest<
   TMetadata extends RuntimeExecutionMetadata = RuntimeExecutionMetadata,
 > extends ContractBoundaryContext {
   executionId: string;
-  operation: string;
+  operation: RuntimeOperation;
   target: RuntimeTarget;
   input: TInput;
   options?: RuntimeExecutionOptions;
@@ -27,7 +28,7 @@ export function createRuntimeExecutionRequest<
   TInput,
   TMetadata extends RuntimeExecutionMetadata = RuntimeExecutionMetadata,
 >(
-  operation: string,
+  operation: RuntimeOperation,
   input: TInput,
   options: {
     executionId: string;

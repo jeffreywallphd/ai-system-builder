@@ -1,13 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createPersistenceOperation,
   createPersistenceError,
   createPersistenceFailureResult,
   createPersistenceRecordReference,
   createPersistenceSuccessResult,
+  normalizePersistenceOperation,
 } from ".";
 
 describe("persistence contracts", () => {
+  it("normalizes and validates persistence operation identity naming", () => {
+    expect(createPersistenceOperation("workspace", "insert")).toBe(
+      "workspace.insert",
+    );
+    expect(normalizePersistenceOperation(" Workspace.Update ")).toBe(
+      "workspace.update",
+    );
+    expect(() => normalizePersistenceOperation("workspace_update")).toThrow(
+      "Operation identity must use lowercase dot-separated segments",
+    );
+  });
+
   it("creates explicit record identity references for persistence boundaries", () => {
     const reference = createPersistenceRecordReference("project-run", "run-42");
 

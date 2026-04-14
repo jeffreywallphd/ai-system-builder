@@ -9,10 +9,11 @@ import type {
   PersistenceError,
   PersistenceFailureDetails,
 } from "./persistence-error";
+import type { PersistenceOperation } from "./persistence-operation";
 import type { PersistenceRecordReference } from "./persistence-record-reference";
 
 export interface PersistenceResultEnvelope extends ContractBoundaryContext {
-  operation: string;
+  operation: PersistenceOperation;
   record?: PersistenceRecordReference;
 }
 
@@ -32,7 +33,7 @@ export type PersistenceResult<
 > = PersistenceSuccessResult<TValue> | PersistenceFailureResult<TDetails>;
 
 export function createPersistenceSuccessResult<TValue>(
-  operation: string,
+  operation: PersistenceOperation,
   value: TValue,
   options?: {
     requestId?: string;
