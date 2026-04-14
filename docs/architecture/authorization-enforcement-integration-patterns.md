@@ -360,6 +360,40 @@ Contributor guidance:
 - Prefer canonical reason codes/provenance stages and explicit missing-evidence markers over ad hoc strings.
 - Keep deny-by-default behavior: when upstream evaluation evidence is missing, emit a deny/unavailable diagnostic with explicit missing markers.
 
+## 12) Transport and API diagnostic mapping baseline (Story 2.3.1)
+
+Authorization-sensitive transport and backend API denial paths must preserve stable links between:
+
+- internal diagnostics (`authorization-diagnostic/v1` records),
+- public response reason semantics,
+- request/correlation identifiers used by operators.
+
+Required mapping posture:
+
+- Keep route handlers thin: use shared transport/API mapping seams; do not create route-local authorization reason taxonomies.
+- Preserve correlation continuity: include response correlation identifiers and keep error-envelope `correlationId` aligned with transport headers.
+- Preserve stable reason semantics: forward canonical authorization reason codes on policy-denied API responses (`reasonCode`).
+- Keep public diagnostics redacted: expose only externally projected diagnostics (`surface=external`) and never return internal identifiers/secrets.
+- Distinguish authorization deny from runtime availability state:
+  - policy deny -> authorization failure (`forbidden`/`unauthorized`/`invalid-request` semantics),
+  - runtime-unavailable or runtime-degraded denial reasons -> temporary availability failure semantics (`temporarily-unavailable`) with explicit availability state metadata.
+
+Minimum transport mapping expectations:
+
+- HTTP denial mapping:
+  - `unauthorized` -> `401`
+  - `forbidden` -> `403`
+  - `invalid-request` -> `400`
+  - `temporarily-unavailable` -> `503`
+  - `internal` -> `500`
+- WebSocket denial mapping:
+  - `unauthorized` -> `4401`
+  - `forbidden` -> `4403`
+  - `invalid-request` -> `4400`
+  - `temporarily-unavailable` -> `1013`
+  - `internal` -> `1011`
+- Emit transport-mapping diagnostics with provenance stage `transport-mapping` and preserve correlation linkage in both logs and response envelopes.
+
 ## Related ADRs
 
 - `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`

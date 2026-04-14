@@ -122,6 +122,8 @@ describe("Authorization transport adapters", () => {
       expect(http.statusCode).toBe(403);
       expect(http.body.error.code).toBe(AuthorizationTransportFailureCodes.forbidden);
       expect(http.body.error.reasonCode).toBe("no-effective-permission");
+      expect(http.body.error.diagnostic?.denialProvenanceStage).toBe("transport-mapping");
+      expect(http.body.error.diagnostic?.outcome).toBe("deny");
     }
 
     const socket = await new WebSocketAuthorizationGuardAdapter(guard).authorize(
@@ -228,6 +230,85 @@ describe("Authorization transport adapters", () => {
 
     expect(socket.ok).toBeTrue();
     expect(evaluator.requests).toHaveLength(1);
+  });
+
+  it("maps runtime availability denials to temporarily-unavailable transport responses", async () => {
+    const evaluator = new StubDecisionEvaluator(() => denyDecision({
+      requiredPermissionKey: "run.submit",
+      reasonCode: "runtime-gate-blocked",
+      reason: "Runtime activation is still warming.",
+      denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
+    }));
+    const guard = new AuthorizationTransportPolicyGuard<TestContext>({
+      decisionEvaluator: evaluator,
+      resolveActor: (context) => Object.freeze({ actorUserIdentityId: context.actorUserIdentityId }),
+    });
+
+    const http = await new HttpAuthorizationGuardAdapter(guard).authorize(
+      Object.freeze({
+        actorUserIdentityId: "user-runtime",
+        workspaceId: "workspace-runtime",
+      }),
+      Object.freeze({
+        requiredPermissionKey: "run.submit",
+        requestId: "req-runtime-unavailable",
+        target: Object.freeze({
+          kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+          workspaceId: (context: TestContext) => context.workspaceId ?? "",
+          capabilityResourceType: "runtime",
+        }),
+      }),
+    );
+
+    expect(http.ok).toBeFalse();
+    if (!http.ok) {
+      expect(http.statusCode).toBe(503);
+      expect(http.body.error.code).toBe(AuthorizationTransportFailureCodes.temporarilyUnavailable);
+      expect(http.body.error.availabilityState).toBe("unavailable");
+      expect(http.body.error.correlationId).toBe("req-runtime-unavailable");
+      expect(http.body.error.diagnostic?.outcome).toBe("unavailable");
+      expect(http.body.error.diagnostic?.reasonCode).toBe("runtime-gate-blocked");
+    }
+  });
+
+  it("maps runtime degraded denials to degraded transport diagnostics", async () => {
+    const evaluator = new StubDecisionEvaluator(() => denyDecision({
+      requiredPermissionKey: "run.read",
+      reasonCode: "runtime-degraded",
+      reason: "Runtime is degraded while dependency recovery completes.",
+      denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
+    }));
+    const guard = new AuthorizationTransportPolicyGuard<TestContext>({
+      decisionEvaluator: evaluator,
+      resolveActor: (context) => Object.freeze({ actorUserIdentityId: context.actorUserIdentityId }),
+    });
+
+    const socket = await new WebSocketAuthorizationGuardAdapter(guard).authorize(
+      Object.freeze({
+        actorUserIdentityId: "user-runtime",
+        resourceId: "run-1",
+      }),
+      Object.freeze({
+        requiredPermissionKey: "run.read",
+        correlationId: "corr-runtime-degraded",
+        target: Object.freeze({
+          kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: (context: TestContext) => context.resourceId ?? "",
+        }),
+      }),
+    );
+
+    expect(socket.ok).toBeFalse();
+    if (!socket.ok) {
+      expect(socket.closeCode).toBe(1013);
+      expect(socket.error.code).toBe(AuthorizationTransportFailureCodes.temporarilyUnavailable);
+      expect(socket.error.availabilityState).toBe("degraded");
+      expect(socket.error.correlationId).toBe("corr-runtime-degraded");
+      expect(socket.error.diagnostic?.outcome).toBe("degraded");
+      expect(socket.error.diagnostic?.target?.targetIdentifier).toBeUndefined();
+    }
   });
 });
 
