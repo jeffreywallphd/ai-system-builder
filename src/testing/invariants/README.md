@@ -12,6 +12,9 @@ This module provides a shared baseline for cross-system invariant testing:
 - Contracts and harness: `src/testing/invariants/`
 - Tests for this module: `src/testing/invariants/tests/`
 - Asset feature-slice invariant coverage (shared framework): `src/application/authorization/tests/AssetAuthorizationInvariantCoverage.test.ts`
+- Workflow feature-slice invariant coverage (shared framework): `src/application/authorization/tests/WorkflowAuthorizationInvariantCoverage.test.ts`
+- Run feature-slice invariant coverage (shared framework): `src/application/authorization/tests/RunAuthorizationInvariantCoverage.test.ts`
+- Shared authorization slice adapter/test support: `src/application/authorization/tests/AuthorizationInvariantCoverageTestSupport.ts`
 
 ## Core Contracts
 
