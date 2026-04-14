@@ -85,6 +85,54 @@ Redaction behavior is preserved because upstream observability adapters still sa
 5. Validate that payloads/messages remain redacted; if sensitive values appear, treat as regression.
 6. For realtime failures, map websocket close code and error code with the same correlation id.
 
+## Authorization denial triage flow
+
+Use this when a request is denied and operators need to localize where and why the decision/failure occurred.
+
+Canonical diagnostic contracts:
+
+1. schema and projection boundaries: `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
+2. reason-code and provenance catalogs: `src/shared/contracts/authorization/AuthorizationDiagnosticCatalogs.ts`
+3. integration baseline: `docs/architecture/authorization-enforcement-integration-patterns.md`
+
+Primary emission seams by provenance stage:
+
+1. `route`/`api`/`transport-mapping`:
+   - `src/infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
+   - `src/infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
+   - `src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts`
+2. `permission-snapshot`/`scope-filtering`/`evaluator-resolution`/`final-decision-emission`/`adapter-failure`:
+   - `src/application/authorization/use-cases/AuthorizationDecisionDiagnostics.ts`
+   - `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
+3. adapter/repository lookup failures:
+   - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
+
+Step-by-step interpretation:
+
+1. Start with response `error.correlationId` (or `x-correlation-id`) and locate all events sharing that id.
+2. Order events by provenance stage:
+   - `permission-snapshot` -> `scope-filtering` -> `evaluator-resolution` -> `final-decision-emission`
+   - include `adapter-failure` or `transport-mapping` when present
+3. Read `reasonCode` at each stage:
+   - policy denial examples: `no-effective-permission`, `scope-mismatch`
+   - boundary failure examples: `authorization-repository-lookup-failed`, `authorization-adapter-timeout`, `transport-denied`
+4. Confirm the first stage where a stable deny/failure appears. That stage is the owning failure boundary.
+5. Use `evidence.missing` and counts to distinguish "data unavailable" from "policy denied with complete evidence".
+
+Security and redaction boundaries:
+
+1. External diagnostics are projected and must not contain actor IDs, resource identifiers, or identifier arrays.
+2. Secret-sensitive/admin-sensitive surfaces additionally suppress permission keys and sensitive target metadata.
+3. Runtime details and extensions are sanitized; `.public`/`:public` extension keys are the only externally retained extension paths.
+
+Relationship to invariant and composed integration tests:
+
+1. Use invariant coverage to verify policy truth under workspace/scope permutations:
+   - `src/testing/invariants/tests`
+   - `src/application/authorization/tests/*InvariantCoverage.test.ts`
+2. Use composed runtime regression coverage for cross-layer drift and denial provenance continuity:
+   - `src/application/authorization/tests/AuthorizationRuntimeContextDriftRegression.test.ts`
+
 ## Regression checklist
 
 1. HTTP error responses include `error.correlationId` and response headers.

@@ -25,6 +25,7 @@
 - [Workspace Administration Operations](../workspace-administration-operations.md)
 - [Storage Administration Operations](../storage-administration-operations.md)
 - [Node Bootstrap Identity Operations](../node-bootstrap-identity-operations.md)
+- [Unified API Observability and Troubleshooting](../unified-api-observability-troubleshooting.md)
 - [Secret Health And Operational Diagnostics](../secret-health-and-operational-diagnostics.md)
 - [Governance Audit Review Workflows](../governance-audit-review-workflows.md)
 - [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.md)

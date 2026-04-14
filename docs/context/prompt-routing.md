@@ -55,6 +55,7 @@ Use the smallest context set that can still produce a correct answer:
 - For readiness checkpoint, diagnostic redaction/correlation, and observability-contract tasks, insert `observability-and-readiness` after runtime availability context.
 - For durable storage authority, persistence verification, and file/materialization truth tasks, insert `storage-persistence-and-materialization` before `context-system-foundations`.
 - For identity/authentication/authorization/trust/secrets-sensitive tasks, insert `identity-and-security` after `architecture-core` and before `context-system-foundations`.
+- For authorization diagnostics interpretation/extension tasks, include `identity-and-security` plus `observability-and-readiness`, and load `docs/architecture/authorization-enforcement-integration-patterns.md` with `docs/unified-api-observability-troubleshooting.md`.
 - For Studio Shell and System Studio composition tasks, insert `studio-and-system-composition` after `architecture-core` and before `context-system-foundations`.
 - Add ADR references only when decisions materially constrain implementation outcomes (for example control-plane authority, trust boundary enforcement, or studio/system authority).
 - Add path-specific architecture or contributor docs only when they directly match `changedPaths` or `primarySurfaces`.
@@ -202,8 +203,10 @@ Use for policy, authorization, and runtime safety boundaries.
 Primary docs:
 - `docs/context/packs/identity-and-security.pack.md`
 - `docs/architecture/authorization-foundation.md`
+- `docs/architecture/authorization-enforcement-integration-patterns.md`
 - `docs/architecture/transport-security-foundation.md`
 - `docs/architecture/secrets-foundation.md`
+- `docs/unified-api-observability-troubleshooting.md`
 
 Typical code surfaces:
 - security-sensitive paths under `src/application/`, `src/infrastructure/`, and host startup boundaries.

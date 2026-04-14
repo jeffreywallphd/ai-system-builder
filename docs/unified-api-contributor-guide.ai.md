@@ -91,6 +91,48 @@ Permission-sensitive PR checklist:
 4. explain any permission-sensitive change that intentionally omits invariant coverage
 5. prefer reusable fixtures/helpers over scenario-local setup duplication
 
+## Authorization diagnostics extension workflow
+
+Use this workflow when a change can alter authorization deny outcomes, cross-layer failure provenance, or public authorization diagnostics.
+
+Canonical contracts and catalogs:
+
+1. schema + redaction/projection contract: `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
+2. canonical reason/provenance catalogs: `src/shared/contracts/authorization/AuthorizationDiagnosticCatalogs.ts`
+3. architecture integration baseline: `docs/architecture/authorization-enforcement-integration-patterns.md`
+
+Where diagnostics are emitted:
+
+1. transport boundary mapping: `src/infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
+2. use-case/evaluator emission helpers: `src/application/authorization/use-cases/AuthorizationDecisionDiagnostics.ts`
+3. decisive + adapter-failure stages: `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
+4. transport status/envelope mapping: `src/infrastructure/transport/http-server/identity/IdentityHttpServerErrorTranslation.ts`
+
+How to add diagnostics for new permissioned features:
+
+1. reuse a catalog reason code when semantics exist; otherwise add a stable namespaced reason code
+2. emit `createAuthorizationDiagnosticRecord(...)` at the stage where evidence is known
+3. keep one correlation value across permission snapshot, scope filtering, evaluator resolution, final decision, adapter failure, and transport mapping
+4. emit explicit `evidence.missing` markers when upstream evidence is unavailable
+5. project external diagnostics with `projectAuthorizationDiagnosticRecord(...)` and avoid actor/target identifier leakage
+
+Contributor interpretation rules:
+
+1. correlation id -> links one denial across route/API/use-case/evaluator/adapter stages
+2. reason code -> stable machine-readable cause classification
+3. provenance stage -> authoritative layer where failure/decision truth was established
+4. extensions -> namespaced additive metadata only; never replace canonical fields
+
+Required verification surfaces for authorization diagnostics changes:
+
+1. `src/shared/contracts/authorization/tests/AuthorizationDiagnosticsContracts.test.ts`
+2. `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
+3. `src/infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
+4. invariant/composed coverage when cross-layer behavior changed:
+   - `src/testing/invariants/tests`
+   - `src/application/authorization/tests/*InvariantCoverage.test.ts`
+   - `src/application/authorization/tests/AuthorizationRuntimeContextDriftRegression.test.ts`
+
 ## Migration reminders
 
 - Preload protected shortcuts: converge to authoritative HTTP/WSS.
