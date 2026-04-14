@@ -1,5 +1,7 @@
-import { createRequire } from "node:module";
+import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 export interface SqliteCompatRunResult {
   readonly changes: number;
@@ -20,6 +22,7 @@ export interface SqliteCompatDatabase {
 }
 
 const require = createRequire(import.meta.url);
+const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 type ModuleRequire = (id: string) => unknown;
 
 type BetterSqlite3Database = {
@@ -101,16 +104,78 @@ function resolveBetterSqlite3ForRuntime(moduleRequire: ModuleRequire): {
     return { constructor: moduleRequireResolution.constructor, diagnostics };
   }
 
-  const cwdRequire = createRequire(path.join(process.cwd(), "package.json"));
-  if (cwdRequire !== moduleRequire) {
-    const cwdResolution = loadBetterSqlite3Constructor(cwdRequire, "cwd package.json require");
-    diagnostics.push(cwdResolution.diagnostic);
-    if (cwdResolution.constructor) {
-      return { constructor: cwdResolution.constructor, diagnostics };
-    }
+  const explicitNodeModulesResolution = loadBetterSqlite3ConstructorFromNodeModulesPath(moduleRequire);
+  diagnostics.push(explicitNodeModulesResolution.diagnostic);
+  if (explicitNodeModulesResolution.constructor) {
+    return { constructor: explicitNodeModulesResolution.constructor, diagnostics };
   }
 
   return { constructor: undefined, diagnostics };
+}
+
+function loadBetterSqlite3ConstructorFromNodeModulesPath(moduleRequire: ModuleRequire): {
+  readonly constructor: (new (path: string) => BetterSqlite3Database) | undefined;
+  readonly diagnostic: string;
+} {
+  const packageDirectory = findNodeModulePackageDirectory(MODULE_DIRECTORY, "better-sqlite3");
+  if (!packageDirectory) {
+    return {
+      constructor: undefined,
+      diagnostic: "module-directory node_modules require: better-sqlite3 package directory not found.",
+    };
+  }
+
+  return loadBetterSqlite3ConstructorById(moduleRequire, packageDirectory, "module-directory node_modules require");
+}
+
+function findNodeModulePackageDirectory(startDirectory: string, moduleName: string): string | undefined {
+  let currentDirectory = path.resolve(startDirectory);
+
+  while (true) {
+    const packageDirectory = path.join(currentDirectory, "node_modules", moduleName);
+    const packageJsonPath = path.join(packageDirectory, "package.json");
+    if (fs.existsSync(packageJsonPath)) {
+      return packageDirectory;
+    }
+
+    const parentDirectory = path.dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      return undefined;
+    }
+
+    currentDirectory = parentDirectory;
+  }
+}
+
+function loadBetterSqlite3ConstructorById(
+  moduleRequire: ModuleRequire,
+  moduleId: string,
+  label: string,
+): {
+  readonly constructor: (new (path: string) => BetterSqlite3Database) | undefined;
+  readonly diagnostic: string;
+} {
+  try {
+    const moduleExport = moduleRequire(moduleId);
+    const resolvedConstructor = resolveBetterSqlite3Constructor(moduleExport);
+    if (resolvedConstructor) {
+      return {
+        constructor: resolvedConstructor,
+        diagnostic: `${label}: loaded better-sqlite3 from '${moduleId}'.`,
+      };
+    }
+
+    return {
+      constructor: undefined,
+      diagnostic: `${label}: loaded '${moduleId}' but no constructor export was found.`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      constructor: undefined,
+      diagnostic: `${label}: ${message}`,
+    };
+  }
 }
 
 function loadBetterSqlite3Constructor(
@@ -120,27 +185,7 @@ function loadBetterSqlite3Constructor(
   readonly constructor: (new (path: string) => BetterSqlite3Database) | undefined;
   readonly diagnostic: string;
 } {
-  try {
-    const moduleExport = moduleRequire("better-sqlite3");
-    const resolvedConstructor = resolveBetterSqlite3Constructor(moduleExport);
-    if (resolvedConstructor) {
-      return {
-        constructor: resolvedConstructor,
-        diagnostic: `${label}: loaded better-sqlite3.`,
-      };
-    }
-
-    return {
-      constructor: undefined,
-      diagnostic: `${label}: better-sqlite3 loaded but no constructor export was found.`,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      constructor: undefined,
-      diagnostic: `${label}: ${message}`,
-    };
-  }
+  return loadBetterSqlite3ConstructorById(moduleRequire, "better-sqlite3", label);
 }
 
 function openBunSqliteDatabase(databasePath: string, moduleRequire: ModuleRequire = require): SqliteCompatDatabase {
