@@ -26,6 +26,7 @@ import {
   AuthorizationPolicyEvaluationTargetKinds,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationPolicyDecisionEvaluator } from "../use-cases/AuthorizationPolicyDecisionEvaluator";
+import { AuthorizationAdapterFailureReasonCodes } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
 import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../ports/IAuthorizationResourcePolicyMetadataReadRepository";
 import type { IAuthorizationRoleGrantReadRepository } from "../ports/IAuthorizationRoleGrantReadRepository";
 import type { IAuthorizationSharingGrantReadRepository } from "../ports/IAuthorizationSharingGrantReadRepository";
@@ -43,22 +44,42 @@ class InMemoryDecisionPolicyRepositories
   });
   public sharingGrantRecords: ReadonlyArray<AuthorizationSharingGrantRecord> = Object.freeze([]);
   public resourcePolicyMetadataByResourceKey = new Map<string, AuthorizationResourcePolicyMetadata>();
+  public roleGrantSnapshotError?: Error;
+  public sharingGrantLookupError?: Error;
+  public resourcePolicyMetadataLookupError?: Error;
+  public roleGrantSnapshotMalformed = false;
+  public sharingGrantRecordsMalformed = false;
 
   async getActorRoleGrantSnapshot(
     _query: AuthorizationActorRoleGrantSnapshotQuery,
   ): Promise<AuthorizationActorRoleGrantSnapshot> {
+    if (this.roleGrantSnapshotError) {
+      throw this.roleGrantSnapshotError;
+    }
+    if (this.roleGrantSnapshotMalformed) {
+      return undefined as unknown as AuthorizationActorRoleGrantSnapshot;
+    }
     return this.roleGrantSnapshot;
   }
 
   async listSharingGrants(
     _query: AuthorizationSharingGrantLookupQuery,
   ): Promise<ReadonlyArray<AuthorizationSharingGrantRecord>> {
+    if (this.sharingGrantLookupError) {
+      throw this.sharingGrantLookupError;
+    }
+    if (this.sharingGrantRecordsMalformed) {
+      return undefined as unknown as ReadonlyArray<AuthorizationSharingGrantRecord>;
+    }
     return this.sharingGrantRecords;
   }
 
   async findResourcePolicyMetadata(
     query: AuthorizationResourcePolicyMetadataLookupQuery,
   ): Promise<AuthorizationResourcePolicyMetadata | undefined> {
+    if (this.resourcePolicyMetadataLookupError) {
+      throw this.resourcePolicyMetadataLookupError;
+    }
     return this.resourcePolicyMetadataByResourceKey.get(toResourceKey(query.resource.resourceType, query.resource.resourceId));
   }
 
@@ -458,6 +479,155 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
     expect(diagnosticsLogger.events.map((event) => event.event)).toContain("authorization.evaluator-resolution.diagnostic");
     expect(diagnosticsLogger.events.map((event) => event.event)).toContain("authorization.decision-diagnostic.emission-failed");
     expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.completed");
+  });
+
+  it("emits adapter-failure provenance when role snapshot lookup times out", async () => {
+    const repositories = new InMemoryDecisionPolicyRepositories();
+    const diagnosticsLogger = new RecordingDiagnosticsLogger();
+    repositories.roleGrantSnapshotError = new Error("ETIMEDOUT while querying authorization role snapshot");
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: repositories,
+      sharingGrantReadRepository: repositories,
+      resourcePolicyMetadataReadRepository: repositories,
+      diagnosticsLogger,
+    });
+
+    const result = await evaluator.evaluateDecision({
+      actor: {
+        actorUserIdentityId: "user-timeout",
+      },
+      requiredPermissionKey: "asset.read",
+      target: {
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-timeout-1",
+        },
+      },
+      asOf: evaluationAsOf,
+    });
+
+    expect(result.decision.outcome).toBe("deny");
+    expect(result.decision.reasonCode).toBe("authorization-evaluation-invalid-context");
+
+    const adapterFailureEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "authorization.adapter-failure.diagnostic"
+    ));
+    const finalDecisionEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "authorization.final-decision.diagnostic"
+    ));
+    expect(adapterFailureEvent).toBeDefined();
+    expect(finalDecisionEvent).toBeDefined();
+
+    const adapterFailureDiagnostic = adapterFailureEvent?.details?.diagnostic as {
+      readonly reasonCode: string;
+      readonly denialProvenanceStage: string;
+      readonly correlation: { readonly correlationId?: string };
+      readonly extensions?: Readonly<Record<string, unknown>>;
+    };
+    const finalDecisionDiagnostic = finalDecisionEvent?.details?.diagnostic as {
+      readonly correlation: { readonly correlationId?: string };
+    };
+    expect(adapterFailureDiagnostic.denialProvenanceStage).toBe("adapter-failure");
+    expect(adapterFailureDiagnostic.reasonCode).toBe(AuthorizationAdapterFailureReasonCodes.adapterTimeout);
+    expect(adapterFailureDiagnostic.extensions?.["authorization.adapter-failure.repository-operation"]).toBe("role-grant-snapshot");
+    expect(adapterFailureDiagnostic.correlation.correlationId).toBe(finalDecisionDiagnostic.correlation.correlationId);
+  });
+
+  it("emits adapter-failure provenance for unexpected empty repository results", async () => {
+    const repositories = new InMemoryDecisionPolicyRepositories();
+    const diagnosticsLogger = new RecordingDiagnosticsLogger();
+    repositories.roleGrantSnapshotMalformed = true;
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: repositories,
+      sharingGrantReadRepository: repositories,
+      resourcePolicyMetadataReadRepository: repositories,
+      diagnosticsLogger,
+    });
+
+    await evaluator.evaluateDecision({
+      actor: {
+        actorUserIdentityId: "user-empty",
+      },
+      requiredPermissionKey: "asset.read",
+      target: {
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-empty-1",
+        },
+      },
+      asOf: evaluationAsOf,
+    });
+
+    const adapterFailureEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "authorization.adapter-failure.diagnostic"
+    ));
+    expect(adapterFailureEvent).toBeDefined();
+    const adapterFailureDiagnostic = adapterFailureEvent?.details?.diagnostic as {
+      readonly reasonCode: string;
+      readonly extensions?: Readonly<Record<string, unknown>>;
+    };
+    expect(adapterFailureDiagnostic.reasonCode).toBe(AuthorizationAdapterFailureReasonCodes.unexpectedEmptyResult);
+    expect(adapterFailureDiagnostic.extensions?.["authorization.adapter-failure.unexpected-empty-result"]).toBe(true);
+  });
+
+  it("emits adapter-failure provenance for persistence mapping failures", async () => {
+    const repositories = new InMemoryDecisionPolicyRepositories();
+    const diagnosticsLogger = new RecordingDiagnosticsLogger();
+    repositories.resourcePolicyMetadataByResourceKey.set(
+      toResourceKey("asset", "asset-mapping-failure-1"),
+      Object.freeze({
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-mapping-failure-1",
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-alpha",
+        visibility: ResourceVisibilities.shared,
+        sharingPolicyMode: SharingPolicyModes.explicit,
+        allowResharing: false,
+        isPublishedCapable: false,
+      }),
+    );
+    repositories.sharingGrantLookupError = new Error(
+      "Persisted sharing subject kind 'workspace-role' is missing workspace or role fields.",
+    );
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: repositories,
+      sharingGrantReadRepository: repositories,
+      resourcePolicyMetadataReadRepository: repositories,
+      diagnosticsLogger,
+    });
+
+    await evaluator.evaluateDecision({
+      actor: {
+        actorUserIdentityId: "user-mapping",
+      },
+      requiredPermissionKey: "asset.read",
+      target: {
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-mapping-failure-1",
+        },
+      },
+      asOf: evaluationAsOf,
+    });
+
+    const adapterFailureEvent = diagnosticsLogger.events.find((event) => (
+      event.event === "authorization.adapter-failure.diagnostic"
+    ));
+    expect(adapterFailureEvent).toBeDefined();
+    const adapterFailureDiagnostic = adapterFailureEvent?.details?.diagnostic as {
+      readonly reasonCode: string;
+      readonly extensions?: Readonly<Record<string, unknown>>;
+    };
+    expect(adapterFailureDiagnostic.reasonCode).toBe(AuthorizationAdapterFailureReasonCodes.persistenceMappingFailed);
+    expect(adapterFailureDiagnostic.extensions?.["authorization.adapter-failure.mapping-failure-detected"]).toBe(true);
   });
 
   it("uses workspace visibility fallback for read/list when actor has workspace membership context", async () => {

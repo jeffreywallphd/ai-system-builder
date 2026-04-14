@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  AuthorizationAdapterFailureReasonCodes,
   AuthorizationContextResolutionReasonCodes,
   AuthorizationDecisionDenialReasonCodes,
   AuthorizationDecisionReasonCodes,
@@ -16,9 +17,12 @@ describe("AuthorizationDiagnosticCatalogs", () => {
     expect(AuthorizationDecisionDenialReasonCodes.scopeMismatch).toBe("scope-mismatch");
     expect(AuthorizationRuntimeAvailabilityReasonCodes.runtimeGateBlocked).toBe("runtime-gate-blocked");
     expect(AuthorizationTransportMappingReasonCodes.transportDenied).toBe("transport-denied");
+    expect(AuthorizationAdapterFailureReasonCodes.repositoryLookupFailed).toBe("authorization-repository-lookup-failed");
+    expect(AuthorizationAdapterFailureReasonCodes.adapterTimeout).toBe("authorization-adapter-timeout");
     expect(AuthorizationContextResolutionReasonCodes.workspaceContextMissing).toBe("workspace-context-missing");
     expect(AuthorizationDiagnosticReasonCodes.transportDenied).toBe("transport-denied");
     expect(AuthorizationDiagnosticReasonCodes.contextSnapshotCaptured).toBe("context-snapshot-captured");
+    expect(AuthorizationDiagnosticReasonCodes.persistenceMappingFailed).toBe("authorization-persistence-mapping-failed");
   });
 
   it("includes canonical provenance stages for evaluator, decision emission, and transport mapping", () => {
