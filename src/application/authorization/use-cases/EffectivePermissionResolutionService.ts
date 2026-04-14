@@ -19,6 +19,7 @@ import {
   type WorkspaceAuthorizationRoleKey,
   isWorkspaceAuthorizationRoleKey,
 } from "@domain/authorization/AuthorizationRoleDefinitions";
+import { AuthorizationDecisionReasonCodes } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
 import type {
   AuthorizationPolicyEvaluatorRequest,
   AuthorizationPolicyEvaluatorResult,
@@ -127,7 +128,7 @@ export class EffectivePermissionResolutionService
         request.asOf,
         PolicyDecisionOutcomes.deny,
         EffectivePermissionResolutionSourceKinds.explicitDeny,
-        "explicit-deny-permission-grant",
+        AuthorizationDecisionReasonCodes.explicitDenyPermissionGrant,
         "An explicit deny permission grant matched the requested permission.",
         {
           matchedPermissionGrantIds: deniedPermissionGrantIds,
@@ -144,7 +145,7 @@ export class EffectivePermissionResolutionService
         request.asOf,
         PolicyDecisionOutcomes.allow,
         EffectivePermissionResolutionSourceKinds.ownerOverride,
-        "owner-override",
+        AuthorizationDecisionReasonCodes.ownerOverride,
         "The actor owns the resource and owner override applies.",
       );
     }
@@ -159,7 +160,7 @@ export class EffectivePermissionResolutionService
         request.asOf,
         PolicyDecisionOutcomes.allow,
         EffectivePermissionResolutionSourceKinds.roleGrant,
-        "matched-role-grant",
+        AuthorizationDecisionReasonCodes.matchedRoleGrant,
         "A matching active role assignment grants the requested permission.",
         {
           matchedRoleAssignmentIds,
@@ -177,7 +178,7 @@ export class EffectivePermissionResolutionService
         request.asOf,
         PolicyDecisionOutcomes.allow,
         EffectivePermissionResolutionSourceKinds.permissionGrant,
-        "matched-permission-grant",
+        AuthorizationDecisionReasonCodes.matchedPermissionGrant,
         "An explicit allow permission grant matched the requested permission.",
         {
           matchedPermissionGrantIds: allowedPermissionGrantIds,
@@ -197,7 +198,7 @@ export class EffectivePermissionResolutionService
         request.asOf,
         PolicyDecisionOutcomes.allow,
         EffectivePermissionResolutionSourceKinds.sharingGrant,
-        "matched-sharing-grant",
+        AuthorizationDecisionReasonCodes.matchedSharingGrant,
         "A matching explicit sharing grant includes the requested permission.",
         {
           matchedSharingGrantIds,
@@ -217,7 +218,7 @@ export class EffectivePermissionResolutionService
           request.asOf,
           PolicyDecisionOutcomes.allow,
           EffectivePermissionResolutionSourceKinds.visibilityRule,
-          "visibility-workspace-member",
+          AuthorizationDecisionReasonCodes.visibilityWorkspaceMember,
           "Workspace visibility allows read/list for active workspace members.",
         );
       }
@@ -228,7 +229,7 @@ export class EffectivePermissionResolutionService
           request.asOf,
           PolicyDecisionOutcomes.allow,
           EffectivePermissionResolutionSourceKinds.visibilityRule,
-          "visibility-published",
+          AuthorizationDecisionReasonCodes.visibilityPublished,
           "Published visibility allows read/list access.",
         );
       }
@@ -239,7 +240,7 @@ export class EffectivePermissionResolutionService
       request.asOf,
       PolicyDecisionOutcomes.deny,
       EffectivePermissionResolutionSourceKinds.none,
-      "no-effective-permission",
+      AuthorizationDecisionReasonCodes.noEffectivePermission,
       "No role grant, owner override, sharing grant, or visibility rule allowed the permission.",
     );
     this.diagnosticsLogger.info({

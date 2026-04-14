@@ -4,6 +4,29 @@ import type {
   RuntimeAvailabilityBlockingReasonCode,
   RuntimeAvailabilityState,
 } from "@shared/contracts/runtime/RuntimeAvailabilityResponseContracts";
+import {
+  AuthorizationDiagnosticProvenanceStages,
+  type AuthorizationDiagnosticProvenanceStage,
+  type AuthorizationDiagnosticReasonCode,
+  isKnownAuthorizationDiagnosticReasonCode,
+} from "./AuthorizationDiagnosticCatalogs";
+export {
+  AuthorizationDecisionDenialReasonCodes,
+  AuthorizationDecisionReasonCodes,
+  AuthorizationDiagnosticProvenanceStages,
+  AuthorizationDiagnosticReasonCodes,
+  AuthorizationRuntimeAvailabilityReasonCodes,
+  AuthorizationTransportMappingReasonCodes,
+  isKnownAuthorizationDiagnosticReasonCode,
+} from "./AuthorizationDiagnosticCatalogs";
+export type {
+  AuthorizationDecisionDenialReasonCode,
+  AuthorizationDecisionReasonCode,
+  AuthorizationDiagnosticProvenanceStage,
+  AuthorizationDiagnosticReasonCode,
+  AuthorizationRuntimeAvailabilityReasonCode,
+  AuthorizationTransportMappingReasonCode,
+} from "./AuthorizationDiagnosticCatalogs";
 
 export class AuthorizationDiagnosticContractError extends Error {
   constructor(message: string) {
@@ -42,17 +65,10 @@ export const AuthorizationDiagnosticMatchedSourceKinds = Object.freeze({
 export type AuthorizationDiagnosticMatchedSourceKind =
   typeof AuthorizationDiagnosticMatchedSourceKinds[keyof typeof AuthorizationDiagnosticMatchedSourceKinds];
 
-export const AuthorizationDenialProvenanceStages = Object.freeze({
-  route: "route",
-  api: "api",
-  useCase: "use-case",
-  evaluator: "evaluator",
-  adapter: "adapter",
-  runtimeReadiness: "runtime-readiness",
-} as const);
+export const AuthorizationDenialProvenanceStages = AuthorizationDiagnosticProvenanceStages;
 
 export type AuthorizationDenialProvenanceStage =
-  typeof AuthorizationDenialProvenanceStages[keyof typeof AuthorizationDenialProvenanceStages];
+  AuthorizationDiagnosticProvenanceStage;
 
 export interface AuthorizationDiagnosticCorrelation {
   readonly requestId?: string;
@@ -98,7 +114,7 @@ export interface AuthorizationDiagnosticRecord {
   readonly requiredPermissionKey?: string;
   readonly counts: AuthorizationDiagnosticCounts;
   readonly matchedSourceKind?: AuthorizationDiagnosticMatchedSourceKind;
-  readonly reasonCode: string;
+  readonly reasonCode: AuthorizationDiagnosticReasonCode;
   readonly denialProvenanceStage: AuthorizationDenialProvenanceStage;
   readonly runtimeAvailability?: AuthorizationRuntimeAvailabilityDiagnostic;
   readonly extensions?: Readonly<Record<string, unknown>>;
@@ -112,7 +128,7 @@ interface CreateAuthorizationDiagnosticRecordInput {
   readonly requiredPermissionKey?: string;
   readonly counts?: AuthorizationDiagnosticCounts;
   readonly matchedSourceKind?: AuthorizationDiagnosticMatchedSourceKind;
-  readonly reasonCode: string;
+  readonly reasonCode: AuthorizationDiagnosticReasonCode | string;
   readonly denialProvenanceStage: AuthorizationDenialProvenanceStage;
   readonly runtimeAvailability?: AuthorizationRuntimeAvailabilityDiagnostic;
   readonly extensions?: Readonly<Record<string, unknown>>;
@@ -135,11 +151,24 @@ export function createAuthorizationDiagnosticRecord(
     requiredPermissionKey: normalizeOptional(input.requiredPermissionKey),
     counts: normalizeCounts(input.counts),
     matchedSourceKind: input.matchedSourceKind,
-    reasonCode: normalizeRequired(input.reasonCode, "Authorization diagnostic reasonCode"),
+    reasonCode: normalizeReasonCode(input.reasonCode),
     denialProvenanceStage: input.denialProvenanceStage,
     runtimeAvailability,
     extensions: normalizeExtensions(input.extensions),
   });
+}
+
+function normalizeReasonCode(value: string): AuthorizationDiagnosticReasonCode {
+  const normalized = normalizeRequired(value, "Authorization diagnostic reasonCode");
+  if (isKnownAuthorizationDiagnosticReasonCode(normalized)) {
+    return normalized;
+  }
+  if (!/^[a-z0-9]+(?:[._:-][a-z0-9]+)+$/.test(normalized)) {
+    throw new AuthorizationDiagnosticContractError(
+      "Authorization diagnostic reasonCode must be a known catalog value or a stable namespaced code.",
+    );
+  }
+  return normalized as AuthorizationDiagnosticReasonCode;
 }
 
 function normalizeRequired(value: string, field: string): string {

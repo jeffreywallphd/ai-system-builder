@@ -6,6 +6,10 @@ import {
   type InvariantObservedResult,
 } from "@testing/invariants";
 import type { AuthorizationInvariantRuntimeFixture } from "@testing/invariants/composedRuntimeFixtures";
+import {
+  AuthorizationDecisionDenialReasonCodes,
+  AuthorizationTransportMappingReasonCodes,
+} from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
 
 export interface AuthorizationRuntimeGrantRequestInput {
   readonly sessionToken: string;
@@ -89,7 +93,9 @@ export class AuthorizationRuntimeGrantInvariantAdapter
     return Object.freeze({
       outcome,
       decision: Object.freeze({
-        reasonCode: response.ok ? "transport-accepted" : "transport-denied",
+        reasonCode: response.ok
+          ? AuthorizationTransportMappingReasonCodes.transportAccepted
+          : AuthorizationTransportMappingReasonCodes.transportDenied,
         denialReason: response.ok ? undefined : payload.error?.code,
         sourceKind: "composed-runtime-route-family",
         targetKind: request.scenario.target.targetKind ?? InvariantTargetKinds.resource,
@@ -154,7 +160,7 @@ export class AuthorizationRuntimeAccessStateInvariantAdapter
       return Object.freeze({
         outcome: "deny",
         decision: Object.freeze({
-          reasonCode: "transport-denied",
+          reasonCode: AuthorizationTransportMappingReasonCodes.transportDenied,
           denialReason: deniedPayload.error?.code,
           sourceKind: "composed-runtime-route-family",
           targetKind: request.scenario.target.targetKind ?? InvariantTargetKinds.resource,
@@ -195,8 +201,8 @@ export class AuthorizationRuntimeAccessStateInvariantAdapter
     return Object.freeze({
       outcome: isAllowed ? "allow" : "deny",
       decision: Object.freeze({
-        reasonCode: permissionEntry?.reasonCode ?? "permission-entry-missing",
-        denialReason: isAllowed ? undefined : permissionEntry?.denialReason ?? "insufficient-permissions",
+        reasonCode: permissionEntry?.reasonCode ?? AuthorizationTransportMappingReasonCodes.permissionEntryMissing,
+        denialReason: isAllowed ? undefined : permissionEntry?.denialReason ?? AuthorizationDecisionDenialReasonCodes.insufficientPermissions,
         sourceKind: "composed-runtime-route-family",
         targetKind: request.scenario.target.targetKind ?? InvariantTargetKinds.resource,
         requiredPermissionKey: input.requiredPermissionKey,
@@ -261,7 +267,9 @@ export class AuthorizationRuntimeWorkspaceReportInvariantAdapter
     return Object.freeze({
       outcome: response.ok ? "allow" : "deny",
       decision: Object.freeze({
-        reasonCode: response.ok ? "transport-accepted" : "transport-denied",
+        reasonCode: response.ok
+          ? AuthorizationTransportMappingReasonCodes.transportAccepted
+          : AuthorizationTransportMappingReasonCodes.transportDenied,
         denialReason,
         sourceKind: "composed-runtime-route-family",
         targetKind: request.scenario.target.targetKind ?? InvariantTargetKinds.capability,

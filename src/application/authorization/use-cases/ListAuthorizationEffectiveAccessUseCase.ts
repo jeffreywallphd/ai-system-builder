@@ -16,6 +16,7 @@ import {
 } from "./AuthorizationAdministrationUseCaseShared";
 import { parseAuthorizationPolicyEvaluationRequestDto } from "@shared/schemas/authorization/AuthorizationSchemaContracts";
 import { AuthorizationPolicyEvaluationTargetKinds } from "../contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationDecisionReasonCodes } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
 
 export interface ListAuthorizationEffectiveAccessUseCaseInput {
   readonly actor: unknown;
@@ -161,15 +162,18 @@ function buildPermissionExplanation(input: {
 }): EffectiveAccessPermissionExplanation {
   const normalizedActorUserIdentityId = input.actorUserIdentityId?.trim();
   const isResourceOwner = !!normalizedActorUserIdentityId && normalizedActorUserIdentityId === input.metadata.ownerUserIdentityId;
-  const ownershipContributed = input.decision.reasonCode === "owner-override";
-  const roleContributed = input.decision.matchedRoleAssignmentIds.length > 0 || input.decision.reasonCode === "matched-role-grant";
+  const ownershipContributed = input.decision.reasonCode === AuthorizationDecisionReasonCodes.ownerOverride;
+  const roleContributed = input.decision.matchedRoleAssignmentIds.length > 0
+    || input.decision.reasonCode === AuthorizationDecisionReasonCodes.matchedRoleGrant;
   const permissionGrantContributed = input.decision.matchedPermissionGrantIds.length > 0 || (
-    input.decision.reasonCode === "matched-permission-grant" || input.decision.reasonCode === "explicit-deny-permission-grant"
+    input.decision.reasonCode === AuthorizationDecisionReasonCodes.matchedPermissionGrant
+    || input.decision.reasonCode === AuthorizationDecisionReasonCodes.explicitDenyPermissionGrant
   );
-  const sharingContributed = input.decision.matchedSharingGrantIds.length > 0 || input.decision.reasonCode === "matched-sharing-grant";
+  const sharingContributed = input.decision.matchedSharingGrantIds.length > 0
+    || input.decision.reasonCode === AuthorizationDecisionReasonCodes.matchedSharingGrant;
   const visibilityContributed = (
-    input.decision.reasonCode === "visibility-workspace-member"
-    || input.decision.reasonCode === "visibility-published"
+    input.decision.reasonCode === AuthorizationDecisionReasonCodes.visibilityWorkspaceMember
+    || input.decision.reasonCode === AuthorizationDecisionReasonCodes.visibilityPublished
   );
 
   return Object.freeze({

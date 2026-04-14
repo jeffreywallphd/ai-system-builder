@@ -17,6 +17,7 @@ Goal: prevent bypasses and keep all policy checks centralized.
 - `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
 - `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/application/authorization/use-cases/AuthorizationResponseRedaction.ts`
+- `src/shared/contracts/authorization/AuthorizationDiagnosticCatalogs.ts`
 - `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
 - `src/ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
@@ -138,10 +139,27 @@ Reference docs:
 - `docs/architecture/authorization-feature-4-final-baseline.md`
 - `docs/authorization-sharing-management-and-access-review.md`
 
-## 10) Canonical authorization diagnostics (Story 2.1.1)
+## 10) Canonical authorization diagnostics (Stories 2.1.1 + 2.1.2)
 
 Use `createAuthorizationDiagnosticRecord(...)` from
 `src/shared/contracts/authorization/AuthorizationDiagnosticsContracts.ts` as the shared machine-readable schema for authorization denials and cross-layer failure provenance.
+
+Use `src/shared/contracts/authorization/AuthorizationDiagnosticCatalogs.ts` as the stable source for reason-code and provenance-stage values.
+
+Reason-code catalogs:
+
+- `AuthorizationDecisionReasonCodes`: evaluator/use-case decision outcomes (`matched-role-grant`, `visibility-published`, `no-effective-permission`, `scope-mismatch`).
+- `AuthorizationDecisionDenialReasonCodes`: denial-focused subset for policy-deny interpretation and safe mapping.
+- `AuthorizationRuntimeAvailabilityReasonCodes`: unavailable/degraded intersection with runtime readiness (`runtime-gate-blocked`, `runtime-degraded`, blocking dependency reason codes).
+- `AuthorizationTransportMappingReasonCodes`: boundary mapping outcomes (`transport-denied`, `transport-mapping-failed`, `permission-entry-missing`).
+- `AuthorizationDiagnosticReasonCodes`: consolidated machine-readable catalog for diagnostic `reasonCode`.
+
+Provenance-stage catalog:
+
+- Use `AuthorizationDiagnosticProvenanceStages` for stable stage attribution across layers.
+- Route/API boundary stages: `route`, `api`, `transport-mapping`.
+- Evaluation pipeline stages: `actor-snapshot`, `permission-snapshot`, `scope-filtering`, `evaluator-resolution`, `final-decision-emission`.
+- Cross-layer failure stages: `adapter-failure`, `runtime-readiness`, `use-case`, `adapter`.
 
 Required fields:
 

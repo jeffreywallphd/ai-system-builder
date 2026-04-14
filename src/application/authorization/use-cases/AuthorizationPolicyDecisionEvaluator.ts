@@ -20,6 +20,7 @@ import {
   AuthorizationPolicyDecisionDenialReasons,
   AuthorizationPolicyEvaluationTargetKinds,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationDecisionReasonCodes } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../ports/IAuthorizationPolicyDecisionEvaluator";
 import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../ports/IAuthorizationResourcePolicyMetadataReadRepository";
 import type { IAuthorizationRoleGrantReadRepository } from "../ports/IAuthorizationRoleGrantReadRepository";
@@ -77,7 +78,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
         decision: createDeniedDecision({
           evaluatedAt,
           requiredPermissionKey: normalizePermissionKey(request.requiredPermissionKey) ?? "authorization.invalid",
-          reasonCode: "authorization-evaluation-invalid-actor",
+          reasonCode: AuthorizationDecisionReasonCodes.invalidActorContext,
           reason: "Actor identity context is required for authorization evaluation.",
           denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
         }),
@@ -94,7 +95,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
         decision: createDeniedDecision({
           evaluatedAt,
           requiredPermissionKey: "authorization.invalid",
-          reasonCode: "authorization-evaluation-invalid-permission-key",
+          reasonCode: AuthorizationDecisionReasonCodes.invalidPermissionKey,
           reason: "The required permission key is invalid.",
           denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
         }),
@@ -290,7 +291,7 @@ export class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolic
         decision: createDeniedDecision({
           evaluatedAt,
           requiredPermissionKey,
-          reasonCode: "authorization-evaluation-invalid-context",
+          reasonCode: AuthorizationDecisionReasonCodes.invalidEvaluationContext,
           reason: "Authorization evaluation context could not be resolved.",
           denialReason: AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext,
         }),
@@ -425,7 +426,7 @@ function toDenialReason(reasonCode: string): AuthorizationPolicyDecisionDenialRe
   if (reasonCode === AuthorizationPolicyDecisionDenialReasons.explicitDenyPermissionGrant) {
     return AuthorizationPolicyDecisionDenialReasons.explicitDenyPermissionGrant;
   }
-  if (reasonCode === "no-effective-permission") {
+  if (reasonCode === AuthorizationDecisionReasonCodes.noEffectivePermission) {
     return AuthorizationPolicyDecisionDenialReasons.insufficientPermissions;
   }
   return AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext;

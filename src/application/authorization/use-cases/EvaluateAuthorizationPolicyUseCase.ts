@@ -16,6 +16,7 @@ import {
   AuthorizationPolicyDecisionDenialReasons,
   AuthorizationPolicyEvaluationEventTypes,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationDecisionReasonCodes } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
 import type { AuthorizationPolicyEvaluationPorts } from "../ports/AuthorizationPolicyEvaluationPorts";
 
 export const EvaluateAuthorizationPolicyErrorCodes = Object.freeze({
@@ -273,7 +274,7 @@ function toDenialReason(reasonCode: string) {
   if (reasonCode === AuthorizationPolicyDecisionDenialReasons.resourcePolicyMetadataNotFound) {
     return AuthorizationPolicyDecisionDenialReasons.resourcePolicyMetadataNotFound;
   }
-  if (reasonCode === "no-effective-permission") {
+  if (reasonCode === AuthorizationDecisionReasonCodes.noEffectivePermission) {
     return AuthorizationPolicyDecisionDenialReasons.insufficientPermissions;
   }
   return AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext;
