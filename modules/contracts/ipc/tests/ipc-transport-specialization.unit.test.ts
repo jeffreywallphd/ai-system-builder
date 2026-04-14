@@ -16,11 +16,8 @@ import {
 } from "../../transport";
 
 describe("ipc transport specialization contracts", () => {
-  it("creates an ipc request from a channel binding and preserves transport request semantics", () => {
-    const channel = createIpcChannel(
-      "workspace.create",
-      "desktop.workspace.create.request",
-    );
+  it("creates an ipc request from a derived channel binding and preserves transport request semantics", () => {
+    const channel = createIpcChannel("workspace.create", "request");
 
     const ipcRequest = createIpcRequest(channel, { name: "alpha" }, {
       requestId: "req-500",
@@ -39,15 +36,12 @@ describe("ipc transport specialization contracts", () => {
 
     expect(ipcRequest).toEqual({
       ...transportRequest,
-      channel: "desktop.workspace.create.request",
+      channel: "ipc.workspace.create.request",
     });
   });
 
   it("creates an ipc success response that is transport-compatible plus channel context", () => {
-    const channel = createIpcChannel(
-      "workspace.create",
-      "desktop.workspace.create.response",
-    );
+    const channel = createIpcChannel("workspace.create", "response");
 
     const ipcResponse = createIpcSuccessResponse(channel, { workspaceId: "ws-10" }, {
       requestId: "req-501",
@@ -66,16 +60,13 @@ describe("ipc transport specialization contracts", () => {
 
     expect(ipcResponse).toEqual({
       ...transportResponse,
-      channel: "desktop.workspace.create.response",
+      channel: "ipc.workspace.create.response",
     });
     expect("sender" in ipcResponse).toBe(false);
   });
 
   it("creates an ipc failure response from transport failure semantics and retains channel identity", () => {
-    const channel = createIpcChannel(
-      "workspace.create",
-      "desktop.workspace.create.request",
-    );
+    const channel = createIpcChannel("workspace.create", "request");
 
     const error = createIpcError(channel, "validation", "Workspace name is required", {
       requestId: "req-502",
@@ -91,23 +82,20 @@ describe("ipc transport specialization contracts", () => {
 
     expect(ipcResponse).toEqual({
       ...transportResponse,
-      channel: "desktop.workspace.create.request",
+      channel: "ipc.workspace.create.request",
       error,
     });
   });
 
   it("keeps ipc response assignable to the shared transport response contract", () => {
-    const channel = createIpcChannel(
-      "workspace.create",
-      "desktop.workspace.create.response",
-    );
+    const channel = createIpcChannel("workspace.create", "response");
 
     const ipcResponse: IpcResponse<
       { workspaceId: string },
       { reason?: string },
       "workspace.create",
       { source: string },
-      "desktop.workspace.create.response"
+      "ipc.workspace.create.response"
     > = createIpcSuccessResponse(channel, { workspaceId: "ws-11" }, {
       metadata: { source: "desktop-host" },
     });
