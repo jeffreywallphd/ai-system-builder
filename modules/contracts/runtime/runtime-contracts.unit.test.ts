@@ -3,12 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   KNOWN_RUNTIME_KINDS,
   createRuntimeOperation,
+  createRuntimeExecutionDiagnostic,
   createRuntimeExecutionError,
   createRuntimeExecutionFailureResult,
   createRuntimeExecutionProgressEvent,
   createRuntimeExecutionRequest,
   createRuntimeExecutionSuccessResult,
   createRuntimeTarget,
+  isRuntimeDiagnosticEvent,
+  mapRuntimeDiagnosticToStructuredLogEvent,
+  normalizeRuntimeDiagnosticEvent,
   isKnownRuntimeKind,
   normalizeRuntimeOperation,
   resolveRuntimeKind,
@@ -196,6 +200,71 @@ describe("runtime contracts", () => {
         verbosity: "normal",
         event: "runtime.dispatch.started",
       },
+    });
+  });
+
+  it("normalizes runtime diagnostics as a runtime.* specialization of shared log vocabulary", () => {
+    const diagnostic = createRuntimeExecutionDiagnostic({
+      timestamp: "2026-04-14T12:00:01.000Z",
+      level: "debug",
+      verbosity: "verbose",
+      event: " RUNTIME.Dispatch.Started ",
+      message: "Dispatch started",
+      component: "runtime-adapter",
+      stage: "dispatch",
+      executionId: "exec-4",
+      outcome: "success",
+      durationMs: 12,
+    });
+
+    expect(diagnostic.event).toBe("runtime.dispatch.started");
+    expect(isRuntimeDiagnosticEvent(diagnostic.event)).toBe(true);
+    expect(normalizeRuntimeDiagnosticEvent("runtime.execution.completed")).toBe(
+      "runtime.execution.completed",
+    );
+    expect(() => normalizeRuntimeDiagnosticEvent("dispatch.started")).toThrow(
+      "Runtime diagnostic events must use the runtime.* namespace",
+    );
+  });
+
+  it("maps runtime diagnostics into the shared structured log envelope", () => {
+    const diagnostic = createRuntimeExecutionDiagnostic({
+      timestamp: "2026-04-14T12:00:02.000Z",
+      level: "info",
+      verbosity: "normal",
+      event: "runtime.dispatch.completed",
+      message: "Dispatch completed",
+      component: "runtime-adapter",
+      operation: "tool.run",
+      outcome: "success",
+      durationMs: 45,
+      data: { stage: "dispatch" },
+    });
+
+    const logEvent = mapRuntimeDiagnosticToStructuredLogEvent(diagnostic, {
+      host: "server",
+      requestId: "req-3",
+      correlationId: "corr-3",
+      useCase: "run-tool",
+    });
+
+    expect(logEvent).toEqual({
+      timestamp: "2026-04-14T12:00:02.000Z",
+      level: "info",
+      verbosity: "normal",
+      event: "runtime.dispatch.completed",
+      message: "Dispatch completed",
+      component: "runtime-adapter",
+      operation: "tool.run",
+      useCase: "run-tool",
+      host: "server",
+      subsystem: undefined,
+      outcome: "success",
+      durationMs: 45,
+      data: { stage: "dispatch" },
+      error: undefined,
+      requestId: "req-3",
+      correlationId: "corr-3",
     });
   });
 });

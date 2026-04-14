@@ -33,3 +33,20 @@ export interface StructuredLogEvent<
   data?: TData;
   error?: StructuredLogError;
 }
+
+export type StructuredLogDiagnosticFields<
+  TData extends StructuredLogData = StructuredLogData,
+> = Pick<
+  StructuredLogEvent<TData>,
+  | "timestamp"
+  | "level"
+  | "verbosity"
+  | "event"
+  | "message"
+  | "component"
+  | "operation"
+  | "outcome"
+  | "durationMs"
+  | "data"
+  | "error"
+>;
