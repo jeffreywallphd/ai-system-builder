@@ -82,12 +82,18 @@ At minimum, tests should cover:
 
 For shared contract families, add or maintain invariant tests that protect canonical family rules.
 
-For runtime/logging/persistence/storage, minimum invariant expectations include:
+For major contract systems, add cross-family invariant tests in `tests` folders that
+exercise the intended relationships between families and fail when those relationships drift.
 
-- operation identity normalization stays helper-driven and transport-neutral,
+Minimum invariant expectations include:
+
+- transport/API/IPC remain specialization-aligned (shared transport envelope semantics, no parallel contract systems),
+- operation identity normalization stays helper-driven and transport-neutral across families,
+- IPC channel derivation remains operation-bound (`ipc.<operation>.<kind>`) rather than ad hoc,
 - runtime diagnostics remain a specialization of shared logging diagnostics and map directly to structured logs,
 - persistence record references and record-targeted operations remain aligned,
 - storage identity remains key-based and path-agnostic,
+- persistence/storage remain mechanically distinct (record operations vs artifact-key operations),
 - family barrels export only family-owned contract surfaces.
 
 These tests belong near the contract families and should fail fast when drift is introduced.
