@@ -1,16 +1,12 @@
-import { resolveHostKind, type HostKind } from "../host";
+import { createHostIdentity, resolveHostKind, type HostIdentity } from "../host";
 
-export interface HostConfig {
-  kind: HostKind;
-  id?: string;
-}
+export type HostConfig = HostIdentity;
 
 export function createHostConfig(options?: {
   kind?: string;
   id?: string;
 }): HostConfig {
-  return {
-    kind: resolveHostKind(options?.kind),
+  return createHostIdentity(resolveHostKind(options?.kind), {
     id: options?.id,
-  };
+  });
 }

@@ -28,6 +28,8 @@
 - Server host composition is separate from transport adaptation.
 - Pass host metadata inward via `modules/contracts/host` host-context contracts,
   not HTTP framework objects.
+- Keep host-context metadata small and serialization-friendly (JSON-serializable values only).
+- Do not encode auth/session/request/window/framework semantics in host-context metadata.
 - `apps/web-thin-client` is a thin surface over server capabilities, not assumed full parity from day one.
 
 ## Key Constraints

@@ -29,6 +29,8 @@
 - Desktop host code should compose adapters and lifecycle behavior, then delegate inward.
 - Pass inward host metadata through `modules/contracts/host` host-context shapes,
   not Electron-specific objects.
+- Keep host-context metadata small and serialization-friendly (JSON-serializable values only).
+- Do not encode auth/session/request/window/framework semantics in host-context metadata.
 - Electron-specific assumptions must not leak into shared application/domain contracts.
 
 ## Key Constraints
