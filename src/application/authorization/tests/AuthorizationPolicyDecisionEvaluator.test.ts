@@ -27,6 +27,10 @@ import {
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationPolicyDecisionEvaluator } from "../use-cases/AuthorizationPolicyDecisionEvaluator";
 import { AuthorizationAdapterFailureReasonCodes } from "@shared/contracts/authorization/AuthorizationDiagnosticCatalogs";
+import {
+  extractAuthorizationDiagnosticCorrelationId,
+  requireAuthorizationDiagnosticEvent,
+} from "./AuthorizationDiagnosticRegressionTestSupport";
 import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../ports/IAuthorizationResourcePolicyMetadataReadRepository";
 import type { IAuthorizationRoleGrantReadRepository } from "../ports/IAuthorizationRoleGrantReadRepository";
 import type { IAuthorizationSharingGrantReadRepository } from "../ports/IAuthorizationSharingGrantReadRepository";
@@ -170,6 +174,89 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
     expect(result.decision.matchedSharingGrantIds).toEqual(["share-actor-1"]);
     expect(result.debug?.targetKind).toBe("resource-instance");
     expect(result.debug?.sharingGrantCount).toBe(1);
+  });
+
+  it("emits complete decisive-stage diagnostics for allow outcomes with shared correlation", async () => {
+    const repositories = new InMemoryDecisionPolicyRepositories();
+    const diagnosticsLogger = new RecordingDiagnosticsLogger();
+    repositories.resourcePolicyMetadataByResourceKey.set(
+      toResourceKey("asset", "asset-allow-1"),
+      Object.freeze({
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-allow-1",
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-alpha",
+        visibility: ResourceVisibilities.private,
+        sharingPolicyMode: SharingPolicyModes.ownerOnly,
+        allowResharing: false,
+        isPublishedCapable: false,
+      }),
+    );
+    repositories.roleGrantSnapshot = Object.freeze({
+      roleAssignments: Object.freeze([
+        createRoleAssignment({
+          id: "role-member-allow-1",
+          actorUserIdentityId: "user-member",
+          roleKey: "member",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-01T00:00:00.000Z",
+        }),
+      ]),
+      permissionGrants: Object.freeze([]),
+    });
+
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: repositories,
+      sharingGrantReadRepository: repositories,
+      resourcePolicyMetadataReadRepository: repositories,
+      diagnosticsLogger,
+    });
+
+    const result = await evaluator.evaluateDecision({
+      actor: {
+        actorUserIdentityId: "user-member",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      requiredPermissionKey: "asset.read",
+      target: {
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-allow-1",
+        },
+      },
+      asOf: evaluationAsOf,
+    });
+
+    expect(result.decision.outcome).toBe("allow");
+    expect(result.decision.reasonCode).toBe("matched-role-grant");
+
+    const evaluatorResolution = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.evaluator-resolution.diagnostic",
+    );
+    const finalDecision = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.final-decision.diagnostic",
+    );
+
+    expect(evaluatorResolution.denialProvenanceStage).toBe("evaluator-resolution");
+    expect(finalDecision.denialProvenanceStage).toBe("final-decision-emission");
+    expect(evaluatorResolution.reasonCode).toBe("matched-role-grant");
+    expect(finalDecision.reasonCode).toBe("matched-role-grant");
+    expect(evaluatorResolution.requiredPermissionKey).toBe("asset.read");
+    expect(finalDecision.requiredPermissionKey).toBe("asset.read");
+    expect(evaluatorResolution.matchedSourceKind).toBe("role-grant");
+    expect(finalDecision.matchedSourceKind).toBe("role-grant");
+
+    const correlationId = extractAuthorizationDiagnosticCorrelationId(evaluatorResolution);
+    expect(correlationId).toBeDefined();
+    expect(extractAuthorizationDiagnosticCorrelationId(finalDecision)).toBe(correlationId);
   });
 
   it("returns stable denial reason when explicit deny grant matches", async () => {
@@ -342,54 +429,28 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
     expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.workspace-capability.evaluate");
     expect(diagnosticsLogger.events.map((event) => event.event)).toContain("auth.decision.completed");
 
-    const permissionSnapshotEvent = diagnosticsLogger.events.find((event) => (
-      event.event === "authorization.permission-snapshot.diagnostic"
-    ));
-    const scopeFilteringEvent = diagnosticsLogger.events.find((event) => (
-      event.event === "authorization.scope-filtering.diagnostic"
-    ));
-    const finalDecisionEvent = diagnosticsLogger.events.find((event) => (
-      event.event === "authorization.final-decision.diagnostic"
-    ));
-    const evaluatorResolutionEvent = diagnosticsLogger.events.find((event) => (
-      event.event === "authorization.evaluator-resolution.diagnostic"
-    ));
     const completedEvent = diagnosticsLogger.events.find((event) => (
       event.event === "auth.decision.completed"
       && typeof event.details?.diagnosticCorrelationId === "string"
     ));
 
-    expect(permissionSnapshotEvent).toBeDefined();
-    expect(scopeFilteringEvent).toBeDefined();
-    expect(evaluatorResolutionEvent).toBeDefined();
-    expect(finalDecisionEvent).toBeDefined();
     expect(completedEvent).toBeDefined();
-
-    const permissionSnapshot = permissionSnapshotEvent?.details?.diagnostic as {
-      readonly denialProvenanceStage: string;
-      readonly target: { readonly kind: string; readonly targetWorkspaceId?: string };
-      readonly counts: { readonly roleAssignmentCount?: number; readonly permissionGrantCount?: number };
-      readonly extensions?: Readonly<Record<string, unknown>>;
-      readonly correlation: { readonly correlationId?: string };
-    };
-    const scopeFiltering = scopeFilteringEvent?.details?.diagnostic as {
-      readonly denialProvenanceStage: string;
-      readonly counts: { readonly applicableScopeCount?: number };
-      readonly extensions?: Readonly<Record<string, unknown>>;
-      readonly correlation: { readonly correlationId?: string };
-    };
-    const finalDecision = finalDecisionEvent?.details?.diagnostic as {
-      readonly denialProvenanceStage: string;
-      readonly counts: { readonly applicableScopeCount?: number };
-      readonly correlation: { readonly correlationId?: string };
-    };
-    const evaluatorResolution = evaluatorResolutionEvent?.details?.diagnostic as {
-      readonly denialProvenanceStage: string;
-      readonly reasonCode: string;
-      readonly matchedSourceKind?: string;
-      readonly counts: { readonly applicableScopeCount?: number };
-      readonly correlation: { readonly correlationId?: string };
-    };
+    const permissionSnapshot = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.permission-snapshot.diagnostic",
+    );
+    const scopeFiltering = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.scope-filtering.diagnostic",
+    );
+    const finalDecision = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.final-decision.diagnostic",
+    );
+    const evaluatorResolution = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.evaluator-resolution.diagnostic",
+    );
 
     expect(permissionSnapshot.denialProvenanceStage).toBe("permission-snapshot");
     expect(permissionSnapshot.target.kind).toBe("workspace-capability");
@@ -399,6 +460,7 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
     expect(permissionSnapshot.extensions?.["authorization.permission-snapshot.synthesized-fallback-used"]).toBe(true);
 
     expect(scopeFiltering.denialProvenanceStage).toBe("scope-filtering");
+    expect(scopeFiltering.reasonCode).toBe("authorization.scope-filtering.applicable-scopes");
     expect(scopeFiltering.counts.applicableScopeCount).toBeGreaterThanOrEqual(1);
     expect(scopeFiltering.extensions?.["authorization.scope-filtering.visibility-fallback-used"]).toBe(false);
 
@@ -408,13 +470,15 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
     expect(evaluatorResolution.counts.applicableScopeCount).toBeGreaterThanOrEqual(1);
 
     expect(finalDecision.denialProvenanceStage).toBe("final-decision-emission");
+    expect(finalDecision.reasonCode).toBe("no-effective-permission");
     expect(finalDecision.counts.applicableScopeCount).toBeGreaterThanOrEqual(1);
+    expect(diagnosticsLogger.events.map((event) => event.event)).not.toContain("authorization.adapter-failure.diagnostic");
 
-    const correlationId = permissionSnapshot.correlation.correlationId;
+    const correlationId = extractAuthorizationDiagnosticCorrelationId(permissionSnapshot);
     expect(correlationId).toBeDefined();
-    expect(scopeFiltering.correlation.correlationId).toBe(correlationId);
-    expect(evaluatorResolution.correlation.correlationId).toBe(correlationId);
-    expect(finalDecision.correlation.correlationId).toBe(correlationId);
+    expect(extractAuthorizationDiagnosticCorrelationId(scopeFiltering)).toBe(correlationId);
+    expect(extractAuthorizationDiagnosticCorrelationId(evaluatorResolution)).toBe(correlationId);
+    expect(extractAuthorizationDiagnosticCorrelationId(finalDecision)).toBe(correlationId);
     expect(completedEvent?.details?.diagnosticCorrelationId).toBe(correlationId);
   });
 
@@ -510,29 +574,21 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
 
     expect(result.decision.outcome).toBe("deny");
     expect(result.decision.reasonCode).toBe("authorization-evaluation-invalid-context");
+    const adapterFailureDiagnostic = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.adapter-failure.diagnostic",
+    );
+    const finalDecisionDiagnostic = requireAuthorizationDiagnosticEvent(
+      diagnosticsLogger.events,
+      "authorization.final-decision.diagnostic",
+    );
 
-    const adapterFailureEvent = diagnosticsLogger.events.find((event) => (
-      event.event === "authorization.adapter-failure.diagnostic"
-    ));
-    const finalDecisionEvent = diagnosticsLogger.events.find((event) => (
-      event.event === "authorization.final-decision.diagnostic"
-    ));
-    expect(adapterFailureEvent).toBeDefined();
-    expect(finalDecisionEvent).toBeDefined();
-
-    const adapterFailureDiagnostic = adapterFailureEvent?.details?.diagnostic as {
-      readonly reasonCode: string;
-      readonly denialProvenanceStage: string;
-      readonly correlation: { readonly correlationId?: string };
-      readonly extensions?: Readonly<Record<string, unknown>>;
-    };
-    const finalDecisionDiagnostic = finalDecisionEvent?.details?.diagnostic as {
-      readonly correlation: { readonly correlationId?: string };
-    };
     expect(adapterFailureDiagnostic.denialProvenanceStage).toBe("adapter-failure");
     expect(adapterFailureDiagnostic.reasonCode).toBe(AuthorizationAdapterFailureReasonCodes.adapterTimeout);
     expect(adapterFailureDiagnostic.extensions?.["authorization.adapter-failure.repository-operation"]).toBe("role-grant-snapshot");
-    expect(adapterFailureDiagnostic.correlation.correlationId).toBe(finalDecisionDiagnostic.correlation.correlationId);
+    expect(finalDecisionDiagnostic.reasonCode).toBe("authorization-evaluation-invalid-context");
+    expect(extractAuthorizationDiagnosticCorrelationId(adapterFailureDiagnostic))
+      .toBe(extractAuthorizationDiagnosticCorrelationId(finalDecisionDiagnostic));
   });
 
   it("emits adapter-failure provenance for unexpected empty repository results", async () => {

@@ -268,6 +268,10 @@ describe("Authorization transport adapters", () => {
       expect(http.body.error.correlationId).toBe("req-runtime-unavailable");
       expect(http.body.error.diagnostic?.outcome).toBe("unavailable");
       expect(http.body.error.diagnostic?.reasonCode).toBe("runtime-gate-blocked");
+      expect(http.body.error.diagnostic?.denialProvenanceStage).toBe("transport-mapping");
+      expect(http.body.error.diagnostic?.runtimeAvailability?.affectedByRuntimeAvailability).toBe(true);
+      expect(http.body.error.diagnostic?.runtimeAvailability?.degraded).toBe(false);
+      expect(http.body.error.diagnostic?.target?.targetIdentifier).toBeUndefined();
     }
   });
 
@@ -307,6 +311,9 @@ describe("Authorization transport adapters", () => {
       expect(socket.error.availabilityState).toBe("degraded");
       expect(socket.error.correlationId).toBe("corr-runtime-degraded");
       expect(socket.error.diagnostic?.outcome).toBe("degraded");
+      expect(socket.error.diagnostic?.denialProvenanceStage).toBe("transport-mapping");
+      expect(socket.error.diagnostic?.runtimeAvailability?.affectedByRuntimeAvailability).toBe(true);
+      expect(socket.error.diagnostic?.runtimeAvailability?.degraded).toBe(true);
       expect(socket.error.diagnostic?.target?.targetIdentifier).toBeUndefined();
     }
   });

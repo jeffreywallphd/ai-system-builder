@@ -65,6 +65,30 @@ describe("AuthorizationDiagnosticsContracts", () => {
     expect(diagnostic.extensions?.["auth.trace-id"]).toBe("trace-1");
   });
 
+  it("requires matched source for allow diagnostics at evaluation stages", () => {
+    expect(() => createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.allow,
+      correlation: {
+        requestId: "req-allow-source",
+      },
+      target: {
+        kind: AuthorizationDiagnosticTargetKinds.resourceInstance,
+        targetIdentifier: "asset:asset-allow-1",
+      },
+      requiredPermissionKey: "asset.read",
+      reasonCode: AuthorizationDiagnosticReasonCodes.matchedRoleGrant,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.evaluatorResolution,
+      counts: {
+        roleAssignmentCount: 1,
+        permissionGrantCount: 0,
+        sharingGrantCount: 0,
+      },
+      evidence: {
+        roleAssignmentIds: ["role-1"],
+      },
+    })).toThrow("must include a matchedSourceKind");
+  });
+
   it("requires requestId or correlationId", () => {
     expect(() => createAuthorizationDiagnosticRecord({
       outcome: AuthorizationDiagnosticOutcomes.deny,
@@ -263,6 +287,47 @@ describe("AuthorizationDiagnosticsContracts", () => {
     expect(external.requiredPermissionKey).toBeUndefined();
     expect(external.evidence?.roleAssignmentIds).toBeUndefined();
     expect(external.extensions).toBeUndefined();
+  });
+
+  it("projects runtime-unavailable diagnostics without leaking sensitive runtime details", () => {
+    const diagnostic = createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.unavailable,
+      correlation: {
+        correlationId: "corr-runtime-unavailable",
+      },
+      actor: {
+        actorIdentityId: "service-runtime",
+      },
+      target: {
+        kind: AuthorizationDiagnosticTargetKinds.workspaceCapability,
+        targetWorkspaceId: "workspace-runtime",
+        targetResourceType: "runtime",
+      },
+      reasonCode: AuthorizationRuntimeAvailabilityReasonCodes.runtimeGateBlocked,
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.runtimeReadiness,
+      runtimeAvailability: {
+        affectedByRuntimeAvailability: true,
+        degraded: false,
+        runtimeState: "unavailable",
+        detail: "Bearer runtime-secret-token",
+      },
+      extensions: {
+        "runtime.internal.path": "C:\\runtime\\secrets\\state.db",
+        "runtime.readiness.public": "runtime gate blocked",
+      },
+    });
+
+    const external = projectAuthorizationDiagnosticRecord(diagnostic, {
+      surface: AuthorizationDiagnosticEmissionSurfaces.external,
+      secretSensitiveSurface: false,
+    });
+
+    expect(external.runtimeAvailability?.detail).toBe("[REDACTED]");
+    expect(external.actor.actorIdentityId).toBeUndefined();
+    expect(external.target.targetWorkspaceId).toBe("workspace-runtime");
+    expect(external.extensions).toEqual({
+      "runtime.readiness.public": "runtime gate blocked",
+    });
   });
 
   it("accepts canonical transport-mapping provenance stage and reason code values", () => {

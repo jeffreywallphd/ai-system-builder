@@ -284,6 +284,34 @@ Transport mapping expectations:
   - `internal` -> `1011`
 - Emit canonical diagnostic records at `transport-mapping` provenance stage and project external diagnostics for public payloads.
 
+## 13) Diagnostic regression baseline (Story 2.3.2)
+
+Keep diagnostics regression coverage contract-focused and high-signal; avoid large serialized snapshot assertions.
+
+Required regression assertions:
+
+- schema completeness for representative outcomes (`allow`, `deny`, `unavailable`, `degraded`),
+- canonical reason-code and provenance-stage values at decisive stages,
+- correlation continuity across multi-stage diagnostic emission (`permission-snapshot`, `scope-filtering`, `evaluator-resolution`, `final-decision-emission`, and `adapter-failure` when present),
+- explicit distinction between:
+  - scope mismatch observations (`scope-filtering`),
+  - policy denial outcomes (`no-effective-permission`, `insufficient-permissions`),
+  - adapter/repository failures (`adapter-failure`),
+- internal vs external projection boundaries with redaction and identifier suppression checks.
+
+Primary suites:
+
+- `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
+- `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
+- `src/infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
+- `src/shared/contracts/authorization/tests/AuthorizationDiagnosticsContracts.test.ts`
+
+Suggested contributor fast loop:
+
+```bash
+npm run test:unit -- src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts src/application/authorization/tests/EffectivePermissionResolutionService.test.ts src/infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts src/shared/contracts/authorization/tests/AuthorizationDiagnosticsContracts.test.ts
+```
+
 ## Related ADRs
 
 - `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`
