@@ -31,6 +31,7 @@ If this boundary is not explicit early, desktop and server implementations drift
 - API and IPC contracts are strict transport specializations: they must reuse shared transport operation and success/failure semantics rather than creating parallel contract families.
 - Operation identifiers are shared identities (`lowercase.dot.segments`) created/normalized through shared operation helpers.
 - IPC channel values are operation-derived (`ipc.<operation>.<kind>`) where `<kind>` is constrained to `request`, `response`, or `event`.
+- Host context contracts remain intentionally small and framework-free; only host identity and lightweight JSON-serializable boundary metadata are allowed across inner boundaries.
 
 Additional position:
 
@@ -76,5 +77,6 @@ Merging concerns obscures ownership boundaries and increases the risk that lifec
 
 - Keep `docs/architecture/host-model.md` aligned with this ADR as host composition patterns are implemented.
 - Keep transport specialization and operation/channel naming rules aligned across ADR, architecture docs, standards docs, and context packs.
+- Keep contract public-surface discipline explicit: root contracts exports are family namespaces only, and non-contract modules consume contracts through family barrels.
 - Add guidance for composition root placement in `apps/desktop/` and `apps/server/` to prevent logic leakage into transport handlers.
 - Create a future ADR for hybrid synchronization/coordination once implementation planning begins.

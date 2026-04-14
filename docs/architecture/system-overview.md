@@ -66,6 +66,7 @@ ai-system-builder/
   - Explicit boundary contracts (API, IPC, runtime integration contracts, etc.).
   - Shared language for cross-module communication.
   - Import contracts through family-level entry points (`modules/contracts/<family>`) to keep boundaries explicit and refactor-safe.
+  - Non-contract modules must not import from the root contracts entry (`modules/contracts`) or deep internal contract files.
   - Root-level contracts exports are namespace-only by family; do not rely on a flattened catch-all surface.
   - Includes shared result/error contracts so boundaries reuse one success/failure vocabulary.
   - Includes shared operation identity helpers so transport/runtime/persistence families use a consistent operation naming pattern.
@@ -142,6 +143,11 @@ This repository intentionally avoids premature package explosion.
 - A folder is not automatically a package.
 - Package boundaries are introduced only when justified by independent build/dependency/isolation needs.
 - Architecture boundaries are primary; package boundaries follow proven need.
+
+## Contract drift safeguards
+
+- Contract hardening is enforced by invariant tests in contract-family `tests` folders and by cross-family anti-drift tests under `modules/contracts/tests/`.
+- These invariants protect transport specialization, operation/channel identity discipline, runtime-to-logging alignment, persistence-vs-storage separation, host/config boundary constraints, and public export/import discipline.
 
 ## Not yet finalized
 

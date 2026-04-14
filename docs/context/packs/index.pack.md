@@ -31,6 +31,8 @@
 - Keep runtime diagnostics as a strict specialization of shared structured logging contracts (`runtime.*` events, mechanical mapping).
 - Keep persistence and storage contract families mechanically distinct (record-aligned operations vs key-based artifact operations).
 - Import contracts via family barrels (`modules/contracts/<family>`); avoid deep internal contract imports and flattened catch-all usage.
+- For non-contract modules, avoid root `modules/contracts` imports; consume contracts from specific family barrels.
+- Keep contract anti-drift tests explicit: family invariants in `modules/contracts/<family>/tests` and cross-family invariants in `modules/contracts/tests`.
 - Add regression tests for meaningful bug fixes when practical; prioritize behavioral value and deterministic tests.
 
 ## Key Constraints

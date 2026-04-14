@@ -85,6 +85,11 @@ For shared contract families, add or maintain invariant tests that protect canon
 For major contract systems, add cross-family invariant tests in `tests` folders that
 exercise the intended relationships between families and fail when those relationships drift.
 
+Placement rule:
+
+- family invariants live in `modules/contracts/<family>/tests/`,
+- cross-family anti-drift invariants live in `modules/contracts/tests/`.
+
 Minimum invariant expectations include:
 
 - transport/API/IPC remain specialization-aligned (shared transport envelope semantics, no parallel contract systems),
@@ -95,6 +100,7 @@ Minimum invariant expectations include:
 - storage identity remains key-based and path-agnostic,
 - persistence/storage remain mechanically distinct (record operations vs artifact-key operations),
 - family barrels export only family-owned contract surfaces.
+- non-contract modules stay on family-level contract imports (`modules/contracts/<family>`) and avoid root/deep contract import drift.
 
 These tests belong near the contract families and should fail fast when drift is introduced.
 
