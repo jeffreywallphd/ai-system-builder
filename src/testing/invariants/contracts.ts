@@ -15,6 +15,13 @@ export type InvariantFeatureFamily =
 
 export type InvariantDecisionOutcome = "allow" | "deny";
 
+export const InvariantTargetKinds = Object.freeze({
+  resource: "resource",
+  capability: "capability",
+});
+
+export type InvariantTargetKind = typeof InvariantTargetKinds[keyof typeof InvariantTargetKinds];
+
 export interface InvariantActorContextInput {
   readonly actorUserIdentityId?: string;
   readonly actorServiceId?: string;
@@ -31,11 +38,24 @@ export interface InvariantWorkspaceContextInput {
 }
 
 export interface InvariantTargetContextInput {
+  readonly targetKind?: InvariantTargetKind;
+  readonly resourceFamily: AuthorizationResourceFamily | string;
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly workspaceId?: string;
+  readonly targetWorkspaceId?: string;
+  readonly ownerUserIdentityId?: string;
+  readonly identifiers?: Readonly<Record<string, string>>;
+  readonly attributes?: Readonly<Record<string, string>>;
+}
+
+export interface InvariantResourceContextInput {
   readonly resourceFamily: AuthorizationResourceFamily | string;
   readonly resourceType: string;
   readonly resourceId: string;
   readonly workspaceId?: string;
   readonly ownerUserIdentityId?: string;
+  readonly identifiers?: Readonly<Record<string, string>>;
   readonly attributes?: Readonly<Record<string, string>>;
 }
 
@@ -71,6 +91,7 @@ export interface InvariantScenarioDefinition<TInput = unknown> {
   readonly actor: InvariantActorContextInput;
   readonly workspace: InvariantWorkspaceContextInput;
   readonly target: InvariantTargetContextInput;
+  readonly resource?: InvariantResourceContextInput;
   readonly input?: TInput;
   readonly expectation: InvariantScenarioExpectation;
   readonly tags?: ReadonlyArray<string>;
