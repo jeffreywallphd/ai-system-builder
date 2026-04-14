@@ -10,6 +10,15 @@ Current contract scope:
 - record identity references (`persistence-record-reference`)
 - persistence failure shape (`persistence-error`)
 - persistence operation result envelope (`persistence-result`)
+- operation helpers with record-alignment checks (`persistence-operation`)
+
+Family invariants:
+
+- persistence operations must use shared operation identity formatting
+  (`lowercase.dot.segments`)
+- persistence record references normalize `recordType` and `id`
+- when a `record` is supplied, the operation must target that record type
+  (`<recordType>.<action>[.<qualifier>...]`)
 
 These contracts are intentionally distinct from:
 

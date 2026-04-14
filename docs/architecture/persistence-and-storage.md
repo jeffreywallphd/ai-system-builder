@@ -24,6 +24,13 @@ The shared persistence contract vocabulary under `modules/contracts/persistence`
 - identity-explicit (record references by logical type plus stable record id),
 - implementation-neutral (no ORM, SQL builder, or driver-specific contract leakage).
 
+Persistence family invariants:
+
+- persistence operations must use shared operation identity format (`lowercase.dot.segments`),
+- persistence record references normalize record identity (`recordType`, `id`) at creation boundaries,
+- operation identity remains transport-neutral (no API/IPC namespace leakage),
+- when a persistence result/error includes a `record`, the operation must target that record type (`<recordType>.<action>[.<qualifier>...]`).
+
 This keeps Postgres as the default adapter direction without coupling application/domain boundaries to Postgres-specific APIs.
 
 ## What belongs in persistence

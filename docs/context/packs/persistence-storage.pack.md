@@ -23,6 +23,9 @@
 
 - Postgres is the default persistence target for structured durable application data.
 - Storage is a separate concern for files, blobs, uploads, exports, generated artifacts, and temp workspace content.
+- Persistence contracts stay record-oriented: operation identity + record reference + result/error envelope.
+- Persistence operation names should stay helper-driven and transport-neutral (`lowercase.dot.segments` with no `api.`/`ipc.` prefixes).
+- When persistence contracts include a record reference, operation identity should target that record type (`<recordType>.<action>[.<qualifier>...]`).
 - Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
 - Metadata records and file/blob content are different concerns and should stay separated.
 - Application logic should depend on persistence/storage ports and contracts, not direct DB/filesystem details.
