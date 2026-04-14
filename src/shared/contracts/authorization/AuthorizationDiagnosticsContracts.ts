@@ -17,9 +17,11 @@ export {
   AuthorizationDiagnosticReasonCodes,
   AuthorizationRuntimeAvailabilityReasonCodes,
   AuthorizationTransportMappingReasonCodes,
+  AuthorizationContextResolutionReasonCodes,
   isKnownAuthorizationDiagnosticReasonCode,
 } from "./AuthorizationDiagnosticCatalogs";
 export type {
+  AuthorizationContextResolutionReasonCode,
   AuthorizationDecisionDenialReasonCode,
   AuthorizationDecisionReasonCode,
   AuthorizationDiagnosticProvenanceStage,
@@ -73,6 +75,7 @@ export const AuthorizationDiagnosticOutcomes = Object.freeze({
   deny: "deny",
   unavailable: "unavailable",
   degraded: "degraded",
+  observed: "observed",
 } as const);
 
 export type AuthorizationDiagnosticOutcome =
@@ -195,6 +198,17 @@ const StagesRequiringEvaluationEvidence = new Set<AuthorizationDiagnosticProvena
   AuthorizationDiagnosticProvenanceStages.adapter,
 ]);
 
+const StagesRequiringPermissionContext = new Set<AuthorizationDiagnosticProvenanceStage>([
+  AuthorizationDiagnosticProvenanceStages.permissionSnapshot,
+  AuthorizationDiagnosticProvenanceStages.scopeFiltering,
+  AuthorizationDiagnosticProvenanceStages.useCase,
+  AuthorizationDiagnosticProvenanceStages.evaluator,
+  AuthorizationDiagnosticProvenanceStages.evaluatorResolution,
+  AuthorizationDiagnosticProvenanceStages.finalDecisionEmission,
+  AuthorizationDiagnosticProvenanceStages.adapter,
+  AuthorizationDiagnosticProvenanceStages.transportMapping,
+]);
+
 const MatchedSourceKindsForAllow = new Set<AuthorizationDiagnosticMatchedSourceKind>([
   AuthorizationDiagnosticMatchedSourceKinds.ownerOverride,
   AuthorizationDiagnosticMatchedSourceKinds.roleGrant,
@@ -292,24 +306,32 @@ export function projectAuthorizationDiagnosticRecord(
 function validateDiagnosticCompleteness(record: AuthorizationDiagnosticRecord): void {
   if (
     (record.outcome === AuthorizationDiagnosticOutcomes.allow || record.outcome === AuthorizationDiagnosticOutcomes.deny)
+    && StagesRequiringPermissionContext.has(record.denialProvenanceStage)
     && !record.requiredPermissionKey
   ) {
     throw new AuthorizationDiagnosticContractError(
-      "Authorization diagnostics for allow/deny outcomes must include requiredPermissionKey.",
+      "Authorization diagnostics for allow/deny outcomes must include requiredPermissionKey at permission-evaluation stages.",
     );
   }
 
   if (record.outcome === AuthorizationDiagnosticOutcomes.allow) {
-    if (!record.matchedSourceKind || !MatchedSourceKindsForAllow.has(record.matchedSourceKind)) {
+    if (
+      StagesRequiringPermissionContext.has(record.denialProvenanceStage)
+      && (!record.matchedSourceKind || !MatchedSourceKindsForAllow.has(record.matchedSourceKind))
+    ) {
       throw new AuthorizationDiagnosticContractError(
-        "Authorization allow diagnostics must include a matchedSourceKind that identifies the effective authorization source.",
+        "Authorization allow diagnostics must include a matchedSourceKind that identifies the effective authorization source at permission-evaluation stages.",
       );
     }
   }
 
-  if (record.outcome === AuthorizationDiagnosticOutcomes.deny && !record.matchedSourceKind) {
+  if (
+    record.outcome === AuthorizationDiagnosticOutcomes.deny
+    && StagesRequiringPermissionContext.has(record.denialProvenanceStage)
+    && !record.matchedSourceKind
+  ) {
     throw new AuthorizationDiagnosticContractError(
-      "Authorization deny diagnostics must include matchedSourceKind (use 'none' when no source matched).",
+      "Authorization deny diagnostics must include matchedSourceKind at permission-evaluation stages (use 'none' when no source matched).",
     );
   }
 
