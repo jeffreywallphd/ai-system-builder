@@ -115,6 +115,7 @@ Transport technologies are adapters, not application definitions.
 
 - Express is the default server API transport adapter.
 - Electron IPC is the desktop transport boundary.
+- API and IPC contracts are transport specializations that compose from shared transport request/response/error semantics.
 - Business rules must stay in domain/application layers, not in route handlers or IPC handlers.
 
 ## Persistence and storage posture
