@@ -47,6 +47,10 @@ This module provides a shared baseline for cross-system invariant testing:
   - canonical allow/deny assertions with readable drift messages for authorization-sensitive stories.
 - `assertInvariantExecution(...)`
   - canonical assertion entry point that validates outcome plus decision/runtime metadata, including reason code, source kind, target kind, scope, matched/unmatched identifiers, and decision provenance when supplied.
+- `buildAuthorizationBaselineScenarioBuilders()`
+  - reusable baseline authorization scenario set covering persisted role applicability, synthesized workspace-role fallback, scope mismatch, explicit deny precedence, read/list-vs-create distinctions, and no-applicable-permission default-deny behavior.
+- `validateAuthorizationBaselineScenario(...)`
+  - validates that baseline scenario expectations reference concrete role/grant inputs so builder drift is caught by tests before feature-family adapters reuse the scenarios.
 
 ## Canonical Authorization Expectation Fields
 
