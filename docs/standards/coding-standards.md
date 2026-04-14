@@ -15,8 +15,11 @@ Required behavior:
 - Keep domain and application free from infrastructure and framework details.
 - Keep transport mechanisms (Express, Electron IPC, etc.) inside adapter boundaries.
 - Keep API and IPC contract families as strict specializations of shared transport contracts; do not recreate parallel transport envelopes.
+- Keep contract imports predictable: non-contract modules import only from `modules/contracts/<family>`; do not import root `modules/contracts` or deep internal contract files.
 - Keep host lifecycle/composition separate from transport translation.
+- Keep host context contracts small, framework-free, and limited to host identity plus lightweight boundary metadata.
 - Keep persistence and storage concerns separate.
+- Keep config contracts typed and concern-specific; grouped envelopes are composition conveniences, not generic settings bags.
 
 Do not bypass architecture for convenience, even temporarily.
 

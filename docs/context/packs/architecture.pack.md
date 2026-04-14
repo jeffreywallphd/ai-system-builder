@@ -22,12 +22,14 @@
 - Maintain clean architecture direction: inner layers (domain/application) must not depend on outer infrastructure/host/UI layers.
 - Keep contracts explicit at boundaries; avoid embedding boundary semantics in ad hoc types.
 - Prefer `modules/contracts/<family>` imports and avoid deep contract file paths so family boundaries remain the public extension surface.
+- Keep non-contract modules off root `modules/contracts` imports; consume contract APIs through explicit family barrels.
 - Treat API and IPC contract families as true transport specializations: compose from shared transport semantics and add only narrow transport-specific fields.
 - Keep operation identity consistent across transport/runtime/persistence via shared helper patterns (lowercase dotted operation names).
 - Keep operation identity transport-neutral; avoid embedding transport namespace into operation names.
 - Keep IPC channels derived from operation identity (`ipc.<operation>.<kind>`) so channel and operation cannot drift independently.
 - Use `modules/contracts/host` for thin host-aware context metadata instead of
   passing framework-native objects inward.
+- Keep host contracts intentionally small and framework-free; keep config contracts typed and concern-specific.
 - Treat hosts (desktop/server) and transport (IPC/HTTP) as separate concerns.
 - Preserve shared-first UI: reusable components in shared UI, thin platform-specific layers.
 - Follow TypeScript-first runtime posture; external runtimes are adapter extensions, not architecture centers.

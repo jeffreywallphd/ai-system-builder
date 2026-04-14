@@ -66,6 +66,7 @@ Contract families must compose, not fork:
 - Keep operation identity and IPC channel derivation helper-driven rather than ad hoc string assembly.
 - Import contract symbols via family barrels (`modules/contracts/<family>`) rather than deep file paths to internal contract files.
 - Do not depend on flattened catch-all root contract exports; family boundaries are the stable public surface.
+- For non-contract modules, root `modules/contracts` imports are disallowed; import a specific family barrel directly.
 
 ## 4) Adapters (`modules/adapters`)
 
@@ -141,7 +142,8 @@ Avoid these patterns even if they "work":
 
 Some automated rule enforcement may be added later (lint/import rules/build checks), but full tooling is **not yet finalized**.
 
-Until then, treat this document as mandatory review criteria for code changes.
+Current baseline enforcement already includes contract-surface and anti-drift invariant tests under `modules/contracts/**/tests` and `modules/contracts/tests`.
+Treat this document as mandatory review criteria in addition to those tests.
 
 ## Lightweight review checklist
 

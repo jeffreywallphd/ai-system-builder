@@ -27,6 +27,7 @@
 - Add targeted host/transport integration tests for wiring, composition, and delegation correctness.
 - Add cross-family contract invariant tests (in `tests` folders) for major contract systems where drift risk is high.
   Focus these on boundary relationships such as transport/API/IPC specialization, runtime/logging alignment, and persistence/storage separation.
+- Place contract invariants predictably: family tests in `modules/contracts/<family>/tests` and cross-family anti-drift tests in `modules/contracts/tests`.
 - Add regression tests for bug fixes when practical in the layer where defect should be caught.
 - Keep tests deterministic, CI-suitable, and non-flaky; avoid performative coverage-only tests.
 
