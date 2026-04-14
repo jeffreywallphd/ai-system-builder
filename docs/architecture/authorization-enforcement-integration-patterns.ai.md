@@ -152,6 +152,7 @@ Reason-code catalogs:
 - `AuthorizationDecisionDenialReasonCodes`: denial-focused subset for policy-deny interpretation and safe mapping.
 - `AuthorizationRuntimeAvailabilityReasonCodes`: unavailable/degraded intersection with runtime readiness (`runtime-gate-blocked`, `runtime-degraded`, blocking dependency reason codes).
 - `AuthorizationTransportMappingReasonCodes`: boundary mapping outcomes (`transport-denied`, `transport-mapping-failed`, `permission-entry-missing`).
+- `AuthorizationContextResolutionReasonCodes`: actor/request-context snapshot outcomes (`context-snapshot-captured`, `workspace-context-resolved`, `workspace-context-missing`, `workspace-context-ambiguous`, `actor-context-missing`).
 - `AuthorizationDiagnosticReasonCodes`: consolidated machine-readable catalog for diagnostic `reasonCode`.
 
 Provenance-stage catalog:
@@ -199,9 +200,10 @@ Use `createAuthorizationDiagnosticRecord(...)` and `projectAuthorizationDiagnost
 
 Outcome completeness rules:
 
-- `allow` and `deny` diagnostics must include `requiredPermissionKey`.
+- `allow` and `deny` diagnostics must include `requiredPermissionKey` at permission-evaluation stages (`permission-snapshot`, `scope-filtering`, `use-case`, `evaluator`, `evaluator-resolution`, `final-decision-emission`, `adapter`, `transport-mapping`).
 - `allow` diagnostics must include `matchedSourceKind` that identifies an effective source (`owner-override`, `role-grant`, `permission-grant`, `sharing-grant`, or `visibility-rule`).
-- `deny` diagnostics must include `matchedSourceKind` (`none` is valid when nothing matched).
+- `deny` diagnostics at permission-evaluation stages must include `matchedSourceKind` (`none` is valid when nothing matched).
+- `observed` diagnostics are valid for pre-evaluation context snapshots (for example `actor-snapshot`) and do not require `requiredPermissionKey`.
 - `unavailable` and `degraded` diagnostics must include `runtimeAvailability` with `affectedByRuntimeAvailability=true`.
 - Evaluator/use-case/final-decision stages must emit role/permission/sharing evidence by either:
   - counts and/or identifier arrays, or

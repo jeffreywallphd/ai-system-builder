@@ -381,6 +381,10 @@ import { createWorkspaceRouteFamilyHandler } from "./route-families/WorkspaceRou
 import { buildIdentityHttpRouteCompositionLogDetails } from "./middleware/request-observability";
 import { evaluateRuntimeCapabilityGuard } from "./middleware/runtime-capability-guard";
 import {
+  AuthorizationContextResolutionReasonCodes,
+  AuthorizationDiagnosticOutcomes,
+} from "@shared/contracts/authorization/AuthorizationDiagnosticsContracts";
+import {
   CORRELATION_ID_HEADER,
   REQUEST_ID_HEADER,
   addCorrelationIdToErrorEnvelope,
@@ -410,6 +414,11 @@ import {
   type ResolveWorkspaceContextOptions,
   type ResolvedWorkspaceRequestContext,
 } from "./middleware/workspace-context";
+import {
+  buildAuthorizationContextSnapshotDiagnostic,
+  resolveAuthorizationContextSnapshotReasonCode,
+  resolveAuthorizationRequestContextHints,
+} from "./middleware/authorization-context-diagnostics";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 import {
   normalizeRequestContentType,
@@ -4808,10 +4817,29 @@ async function requireAuthenticatedSession(
   } | undefined,
   onAuthenticated: (context: AuthenticatedRequestContext) => Promise<void>,
 ): Promise<void> {
+  const correlationId = resolveRequestCorrelationId(request, requestId);
+  const contextHints = resolveAuthorizationRequestContextHints(request);
   const sessionResolution = await resolveAuthenticatedSessionFromRequest(request, backendApi, {
     mapStatusCode,
   });
   if (!sessionResolution.ok) {
+    const authFailureCode = (asRecord(sessionResolution.body)?.error as { readonly code?: unknown } | undefined)?.code;
+    const reasonCode = authFailureCode === IdentityAuthApiErrorCodes.authenticationFailed
+      ? AuthorizationContextResolutionReasonCodes.actorContextMissing
+      : AuthorizationContextResolutionReasonCodes.actorContextInvalid;
+    logAuthorizationContextSnapshot(
+      logger,
+      requestId,
+      request,
+      buildAuthorizationContextSnapshotDiagnostic({
+        requestId,
+        correlationId,
+        hints: contextHints,
+        reasonCode,
+        outcome: AuthorizationDiagnosticOutcomes.deny,
+      }),
+      sessionResolution.statusCode,
+    );
     writeJson(response, sessionResolution.statusCode, sessionResolution.body);
     logResponse(
       logger,
@@ -4832,6 +4860,20 @@ async function requireAuthenticatedSession(
     buildForbiddenResponse: buildForbiddenResponse,
   });
   if (!sessionAssuranceEnforcement.ok) {
+    logAuthorizationContextSnapshot(
+      logger,
+      requestId,
+      request,
+      buildAuthorizationContextSnapshotDiagnostic({
+        requestId,
+        correlationId,
+        actorIdentityId: resolvedSession.principal.userIdentityId,
+        hints: contextHints,
+        reasonCode: AuthorizationContextResolutionReasonCodes.actorContextInvalid,
+        outcome: AuthorizationDiagnosticOutcomes.deny,
+      }),
+      sessionAssuranceEnforcement.failure.statusCode,
+    );
     writeJson(
       response,
       sessionAssuranceEnforcement.failure.statusCode,
@@ -4871,6 +4913,20 @@ async function requireAuthenticatedSession(
     });
     const transportValidation = await transportTrust.httpValidator.validate(transportValidationRequest);
     if (!transportValidation.ok) {
+      logAuthorizationContextSnapshot(
+        logger,
+        requestId,
+        request,
+        buildAuthorizationContextSnapshotDiagnostic({
+          requestId,
+          correlationId,
+          actorIdentityId: resolvedSession.principal.userIdentityId,
+          hints: contextHints,
+          reasonCode: AuthorizationContextResolutionReasonCodes.actorContextInvalid,
+          outcome: AuthorizationDiagnosticOutcomes.deny,
+        }),
+        transportValidation.statusCode,
+      );
       writeJson(response, transportValidation.statusCode, transportValidation.body);
       logResponse(
         logger,
@@ -4890,6 +4946,24 @@ async function requireAuthenticatedSession(
       return;
     }
   }
+
+  logAuthorizationContextSnapshot(
+    logger,
+    requestId,
+    request,
+    buildAuthorizationContextSnapshotDiagnostic({
+      requestId,
+      correlationId,
+      actorIdentityId: resolvedSession.principal.userIdentityId,
+      actorActiveWorkspaceId: contextHints.workspaceHintState === "resolved" ? contextHints.workspaceHint : undefined,
+      hints: contextHints,
+      reasonCode: resolveAuthorizationContextSnapshotReasonCode({
+        workspaceResolved: contextHints.workspaceHintState === "resolved",
+        workspaceAmbiguous: contextHints.workspaceHintState === "ambiguous",
+      }),
+      outcome: AuthorizationDiagnosticOutcomes.observed,
+    }),
+  );
 
   await onAuthenticated(buildAuthenticatedSessionActorContext({
     resolvedSession,
@@ -4930,14 +5004,50 @@ async function requireAuthenticatedWorkspaceSession(
     transportTrust,
     options.sessionOptions,
     async (context) => {
+      const correlationId = resolveRequestCorrelationId(request, requestId);
+      const contextHints = resolveAuthorizationRequestContextHints(request);
       const workspaceResolution = resolveWorkspaceContextFromRequest(request, options);
       if (!workspaceResolution.ok) {
+        logAuthorizationContextSnapshot(
+          logger,
+          requestId,
+          request,
+          buildAuthorizationContextSnapshotDiagnostic({
+            requestId,
+            correlationId,
+            actorIdentityId: context.actor.userIdentityId,
+            hints: contextHints,
+            reasonCode: AuthorizationContextResolutionReasonCodes.workspaceContextMissing,
+            outcome: AuthorizationDiagnosticOutcomes.deny,
+          }),
+          workspaceResolution.statusCode,
+        );
         writeJson(response, workspaceResolution.statusCode, workspaceResolution.body);
         logResponse(logger, requestId, request, workspaceResolution.statusCode, Object.freeze({
           actorUserIdentityId: context.actor.userIdentityId,
         }), workspaceResolution.body);
         return;
       }
+
+      logAuthorizationContextSnapshot(
+        logger,
+        requestId,
+        request,
+        buildAuthorizationContextSnapshotDiagnostic({
+          requestId,
+          correlationId,
+          actorIdentityId: context.actor.userIdentityId,
+          actorActiveWorkspaceId: workspaceResolution.workspace.workspaceId,
+          hints: Object.freeze({
+            ...contextHints,
+            workspaceHintState: "resolved" as const,
+            workspaceHint: workspaceResolution.workspace.workspaceId,
+            workspaceHintCount: 1,
+          }),
+          reasonCode: AuthorizationContextResolutionReasonCodes.workspaceContextResolved,
+          outcome: AuthorizationDiagnosticOutcomes.observed,
+        }),
+      );
 
       await onAuthenticated(Object.freeze({
         ...context,
@@ -8749,6 +8859,33 @@ function logResponse<TRequest extends Record<string, unknown>>(
     return;
   }
 
+  logger.info(event);
+}
+
+function logAuthorizationContextSnapshot(
+  logger: IdentityHttpServerLogger,
+  requestId: string,
+  request: IncomingMessage,
+  diagnostic: ReturnType<typeof buildAuthorizationContextSnapshotDiagnostic>,
+  statusCode?: number,
+): void {
+  const correlationId = resolveRequestCorrelationId(request, requestId);
+  const event = Object.freeze({
+    event: "authorization.context.snapshot",
+    requestId,
+    correlationId,
+    method: request.method,
+    path: resolveCanonicalRequestPath(request.url),
+    statusCode,
+    details: Object.freeze({
+      diagnostic,
+    }),
+  });
+
+  if (diagnostic.outcome === AuthorizationDiagnosticOutcomes.deny) {
+    logger.warn(event);
+    return;
+  }
   logger.info(event);
 }
 

@@ -290,4 +290,49 @@ describe("AuthorizationDiagnosticsContracts", () => {
     expect(diagnostic.reasonCode).toBe(AuthorizationDiagnosticReasonCodes.transportDenied);
     expect(diagnostic.denialProvenanceStage).toBe(AuthorizationDiagnosticProvenanceStages.transportMapping);
   });
+
+  it("allows actor-snapshot context diagnostics without requiredPermissionKey", () => {
+    const diagnostic = createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.deny,
+      correlation: {
+        requestId: "req-actor-context",
+      },
+      actor: {
+        actorIdentityId: "user-context",
+      },
+      target: {
+        kind: AuthorizationDiagnosticTargetKinds.unresolved,
+      },
+      reasonCode: "workspace-context-missing",
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.actorSnapshot,
+    });
+
+    expect(diagnostic.requiredPermissionKey).toBeUndefined();
+    expect(diagnostic.denialProvenanceStage).toBe(AuthorizationDiagnosticProvenanceStages.actorSnapshot);
+  });
+
+  it("supports observed context snapshots for non-decision stages", () => {
+    const diagnostic = createAuthorizationDiagnosticRecord({
+      outcome: AuthorizationDiagnosticOutcomes.observed,
+      correlation: {
+        requestId: "req-observed-context",
+      },
+      actor: {
+        actorIdentityId: "user-observed",
+        actorActiveWorkspaceId: "workspace-observed",
+      },
+      target: {
+        kind: AuthorizationDiagnosticTargetKinds.unresolved,
+      },
+      reasonCode: "context-snapshot-captured",
+      denialProvenanceStage: AuthorizationDiagnosticProvenanceStages.actorSnapshot,
+      extensions: {
+        "identity.request-family": "identity",
+        "identity.operation-name": "GET /api/v1/identity/session",
+      },
+    });
+
+    expect(diagnostic.outcome).toBe(AuthorizationDiagnosticOutcomes.observed);
+    expect(diagnostic.actor.actorActiveWorkspaceId).toBe("workspace-observed");
+  });
 });
