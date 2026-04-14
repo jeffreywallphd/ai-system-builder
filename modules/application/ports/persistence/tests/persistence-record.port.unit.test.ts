@@ -3,9 +3,12 @@ import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   createPersistenceOperationForRecord,
   createPersistenceRecordReference,
+  createPersistenceSuccessResult,
   type PersistenceOperation,
   type PersistenceRecordReference,
+  type PersistenceResult,
 } from "../../../../contracts/persistence";
+import type { ContractBoundaryContext } from "../../../../contracts/shared";
 
 import type {
   DeletePersistenceRecordRequest,
@@ -27,74 +30,166 @@ describe("PersistenceRecordPort", () => {
       operation: PersistenceOperation;
       record: PersistenceRecordReference;
     }>();
+    expectTypeOf<PersistenceRecordOperationRequest>().toExtend<ContractBoundaryContext>();
 
     expectTypeOf<LoadPersistenceRecordRequest>().toExtend<{
       operation: PersistenceOperation;
       record: PersistenceRecordReference;
     }>();
+    expectTypeOf<LoadPersistenceRecordRequest>().toExtend<ContractBoundaryContext>();
 
     expectTypeOf<SavePersistenceRecordRequest<{ name: string }>>().toExtend<{
       operation: PersistenceOperation;
       record: PersistenceRecordReference;
       value: { name: string };
     }>();
+    expectTypeOf<SavePersistenceRecordRequest<{ name: string }>>().toExtend<ContractBoundaryContext>();
 
     expectTypeOf<DeletePersistenceRecordRequest>().toExtend<{
       operation: PersistenceOperation;
       record: PersistenceRecordReference;
     }>();
+    expectTypeOf<DeletePersistenceRecordRequest>().toExtend<ContractBoundaryContext>();
   });
 
-  it("passes operation-aware record requests through the port contract", async () => {
-    const operation = createPersistenceOperationForRecord("project", "load");
+  it("keeps return types contract-aligned and operation-aware", () => {
+    expectTypeOf<Awaited<ReturnType<PersistenceRecordPort["loadRecord"]>>>().toEqualTypeOf<
+      PersistenceResult<unknown | null>
+    >();
+    expectTypeOf<Awaited<ReturnType<PersistenceRecordPort["saveRecord"]>>>().toEqualTypeOf<
+      PersistenceResult<unknown>
+    >();
+    expectTypeOf<
+      Awaited<ReturnType<PersistenceRecordPort["deleteRecord"]>>
+    >().toEqualTypeOf<PersistenceResult<boolean>>();
+  });
+
+  it("passes operation-aware record requests through load/save/delete port operations", async () => {
+    const loadOperation = createPersistenceOperationForRecord("project", "load");
+    const saveOperation = createPersistenceOperationForRecord("project", "save");
+    const deleteOperation = createPersistenceOperationForRecord("project", "delete");
     const record = createPersistenceRecordReference("project", "project-42");
 
-    const request: LoadPersistenceRecordRequest = {
-      operation,
+    const loadRequest: LoadPersistenceRecordRequest = {
+      operation: loadOperation,
       record,
       requestId: "req-42",
       correlationId: "corr-42",
     };
 
-    const loadRecord = vi
-      .fn<PersistenceRecordPort["loadRecord"]>()
-      .mockResolvedValue({
-        ok: true,
-        operation,
-        record,
-        value: {
+    const saveRequest: SavePersistenceRecordRequest<{ id: string; name: string }> = {
+      operation: saveOperation,
+      record,
+      value: {
+        id: "project-42",
+        name: "Project 42",
+      },
+      requestId: "req-42",
+      correlationId: "corr-42",
+    };
+
+    const deleteRequest: DeletePersistenceRecordRequest = {
+      operation: deleteOperation,
+      record,
+      requestId: "req-42",
+      correlationId: "corr-42",
+    };
+
+    const loadRecord = vi.fn<PersistenceRecordPort["loadRecord"]>().mockResolvedValue(
+      createPersistenceSuccessResult(
+        loadOperation,
+        {
           id: "project-42",
           name: "Project 42",
         },
-        requestId: request.requestId,
-        correlationId: request.correlationId,
-      });
+        {
+          record,
+          requestId: loadRequest.requestId,
+          correlationId: loadRequest.correlationId,
+        },
+      ),
+    );
+    const saveRecord = vi.fn<PersistenceRecordPort["saveRecord"]>().mockResolvedValue(
+      createPersistenceSuccessResult(saveOperation, saveRequest.value, {
+        record,
+        requestId: saveRequest.requestId,
+        correlationId: saveRequest.correlationId,
+      }),
+    );
+    const deleteRecord = vi.fn<PersistenceRecordPort["deleteRecord"]>().mockResolvedValue(
+      createPersistenceSuccessResult(deleteOperation, true, {
+        record,
+        requestId: deleteRequest.requestId,
+        correlationId: deleteRequest.correlationId,
+      }),
+    );
 
     const port: PersistenceRecordPort = {
       loadRecord,
-      saveRecord: vi.fn(),
-      deleteRecord: vi.fn(),
+      saveRecord,
+      deleteRecord,
     };
 
-    const result = await port.loadRecord(request);
+    const loadResult = await port.loadRecord(loadRequest);
+    const saveResult = await port.saveRecord(saveRequest);
+    const deleteResult = await port.deleteRecord(deleteRequest);
 
-    expect(loadRecord).toHaveBeenCalledWith(request);
-    expect(result.ok).toBe(true);
-    expect(result.operation).toBe("project.load");
-    expect(result.record).toEqual({
+    expect(loadRecord).toHaveBeenCalledWith(loadRequest);
+    expect(saveRecord).toHaveBeenCalledWith(saveRequest);
+    expect(deleteRecord).toHaveBeenCalledWith(deleteRequest);
+
+    expect(loadResult.ok).toBe(true);
+    expect(loadResult.operation).toBe("project.load");
+    expect(loadResult.record).toEqual({
+      recordType: "project",
+      id: "project-42",
+    });
+    expect(saveResult.ok).toBe(true);
+    expect(saveResult.operation).toBe("project.save");
+    expect(saveResult.record).toEqual({
+      recordType: "project",
+      id: "project-42",
+    });
+    expect(deleteResult.ok).toBe(true);
+    expect(deleteResult.operation).toBe("project.delete");
+    expect(deleteResult.record).toEqual({
       recordType: "project",
       id: "project-42",
     });
   });
 
-  it("keeps requests record-oriented rather than storage-key oriented", () => {
-    const request: DeletePersistenceRecordRequest = {
+  it("keeps requests record-oriented rather than storage-key oriented across all operations", () => {
+    const loadRequest: LoadPersistenceRecordRequest = {
+      operation: createPersistenceOperationForRecord("project", "load"),
+      record: createPersistenceRecordReference("project", "project-42"),
+    };
+
+    const saveRequest: SavePersistenceRecordRequest<{ name: string }> = {
+      operation: createPersistenceOperationForRecord("project", "save"),
+      record: createPersistenceRecordReference("project", "project-42"),
+      value: {
+        name: "Project 42",
+      },
+    };
+
+    const deleteRequest: DeletePersistenceRecordRequest = {
       operation: createPersistenceOperationForRecord("project", "delete"),
       record: createPersistenceRecordReference("project", "project-42"),
     };
 
-    expect("key" in request).toBe(false);
-    expect(request.record).toEqual({
+    expect("key" in loadRequest).toBe(false);
+    expect("key" in saveRequest).toBe(false);
+    expect("key" in deleteRequest).toBe(false);
+
+    expect(loadRequest.record).toEqual({
+      recordType: "project",
+      id: "project-42",
+    });
+    expect(saveRequest.record).toEqual({
+      recordType: "project",
+      id: "project-42",
+    });
+    expect(deleteRequest.record).toEqual({
       recordType: "project",
       id: "project-42",
     });

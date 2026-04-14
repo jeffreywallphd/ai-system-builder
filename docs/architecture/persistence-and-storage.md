@@ -117,5 +117,6 @@ Contract-family tests should protect this boundary model directly:
 
 - persistence invariants (operation identity + record alignment + family exports),
 - storage invariants (key normalization + artifact operation shapes + family exports).
+- application persistence-port seam invariants in `modules/application/ports/persistence/tests/` (thin operation-aware record requests/results and no storage-key drift).
 
 If these invariants change, update canonical docs and context packs in the same change.
