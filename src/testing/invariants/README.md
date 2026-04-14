@@ -16,6 +16,8 @@ This module provides a shared baseline for cross-system invariant testing:
 - Run feature-slice invariant coverage (shared framework): `src/application/authorization/tests/RunAuthorizationInvariantCoverage.test.ts`
 - System feature-slice invariant coverage (shared framework): `src/application/authorization/tests/SystemAuthorizationInvariantCoverage.test.ts`
 - Storage feature-slice invariant coverage (shared framework): `src/application/authorization/tests/StorageAuthorizationInvariantCoverage.test.ts`
+- Secret metadata feature-slice invariant coverage (shared framework): `src/application/authorization/tests/SecretAuthorizationInvariantCoverage.test.ts`
+- Admin/deployment capability invariant coverage (shared framework): `src/infrastructure/api/deployment/tests/WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService.test.ts`
 - Shared authorization slice adapter/test support: `src/application/authorization/tests/AuthorizationInvariantCoverageTestSupport.ts`
 
 ## Core Contracts
