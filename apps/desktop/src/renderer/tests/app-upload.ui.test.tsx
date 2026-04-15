@@ -2,13 +2,6 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  createDesktopImageUploadSuccessResponse,
-  createIpcError,
-  createIpcFailureResponse,
-  getDesktopImageUploadChannel,
-} from "../../../../../modules/contracts/ipc";
-
 import { App } from "../App";
 import type { DesktopImageUploadApi } from "../lib/desktopApi";
 
@@ -49,13 +42,16 @@ describe("desktop renderer image upload component", () => {
   });
 
   it("shows selected file information after one image file is chosen", async () => {
-    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue(
-      createDesktopImageUploadSuccessResponse({
-        key: "uploads/example.png",
-        mediaType: "image/png",
-        sizeBytes: 5,
-      }),
-    );
+    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue({
+      ok: true,
+      value: {
+        descriptor: {
+          key: "uploads/example.png",
+          mediaType: "image/png",
+          sizeBytes: 5,
+        },
+      },
+    });
 
     const { root, container } = mountApp();
 
@@ -79,18 +75,16 @@ describe("desktop renderer image upload component", () => {
   });
 
   it("uploads selected image bytes through the preload bridge dependency and renders success details", async () => {
-    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue(
-      createDesktopImageUploadSuccessResponse(
-        {
+    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue({
+      ok: true,
+      value: {
+        descriptor: {
           key: "uploads/cat.png",
           mediaType: "image/png",
           sizeBytes: 4,
         },
-        {
-          requestId: "req-ui-success",
-        },
-      ),
-    );
+      },
+    });
 
     const { root, container } = mountApp();
 
@@ -126,15 +120,13 @@ describe("desktop renderer image upload component", () => {
   });
 
   it("renders failure feedback when upload response returns a contract failure", async () => {
-    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue(
-      createIpcFailureResponse(
-        createIpcError(
-          getDesktopImageUploadChannel("response"),
-          "validation",
-          "mediaType must be an image media type.",
-        ),
-      ),
-    );
+    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue({
+      ok: false,
+      error: {
+        code: "validation",
+        message: "mediaType must be an image media type.",
+      },
+    });
 
     const { root, container } = mountApp();
 
