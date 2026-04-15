@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "main": ".webpack/main",
+  "config": {
+    "forge": "./apps/desktop/forge.config.js"
+  },
   "scripts": {
-    "dev": "electron-forge start --config ./apps/desktop/forge.config.js",
-    "package": "electron-forge package --config ./apps/desktop/forge.config.js",
-    "make": "electron-forge make --config ./apps/desktop/forge.config.js",
+    "dev": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
     "start": "npm run dev",
     "test": "vitest run --environment jsdom"
   },
