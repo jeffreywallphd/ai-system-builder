@@ -28,14 +28,15 @@ import {
 } from "../../../../contracts/storage";
 
 const STORAGE_COMPONENT = "adapters.storage.filesystem";
-const STORAGE_HOST = "desktop";
+const DEFAULT_STORAGE_HOST = "desktop";
 const STORAGE_CHECKSUM_ALGORITHM = "sha256";
 
 class StorageAdapterValidationError extends Error {}
 class StorageAdapterVerificationError extends Error {}
 
-export interface CreateDesktopFilesystemArtifactStorageAdapterOptions {
+export interface CreateFilesystemArtifactStorageAdapterOptions {
   rootDirectory: string;
+  host?: "desktop" | "server";
   logging?: LoggingPort;
   now?: () => string;
   randomSuffix?: () => string;
@@ -161,8 +162,8 @@ function createContentChecksum(bytes: Uint8Array): StorageObjectChecksum {
   };
 }
 
-export function createDesktopFilesystemArtifactStorageAdapter(
-  options: CreateDesktopFilesystemArtifactStorageAdapterOptions,
+export function createFilesystemArtifactStorageAdapter(
+  options: CreateFilesystemArtifactStorageAdapterOptions,
 ): ArtifactStoragePort {
   if (options.rootDirectory.trim().length === 0) {
     throw new Error("rootDirectory must be a non-empty path.");
@@ -204,7 +205,7 @@ export function createDesktopFilesystemArtifactStorageAdapter(
         message: event.message,
         component: STORAGE_COMPONENT,
         operation: event.operation,
-        host: STORAGE_HOST,
+        host: options.host ?? DEFAULT_STORAGE_HOST,
         requestId: event.requestId,
         correlationId: event.correlationId,
         durationMs: event.durationMs,
@@ -239,7 +240,7 @@ export function createDesktopFilesystemArtifactStorageAdapter(
       await logBoundaryEvent({
         level: "debug",
         name: "storage.filesystem.store.started",
-        message: "Starting artifact write to desktop filesystem storage.",
+        message: "Starting artifact write to local filesystem storage.",
         operation: "storage.artifact.store",
         requestId: request.requestId,
         correlationId: request.correlationId,

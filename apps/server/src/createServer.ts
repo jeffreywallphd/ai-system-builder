@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import type express from "express";
+import express from "express";
 
 import { composeServerHost } from "../../../modules/hosts/server";
 
@@ -51,10 +51,16 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
     },
   });
 
+  const app = express();
+  app.use(express.json({ limit: "5mb" }));
+
+  serverHost.registerApi({
+    app,
+    storageRootDirectory: config.storageRootDirectory,
+  });
+
   return {
-    app: serverHost.createServerApp({
-      storageRootDirectory: config.storageRootDirectory,
-    }),
+    app,
     config,
   };
 }

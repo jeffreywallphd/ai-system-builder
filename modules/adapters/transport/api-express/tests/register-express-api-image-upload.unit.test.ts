@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createContractError } from "../../../../contracts/shared";
 import {
-  mapApiImageUploadRequestToCommand,
+  mapApiImageUploadRequestBody,
   mapStoreImageUploadResultToApiResponse,
-  registerExpressApi,
+  registerImageUploadApiRoute,
   type ExpressPostRoutePort,
   type StoreImageUploadUseCasePort,
-} from "../registerExpressApi";
+} from "../image-upload/registerImageUploadApiRoute";
 
 function createUseCaseStub(
   executeImpl?: ReturnType<typeof vi.fn<StoreImageUploadUseCasePort["execute"]>>,
@@ -21,19 +21,24 @@ function createUseCaseStub(
   };
 }
 
-describe("registerExpressApi image upload mappings", () => {
-  it("maps api request payload into the store image upload command", () => {
-    const command = mapApiImageUploadRequestToCommand({
+describe("registerImageUploadApiRoute", () => {
+  it("maps api request payload into application command and command context", () => {
+    const mapping = mapApiImageUploadRequestBody({
       fileName: "cat.png",
       mediaType: "image/png",
       bytes: [137, 80, 78, 71],
       source: "web.upload.form",
     });
 
-    expect(command).toEqual({
-      fileName: "cat.png",
-      mediaType: "image/png",
-      bytes: new Uint8Array([137, 80, 78, 71]),
+    expect(mapping).toEqual({
+      command: {
+        fileName: "cat.png",
+        mediaType: "image/png",
+        bytes: new Uint8Array([137, 80, 78, 71]),
+      },
+      commandContext: {
+        source: "web.upload.form",
+      },
     });
   });
 
@@ -141,7 +146,7 @@ describe("registerExpressApi image upload mappings", () => {
       correlationId: "corr-upload-3",
     });
 
-    registerExpressApi({
+    registerImageUploadApiRoute({
       app,
       storeImageUploadUseCase: createUseCaseStub(execute),
     });
@@ -179,7 +184,6 @@ describe("registerExpressApi image upload mappings", () => {
         bytes: new Uint8Array([137, 80, 78, 71]),
       },
       {
-        host: "server",
         source: "server.web.upload-form",
       },
       {

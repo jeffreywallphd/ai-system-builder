@@ -27,7 +27,6 @@ function createCommandContext(
   overrides: Partial<StoreImageUploadCommandContext> = {},
 ): StoreImageUploadCommandContext {
   return {
-    host: "desktop",
     source: "desktop.renderer.upload-form",
     ...overrides,
   };
@@ -70,6 +69,7 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging,
+      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
@@ -128,6 +128,7 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
+      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
@@ -167,6 +168,7 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
+      host: "desktop",
     });
 
     const result = await useCase.execute(
@@ -203,6 +205,7 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
+      host: "desktop",
     });
 
     const result = await useCase.execute(createCommand(), createCommandContext());
@@ -234,6 +237,7 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
+      host: "desktop",
     });
 
     const result = await useCase.execute(createCommand(), createCommandContext(), {
@@ -269,6 +273,7 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
+      host: "desktop",
     });
 
     const result = await useCase.execute(

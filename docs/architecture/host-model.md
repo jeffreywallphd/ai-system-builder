@@ -100,6 +100,9 @@ Contributors should:
 
 ## Practical boundaries
 
+- Apps own framework bootstrap surfaces (for example `express()` instantiation and app-level middleware).
+- Host modules compose dependencies and register transport adapters against app-provided ports.
+- Transport adapter registration should be feature-sliced (for example `image-upload/...`) with only tiny top-level aggregators.
 - Host modules may depend on application/contracts/adapters.
 - Transport adapters may be selected by hosts.
 - Business rules remain in domain/application.

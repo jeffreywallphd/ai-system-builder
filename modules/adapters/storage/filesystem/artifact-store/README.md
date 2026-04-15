@@ -1,7 +1,7 @@
-# Desktop Artifact Store Adapter
+# Filesystem Artifact Store Adapter
 
-`createDesktopFilesystemArtifactStorageAdapter` is a real filesystem-backed
-`ArtifactStoragePort` implementation for desktop-host storage.
+`createFilesystemArtifactStorageAdapter` is a real filesystem-backed
+`ArtifactStoragePort` implementation for host-local storage.
 
 Current behavior:
 
