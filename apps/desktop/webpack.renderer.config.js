@@ -1,3 +1,5 @@
+const path = require("node:path");
+
 /** @type {import('webpack').Configuration} */
 module.exports = {
   module: {
@@ -7,6 +9,10 @@ module.exports = {
         exclude: /node_modules/,
         use: {
           loader: 'ts-loader',
+          options: {
+            configFile: path.resolve(__dirname, "tsconfig.webpack.json"),
+            onlyCompileBundledFiles: true,
+          },
         },
       },
       {
