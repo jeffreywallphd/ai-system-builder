@@ -1,5 +1,11 @@
 import type { LoggingPort } from "../../../application/ports/logging";
+import { StoreImageUploadUseCase } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
+import { createDesktopFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
+import {
+  registerElectronIpc,
+  type IpcMainHandlePort,
+} from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
@@ -16,9 +22,15 @@ export interface ComposeDesktopHostOptions {
   now?: () => string;
 }
 
+export interface RegisterDesktopImageUploadIpcOptions {
+  ipcMain: IpcMainHandlePort;
+  storageRootDirectory: string;
+}
+
 export interface DesktopHostComposition {
   loggingPort: LoggingPort;
   loggingConfig: LoggingConfig;
+  registerImageUploadIpc: (options: RegisterDesktopImageUploadIpcOptions) => void;
 }
 
 export function composeDesktopHost(
@@ -42,5 +54,22 @@ export function composeDesktopHost(
   return {
     loggingPort,
     loggingConfig,
+    registerImageUploadIpc(registerOptions) {
+      const storage = createDesktopFilesystemArtifactStorageAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
+        logging: loggingPort,
+        now: options.now,
+      });
+      const storeImageUploadUseCase = new StoreImageUploadUseCase({
+        storage,
+        logging: loggingPort,
+        now: options.now,
+      });
+
+      registerElectronIpc({
+        ipcMain: registerOptions.ipcMain,
+        storeImageUploadUseCase,
+      });
+    },
   };
 }

@@ -1,4 +1,8 @@
-import { app, BrowserWindow } from "electron";
+import path from "node:path";
+
+import { app, BrowserWindow, ipcMain } from "electron";
+
+import { composeDesktopHost } from "../../../../modules/hosts/desktop";
 
 const openWindows = new Set<BrowserWindow>();
 
@@ -23,6 +27,18 @@ async function createMainWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  const desktopHost = composeDesktopHost({
+    logging: {
+      verbosity: process.env.LOG_VERBOSITY,
+      level: "info",
+    },
+  });
+
+  desktopHost.registerImageUploadIpc({
+    ipcMain,
+    storageRootDirectory: path.join(app.getPath("userData"), "artifacts"),
+  });
+
   await createMainWindow();
 
   app.on("activate", async () => {
