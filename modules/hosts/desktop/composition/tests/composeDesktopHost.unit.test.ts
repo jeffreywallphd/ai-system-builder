@@ -3,6 +3,8 @@ import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 
+import { DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL } from "../../../../contracts/ipc";
+
 import { composeDesktopHost } from "../composeDesktopHost";
 
 describe("composeDesktopHost", () => {
@@ -43,6 +45,24 @@ describe("composeDesktopHost", () => {
       component: "store-image-upload-use-case",
       useCase: "store-image-upload",
     });
+  });
+
+
+  it("registers the desktop image upload IPC handler on the request channel", () => {
+    const ipcMain = {
+      handle: vi.fn(),
+    };
+    const host = composeDesktopHost();
+
+    host.registerImageUploadIpc({
+      ipcMain,
+      storageRootDirectory: "/tmp/desktop-image-upload-test",
+    });
+
+    expect(ipcMain.handle).toHaveBeenCalledOnce();
+    const [channel, listener] = ipcMain.handle.mock.calls[0] as [string, unknown];
+    expect(channel).toBe(DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value);
+    expect(listener).toBeTypeOf("function");
   });
 
   it("keeps the composition seam usable for upload success and failure event logging", async () => {
