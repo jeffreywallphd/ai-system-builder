@@ -30,12 +30,14 @@ const STORAGE_COMPONENT = "adapters.storage.filesystem";
 const STORAGE_HOST = "desktop";
 
 class StorageAdapterValidationError extends Error {}
+class StorageAdapterVerificationError extends Error {}
 
 export interface CreateDesktopFilesystemArtifactStorageAdapterOptions {
   rootDirectory: string;
   logging?: LoggingPort;
   now?: () => string;
   randomSuffix?: () => string;
+  statPath?: typeof stat;
 }
 
 function isFsError(error: unknown): error is NodeJS.ErrnoException {
@@ -48,6 +50,10 @@ function toErrorCode(
 ): ContractErrorCode {
   if (error instanceof StorageAdapterValidationError) {
     return "validation";
+  }
+
+  if (error instanceof StorageAdapterVerificationError) {
+    return "unavailable";
   }
 
   if (!isFsError(error)) {
@@ -155,6 +161,7 @@ export function createDesktopFilesystemArtifactStorageAdapter(
   const logging = options.logging;
   const now = options.now ?? (() => new Date().toISOString());
   const randomSuffix = options.randomSuffix ?? (() => randomUUID().replaceAll("-", ""));
+  const statPath = options.statPath ?? stat;
 
   async function logBoundaryEvent(event: {
     level: "debug" | "info" | "warn" | "error";
@@ -215,6 +222,8 @@ export function createDesktopFilesystemArtifactStorageAdapter(
         requestId: request.requestId,
         correlationId: request.correlationId,
       };
+      let attemptedKey: string | undefined;
+      let attemptedAbsolutePath: string | undefined;
 
       await logBoundaryEvent({
         level: "debug",
@@ -233,12 +242,27 @@ export function createDesktopFilesystemArtifactStorageAdapter(
         const key = request.descriptor.key
           ? normalizeStorageArtifactKey(request.descriptor.key)
           : createGeneratedKey(request.descriptor.mediaType);
+        attemptedKey = key;
         const bytes = toBytes(request.content);
         const absolutePath = resolvePathInsideRoot(rootDirectory, key);
+        attemptedAbsolutePath = absolutePath;
         const writeFlag = request.overwrite === true ? "w" : "wx";
 
         await mkdir(path.dirname(absolutePath), { recursive: true });
         await writeFile(absolutePath, bytes, { flag: writeFlag });
+        const writtenStats = await statPath(absolutePath);
+
+        if (!writtenStats.isFile()) {
+          throw new StorageAdapterVerificationError(
+            "Post-write verification failed: resolved artifact path is not a file.",
+          );
+        }
+
+        if (writtenStats.size !== bytes.byteLength) {
+          throw new StorageAdapterVerificationError(
+            `Post-write verification failed: expected ${bytes.byteLength} bytes but found ${writtenStats.size}.`,
+          );
+        }
 
         await logBoundaryEvent({
           level: "info",
@@ -251,6 +275,7 @@ export function createDesktopFilesystemArtifactStorageAdapter(
           outcome: "success",
           data: {
             key,
+            absolutePath,
             sizeBytes: bytes.byteLength,
             mediaType: request.descriptor.mediaType,
           },
@@ -286,6 +311,8 @@ export function createDesktopFilesystemArtifactStorageAdapter(
             errorCode: code,
             errorMessage: message,
             details: {
+              key: attemptedKey,
+              absolutePath: attemptedAbsolutePath,
               filesystemCode: isFsError(error) ? (error.code ?? "unknown") : "unknown",
             },
           },
@@ -296,6 +323,8 @@ export function createDesktopFilesystemArtifactStorageAdapter(
             ...requestContext,
             details: {
               operation: "storeArtifact",
+              key: attemptedKey,
+              absolutePath: attemptedAbsolutePath,
               filesystemCode: isFsError(error) ? error.code : undefined,
             },
           }),

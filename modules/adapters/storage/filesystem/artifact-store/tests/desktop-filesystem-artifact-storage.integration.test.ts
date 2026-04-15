@@ -91,6 +91,95 @@ describe("desktop filesystem artifact storage adapter integration", () => {
       event: "storage.filesystem.store.succeeded",
       operation: "storage.artifact.store",
       outcome: "success",
+      data: {
+        key: "uploads/session-1/kitten.png",
+        absolutePath: path.join(rootDirectory, "uploads", "session-1", "kitten.png"),
+        sizeBytes: bytes.byteLength,
+      },
+    });
+  });
+
+  it("returns a structured failure when post-write verification cannot stat the stored file", async () => {
+    const rootDirectory = await createTempRoot();
+    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const statPath = vi.fn().mockRejectedValue(
+      Object.assign(new Error("missing file after write"), {
+        code: "ENOENT",
+      }),
+    );
+    const adapter = createDesktopFilesystemArtifactStorageAdapter({
+      rootDirectory,
+      logging: createLoggingPortMock(log),
+      statPath: statPath as typeof import("node:fs/promises").stat,
+    });
+
+    const result = await adapter.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([1, 2, 3]), {
+        descriptor: {
+          key: "uploads/verifies/missing-after-write.png",
+          mediaType: "image/png",
+        },
+        requestId: "req-verify-fail-1",
+        correlationId: "corr-verify-fail-1",
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected post-write verification failure.");
+    }
+
+    expect(result.error.code).toBe("not-found");
+    expect(result.error.message).toContain("Failed to store artifact bytes");
+    expect(result.error.details).toMatchObject({
+      operation: "storeArtifact",
+      key: "uploads/verifies/missing-after-write.png",
+      absolutePath: path.join(rootDirectory, "uploads", "verifies", "missing-after-write.png"),
+      filesystemCode: "ENOENT",
+    });
+
+    expect(statPath).toHaveBeenCalledWith(
+      path.join(rootDirectory, "uploads", "verifies", "missing-after-write.png"),
+    );
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(log.mock.calls[1]?.[0]).toMatchObject({
+      event: "storage.filesystem.store.failed",
+      outcome: "failure",
+      error: {
+        errorType: "storage",
+        errorCode: "not-found",
+      },
+    });
+  });
+
+  it("returns a structured failure when post-write verification size mismatches the write payload", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createDesktopFilesystemArtifactStorageAdapter({
+      rootDirectory,
+      statPath: vi.fn().mockResolvedValue({
+        isFile: () => true,
+        size: 999,
+      }) as typeof import("node:fs/promises").stat,
+    });
+
+    const result = await adapter.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([9, 8, 7]), {
+        descriptor: {
+          key: "uploads/verifies/size-mismatch.png",
+          mediaType: "image/png",
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected post-write size verification failure.");
+    }
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.message).toContain("expected 3 bytes but found 999");
+    expect(result.error.details).toMatchObject({
+      operation: "storeArtifact",
+      key: "uploads/verifies/size-mismatch.png",
     });
   });
 
