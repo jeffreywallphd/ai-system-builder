@@ -1,5 +1,6 @@
 import type {
   DesktopImageUploadRequest,
+  DesktopImageUploadRequestPayload,
   DesktopImageUploadResponse,
 } from "../../../contracts/ipc";
 import {
@@ -9,11 +10,16 @@ import {
   createIpcError,
   createIpcFailureResponse,
 } from "../../../contracts/ipc";
-import type { StoreImageUploadUseCaseResult } from "../../../application/use-cases/store-image-upload.use-case";
+import type {
+  StoreImageUploadCommand,
+  StoreImageUploadCommandContext,
+  StoreImageUploadUseCaseResult,
+} from "../../../application/use-cases";
 
 export interface StoreImageUploadUseCasePort {
   execute: (
-    request: DesktopImageUploadRequest["payload"],
+    command: StoreImageUploadCommand,
+    commandContext: StoreImageUploadCommandContext,
     context?: {
       requestId?: string;
       correlationId?: string;
@@ -36,6 +42,50 @@ export interface RegisterElectronIpcDependencies {
   storeImageUploadUseCase: StoreImageUploadUseCasePort;
 }
 
+function mapIpcRequestToStoreImageUploadCommand(
+  payload: DesktopImageUploadRequestPayload,
+): StoreImageUploadCommand {
+  return {
+    fileName: payload.fileName,
+    mediaType: payload.mediaType,
+    bytes: payload.bytes,
+  };
+}
+
+function mapIpcRequestToStoreImageUploadCommandContext(
+  payload: DesktopImageUploadRequestPayload,
+): StoreImageUploadCommandContext {
+  return {
+    host: payload.boundary.host,
+    source: payload.boundary.source,
+  };
+}
+
+function mapStoreImageUploadResultToIpcResponse(
+  result: StoreImageUploadUseCaseResult,
+  request: DesktopImageUploadRequest,
+): DesktopImageUploadResponse {
+  if (result.ok) {
+    return createDesktopImageUploadSuccessResponse(result.value.descriptor, {
+      requestId: result.requestId ?? request.requestId,
+      correlationId: result.correlationId ?? request.correlationId,
+    });
+  }
+
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
+      result.error.code,
+      result.error.message,
+      {
+        details: result.error.details,
+        requestId: result.requestId ?? request.requestId,
+        correlationId: result.correlationId ?? request.correlationId,
+      },
+    ),
+  );
+}
+
 export function createDesktopImageUploadIpcHandler(
   storeImageUploadUseCase: StoreImageUploadUseCasePort,
 ) {
@@ -43,30 +93,16 @@ export function createDesktopImageUploadIpcHandler(
     _event: unknown,
     request: DesktopImageUploadRequest,
   ): Promise<DesktopImageUploadResponse> => {
-    const result = await storeImageUploadUseCase.execute(request.payload, {
-      requestId: request.requestId,
-      correlationId: request.correlationId,
-    });
-
-    if (result.ok) {
-      return createDesktopImageUploadSuccessResponse(result.value.descriptor, {
-        requestId: result.requestId ?? request.requestId,
-        correlationId: result.correlationId ?? request.correlationId,
-      });
-    }
-
-    return createIpcFailureResponse(
-      createIpcError(
-        DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
-        result.error.code,
-        result.error.message,
-        {
-          details: result.error.details,
-          requestId: result.requestId ?? request.requestId,
-          correlationId: result.correlationId ?? request.correlationId,
-        },
-      ),
+    const result = await storeImageUploadUseCase.execute(
+      mapIpcRequestToStoreImageUploadCommand(request.payload),
+      mapIpcRequestToStoreImageUploadCommandContext(request.payload),
+      {
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
     );
+
+    return mapStoreImageUploadResultToIpcResponse(result, request);
   };
 }
 

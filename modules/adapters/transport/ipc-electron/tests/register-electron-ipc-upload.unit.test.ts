@@ -58,10 +58,21 @@ describe("registerElectronIpc desktop image upload handler", () => {
 
     const response = await handler({}, request);
 
-    expect(execute).toHaveBeenCalledWith(request.payload, {
-      requestId: "req-upload-1",
-      correlationId: "corr-upload-1",
-    });
+    expect(execute).toHaveBeenCalledWith(
+      {
+        fileName: "kitten.png",
+        mediaType: "image/png",
+        bytes: new Uint8Array([137, 80, 78, 71]),
+      },
+      {
+        host: "desktop",
+        source: "desktop.renderer.upload-form",
+      },
+      {
+        requestId: "req-upload-1",
+        correlationId: "corr-upload-1",
+      },
+    );
     expect(response).toEqual({
       ok: true,
       value: {
@@ -183,9 +194,20 @@ describe("registerElectronIpc desktop image upload handler", () => {
       channel: "ipc.image.upload.response",
       operation: "image.upload",
     });
-    expect(execute).toHaveBeenCalledWith(request.payload, {
-      requestId: "req-upload-3",
-      correlationId: undefined,
-    });
+    expect(execute).toHaveBeenCalledWith(
+      {
+        fileName: "cat.png",
+        mediaType: "image/png",
+        bytes: new Uint8Array([1, 2, 3, 4]),
+      },
+      {
+        host: "desktop",
+        source: "desktop.renderer.upload-form",
+      },
+      {
+        requestId: "req-upload-3",
+        correlationId: undefined,
+      },
+    );
   });
 });

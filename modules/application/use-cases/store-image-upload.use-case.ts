@@ -1,10 +1,5 @@
-import type {
-  DesktopImageUploadRequestPayload,
-  DesktopImageUploadSuccessValue,
-} from "../../contracts/ipc";
 import type { StructuredLogEvent } from "../../contracts/logging";
 import {
-  type ContractResult,
   createContractError,
   createFailureResult,
   createSuccessResult,
@@ -12,6 +7,11 @@ import {
 import { createStoreArtifactRequest } from "../../contracts/storage";
 import type { LoggingPort } from "../ports/logging";
 import type { ArtifactStoragePort } from "../ports/storage";
+import type {
+  StoreImageUploadCommand,
+  StoreImageUploadCommandContext,
+  StoreImageUploadUseCaseResult,
+} from "./store-image-upload.types";
 
 export interface StoreImageUploadUseCaseDependencies {
   storage: ArtifactStoragePort;
@@ -19,11 +19,7 @@ export interface StoreImageUploadUseCaseDependencies {
   now?: () => string;
 }
 
-export type StoreImageUploadUseCaseResult = ContractResult<DesktopImageUploadSuccessValue>;
-type StoreImageUploadUseCaseFailure = Extract<
-  StoreImageUploadUseCaseResult,
-  { ok: false }
->;
+type StoreImageUploadUseCaseFailure = Extract<StoreImageUploadUseCaseResult, { ok: false }>;
 
 const STORE_IMAGE_UPLOAD_USE_CASE = "StoreImageUploadUseCase";
 const IMAGE_UPLOAD_OPERATION = "image.upload";
@@ -58,7 +54,7 @@ function createBaseLogEvent(
   level: StructuredLogEvent["level"],
   event: string,
   message: string,
-  request: DesktopImageUploadRequestPayload,
+  commandContext: StoreImageUploadCommandContext,
   context: {
     requestId?: string;
     correlationId?: string;
@@ -73,7 +69,7 @@ function createBaseLogEvent(
     component: "application.use-cases",
     operation: IMAGE_UPLOAD_OPERATION,
     useCase: STORE_IMAGE_UPLOAD_USE_CASE,
-    host: request.boundary.host,
+    host: commandContext.host,
     requestId: context.requestId,
     correlationId: context.correlationId,
   };
@@ -93,15 +89,16 @@ export class StoreImageUploadUseCase {
   }
 
   public async execute(
-    request: DesktopImageUploadRequestPayload,
+    command: StoreImageUploadCommand,
+    commandContext: StoreImageUploadCommandContext,
     context: {
       requestId?: string;
       correlationId?: string;
     } = {},
   ): Promise<StoreImageUploadUseCaseResult> {
     const startedAt = Date.now();
-    const fileName = request.fileName.trim();
-    const mediaType = request.mediaType.trim();
+    const fileName = command.fileName.trim();
+    const mediaType = command.mediaType.trim();
 
     await this.logging.log({
       ...createBaseLogEvent(
@@ -109,14 +106,14 @@ export class StoreImageUploadUseCase {
         "info",
         "application.image-upload.store.started",
         "Starting image upload storage flow",
-        request,
+        commandContext,
         context,
       ),
       data: {
         fileName,
         mediaType,
-        bytesLength: request.bytes.length,
-        source: request.boundary.source,
+        bytesLength: command.bytes.length,
+        source: commandContext.source,
       },
     });
 
@@ -129,7 +126,7 @@ export class StoreImageUploadUseCase {
           "warn",
           "application.image-upload.store.failed",
           "Image upload validation failed",
-          request,
+          commandContext,
           context,
         ),
         outcome: "failure",
@@ -144,7 +141,7 @@ export class StoreImageUploadUseCase {
       return failure;
     }
 
-    if (request.bytes.length === 0) {
+    if (command.bytes.length === 0) {
       const failure = toFailureResult("validation", "bytes must not be empty.", context);
 
       await this.logging.log({
@@ -153,7 +150,7 @@ export class StoreImageUploadUseCase {
           "warn",
           "application.image-upload.store.failed",
           "Image upload validation failed",
-          request,
+          commandContext,
           context,
         ),
         outcome: "failure",
@@ -181,7 +178,7 @@ export class StoreImageUploadUseCase {
           "warn",
           "application.image-upload.store.failed",
           "Image upload validation failed",
-          request,
+          commandContext,
           context,
         ),
         outcome: "failure",
@@ -198,7 +195,7 @@ export class StoreImageUploadUseCase {
 
     try {
       const storeResult = await this.storage.storeArtifact(
-        createStoreArtifactRequest(request.bytes, {
+        createStoreArtifactRequest(command.bytes, {
           descriptor: {
             mediaType,
             metadata: {
@@ -222,7 +219,7 @@ export class StoreImageUploadUseCase {
             "error",
             "application.image-upload.store.failed",
             "Image upload storage failed",
-            request,
+            commandContext,
             context,
           ),
           outcome: "failure",
@@ -251,7 +248,7 @@ export class StoreImageUploadUseCase {
           "info",
           "application.image-upload.store.succeeded",
           "Image upload stored successfully",
-          request,
+          commandContext,
           context,
         ),
         outcome: "success",
@@ -273,7 +270,7 @@ export class StoreImageUploadUseCase {
           "error",
           "application.image-upload.store.failed",
           "Unexpected image upload storage failure",
-          request,
+          commandContext,
           context,
         ),
         outcome: "failure",
