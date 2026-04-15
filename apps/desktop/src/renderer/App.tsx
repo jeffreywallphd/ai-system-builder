@@ -19,7 +19,7 @@ export interface AppProps {
   uploadApi?: DesktopImageUploadApi;
 }
 
-export function App({ uploadApi }: AppProps): JSX.Element {
+export function App({ uploadApi }: AppProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [viewState, setViewState] = useState<UploadViewState>({
     status: "idle",
