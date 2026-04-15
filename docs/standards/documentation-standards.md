@@ -61,8 +61,10 @@ Documentation updates are required in the same change set when any of the follow
 - persistence/storage contract-family invariants or export discipline change,
 - behavior that docs currently describe is materially altered,
 - standards are added, tightened, or intentionally relaxed.
+- an application port seam is added or materially changed (ownership, required usage, or contract alignment expectations).
 
 A pull request is incomplete if behavior changed but canonical documentation was not updated.
+Document seam ownership and stable boundary rules; do not mirror adapter internals or transient implementation details.
 
 ## When to update ADRs vs architecture docs vs standards
 
