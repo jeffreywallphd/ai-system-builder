@@ -1,0 +1,29 @@
+{
+  "name": "ai-system-builder",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/apps/desktop/src/main/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "dev": "concurrently -k \"npm:build:watch\" \"npm:dev:electron\"",
+    "dev:electron": "wait-on dist/apps/desktop/src/main/index.js && electron .",
+    "start": "electron .",
+    "test": "vitest run --environment jsdom"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "concurrently": "^9.2.1",
+    "electron": "^38.3.0",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "wait-on": "^8.0.5"
+  }
+}
