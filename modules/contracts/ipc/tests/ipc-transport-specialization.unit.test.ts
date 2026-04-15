@@ -66,7 +66,7 @@ describe("ipc transport specialization contracts", () => {
   });
 
   it("creates an ipc failure response from transport failure semantics and retains channel identity", () => {
-    const channel = createIpcChannel("workspace.create", "request");
+    const channel = createIpcChannel("workspace.create", "response");
 
     const error = createIpcError(channel, "validation", "Workspace name is required", {
       requestId: "req-502",
@@ -82,7 +82,7 @@ describe("ipc transport specialization contracts", () => {
 
     expect(ipcResponse).toEqual({
       ...transportResponse,
-      channel: "ipc.workspace.create.request",
+      channel: "ipc.workspace.create.response",
       error,
     });
   });

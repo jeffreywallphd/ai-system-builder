@@ -110,6 +110,7 @@ export function createRuntimeExecutionFailureResult<
 
   return {
     ...result,
+    error,
     operation: error.operation,
     executionId: error.executionId,
     target: error.target,

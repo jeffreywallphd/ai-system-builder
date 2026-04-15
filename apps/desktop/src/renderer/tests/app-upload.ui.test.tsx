@@ -22,18 +22,30 @@ function setInputFiles(input: HTMLInputElement, files: File[]): void {
 }
 
 describe("desktop renderer image upload component", () => {
-  let container: HTMLDivElement | undefined;
-  let root: Root | undefined;
+  let mountedRoot: Root | undefined;
+  let mountedContainer: HTMLDivElement | undefined;
+
+  function mountApp(): {
+    root: Root;
+    container: HTMLDivElement;
+  } {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+    return { root, container };
+  }
 
   afterEach(async () => {
-    if (root) {
+    if (mountedRoot) {
       await act(async () => {
-        root.unmount();
+        mountedRoot?.unmount();
       });
     }
-    container?.remove();
-    root = undefined;
-    container = undefined;
+    mountedContainer?.remove();
+    mountedRoot = undefined;
+    mountedContainer = undefined;
   });
 
   it("shows selected file information after one image file is chosen", async () => {
@@ -45,9 +57,7 @@ describe("desktop renderer image upload component", () => {
       }),
     );
 
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
+    const { root, container } = mountApp();
 
     await act(async () => {
       root.render(<App uploadApi={{ uploadImage }} />);
@@ -82,9 +92,7 @@ describe("desktop renderer image upload component", () => {
       ),
     );
 
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
+    const { root, container } = mountApp();
 
     await act(async () => {
       root.render(<App uploadApi={{ uploadImage }} />);
@@ -128,9 +136,7 @@ describe("desktop renderer image upload component", () => {
       ),
     );
 
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
+    const { root, container } = mountApp();
 
     await act(async () => {
       root.render(<App uploadApi={{ uploadImage }} />);

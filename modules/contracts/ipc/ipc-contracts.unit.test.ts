@@ -97,7 +97,7 @@ describe("ipc contracts", () => {
   });
 
   it("creates ipc error and failure response envelopes with channel context", () => {
-    const channel = createIpcChannel("workspace.create", "request");
+    const channel = createIpcChannel("workspace.create", "response");
 
     const error = createIpcError(
       channel,
@@ -117,7 +117,7 @@ describe("ipc contracts", () => {
     expect(response).toEqual({
       ok: false,
       error: {
-        channel: "ipc.workspace.create.request",
+        channel: "ipc.workspace.create.response",
         operation: "workspace.create",
         code: "validation",
         message: "Workspace name is required",
@@ -126,7 +126,7 @@ describe("ipc contracts", () => {
         correlationId: undefined,
         metadata: { source: "desktop-host" },
       },
-      channel: "ipc.workspace.create.request",
+      channel: "ipc.workspace.create.response",
       operation: "workspace.create",
       requestId: "req-401",
       correlationId: "corr-401",

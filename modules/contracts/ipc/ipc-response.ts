@@ -15,7 +15,10 @@ export type IpcSuccessResponse<
   TPayload,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, "response"> = IpcChannelValue<
+    TOperation,
+    "response"
+  >,
 > = TransportSuccessResponse<TPayload, TOperation, TMetadata> & {
   channel: TChannel;
 };
@@ -24,7 +27,10 @@ export type IpcFailureResponse<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, "response"> = IpcChannelValue<
+    TOperation,
+    "response"
+  >,
 > = Omit<TransportFailureResponse<TDetails, TOperation, TMetadata>, "error"> & {
     channel: TChannel;
     error: IpcError<TDetails, TOperation, TMetadata, TChannel>;
@@ -35,7 +41,10 @@ export type IpcResponse<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, "response"> = IpcChannelValue<
+    TOperation,
+    "response"
+  >,
 > =
   | IpcSuccessResponse<TPayload, TOperation, TMetadata, TChannel>
   | IpcFailureResponse<TDetails, TOperation, TMetadata, TChannel>;
@@ -44,9 +53,12 @@ export function createIpcSuccessResponse<
   TPayload,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, "response"> = IpcChannelValue<
+    TOperation,
+    "response"
+  >,
 >(
-  channel: IpcChannel<TOperation, TChannel>,
+  channel: IpcChannel<TOperation, "response", TChannel>,
   value: TPayload,
   options?: {
     requestId?: string;
@@ -66,7 +78,10 @@ export function createIpcFailureResponse<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, "response"> = IpcChannelValue<
+    TOperation,
+    "response"
+  >,
 >(
   error: IpcError<TDetails, TOperation, TMetadata, TChannel>,
   options?: {

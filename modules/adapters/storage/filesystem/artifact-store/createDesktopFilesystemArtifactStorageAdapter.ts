@@ -207,7 +207,9 @@ export function createDesktopFilesystemArtifactStorageAdapter(
   }
 
   return {
-    async storeArtifact(request: StoreArtifactRequest): Promise<StoreArtifactResult> {
+    async storeArtifact<TContent = Uint8Array>(
+      request: StoreArtifactRequest<TContent>,
+    ): Promise<StoreArtifactResult> {
       const startedAt = Date.now();
       const requestContext = {
         requestId: request.requestId,
@@ -302,9 +304,9 @@ export function createDesktopFilesystemArtifactStorageAdapter(
       }
     },
 
-    async retrieveArtifact(
+    async retrieveArtifact<TContent = Uint8Array>(
       request: RetrieveArtifactRequest,
-    ): Promise<RetrieveArtifactResult<Uint8Array>> {
+    ): Promise<RetrieveArtifactResult<TContent>> {
       try {
         const key = normalizeStorageArtifactKey(request.key);
         const absolutePath = resolvePathInsideRoot(rootDirectory, key);
@@ -318,7 +320,7 @@ export function createDesktopFilesystemArtifactStorageAdapter(
             key,
             sizeBytes: fileStats.size,
           },
-          new Uint8Array(fileContent),
+          new Uint8Array(fileContent) as TContent,
           {
             requestId: request.requestId,
             correlationId: request.correlationId,
@@ -326,7 +328,7 @@ export function createDesktopFilesystemArtifactStorageAdapter(
         );
       } catch (error) {
         const code = toErrorCode(error, "not-found");
-        return createRetrieveArtifactFailureResult(
+        return createRetrieveArtifactFailureResult<TContent>(
           createContractError(code, `Failed to retrieve artifact bytes: ${toErrorMessage(error)}`, {
             requestId: request.requestId,
             correlationId: request.correlationId,

@@ -80,6 +80,7 @@ export function createTransportFailureResponse<
 
   return {
     ...result,
+    error,
     operation: error.operation,
     metadata: options?.metadata ?? error.metadata,
   };

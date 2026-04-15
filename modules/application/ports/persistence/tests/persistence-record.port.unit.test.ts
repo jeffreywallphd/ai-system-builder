@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   createPersistenceOperationForRecord,
@@ -95,34 +95,39 @@ describe("PersistenceRecordPort", () => {
       correlationId: "corr-42",
     };
 
-    const loadRecord = vi.fn<PersistenceRecordPort["loadRecord"]>().mockResolvedValue(
-      createPersistenceSuccessResult(
+    const loadRecordCalls: LoadPersistenceRecordRequest[] = [];
+    const saveRecordCalls: SavePersistenceRecordRequest[] = [];
+    const deleteRecordCalls: DeletePersistenceRecordRequest[] = [];
+    const loadRecord: PersistenceRecordPort["loadRecord"] = async (incomingRequest) => {
+      loadRecordCalls.push(incomingRequest);
+      return createPersistenceSuccessResult(
         loadOperation,
-        {
-          id: "project-42",
-          name: "Project 42",
-        },
+        null,
         {
           record,
           requestId: loadRequest.requestId,
           correlationId: loadRequest.correlationId,
         },
-      ),
-    );
-    const saveRecord = vi.fn<PersistenceRecordPort["saveRecord"]>().mockResolvedValue(
-      createPersistenceSuccessResult(saveOperation, saveRequest.value, {
+      );
+    };
+    const saveRecord: PersistenceRecordPort["saveRecord"] = async <TValue>(
+      incomingRequest: SavePersistenceRecordRequest<TValue>,
+    ) => {
+      saveRecordCalls.push(incomingRequest);
+      return createPersistenceSuccessResult(saveOperation, incomingRequest.value, {
         record,
         requestId: saveRequest.requestId,
         correlationId: saveRequest.correlationId,
-      }),
-    );
-    const deleteRecord = vi.fn<PersistenceRecordPort["deleteRecord"]>().mockResolvedValue(
-      createPersistenceSuccessResult(deleteOperation, true, {
+      });
+    };
+    const deleteRecord: PersistenceRecordPort["deleteRecord"] = async (incomingRequest) => {
+      deleteRecordCalls.push(incomingRequest);
+      return createPersistenceSuccessResult(deleteOperation, true, {
         record,
         requestId: deleteRequest.requestId,
         correlationId: deleteRequest.correlationId,
-      }),
-    );
+      });
+    };
 
     const port: PersistenceRecordPort = {
       loadRecord,
@@ -134,9 +139,9 @@ describe("PersistenceRecordPort", () => {
     const saveResult = await port.saveRecord(saveRequest);
     const deleteResult = await port.deleteRecord(deleteRequest);
 
-    expect(loadRecord).toHaveBeenCalledWith(loadRequest);
-    expect(saveRecord).toHaveBeenCalledWith(saveRequest);
-    expect(deleteRecord).toHaveBeenCalledWith(deleteRequest);
+    expect(loadRecordCalls).toEqual([loadRequest]);
+    expect(saveRecordCalls).toEqual([saveRequest]);
+    expect(deleteRecordCalls).toEqual([deleteRequest]);
 
     expect(loadResult.ok).toBe(true);
     expect(loadResult.operation).toBe("project.load");

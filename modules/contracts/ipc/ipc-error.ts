@@ -3,14 +3,17 @@ import {
   createTransportError,
   type TransportError,
 } from "../transport";
-import type { IpcChannel, IpcChannelValue } from "./ipc-channel";
+import type { IpcChannel, IpcChannelKind, IpcChannelValue } from "./ipc-channel";
 import type { IpcMetadata, IpcOperation } from "./ipc-operation";
 
 export interface IpcError<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, IpcChannelKind> = IpcChannelValue<
+    TOperation,
+    IpcChannelKind
+  >,
 > extends TransportError<TDetails, TOperation, TMetadata> {
   channel: TChannel;
 }
@@ -19,9 +22,12 @@ export function createIpcError<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, IpcChannelKind> = IpcChannelValue<
+    TOperation,
+    IpcChannelKind
+  >,
 >(
-  channel: IpcChannel<TOperation, TChannel>,
+  channel: IpcChannel<TOperation, IpcChannelKind, TChannel>,
   code: ContractErrorCode,
   message: string,
   options?: {

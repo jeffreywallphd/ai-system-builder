@@ -44,10 +44,11 @@ export function createRetrieveArtifactSuccessResult<
 }
 
 export function createRetrieveArtifactFailureResult<
+  TContent = Uint8Array,
   TDetails extends ContractErrorDetails = ContractErrorDetails,
 >(
   error: ContractError<TDetails>,
   context?: ContractBoundaryContext,
-): RetrieveArtifactResult<Uint8Array, TDetails> {
+): RetrieveArtifactResult<TContent, TDetails> {
   return createFailureResult(error, context);
 }

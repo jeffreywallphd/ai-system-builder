@@ -14,9 +14,8 @@ import type {
   RuntimeExecutionRequest,
 } from "../../../contracts/runtime";
 import {
+  createRuntimeExecutionError,
   createRuntimeExecutionRequest,
-  createRuntimeExecutionSuccessResult,
-  createRuntimeTarget,
 } from "../../../contracts/runtime";
 import {
   createStoreArtifactRequest,
@@ -176,19 +175,25 @@ describe("application ports cross-family invariants", () => {
     >();
     expectTypeOf<RuntimeExecutionEvent>().not.toExtend<StructuredLogEvent>();
 
-    const runtimeExecute = vi
-      .fn<RuntimeExecutionPort["execute"]>()
-      .mockResolvedValue(
-        createRuntimeExecutionSuccessResult(
-          "workspace.create",
-          "exec-ports-1",
-          createRuntimeTarget("local"),
-          { id: "ws-42" },
-          {
-            completedAt: "2026-04-14T12:00:01.000Z",
-          },
+    let runtimeExecuteCallCount = 0;
+    const runtimeExecute: RuntimeExecutionPort["execute"] = async (incomingRequest) => {
+      runtimeExecuteCallCount += 1;
+      return {
+        ok: false,
+        error: createRuntimeExecutionError(
+          incomingRequest.operation,
+          incomingRequest.executionId,
+          incomingRequest.target,
+          "internal",
+          "Execution failed.",
         ),
-      );
+        operation: incomingRequest.operation,
+        executionId: incomingRequest.executionId,
+        target: incomingRequest.target,
+        requestId: incomingRequest.requestId,
+        correlationId: incomingRequest.correlationId,
+      };
+    };
     const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
 
     const runtimePort: RuntimeExecutionPort = { execute: runtimeExecute };
@@ -211,7 +216,7 @@ describe("application ports cross-family invariants", () => {
       component: "application",
     });
 
-    expect(runtimeExecute).toHaveBeenCalledOnce();
+    expect(runtimeExecuteCallCount).toBe(1);
     expect(log).toHaveBeenCalledOnce();
     expect("log" in runtimePort).toBe(false);
     expect("execute" in loggingPort).toBe(false);

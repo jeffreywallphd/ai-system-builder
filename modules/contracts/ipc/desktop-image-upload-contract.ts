@@ -153,11 +153,32 @@ export function isDesktopImageUploadResponseChannel(
 }
 
 export function getDesktopImageUploadChannel(
-  kind: "request" | "response",
+  kind: "request",
 ): IpcChannel<
   typeof DESKTOP_IMAGE_UPLOAD_OPERATION,
-  IpcChannelValue<typeof DESKTOP_IMAGE_UPLOAD_OPERATION, typeof kind>
-> {
+  "request",
+  IpcChannelValue<typeof DESKTOP_IMAGE_UPLOAD_OPERATION, "request">
+>;
+export function getDesktopImageUploadChannel(
+  kind: "response",
+): IpcChannel<
+  typeof DESKTOP_IMAGE_UPLOAD_OPERATION,
+  "response",
+  IpcChannelValue<typeof DESKTOP_IMAGE_UPLOAD_OPERATION, "response">
+>;
+export function getDesktopImageUploadChannel(
+  kind: "request" | "response",
+):
+  | IpcChannel<
+    typeof DESKTOP_IMAGE_UPLOAD_OPERATION,
+    "request",
+    IpcChannelValue<typeof DESKTOP_IMAGE_UPLOAD_OPERATION, "request">
+  >
+  | IpcChannel<
+    typeof DESKTOP_IMAGE_UPLOAD_OPERATION,
+    "response",
+    IpcChannelValue<typeof DESKTOP_IMAGE_UPLOAD_OPERATION, "response">
+  > {
   return kind === "request"
     ? DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL
     : DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL;

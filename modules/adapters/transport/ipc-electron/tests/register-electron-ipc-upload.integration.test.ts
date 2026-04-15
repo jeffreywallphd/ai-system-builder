@@ -82,7 +82,9 @@ describe("desktop image upload IPC integration", () => {
     const writtenBytes = await readFile(path.join(rootDirectory, ...response.value.descriptor.key.split("/")));
     expect(new Uint8Array(writtenBytes)).toEqual(new Uint8Array([137, 80, 78, 71]));
 
-    const events = log.mock.calls.map(([event]) => event.event);
+    const events = log.mock.calls.map(
+      ([event]: Parameters<LoggingPort["log"]>) => event.event,
+    );
     expect(events).toContain("application.image-upload.store.started");
     expect(events).toContain("application.image-upload.store.succeeded");
     expect(events).toContain("storage.filesystem.store.started");

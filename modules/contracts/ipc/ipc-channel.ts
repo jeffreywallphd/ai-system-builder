@@ -17,10 +17,14 @@ export type IpcChannelValue<
 
 export interface IpcChannel<
   TOperation extends IpcOperation = IpcOperation,
-  TChannel extends IpcChannelValue<TOperation> = IpcChannelValue<TOperation>,
+  TKind extends IpcChannelKind = IpcChannelKind,
+  TChannel extends IpcChannelValue<TOperation, TKind> = IpcChannelValue<
+    TOperation,
+    TKind
+  >,
 > {
   operation: TOperation;
-  kind: IpcChannelKind;
+  kind: TKind;
   value: TChannel;
 }
 
@@ -114,7 +118,7 @@ export function createIpcChannel<
 >(
   operation: TOperation,
   kind: TKind,
-): IpcChannel<TOperation, IpcChannelValue<TOperation, TKind>> {
+): IpcChannel<TOperation, TKind> {
   return {
     operation,
     kind,

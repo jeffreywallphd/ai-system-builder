@@ -1,9 +1,9 @@
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
+  createRuntimeExecutionError,
   createRuntimeExecutionProgressEvent,
   createRuntimeExecutionRequest,
-  createRuntimeExecutionSuccessResult,
   createRuntimeTarget,
   type RuntimeExecutionEvent,
   type RuntimeExecutionRequest,
@@ -44,40 +44,49 @@ describe("RuntimeExecutionPort", () => {
     const onEvent = vi.fn<(event: RuntimeExecutionEvent<string>) => void>();
     const handlers: RuntimeExecutionHandlers<string> = { onEvent };
 
-    const execute = vi.fn<RuntimeExecutionPort["execute"]>().mockImplementation(
-      async (incomingRequest, incomingHandlers) => {
-        incomingHandlers?.onEvent?.(
-          createRuntimeExecutionProgressEvent(
-            incomingRequest.operation,
-            incomingRequest.executionId,
-            incomingRequest.target,
-            "invoking",
-            {
-              sequence: 1,
-              requestId: incomingRequest.requestId,
-              correlationId: incomingRequest.correlationId,
-            },
-          ),
-        );
+    const executeCalls: RuntimeExecutionRequest[] = [];
+    const execute: RuntimeExecutionPort["execute"] = async (incomingRequest, incomingHandlers) => {
+      executeCalls.push(incomingRequest);
 
-        return createRuntimeExecutionSuccessResult(
+      incomingHandlers?.onEvent?.(
+        createRuntimeExecutionProgressEvent(
           incomingRequest.operation,
           incomingRequest.executionId,
           incomingRequest.target,
-          { id: "ws-42" },
+          "invoking",
           {
-            completedAt: "2026-04-14T12:00:01.000Z",
+            sequence: 1,
             requestId: incomingRequest.requestId,
             correlationId: incomingRequest.correlationId,
           },
-        );
-      },
-    );
+        ),
+      );
+
+      return {
+        ok: false,
+        error: createRuntimeExecutionError(
+          incomingRequest.operation,
+          incomingRequest.executionId,
+          incomingRequest.target,
+          "internal",
+          "Execution failed.",
+          {
+            requestId: incomingRequest.requestId,
+            correlationId: incomingRequest.correlationId,
+          },
+        ),
+        operation: incomingRequest.operation,
+        executionId: incomingRequest.executionId,
+        target: incomingRequest.target,
+        requestId: incomingRequest.requestId,
+        correlationId: incomingRequest.correlationId,
+      };
+    };
 
     const port: RuntimeExecutionPort = { execute };
     const result = await port.execute(request, handlers);
 
-    expect(execute).toHaveBeenCalledWith(request, handlers);
+    expect(executeCalls).toEqual([request]);
     expect(onEvent).toHaveBeenCalledOnce();
     expect(onEvent.mock.calls[0]?.[0]).toMatchObject({
       type: "progress",
@@ -89,7 +98,7 @@ describe("RuntimeExecutionPort", () => {
       correlationId: "corr-runtime-1",
     });
 
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
     expect(result.operation).toBe("workspace.create");
     expect(result.executionId).toBe("exec-runtime-1");
     expect(result.target).toEqual(createRuntimeTarget("local"));

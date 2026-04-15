@@ -137,7 +137,7 @@ describe("registerElectronIpc desktop image upload handler", () => {
       | ((event: unknown, request: ReturnType<typeof createDesktopImageUploadRequest>) => Promise<unknown>)
       | undefined;
     const ipcMain: IpcMainHandlePort = {
-      handle: vi.fn((channel, listener) => {
+      handle: vi.fn((channel: string, listener: Parameters<IpcMainHandlePort["handle"]>[1]) => {
         expect(channel).toBe(DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value);
         registeredHandler = listener;
       }),

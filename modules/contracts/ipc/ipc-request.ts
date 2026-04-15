@@ -9,7 +9,10 @@ export interface IpcRequest<
   TPayload = unknown,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, "request"> = IpcChannelValue<
+    TOperation,
+    "request"
+  >,
 > extends TransportRequest<TPayload, TOperation, TMetadata> {
   channel: TChannel;
 }
@@ -18,9 +21,12 @@ export function createIpcRequest<
   TPayload,
   TOperation extends IpcOperation = IpcOperation,
   TMetadata extends IpcMetadata = IpcMetadata,
-  TChannel extends IpcChannelValue = IpcChannelValue,
+  TChannel extends IpcChannelValue<TOperation, "request"> = IpcChannelValue<
+    TOperation,
+    "request"
+  >,
 >(
-  channel: IpcChannel<TOperation, TChannel>,
+  channel: IpcChannel<TOperation, "request", TChannel>,
   payload: TPayload,
   options?: {
     requestId?: string;
