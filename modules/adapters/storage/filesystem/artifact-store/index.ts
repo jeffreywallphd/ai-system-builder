@@ -1,1 +1,1 @@
-export * from "./createDesktopFilesystemArtifactStorageAdapter";
+export * from "./createFilesystemArtifactStorageAdapter";

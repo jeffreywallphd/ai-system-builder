@@ -4,7 +4,7 @@ This module provides concrete storage adapters that map logical storage keys
 to host-local filesystem paths for real artifact persistence.
 
 For the desktop upload slice, use the adapter exposed by
-`artifact-store/createDesktopFilesystemArtifactStorageAdapter`.
+`artifact-store/createFilesystemArtifactStorageAdapter`.
 
 Boundary rules:
 

@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StoreImageUploadUseCase } from "../../../../application/use-cases";
-import { createDesktopFilesystemArtifactStorageAdapter } from "../../../storage/filesystem/artifact-store";
+import { createFilesystemArtifactStorageAdapter } from "../../../storage/filesystem/artifact-store";
 import {
   createDesktopImageUploadRequest,
   DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
@@ -41,11 +41,12 @@ describe("desktop image upload IPC integration", () => {
     const rootDirectory = await createTempRoot();
     const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const useCase = new StoreImageUploadUseCase({
-      storage: createDesktopFilesystemArtifactStorageAdapter({
+      storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,
         logging: createLoggingPort(log),
       }),
       logging: createLoggingPort(log),
+      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
     const handler = createDesktopImageUploadIpcHandler(useCase);
@@ -94,10 +95,11 @@ describe("desktop image upload IPC integration", () => {
   it("maps real use-case validation failures to structured IPC failures", async () => {
     const rootDirectory = await createTempRoot();
     const useCase = new StoreImageUploadUseCase({
-      storage: createDesktopFilesystemArtifactStorageAdapter({
+      storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,
       }),
       logging: createLoggingPort(),
+      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
     const handler = createDesktopImageUploadIpcHandler(useCase);

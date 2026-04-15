@@ -7,7 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createLogger, type StructuredLogSink } from "../../../../../modules/adapters/observability/logging";
-import { createDesktopFilesystemArtifactStorageAdapter } from "../../../../../modules/adapters/storage/filesystem/artifact-store";
+import { createFilesystemArtifactStorageAdapter } from "../../../../../modules/adapters/storage/filesystem/artifact-store";
 import {
   registerElectronIpc,
   type IpcMainHandlePort,
@@ -70,13 +70,14 @@ describe("desktop image upload end-to-end", () => {
     });
 
     const useCase = new StoreImageUploadUseCase({
-      storage: createDesktopFilesystemArtifactStorageAdapter({
+      storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,
         logging: logger,
         now: () => "2026-04-14T12:00:00.000Z",
         randomSuffix: () => "e2e",
       }),
       logging: logger,
+      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
 

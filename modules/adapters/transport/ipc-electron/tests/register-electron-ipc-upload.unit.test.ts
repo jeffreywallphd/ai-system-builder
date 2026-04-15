@@ -7,10 +7,10 @@ import {
 import { createContractError } from "../../../../contracts/shared";
 import {
   createDesktopImageUploadIpcHandler,
-  registerElectronIpc,
+  registerImageUploadIpc,
   type IpcMainHandlePort,
   type StoreImageUploadUseCasePort,
-} from "../registerElectronIpc";
+} from "../image-upload/registerImageUploadIpc";
 
 function createUseCaseStub(
   executeImpl?: ReturnType<typeof vi.fn<StoreImageUploadUseCasePort["execute"]>>,
@@ -24,7 +24,7 @@ function createUseCaseStub(
   };
 }
 
-describe("registerElectronIpc desktop image upload handler", () => {
+describe("registerImageUploadIpc desktop image upload handler", () => {
   it("maps request payload and context into the upload use case and returns a success response", async () => {
     const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
@@ -65,7 +65,6 @@ describe("registerElectronIpc desktop image upload handler", () => {
         bytes: new Uint8Array([137, 80, 78, 71]),
       },
       {
-        host: "desktop",
         source: "desktop.renderer.upload-form",
       },
       {
@@ -165,7 +164,7 @@ describe("registerElectronIpc desktop image upload handler", () => {
       requestId: "req-upload-3",
     });
 
-    registerElectronIpc({
+    registerImageUploadIpc({
       ipcMain,
       storeImageUploadUseCase: createUseCaseStub(execute),
     });
@@ -201,7 +200,6 @@ describe("registerElectronIpc desktop image upload handler", () => {
         bytes: new Uint8Array([1, 2, 3, 4]),
       },
       {
-        host: "desktop",
         source: "desktop.renderer.upload-form",
       },
       {

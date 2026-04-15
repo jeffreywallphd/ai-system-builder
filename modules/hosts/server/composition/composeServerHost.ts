@@ -1,10 +1,11 @@
-import express from "express";
-
 import type { LoggingPort } from "../../../application/ports/logging";
 import { StoreImageUploadUseCase } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
-import { createDesktopFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
-import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
+import { createFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
+import {
+  registerExpressApi,
+  type ExpressPostRoutePort,
+} from "../../../adapters/transport/api-express/registerExpressApi";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
@@ -21,14 +22,15 @@ export interface ComposeServerHostOptions {
   now?: () => string;
 }
 
-export interface ComposeServerAppOptions {
+export interface RegisterServerApiOptions {
+  app: ExpressPostRoutePort;
   storageRootDirectory: string;
 }
 
 export interface ServerHostComposition {
   loggingPort: LoggingPort;
   loggingConfig: LoggingConfig;
-  createServerApp: (options: ComposeServerAppOptions) => express.Express;
+  registerApi: (options: RegisterServerApiOptions) => void;
 }
 
 export function composeServerHost(
@@ -52,12 +54,10 @@ export function composeServerHost(
   return {
     loggingPort,
     loggingConfig,
-    createServerApp(createOptions) {
-      const app = express();
-      app.use(express.json({ limit: "5mb" }));
-
-      const storage = createDesktopFilesystemArtifactStorageAdapter({
-        rootDirectory: createOptions.storageRootDirectory,
+    registerApi(registerOptions) {
+      const storage = createFilesystemArtifactStorageAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
+        host: "server",
         logging: loggingPort,
         now: options.now,
       });
@@ -65,15 +65,14 @@ export function composeServerHost(
       const storeImageUploadUseCase = new StoreImageUploadUseCase({
         storage,
         logging: loggingPort,
+        host: "server",
         now: options.now,
       });
 
       registerExpressApi({
-        app,
+        app: registerOptions.app,
         storeImageUploadUseCase,
       });
-
-      return app;
     },
   };
 }

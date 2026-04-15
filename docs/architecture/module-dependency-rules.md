@@ -130,6 +130,7 @@ Contract families must compose, not fork:
 - Becoming the main container for core logic.
 
 **Rule**: Apps are entry points and packaging surfaces, not architecture centers.
+Apps own framework runtime/bootstrap creation (for example `express()` and top-level middleware), while hosts compose dependencies and register transport routes/handlers through thin ports.
 
 ## Anti-rules (common failure patterns)
 

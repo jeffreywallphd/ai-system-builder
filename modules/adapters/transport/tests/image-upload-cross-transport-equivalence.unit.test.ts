@@ -5,12 +5,12 @@ import { createContractError } from "../../../contracts/shared";
 import {
   createDesktopImageUploadIpcHandler,
   type StoreImageUploadUseCasePort as IpcStoreImageUploadUseCasePort,
-} from "../ipc-electron/registerElectronIpc";
+} from "../ipc-electron/image-upload/registerImageUploadIpc";
 import {
-  registerExpressApi,
+  registerImageUploadApiRoute,
   type ExpressPostRoutePort,
   type StoreImageUploadUseCasePort as ApiStoreImageUploadUseCasePort,
-} from "../api-express/registerExpressApi";
+} from "../api-express/image-upload/registerImageUploadApiRoute";
 
 function createIpcUseCaseStub(
   executeImpl?: ReturnType<typeof vi.fn<IpcStoreImageUploadUseCasePort["execute"]>>,
@@ -51,7 +51,7 @@ async function invokeApiUploadRoute(
     }),
   };
 
-  registerExpressApi({
+  registerImageUploadApiRoute({
     app,
     storeImageUploadUseCase: createApiUseCaseStub(execute),
   });
@@ -140,7 +140,6 @@ describe("image upload cross-transport equivalence", () => {
         bytes: new Uint8Array([137, 80, 78, 71]),
       },
       {
-        host: "desktop",
         source: "shared.upload.form",
       },
       {
@@ -155,7 +154,6 @@ describe("image upload cross-transport equivalence", () => {
         bytes: new Uint8Array([137, 80, 78, 71]),
       },
       {
-        host: "server",
         source: "shared.upload.form",
       },
       {
