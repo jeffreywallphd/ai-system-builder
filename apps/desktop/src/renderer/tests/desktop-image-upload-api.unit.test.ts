@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getDesktopApi, type DesktopImageUploadApi } from "../lib/desktopApi";
+import { getDesktopPreloadApi } from "../lib/desktopApi";
 
 describe("desktopApi bridge access", () => {
   afterEach(() => {
@@ -8,12 +8,10 @@ describe("desktopApi bridge access", () => {
   });
 
   it("returns the preload-exposed desktop API when present", async () => {
-    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockRejectedValue(
-      new Error("not implemented"),
-    );
+    const uploadImage = vi.fn().mockRejectedValue(new Error("not implemented"));
     window.desktopApi = { uploadImage };
 
-    const api = getDesktopApi();
+    const api = getDesktopPreloadApi();
 
     expect(api).toBe(window.desktopApi);
     await expect(
@@ -27,6 +25,6 @@ describe("desktopApi bridge access", () => {
   });
 
   it("throws a clear error when preload has not exposed the desktop API", () => {
-    expect(() => getDesktopApi()).toThrow("Desktop preload API is unavailable.");
+    expect(() => getDesktopPreloadApi()).toThrow("Desktop preload API is unavailable.");
   });
 });

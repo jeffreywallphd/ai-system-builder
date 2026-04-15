@@ -1,19 +1,9 @@
 import { FormEvent, useState } from "react";
 
 import type { DesktopImageUploadApi } from "../../../lib/desktopApi";
-import {
-  useImageUploadClient,
-} from "../hooks/useImageUpload";
-
-type UploadStatus = "idle" | "uploading" | "success" | "error";
-
-interface UploadViewState {
-  status: UploadStatus;
-  message?: string;
-  key?: string;
-  mediaType?: string;
-  sizeBytes?: number;
-}
+import { useImageUploadClient } from "../hooks/useImageUploadClient";
+import { ImageUploadForm } from "./ImageUploadForm";
+import { ImageUploadStatus, type UploadViewState } from "./ImageUploadStatus";
 
 export interface ImageUploadFeatureProps {
   uploadApi?: DesktopImageUploadApi;
@@ -93,41 +83,13 @@ export function ImageUploadFeature({ uploadApi }: ImageUploadFeatureProps) {
   return (
     <section>
       <h2>Image upload</h2>
-      <form onSubmit={(event) => void onUploadSubmit(event)}>
-        <label htmlFor="desktop-image-file-input">Choose image</label>
-        <input
-          id="desktop-image-file-input"
-          name="desktop-image-file-input"
-          type="file"
-          accept="image/*"
-          multiple={false}
-          onChange={onFileChange}
-        />
-        <button type="submit" disabled={viewState.status === "uploading"}>
-          Upload
-        </button>
-      </form>
-
-      {selectedFile ? (
-        <p>
-          Selected file: {selectedFile.name} ({selectedFile.type || "unknown"})
-        </p>
-      ) : null}
-
-      {viewState.message ? (
-        <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p>
-      ) : null}
-
-      {viewState.status === "success" && viewState.key ? (
-        <dl>
-          <dt>Stored key</dt>
-          <dd>{viewState.key}</dd>
-          <dt>Stored media type</dt>
-          <dd>{viewState.mediaType}</dd>
-          <dt>Stored size bytes</dt>
-          <dd>{viewState.sizeBytes}</dd>
-        </dl>
-      ) : null}
+      <ImageUploadForm
+        selectedFile={selectedFile}
+        uploadStatus={viewState.status}
+        onFileChange={onFileChange}
+        onSubmit={(event) => void onUploadSubmit(event)}
+      />
+      <ImageUploadStatus viewState={viewState} />
     </section>
   );
 }

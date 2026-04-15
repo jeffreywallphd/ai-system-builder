@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type DesktopPageKey = "home" | "system";
+import type { DesktopPageKey } from "../../routes/desktopPage";
 
 export interface AppShellProps {
   activePage: DesktopPageKey;

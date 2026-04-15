@@ -1,0 +1,34 @@
+export type UploadStatus = "idle" | "uploading" | "success" | "error";
+
+export interface UploadViewState {
+  status: UploadStatus;
+  message?: string;
+  key?: string;
+  mediaType?: string;
+  sizeBytes?: number;
+}
+
+export interface ImageUploadStatusProps {
+  viewState: UploadViewState;
+}
+
+export function ImageUploadStatus({ viewState }: ImageUploadStatusProps) {
+  return (
+    <>
+      {viewState.message ? (
+        <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p>
+      ) : null}
+
+      {viewState.status === "success" && viewState.key ? (
+        <dl>
+          <dt>Stored key</dt>
+          <dd>{viewState.key}</dd>
+          <dt>Stored media type</dt>
+          <dd>{viewState.mediaType}</dd>
+          <dt>Stored size bytes</dt>
+          <dd>{viewState.sizeBytes}</dd>
+        </dl>
+      ) : null}
+    </>
+  );
+}
