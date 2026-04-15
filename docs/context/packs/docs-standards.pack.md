@@ -27,6 +27,7 @@
 - Use context packs as routing aids and compact summaries, not as sole sources of truth.
 - When canonical transport specialization or operation/channel rules change, update affected context packs in the same change set.
 - When runtime/logging or persistence/storage family invariants change, update only the materially affected ADR/architecture/standards docs and packs in the same work item.
+- When application-port seam rules change (required seam use, port-family shape, or anti-drift placement), update the materially affected canonical docs and packs in the same work item.
 - When contract export/import discipline changes, update canonical docs and cross-family invariant guidance together so automation inherits one stable extension surface.
 - If implementation changes documented behavior, structure, boundaries, or standards and canonical docs are not updated, the work is incomplete.
 - Mark what is decided versus intentionally not finalized.

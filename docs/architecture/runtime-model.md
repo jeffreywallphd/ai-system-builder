@@ -71,6 +71,7 @@ Runtime family normalization rules:
 - Runtime diagnostics must be additive to logging contracts (for example `executionId` and `stage`) and must not redefine level/verbosity/error semantics.
 - Runtime contract exports must stay family-local (`modules/contracts/runtime/index.ts`) and avoid re-exporting non-runtime families.
 - Runtime contract tests must protect operation identity normalization and diagnostic-to-structured-log mapping behavior.
+- Application runtime orchestration should depend on runtime and logging ports as separate seams; do not collapse runtime execution and logging concerns into one port surface.
 
 This prevents feature teams from creating one-off runtime integration styles per feature.
 

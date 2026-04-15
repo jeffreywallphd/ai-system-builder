@@ -55,6 +55,7 @@ Documentation updates are required in the same change set when any of the follow
 - architectural boundary changes,
 - dependency direction changes,
 - host/runtime/transport/persistence responsibilities change,
+- application port-family boundaries, required seam usage, or port contract-alignment rules change,
 - transport contract specialization rules, operation identity constraints, or IPC channel rules change,
 - runtime/logging diagnostic normalization rules change,
 - persistence/storage contract-family invariants or export discipline change,

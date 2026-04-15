@@ -112,6 +112,7 @@ focused anti-drift tests in the corresponding family `tests` folder.
 Placement rule:
 
 - application port seam tests live in `modules/application/ports/<family>/tests/`.
+- do not place application-port anti-drift tests outside `tests` folders within the ports tree.
 
 Keep these tests narrow and behavior/shape focused (port surface, shared contract
 alignment, and seam invariants), not adapter implementation detail tests.

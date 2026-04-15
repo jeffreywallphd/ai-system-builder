@@ -35,7 +35,7 @@ Preferred dependency flow is **outside-in at runtime, inside-out for source depe
 **Allowed**
 
 - `modules/domain/**`
-- `modules/contracts/**` (for boundary shapes)
+- `modules/contracts/<family>` (for boundary shapes through explicit family surfaces)
 - Application-local ports/policies/DTOs.
 
 **Not allowed**
@@ -44,8 +44,11 @@ Preferred dependency flow is **outside-in at runtime, inside-out for source depe
 - Host lifecycle logic (`modules/hosts/**`)
 - UI modules (`modules/ui/**`)
 - App entry point code (`apps/**`)
+- Root `modules/contracts` imports or deep contract internal-file imports.
+- Application orchestration paths that bypass `modules/application/ports/**` and bind directly to adapter-native inputs/outputs.
 
 **Rule**: Application defines orchestration and required ports; it does not select infrastructure.
+Application ports are required seams and should stay thin, role-revealing, and contract-aligned.
 
 ## 3) Contracts (`modules/contracts`)
 
@@ -131,6 +134,8 @@ Contract families must compose, not fork:
 Avoid these patterns even if they "work":
 
 - Route or IPC handlers containing business decision trees.
+- Application orchestration code importing adapters directly instead of depending on application ports.
+- Ports that become generic service dumps rather than focused boundary seams.
 - API/IPC contract files recreating independent success/failure envelopes instead of specializing shared transport contracts.
 - Ad hoc operation or IPC channel strings that bypass shared normalization/derivation helpers.
 - Domain importing an ORM model, DB client, or host API.

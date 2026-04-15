@@ -30,6 +30,7 @@
 - Place contract invariants predictably: family tests in `modules/contracts/<family>/tests` and cross-family anti-drift tests in `modules/contracts/tests`.
 - For application seam families with drift risk (for example logging ports), keep narrow anti-drift tests in `modules/application/ports/<family>/tests`.
 - For application seams that drift across families, keep a minimal cross-family invariant layer in `modules/application/ports/tests`.
+- Keep application-port anti-drift tests inside `tests` folders only; avoid ad hoc placement that hides seam guarantees.
 - Add regression tests for bug fixes when practical in the layer where defect should be caught.
 - Keep tests deterministic, CI-suitable, and non-flaky; avoid performative coverage-only tests.
 

@@ -13,9 +13,11 @@ All code must follow the dependency rules in `docs/architecture/module-dependenc
 Required behavior:
 
 - Keep domain and application free from infrastructure and framework details.
+- Keep application orchestration on explicit port seams under `modules/application/ports/**`; do not treat ports as optional convenience wrappers.
 - Keep transport mechanisms (Express, Electron IPC, etc.) inside adapter boundaries.
 - Keep API and IPC contract families as strict specializations of shared transport contracts; do not recreate parallel transport envelopes.
 - Keep contract imports predictable: non-contract modules import only from `modules/contracts/<family>`; do not import root `modules/contracts` or deep internal contract files.
+- Keep application port families thin, role-revealing, and contract-aligned; avoid generic service-style catch-all ports.
 - Keep host lifecycle/composition separate from transport translation.
 - Keep host context contracts small, framework-free, and limited to host identity plus lightweight boundary metadata.
 - Keep persistence and storage concerns separate.

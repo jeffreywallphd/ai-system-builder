@@ -33,6 +33,8 @@
 - Import contracts via family barrels (`modules/contracts/<family>`); avoid deep internal contract imports and flattened catch-all usage.
 - For non-contract modules, avoid root `modules/contracts` imports; consume contracts from specific family barrels.
 - Keep contract anti-drift tests explicit: family invariants in `modules/contracts/<family>/tests` and cross-family invariants in `modules/contracts/tests`.
+- Keep application orchestration on explicit port seams in `modules/application/ports/**`; do not bypass ports by coupling application code directly to adapters.
+- Keep application ports thin and role-revealing, with family seam tests in `modules/application/ports/<family>/tests` and minimal cross-family seam checks in `modules/application/ports/tests`.
 - Add regression tests for meaningful bug fixes when practical; prioritize behavioral value and deterministic tests.
 
 ## Key Constraints
