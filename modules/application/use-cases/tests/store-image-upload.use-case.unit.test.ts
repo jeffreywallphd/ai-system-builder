@@ -205,6 +205,44 @@ describe("StoreImageUploadUseCase", () => {
     });
   });
 
+  it("maps unexpected storage exceptions to internal failures and logs failure context", async () => {
+    const storeArtifact = vi
+      .fn<ArtifactStoragePort["storeArtifact"]>()
+      .mockRejectedValue(new Error("disk exploded"));
+    const storage = createStoragePort({ storeArtifact });
+    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const useCase = new StoreImageUploadUseCase({
+      storage,
+      logging: createLoggingPort(log),
+    });
+
+    const result = await useCase.execute(createRequest(), {
+      requestId: "req-internal-1",
+      correlationId: "corr-internal-1",
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected internal failure result.");
+    }
+
+    expect(result.error.code).toBe("internal");
+    expect(result.error.message).toBe("Unexpected storage failure.");
+    expect(result.requestId).toBe("req-internal-1");
+    expect(result.correlationId).toBe("corr-internal-1");
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(log.mock.calls[1]?.[0]).toMatchObject({
+      event: "application.image-upload.store.failed",
+      level: "error",
+      outcome: "failure",
+      error: {
+        errorType: "internal",
+        errorCode: "internal",
+        errorMessage: "disk exploded",
+      },
+    });
+  });
+
   it("logs start and failure when filename is missing", async () => {
     const storage = createStoragePort();
     const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
