@@ -1,4 +1,5 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
@@ -37,6 +38,10 @@ function createLoggingPortMock(log = vi.fn<LoggingPort["log"]>().mockResolvedVal
 }
 
 describe("desktop filesystem artifact storage adapter integration", () => {
+  function sha256Hex(bytes: Uint8Array): string {
+    return createHash("sha256").update(bytes).digest("hex");
+  }
+
   it("writes artifact bytes to disk under the configured root and returns a contract descriptor", async () => {
     const rootDirectory = await createTempRoot();
     const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
@@ -66,7 +71,10 @@ describe("desktop filesystem artifact storage adapter integration", () => {
         key: "uploads/session-1/kitten.png",
         mediaType: "image/png",
         sizeBytes: bytes.byteLength,
-        checksum: undefined,
+        checksum: {
+          algorithm: "sha256",
+          value: sha256Hex(bytes),
+        },
         metadata: {
           originalFileName: "kitten.png",
         },
@@ -95,7 +103,35 @@ describe("desktop filesystem artifact storage adapter integration", () => {
         key: "uploads/session-1/kitten.png",
         absolutePath: path.join(rootDirectory, "uploads", "session-1", "kitten.png"),
         sizeBytes: bytes.byteLength,
+        checksumAlgorithm: "sha256",
+        checksumValue: sha256Hex(bytes),
       },
+    });
+  });
+
+  it("computes checksum from stored content for generic artifact media types", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createDesktopFilesystemArtifactStorageAdapter({
+      rootDirectory,
+    });
+    const artifactBytes = new Uint8Array([10, 20, 30, 40, 50]);
+    const result = await adapter.storeArtifact(
+      createStoreArtifactRequest(artifactBytes, {
+        descriptor: {
+          key: "artifacts/reports/output.pdf",
+          mediaType: "application/pdf",
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected generic artifact store success.");
+    }
+
+    expect(result.value.checksum).toEqual({
+      algorithm: "sha256",
+      value: sha256Hex(artifactBytes),
     });
   });
 

@@ -48,6 +48,10 @@ describe("StoreImageUploadUseCase", () => {
         key: "uploads/image-upload-1",
         mediaType: "image/png",
         sizeBytes: 4,
+        checksum: {
+          algorithm: "sha256",
+          value: "0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543",
+        },
       }),
     );
     const storage = createStoragePort({ storeArtifact });
@@ -71,6 +75,10 @@ describe("StoreImageUploadUseCase", () => {
           key: "uploads/image-upload-1",
           mediaType: "image/png",
           sizeBytes: 4,
+          checksum: {
+            algorithm: "sha256",
+            value: "0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543",
+          },
         },
       },
       requestId: "req-upload-1",
