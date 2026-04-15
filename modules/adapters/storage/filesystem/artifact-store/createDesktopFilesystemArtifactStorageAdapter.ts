@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -16,6 +16,7 @@ import {
   createStoreArtifactFailureResult,
   createStoreArtifactSuccessResult,
   normalizeStorageArtifactKey,
+  type StorageObjectChecksum,
   type DeleteArtifactRequest,
   type DeleteArtifactResult,
   type HasArtifactRequest,
@@ -28,6 +29,7 @@ import {
 
 const STORAGE_COMPONENT = "adapters.storage.filesystem";
 const STORAGE_HOST = "desktop";
+const STORAGE_CHECKSUM_ALGORITHM = "sha256";
 
 class StorageAdapterValidationError extends Error {}
 class StorageAdapterVerificationError extends Error {}
@@ -150,6 +152,15 @@ function extensionForMediaType(mediaType: string | undefined): string {
   }
 }
 
+function createContentChecksum(bytes: Uint8Array): StorageObjectChecksum {
+  const digest = createHash(STORAGE_CHECKSUM_ALGORITHM).update(bytes).digest("hex");
+
+  return {
+    algorithm: STORAGE_CHECKSUM_ALGORITHM,
+    value: digest,
+  };
+}
+
 export function createDesktopFilesystemArtifactStorageAdapter(
   options: CreateDesktopFilesystemArtifactStorageAdapterOptions,
 ): ArtifactStoragePort {
@@ -244,6 +255,7 @@ export function createDesktopFilesystemArtifactStorageAdapter(
           : createGeneratedKey(request.descriptor.mediaType);
         attemptedKey = key;
         const bytes = toBytes(request.content);
+        const checksum = createContentChecksum(bytes);
         const absolutePath = resolvePathInsideRoot(rootDirectory, key);
         attemptedAbsolutePath = absolutePath;
         const writeFlag = request.overwrite === true ? "w" : "wx";
@@ -278,6 +290,8 @@ export function createDesktopFilesystemArtifactStorageAdapter(
             absolutePath,
             sizeBytes: bytes.byteLength,
             mediaType: request.descriptor.mediaType,
+            checksumAlgorithm: checksum.algorithm,
+            checksumValue: checksum.value,
           },
         });
 
@@ -286,7 +300,7 @@ export function createDesktopFilesystemArtifactStorageAdapter(
             key,
             mediaType: request.descriptor.mediaType,
             sizeBytes: bytes.byteLength,
-            checksum: request.descriptor.checksum,
+            checksum,
             metadata: request.descriptor.metadata,
           },
           requestContext,

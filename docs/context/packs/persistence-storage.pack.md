@@ -30,6 +30,7 @@
 - Keep application persistence-port seams operation-aware and record-oriented (not CRUD-generic), with focused anti-drift tests in `modules/application/ports/persistence/tests/`.
 - Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
 - Storage key creation/normalization should flow through shared storage key helpers to prevent per-operation key-shape drift.
+- Storage checksums should be computed in concrete storage adapters from persisted bytes and surfaced through descriptor results; checksum support does not imply deduplication behavior.
 - Keep storage family exports scoped to storage contracts only.
 - Metadata records and file/blob content are different concerns and should stay separated.
 - Application logic should depend on persistence/storage ports and contracts, not direct DB/filesystem details.

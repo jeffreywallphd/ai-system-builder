@@ -98,6 +98,7 @@ Storage family invariants:
 
 - artifact identity is logical-key-first and path-agnostic; keys are normalized through shared storage key helpers.
 - storage request/result contracts stay artifact-operation-specific (`store`, `retrieve`, `has`, `delete`) and avoid persistence-style record semantics.
+- checksum metadata in storage descriptors should be generated at the storage adapter boundary from the bytes actually written (for integrity/diagnostics), not treated as deduplication policy.
 - storage family barrels should export storage-only surfaces so artifact usage is predictable and mechanically discoverable.
 
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
