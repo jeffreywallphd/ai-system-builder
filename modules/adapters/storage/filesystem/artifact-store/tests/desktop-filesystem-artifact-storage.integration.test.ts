@@ -4,7 +4,12 @@ import path from "node:path";
 
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { createStoreArtifactRequest } from "../../../../../contracts/storage";
+import {
+  createDeleteArtifactRequest,
+  createHasArtifactRequest,
+  createRetrieveArtifactRequest,
+  createStoreArtifactRequest,
+} from "../../../../../contracts/storage";
 import type { LoggingPort } from "../../../../../application/ports/logging";
 import { createDesktopFilesystemArtifactStorageAdapter } from "../createDesktopFilesystemArtifactStorageAdapter";
 
@@ -176,5 +181,144 @@ describe("desktop filesystem artifact storage adapter integration", () => {
     expect(result.error.details).toMatchObject({
       operation: "storeArtifact",
     });
+  });
+
+  it("retrieves stored bytes, keeps descriptor key logical, and does not leak host paths", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createDesktopFilesystemArtifactStorageAdapter({
+      rootDirectory,
+    });
+    const storedBytes = new Uint8Array([11, 22, 33, 44]);
+
+    const storeResult = await adapter.storeArtifact(
+      createStoreArtifactRequest(storedBytes, {
+        descriptor: {
+          key: "uploads/retrieve/me.png",
+          mediaType: "image/png",
+        },
+      }),
+    );
+    expect(storeResult.ok).toBe(true);
+
+    const retrieveResult = await adapter.retrieveArtifact(
+      createRetrieveArtifactRequest("uploads/retrieve/me.png", {
+        requestId: "req-retrieve-1",
+        correlationId: "corr-retrieve-1",
+      }),
+    );
+
+    expect(retrieveResult.ok).toBe(true);
+    if (!retrieveResult.ok) {
+      throw new Error("Expected retrieve success for an existing key.");
+    }
+
+    expect(retrieveResult.requestId).toBe("req-retrieve-1");
+    expect(retrieveResult.correlationId).toBe("corr-retrieve-1");
+    expect(retrieveResult.value.descriptor.key).toBe("uploads/retrieve/me.png");
+    expect(path.isAbsolute(retrieveResult.value.descriptor.key)).toBe(false);
+    expect(retrieveResult.value.descriptor.key.includes(rootDirectory)).toBe(false);
+    expect(retrieveResult.value.content).toEqual(storedBytes);
+  });
+
+  it("returns has/delete success envelopes that track real filesystem state", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createDesktopFilesystemArtifactStorageAdapter({
+      rootDirectory,
+    });
+    const key = "uploads/lifecycle/stateful.bin";
+
+    const hasBeforeStore = await adapter.hasArtifact(createHasArtifactRequest(key));
+    expect(hasBeforeStore).toEqual({
+      ok: true,
+      value: {
+        exists: false,
+        descriptor: undefined,
+      },
+      requestId: undefined,
+      correlationId: undefined,
+    });
+
+    const storeResult = await adapter.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([7, 8, 9]), {
+        descriptor: { key },
+      }),
+    );
+    expect(storeResult.ok).toBe(true);
+
+    const hasAfterStore = await adapter.hasArtifact(
+      createHasArtifactRequest(key, {
+        requestId: "req-has-1",
+        correlationId: "corr-has-1",
+      }),
+    );
+    expect(hasAfterStore.ok).toBe(true);
+    if (!hasAfterStore.ok) {
+      throw new Error("Expected hasArtifact success.");
+    }
+    expect(hasAfterStore.requestId).toBe("req-has-1");
+    expect(hasAfterStore.correlationId).toBe("corr-has-1");
+    expect(hasAfterStore.value.exists).toBe(true);
+    expect(hasAfterStore.value.descriptor).toEqual({
+      key,
+      sizeBytes: 3,
+    });
+
+    const deleteExisting = await adapter.deleteArtifact(
+      createDeleteArtifactRequest(key, {
+        requestId: "req-delete-1",
+        correlationId: "corr-delete-1",
+      }),
+    );
+    expect(deleteExisting).toEqual({
+      ok: true,
+      value: {
+        deleted: true,
+      },
+      requestId: "req-delete-1",
+      correlationId: "corr-delete-1",
+    });
+
+    const hasAfterDelete = await adapter.hasArtifact(createHasArtifactRequest(key));
+    expect(hasAfterDelete.ok).toBe(true);
+    if (!hasAfterDelete.ok) {
+      throw new Error("Expected hasArtifact success after deletion.");
+    }
+    expect(hasAfterDelete.value.exists).toBe(false);
+
+    const deleteMissing = await adapter.deleteArtifact(createDeleteArtifactRequest(key));
+    expect(deleteMissing).toEqual({
+      ok: true,
+      value: {
+        deleted: false,
+      },
+      requestId: undefined,
+      correlationId: undefined,
+    });
+  });
+
+  it("returns not-found retrieve failure for missing keys", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createDesktopFilesystemArtifactStorageAdapter({
+      rootDirectory,
+    });
+
+    const retrieveMissing = await adapter.retrieveArtifact(
+      createRetrieveArtifactRequest("uploads/missing/none.png", {
+        requestId: "req-retrieve-missing",
+        correlationId: "corr-retrieve-missing",
+      }),
+    );
+
+    expect(retrieveMissing.ok).toBe(false);
+    if (retrieveMissing.ok) {
+      throw new Error("Expected missing retrieve failure.");
+    }
+
+    expect(retrieveMissing.error.code).toBe("not-found");
+    expect(retrieveMissing.error.details).toMatchObject({
+      operation: "retrieveArtifact",
+    });
+    expect(retrieveMissing.requestId).toBe("req-retrieve-missing");
+    expect(retrieveMissing.correlationId).toBe("corr-retrieve-missing");
   });
 });
