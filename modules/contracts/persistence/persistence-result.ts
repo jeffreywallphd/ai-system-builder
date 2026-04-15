@@ -70,8 +70,8 @@ export function createPersistenceFailureResult<
 
   return {
     ...result,
+    error,
     operation: error.operation,
     record: error.record,
   };
 }
-

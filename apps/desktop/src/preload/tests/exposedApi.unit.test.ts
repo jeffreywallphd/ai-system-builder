@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
+  createIpcChannel,
   createDesktopImageUploadSuccessResponse,
   createIpcError,
   createIpcFailureResponse,
-  getDesktopImageUploadChannel,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
@@ -97,7 +97,7 @@ describe("desktop preload exposedApi uploadImage bridge", () => {
     const invoke = vi.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createIpcFailureResponse(
         createIpcError(
-          getDesktopImageUploadChannel("request"),
+          createIpcChannel("image.archive", "response"),
           "internal",
           "wrong channel",
         ),

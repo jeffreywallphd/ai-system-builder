@@ -20,6 +20,10 @@ export interface StoreImageUploadUseCaseDependencies {
 }
 
 export type StoreImageUploadUseCaseResult = ContractResult<DesktopImageUploadSuccessValue>;
+type StoreImageUploadUseCaseFailure = Extract<
+  StoreImageUploadUseCaseResult,
+  { ok: false }
+>;
 
 const STORE_IMAGE_UPLOAD_USE_CASE = "StoreImageUploadUseCase";
 const IMAGE_UPLOAD_OPERATION = "image.upload";
@@ -39,7 +43,7 @@ function toFailureResult(
     requestId?: string;
     correlationId?: string;
   },
-): StoreImageUploadUseCaseResult {
+): StoreImageUploadUseCaseFailure {
   return createFailureResult(
     createContractError(code, message, {
       requestId: context.requestId,
@@ -207,7 +211,10 @@ export class StoreImageUploadUseCase {
       );
 
       if (!storeResult.ok) {
-        const failure = createFailureResult(storeResult.error, context);
+        const failure: StoreImageUploadUseCaseFailure = createFailureResult(
+          storeResult.error,
+          context,
+        );
 
         await this.logging.log({
           ...createBaseLogEvent(

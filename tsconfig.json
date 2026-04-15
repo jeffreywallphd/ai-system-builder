@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2021",
     "module": "commonjs",
     "moduleResolution": "node",
     "rootDir": ".",
@@ -15,10 +15,12 @@
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
     "types": [
-      "node"
+      "node",
+      "react",
+      "react-dom"
     ],
     "lib": [
-      "ES2020",
+      "ES2021",
       "DOM",
       "DOM.Iterable"
     ]
