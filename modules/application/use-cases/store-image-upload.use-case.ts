@@ -4,6 +4,7 @@ import {
   createFailureResult,
   createSuccessResult,
 } from "../../contracts/shared";
+import { IMAGE_UPLOAD_OPERATION } from "../../contracts/image-upload";
 import { createStoreArtifactRequest } from "../../contracts/storage";
 import type { LoggingPort } from "../ports/logging";
 import type { ArtifactStoragePort } from "../ports/storage";
@@ -22,7 +23,6 @@ export interface StoreImageUploadUseCaseDependencies {
 type StoreImageUploadUseCaseFailure = Extract<StoreImageUploadUseCaseResult, { ok: false }>;
 
 const STORE_IMAGE_UPLOAD_USE_CASE = "StoreImageUploadUseCase";
-const IMAGE_UPLOAD_OPERATION = "image.upload";
 
 function getNow(now: (() => string) | undefined): string {
   return (now ?? (() => new Date().toISOString()))();

@@ -2,8 +2,10 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import { StoreImageUploadUseCase } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
-import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
-import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
+import {
+  registerExpressApi,
+  type ExpressPostRoutePort,
+} from "../../../adapters/transport/api-express/registerExpressApi";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
