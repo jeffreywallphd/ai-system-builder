@@ -57,5 +57,6 @@
 ## Prompt Assembly Notes
 
 - Typical set: `index` + `desktop-host`.
+- Add `desktop-implementation` for renderer/main/preload structure work.
 - Add `architecture` for cross-layer changes.
 - Add `logging` for startup/IPC diagnostics and `testing` for regression-sensitive changes.

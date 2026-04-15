@@ -16,9 +16,14 @@ Hosts are implemented under `modules/hosts/` and surfaced through `apps/*` entry
 
 ## Desktop host (initial implementation priority)
 
-- Built on Electron with Electron Forge as the desktop build/tooling path.
+- Built on Electron with Electron Forge (webpack plugin) as the canonical desktop dev/build/package path.
 - Owns desktop lifecycle composition and desktop-specific wiring.
 - Uses Electron IPC as a transport boundary (via transport adapters), not as business logic location.
+- Desktop implementation is split intentionally across Electron `main`, preload, renderer, and host composition:
+  - `main`: lifecycle/bootstrap/window creation only,
+  - preload: narrow secure renderer bridge,
+  - renderer: React UI composition only (no filesystem or IPC internals),
+  - host composition (`modules/hosts/desktop`): adapter/use-case wiring.
 
 ## Server host
 

@@ -68,3 +68,4 @@
 - Add only the smallest set of specialized packs required by the task.
 - When a task affects canonical rules or boundaries, read and update the relevant canonical docs directly.
 - Typical order: `index` → task-specific pack(s) → targeted canonical doc links when needed.
+- For desktop renderer/main/preload implementation work, pair `desktop-host` with `desktop-implementation` instead of broad unrelated packs.

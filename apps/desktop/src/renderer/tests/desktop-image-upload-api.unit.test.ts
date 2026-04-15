@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getDesktopImageUploadApi } from "../desktopImageUploadApi";
-import type { DesktopImageUploadApi } from "../desktopImageUploadApi";
+import { getDesktopApi, type DesktopImageUploadApi } from "../lib/desktopApi";
 
-describe("desktopImageUploadApi bridge access", () => {
+describe("desktopApi bridge access", () => {
   afterEach(() => {
     delete window.desktopApi;
   });
@@ -14,7 +13,7 @@ describe("desktopImageUploadApi bridge access", () => {
     );
     window.desktopApi = { uploadImage };
 
-    const api = getDesktopImageUploadApi();
+    const api = getDesktopApi();
 
     expect(api).toBe(window.desktopApi);
     await expect(
@@ -28,6 +27,6 @@ describe("desktopImageUploadApi bridge access", () => {
   });
 
   it("throws a clear error when preload has not exposed the desktop API", () => {
-    expect(() => getDesktopImageUploadApi()).toThrow("Desktop preload API is unavailable.");
+    expect(() => getDesktopApi()).toThrow("Desktop preload API is unavailable.");
   });
 });

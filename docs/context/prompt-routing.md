@@ -15,6 +15,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | cross-layer architecture or boundary decisions | `docs/context/packs/architecture.pack.md` |
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
 | Electron/desktop host lifecycle, IPC/preload boundaries, desktop composition | `docs/context/packs/desktop-host.pack.md` |
+| desktop renderer structure, page/feature/component boundaries, renderer API-client usage | `docs/context/packs/desktop-implementation.pack.md` |
 | server host lifecycle, Express transport boundaries, thin web client coupling | `docs/context/packs/server-host.pack.md` |
 | persistence vs storage responsibilities, uploads/downloads/artifacts, filesystem/object storage concerns, AppData/server roots, metadata-vs-file boundaries | `docs/context/packs/persistence-storage.pack.md` |
 | documentation updates, canonical-vs-context discipline, doc governance | `docs/context/packs/docs-standards.pack.md` |
