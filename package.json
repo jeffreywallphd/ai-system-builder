@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "dev": "concurrently -k \"npm:build:watch\" \"npm:dev:electron\"",
-    "dev:electron": "wait-on dist/apps/desktop/src/main/index.ts && electron .",
+    "dev:electron": "wait-on dist/apps/desktop/src/main/index.js && electron .",
     "start": "electron .",
     "test": "vitest run --environment jsdom"
   },
