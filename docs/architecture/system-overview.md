@@ -133,6 +133,8 @@ Transport technologies are adapters, not application definitions.
 
 - Express is the default server API transport adapter.
 - Electron IPC is the desktop transport boundary.
+- Desktop app implementation is intentionally split into Electron `main`, preload, renderer, and desktop host composition to keep lifecycle, bridge, UI, and wiring responsibilities separated.
+- Desktop renderer should use small frontend-facing API clients/hooks rather than scattering direct raw preload global calls through UI components.
 - API and IPC contracts are transport specializations that compose from shared transport request/response/error semantics.
 - API contracts keep shared transport envelopes intact; HTTP-only fields (status, headers, framework request/response objects) remain adapter concerns.
 - IPC contracts keep shared transport envelopes intact and add only operation-derived channel context.

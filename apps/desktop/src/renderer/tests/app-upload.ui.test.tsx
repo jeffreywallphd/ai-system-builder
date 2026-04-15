@@ -10,7 +10,7 @@ import {
 } from "../../../../../modules/contracts/ipc";
 
 import { App } from "../App";
-import type { DesktopImageUploadApi } from "../desktopImageUploadApi";
+import type { DesktopImageUploadApi } from "../lib/desktopApi";
 
 function setInputFiles(input: HTMLInputElement, files: File[]): void {
   Object.defineProperty(input, "files", {

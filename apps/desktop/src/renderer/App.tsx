@@ -1,134 +1,20 @@
-import { FormEvent, useState } from "react";
-
-import {
-  getDesktopImageUploadApi,
-  type DesktopImageUploadApi,
-} from "./desktopImageUploadApi";
-
-type UploadStatus = "idle" | "uploading" | "success" | "error";
-
-interface UploadViewState {
-  status: UploadStatus;
-  message?: string;
-  key?: string;
-  mediaType?: string;
-  sizeBytes?: number;
-}
+import { AppShell } from "./components/layout/AppShell";
+import { useDesktopPage } from "./hooks/useDesktopPage";
+import type { DesktopImageUploadApi } from "./lib/desktopApi";
+import { HomePage } from "./pages/HomePage";
+import { SystemPage } from "./pages/SystemPage";
 
 export interface AppProps {
   uploadApi?: DesktopImageUploadApi;
 }
 
 export function App({ uploadApi }: AppProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [viewState, setViewState] = useState<UploadViewState>({
-    status: "idle",
-  });
-
-  function onFileChange(event: FormEvent<HTMLInputElement>): void {
-    const file = event.currentTarget.files?.[0] ?? null;
-    setSelectedFile(file);
-
-    if (file) {
-      setViewState({
-        status: "idle",
-        message: `Selected ${file.name}.`,
-      });
-      return;
-    }
-
-    setViewState({
-      status: "idle",
-      message: undefined,
-    });
-  }
-
-  async function onUploadSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    if (!selectedFile) {
-      setViewState({
-        status: "error",
-        message: "Select one image file before uploading.",
-      });
-      return;
-    }
-
-    setViewState({
-      status: "uploading",
-      message: `Uploading ${selectedFile.name}...`,
-    });
-
-    try {
-      const resolvedUploadApi = uploadApi ?? getDesktopImageUploadApi();
-      const response = await resolvedUploadApi.uploadImage({
-        fileName: selectedFile.name,
-        mediaType: selectedFile.type,
-        bytes: new Uint8Array(await selectedFile.arrayBuffer()),
-      });
-
-      if (response.ok) {
-        setViewState({
-          status: "success",
-          message: `Stored ${selectedFile.name}.`,
-          key: response.value.descriptor.key,
-          mediaType: response.value.descriptor.mediaType,
-          sizeBytes: response.value.descriptor.sizeBytes,
-        });
-        return;
-      }
-
-      setViewState({
-        status: "error",
-        message: response.error.message,
-      });
-    } catch (error) {
-      setViewState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Image upload failed.",
-      });
-    }
-  }
+  const { activePage, setActivePage } = useDesktopPage();
 
   return (
-    <main>
-      <h1>Desktop Image Upload</h1>
-      <form onSubmit={(event) => void onUploadSubmit(event)}>
-        <label htmlFor="desktop-image-file-input">Choose image</label>
-        <input
-          id="desktop-image-file-input"
-          name="desktop-image-file-input"
-          type="file"
-          accept="image/*"
-          multiple={false}
-          onChange={onFileChange}
-        />
-        <button type="submit" disabled={viewState.status === "uploading"}>
-          Upload
-        </button>
-      </form>
-
-      {selectedFile ? (
-        <p>
-          Selected file: {selectedFile.name} ({selectedFile.type || "unknown"})
-        </p>
-      ) : null}
-
-      {viewState.message ? (
-        <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p>
-      ) : null}
-
-      {viewState.status === "success" && viewState.key ? (
-        <dl>
-          <dt>Stored key</dt>
-          <dd>{viewState.key}</dd>
-          <dt>Stored media type</dt>
-          <dd>{viewState.mediaType}</dd>
-          <dt>Stored size bytes</dt>
-          <dd>{viewState.sizeBytes}</dd>
-        </dl>
-      ) : null}
-    </main>
+    <AppShell activePage={activePage} onNavigate={setActivePage}>
+      {activePage === "home" ? <HomePage uploadApi={uploadApi} /> : <SystemPage />}
+    </AppShell>
   );
 }
 
