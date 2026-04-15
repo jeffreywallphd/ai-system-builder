@@ -8,19 +8,29 @@ import {
   createStoreArtifactFailureResult,
   createStoreArtifactSuccessResult,
 } from "../../../contracts/storage";
-import type { DesktopImageUploadRequestPayload } from "../../../contracts/ipc";
+import type {
+  StoreImageUploadCommand,
+  StoreImageUploadCommandContext,
+} from "../store-image-upload.types";
 
-function createRequest(overrides: Partial<DesktopImageUploadRequestPayload> = {}) {
+function createCommand(overrides: Partial<StoreImageUploadCommand> = {}) {
   return {
     fileName: "kitten.png",
     mediaType: "image/png",
     bytes: new Uint8Array([137, 80, 78, 71]),
-    boundary: {
-      host: "desktop",
-      source: "desktop.renderer.upload-form",
-    },
     ...overrides,
-  } satisfies DesktopImageUploadRequestPayload;
+  } satisfies StoreImageUploadCommand;
+}
+
+
+function createCommandContext(
+  overrides: Partial<StoreImageUploadCommandContext> = {},
+): StoreImageUploadCommandContext {
+  return {
+    host: "desktop",
+    source: "desktop.renderer.upload-form",
+    ...overrides,
+  };
 }
 
 function createStoragePort(
@@ -63,7 +73,7 @@ describe("StoreImageUploadUseCase", () => {
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
-    const result = await useCase.execute(createRequest(), {
+    const result = await useCase.execute(createCommand(), createCommandContext(), {
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",
     });
@@ -122,9 +132,10 @@ describe("StoreImageUploadUseCase", () => {
     });
 
     const result = await useCase.execute(
-      createRequest({
+      createCommand({
         mediaType: "application/pdf",
       }),
+      createCommandContext(),
     );
 
     expect(result.ok).toBe(false);
@@ -159,9 +170,10 @@ describe("StoreImageUploadUseCase", () => {
     });
 
     const result = await useCase.execute(
-      createRequest({
+      createCommand({
         bytes: new Uint8Array([]),
       }),
+      createCommandContext(),
     );
 
     expect(result.ok).toBe(false);
@@ -193,7 +205,7 @@ describe("StoreImageUploadUseCase", () => {
       logging: createLoggingPort(log),
     });
 
-    const result = await useCase.execute(createRequest());
+    const result = await useCase.execute(createCommand(), createCommandContext());
 
     expect(result.ok).toBe(false);
     if (result.ok) {
@@ -224,7 +236,7 @@ describe("StoreImageUploadUseCase", () => {
       logging: createLoggingPort(log),
     });
 
-    const result = await useCase.execute(createRequest(), {
+    const result = await useCase.execute(createCommand(), createCommandContext(), {
       requestId: "req-internal-1",
       correlationId: "corr-internal-1",
     });
@@ -260,9 +272,10 @@ describe("StoreImageUploadUseCase", () => {
     });
 
     const result = await useCase.execute(
-      createRequest({
+      createCommand({
         fileName: "   ",
       }),
+      createCommandContext(),
     );
 
     expect(result.ok).toBe(false);
