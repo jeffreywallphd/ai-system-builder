@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -207,5 +210,18 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
         correlationId: undefined,
       },
     );
+  });
+});
+
+
+describe("registerElectronIpc top-level aggregator surface", () => {
+  it("remains a tiny registration-only aggregator without feature helper re-exports", () => {
+    const aggregatorPath = fileURLToPath(new URL("../registerElectronIpc.ts", import.meta.url));
+    const source = readFileSync(aggregatorPath, "utf8");
+
+    expect(source).not.toContain("export type");
+    expect(source).not.toContain("mapIpcRequestPayload");
+    expect(source).not.toContain("mapStoreImageUploadResultToIpcResponse");
+    expect(source).not.toContain("createDesktopImageUploadIpcHandler");
   });
 });

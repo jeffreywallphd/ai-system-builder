@@ -2,10 +2,8 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import { StoreImageUploadUseCase } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
-import {
-  registerElectronIpc,
-  type IpcMainHandlePort,
-} from "../../../adapters/transport/ipc-electron/registerElectronIpc";
+import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
+import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/image-upload/registerImageUploadIpc";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
@@ -64,7 +62,6 @@ export function composeDesktopHost(
       const storeImageUploadUseCase = new StoreImageUploadUseCase({
         storage,
         logging: loggingPort,
-        host: "desktop",
         now: options.now,
       });
 

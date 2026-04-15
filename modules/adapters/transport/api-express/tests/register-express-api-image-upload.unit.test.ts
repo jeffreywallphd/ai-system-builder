@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { createContractError } from "../../../../contracts/shared";
@@ -206,5 +209,17 @@ describe("registerImageUploadApiRoute", () => {
       correlationId: "corr-upload-3",
       metadata: undefined,
     });
+  });
+});
+
+
+describe("registerExpressApi top-level aggregator surface", () => {
+  it("remains a tiny registration-only aggregator without feature helper re-exports", () => {
+    const aggregatorPath = fileURLToPath(new URL("../registerExpressApi.ts", import.meta.url));
+    const source = readFileSync(aggregatorPath, "utf8");
+
+    expect(source).not.toContain("export type");
+    expect(source).not.toContain("mapApiImageUploadRequestBody");
+    expect(source).not.toContain("mapStoreImageUploadResultToApiResponse");
   });
 });

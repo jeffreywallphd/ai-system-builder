@@ -12,5 +12,6 @@ describe("StoreImageUploadUseCase dependency boundaries", () => {
 
     expect(source).not.toContain('from "../../contracts/ipc"');
     expect(source).not.toContain('from "../../contracts/api"');
+    expect(source).not.toContain('from "../../contracts/host"');
   });
 });

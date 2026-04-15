@@ -1,5 +1,4 @@
 import type { StructuredLogEvent } from "../../contracts/logging";
-import type { HostKind } from "../../contracts/host";
 import {
   createContractError,
   createFailureResult,
@@ -17,7 +16,6 @@ import type {
 export interface StoreImageUploadUseCaseDependencies {
   storage: ArtifactStoragePort;
   logging: LoggingPort;
-  host: HostKind;
   now?: () => string;
 }
 
@@ -56,8 +54,6 @@ function createBaseLogEvent(
   level: StructuredLogEvent["level"],
   event: string,
   message: string,
-  host: HostKind,
-  commandContext: StoreImageUploadCommandContext,
   context: {
     requestId?: string;
     correlationId?: string;
@@ -72,7 +68,6 @@ function createBaseLogEvent(
     component: "application.use-cases",
     operation: IMAGE_UPLOAD_OPERATION,
     useCase: STORE_IMAGE_UPLOAD_USE_CASE,
-    host,
     requestId: context.requestId,
     correlationId: context.correlationId,
   };
@@ -83,14 +78,11 @@ export class StoreImageUploadUseCase {
 
   private readonly logging: LoggingPort;
 
-  private readonly host: HostKind;
-
   private readonly now: () => string;
 
   public constructor(dependencies: StoreImageUploadUseCaseDependencies) {
     this.storage = dependencies.storage;
     this.logging = dependencies.logging;
-    this.host = dependencies.host;
     this.now = dependencies.now ?? (() => new Date().toISOString());
   }
 
@@ -112,8 +104,6 @@ export class StoreImageUploadUseCase {
         "info",
         "application.image-upload.store.started",
         "Starting image upload storage flow",
-        this.host,
-        commandContext,
         context,
       ),
       data: {
@@ -133,8 +123,6 @@ export class StoreImageUploadUseCase {
           "warn",
           "application.image-upload.store.failed",
           "Image upload validation failed",
-          this.host,
-          commandContext,
           context,
         ),
         outcome: "failure",
@@ -158,8 +146,6 @@ export class StoreImageUploadUseCase {
           "warn",
           "application.image-upload.store.failed",
           "Image upload validation failed",
-          this.host,
-          commandContext,
           context,
         ),
         outcome: "failure",
@@ -187,8 +173,6 @@ export class StoreImageUploadUseCase {
           "warn",
           "application.image-upload.store.failed",
           "Image upload validation failed",
-          this.host,
-          commandContext,
           context,
         ),
         outcome: "failure",
@@ -229,8 +213,6 @@ export class StoreImageUploadUseCase {
             "error",
             "application.image-upload.store.failed",
             "Image upload storage failed",
-            this.host,
-            commandContext,
             context,
           ),
           outcome: "failure",
@@ -259,8 +241,6 @@ export class StoreImageUploadUseCase {
           "info",
           "application.image-upload.store.succeeded",
           "Image upload stored successfully",
-          this.host,
-          commandContext,
           context,
         ),
         outcome: "success",
@@ -282,8 +262,6 @@ export class StoreImageUploadUseCase {
           "error",
           "application.image-upload.store.failed",
           "Unexpected image upload storage failure",
-          this.host,
-          commandContext,
           context,
         ),
         outcome: "failure",

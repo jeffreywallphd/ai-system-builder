@@ -69,7 +69,6 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging,
-      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
@@ -113,6 +112,7 @@ describe("StoreImageUploadUseCase", () => {
       operation: "image.upload",
       level: "info",
     });
+    expect(log.mock.calls[0]?.[0].host).toBeUndefined();
     expect(log.mock.calls[1]?.[0]).toMatchObject({
       event: "application.image-upload.store.succeeded",
       outcome: "success",
@@ -128,7 +128,6 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
-      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
@@ -168,7 +167,6 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
-      host: "desktop",
     });
 
     const result = await useCase.execute(
@@ -205,7 +203,6 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
-      host: "desktop",
     });
 
     const result = await useCase.execute(createCommand(), createCommandContext());
@@ -237,7 +234,6 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
-      host: "desktop",
     });
 
     const result = await useCase.execute(createCommand(), createCommandContext(), {
@@ -273,7 +269,6 @@ describe("StoreImageUploadUseCase", () => {
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
-      host: "desktop",
     });
 
     const result = await useCase.execute(
