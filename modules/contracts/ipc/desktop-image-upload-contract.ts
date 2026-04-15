@@ -3,7 +3,7 @@ import {
   type StorageObjectDescriptor,
   type StorageObjectMetadata,
 } from "../storage";
-import { createTransportOperation } from "../transport";
+import { IMAGE_UPLOAD_OPERATION } from "../image-upload";
 import {
   createIpcChannel,
   type IpcChannel,
@@ -18,11 +18,7 @@ import {
   type IpcResponse,
 } from "./ipc-response";
 
-const DESKTOP_IMAGE_UPLOAD_OPERATION_SEGMENTS = ["image", "upload"] as const;
-
-export const DESKTOP_IMAGE_UPLOAD_OPERATION = createTransportOperation(
-  ...DESKTOP_IMAGE_UPLOAD_OPERATION_SEGMENTS,
-);
+export const DESKTOP_IMAGE_UPLOAD_OPERATION = IMAGE_UPLOAD_OPERATION;
 
 export const DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL = createIpcChannel(
   DESKTOP_IMAGE_UPLOAD_OPERATION,

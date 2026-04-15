@@ -2,8 +2,10 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import { StoreImageUploadUseCase } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
-import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
-import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/image-upload/registerImageUploadIpc";
+import {
+  registerElectronIpc,
+  type IpcMainHandlePort,
+} from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
