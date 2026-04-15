@@ -31,6 +31,7 @@ Persistence family invariants:
 - operation identity remains transport-neutral (no API/IPC namespace leakage),
 - when a persistence result/error includes a `record`, the operation must target that record type (`<recordType>.<action>[.<qualifier>...]`).
 - persistence family barrels should export persistence-only surfaces so consumers get a predictable family boundary.
+- application persistence ports should stay record-oriented and operation-aware (not generic CRUD bags) and should depend on persistence contracts, not adapter-native query APIs.
 
 This keeps Postgres as the default adapter direction without coupling application/domain boundaries to Postgres-specific APIs.
 

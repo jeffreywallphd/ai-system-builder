@@ -20,9 +20,11 @@
 ## Core Guidance
 
 - Maintain clean architecture direction: inner layers (domain/application) must not depend on outer infrastructure/host/UI layers.
+- Treat `modules/application/ports` as required application seams between orchestration and adapters.
 - Keep contracts explicit at boundaries; avoid embedding boundary semantics in ad hoc types.
 - Prefer `modules/contracts/<family>` imports and avoid deep contract file paths so family boundaries remain the public extension surface.
 - Keep non-contract modules off root `modules/contracts` imports; consume contract APIs through explicit family barrels.
+- Keep application ports thin, role-revealing, and contract-family aligned; avoid generic service-dump ports.
 - Treat API and IPC contract families as true transport specializations: compose from shared transport semantics and add only narrow transport-specific fields.
 - Keep operation identity consistent across transport/runtime/persistence via shared helper patterns (lowercase dotted operation names).
 - Keep operation identity transport-neutral; avoid embedding transport namespace into operation names.
@@ -40,6 +42,7 @@
 
 - Business logic belongs in domain/application, not route handlers, IPC handlers, or host bootstrap code.
 - Transport/framework specifics must stay in adapters.
+- Application code should depend on ports/contracts and must not import concrete adapters directly.
 - Before changing boundaries, dependency rules, cross-layer responsibilities, or architectural ownership, read the referenced canonical architecture docs and ADRs directly.
 - This pack supports implementation, but does not replace canonical architectural guidance.
 - Changes to architectural boundaries require canonical doc updates and often ADR updates.

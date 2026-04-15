@@ -61,6 +61,11 @@ ai-system-builder/
   - Initial contract-backed ports are under `modules/application/ports` for
     runtime execution, persistence records, artifact storage, structured
     logging, and host context.
+  - Application ports are a required boundary seam, not an optional convenience:
+    - keep port families under `modules/application/ports/<family>/`,
+    - keep port surfaces thin and role-revealing,
+    - keep port requests/results aligned to contract families (not adapter-native shapes),
+    - keep drift tests in `modules/application/ports/<family>/tests/` and cross-family seam checks in `modules/application/ports/tests/`.
 
 - `modules/contracts/`
   - Explicit boundary contracts (API, IPC, runtime integration contracts, etc.).
@@ -148,6 +153,7 @@ This repository intentionally avoids premature package explosion.
 
 - Contract hardening is enforced by invariant tests in contract-family `tests` folders and by cross-family anti-drift tests under `modules/contracts/tests/`.
 - These invariants protect transport specialization, operation/channel identity discipline, runtime-to-logging alignment, persistence-vs-storage separation, host/config boundary constraints, and public export/import discipline.
+- Application-port hardening is enforced by family seam tests in `modules/application/ports/<family>/tests/` and minimal cross-family seam tests in `modules/application/ports/tests/`.
 
 ## Not yet finalized
 
