@@ -1,46 +1,17 @@
 import { app, BrowserWindow } from "electron";
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
-
-function resolvePreloadPath(): string {
-  return path.resolve(__dirname, "../preload/index.js");
-}
-
-function resolveRendererPath(): string {
-  const distRendererHtml = path.resolve(__dirname, "../renderer/index.html");
-
-  if (existsSync(distRendererHtml)) {
-    return distRendererHtml;
-  }
-
-  return path.resolve(process.cwd(), "apps/desktop/src/renderer/index.html");
-}
-
-async function loadRenderer(mainWindow: BrowserWindow): Promise<void> {
-  const devServerUrl = process.env.ELECTRON_RENDERER_URL;
-
-  if (devServerUrl) {
-    await mainWindow.loadURL(devServerUrl);
-    return;
-  }
-
-  const rendererPath = resolveRendererPath();
-  await mainWindow.loadURL(pathToFileURL(rendererPath).toString());
-}
 
 async function createMainWindow(): Promise<BrowserWindow> {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: resolvePreloadPath(),
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
-  await loadRenderer(mainWindow);
+  await mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
   return mainWindow;
 }
