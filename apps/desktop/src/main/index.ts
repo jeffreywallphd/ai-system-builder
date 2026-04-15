@@ -1,6 +1,8 @@
 import { app, BrowserWindow } from "electron";
 
-async function createMainWindow(): Promise<BrowserWindow> {
+const openWindows = new Set<BrowserWindow>();
+
+async function createMainWindow(): Promise<void> {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -11,16 +13,20 @@ async function createMainWindow(): Promise<BrowserWindow> {
     },
   });
 
-  await mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  openWindows.add(mainWindow);
 
-  return mainWindow;
+  mainWindow.on("closed", () => {
+    openWindows.delete(mainWindow);
+  });
+
+  await mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 }
 
 app.whenReady().then(async () => {
   await createMainWindow();
 
   app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (openWindows.size === 0) {
       await createMainWindow();
     }
   });
