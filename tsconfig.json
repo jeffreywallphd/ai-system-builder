@@ -9,6 +9,9 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
+    "noEmitOnError": true,
+    "sourceMap": true,
+    "incremental": true,
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
     "types": [
@@ -29,7 +32,7 @@
     "apps/**/*.d.ts",
     "tests/**/*.ts",
     "tests/**/*.tsx",
-    "tests/**/*.d.ts",
+    "tests/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",
