@@ -116,6 +116,14 @@ Placement rule:
 Keep these tests narrow and behavior/shape focused (port surface, shared contract
 alignment, and seam invariants), not adapter implementation detail tests.
 
+For cross-family application seam drift risk, add a small invariant layer in:
+
+- `modules/application/ports/tests/`.
+
+Cross-family application ports invariants should protect high-value seam relationships
+(for example persistence-vs-storage separation, logging-vs-runtime seam separation,
+and contracts-family import discipline) without becoming broad integration suites.
+
 ## Regression test rule
 
 When fixing a bug, add a regression test when practical in the layer where the defect should have been caught.
