@@ -23,14 +23,13 @@
   "include": [
     "modules/**/*.ts",
     "modules/**/*.tsx",
-    "hosts/**/*.ts",
-    "hosts/**/*.tsx",
-    "ui/**/*.ts",
-    "ui/**/*.tsx",
+    "modules/**/*.d.ts",
     "apps/**/*.ts",
     "apps/**/*.tsx",
+    "apps/**/*.d.ts",
     "tests/**/*.ts",
-    "tests/**/*.tsx"
+    "tests/**/*.tsx",
+    "tests/**/*.d.ts",
   ],
   "exclude": [
     "node_modules",

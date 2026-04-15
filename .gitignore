@@ -6,6 +6,7 @@ build/
 out/
 coverage/
 .vite/
+package-lock.json
 
 *.log
 npm-debug.log*
