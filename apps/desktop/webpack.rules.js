@@ -1,3 +1,5 @@
+const path = require("node:path");
+
 module.exports = [
   {
     test: /native_modules\\.+\.node$/,
@@ -20,6 +22,10 @@ module.exports = [
     exclude: /(node_modules|\.webpack)/,
     use: {
       loader: 'ts-loader',
+      options: {
+        configFile: path.resolve(__dirname, "tsconfig.webpack.json"),
+        onlyCompileBundledFiles: true,
+      },
     },
   },
 ];
