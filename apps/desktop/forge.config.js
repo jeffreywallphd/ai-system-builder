@@ -3,6 +3,9 @@ const { MakerSquirrel } = require('@electron-forge/maker-squirrel');
 const { MakerZIP } = require('@electron-forge/maker-zip');
 const { WebpackPlugin } = require('@electron-forge/plugin-webpack');
 
+const mainConfig = require('./webpack.main.config');
+const rendererConfig = require('./webpack.renderer.config');
+
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 module.exports = {
   packagerConfig: {},
@@ -12,9 +15,9 @@ module.exports = {
   ],
   plugins: [
     new WebpackPlugin({
-      mainConfig: path.resolve(__dirname, 'webpack.main.config.js'),
+      mainConfig,
       renderer: {
-        config: path.resolve(__dirname, 'webpack.renderer.config.js'),
+        config: rendererConfig,
         entryPoints: [
           {
             html: path.resolve(__dirname, 'src/renderer/index.html'),
