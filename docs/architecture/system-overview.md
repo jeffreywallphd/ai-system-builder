@@ -81,6 +81,12 @@ ai-system-builder/
     config families remain the source of typed rules and must not degrade into a
     generic settings bag.
 
+### Configuration posture (current)
+
+- Typed config contracts in `modules/contracts/config` are required for boundary-safe config shapes.
+- Config loading and resolution are currently composition-root concerns (apps/hosts/adapters), not a required application port seam.
+- Do not infer a required `modules/application/ports/config` seam unless architecture docs and code explicitly introduce it.
+
 ### Infrastructure and edges
 
 - `modules/adapters/`

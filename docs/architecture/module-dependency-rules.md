@@ -46,9 +46,11 @@ Preferred dependency flow is **outside-in at runtime, inside-out for source depe
 - App entry point code (`apps/**`)
 - Root `modules/contracts` imports or deep contract internal-file imports.
 - Application orchestration paths that bypass `modules/application/ports/**` and bind directly to adapter-native inputs/outputs.
+- Application orchestration paths that bypass the logging port seam (`modules/application/ports/logging`) and call adapter-native logger APIs directly.
 
 **Rule**: Application defines orchestration and required ports; it does not select infrastructure.
 Application ports are required seams and should stay thin, role-revealing, and contract-aligned.
+Configuration loading/resolution remains a composition-root responsibility today; typed config contracts do not by themselves imply a required application config port seam yet.
 
 ## 3) Contracts (`modules/contracts`)
 
@@ -135,6 +137,7 @@ Avoid these patterns even if they "work":
 
 - Route or IPC handlers containing business decision trees.
 - Application orchestration code importing adapters directly instead of depending on application ports.
+- Application orchestration code writing logs through adapter-native logger APIs instead of the logging port seam.
 - Ports that become generic service dumps rather than focused boundary seams.
 - API/IPC contract files recreating independent success/failure envelopes instead of specializing shared transport contracts.
 - Ad hoc operation or IPC channel strings that bypass shared normalization/derivation helpers.
