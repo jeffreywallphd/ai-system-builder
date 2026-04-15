@@ -3,14 +3,6 @@ import {
   type RegisterImageUploadApiRouteDependencies,
 } from "./image-upload/registerImageUploadApiRoute";
 
-export type {
-  ApiImageUploadRequestBody,
-  ExpressPostRoutePort,
-  ExpressRequestLike,
-  ExpressResponseLike,
-  StoreImageUploadUseCasePort,
-} from "./image-upload/registerImageUploadApiRoute";
-
 export function registerExpressApi(
   dependencies: RegisterImageUploadApiRouteDependencies,
 ): void {

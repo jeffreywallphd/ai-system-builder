@@ -11,7 +11,7 @@ import {
   DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { LoggingPort } from "../../../../application/ports/logging";
-import { createDesktopImageUploadIpcHandler } from "../registerElectronIpc";
+import { createDesktopImageUploadIpcHandler } from "../image-upload/registerImageUploadIpc";
 
 let tempRoots: string[] = [];
 
@@ -46,7 +46,6 @@ describe("desktop image upload IPC integration", () => {
         logging: createLoggingPort(log),
       }),
       logging: createLoggingPort(log),
-      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
     const handler = createDesktopImageUploadIpcHandler(useCase);
@@ -99,7 +98,6 @@ describe("desktop image upload IPC integration", () => {
         rootDirectory,
       }),
       logging: createLoggingPort(),
-      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
     const handler = createDesktopImageUploadIpcHandler(useCase);
