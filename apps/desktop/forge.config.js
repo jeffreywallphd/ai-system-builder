@@ -15,6 +15,7 @@ module.exports = {
   ],
   plugins: [
     new WebpackPlugin({
+      port: 3005,
       mainConfig,
       renderer: {
         config: rendererConfig,
