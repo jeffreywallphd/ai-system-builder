@@ -11,7 +11,7 @@ export interface StoreImageUploadCommand {
 }
 
 export interface StoreImageUploadCommandContext {
-  host: "desktop";
+  host: "desktop" | "server";
   source: string;
 }
 
