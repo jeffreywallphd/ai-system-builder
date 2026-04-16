@@ -37,6 +37,7 @@ apps/desktop/*.tsbuildinfo
 apps/server/dist/
 apps/server/*.tsbuildinfo
 apps/server/.local/
+apps/server/server-artifacts/
 
 apps/web-thin-client/dist/
 apps/web-thin-client/.vite/
