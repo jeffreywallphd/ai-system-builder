@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "../../../../testing/node-test";
 
 import { StoreImageUploadUseCase } from "../../../../application/use-cases";
 import { createFilesystemArtifactStorageAdapter } from "../../../storage/filesystem/artifact-store";

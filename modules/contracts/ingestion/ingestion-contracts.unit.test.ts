@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../testing/node-test";
 
 import { createArtifactDescriptorFromStagedArtifactDescriptor } from "../artifact";
 import { createContractError } from "../shared";

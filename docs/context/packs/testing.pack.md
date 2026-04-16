@@ -21,6 +21,7 @@
 ## Core Guidance
 
 - Test meaningful behavior, not implementation trivia.
+- Treat Node's built-in test runner (`node:test`) as the canonical default for non-browser tests.
 - Test domain logic directly with unit-level isolation.
 - Test application use cases with controlled boundaries (ports/test doubles).
 - Give adapters focused integration coverage for real boundary translation/behavior.

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "../../../../../modules/testing/node-test";
 
 import {
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "../../../testing/node-test";
 
 import { type LoggingPort } from "../../ports/logging";
 import { type ArtifactStoragePort } from "../../ports/storage";
