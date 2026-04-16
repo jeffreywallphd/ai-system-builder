@@ -28,9 +28,10 @@ describe("ingestion contracts", () => {
   it("creates staged-data registration requests with normalized descriptor fields", () => {
     const request = createRegisterStagedDataRequest(new Uint8Array([9, 8]), {
       descriptor: {
-        storageKey: " staging/object-8 ",
+        storage: {
+          key: " staging/object-8 ",
+        },
         sourceKind: " generated ",
-        mediaType: "application/json",
         originalName: " generated-output.json ",
       },
       overwrite: true,
@@ -40,9 +41,10 @@ describe("ingestion contracts", () => {
 
     expect(request).toEqual({
       descriptor: {
-        storageKey: "staging/object-8",
+        storage: {
+          key: "staging/object-8",
+        },
         sourceKind: "generated",
-        mediaType: "application/json",
         originalName: "generated-output.json",
       },
       content: new Uint8Array([9, 8]),
@@ -66,28 +68,32 @@ describe("ingestion contracts", () => {
     );
 
     expect(descriptor).toEqual({
-      storageKey: "uploads/images/kitten.png",
       sourceKind: "upload",
-      mediaType: "image/png",
-      sizeBytes: 42,
       originalName: "kitten.png",
+      storage: {
+        key: "uploads/images/kitten.png",
+        mediaType: "image/png",
+        sizeBytes: 42,
+      },
     });
   });
 
   it("creates registration failure and success results using shared contract result semantics", () => {
     const success = createRegisterStagedDataSuccessResult({
-      storageKey: " staging/object-9 ",
+      storage: {
+        key: " staging/object-9 ",
+      },
       sourceKind: "api",
-      mediaType: "application/json",
       createdAt: " 2026-04-16T00:00:00.000Z ",
     });
 
     expect(success).toEqual({
       ok: true,
       value: {
-        storageKey: "staging/object-9",
+        storage: {
+          key: "staging/object-9",
+        },
         sourceKind: "api",
-        mediaType: "application/json",
         createdAt: "2026-04-16T00:00:00.000Z",
       },
       requestId: undefined,

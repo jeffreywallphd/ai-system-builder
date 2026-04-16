@@ -1,13 +1,15 @@
 import {
-  normalizeStorageArtifactKey,
-  type StorageArtifactKey,
-  type StorageObjectChecksum,
   type StorageObjectDescriptor,
 } from "../storage";
 import {
   normalizeIngestionSourceKind,
   type IngestionSourceKind,
 } from "./ingestion-source-kind";
+import {
+  normalizeStagedDataStorageReference,
+  type StagedDataStorageReference,
+  type StagedDataStorageReferenceInput,
+} from "./staged-data-storage-reference";
 
 export type StagedDataMetadata = Readonly<Record<string, unknown>>;
 
@@ -15,28 +17,22 @@ export interface StagedDataDescriptor<
   TMetadata extends StagedDataMetadata = StagedDataMetadata,
 > {
   id?: string;
-  storageKey: StorageArtifactKey;
   sourceKind: IngestionSourceKind;
-  mediaType?: string;
-  sizeBytes?: number;
-  checksum?: StorageObjectChecksum;
   originalName?: string;
   createdAt?: string;
   metadata?: TMetadata;
+  storage: StagedDataStorageReference;
 }
 
 export interface StagedDataDescriptorInput<
   TMetadata extends StagedDataMetadata = StagedDataMetadata,
 > {
   id?: string;
-  storageKey?: string;
   sourceKind?: IngestionSourceKind | string;
-  mediaType?: string;
-  sizeBytes?: number;
-  checksum?: StorageObjectChecksum;
   originalName?: string;
   createdAt?: string;
   metadata?: TMetadata;
+  storage?: StagedDataStorageReferenceInput;
 }
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -56,10 +52,10 @@ export function normalizeStagedDataDescriptor<
   return {
     ...descriptor,
     id: normalizeOptionalText(descriptor.id),
-    storageKey: normalizeStorageArtifactKey(descriptor.storageKey),
     sourceKind: normalizeIngestionSourceKind(descriptor.sourceKind),
     originalName: normalizeOptionalText(descriptor.originalName),
     createdAt: normalizeOptionalText(descriptor.createdAt),
+    storage: normalizeStagedDataStorageReference(descriptor.storage),
   };
 }
 
@@ -72,19 +68,32 @@ export function normalizeStagedDataDescriptorInput<
     return {};
   }
 
+  let normalizedStorage: StagedDataStorageReferenceInput | undefined;
+  if (descriptor.storage) {
+    normalizedStorage = {
+      ...descriptor.storage,
+      key:
+        typeof descriptor.storage.key === "string"
+          ? normalizeStagedDataStorageReference({
+            key: descriptor.storage.key,
+            mediaType: descriptor.storage.mediaType,
+            sizeBytes: descriptor.storage.sizeBytes,
+            checksum: descriptor.storage.checksum,
+          }).key
+          : undefined,
+    };
+  }
+
   return {
     ...descriptor,
     id: normalizeOptionalText(descriptor.id),
-    storageKey:
-      typeof descriptor.storageKey === "string"
-        ? normalizeStorageArtifactKey(descriptor.storageKey)
-        : undefined,
     sourceKind:
       typeof descriptor.sourceKind === "string"
         ? normalizeIngestionSourceKind(descriptor.sourceKind)
         : undefined,
     originalName: normalizeOptionalText(descriptor.originalName),
     createdAt: normalizeOptionalText(descriptor.createdAt),
+    storage: normalizedStorage,
   };
 }
 
@@ -101,13 +110,15 @@ export function createStagedDataDescriptorFromStorageObjectDescriptor<
 ): StagedDataDescriptor<TMetadata> {
   return normalizeStagedDataDescriptor({
     id: options.id,
-    storageKey: descriptor.key,
     sourceKind: options.sourceKind,
-    mediaType: descriptor.mediaType,
-    sizeBytes: descriptor.sizeBytes,
-    checksum: descriptor.checksum,
     originalName: options.originalName,
     createdAt: options.createdAt,
     metadata: descriptor.metadata,
+    storage: {
+      key: descriptor.key,
+      mediaType: descriptor.mediaType,
+      sizeBytes: descriptor.sizeBytes,
+      checksum: descriptor.checksum,
+    },
   });
 }

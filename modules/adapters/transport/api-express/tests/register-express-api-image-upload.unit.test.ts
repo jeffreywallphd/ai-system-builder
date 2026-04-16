@@ -113,10 +113,12 @@ describe("registerImageUploadApiRoute", () => {
         ok: true,
         value: {
           descriptor: {
-            storageKey: "uploads/cat.png",
+            storage: {
+              key: "uploads/cat.png",
+              mediaType: "image/png",
+              sizeBytes: 4,
+            },
             sourceKind: "upload",
-            mediaType: "image/png",
-            sizeBytes: 4,
           },
         },
         requestId: "req-upload-1",
@@ -133,10 +135,12 @@ describe("registerImageUploadApiRoute", () => {
       operation: "image.upload",
       value: {
         descriptor: {
-          storageKey: "uploads/cat.png",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 4,
         },
       },
       requestId: "req-upload-1",
@@ -204,10 +208,12 @@ describe("registerImageUploadApiRoute", () => {
       ok: true,
       value: {
         descriptor: {
-          storageKey: "uploads/cat.png",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 4,
         },
       },
       requestId: "req-upload-3",
@@ -263,10 +269,12 @@ describe("registerImageUploadApiRoute", () => {
       operation: "image.upload",
       value: {
         descriptor: {
-          storageKey: "uploads/cat.png",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 4,
         },
       },
       requestId: "req-upload-3",

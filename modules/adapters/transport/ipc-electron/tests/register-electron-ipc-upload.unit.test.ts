@@ -33,10 +33,12 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       ok: true,
       value: {
         descriptor: {
-          storageKey: "uploads/kitten.png",
+          storage: {
+            key: "uploads/kitten.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 4,
         },
       },
       requestId: "req-upload-1",
@@ -80,10 +82,12 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       ok: true,
       value: {
         descriptor: {
-          storageKey: "uploads/kitten.png",
+          storage: {
+            key: "uploads/kitten.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 4,
         },
       },
       requestId: "req-upload-1",
@@ -161,10 +165,12 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       ok: true,
       value: {
         descriptor: {
-          storageKey: "uploads/cat.png",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 16,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 16,
         },
       },
       requestId: "req-upload-3",

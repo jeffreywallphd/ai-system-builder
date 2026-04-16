@@ -15,9 +15,11 @@ describe("api image upload client", () => {
         operation: "image.upload",
         value: {
           descriptor: {
-            key: "uploads/cat.png",
-            mediaType: "image/png",
-            sizeBytes: 3,
+            storage: {
+              key: "uploads/cat.png",
+              mediaType: "image/png",
+              sizeBytes: 3,
+            },
           },
         },
       }),

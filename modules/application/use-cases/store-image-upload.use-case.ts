@@ -6,6 +6,7 @@ import {
 } from "../../contracts/shared";
 import { IMAGE_UPLOAD_OPERATION } from "../../contracts/image-upload";
 import {
+  type RegisterStagedDataResult,
   createStagedDataDescriptorFromStorageObjectDescriptor,
 } from "../../contracts/ingestion";
 import { createStoreArtifactRequest } from "../../contracts/storage";
@@ -14,8 +15,10 @@ import type { ArtifactStoragePort } from "../ports/storage";
 import type {
   StoreImageUploadCommand,
   StoreImageUploadCommandContext,
+  StoreImageUploadUseCaseSuccessValue,
   StoreImageUploadUseCaseResult,
 } from "./store-image-upload.types";
+import { mapStoreImageUploadToRegisterStagedDataResult } from "./image-upload/mapStoreImageUploadToRegisterStagedDataResult";
 
 export interface StoreImageUploadUseCaseDependencies {
   storage: ArtifactStoragePort;
@@ -24,6 +27,7 @@ export interface StoreImageUploadUseCaseDependencies {
 }
 
 type StoreImageUploadUseCaseFailure = Extract<StoreImageUploadUseCaseResult, { ok: false }>;
+type StoreImageUploadUseCaseSuccess = Extract<StoreImageUploadUseCaseResult, { ok: true }>;
 
 const STORE_IMAGE_UPLOAD_USE_CASE = "StoreImageUploadUseCase";
 
@@ -43,13 +47,18 @@ function toFailureResult(
     correlationId?: string;
   },
 ): StoreImageUploadUseCaseFailure {
-  return createFailureResult(
-    createContractError(code, message, {
-      requestId: context.requestId,
-      correlationId: context.correlationId,
-    }),
+  const registerResult = mapStoreImageUploadToRegisterStagedDataResult(
+    {
+      ok: false,
+      error: createContractError(code, message, {
+        requestId: context.requestId,
+        correlationId: context.correlationId,
+      }),
+    },
     context,
   );
+
+  return toStoreImageUploadResult(registerResult) as StoreImageUploadUseCaseFailure;
 }
 
 function createBaseLogEvent(
@@ -74,6 +83,34 @@ function createBaseLogEvent(
     requestId: context.requestId,
     correlationId: context.correlationId,
   };
+}
+
+function toStoreImageUploadResult(
+  registerResult: RegisterStagedDataResult,
+): StoreImageUploadUseCaseResult {
+  if (registerResult.ok) {
+    const success: StoreImageUploadUseCaseSuccess = createSuccessResult(
+      {
+        descriptor: registerResult.value,
+      } as StoreImageUploadUseCaseSuccessValue,
+      {
+        requestId: registerResult.requestId,
+        correlationId: registerResult.correlationId,
+      },
+    );
+
+    return success;
+  }
+
+  const failure: StoreImageUploadUseCaseFailure = createFailureResult(
+    registerResult.error,
+    {
+      requestId: registerResult.requestId,
+      correlationId: registerResult.correlationId,
+    },
+  );
+
+  return failure;
 }
 
 export class StoreImageUploadUseCase {
@@ -205,10 +242,14 @@ export class StoreImageUploadUseCase {
       );
 
       if (!storeResult.ok) {
-        const failure: StoreImageUploadUseCaseFailure = createFailureResult(
-          storeResult.error,
+        const registerResult = mapStoreImageUploadToRegisterStagedDataResult(
+          {
+            ok: false,
+            error: storeResult.error,
+          },
           context,
         );
+        const failure = toStoreImageUploadResult(registerResult) as StoreImageUploadUseCaseFailure;
 
         await this.logging.log({
           ...createBaseLogEvent(
@@ -231,8 +272,9 @@ export class StoreImageUploadUseCase {
         return failure;
       }
 
-      const result = createSuccessResult(
+      const registerResult = mapStoreImageUploadToRegisterStagedDataResult(
         {
+          ok: true,
           descriptor: createStagedDataDescriptorFromStorageObjectDescriptor(
             storeResult.value,
             {
@@ -243,6 +285,8 @@ export class StoreImageUploadUseCase {
         },
         context,
       );
+
+      const result = toStoreImageUploadResult(registerResult) as StoreImageUploadUseCaseSuccess;
 
       await this.logging.log({
         ...createBaseLogEvent(

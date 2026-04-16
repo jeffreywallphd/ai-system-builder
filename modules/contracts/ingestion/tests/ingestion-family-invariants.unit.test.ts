@@ -14,6 +14,7 @@ describe("ingestion family invariants", () => {
       "normalizeIngestionSourceKind",
       "normalizeStagedDataDescriptor",
       "normalizeStagedDataDescriptorInput",
+      "normalizeStagedDataStorageReference",
     ]);
   });
 
@@ -22,9 +23,10 @@ describe("ingestion family invariants", () => {
       new Uint8Array([1, 2, 3]),
       {
         descriptor: {
-          storageKey: " staged/uploads/object-1 ",
+          storage: {
+            key: " staged/uploads/object-1 ",
+          },
           sourceKind: " Upload ",
-          mediaType: "image/png",
           originalName: " kitten.png ",
         },
         requestId: "req-ingest-1",
@@ -33,9 +35,10 @@ describe("ingestion family invariants", () => {
 
     expect(request).toEqual({
       descriptor: {
-        storageKey: "staged/uploads/object-1",
+        storage: {
+          key: "staged/uploads/object-1",
+        },
         sourceKind: "upload",
-        mediaType: "image/png",
         originalName: "kitten.png",
       },
       content: new Uint8Array([1, 2, 3]),
@@ -45,19 +48,25 @@ describe("ingestion family invariants", () => {
     });
 
     const result = ingestionContracts.createRegisterStagedDataSuccessResult({
-      storageKey: " staged/uploads/object-1 ",
+      storage: {
+        key: " staged/uploads/object-1 ",
+      },
       sourceKind: " upload ",
-      mediaType: "image/png",
-      sizeBytes: 3,
+      metadata: {
+        surface: "test",
+      },
     });
 
     expect(result).toEqual({
       ok: true,
       value: {
-        storageKey: "staged/uploads/object-1",
+        storage: {
+          key: "staged/uploads/object-1",
+        },
         sourceKind: "upload",
-        mediaType: "image/png",
-        sizeBytes: 3,
+        metadata: {
+          surface: "test",
+        },
       },
       requestId: undefined,
       correlationId: undefined,

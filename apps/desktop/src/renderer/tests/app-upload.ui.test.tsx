@@ -48,9 +48,11 @@ describe("desktop renderer image upload component", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "uploads/example.png",
-          mediaType: "image/png",
-          sizeBytes: 5,
+          storage: {
+            key: "uploads/example.png",
+            mediaType: "image/png",
+            sizeBytes: 5,
+          },
         },
       },
     });
@@ -85,9 +87,11 @@ describe("desktop renderer image upload component", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "uploads/cat.png",
-          mediaType: "image/png",
-          sizeBytes: 4,
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
         },
       },
     });
