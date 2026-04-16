@@ -4,7 +4,7 @@ import express from "express";
 
 import { composeServerHost } from "../../../modules/hosts/server";
 
-const DEFAULT_SERVER_PORT = 3000;
+const DEFAULT_SERVER_PORT = 3010;
 const DEFAULT_STORAGE_ROOT = path.resolve(process.cwd(), ".local", "server-artifacts");
 
 export interface ServerRuntimeConfig {
