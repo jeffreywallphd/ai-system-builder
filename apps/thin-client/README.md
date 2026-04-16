@@ -12,3 +12,11 @@ Current scope:
 
 The thin-client image-upload path intentionally reuses the server transport + shared application use
 case path rather than desktop preload wiring.
+
+## Development wiring
+
+- Default API base URL in thin-client code is `/api`.
+- In local development, Vite proxies `/api` to `http://127.0.0.1:3000`, which allows running thin-client
+  and server on separate ports while keeping feature clients same-origin by default.
+- To use a different server origin directly, set `VITE_API_BASE_URL` (for example
+  `http://127.0.0.1:3100/api`).

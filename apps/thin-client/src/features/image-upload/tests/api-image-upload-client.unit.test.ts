@@ -9,6 +9,7 @@ describe("api image upload client", () => {
 
   it("sends upload requests to the express image-upload route and maps success", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
       json: vi.fn().mockResolvedValue({
         ok: true,
         operation: "image.upload",
@@ -60,6 +61,7 @@ describe("api image upload client", () => {
 
   it("maps api error envelopes into renderer-facing failures", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
       json: vi.fn().mockResolvedValue({
         ok: false,
         operation: "image.upload",
@@ -85,6 +87,32 @@ describe("api image upload client", () => {
       error: {
         code: "validation",
         message: "mediaType must be an image media type.",
+      },
+    });
+  });
+
+  it("returns a meaningful failure when the server returns a non-json error response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      json: vi.fn().mockRejectedValue(new Error("Unexpected token < in JSON")),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiImageUploadClient();
+    const result = await client.uploadImage({
+      fileName: "cat.png",
+      mediaType: "image/png",
+      bytes: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "internal",
+        message: "Image upload failed (500 Internal Server Error).",
       },
     });
   });

@@ -86,4 +86,61 @@ describe("server app image upload route", () => {
       });
     }
   });
+
+  it("returns a client failure envelope when request payload fails use-case validation", async () => {
+    const storageRootDirectory = await createTempRoot();
+    const { app } = createServer({
+      env: {
+        ...process.env,
+        PORT: "0",
+        SERVER_STORAGE_ROOT: storageRootDirectory,
+      },
+    });
+
+    const server = await new Promise<import("node:http").Server>((resolve) => {
+      const startedServer = app.listen(0, () => resolve(startedServer));
+    });
+
+    try {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        throw new Error("Expected a numeric test server port.");
+      }
+
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/image/upload`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: "cat.png",
+          mediaType: "application/pdf",
+          bytes: [37, 80, 68, 70],
+          source: "server.integration.test.invalid-media-type",
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      const payload = await response.json();
+      expect(payload).toMatchObject({
+        ok: false,
+        operation: "image.upload",
+        error: {
+          code: "validation",
+          message: "mediaType must be an image media type.",
+          kind: "client",
+        },
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
+  });
 });
