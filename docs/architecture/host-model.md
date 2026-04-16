@@ -100,7 +100,7 @@ Contributors should:
 `apps/thin-client/` is a thin host-specific web surface for server interaction.
 
 - It is not assumed to be full feature parity with desktop.
-- It composes pages/features/components in a renderer-oriented structure and will call server APIs over HTTP.
+- It composes pages/features/components in a renderer-oriented structure and calls server APIs over HTTP through feature-local clients.
 - It should remain structurally distinct from the desktop preload-backed path and avoid duplicating host logic.
 
 ## Practical boundaries

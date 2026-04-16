@@ -11,7 +11,7 @@ export function AppShell({ children }: AppShellProps) {
         <header className="ui-panel ui-stack ui-stack--xs">
           <h1>AI System Builder Thin Client</h1>
           <p className="ui-text-muted">
-            Foundation host surface. API-backed capabilities will be layered in later prompts.
+            Server-backed host surface using feature-local HTTP API clients.
           </p>
         </header>
         {children}

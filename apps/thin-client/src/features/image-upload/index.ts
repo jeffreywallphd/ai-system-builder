@@ -1,7 +1,6 @@
-/**
- * Thin-client image-upload feature placeholder.
- *
- * Prompt 1 establishes only folder boundaries for components/hooks/api.
- * API behavior will be introduced in follow-up prompts.
- */
-export {};
+export * from "./api/apiImageUploadClient";
+export * from "./hooks/useImageUploadClient";
+export * from "./hooks/useImageUploadFeature";
+export * from "./components/ImageUploadFeature";
+export * from "./components/ImageUploadForm";
+export * from "./components/ImageUploadStatus";
