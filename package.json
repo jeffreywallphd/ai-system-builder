@@ -16,8 +16,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "start": "npm run dev:desktop",
-    "test": "node --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs",
-    "test:non-browser": "node --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs",
+    "test": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs",
+    "test:non-browser": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs",
     "dev:thin-client": "npm run dev -w @ai-system-builder/thin-client",
     "build:thin-client": "npm run build -w @ai-system-builder/thin-client",
     "preview:thin-client": "npm run preview -w @ai-system-builder/thin-client",
@@ -53,3 +53,4 @@
     "webpack": "^5.99.9"
   }
 }
+
