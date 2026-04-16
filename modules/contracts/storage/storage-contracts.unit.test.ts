@@ -7,6 +7,9 @@ import {
   createDeleteArtifactSuccessResult,
   createHasArtifactRequest,
   createHasArtifactSuccessResult,
+  normalizeStorageInstanceReference,
+  normalizeStoragePlacementDescriptor,
+  normalizeStorageZoneKind,
   createRetrieveArtifactRequest,
   createRetrieveArtifactSuccessResult,
   createStoreArtifactFailureResult,
@@ -248,6 +251,28 @@ describe("storage contracts", () => {
       },
       requestId: "req-6",
       correlationId: undefined,
+    });
+  });
+
+  it("normalizes storage instance and placement descriptors for zone-aware placement", () => {
+    expect(normalizeStorageZoneKind(" Derived ")).toBe("derived");
+
+    const placement = normalizeStoragePlacementDescriptor({
+      instance: normalizeStorageInstanceReference({
+        id: " local-main ",
+        kind: " FileSystem ",
+        zone: " staging ",
+      }),
+      key: " staging/artifacts/output-2 ",
+    });
+
+    expect(placement).toEqual({
+      instance: {
+        id: "local-main",
+        kind: "filesystem",
+        zone: "staging",
+      },
+      key: "staging/artifacts/output-2",
     });
   });
 });
