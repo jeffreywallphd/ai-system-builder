@@ -1,7 +1,7 @@
 import {
-  normalizeStagedDataDescriptor,
-  type StagedDataDescriptor,
-  type StagedDataMetadata,
+  normalizeStagedArtifactDescriptor,
+  type StagedArtifactDescriptor,
+  type StagedArtifactMetadata,
 } from "../ingestion";
 import { IMAGE_UPLOAD_OPERATION } from "../image-upload";
 import { createApiError } from "./api-error";
@@ -27,9 +27,9 @@ export interface ApiImageUploadRequestPayload {
 }
 
 export interface ApiImageUploadSuccessValue<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 > {
-  descriptor: StagedDataDescriptor<TMetadata>;
+  descriptor: StagedArtifactDescriptor<TMetadata>;
 }
 
 export type ApiImageUploadRequest = ApiRequest<
@@ -39,7 +39,7 @@ export type ApiImageUploadRequest = ApiRequest<
 >;
 
 export type ApiImageUploadResponse<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 > = ApiResponse<
   ApiImageUploadSuccessValue<TMetadata>,
   Record<string, unknown>,
@@ -92,9 +92,9 @@ export function createApiImageUploadRequest(
 }
 
 export function createApiImageUploadSuccessResponse<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 >(
-  descriptor: StagedDataDescriptor<TMetadata>,
+  descriptor: StagedArtifactDescriptor<TMetadata>,
   options?: {
     requestId?: string;
     correlationId?: string;
@@ -103,7 +103,7 @@ export function createApiImageUploadSuccessResponse<
   return createApiSuccessResponse(
     API_IMAGE_UPLOAD_OPERATION,
     {
-      descriptor: normalizeStagedDataDescriptor(descriptor),
+      descriptor: normalizeStagedArtifactDescriptor(descriptor),
     },
     {
       requestId: options?.requestId,

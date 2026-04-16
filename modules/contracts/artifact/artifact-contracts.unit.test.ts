@@ -8,8 +8,8 @@ import {
 
 describe("artifact contracts", () => {
   it("normalizes and constrains artifact kind vocabulary", () => {
-    expect(ARTIFACT_KINDS).toEqual(["raw-staged", "derived", "materialized"]);
-    expect(normalizeArtifactKind(" Derived ")).toBe("derived");
+    expect(ARTIFACT_KINDS).toEqual(["raw-staged", "transformed", "materialized"]);
+    expect(normalizeArtifactKind(" transformed ")).toBe("transformed");
   });
 
   it("normalizes artifact descriptors with format/provenance metadata", () => {
@@ -23,7 +23,7 @@ describe("artifact contracts", () => {
       provenance: {
         sourceKind: " Upload ",
         sourceId: " intake-44 ",
-        parentArtifactKeys: [" staging/raw/import-1 "],
+        parentArtifacts: [{ key: " staging/raw/import-1 " }],
       },
     });
 
@@ -39,8 +39,8 @@ describe("artifact contracts", () => {
       provenance: {
         sourceKind: "upload",
         sourceId: "intake-44",
-        parentArtifactKeys: ["staging/raw/import-1"],
-        transformId: undefined,
+        parentArtifacts: [{ key: "staging/raw/import-1", label: undefined }],
+        transform: undefined,
       },
     });
   });

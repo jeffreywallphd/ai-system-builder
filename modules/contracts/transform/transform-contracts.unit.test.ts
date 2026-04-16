@@ -14,7 +14,7 @@ describe("transform contracts", () => {
     const summary = normalizeTransformExecutionSummary({
       record: {
         specification: {
-          id: " parse-json-lines ",
+          definitionId: " parse-json-lines ",
           kind: " parsing ",
           stage: " derivation ",
         },
@@ -27,16 +27,16 @@ describe("transform contracts", () => {
 
     expect(summary).toEqual({
       record: {
-        id: undefined,
+        executionId: undefined,
         specification: {
-          id: "parse-json-lines",
+          definitionId: "parse-json-lines",
           kind: "parsing",
           stage: "derivation",
           name: undefined,
           version: undefined,
         },
-        inputs: [{ key: "staging/raw/events.ndjson", role: undefined }],
-        outputs: [{ key: "derived/structured/events.parquet", role: undefined }],
+        inputs: [{ key: "staging/raw/events.ndjson", label: undefined }],
+        outputs: [{ key: "derived/structured/events.parquet", label: undefined }],
         startedAt: undefined,
         completedAt: undefined,
       },

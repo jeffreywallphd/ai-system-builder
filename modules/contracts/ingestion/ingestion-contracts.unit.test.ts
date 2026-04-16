@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { createArtifactDescriptorFromStagedArtifactDescriptor } from "../artifact";
 import { createContractError } from "../shared";
 import {
   INGESTION_SOURCE_KINDS,
-  createRegisterStagedDataFailureResult,
-  createRegisterStagedDataRequest,
-  createRegisterStagedDataSuccessResult,
-  createStagedArtifactDescriptorFromStagedDataDescriptor,
-  createStagedDataDescriptorFromStorageObjectDescriptor,
+  createRegisterStagedArtifactFailureResult,
+  createRegisterStagedArtifactRequest,
+  createRegisterStagedArtifactSuccessResult,
+  createStagedArtifactDescriptorFromStorageObjectDescriptor,
   normalizeIngestionSourceKind,
 } from ".";
 
@@ -26,8 +26,8 @@ describe("ingestion contracts", () => {
     );
   });
 
-  it("creates staged-data registration requests with normalized descriptor fields", () => {
-    const request = createRegisterStagedDataRequest(new Uint8Array([9, 8]), {
+  it("creates staged-artifact registration requests with normalized descriptor fields", () => {
+    const request = createRegisterStagedArtifactRequest(new Uint8Array([9, 8]), {
       descriptor: {
         storage: {
           key: " staging/object-8 ",
@@ -55,8 +55,8 @@ describe("ingestion contracts", () => {
     });
   });
 
-  it("creates staged-data descriptors from storage descriptors for specialized intake paths", () => {
-    const descriptor = createStagedDataDescriptorFromStorageObjectDescriptor(
+  it("creates staged-artifact descriptors from storage descriptors", () => {
+    const descriptor = createStagedArtifactDescriptorFromStorageObjectDescriptor(
       {
         key: " uploads/images/kitten.png ",
         mediaType: "image/png",
@@ -77,34 +77,17 @@ describe("ingestion contracts", () => {
         sizeBytes: 42,
       },
     });
-  });
 
-  it("provides additive staged-artifact vocabulary while preserving staged-data compatibility", () => {
-    const stagedArtifact = createStagedArtifactDescriptorFromStagedDataDescriptor({
-      id: " staged-1 ",
-      sourceKind: " runtime ",
-      storage: {
-        key: " staging/runtime/events-1 ",
-        mediaType: " application/json ",
-      },
-      originalName: " events-1.json ",
-    });
+    const artifactDescriptor = createArtifactDescriptorFromStagedArtifactDescriptor(
+      descriptor,
+    );
 
-    expect(stagedArtifact).toEqual({
-      id: "staged-1",
-      sourceKind: "runtime",
-      artifactKey: "staging/runtime/events-1",
-      originalName: "events-1.json",
-      mediaType: "application/json",
-      sizeBytes: undefined,
-      checksum: undefined,
-      createdAt: undefined,
-      metadata: undefined,
-    });
+    expect(artifactDescriptor.kind).toBe("raw-staged");
+    expect(artifactDescriptor.key).toBe("uploads/images/kitten.png");
   });
 
   it("creates registration failure and success results using shared contract result semantics", () => {
-    const success = createRegisterStagedDataSuccessResult({
+    const success = createRegisterStagedArtifactSuccessResult({
       storage: {
         key: " staging/object-9 ",
       },
@@ -125,7 +108,7 @@ describe("ingestion contracts", () => {
       correlationId: undefined,
     });
 
-    const failure = createRegisterStagedDataFailureResult(
+    const failure = createRegisterStagedArtifactFailureResult(
       createContractError("unavailable", "Ingestion adapter unavailable", {
         details: {
           sourceKind: "api",

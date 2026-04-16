@@ -3,9 +3,9 @@ import {
   type StorageArtifactKey,
 } from "../storage";
 
-export interface TransformArtifactReference {
+export interface ArtifactReference {
   key: StorageArtifactKey;
-  role?: string;
+  label?: string;
 }
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -17,12 +17,12 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-export function normalizeTransformArtifactReference(
-  reference: TransformArtifactReference,
-): TransformArtifactReference {
+export function normalizeArtifactReference(
+  reference: ArtifactReference,
+): ArtifactReference {
   return {
     ...reference,
     key: normalizeStorageArtifactKey(reference.key),
-    role: normalizeOptionalText(reference.role),
+    label: normalizeOptionalText(reference.label),
   };
 }

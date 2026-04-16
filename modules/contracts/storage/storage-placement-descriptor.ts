@@ -7,6 +7,7 @@ import {
   type StorageInstanceReference,
 } from "./storage-instance-reference";
 
+/** Placement uses instance identity + key; zone semantics are owned by the instance reference. */
 export interface StoragePlacementDescriptor {
   instance: StorageInstanceReference;
   key: StorageArtifactKey;

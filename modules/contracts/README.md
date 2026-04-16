@@ -16,8 +16,10 @@ Current contract families include:
 ## Terminology Guardrails
 
 - Use **asset** terminology for composable system parts and built-system units.
-- Use **artifact** terminology for stored/flowing ELT-side data objects.
-- Keep ingestion/staging, transform, dataset, and lineage vocabulary explicit and typed.
+- Use **artifact** terminology for ELT-side stored/flowing data objects.
+- Use **ingestion** for the intake semantic layer.
+- Use **staged artifact** for inbound content that has entered ingestion/staging.
+- Do not use **staged-data** terminology as a contract or architecture term.
 
 ## Public Surface Discipline
 

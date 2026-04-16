@@ -4,23 +4,23 @@ import {
   type StorageObjectChecksum,
 } from "../storage";
 
-export interface StagedDataStorageReference {
+export interface StagedArtifactStorageReference {
   key: StorageArtifactKey;
   mediaType?: string;
   sizeBytes?: number;
   checksum?: StorageObjectChecksum;
 }
 
-export interface StagedDataStorageReferenceInput {
+export interface StagedArtifactStorageReferenceInput {
   key?: string;
   mediaType?: string;
   sizeBytes?: number;
   checksum?: StorageObjectChecksum;
 }
 
-export function normalizeStagedDataStorageReference(
-  reference: StagedDataStorageReference,
-): StagedDataStorageReference {
+export function normalizeStagedArtifactStorageReference(
+  reference: StagedArtifactStorageReference,
+): StagedArtifactStorageReference {
   return {
     ...reference,
     key: normalizeStorageArtifactKey(reference.key),

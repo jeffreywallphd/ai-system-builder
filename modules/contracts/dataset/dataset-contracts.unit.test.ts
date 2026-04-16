@@ -7,8 +7,8 @@ describe("dataset contracts", () => {
     const descriptor = normalizeDatasetDescriptor({
       id: " orders.curated.v1 ",
       name: " Orders Curated ",
-      sourceArtifactKeys: [" derived/orders/normalized.parquet "],
-      transformIds: [" normalize-orders "],
+      sourceArtifacts: [{ key: " derived/orders/normalized.parquet " }],
+      transforms: [{ definitionId: " normalize-orders " }],
       schema: {
         fields: [
           {
@@ -28,8 +28,8 @@ describe("dataset contracts", () => {
     expect(descriptor).toEqual({
       id: "orders.curated.v1",
       name: "Orders Curated",
-      sourceArtifactKeys: ["derived/orders/normalized.parquet"],
-      transformIds: ["normalize-orders"],
+      sourceArtifacts: [{ key: "derived/orders/normalized.parquet", label: undefined }],
+      transforms: [{ definitionId: "normalize-orders", executionId: undefined }],
       schema: {
         fieldCount: undefined,
         fields: [

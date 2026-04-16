@@ -1,6 +1,13 @@
+/**
+ * ArtifactKind captures lifecycle/derivation state only.
+ *
+ * - raw-staged: inbound staged artifact as received through ingestion.
+ * - transformed: artifact produced by transform execution.
+ * - materialized: artifact persisted as a dataset/output materialization.
+ */
 export const ARTIFACT_KINDS = [
   "raw-staged",
-  "derived",
+  "transformed",
   "materialized",
 ] as const;
 

@@ -7,6 +7,7 @@ describe("dataset family invariants", () => {
     expect(Object.keys(datasetContracts).sort()).toEqual([
       "normalizeDatasetDescriptor",
       "normalizeDatasetMaterializationDescriptor",
+      "normalizeDatasetReference",
       "normalizeDatasetSchemaSummary",
     ]);
   });

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createContractError } from "../../../contracts/shared";
-import { mapStoreImageUploadToRegisterStagedDataResult } from "../image-upload/mapStoreImageUploadToRegisterStagedDataResult";
+import { mapStoreImageUploadToRegisterStagedArtifactResult } from "../image-upload/mapStoreImageUploadToRegisterStagedArtifactResult";
 
-describe("mapStoreImageUploadToRegisterStagedDataResult", () => {
-  it("maps staged-data descriptor success into a register-staged-data success result", () => {
-    const result = mapStoreImageUploadToRegisterStagedDataResult(
+describe("mapStoreImageUploadToRegisterStagedArtifactResult", () => {
+  it("maps staged-artifact descriptor success into a register-staged-artifact success result", () => {
+    const result = mapStoreImageUploadToRegisterStagedArtifactResult(
       {
         ok: true,
         descriptor: {
@@ -37,8 +37,8 @@ describe("mapStoreImageUploadToRegisterStagedDataResult", () => {
     });
   });
 
-  it("maps contract failures into register-staged-data failure results", () => {
-    const result = mapStoreImageUploadToRegisterStagedDataResult(
+  it("maps contract failures into register-staged-artifact failure results", () => {
+    const result = mapStoreImageUploadToRegisterStagedArtifactResult(
       {
         ok: false,
         error: createContractError("validation", "bytes must not be empty."),

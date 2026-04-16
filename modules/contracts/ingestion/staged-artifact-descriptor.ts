@@ -1,36 +1,36 @@
-import {
-  normalizeStorageArtifactKey,
-  type StorageArtifactKey,
-  type StorageObjectChecksum,
-} from "../storage";
+import { type StorageObjectDescriptor } from "../storage";
 import {
   normalizeIngestionSourceKind,
   type IngestionSourceKind,
 } from "./ingestion-source-kind";
 import {
-  type StagedDataDescriptor,
-  type StagedDataMetadata,
-} from "./staged-data-descriptor";
+  normalizeStagedArtifactStorageReference,
+  type StagedArtifactStorageReference,
+  type StagedArtifactStorageReferenceInput,
+} from "./staged-artifact-storage-reference";
 
-/**
- * Artifact-oriented companion contract for staged intake semantics.
- *
- * `StagedDataDescriptor` remains the compatibility surface for existing callers,
- * while this descriptor provides clearer ELT vocabulary without renaming the
- * existing public type.
- */
+export type StagedArtifactMetadata = Readonly<Record<string, unknown>>;
+
 export interface StagedArtifactDescriptor<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 > {
   id?: string;
   sourceKind: IngestionSourceKind;
-  artifactKey: StorageArtifactKey;
   originalName?: string;
-  mediaType?: string;
-  sizeBytes?: number;
-  checksum?: StorageObjectChecksum;
   createdAt?: string;
   metadata?: TMetadata;
+  storage: StagedArtifactStorageReference;
+}
+
+export interface StagedArtifactDescriptorInput<
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
+> {
+  id?: string;
+  sourceKind?: IngestionSourceKind | string;
+  originalName?: string;
+  createdAt?: string;
+  metadata?: TMetadata;
+  storage?: StagedArtifactStorageReferenceInput;
 }
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -43,7 +43,7 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 }
 
 export function normalizeStagedArtifactDescriptor<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 >(
   descriptor: StagedArtifactDescriptor<TMetadata>,
 ): StagedArtifactDescriptor<TMetadata> {
@@ -51,27 +51,72 @@ export function normalizeStagedArtifactDescriptor<
     ...descriptor,
     id: normalizeOptionalText(descriptor.id),
     sourceKind: normalizeIngestionSourceKind(descriptor.sourceKind),
-    artifactKey: normalizeStorageArtifactKey(descriptor.artifactKey),
     originalName: normalizeOptionalText(descriptor.originalName),
-    mediaType: normalizeOptionalText(descriptor.mediaType),
     createdAt: normalizeOptionalText(descriptor.createdAt),
+    storage: normalizeStagedArtifactStorageReference(descriptor.storage),
   };
 }
 
-export function createStagedArtifactDescriptorFromStagedDataDescriptor<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+export function normalizeStagedArtifactDescriptorInput<
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 >(
-  descriptor: StagedDataDescriptor<TMetadata>,
+  descriptor?: StagedArtifactDescriptorInput<TMetadata>,
+): StagedArtifactDescriptorInput<TMetadata> {
+  if (!descriptor) {
+    return {};
+  }
+
+  let normalizedStorage: StagedArtifactStorageReferenceInput | undefined;
+  if (descriptor.storage) {
+    normalizedStorage = {
+      ...descriptor.storage,
+      key:
+        typeof descriptor.storage.key === "string"
+          ? normalizeStagedArtifactStorageReference({
+              key: descriptor.storage.key,
+              mediaType: descriptor.storage.mediaType,
+              sizeBytes: descriptor.storage.sizeBytes,
+              checksum: descriptor.storage.checksum,
+            }).key
+          : undefined,
+    };
+  }
+
+  return {
+    ...descriptor,
+    id: normalizeOptionalText(descriptor.id),
+    sourceKind:
+      typeof descriptor.sourceKind === "string"
+        ? normalizeIngestionSourceKind(descriptor.sourceKind)
+        : undefined,
+    originalName: normalizeOptionalText(descriptor.originalName),
+    createdAt: normalizeOptionalText(descriptor.createdAt),
+    storage: normalizedStorage,
+  };
+}
+
+export function createStagedArtifactDescriptorFromStorageObjectDescriptor<
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
+>(
+  descriptor: StorageObjectDescriptor<TMetadata>,
+  options: {
+    sourceKind: IngestionSourceKind;
+    originalName?: string;
+    id?: string;
+    createdAt?: string;
+  },
 ): StagedArtifactDescriptor<TMetadata> {
   return normalizeStagedArtifactDescriptor({
-    id: descriptor.id,
-    sourceKind: descriptor.sourceKind,
-    artifactKey: descriptor.storage.key,
-    originalName: descriptor.originalName,
-    mediaType: descriptor.storage.mediaType,
-    sizeBytes: descriptor.storage.sizeBytes,
-    checksum: descriptor.storage.checksum,
-    createdAt: descriptor.createdAt,
+    id: options.id,
+    sourceKind: options.sourceKind,
+    originalName: options.originalName,
+    createdAt: options.createdAt,
     metadata: descriptor.metadata,
+    storage: {
+      key: descriptor.key,
+      mediaType: descriptor.mediaType,
+      sizeBytes: descriptor.sizeBytes,
+      checksum: descriptor.checksum,
+    },
   });
 }

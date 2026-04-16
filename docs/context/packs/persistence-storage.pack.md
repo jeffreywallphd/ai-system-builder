@@ -23,14 +23,14 @@
 
 - Postgres is the default persistence target for structured durable application data.
 - Storage is a separate concern for files, blobs, uploads, exports, generated artifacts, and temp workspace content.
-- Ingestion/staged-data contracts are the canonical higher-level intake semantics for inbound content; storage stays the underlying artifact capability.
+- Ingestion/staged artifact contracts are the canonical higher-level intake semantics for inbound content; storage stays the underlying artifact capability.
 - Persistence contracts stay record-oriented: operation identity + record reference + result/error envelope.
 - Persistence operation names should stay helper-driven and transport-neutral (`lowercase.dot.segments` with no `api.`/`ipc.` prefixes).
 - When persistence contracts include a record reference, operation identity should target that record type (`<recordType>.<action>[.<qualifier>...]`).
 - Keep persistence family exports scoped to persistence contracts only.
 - Keep application persistence-port seams operation-aware and record-oriented (not CRUD-generic), with focused anti-drift tests in `modules/application/ports/persistence/tests/`.
 - Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
-- Shared ingestion contracts (`modules/contracts/ingestion`) should carry staged-data intake metadata (for example source kind, original name, staged descriptor identity) without becoming transport-specific.
+- Shared ingestion contracts (`modules/contracts/ingestion`) should carry staged artifact intake metadata (for example source kind, original name, staged descriptor identity) without becoming transport-specific.
 - Storage key creation/normalization should flow through shared storage key helpers to prevent per-operation key-shape drift.
 - Storage checksums should be computed in concrete storage adapters from persisted bytes and surfaced through descriptor results; checksum support does not imply deduplication behavior.
 - Keep storage family exports scoped to storage contracts only.
@@ -48,7 +48,7 @@
 ## Canonical Source Docs
 
 - `docs/adr/ADR-0004-persistence-and-storage-separation.md` — decision rationale for separating persistence and storage.
-- `docs/adr/ADR-0008-ingestion-and-staged-data-semantic-model.md` — direction for ingestion-centric staged-data semantics above storage mechanics.
+- `docs/adr/ADR-0008-ingestion-and-staged-artifact-semantic-model.md` — direction for ingestion-centric staged artifact semantics above storage mechanics.
 - `docs/architecture/persistence-and-storage.md` — current boundary model and practical implementation guidance.
 - `docs/architecture/module-dependency-rules.md` — dependency constraints for adapters and inner layers.
 - `docs/architecture/host-model.md` — host wiring responsibilities vs storage/persistence ownership.
