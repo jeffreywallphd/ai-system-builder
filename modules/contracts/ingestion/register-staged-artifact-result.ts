@@ -18,19 +18,21 @@ export type RegisterStagedArtifactResult<
 > = ContractResult<StagedArtifactDescriptor<TMetadata>, TDetails>;
 
 export function createRegisterStagedArtifactSuccessResult<
+  TDetails extends ContractErrorDetails = ContractErrorDetails,
   TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 >(
   descriptor: StagedArtifactDescriptor<TMetadata>,
   context?: ContractBoundaryContext,
-): RegisterStagedArtifactResult<ContractErrorDetails, TMetadata> {
+): RegisterStagedArtifactResult<TDetails, TMetadata> {
   return createSuccessResult(normalizeStagedArtifactDescriptor(descriptor), context);
 }
 
 export function createRegisterStagedArtifactFailureResult<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 >(
   error: ContractError<TDetails>,
   context?: ContractBoundaryContext,
-): RegisterStagedArtifactResult<TDetails> {
+): RegisterStagedArtifactResult<TDetails, TMetadata> {
   return createFailureResult(error, context);
 }
