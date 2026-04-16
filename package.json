@@ -16,15 +16,14 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "start": "npm run dev:desktop",
-    "test": "npm run test:non-browser",
-    "test:non-browser": "node --import tsx --test",
+    "test": "node --import tsx dev-tools/scripts/testing/run-non-browser-tests.mjs",
+    "test:non-browser": "node --import tsx dev-tools/scripts/testing/run-non-browser-tests.mjs",
     "dev:thin-client": "npm run dev -w @ai-system-builder/thin-client",
     "build:thin-client": "npm run build -w @ai-system-builder/thin-client",
     "preview:thin-client": "npm run preview -w @ai-system-builder/thin-client",
     "dev:server": "npm run dev -w @ai-system-builder/server",
     "build:server": "npm run build -w @ai-system-builder/server",
-    "start:server": "npm run start -w @ai-system-builder/server",
-    "posttest:non-browser": "node --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs"
+    "start:server": "npm run start -w @ai-system-builder/server"
   },
   "dependencies": {
     "busboy": "^1.6.0",
