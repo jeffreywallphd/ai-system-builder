@@ -10,9 +10,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const require = createRequire(import.meta.url);
 const reportRelativePath = "artifacts/test-reports/non-browser-test-report.json";
 const reportPath = path.resolve(repoRoot, reportRelativePath);
 const isVerbose =
@@ -192,9 +190,19 @@ console.log(
   `Starting tsx --test with ${resolvedFiles.length} discovered non-browser test file(s).`,
 );
 
-const tsxPackageJsonPath = require.resolve("tsx/package.json", {
-  paths: [repoRoot],
-});
+const tsxPackageJsonPath = path.resolve(repoRoot, "node_modules", "tsx", "package.json");
+if (!existsSync(tsxPackageJsonPath)) {
+  const startupError = `Could not locate tsx package metadata at '${tsxPackageJsonPath}'. Install dependencies before running non-browser tests.`;
+  console.error(startupError);
+  finalizeRun({
+    status: "failed",
+    exitCode: 1,
+    filesByPattern,
+    resolvedFiles,
+    startupError,
+  });
+}
+
 const tsxPackageJson = JSON.parse(readFileSync(tsxPackageJsonPath, "utf8"));
 
 let tsxBinEntry = tsxPackageJson.bin;
@@ -209,8 +217,23 @@ if (typeof tsxBinEntry !== "string" || tsxBinEntry.length === 0) {
 
 const tsxPackageRoot = path.dirname(tsxPackageJsonPath);
 const tsxBinPath = path.resolve(tsxPackageRoot, tsxBinEntry);
+if (!existsSync(tsxBinPath)) {
+  const startupError = `Could not locate tsx executable script at '${tsxBinPath}' resolved from '${tsxPackageJsonPath}'.`;
+  console.error(startupError);
+  finalizeRun({
+    status: "failed",
+    exitCode: 1,
+    filesByPattern,
+    resolvedFiles,
+    startupError,
+  });
+}
+
+const nodeLaunchArgs = process.execArgv.includes("--preserve-symlinks-main")
+  ? ["--preserve-symlinks-main"]
+  : [];
 const launchExecutable = process.execPath;
-const launchArgs = [tsxBinPath, "--test", ...resolvedFiles];
+const launchArgs = [...nodeLaunchArgs, tsxBinPath, "--test", ...resolvedFiles];
 
 const testProcess = spawnSync(
   launchExecutable,
