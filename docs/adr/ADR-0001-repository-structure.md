@@ -27,34 +27,34 @@ Baseline structure:
 ```text
 ai-system-builder/
 +- apps/
-¦  +- desktop/
-¦  +- server/
-¦  +- web-thin-client/
+  +- thin-client/
+Â¦  +- server/
+Â¦  +- web-thin-client/
 +- modules/
-¦  +- domain/
-¦  +- application/
-¦  +- contracts/
-¦  +- adapters/
-¦  ¦  +- persistence/
-¦  ¦  +- runtime/
-¦  ¦  +- transport/
-¦  ¦  +- storage/
-¦  ¦  +- observability/
-¦  ¦  +- auth/
-¦  +- hosts/
-¦  ¦  +- desktop/
-¦  ¦  +- server/
-¦  +- ui/
-¦  ¦  +- shared/
-¦  ¦  +- desktop/
-¦  ¦  +- web/
-¦  +- testing/
+Â¦  +- domain/
+Â¦  +- application/
+Â¦  +- contracts/
+Â¦  +- adapters/
+Â¦  Â¦  +- persistence/
+Â¦  Â¦  +- runtime/
+Â¦  Â¦  +- transport/
+Â¦  Â¦  +- storage/
+Â¦  Â¦  +- observability/
+Â¦  Â¦  +- auth/
+Â¦  +- hosts/
+Â¦  Â¦  +- desktop/
+Â¦  Â¦  +- server/
+Â¦  +- ui/
+Â¦  Â¦  +- shared/
+Â¦  Â¦  +- desktop/
+Â¦  Â¦  +- web/
+Â¦  +- testing/
 +- docs/
-¦  +- adr/
-¦  +- architecture/
-¦  +- context/
-¦  +- templates/
-¦  +- standards/
+Â¦  +- adr/
+Â¦  +- architecture/
+Â¦  +- context/
+Â¦  +- templates/
+Â¦  +- standards/
 +- dev-tools/
 +- config/
 +- migrations/

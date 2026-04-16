@@ -20,7 +20,7 @@ ai-system-builder/
 ├─ apps/
 │  ├─ desktop/
 │  ├─ server/
-│  └─ web-thin-client/
+│  └─ thin-client/
 ├─ modules/
 │  ├─ domain/
 │  ├─ application/
@@ -105,7 +105,7 @@ ai-system-builder/
 
 ### App entry points
 
-- `apps/desktop/`, `apps/server/`, `apps/web-thin-client/`
+- `apps/desktop/`, `apps/server/`, `apps/thin-client/`
   - Entry points and packaging/deployment surfaces.
   - Not the home for core business logic.
 

@@ -35,7 +35,7 @@ If this boundary is not explicit early, desktop and server implementations drift
 
 Additional position:
 
-- `apps/web-thin-client/` is a thin surface over the server host, not a full-parity environment by default.
+- `apps/thin-client/` is a thin surface over the server host, not a full-parity environment by default.
 
 ## Alternatives Considered
 
