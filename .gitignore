@@ -43,4 +43,6 @@ apps/web-thin-client/dist/
 apps/web-thin-client/.vite/
 apps/web-thin-client/*.tsbuildinfo
 
+artifacts/
+
 *.tsbuildinfo
