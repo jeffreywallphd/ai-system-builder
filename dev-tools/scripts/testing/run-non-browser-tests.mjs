@@ -3,17 +3,18 @@
 import {
   readdirSync,
   existsSync,
-  readFileSync,
   mkdirSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const reportRelativePath = "artifacts/test-reports/non-browser-test-report.json";
 const reportPath = path.resolve(repoRoot, reportRelativePath);
 const TEST_BATCH_SIZE = 10;
+const NON_BROWSER_FRAMEWORK_SCRIPT = "test:non-browser:framework";
 const isVerbose =
   process.argv.includes("--verbose")
   || process.env.NON_BROWSER_TEST_VERBOSE === "1"
@@ -101,6 +102,10 @@ function chunkFiles(filePaths, size) {
     chunks.push(filePaths.slice(index, index + size));
   }
   return chunks;
+}
+
+function resolveNpmCommand() {
+  return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
 function finalizeRun({
@@ -223,56 +228,10 @@ if (resolvedFiles.length === 0) {
 }
 
 console.log(
-  `Starting tsx --test with ${resolvedFiles.length} discovered non-browser test file(s).`,
+  `Starting ${NON_BROWSER_FRAMEWORK_SCRIPT} with ${resolvedFiles.length} discovered non-browser test file(s).`,
 );
 
-const tsxPackageJsonPath = path.resolve(repoRoot, "node_modules", "tsx", "package.json");
-if (!existsSync(tsxPackageJsonPath)) {
-  const startupError = `Could not locate tsx package metadata at '${tsxPackageJsonPath}'. Install dependencies before running non-browser tests.`;
-  console.error(startupError);
-  finalizeRun({
-    status: "failed",
-    exitCode: 1,
-    filesByPattern,
-    resolvedFiles,
-    batchStats: { total: 0, passed: 0, failed: 0 },
-    batchResults: [],
-    startupError,
-  });
-}
-
-const tsxPackageJson = JSON.parse(readFileSync(tsxPackageJsonPath, "utf8"));
-
-let tsxBinEntry = tsxPackageJson.bin;
-if (tsxBinEntry && typeof tsxBinEntry === "object") {
-  tsxBinEntry = tsxBinEntry.tsx ?? Object.values(tsxBinEntry)[0];
-}
-
-if (typeof tsxBinEntry !== "string" || tsxBinEntry.length === 0) {
-  console.error(`Invalid tsx bin entry in package metadata at '${tsxPackageJsonPath}'.`);
-  process.exit(1);
-}
-
-const tsxPackageRoot = path.dirname(tsxPackageJsonPath);
-const tsxBinPath = path.resolve(tsxPackageRoot, tsxBinEntry);
-if (!existsSync(tsxBinPath)) {
-  const startupError = `Could not locate tsx executable script at '${tsxBinPath}' resolved from '${tsxPackageJsonPath}'.`;
-  console.error(startupError);
-  finalizeRun({
-    status: "failed",
-    exitCode: 1,
-    filesByPattern,
-    resolvedFiles,
-    batchStats: { total: 0, passed: 0, failed: 0 },
-    batchResults: [],
-    startupError,
-  });
-}
-
-const nodeLaunchArgs = process.execArgv.includes("--preserve-symlinks-main")
-  ? ["--preserve-symlinks-main"]
-  : [];
-const launchExecutable = process.execPath;
+const npmCommand = resolveNpmCommand();
 const fileBatches = chunkFiles(resolvedFiles, TEST_BATCH_SIZE);
 const aggregatedStdout = [];
 const aggregatedStderr = [];
@@ -284,21 +243,22 @@ for (const [batchIndex, batchFiles] of fileBatches.entries()) {
   const batchLabel = `batch ${batchNumber}/${fileBatches.length}`;
   console.log(`Running ${batchLabel} (${batchFiles.length} files)...`);
 
-  const launchArgs = [...nodeLaunchArgs, tsxBinPath, "--test", ...batchFiles];
+  const launchArgs = ["run", "--silent", NON_BROWSER_FRAMEWORK_SCRIPT, "--", ...batchFiles];
   const testProcess = spawnSync(
-    launchExecutable,
+    npmCommand,
     launchArgs,
     {
       cwd: repoRoot,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
     },
   );
 
   const stdout = testProcess.stdout ?? "";
   const stderr = testProcess.stderr ?? "";
   const startupError = testProcess.error
-    ? `Failed to start tsx test runner executable '${launchExecutable}' with script '${tsxBinPath}' for ${batchLabel}: ${testProcess.error.message}`
+    ? `Failed to start npm script '${NON_BROWSER_FRAMEWORK_SCRIPT}' for ${batchLabel}: ${testProcess.error.message}`
     : null;
   const exitCode = testProcess.status ?? (startupError ? 1 : 0);
   const status = startupError || exitCode !== 0 ? "failed" : "passed";

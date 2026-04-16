@@ -23,7 +23,8 @@
     "preview:thin-client": "npm run preview -w @ai-system-builder/thin-client",
     "dev:server": "npm run dev -w @ai-system-builder/server",
     "build:server": "npm run build -w @ai-system-builder/server",
-    "start:server": "npm run start -w @ai-system-builder/server"
+    "start:server": "npm run start -w @ai-system-builder/server",
+    "test:non-browser:framework": "node --import tsx --test"
   },
   "dependencies": {
     "busboy": "^1.6.0",
