@@ -55,4 +55,5 @@
 - Typical desktop implementation set: `index` → `desktop-host` → `desktop-implementation`.
 - Add `architecture` when dependency or ownership boundaries change.
 - Add `testing` for behavior-sensitive desktop refactors.
+- Add `desktop-styling` when renderer CSS layering/tokens/shared style ownership are part of scope.
 - Use minimum-sufficient context: include only desktop packs relevant to touched layers (`main`, preload, renderer, host composition, IPC adapter).

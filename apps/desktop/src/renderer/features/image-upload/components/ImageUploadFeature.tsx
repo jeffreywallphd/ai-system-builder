@@ -81,8 +81,8 @@ export function ImageUploadFeature({ uploadApi }: ImageUploadFeatureProps) {
   }
 
   return (
-    <section>
-      <h2>Image upload</h2>
+    <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
+      <h2 className="ui-panel__title">Image upload</h2>
       <ImageUploadForm
         selectedFile={selectedFile}
         uploadStatus={viewState.status}

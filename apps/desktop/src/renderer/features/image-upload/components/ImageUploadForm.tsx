@@ -17,7 +17,7 @@ export function ImageUploadForm({
 }: ImageUploadFormProps) {
   return (
     <>
-      <form onSubmit={onSubmit}>
+      <form className="ui-stack ui-stack--sm" onSubmit={onSubmit}>
         <label htmlFor="desktop-image-file-input">Choose image</label>
         <input
           id="desktop-image-file-input"

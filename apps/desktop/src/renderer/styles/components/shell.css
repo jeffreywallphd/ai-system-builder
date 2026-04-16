@@ -1,0 +1,23 @@
+.ui-shell {
+  min-height: 100vh;
+  padding: var(--space-xl) 0;
+}
+
+.ui-shell__header {
+  margin-bottom: var(--space-lg);
+}
+
+.ui-shell__title {
+  margin-bottom: var(--space-sm);
+}
+
+.ui-shell__nav {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.ui-shell__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}

@@ -1,11 +1,17 @@
-main {
-  font-family: sans-serif;
-  margin: 2rem;
-  max-width: 46rem;
-}
+@import "./tokens.css";
+@import "./reset.css";
+@import "./typography.css";
 
-nav {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
+@import "./layout/container.css";
+@import "./layout/grid.css";
+@import "./layout/stack.css";
+
+@import "./components/shell.css";
+@import "./components/buttons.css";
+@import "./components/inputs.css";
+@import "./components/panels.css";
+@import "./components/feedback.css";
+
+#root {
+  min-height: 100vh;
 }
