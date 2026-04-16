@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const testPatterns = [
   "modules/**/*.test.ts",
@@ -40,29 +40,43 @@ function resolvePatternFiles(pattern) {
   const rootDir = path.resolve(repoRoot, rootPrefix);
 
   if (!existsSync(rootDir)) {
-    return [];
+    return {
+      rootDir,
+      files: [],
+    };
   }
 
   const files = [];
   walkFiles(rootDir, files);
 
-  return files.filter((filePath) => {
-    const relativePath = toPosixPath(path.relative(repoRoot, filePath));
-    return path.matchesGlob(relativePath, pattern);
-  });
+  return {
+    rootDir,
+    files: files.filter((filePath) => {
+      const relativePath = toPosixPath(path.relative(repoRoot, filePath));
+      return path.matchesGlob(relativePath, pattern);
+    }),
+  };
 }
 
 const filesByPattern = testPatterns.map((pattern) => ({
   pattern,
-  files: resolvePatternFiles(pattern),
+  ...resolvePatternFiles(pattern),
 }));
 
 const resolvedFiles = [...new Set(filesByPattern.flatMap((entry) => entry.files))].sort();
 
+console.log(`Resolved non-browser test repo root: ${repoRoot}`);
+for (const entry of filesByPattern) {
+  console.log(`Pattern '${entry.pattern}' matched ${entry.files.length} file(s).`);
+}
+console.log(`Total resolved non-browser test files: ${resolvedFiles.length}`);
+
 if (resolvedFiles.length === 0) {
   console.error("No non-browser test files were found for patterns:");
-  for (const pattern of testPatterns) {
-    console.error(`  - ${pattern}`);
+  console.error(`Resolved repo root: ${repoRoot}`);
+  for (const entry of filesByPattern) {
+    console.error(`  - Pattern: ${entry.pattern}`);
+    console.error(`    Search root: ${entry.rootDir}`);
   }
   process.exit(1);
 }
@@ -72,6 +86,10 @@ for (const entry of filesByPattern) {
     console.warn(`No matches for pattern: ${entry.pattern}`);
   }
 }
+
+console.log(
+  `Starting tsx --test with ${resolvedFiles.length} discovered non-browser test file(s).`,
+);
 
 let tsxCliPath;
 try {
