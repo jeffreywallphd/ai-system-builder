@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { run } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -11,11 +11,21 @@ const repoRoot = path.resolve(runnerDir, "../../..");
 const reportRelativePath = "artifacts/test-reports/non-browser-test-report.json";
 const reportPath = path.resolve(repoRoot, reportRelativePath);
 
-const globPatterns = [
-  "modules/**/*.test.ts",
-  "apps/server/src/tests/**/*.test.ts",
-  "apps/desktop/src/preload/tests/**/*.test.ts",
-];
+const discoveryRoots = ["modules", "apps/server", "apps/desktop", "apps/thin-client"];
+const validTestFilePattern = /\.test\.[cm]?[jt]sx?$/i;
+const browserOnlyTestPattern = /\.(ui|e2e)\.test\.[cm]?[jt]sx?$/i;
+const ignoredDirectories = new Set([
+  ".git",
+  ".turbo",
+  "artifacts",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "out",
+]);
+
+const discoveredTestFiles = [];
 
 const discoveredFiles = new Set();
 
@@ -25,7 +35,7 @@ const report = {
   reportPath: reportRelativePath,
   status: "failed",
   exitCode: 1,
-  configuredGlobPatterns: globPatterns,
+  configuredDiscoveryRoots: discoveryRoots,
   discoveredFileCount: 0,
   discoveredFiles: [],
   summary: {
@@ -57,6 +67,64 @@ const recordDiscoveredFile = (event) => {
   if (event && typeof event.file === "string" && event.file.length > 0) {
     discoveredFiles.add(path.relative(repoRoot, event.file));
   }
+};
+
+const normalizeToPosixPath = (value) => value.split(path.sep).join("/");
+
+const walkForTests = (startPath) => {
+  const entries = readdirSync(startPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (ignoredDirectories.has(entry.name)) {
+        continue;
+      }
+
+      walkForTests(path.join(startPath, entry.name));
+      continue;
+    }
+
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    if (!validTestFilePattern.test(entry.name)) {
+      continue;
+    }
+
+    if (browserOnlyTestPattern.test(entry.name)) {
+      continue;
+    }
+
+    discoveredTestFiles.push(path.join(startPath, entry.name));
+  }
+};
+
+const discoverNonBrowserTests = () => {
+  for (const discoveryRoot of discoveryRoots) {
+    const absoluteRoot = path.join(repoRoot, discoveryRoot);
+
+    let exists = false;
+    try {
+      exists = statSync(absoluteRoot).isDirectory();
+    } catch {
+      exists = false;
+    }
+
+    if (!exists) {
+      continue;
+    }
+
+    walkForTests(absoluteRoot);
+  }
+
+  discoveredTestFiles.sort((left, right) => left.localeCompare(right));
+
+  report.configuredDiscoveryRoots = discoveryRoots;
+  report.discoveredFiles = discoveredTestFiles.map((filePath) =>
+    normalizeToPosixPath(path.relative(repoRoot, filePath)),
+  );
+  report.discoveredFileCount = discoveredTestFiles.length;
 };
 
 const serializeError = (value) => {
@@ -91,20 +159,33 @@ const serializeError = (value) => {
 };
 
 try {
+  discoverNonBrowserTests();
+
+  if (discoveredTestFiles.length === 0) {
+    throw new Error("No non-browser test files were discovered.");
+  }
+
   const testsStream = run({
     cwd: repoRoot,
-    globPatterns,
+    files: discoveredTestFiles,
     isolation: "none",
   });
 
-  await new Promise((resolve, reject) => {
-    testsStream.on("test:start", recordDiscoveredFile);
+  for await (const streamEvent of testsStream) {
+    const eventType = streamEvent?.type;
+    const event = streamEvent?.data ?? streamEvent;
 
-    testsStream.on("test:pass", (event) => {
+    if (eventType === "test:start") {
       recordDiscoveredFile(event);
-    });
+      continue;
+    }
 
-    testsStream.on("test:fail", (event) => {
+    if (eventType === "test:pass") {
+      recordDiscoveredFile(event);
+      continue;
+    }
+
+    if (eventType === "test:fail") {
       recordDiscoveredFile(event);
 
       report.failures.push({
@@ -120,9 +201,10 @@ try {
           error: serializeError(event.details?.error),
         },
       });
-    });
+      continue;
+    }
 
-    testsStream.on("test:summary", (event) => {
+    if (eventType === "test:summary") {
       report.summary = {
         counts: {
           cancelled: event.counts.cancelled,
@@ -136,11 +218,8 @@ try {
         durationMs: event.duration_ms,
         success: event.success,
       };
-    });
-
-    testsStream.once("error", reject);
-    testsStream.once("close", resolve);
-  });
+    }
+  }
 
   const didFail = report.failures.length > 0 || report.summary.success === false;
   report.status = didFail ? "failed" : "passed";
