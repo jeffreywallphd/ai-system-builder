@@ -33,7 +33,8 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "uploads/kitten.png",
+          storageKey: "uploads/kitten.png",
+          sourceKind: "upload",
           mediaType: "image/png",
           sizeBytes: 4,
         },
@@ -79,7 +80,8 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "uploads/kitten.png",
+          storageKey: "uploads/kitten.png",
+          sourceKind: "upload",
           mediaType: "image/png",
           sizeBytes: 4,
         },
@@ -159,7 +161,8 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "uploads/cat.png",
+          storageKey: "uploads/cat.png",
+          sourceKind: "upload",
           mediaType: "image/png",
           sizeBytes: 16,
         },

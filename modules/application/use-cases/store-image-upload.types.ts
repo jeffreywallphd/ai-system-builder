@@ -1,8 +1,8 @@
 import type { ContractResult } from "../../contracts/shared";
 import type {
-  StorageObjectDescriptor,
-  StorageObjectMetadata,
-} from "../../contracts/storage";
+  StagedDataDescriptor,
+  StagedDataMetadata,
+} from "../../contracts/ingestion";
 
 export interface StoreImageUploadCommand {
   fileName: string;
@@ -15,11 +15,11 @@ export interface StoreImageUploadCommandContext {
 }
 
 export interface StoreImageUploadUseCaseSuccessValue<
-  TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
+  TMetadata extends StagedDataMetadata = StagedDataMetadata,
 > {
-  descriptor: StorageObjectDescriptor<TMetadata>;
+  descriptor: StagedDataDescriptor<TMetadata>;
 }
 
 export type StoreImageUploadUseCaseResult<
-  TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
+  TMetadata extends StagedDataMetadata = StagedDataMetadata,
 > = ContractResult<StoreImageUploadUseCaseSuccessValue<TMetadata>>;

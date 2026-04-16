@@ -5,6 +5,9 @@ import {
   createSuccessResult,
 } from "../../contracts/shared";
 import { IMAGE_UPLOAD_OPERATION } from "../../contracts/image-upload";
+import {
+  createStagedDataDescriptorFromStorageObjectDescriptor,
+} from "../../contracts/ingestion";
 import { createStoreArtifactRequest } from "../../contracts/storage";
 import type { LoggingPort } from "../ports/logging";
 import type { ArtifactStoragePort } from "../ports/storage";
@@ -230,7 +233,13 @@ export class StoreImageUploadUseCase {
 
       const result = createSuccessResult(
         {
-          descriptor: storeResult.value,
+          descriptor: createStagedDataDescriptorFromStorageObjectDescriptor(
+            storeResult.value,
+            {
+              sourceKind: "upload",
+              originalName: fileName,
+            },
+          ),
         },
         context,
       );

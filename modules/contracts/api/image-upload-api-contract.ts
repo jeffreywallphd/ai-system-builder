@@ -1,8 +1,8 @@
 import {
-  normalizeStorageObjectDescriptor,
-  type StorageObjectDescriptor,
-  type StorageObjectMetadata,
-} from "../storage";
+  normalizeStagedDataDescriptor,
+  type StagedDataDescriptor,
+  type StagedDataMetadata,
+} from "../ingestion";
 import { IMAGE_UPLOAD_OPERATION } from "../image-upload";
 import { createApiError } from "./api-error";
 import { createApiRequest, type ApiRequest } from "./api-request";
@@ -27,9 +27,9 @@ export interface ApiImageUploadRequestPayload {
 }
 
 export interface ApiImageUploadSuccessValue<
-  TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
+  TMetadata extends StagedDataMetadata = StagedDataMetadata,
 > {
-  descriptor: StorageObjectDescriptor<TMetadata>;
+  descriptor: StagedDataDescriptor<TMetadata>;
 }
 
 export type ApiImageUploadRequest = ApiRequest<
@@ -39,7 +39,7 @@ export type ApiImageUploadRequest = ApiRequest<
 >;
 
 export type ApiImageUploadResponse<
-  TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
+  TMetadata extends StagedDataMetadata = StagedDataMetadata,
 > = ApiResponse<
   ApiImageUploadSuccessValue<TMetadata>,
   Record<string, unknown>,
@@ -92,9 +92,9 @@ export function createApiImageUploadRequest(
 }
 
 export function createApiImageUploadSuccessResponse<
-  TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
+  TMetadata extends StagedDataMetadata = StagedDataMetadata,
 >(
-  descriptor: StorageObjectDescriptor<TMetadata>,
+  descriptor: StagedDataDescriptor<TMetadata>,
   options?: {
     requestId?: string;
     correlationId?: string;
@@ -103,7 +103,7 @@ export function createApiImageUploadSuccessResponse<
   return createApiSuccessResponse(
     API_IMAGE_UPLOAD_OPERATION,
     {
-      descriptor: normalizeStorageObjectDescriptor(descriptor),
+      descriptor: normalizeStagedDataDescriptor(descriptor),
     },
     {
       requestId: options?.requestId,

@@ -156,8 +156,11 @@ Transport technologies are adapters, not application definitions.
 
 - Persistence: structured durable records (default adapter target: Postgres).
 - Storage: files/blobs/artifacts/workspaces and other non-relational content.
+- Ingestion/staged-data: canonical semantic model for inbound content (uploads, scrape outputs, selected generated outputs, and similar intake paths) above raw storage mechanics.
 
 They are separate architectural concerns even if they share physical disk territory in some host deployments.
+
+Image upload remains an implemented specialized intake path and should align to staged-data descriptor semantics rather than defining a parallel semantic world.
 
 ## Packaging restraint
 

@@ -92,7 +92,8 @@ describe("image upload cross-transport equivalence", () => {
         ok: true,
         value: {
           descriptor: {
-            key: "uploads/cat.png",
+            storageKey: "uploads/cat.png",
+            sourceKind: "upload",
             mediaType: "image/png",
             sizeBytes: 4,
           },
@@ -125,7 +126,8 @@ describe("image upload cross-transport equivalence", () => {
         ok: true,
         value: {
           descriptor: {
-            key: "uploads/cat.png",
+            storageKey: "uploads/cat.png",
+            sourceKind: "upload",
             mediaType: "image/png",
             sizeBytes: 4,
           },
@@ -170,7 +172,8 @@ describe("image upload cross-transport equivalence", () => {
           ok: true,
           value: {
             descriptor: {
-              key: "uploads/cat.png",
+              storageKey: "uploads/cat.png",
+              sourceKind: "upload",
               mediaType: "image/png",
               sizeBytes: 4,
             },
@@ -203,7 +206,8 @@ describe("image upload cross-transport equivalence", () => {
         ok: true,
         value: {
           descriptor: {
-            key: "uploads/cat.png",
+            storageKey: "uploads/cat.png",
+            sourceKind: "upload",
             mediaType: "image/png",
             sizeBytes: 4,
           },
@@ -223,7 +227,8 @@ describe("image upload cross-transport equivalence", () => {
         correlationId: "corr-transport-2",
         value: {
           descriptor: {
-            key: "uploads/cat.png",
+            storageKey: "uploads/cat.png",
+            sourceKind: "upload",
             mediaType: "image/png",
             sizeBytes: 4,
           },

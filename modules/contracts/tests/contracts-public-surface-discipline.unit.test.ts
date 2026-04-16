@@ -8,6 +8,8 @@ const CONTRACT_FAMILIES = [
   "api",
   "config",
   "host",
+  "imageUpload",
+  "ingestion",
   "ipc",
   "logging",
   "persistence",
