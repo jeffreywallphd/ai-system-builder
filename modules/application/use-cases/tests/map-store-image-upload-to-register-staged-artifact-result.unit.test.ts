@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../testing/node-test";
 
 import { createContractError } from "../../../contracts/shared";
 import { mapStoreImageUploadToRegisterStagedArtifactResult } from "../image-upload/mapStoreImageUploadToRegisterStagedArtifactResult";

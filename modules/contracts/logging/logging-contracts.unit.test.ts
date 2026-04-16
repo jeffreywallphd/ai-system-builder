@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../testing/node-test";
 
 import { isLogLevel, LOG_LEVELS } from "./log-level";
 import {

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "../../../../testing/node-test";
 
 import { createContractError } from "../../../../contracts/shared";
 import {

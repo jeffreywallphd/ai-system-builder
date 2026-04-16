@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "../../../../testing/node-test";
 
 import { createLoggingConfig } from "../../../../contracts/config";
 import type { StructuredLogEvent } from "../../../../contracts/logging";

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../testing/node-test";
 
 describe("StoreImageUploadUseCase dependency boundaries", () => {
   it("does not import transport-specialized contract families into the application use case", () => {

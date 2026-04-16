@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "../../../testing/node-test";
 
 import { createDesktopImageUploadRequest } from "../../../contracts/ipc";
 import { createContractError } from "../../../contracts/shared";
