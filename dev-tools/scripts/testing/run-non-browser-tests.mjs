@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
-import { readdirSync, existsSync } from "node:fs";
+import { readdirSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const require = createRequire(import.meta.url);
 
 const testPatterns = [
   "modules/**/*.test.ts",
@@ -88,11 +90,28 @@ console.log(
   `Starting tsx --test with ${resolvedFiles.length} discovered non-browser test file(s).`,
 );
 
-const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
-const launchArgs = ["tsx", "--test", ...resolvedFiles];
+const tsxPackageJsonPath = require.resolve("tsx/package.json", {
+  paths: [repoRoot],
+});
+const tsxPackageJson = JSON.parse(readFileSync(tsxPackageJsonPath, "utf8"));
+
+let tsxBinEntry = tsxPackageJson.bin;
+if (tsxBinEntry && typeof tsxBinEntry === "object") {
+  tsxBinEntry = tsxBinEntry.tsx ?? Object.values(tsxBinEntry)[0];
+}
+
+if (typeof tsxBinEntry !== "string" || tsxBinEntry.length === 0) {
+  console.error(`Invalid tsx bin entry in package metadata at '${tsxPackageJsonPath}'.`);
+  process.exit(1);
+}
+
+const tsxPackageRoot = path.dirname(tsxPackageJsonPath);
+const tsxBinPath = path.resolve(tsxPackageRoot, tsxBinEntry);
+const launchExecutable = process.execPath;
+const launchArgs = [tsxBinPath, "--test", ...resolvedFiles];
 
 const testProcess = spawnSync(
-  npxCommand,
+  launchExecutable,
   launchArgs,
   {
     cwd: repoRoot,
@@ -101,9 +120,9 @@ const testProcess = spawnSync(
 );
 
 if (testProcess.error) {
-  const commandString = `${npxCommand} ${launchArgs.join(" ")}`;
+  const commandString = `${launchExecutable} ${launchArgs.join(" ")}`;
   console.error(
-    `Failed to start tsx test runner command '${commandString}': ${testProcess.error.message}`,
+    `Failed to start tsx test runner executable '${launchExecutable}' with script '${tsxBinPath}' (full command: '${commandString}'): ${testProcess.error.message}`,
   );
   process.exit(1);
 }
