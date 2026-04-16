@@ -1,9 +1,6 @@
 import type { StructuredLogEvent } from "../../contracts/logging";
 import { createContractError } from "../../contracts/shared";
 import { IMAGE_UPLOAD_OPERATION } from "../../contracts/image-upload";
-import {
-  type RegisterStagedArtifactResult,
-} from "../../contracts/ingestion";
 import { createStoreArtifactRequest } from "../../contracts/storage";
 import type { LoggingPort } from "../ports/logging";
 import type { ArtifactStoragePort } from "../ports/storage";
@@ -19,8 +16,6 @@ export interface StoreImageUploadUseCaseDependencies {
   logging: LoggingPort;
   now?: () => string;
 }
-
-type StoreImageUploadUseCaseFailure = Extract<RegisterStagedArtifactResult, { ok: false }>;
 
 const STORE_IMAGE_UPLOAD_USE_CASE = "StoreImageUploadUseCase";
 
@@ -39,7 +34,7 @@ function toFailureResult(
     requestId?: string;
     correlationId?: string;
   },
-): StoreImageUploadUseCaseFailure {
+): StoreImageUploadUseCaseResult {
   return mapStoreImageUploadToRegisterStagedArtifactResult(
     {
       ok: false,
@@ -119,6 +114,9 @@ export class StoreImageUploadUseCase {
 
     if (fileName.length === 0) {
       const failure = toFailureResult("validation", "fileName must be provided.", context);
+      if (failure.ok) {
+        return failure;
+      }
 
       await this.logging.log({
         ...createBaseLogEvent(
@@ -142,6 +140,9 @@ export class StoreImageUploadUseCase {
 
     if (command.bytes.length === 0) {
       const failure = toFailureResult("validation", "bytes must not be empty.", context);
+      if (failure.ok) {
+        return failure;
+      }
 
       await this.logging.log({
         ...createBaseLogEvent(
@@ -169,6 +170,9 @@ export class StoreImageUploadUseCase {
         "mediaType must be an image media type.",
         context,
       );
+      if (failure.ok) {
+        return failure;
+      }
 
       await this.logging.log({
         ...createBaseLogEvent(
@@ -264,6 +268,9 @@ export class StoreImageUploadUseCase {
       return result;
     } catch (error) {
       const failure = toFailureResult("internal", "Unexpected storage failure.", context);
+      if (failure.ok) {
+        return failure;
+      }
 
       await this.logging.log({
         ...createBaseLogEvent(
