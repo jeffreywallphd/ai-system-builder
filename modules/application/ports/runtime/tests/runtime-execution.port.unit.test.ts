@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it, vi } from "../../../../testing/node-test";
+import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 
 import {
   createRuntimeExecutionError,
@@ -41,7 +41,7 @@ describe("RuntimeExecutionPort", () => {
       },
     });
 
-    const onEvent = vi.fn<(event: RuntimeExecutionEvent<string>) => void>();
+    const onEvent = testDouble.fn<(event: RuntimeExecutionEvent<string>) => void>();
     const handlers: RuntimeExecutionHandlers<string> = { onEvent };
 
     const executeCalls: RuntimeExecutionRequest[] = [];

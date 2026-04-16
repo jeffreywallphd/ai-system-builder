@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it, vi, afterEach } from "../../../../../testing/node-test";
+import { afterEach, describe, expect, it, testDouble } from "../../../../../testing/node-test";
 
 import {
   createDeleteArtifactRequest,
@@ -31,7 +31,7 @@ async function createTempRoot(): Promise<string> {
   return root;
 }
 
-function createLoggingPortMock(log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined)) {
+function createLoggingPortMock(log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined)) {
   return {
     log,
   } satisfies LoggingPort;
@@ -44,7 +44,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("writes artifact bytes to disk under the configured root and returns a contract descriptor", async () => {
     const rootDirectory = await createTempRoot();
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const adapter = createFilesystemArtifactStorageAdapter({
       rootDirectory,
       logging: createLoggingPortMock(log),
@@ -137,8 +137,8 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("returns a structured failure when post-write verification cannot stat the stored file", async () => {
     const rootDirectory = await createTempRoot();
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
-    const statPath = vi.fn().mockRejectedValue(
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const statPath = testDouble.fn().mockRejectedValue(
       Object.assign(new Error("missing file after write"), {
         code: "ENOENT",
       }),
@@ -192,7 +192,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
     const rootDirectory = await createTempRoot();
     const adapter = createFilesystemArtifactStorageAdapter({
       rootDirectory,
-      statPath: vi.fn().mockResolvedValue({
+      statPath: testDouble.fn().mockResolvedValue({
         isFile: () => true,
         size: 999,
       }) as typeof import("node:fs/promises").stat,

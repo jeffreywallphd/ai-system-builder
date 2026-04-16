@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, expectTypeOf, it, vi } from "../../../testing/node-test";
+import { describe, expect, expectTypeOf, it, testDouble } from "../../../testing/node-test";
 
 import {
   createPersistenceOperationForRecord,
@@ -194,7 +194,7 @@ describe("application ports cross-family invariants", () => {
         correlationId: incomingRequest.correlationId,
       };
     };
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
 
     const runtimePort: RuntimeExecutionPort = { execute: runtimeExecute };
     const loggingPort: LoggingPort = { log };

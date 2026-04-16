@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it, vi } from "../../../../testing/node-test";
+import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
@@ -9,7 +9,7 @@ import { composeDesktopHost } from "../composeDesktopHost";
 
 describe("composeDesktopHost", () => {
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
-    const sink = vi.fn();
+    const sink = testDouble.fn();
     const host = composeDesktopHost({
       logging: {
         verbosity: "verbose",
@@ -50,7 +50,7 @@ describe("composeDesktopHost", () => {
 
   it("registers the desktop image upload IPC handler on the request channel", () => {
     const ipcMain = {
-      handle: vi.fn(),
+      handle: testDouble.fn(),
     };
     const host = composeDesktopHost();
 
@@ -66,7 +66,7 @@ describe("composeDesktopHost", () => {
   });
 
   it("keeps the composition seam usable for upload success and failure event logging", async () => {
-    const sink = vi.fn();
+    const sink = testDouble.fn();
     const host = composeDesktopHost({
       logging: {
         verbosity: "trace",

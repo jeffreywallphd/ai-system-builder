@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it, vi } from "../../../../testing/node-test";
+import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import {
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
@@ -16,12 +16,12 @@ import {
 } from "../image-upload/registerImageUploadIpc";
 
 function createUseCaseStub(
-  executeImpl?: ReturnType<typeof vi.fn<StoreImageUploadUseCasePort["execute"]>>,
+  executeImpl?: ReturnType<typeof testDouble.fn<StoreImageUploadUseCasePort["execute"]>>,
 ): StoreImageUploadUseCasePort {
   return {
     execute:
       executeImpl ??
-      vi
+      testDouble
         .fn<StoreImageUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
   };
@@ -29,7 +29,7 @@ function createUseCaseStub(
 
 describe("registerImageUploadIpc desktop image upload handler", () => {
   it("maps request payload and context into the upload use case and returns a success response", async () => {
-    const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
         storage: {
@@ -97,7 +97,7 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
   });
 
   it("maps use-case failures to a structured ipc failure response envelope", async () => {
-    const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: false,
       error: createContractError("validation", "mediaType must be an image media type.", {
         details: {
@@ -154,12 +154,12 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       | ((event: unknown, request: ReturnType<typeof createDesktopImageUploadRequest>) => Promise<unknown>)
       | undefined;
     const ipcMain: IpcMainHandlePort = {
-      handle: vi.fn((channel: string, listener: Parameters<IpcMainHandlePort["handle"]>[1]) => {
+      handle: testDouble.fn((channel: string, listener: Parameters<IpcMainHandlePort["handle"]>[1]) => {
         expect(channel).toBe(DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value);
         registeredHandler = listener;
       }),
     };
-    const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
         storage: {
