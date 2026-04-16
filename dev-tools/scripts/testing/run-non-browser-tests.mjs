@@ -13,6 +13,7 @@ import { spawnSync } from "node:child_process";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const reportRelativePath = "artifacts/test-reports/non-browser-test-report.json";
 const reportPath = path.resolve(repoRoot, reportRelativePath);
+const TEST_BATCH_SIZE = 10;
 const isVerbose =
   process.argv.includes("--verbose")
   || process.env.NON_BROWSER_TEST_VERBOSE === "1"
@@ -94,16 +95,29 @@ function writeReportFile(report) {
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 }
 
+function chunkFiles(filePaths, size) {
+  const chunks = [];
+  for (let index = 0; index < filePaths.length; index += size) {
+    chunks.push(filePaths.slice(index, index + size));
+  }
+  return chunks;
+}
+
 function finalizeRun({
   status,
   exitCode,
   filesByPattern,
   resolvedFiles,
+  batchStats,
+  batchResults = [],
   stdout = "",
   stderr = "",
   startupError = null,
 }) {
   const summary = parseTapSummary(`${stdout}\n${stderr}`);
+  const totalBatches = batchStats?.total ?? 0;
+  const passedBatches = batchStats?.passed ?? 0;
+  const failedBatches = batchStats?.failed ?? 0;
   const report = {
     generatedAt: new Date().toISOString(),
     repoRoot,
@@ -112,6 +126,20 @@ function finalizeRun({
     status,
     exitCode,
     discoveredFileCount: resolvedFiles.length,
+    batchSize: TEST_BATCH_SIZE,
+    batchCount: totalBatches,
+    passedBatchCount: passedBatches,
+    failedBatchCount: failedBatches,
+    batches: batchResults.map((batch) => ({
+      batchNumber: batch.batchNumber,
+      totalBatches: batch.totalBatches,
+      fileCount: batch.fileCount,
+      files: batch.files,
+      status: batch.status,
+      exitCode: batch.exitCode,
+      startupError: batch.startupError,
+      summary: batch.summary,
+    })),
     files: toRepoRelativePaths(resolvedFiles),
     patterns: filesByPattern.map((entry) => ({
       pattern: entry.pattern,
@@ -136,10 +164,16 @@ function finalizeRun({
     console.log(
       `Non-browser tests passed. ${passedCount} passing test(s) across ${resolvedFiles.length} file(s).`,
     );
+    console.log(
+      `Batch summary: ${passedBatches}/${totalBatches} batches passed, ${failedBatches} failed.`,
+    );
   } else {
     const failedCount = summary.fail ?? "unknown";
     console.error(
       `Non-browser tests failed. ${failedCount} failing test(s) across ${resolvedFiles.length} file(s). Exit code: ${exitCode}.`,
+    );
+    console.error(
+      `Batch summary: ${passedBatches}/${totalBatches} batches passed, ${failedBatches} failed.`,
     );
   }
 
@@ -182,6 +216,8 @@ if (resolvedFiles.length === 0) {
     exitCode: 1,
     filesByPattern,
     resolvedFiles,
+    batchStats: { total: 0, passed: 0, failed: 0 },
+    batchResults: [],
     startupError: detailLines.join("\n"),
   });
 }
@@ -199,6 +235,8 @@ if (!existsSync(tsxPackageJsonPath)) {
     exitCode: 1,
     filesByPattern,
     resolvedFiles,
+    batchStats: { total: 0, passed: 0, failed: 0 },
+    batchResults: [],
     startupError,
   });
 }
@@ -225,6 +263,8 @@ if (!existsSync(tsxBinPath)) {
     exitCode: 1,
     filesByPattern,
     resolvedFiles,
+    batchStats: { total: 0, passed: 0, failed: 0 },
+    batchResults: [],
     startupError,
   });
 }
@@ -233,56 +273,94 @@ const nodeLaunchArgs = process.execArgv.includes("--preserve-symlinks-main")
   ? ["--preserve-symlinks-main"]
   : [];
 const launchExecutable = process.execPath;
-const launchArgs = [...nodeLaunchArgs, tsxBinPath, "--test", ...resolvedFiles];
+const fileBatches = chunkFiles(resolvedFiles, TEST_BATCH_SIZE);
+const aggregatedStdout = [];
+const aggregatedStderr = [];
+const batchResults = [];
+let hasBatchFailures = false;
 
-const testProcess = spawnSync(
-  launchExecutable,
-  launchArgs,
-  {
-    cwd: repoRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  },
-);
+for (const [batchIndex, batchFiles] of fileBatches.entries()) {
+  const batchNumber = batchIndex + 1;
+  const batchLabel = `batch ${batchNumber}/${fileBatches.length}`;
+  console.log(`Running ${batchLabel} (${batchFiles.length} files)...`);
 
-if (testProcess.error) {
-  const commandString = `${launchExecutable} ${launchArgs.join(" ")}`;
-  const startupError = `Failed to start tsx test runner executable '${launchExecutable}' with script '${tsxBinPath}' (full command: '${commandString}'): ${testProcess.error.message}`;
-  console.error(startupError);
-  finalizeRun({
-    status: "failed",
-    exitCode: 1,
-    filesByPattern,
-    resolvedFiles,
+  const launchArgs = [...nodeLaunchArgs, tsxBinPath, "--test", ...batchFiles];
+  const testProcess = spawnSync(
+    launchExecutable,
+    launchArgs,
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+
+  const stdout = testProcess.stdout ?? "";
+  const stderr = testProcess.stderr ?? "";
+  const startupError = testProcess.error
+    ? `Failed to start tsx test runner executable '${launchExecutable}' with script '${tsxBinPath}' for ${batchLabel}: ${testProcess.error.message}`
+    : null;
+  const exitCode = testProcess.status ?? (startupError ? 1 : 0);
+  const status = startupError || exitCode !== 0 ? "failed" : "passed";
+
+  aggregatedStdout.push(
+    `--- ${batchLabel} stdout ---`,
+    stdout.length > 0 ? stdout : "(no stdout)",
+  );
+  aggregatedStderr.push(
+    `--- ${batchLabel} stderr ---`,
+    stderr.length > 0 ? stderr : "(no stderr)",
+  );
+
+  batchResults.push({
+    batchNumber,
+    totalBatches: fileBatches.length,
+    fileCount: batchFiles.length,
+    files: toRepoRelativePaths(batchFiles),
+    status,
+    exitCode,
     startupError,
+    summary: parseTapSummary(`${stdout}\n${stderr}`),
+    stdout,
+    stderr,
   });
+
+  if (isVerbose || status === "failed") {
+    if (stdout.length > 0) {
+      process.stdout.write(stdout);
+    }
+    if (stderr.length > 0) {
+      process.stderr.write(stderr);
+    }
+  }
+
+  if (status === "failed") {
+    hasBatchFailures = true;
+  }
 }
 
-const stdout = testProcess.stdout ?? "";
-const stderr = testProcess.stderr ?? "";
-const exitCode = testProcess.status ?? 1;
-
-if (isVerbose) {
-  if (stdout.length > 0) {
-    process.stdout.write(stdout);
-  }
-  if (stderr.length > 0) {
-    process.stderr.write(stderr);
-  }
-} else if (exitCode !== 0) {
-  if (stdout.length > 0) {
-    process.stdout.write(stdout);
-  }
-  if (stderr.length > 0) {
-    process.stderr.write(stderr);
-  }
-}
+const failedBatchDetails = batchResults
+  .filter((batch) => batch.status === "failed")
+  .map((batch) => ({
+    batchNumber: batch.batchNumber,
+    exitCode: batch.exitCode,
+    startupError: batch.startupError,
+  }));
 
 finalizeRun({
-  status: exitCode === 0 ? "passed" : "failed",
-  exitCode,
+  status: hasBatchFailures ? "failed" : "passed",
+  exitCode: hasBatchFailures ? 1 : 0,
   filesByPattern,
   resolvedFiles,
-  stdout,
-  stderr,
+  batchStats: {
+    total: fileBatches.length,
+    passed: fileBatches.length - failedBatchDetails.length,
+    failed: failedBatchDetails.length,
+  },
+  batchResults,
+  stdout: aggregatedStdout.join("\n"),
+  stderr: aggregatedStderr.join("\n"),
+  startupError: failedBatchDetails.length > 0
+    ? JSON.stringify(failedBatchDetails, null, 2)
+    : null,
 });
