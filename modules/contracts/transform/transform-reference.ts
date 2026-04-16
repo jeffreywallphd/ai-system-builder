@@ -1,3 +1,7 @@
+/**
+ * `definitionId` identifies the transform definition/specification.
+ * `executionId` identifies a specific execution record when available.
+ */
 export interface TransformReference {
   definitionId: string;
   executionId?: string;

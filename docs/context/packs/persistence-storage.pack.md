@@ -30,7 +30,7 @@
 - Keep persistence family exports scoped to persistence contracts only.
 - Keep application persistence-port seams operation-aware and record-oriented (not CRUD-generic), with focused anti-drift tests in `modules/application/ports/persistence/tests/`.
 - Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
-- Shared ingestion contracts (`modules/contracts/ingestion`) should carry staged artifact intake metadata (for example source kind, original name, staged descriptor identity) without becoming transport-specific.
+- Shared ingestion contracts (`modules/contracts/ingestion`) should carry staged artifact intake metadata (for example source kind, original name, staged artifact identity) without becoming transport-specific.
 - Storage key creation/normalization should flow through shared storage key helpers to prevent per-operation key-shape drift.
 - Storage checksums should be computed in concrete storage adapters from persisted bytes and surfaced through descriptor results; checksum support does not imply deduplication behavior.
 - Keep storage family exports scoped to storage contracts only.

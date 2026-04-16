@@ -19,6 +19,9 @@ import {
 
 export type ArtifactMetadata = Readonly<Record<string, unknown>>;
 
+/**
+ * General cross-family artifact descriptor; broader than ingestion-specific staged artifact descriptors.
+ */
 export interface ArtifactDescriptor<
   TMetadata extends ArtifactMetadata = ArtifactMetadata,
 > {

@@ -11,6 +11,9 @@ import {
 
 export type StagedArtifactMetadata = Readonly<Record<string, unknown>>;
 
+/**
+ * Canonical ingestion/staging contract for inbound artifacts; narrower than the general artifact contract.
+ */
 export interface StagedArtifactDescriptor<
   TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 > {

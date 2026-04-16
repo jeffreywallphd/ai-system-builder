@@ -11,6 +11,10 @@ import {
 
 export type DatasetMetadata = Readonly<Record<string, unknown>>;
 
+/**
+ * Datasets reference source artifacts and transforms through typed references.
+ * Raw string id arrays should not be introduced here.
+ */
 export interface DatasetDescriptor<
   TMetadata extends DatasetMetadata = DatasetMetadata,
 > {
