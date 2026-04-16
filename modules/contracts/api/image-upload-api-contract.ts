@@ -3,7 +3,7 @@ import {
   type StorageObjectDescriptor,
   type StorageObjectMetadata,
 } from "../storage";
-import { createTransportOperation } from "../transport";
+import { IMAGE_UPLOAD_OPERATION } from "../image-upload";
 import { createApiError } from "./api-error";
 import { createApiRequest, type ApiRequest } from "./api-request";
 import {
@@ -12,11 +12,7 @@ import {
   type ApiResponse,
 } from "./api-response";
 
-const API_IMAGE_UPLOAD_OPERATION_SEGMENTS = ["image", "upload"] as const;
-
-export const API_IMAGE_UPLOAD_OPERATION = createTransportOperation(
-  ...API_IMAGE_UPLOAD_OPERATION_SEGMENTS,
-);
+export const API_IMAGE_UPLOAD_OPERATION = IMAGE_UPLOAD_OPERATION;
 
 export interface ApiImageUploadBoundaryContext {
   host: "server";

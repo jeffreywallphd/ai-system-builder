@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  API_IMAGE_UPLOAD_OPERATION,
   createApiError,
   createApiFailureResponse,
   createApiRequest,
@@ -14,8 +15,13 @@ import {
   createTransportSuccessResponse,
   type TransportResponse,
 } from "../../transport";
+import { IMAGE_UPLOAD_OPERATION } from "../../image-upload";
 
 describe("api transport specialization contracts", () => {
+
+  it("reuses shared image-upload operation identity from canonical transport contract family", () => {
+    expect(API_IMAGE_UPLOAD_OPERATION).toBe(IMAGE_UPLOAD_OPERATION);
+  });
   it("creates an api request compatible with the transport request envelope", () => {
     const apiRequest = createApiRequest(
       "workspace.create",

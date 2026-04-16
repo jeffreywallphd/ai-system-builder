@@ -40,19 +40,20 @@ describe("server app image upload route", () => {
         throw new Error("Expected a numeric test server port.");
       }
 
+      const uploadFormData = new FormData();
+      uploadFormData.append(
+        "file",
+        new File([new Uint8Array([137, 80, 78, 71])], "cat.png", { type: "image/png" }),
+      );
+      uploadFormData.append("source", "server.integration.test");
+
       const response = await fetch(`http://127.0.0.1:${address.port}/api/image/upload`, {
         method: "POST",
         headers: {
-          "content-type": "application/json",
           "x-request-id": "req-server-1",
           "x-correlation-id": "corr-server-1",
         },
-        body: JSON.stringify({
-          fileName: "cat.png",
-          mediaType: "image/png",
-          bytes: [137, 80, 78, 71],
-          source: "server.integration.test",
-        }),
+        body: uploadFormData,
       });
 
       expect(response.status).toBe(200);
@@ -107,17 +108,16 @@ describe("server app image upload route", () => {
         throw new Error("Expected a numeric test server port.");
       }
 
+      const uploadFormData = new FormData();
+      uploadFormData.append(
+        "file",
+        new File([new Uint8Array([37, 80, 68, 70])], "cat.pdf", { type: "application/pdf" }),
+      );
+      uploadFormData.append("source", "server.integration.test.invalid-media-type");
+
       const response = await fetch(`http://127.0.0.1:${address.port}/api/image/upload`, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          fileName: "cat.png",
-          mediaType: "application/pdf",
-          bytes: [37, 80, 68, 70],
-          source: "server.integration.test.invalid-media-type",
-        }),
+        body: uploadFormData,
       });
 
       expect(response.status).toBe(400);
