@@ -1,1 +1,1 @@
-export type DesktopPageKey = "home" | "system";
+export type { DesktopPageKey } from "./desktopPages";

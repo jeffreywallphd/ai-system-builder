@@ -25,26 +25,22 @@ export type DesktopImageUploadResult =
       };
     };
 
-interface DesktopImageUploadPreloadResponse extends DesktopImageUploadResult {
-  operation: string;
-  channel: string;
-}
-
-interface DesktopPreloadApi {
-  uploadImage: (input: DesktopImageUploadInput) => Promise<DesktopImageUploadPreloadResponse>;
-}
 
 export interface DesktopImageUploadApi {
   uploadImage: (input: DesktopImageUploadInput) => Promise<DesktopImageUploadResult>;
 }
 
+interface DesktopApiBridge {
+  uploadImage: (input: DesktopImageUploadInput) => Promise<unknown>;
+}
+
 declare global {
   interface Window {
-    desktopApi?: DesktopPreloadApi;
+    desktopApi?: DesktopApiBridge;
   }
 }
 
-export function getDesktopPreloadApi(): DesktopPreloadApi {
+export function getDesktopApi(): DesktopApiBridge {
   if (!window.desktopApi) {
     throw new Error("Desktop preload API is unavailable.");
   }

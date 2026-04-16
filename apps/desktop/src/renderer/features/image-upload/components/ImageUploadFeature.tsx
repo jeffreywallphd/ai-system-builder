@@ -1,84 +1,14 @@
-import { FormEvent, useState } from "react";
-
-import type { DesktopImageUploadApi } from "../../../lib/desktopApi";
-import { useImageUploadClient } from "../hooks/useImageUploadClient";
+import type { ImageUploadClient } from "../api/desktopImageUploadClient";
+import { useImageUploadFeature } from "../hooks/useImageUploadFeature";
 import { ImageUploadForm } from "./ImageUploadForm";
-import { ImageUploadStatus, type UploadViewState } from "./ImageUploadStatus";
+import { ImageUploadStatus } from "./ImageUploadStatus";
 
 export interface ImageUploadFeatureProps {
-  uploadApi?: DesktopImageUploadApi;
+  client?: ImageUploadClient;
 }
 
-export function ImageUploadFeature({ uploadApi }: ImageUploadFeatureProps) {
-  const uploadClient = useImageUploadClient(uploadApi);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [viewState, setViewState] = useState<UploadViewState>({
-    status: "idle",
-  });
-
-  function onFileChange(event: FormEvent<HTMLInputElement>): void {
-    const file = event.currentTarget.files?.[0] ?? null;
-    setSelectedFile(file);
-
-    if (file) {
-      setViewState({
-        status: "idle",
-        message: `Selected ${file.name}.`,
-      });
-      return;
-    }
-
-    setViewState({
-      status: "idle",
-      message: undefined,
-    });
-  }
-
-  async function onUploadSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    if (!selectedFile) {
-      setViewState({
-        status: "error",
-        message: "Select one image file before uploading.",
-      });
-      return;
-    }
-
-    setViewState({
-      status: "uploading",
-      message: `Uploading ${selectedFile.name}...`,
-    });
-
-    try {
-      const response = await uploadClient.uploadImage({
-        fileName: selectedFile.name,
-        mediaType: selectedFile.type,
-        bytes: new Uint8Array(await selectedFile.arrayBuffer()),
-      });
-
-      if (response.ok) {
-        setViewState({
-          status: "success",
-          message: `Stored ${selectedFile.name}.`,
-          key: response.value.descriptor.key,
-          mediaType: response.value.descriptor.mediaType,
-          sizeBytes: response.value.descriptor.sizeBytes,
-        });
-        return;
-      }
-
-      setViewState({
-        status: "error",
-        message: response.error.message,
-      });
-    } catch (error) {
-      setViewState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Image upload failed.",
-      });
-    }
-  }
+export function ImageUploadFeature({ client }: ImageUploadFeatureProps) {
+  const { selectedFile, viewState, onFileChange, onUploadSubmit } = useImageUploadFeature(client);
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">

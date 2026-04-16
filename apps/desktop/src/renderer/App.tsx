@@ -1,19 +1,26 @@
+import type { ReactNode } from "react";
+
 import { AppShell } from "./components/layout/AppShell";
 import { useDesktopPage } from "./hooks/useDesktopPage";
-import type { DesktopImageUploadApi } from "./lib/desktopApi";
 import { HomePage } from "./pages/HomePage";
 import { SystemPage } from "./pages/SystemPage";
+import { desktopPageDefinitions, type DesktopPageKey } from "./routes/desktopPages";
 
-export interface AppProps {
-  uploadApi?: DesktopImageUploadApi;
-}
+const desktopPageContentMap: Record<DesktopPageKey, ReactNode> = {
+  home: <HomePage />,
+  system: <SystemPage />,
+};
 
-export function App({ uploadApi }: AppProps) {
+export function App() {
   const { activePage, setActivePage } = useDesktopPage();
 
   return (
-    <AppShell activePage={activePage} onNavigate={setActivePage}>
-      {activePage === "home" ? <HomePage uploadApi={uploadApi} /> : <SystemPage />}
+    <AppShell
+      activePage={activePage}
+      onNavigate={setActivePage}
+      pages={desktopPageDefinitions}
+    >
+      {desktopPageContentMap[activePage]}
     </AppShell>
   );
 }

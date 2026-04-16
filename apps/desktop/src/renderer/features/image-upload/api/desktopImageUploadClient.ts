@@ -1,5 +1,5 @@
 import {
-  getDesktopPreloadApi,
+  getDesktopApi,
   type DesktopImageUploadApi,
   type DesktopImageUploadInput,
   type DesktopImageUploadResult,
@@ -9,7 +9,9 @@ export interface ImageUploadClient {
   uploadImage: DesktopImageUploadApi["uploadImage"];
 }
 
-function toRendererResult(response: {
+interface PreloadUploadResponseEnvelope {
+  operation: string;
+  channel: string;
   ok: boolean;
   value?: {
     descriptor: {
@@ -22,7 +24,23 @@ function toRendererResult(response: {
     code?: string;
     message?: string;
   };
-}): DesktopImageUploadResult {
+}
+
+function isPreloadUploadResponseEnvelope(value: unknown): value is PreloadUploadResponseEnvelope {
+  return typeof value === "object" && value !== null && "ok" in value;
+}
+
+function toRendererResult(response: unknown): DesktopImageUploadResult {
+  if (!isPreloadUploadResponseEnvelope(response)) {
+    return {
+      ok: false,
+      error: {
+        code: "internal",
+        message: "Image upload failed.",
+      },
+    };
+  }
+
   if (response.ok && response.value) {
     return {
       ok: true,
@@ -46,11 +64,11 @@ function toRendererResult(response: {
 }
 
 export function createDesktopImageUploadClient(): ImageUploadClient {
-  const desktopPreloadApi = getDesktopPreloadApi();
+  const desktopApi = getDesktopApi();
 
   return {
     async uploadImage(input: DesktopImageUploadInput): Promise<DesktopImageUploadResult> {
-      const response = await desktopPreloadApi.uploadImage(input);
+      const response = await desktopApi.uploadImage(input);
       return toRendererResult(response);
     },
   };

@@ -3,7 +3,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../App";
-import type { DesktopImageUploadApi } from "../lib/desktopApi";
 
 function setInputFiles(input: HTMLInputElement, files: File[]): void {
   Object.defineProperty(input, "files", {
@@ -37,12 +36,15 @@ describe("desktop renderer image upload component", () => {
       });
     }
     mountedContainer?.remove();
+    delete window.desktopApi;
     mountedRoot = undefined;
     mountedContainer = undefined;
   });
 
   it("shows selected file information after one image file is chosen", async () => {
-    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue({
+    const uploadImage = vi.fn().mockResolvedValue({
+      operation: "image.upload",
+      channel: "ipc.image.upload.response",
       ok: true,
       value: {
         descriptor: {
@@ -53,10 +55,12 @@ describe("desktop renderer image upload component", () => {
       },
     });
 
+    window.desktopApi = { uploadImage };
+
     const { root, container } = mountApp();
 
     await act(async () => {
-      root.render(<App uploadApi={{ uploadImage }} />);
+      root.render(<App />);
     });
 
     const input = container.querySelector("input[type='file']") as HTMLInputElement | null;
@@ -75,7 +79,9 @@ describe("desktop renderer image upload component", () => {
   });
 
   it("uploads selected image bytes through the preload bridge dependency and renders success details", async () => {
-    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue({
+    const uploadImage = vi.fn().mockResolvedValue({
+      operation: "image.upload",
+      channel: "ipc.image.upload.response",
       ok: true,
       value: {
         descriptor: {
@@ -86,10 +92,12 @@ describe("desktop renderer image upload component", () => {
       },
     });
 
+    window.desktopApi = { uploadImage };
+
     const { root, container } = mountApp();
 
     await act(async () => {
-      root.render(<App uploadApi={{ uploadImage }} />);
+      root.render(<App />);
     });
 
     const input = container.querySelector("input[type='file']") as HTMLInputElement | null;
@@ -120,7 +128,9 @@ describe("desktop renderer image upload component", () => {
   });
 
   it("renders failure feedback when upload response returns a contract failure", async () => {
-    const uploadImage = vi.fn<DesktopImageUploadApi["uploadImage"]>().mockResolvedValue({
+    const uploadImage = vi.fn().mockResolvedValue({
+      operation: "image.upload",
+      channel: "ipc.image.upload.response",
       ok: false,
       error: {
         code: "validation",
@@ -128,10 +138,12 @@ describe("desktop renderer image upload component", () => {
       },
     });
 
+    window.desktopApi = { uploadImage };
+
     const { root, container } = mountApp();
 
     await act(async () => {
-      root.render(<App uploadApi={{ uploadImage }} />);
+      root.render(<App />);
     });
 
     const input = container.querySelector("input[type='file']") as HTMLInputElement | null;

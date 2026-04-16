@@ -18,16 +18,19 @@ export function ImageUploadForm({
   return (
     <>
       <form className="ui-stack ui-stack--sm" onSubmit={onSubmit}>
-        <label htmlFor="desktop-image-file-input">Choose image</label>
+        <label className="ui-label" htmlFor="desktop-image-file-input">
+          Choose image
+        </label>
         <input
           id="desktop-image-file-input"
+          className="ui-file-input"
           name="desktop-image-file-input"
           type="file"
           accept="image/*"
           multiple={false}
           onChange={onFileChange}
         />
-        <button type="submit" disabled={uploadStatus === "uploading"}>
+        <button className="ui-button" type="submit" disabled={uploadStatus === "uploading"}>
           Upload
         </button>
       </form>

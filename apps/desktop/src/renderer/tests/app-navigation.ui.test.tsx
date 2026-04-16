@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../App";
 
@@ -15,6 +15,7 @@ describe("desktop renderer page composition", () => {
       });
     }
     mountedContainer?.remove();
+    delete window.desktopApi;
     mountedRoot = undefined;
     mountedContainer = undefined;
   });
@@ -26,8 +27,12 @@ describe("desktop renderer page composition", () => {
     mountedRoot = root;
     mountedContainer = container;
 
+    window.desktopApi = {
+      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+    };
+
     await act(async () => {
-      root.render(<App uploadApi={{ uploadImage: async () => { throw new Error("unused"); } }} />);
+      root.render(<App />);
     });
 
     expect(container.textContent).toContain("Home");
