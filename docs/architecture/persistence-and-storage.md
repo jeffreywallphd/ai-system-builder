@@ -64,6 +64,8 @@ Physical location can vary by host mode:
 
 - Desktop mode may store artifacts under OS-specific app data locations.
 - Server mode may store artifacts in configured file paths, mounted volumes, or object/blob services.
+- For the current server app, the default filesystem storage root is resolved from the server app/module location so
+  it is deterministic and not launch-`cwd` dependent; `SERVER_STORAGE_ROOT` remains the explicit override.
 
 Important: physical location choice does **not** remove the architectural need for storage abstraction.
 

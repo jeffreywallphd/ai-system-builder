@@ -80,19 +80,17 @@ describe("StoreImageUploadUseCase", () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        descriptor: {
-          sourceKind: "upload",
-          storage: {
-            key: "uploads/image-upload-1",
-            mediaType: "image/png",
-            sizeBytes: 4,
-            checksum: {
-              algorithm: "sha256",
-              value: "0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543",
-            },
+        sourceKind: "upload",
+        storage: {
+          key: "uploads/image-upload-1",
+          mediaType: "image/png",
+          sizeBytes: 4,
+          checksum: {
+            algorithm: "sha256",
+            value: "0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543",
           },
-          originalName: "kitten.png",
         },
+        originalName: "kitten.png",
       },
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",

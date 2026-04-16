@@ -65,7 +65,7 @@ export function mapStoreImageUploadResultToIpcResponse(
   request: DesktopImageUploadRequest,
 ): DesktopImageUploadResponse {
   if (result.ok) {
-    return createDesktopImageUploadSuccessResponse(result.value.descriptor, {
+    return createDesktopImageUploadSuccessResponse(result.value, {
       requestId: result.requestId ?? request.requestId,
       correlationId: result.correlationId ?? request.correlationId,
     });

@@ -9,13 +9,12 @@ describe("mapStoreImageUploadToRegisterStagedDataResult", () => {
       {
         ok: true,
         descriptor: {
-          sourceKind: "upload",
-          storage: {
-            key: " uploads/cat.png ",
-            mediaType: "image/png",
-            sizeBytes: 4,
-          },
+          key: " uploads/cat.png ",
+          mediaType: "image/png",
+          sizeBytes: 4,
         },
+        sourceKind: "upload",
+        originalName: " cat.png ",
       },
       {
         requestId: "req-map-1",
@@ -26,6 +25,7 @@ describe("mapStoreImageUploadToRegisterStagedDataResult", () => {
       ok: true,
       value: {
         sourceKind: "upload",
+        originalName: "cat.png",
         storage: {
           key: "uploads/cat.png",
           mediaType: "image/png",

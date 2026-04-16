@@ -1,8 +1,8 @@
-import type { ContractResult } from "../../contracts/shared";
 import type {
-  StagedDataDescriptor,
+  RegisterStagedDataResult,
   StagedDataMetadata,
 } from "../../contracts/ingestion";
+import type { ContractErrorDetails } from "../../contracts/shared";
 
 export interface StoreImageUploadCommand {
   fileName: string;
@@ -14,12 +14,7 @@ export interface StoreImageUploadCommandContext {
   source: string;
 }
 
-export interface StoreImageUploadUseCaseSuccessValue<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
-> {
-  descriptor: StagedDataDescriptor<TMetadata>;
-}
-
 export type StoreImageUploadUseCaseResult<
+  TDetails extends ContractErrorDetails = ContractErrorDetails,
   TMetadata extends StagedDataMetadata = StagedDataMetadata,
-> = ContractResult<StoreImageUploadUseCaseSuccessValue<TMetadata>>;
+> = RegisterStagedDataResult<TDetails, TMetadata>;

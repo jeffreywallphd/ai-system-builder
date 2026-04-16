@@ -105,6 +105,8 @@ Contributors should:
 - The initial server-backed vertical slice is the image-upload path, where thin-client UI calls an HTTP client,
   the Express adapter accepts browser-native multipart upload input, delegates to a shared application use case, and
   storage is handled through the same server host composition seam used by other server flows.
+- Multipart parsing for that server-backed image-upload path stays in the Express transport adapter and should parse
+  the live request stream with Busboy rather than buffering the full request body before parsing.
 
 ## Practical boundaries
 

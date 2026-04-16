@@ -91,14 +91,12 @@ describe("image upload cross-transport equivalence", () => {
       .mockResolvedValue({
         ok: true,
         value: {
-          descriptor: {
-            storage: {
-              key: "uploads/cat.png",
-              mediaType: "image/png",
-              sizeBytes: 4,
-            },
-            sourceKind: "upload",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
       });
     const ipcHandler = createDesktopImageUploadIpcHandler(createIpcUseCaseStub(executeFromIpc));
@@ -127,14 +125,12 @@ describe("image upload cross-transport equivalence", () => {
       .mockResolvedValue({
         ok: true,
         value: {
-          descriptor: {
-            storage: {
-              key: "uploads/cat.png",
-              mediaType: "image/png",
-              sizeBytes: 4,
-            },
-            sourceKind: "upload",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
       });
     await invokeApiUploadRoute(executeFromApi);
@@ -175,14 +171,12 @@ describe("image upload cross-transport equivalence", () => {
         vi.fn<IpcStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
           ok: true,
           value: {
-            descriptor: {
-              storage: {
-                key: "uploads/cat.png",
-                mediaType: "image/png",
-                sizeBytes: 4,
-              },
-              sourceKind: "upload",
+            storage: {
+              key: "uploads/cat.png",
+              mediaType: "image/png",
+              sizeBytes: 4,
             },
+            sourceKind: "upload",
           },
           requestId: "req-transport-2",
           correlationId: "corr-transport-2",
@@ -211,14 +205,12 @@ describe("image upload cross-transport equivalence", () => {
       vi.fn<ApiStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
         ok: true,
         value: {
-          descriptor: {
-            storage: {
-              key: "uploads/cat.png",
-              mediaType: "image/png",
-              sizeBytes: 4,
-            },
-            sourceKind: "upload",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
         requestId: "req-transport-2",
         correlationId: "corr-transport-2",

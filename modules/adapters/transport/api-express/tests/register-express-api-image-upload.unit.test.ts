@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it, vi } from "vitest";
@@ -36,7 +37,7 @@ function createMultipartRequest(
 ): {
   body: undefined;
   headers: Record<string, string>;
-  on: (event: string, listener: (chunk?: Buffer) => void) => void;
+  pipe: (destination: NodeJS.WritableStream) => NodeJS.WritableStream;
 } {
   const fileName = options?.fileName ?? "cat.png";
   const mediaType = options?.mediaType ?? "image/png";
@@ -52,21 +53,16 @@ function createMultipartRequest(
   const end = `\r\n--${boundary}--\r\n`;
   const body = Buffer.concat([Buffer.from(start, "utf8"), Buffer.from(bytes), Buffer.from(end, "utf8")]);
 
-  return {
-    body: undefined,
-    headers: {
-      "content-type": `multipart/form-data; boundary=${boundary}`,
-    },
-    on(event, listener) {
-      if (event === "data") {
-        listener(body);
-      }
-
-      if (event === "end") {
-        listener();
-      }
-    },
+  const request = Readable.from([body]) as Readable & {
+    body: undefined;
+    headers: Record<string, string>;
   };
+  request.body = undefined;
+  request.headers = {
+    "content-type": `multipart/form-data; boundary=${boundary}`,
+  };
+
+  return request;
 }
 
 describe("registerImageUploadApiRoute", () => {
@@ -112,14 +108,12 @@ describe("registerImageUploadApiRoute", () => {
       {
         ok: true,
         value: {
-          descriptor: {
-            storage: {
-              key: "uploads/cat.png",
-              mediaType: "image/png",
-              sizeBytes: 4,
-            },
-            sourceKind: "upload",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
         requestId: "req-upload-1",
         correlationId: "corr-upload-1",
@@ -207,14 +201,12 @@ describe("registerImageUploadApiRoute", () => {
     const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
-        descriptor: {
-          storage: {
-            key: "uploads/cat.png",
-            mediaType: "image/png",
-            sizeBytes: 4,
-          },
-          sourceKind: "upload",
+        storage: {
+          key: "uploads/cat.png",
+          mediaType: "image/png",
+          sizeBytes: 4,
         },
+        sourceKind: "upload",
       },
       requestId: "req-upload-3",
       correlationId: "corr-upload-3",
@@ -231,18 +223,17 @@ describe("registerImageUploadApiRoute", () => {
 
     const status = vi.fn().mockReturnThis();
     const json = vi.fn();
+    const routeRequest = createMultipartRequest("route-test-boundary", [137, 80, 78, 71], {
+      source: "server.web.upload-form",
+    });
+    routeRequest.headers = {
+      "content-type": "multipart/form-data; boundary=route-test-boundary",
+      "x-request-id": "req-upload-3",
+      "x-correlation-id": "corr-upload-3",
+    };
 
     await registeredHandler?.(
-      {
-        ...createMultipartRequest("route-test-boundary", [137, 80, 78, 71], {
-          source: "server.web.upload-form",
-        }),
-        headers: {
-          "content-type": "multipart/form-data; boundary=route-test-boundary",
-          "x-request-id": "req-upload-3",
-          "x-correlation-id": "corr-upload-3",
-        },
-      },
+      routeRequest,
       {
         status,
         json,
@@ -301,19 +292,17 @@ describe("registerImageUploadApiRoute", () => {
 
     const status = vi.fn().mockReturnThis();
     const json = vi.fn();
+    const missingFileRequest = Readable.from([Buffer.from("--missing-file-boundary--\r\n")]) as Readable & {
+      body: undefined;
+      headers: Record<string, string>;
+    };
+    missingFileRequest.body = undefined;
+    missingFileRequest.headers = {
+      "content-type": "multipart/form-data; boundary=missing-file-boundary",
+    };
 
     await registeredHandler?.(
-      {
-        ...createMultipartRequest("missing-file-boundary", [], { source: "thin-client.image-upload.form" }),
-        on(event, listener) {
-          if (event === "data") {
-            listener(Buffer.from("--missing-file-boundary--\r\n"));
-          }
-          if (event === "end") {
-            listener();
-          }
-        },
-      },
+      missingFileRequest,
       {
         status,
         json,

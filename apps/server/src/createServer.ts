@@ -1,4 +1,3 @@
-import os from "node:os";
 import path from "node:path";
 
 import express from "express";
@@ -33,8 +32,8 @@ function normalizePort(rawPort: string | undefined): number {
 
 export function resolveDefaultServerStorageRootDirectory(): string {
   return path.resolve(
-    os.homedir(),
-    ".ai-system-builder",
+    __dirname,
+    "..",
     DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
   );
 }
