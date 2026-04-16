@@ -1,0 +1,24 @@
+label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+input[type="file"] {
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--color-border-strong);
+  background: var(--color-bg-panel);
+  color: var(--color-text-secondary);
+}
+
+input[type="file"]::file-selector-button {
+  margin-right: var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  padding: var(--space-xs) var(--space-sm);
+  cursor: pointer;
+}

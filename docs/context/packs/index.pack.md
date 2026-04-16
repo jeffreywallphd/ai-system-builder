@@ -69,3 +69,4 @@
 - When a task affects canonical rules or boundaries, read and update the relevant canonical docs directly.
 - Typical order: `index` → task-specific pack(s) → targeted canonical doc links when needed.
 - For desktop renderer/main/preload implementation work, pair `desktop-host` with `desktop-implementation` instead of broad unrelated packs.
+- For desktop renderer styling tasks, pair `desktop-implementation` with `desktop-styling` and include only style-relevant canonical docs.

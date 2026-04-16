@@ -16,11 +16,16 @@ export function ImageUploadStatus({ viewState }: ImageUploadStatusProps) {
   return (
     <>
       {viewState.message ? (
-        <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p>
+        <p
+          className={viewState.status === "success" ? "ui-status ui-status--success" : "ui-status"}
+          role={viewState.status === "error" ? "alert" : "status"}
+        >
+          {viewState.message}
+        </p>
       ) : null}
 
       {viewState.status === "success" && viewState.key ? (
-        <dl>
+        <dl className="ui-grid ui-grid--two">
           <dt>Stored key</dt>
           <dd>{viewState.key}</dd>
           <dt>Stored media type</dt>

@@ -8,8 +8,8 @@ export interface HomePageProps {
 
 export function HomePage({ uploadApi }: HomePageProps) {
   return (
-    <section>
-      <h2>Home</h2>
+    <section className="ui-panel ui-stack ui-stack--sm">
+      <h2 className="ui-panel__title">Home</h2>
       <p>Desktop image upload starter flow.</p>
       <ImageUploadFeature uploadApi={uploadApi} />
     </section>
