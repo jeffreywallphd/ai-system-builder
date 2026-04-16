@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it, vi } from "../../../../testing/node-test";
+import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import { createContractError } from "../../../../contracts/shared";
 import {
@@ -15,12 +15,12 @@ import {
 } from "../image-upload/registerImageUploadApiRoute";
 
 function createUseCaseStub(
-  executeImpl?: ReturnType<typeof vi.fn<StoreImageUploadUseCasePort["execute"]>>,
+  executeImpl?: ReturnType<typeof testDouble.fn<StoreImageUploadUseCasePort["execute"]>>,
 ): StoreImageUploadUseCasePort {
   return {
     execute:
       executeImpl
-      ?? vi
+      ?? testDouble
         .fn<StoreImageUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
   };
@@ -192,13 +192,13 @@ describe("registerImageUploadApiRoute", () => {
       | undefined;
 
     const app: ExpressPostRoutePort = {
-      post: vi.fn((path, handler) => {
+      post: testDouble.fn((path, handler) => {
         registeredPath = path;
         registeredHandler = handler;
       }),
     };
 
-    const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
         storage: {
@@ -221,8 +221,8 @@ describe("registerImageUploadApiRoute", () => {
     expect(registeredPath).toBe("/api/image/upload");
     expect(registeredHandler).toBeTypeOf("function");
 
-    const status = vi.fn().mockReturnThis();
-    const json = vi.fn();
+    const status = testDouble.fn().mockReturnThis();
+    const json = testDouble.fn();
     const routeRequest = createMultipartRequest("route-test-boundary", [137, 80, 78, 71], {
       source: "server.web.upload-form",
     });
@@ -280,7 +280,7 @@ describe("registerImageUploadApiRoute", () => {
       | undefined;
 
     const app: ExpressPostRoutePort = {
-      post: vi.fn((_path, handler) => {
+      post: testDouble.fn((_path, handler) => {
         registeredHandler = handler as typeof registeredHandler;
       }),
     };
@@ -290,8 +290,8 @@ describe("registerImageUploadApiRoute", () => {
       storeImageUploadUseCase: createUseCaseStub(),
     });
 
-    const status = vi.fn().mockReturnThis();
-    const json = vi.fn();
+    const status = testDouble.fn().mockReturnThis();
+    const json = testDouble.fn();
     const missingFileRequest = Readable.from([Buffer.from("--missing-file-boundary--\r\n")]) as Readable & {
       body: undefined;
       headers: Record<string, string>;

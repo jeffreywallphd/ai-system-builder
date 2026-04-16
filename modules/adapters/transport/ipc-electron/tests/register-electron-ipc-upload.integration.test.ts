@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "../../../../testing/node-test";
+import { afterEach, describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import { StoreImageUploadUseCase } from "../../../../application/use-cases";
 import { createFilesystemArtifactStorageAdapter } from "../../../storage/filesystem/artifact-store";
@@ -30,7 +30,7 @@ async function createTempRoot(): Promise<string> {
   return root;
 }
 
-function createLoggingPort(log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined)) {
+function createLoggingPort(log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined)) {
   return {
     log,
   } satisfies LoggingPort;
@@ -39,7 +39,7 @@ function createLoggingPort(log = vi.fn<LoggingPort["log"]>().mockResolvedValue(u
 describe("desktop image upload IPC integration", () => {
   it("handles a real upload request through IPC -> use case -> filesystem adapter and returns success", async () => {
     const rootDirectory = await createTempRoot();
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const useCase = new StoreImageUploadUseCase({
       storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,

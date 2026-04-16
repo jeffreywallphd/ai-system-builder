@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "../../../testing/node-test";
+import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
 import { type LoggingPort } from "../../ports/logging";
 import { type ArtifactStoragePort } from "../../ports/storage";
@@ -36,23 +36,23 @@ function createStoragePort(
   overrides: Partial<Record<keyof ArtifactStoragePort, unknown>> = {},
 ): ArtifactStoragePort {
   return {
-    storeArtifact: vi.fn<ArtifactStoragePort["storeArtifact"]>(),
-    retrieveArtifact: vi.fn<ArtifactStoragePort["retrieveArtifact"]>(),
-    hasArtifact: vi.fn<ArtifactStoragePort["hasArtifact"]>(),
-    deleteArtifact: vi.fn<ArtifactStoragePort["deleteArtifact"]>(),
+    storeArtifact: testDouble.fn<ArtifactStoragePort["storeArtifact"]>(),
+    retrieveArtifact: testDouble.fn<ArtifactStoragePort["retrieveArtifact"]>(),
+    hasArtifact: testDouble.fn<ArtifactStoragePort["hasArtifact"]>(),
+    deleteArtifact: testDouble.fn<ArtifactStoragePort["deleteArtifact"]>(),
     ...overrides,
   } as ArtifactStoragePort;
 }
 
-function createLoggingPort(log?: ReturnType<typeof vi.fn<LoggingPort["log"]>>) {
+function createLoggingPort(log?: ReturnType<typeof testDouble.fn<LoggingPort["log"]>>) {
   return {
-    log: log ?? vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined),
+    log: log ?? testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined),
   } satisfies LoggingPort;
 }
 
 describe("StoreImageUploadUseCase", () => {
   it("stores a valid image upload through the storage port and returns a descriptor result", async () => {
-    const storeArtifact = vi.fn<ArtifactStoragePort["storeArtifact"]>().mockResolvedValue(
+    const storeArtifact = testDouble.fn<ArtifactStoragePort["storeArtifact"]>().mockResolvedValue(
       createStoreArtifactSuccessResult({
         key: "uploads/image-upload-1",
         mediaType: "image/png",
@@ -64,7 +64,7 @@ describe("StoreImageUploadUseCase", () => {
       }),
     );
     const storage = createStoragePort({ storeArtifact });
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const logging = createLoggingPort(log);
     const useCase = new StoreImageUploadUseCase({
       storage,
@@ -124,9 +124,9 @@ describe("StoreImageUploadUseCase", () => {
   });
 
   it("fails validation for non-image media types and logs a failed outcome", async () => {
-    const storeArtifact = vi.fn<ArtifactStoragePort["storeArtifact"]>();
+    const storeArtifact = testDouble.fn<ArtifactStoragePort["storeArtifact"]>();
     const storage = createStoragePort({ storeArtifact });
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
@@ -163,9 +163,9 @@ describe("StoreImageUploadUseCase", () => {
   });
 
   it("fails validation for empty bytes and does not call storage", async () => {
-    const storeArtifact = vi.fn<ArtifactStoragePort["storeArtifact"]>();
+    const storeArtifact = testDouble.fn<ArtifactStoragePort["storeArtifact"]>();
     const storage = createStoragePort({ storeArtifact });
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
@@ -195,13 +195,13 @@ describe("StoreImageUploadUseCase", () => {
   });
 
   it("returns storage failures and logs failed storage outcomes", async () => {
-    const storeArtifact = vi.fn<ArtifactStoragePort["storeArtifact"]>().mockResolvedValue(
+    const storeArtifact = testDouble.fn<ArtifactStoragePort["storeArtifact"]>().mockResolvedValue(
       createStoreArtifactFailureResult(
         createContractError("unavailable", "Storage adapter unavailable"),
       ),
     );
     const storage = createStoragePort({ storeArtifact });
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
@@ -228,11 +228,11 @@ describe("StoreImageUploadUseCase", () => {
   });
 
   it("maps unexpected storage exceptions to internal failures and logs failure context", async () => {
-    const storeArtifact = vi
+    const storeArtifact = testDouble
       .fn<ArtifactStoragePort["storeArtifact"]>()
       .mockRejectedValue(new Error("disk exploded"));
     const storage = createStoragePort({ storeArtifact });
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),
@@ -267,7 +267,7 @@ describe("StoreImageUploadUseCase", () => {
 
   it("logs start and failure when filename is missing", async () => {
     const storage = createStoragePort();
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const useCase = new StoreImageUploadUseCase({
       storage,
       logging: createLoggingPort(log),

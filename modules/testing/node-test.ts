@@ -148,7 +148,7 @@ function ensureSpy(value: unknown, matcherName: string): asserts value is { mock
     typeof (value as { mock?: unknown }).mock !== "object" ||
     (value as { mock?: { calls?: unknown } }).mock?.calls === undefined
   ) {
-    throwWithMessage(`${matcherName} requires a spy function created with vi.fn/vi.spyOn.`);
+    throwWithMessage(`${matcherName} requires a spy function created with testDouble.fn/testDouble.spyOn.`);
   }
 }
 
@@ -417,7 +417,7 @@ export function expectTypeOf<T>() {
   };
 }
 
-export const vi = {
+export const testDouble = {
   fn<TFunction extends AnyFunction = AnyFunction>(
     implementation?: TFunction,
   ): SpyFunction<TFunction> {
@@ -455,8 +455,12 @@ export const vi = {
 };
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  testDouble.restoreAllMocks();
 });
+
+// Backward-compatible alias for older tests still using Vitest naming.
+export const vi = testDouble;
+
 
 export {
   after,

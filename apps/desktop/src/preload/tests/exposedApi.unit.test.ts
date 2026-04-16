@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "../../../../../modules/testing/node-test";
+import { describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
 
 import {
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
@@ -11,7 +11,7 @@ import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedA
 
 describe("desktop preload exposedApi uploadImage bridge", () => {
   it("maps bridge input into the desktop upload request envelope and invokes the request channel", async () => {
-    const invoke = vi.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopImageUploadSuccessResponse(
         {
           key: "uploads/kitten.png",
@@ -66,7 +66,7 @@ describe("desktop preload exposedApi uploadImage bridge", () => {
   });
 
   it("supports preload-owned boundary source overrides without exposing IPC internals to ui callers", async () => {
-    const invoke = vi.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopImageUploadSuccessResponse({
         key: "uploads/cat.png",
         mediaType: "image/png",
@@ -94,7 +94,7 @@ describe("desktop preload exposedApi uploadImage bridge", () => {
   });
 
   it("throws when IPC returns a response envelope for the wrong operation or channel", async () => {
-    const invoke = vi.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createIpcFailureResponse(
         createIpcError(
           createIpcChannel("image.archive", "response"),
