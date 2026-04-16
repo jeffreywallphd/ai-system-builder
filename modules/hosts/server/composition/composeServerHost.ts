@@ -3,12 +3,9 @@ import { StoreImageUploadUseCase } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
+import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
-
-export interface ExpressPostRoutePort {
-  post: (path: string, handler: (...args: unknown[]) => unknown) => unknown;
-}
 
 export interface ComposeServerHostLoggingOptions {
   verbosity?: string;

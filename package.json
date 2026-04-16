@@ -14,8 +14,9 @@
     "test": "vitest run --environment jsdom",
     "dev:thin-client": "npm run dev --prefix apps/thin-client",
     "build:thin-client": "npm run build --prefix apps/thin-client",
-    "dev:server": "npm run start:server",
-    "start:server": "tsc -p tsconfig.json && node dist/apps/server/src/index.js"
+    "build:server": "tsc -p apps/server/tsconfig.json",
+    "start:server": "npm run build:server && node dist/apps/server/src/index.js",
+    "dev:server": "npm run start:server"
   },
   "dependencies": {
     "react": "^19.2.0",
