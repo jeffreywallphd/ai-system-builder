@@ -75,11 +75,11 @@ describe("desktop image upload IPC integration", () => {
     expect(response.operation).toBe("image.upload");
     expect(response.requestId).toBe("req-ipc-integration-1");
     expect(response.correlationId).toBe("corr-ipc-integration-1");
-    expect(path.isAbsolute(response.value.descriptor.key)).toBe(false);
-    expect(response.value.descriptor.mediaType).toBe("image/png");
-    expect(response.value.descriptor.sizeBytes).toBe(4);
+    expect(path.isAbsolute(response.value.descriptor.storage.key)).toBe(false);
+    expect(response.value.descriptor.storage.mediaType).toBe("image/png");
+    expect(response.value.descriptor.storage.sizeBytes).toBe(4);
 
-    const writtenBytes = await readFile(path.join(rootDirectory, ...response.value.descriptor.key.split("/")));
+    const writtenBytes = await readFile(path.join(rootDirectory, ...response.value.descriptor.storage.key.split("/")));
     expect(new Uint8Array(writtenBytes)).toEqual(new Uint8Array([137, 80, 78, 71]));
 
     const events = log.mock.calls.map(

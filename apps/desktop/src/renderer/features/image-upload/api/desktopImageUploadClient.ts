@@ -15,9 +15,11 @@ interface PreloadUploadResponseEnvelope {
   ok: boolean;
   value?: {
     descriptor: {
-      key: string;
-      mediaType: string;
-      sizeBytes: number;
+      storage: {
+        key: string;
+        mediaType: string;
+        sizeBytes: number;
+      };
     };
   };
   error?: {
@@ -46,9 +48,9 @@ function toRendererResult(response: unknown): DesktopImageUploadResult {
       ok: true,
       value: {
         descriptor: {
-          key: response.value.descriptor.key,
-          mediaType: response.value.descriptor.mediaType,
-          sizeBytes: response.value.descriptor.sizeBytes,
+          key: response.value.descriptor.storage.key,
+          mediaType: response.value.descriptor.storage.mediaType,
+          sizeBytes: response.value.descriptor.storage.sizeBytes,
         },
       },
     };

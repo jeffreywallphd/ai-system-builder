@@ -179,11 +179,13 @@ describe("contracts cross-family invariants", () => {
     );
 
     expect(stagedDescriptor).toEqual({
-      storageKey: "staging/uploads/image-9",
       sourceKind: "upload",
-      mediaType: "image/png",
-      sizeBytes: 3,
       originalName: "image-9.png",
+      storage: {
+        key: "staging/uploads/image-9",
+        mediaType: "image/png",
+        sizeBytes: 3,
+      },
     });
     expect("operation" in stagedDescriptor).toBe(false);
     expect("channel" in stagedDescriptor).toBe(false);

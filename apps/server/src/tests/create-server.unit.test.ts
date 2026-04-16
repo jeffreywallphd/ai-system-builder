@@ -1,0 +1,36 @@
+import os from "node:os";
+import path from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+import {
+  DEFAULT_SERVER_PORT,
+  DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
+  resolveDefaultServerStorageRootDirectory,
+  resolveServerRuntimeConfig,
+} from "../createServer";
+
+describe("resolveServerRuntimeConfig", () => {
+  it("uses stable server-owned defaults when environment overrides are absent", () => {
+    const config = resolveServerRuntimeConfig({});
+
+    expect(config.port).toBe(DEFAULT_SERVER_PORT);
+    expect(config.storageRootDirectory).toBe(
+      path.resolve(os.homedir(), ".ai-system-builder", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
+    );
+  });
+
+  it("honors SERVER_STORAGE_ROOT override when provided", () => {
+    const config = resolveServerRuntimeConfig({
+      SERVER_STORAGE_ROOT: " ./tmp/server-root ",
+    });
+
+    expect(config.storageRootDirectory).toBe(path.resolve("./tmp/server-root"));
+  });
+
+  it("exposes the same default storage root through resolveDefaultServerStorageRootDirectory", () => {
+    expect(resolveDefaultServerStorageRootDirectory()).toBe(
+      path.resolve(os.homedir(), ".ai-system-builder", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
+    );
+  });
+});

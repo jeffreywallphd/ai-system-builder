@@ -32,9 +32,11 @@ interface ApiResponseEnvelope {
   ok: boolean;
   value?: {
     descriptor?: {
-      key?: string;
-      mediaType?: string;
-      sizeBytes?: number;
+      storage?: {
+        key?: string;
+        mediaType?: string;
+        sizeBytes?: number;
+      };
     };
   };
   error?: {
@@ -91,14 +93,14 @@ function toRendererResult(responseBody: unknown): ThinClientImageUploadResult {
     };
   }
 
-  if (responseBody.ok && responseBody.value?.descriptor?.key) {
+  if (responseBody.ok && responseBody.value?.descriptor?.storage?.key) {
     return {
       ok: true,
       value: {
         descriptor: {
-          key: responseBody.value.descriptor.key,
-          mediaType: responseBody.value.descriptor.mediaType,
-          sizeBytes: responseBody.value.descriptor.sizeBytes,
+          key: responseBody.value.descriptor.storage.key,
+          mediaType: responseBody.value.descriptor.storage.mediaType,
+          sizeBytes: responseBody.value.descriptor.storage.sizeBytes,
         },
       },
     };

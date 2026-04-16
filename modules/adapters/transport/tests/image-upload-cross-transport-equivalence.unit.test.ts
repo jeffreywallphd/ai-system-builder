@@ -92,10 +92,12 @@ describe("image upload cross-transport equivalence", () => {
         ok: true,
         value: {
           descriptor: {
-            storageKey: "uploads/cat.png",
+            storage: {
+              key: "uploads/cat.png",
+              mediaType: "image/png",
+              sizeBytes: 4,
+            },
             sourceKind: "upload",
-            mediaType: "image/png",
-            sizeBytes: 4,
           },
         },
       });
@@ -126,10 +128,12 @@ describe("image upload cross-transport equivalence", () => {
         ok: true,
         value: {
           descriptor: {
-            storageKey: "uploads/cat.png",
+            storage: {
+              key: "uploads/cat.png",
+              mediaType: "image/png",
+              sizeBytes: 4,
+            },
             sourceKind: "upload",
-            mediaType: "image/png",
-            sizeBytes: 4,
           },
         },
       });
@@ -172,10 +176,12 @@ describe("image upload cross-transport equivalence", () => {
           ok: true,
           value: {
             descriptor: {
-              storageKey: "uploads/cat.png",
+              storage: {
+                key: "uploads/cat.png",
+                mediaType: "image/png",
+                sizeBytes: 4,
+              },
               sourceKind: "upload",
-              mediaType: "image/png",
-              sizeBytes: 4,
             },
           },
           requestId: "req-transport-2",
@@ -206,10 +212,12 @@ describe("image upload cross-transport equivalence", () => {
         ok: true,
         value: {
           descriptor: {
-            storageKey: "uploads/cat.png",
+            storage: {
+              key: "uploads/cat.png",
+              mediaType: "image/png",
+              sizeBytes: 4,
+            },
             sourceKind: "upload",
-            mediaType: "image/png",
-            sizeBytes: 4,
           },
         },
         requestId: "req-transport-2",
@@ -227,10 +235,12 @@ describe("image upload cross-transport equivalence", () => {
         correlationId: "corr-transport-2",
         value: {
           descriptor: {
-            storageKey: "uploads/cat.png",
+            storage: {
+              key: "uploads/cat.png",
+              mediaType: "image/png",
+              sizeBytes: 4,
+            },
             sourceKind: "upload",
-            mediaType: "image/png",
-            sizeBytes: 4,
           },
         },
       }),

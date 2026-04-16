@@ -10,9 +10,11 @@ describe("desktop image upload client", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "uploads/cat.png",
-          mediaType: "image/png",
-          sizeBytes: 3,
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 3,
+          },
         },
       },
     });
