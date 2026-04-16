@@ -18,10 +18,16 @@ describe("storage family invariants", () => {
       "createStoreArtifactFailureResult",
       "createStoreArtifactRequest",
       "createStoreArtifactSuccessResult",
+      "isStorageInstanceKind",
+      "isStorageZoneKind",
       "isStorageArtifactKey",
       "normalizeStorageArtifactKey",
+      "normalizeStorageInstanceKind",
+      "normalizeStorageInstanceReference",
       "normalizeStorageObjectDescriptor",
       "normalizeStorageObjectDescriptorInput",
+      "normalizeStoragePlacementDescriptor",
+      "normalizeStorageZoneKind",
     ]);
   });
 

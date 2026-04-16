@@ -29,6 +29,9 @@ import {
 import {
   createStagedDataDescriptorFromStorageObjectDescriptor,
 } from "../ingestion";
+import { normalizeTransformRecord } from "../transform";
+import { normalizeDatasetDescriptor } from "../dataset";
+import { normalizeLineageRecord } from "../lineage";
 import {
   createTransportOperation,
   createTransportRequest,
@@ -189,6 +192,60 @@ describe("contracts cross-family invariants", () => {
     });
     expect("operation" in stagedDescriptor).toBe(false);
     expect("channel" in stagedDescriptor).toBe(false);
+  });
+
+  it("keeps transform, dataset, and lineage contracts aligned around artifact-key references", () => {
+    const transformRecord = normalizeTransformRecord({
+      specification: {
+        id: " normalize-orders ",
+        kind: " normalizatioN ",
+        stage: " derivation ",
+      },
+      inputs: [{ key: " staging/orders/raw.jsonl " }],
+      outputs: [{ key: " derived/orders/normalized.parquet " }],
+    });
+
+    const datasetDescriptor = normalizeDatasetDescriptor({
+      id: "orders.v1",
+      sourceArtifactKeys: transformRecord.outputs.map((output) => output.key),
+      transformIds: [transformRecord.specification.id],
+      materializations: [
+        {
+          artifactKey: " dataset/orders/orders.v1.parquet ",
+          format: " parquet ",
+        },
+      ],
+    });
+
+    const lineage = normalizeLineageRecord({
+      nodes: [
+        { id: transformRecord.outputs[0].key, kind: "artifact" },
+        { id: transformRecord.specification.id, kind: "transform" },
+        { id: datasetDescriptor.id, kind: "dataset" },
+      ],
+      edges: [
+        {
+          kind: "derived-from",
+          from: { id: transformRecord.inputs[0].key, kind: "artifact" },
+          to: { id: transformRecord.outputs[0].key, kind: "artifact" },
+        },
+        {
+          kind: "produced",
+          from: { id: transformRecord.specification.id, kind: "transform" },
+          to: { id: datasetDescriptor.id, kind: "dataset" },
+        },
+      ],
+    });
+
+    expect(transformRecord.outputs[0].key).toBe("derived/orders/normalized.parquet");
+    expect(datasetDescriptor.sourceArtifactKeys).toEqual([
+      "derived/orders/normalized.parquet",
+    ]);
+    expect(lineage.edges[1]).toMatchObject({
+      kind: "produced",
+      from: { id: "normalize-orders", kind: "transform" },
+      to: { id: "orders.v1", kind: "dataset" },
+    });
   });
 
 });
