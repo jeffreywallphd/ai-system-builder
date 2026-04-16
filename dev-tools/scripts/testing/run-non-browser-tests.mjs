@@ -4,9 +4,6 @@ import { readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const testPatterns = [
@@ -91,17 +88,12 @@ console.log(
   `Starting tsx --test with ${resolvedFiles.length} discovered non-browser test file(s).`,
 );
 
-let tsxCliPath;
-try {
-  tsxCliPath = require.resolve("tsx/dist/cli.mjs");
-} catch (error) {
-  console.error("Could not resolve tsx CLI at 'tsx/dist/cli.mjs'.");
-  process.exit(1);
-}
+const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+const launchArgs = ["tsx", "--test", ...resolvedFiles];
 
 const testProcess = spawnSync(
-  process.execPath,
-  [tsxCliPath, "--test", ...resolvedFiles],
+  npxCommand,
+  launchArgs,
   {
     cwd: repoRoot,
     stdio: "inherit",
@@ -109,7 +101,10 @@ const testProcess = spawnSync(
 );
 
 if (testProcess.error) {
-  console.error(`Failed to start tsx test runner: ${testProcess.error.message}`);
+  const commandString = `${npxCommand} ${launchArgs.join(" ")}`;
+  console.error(
+    `Failed to start tsx test runner command '${commandString}': ${testProcess.error.message}`,
+  );
   process.exit(1);
 }
 
