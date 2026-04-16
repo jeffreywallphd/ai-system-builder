@@ -17,7 +17,7 @@
     "make": "electron-forge make",
     "start": "npm run dev:desktop",
     "test": "npm run test:non-browser",
-    "test:non-browser": "tsx --test modules/**/*.test.ts apps/server/src/tests/**/*.test.ts apps/desktop/src/preload/tests/**/*.test.ts",
+    "test:non-browser": "node dev/run-non-browser-tests.mjs",
     "dev:thin-client": "npm run dev -w @ai-system-builder/thin-client",
     "build:thin-client": "npm run build -w @ai-system-builder/thin-client",
     "preview:thin-client": "npm run preview -w @ai-system-builder/thin-client",
