@@ -19,7 +19,7 @@
 
 ## Core Guidance
 
-- `apps/` are entry points and packaging/deployment surfaces (`desktop`, `server`, `web-thin-client`), not architecture centers.
+- `apps/` are entry points and packaging/deployment surfaces (`desktop`, `server`, `thin-client`), not architecture centers.
 - `modules/` contain core architecture: domain, application, contracts, adapters, hosts, ui, and testing support.
 - `docs/` hold canonical architecture, ADRs, standards, and context routing aids.
 - `dev-tools/` is for development tooling/scripts; `config/` for shared configuration surfaces; `migrations/` for schema/data migration assets.

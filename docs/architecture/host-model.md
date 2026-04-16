@@ -97,11 +97,11 @@ Contributors should:
 
 ## Thin web client role
 
-`apps/web-thin-client/` is a thin surface for web interaction.
+`apps/thin-client/` is a thin host-specific web surface for server interaction.
 
 - It is not assumed to be full feature parity with desktop.
-- It should reuse shared UI and contracts where practical.
-- It should not drive architecture toward duplicate full-stack UI logic.
+- It composes pages/features/components in a renderer-oriented structure and will call server APIs over HTTP.
+- It should remain structurally distinct from the desktop preload-backed path and avoid duplicating host logic.
 
 ## Practical boundaries
 

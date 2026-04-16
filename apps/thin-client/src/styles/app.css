@@ -1,0 +1,45 @@
+@import "./tokens.css";
+@import "./reset.css";
+@import "./typography.css";
+
+#root {
+  min-height: 100vh;
+}
+
+.ui-shell {
+  min-height: 100vh;
+  padding: var(--space-lg) var(--space-md);
+}
+
+.ui-container {
+  width: min(100%, var(--container-width));
+  margin: 0 auto;
+}
+
+.ui-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  padding: var(--space-md);
+}
+
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-stack--xs {
+  gap: var(--space-xs);
+}
+
+.ui-stack--sm {
+  gap: var(--space-sm);
+}
+
+.ui-stack--md {
+  gap: var(--space-md);
+}
+
+.ui-text-muted {
+  color: var(--color-text-muted);
+}
