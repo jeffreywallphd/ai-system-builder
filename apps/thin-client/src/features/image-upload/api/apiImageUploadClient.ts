@@ -113,6 +113,16 @@ function toRendererResult(responseBody: unknown): ThinClientImageUploadResult {
   };
 }
 
+function createUploadFormData(input: ThinClientImageUploadInput): FormData {
+  const formData = new FormData();
+  const file = new File([input.bytes], input.fileName, { type: input.mediaType });
+
+  formData.append("file", file);
+  formData.append("source", input.source ?? DEFAULT_UPLOAD_SOURCE);
+
+  return formData;
+}
+
 export function createApiImageUploadClient(
   options: CreateApiImageUploadClientOptions = {},
 ): ApiImageUploadClient {
@@ -122,15 +132,7 @@ export function createApiImageUploadClient(
     async uploadImage(input: ThinClientImageUploadInput): Promise<ThinClientImageUploadResult> {
       const response = await fetch(uploadUrl, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          fileName: input.fileName,
-          mediaType: input.mediaType,
-          bytes: Array.from(input.bytes),
-          source: input.source ?? DEFAULT_UPLOAD_SOURCE,
-        }),
+        body: createUploadFormData(input),
       });
 
       const responseBody = await readApiResponseBody(response);

@@ -103,8 +103,8 @@ Contributors should:
 - It composes pages/features/components in a renderer-oriented structure and calls server APIs over HTTP through feature-local clients.
 - It should remain structurally distinct from the desktop preload-backed path and avoid duplicating host logic.
 - The initial server-backed vertical slice is the image-upload path, where thin-client UI calls an HTTP client,
-  the Express adapter delegates to a shared application use case, and storage is handled through the same server
-  host composition seam used by other server flows.
+  the Express adapter accepts browser-native multipart upload input, delegates to a shared application use case, and
+  storage is handled through the same server host composition seam used by other server flows.
 
 ## Practical boundaries
 

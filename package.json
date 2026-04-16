@@ -3,25 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "main": ".webpack/main",
+  "workspaces": [
+    "apps/server",
+    "apps/thin-client"
+  ],
   "config": {
     "forge": "./apps/desktop/forge.config.js"
   },
   "scripts": {
-    "dev": "electron-forge start",
+    "dev": "npm run dev:desktop",
+    "dev:desktop": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "start": "npm run dev",
+    "start": "npm run dev:desktop",
     "test": "vitest run --environment jsdom",
-    "dev:thin-client": "npm run dev --prefix apps/thin-client",
-    "build:thin-client": "npm run build --prefix apps/thin-client",
-    "build:server": "tsc -p apps/server/tsconfig.json",
-    "start:server": "npm run build:server && node dist/apps/server/src/index.js",
-    "dev:server": "npm run start:server"
+    "dev:thin-client": "npm run dev -w @ai-system-builder/thin-client",
+    "build:thin-client": "npm run build -w @ai-system-builder/thin-client",
+    "preview:thin-client": "npm run preview -w @ai-system-builder/thin-client",
+    "dev:server": "npm run dev -w @ai-system-builder/server",
+    "build:server": "npm run build -w @ai-system-builder/server",
+    "start:server": "npm run start -w @ai-system-builder/server"
   },
   "dependencies": {
+    "express": "^5.1.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "express": "^5.1.0"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.10.2",

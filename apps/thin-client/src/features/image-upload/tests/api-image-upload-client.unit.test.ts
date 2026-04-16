@@ -7,7 +7,7 @@ describe("api image upload client", () => {
     vi.unstubAllGlobals();
   });
 
-  it("sends upload requests to the express image-upload route and maps success", async () => {
+  it("sends multipart upload requests to the express image-upload route and maps success", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({
@@ -34,18 +34,19 @@ describe("api image upload client", () => {
 
     const result = await client.uploadImage(input);
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/image/upload", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        fileName: "cat.png",
-        mediaType: "image/png",
-        bytes: [1, 2, 3],
-        source: "thin-client.image-upload.form",
-      }),
-    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/image/upload");
+    expect(options.method).toBe("POST");
+    expect(options.headers).toBeUndefined();
+    expect(options.body).toBeInstanceOf(FormData);
+
+    const formData = options.body as FormData;
+    expect(formData.get("source")).toBe("thin-client.image-upload.form");
+    const file = formData.get("file");
+    expect(file).toBeInstanceOf(File);
+    expect((file as File).name).toBe("cat.png");
+    expect((file as File).type).toBe("image/png");
 
     expect(result).toEqual({
       ok: true,
@@ -81,7 +82,10 @@ describe("api image upload client", () => {
       bytes: new Uint8Array([1, 2]),
     });
 
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:3000/api/image/upload", expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3000/api/image/upload",
+      expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
+    );
     expect(result).toEqual({
       ok: false,
       error: {

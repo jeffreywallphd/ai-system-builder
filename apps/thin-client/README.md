@@ -20,3 +20,24 @@ case path rather than desktop preload wiring.
   and server on separate ports while keeping feature clients same-origin by default.
 - To use a different server origin directly, set `VITE_API_BASE_URL` (for example
   `http://127.0.0.1:3100/api`).
+
+## Upload transport
+
+- Thin-client image upload submits browser-native `multipart/form-data`.
+- The upload form payload uses:
+  - `file`: binary file body
+  - `source`: upload source identifier
+
+## Commands
+
+From the repository root:
+
+- `npm run dev:thin-client`
+- `npm run build:thin-client`
+- `npm run preview:thin-client`
+
+From this workspace directly:
+
+- `npm run dev`
+- `npm run build`
+- `npm run preview`

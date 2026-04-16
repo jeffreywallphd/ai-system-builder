@@ -1,5 +1,19 @@
 # Desktop App
 
+## Toolchain
+
+- Host runtime: Electron
+- Build/dev system: Electron Forge (webpack plugin)
+- Entry point orchestration: `apps/desktop/src/main` + `modules/hosts/desktop`
+
+## Commands
+
+From the repository root:
+
+- `npm run dev:desktop`
+- `npm run package`
+- `npm run make`
+
 ## Preload Bridge Surface
 
 The preload layer exposes a narrow desktop API at `window.desktopApi` for UI-to-host transport.

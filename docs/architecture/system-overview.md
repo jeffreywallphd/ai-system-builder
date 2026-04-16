@@ -47,6 +47,16 @@ ai-system-builder/
 └─ ...
 ```
 
+## App package and run/build model
+
+App packaging is intentionally mixed but explicit:
+
+- `apps/desktop` remains root-driven through Electron Forge (desktop host bootstrap and packaging are managed from root scripts).
+- `apps/server` and `apps/thin-client` are npm workspace packages with their own app-local scripts.
+- Root scripts remain the canonical convenience surface (`dev:desktop`, `dev:server`, `dev:thin-client`, `build:server`, `build:thin-client`, `start:server`).
+
+This keeps desktop workflow stable while making thin-client/server dependency install and script execution repeatable through one workspace install.
+
 ## High-level layers and boundaries
 
 ### Core logic
