@@ -27,6 +27,9 @@ import {
   normalizeStorageArtifactKey,
 } from "../storage";
 import {
+  createStagedDataDescriptorFromStorageObjectDescriptor,
+} from "../ingestion";
+import {
   createTransportOperation,
   createTransportRequest,
   normalizeTransportOperation,
@@ -150,4 +153,40 @@ describe("contracts cross-family invariants", () => {
     expect("operation" in storageRequest).toBe(false);
     expect("record" in storageRequest).toBe(false);
   });
+
+  it("keeps ingestion staged-data descriptors aligned to storage descriptors without transport coupling", () => {
+    const storageRequest = createStoreArtifactRequest(
+      new Uint8Array([1, 2, 3]),
+      {
+        descriptor: {
+          key: " staging/uploads/image-9 ",
+          mediaType: "image/png",
+          sizeBytes: 3,
+        },
+      },
+    );
+
+    const stagedDescriptor = createStagedDataDescriptorFromStorageObjectDescriptor(
+      {
+        key: storageRequest.descriptor.key ?? "staging/uploads/image-9",
+        mediaType: storageRequest.descriptor.mediaType,
+        sizeBytes: storageRequest.descriptor.sizeBytes,
+      },
+      {
+        sourceKind: "upload",
+        originalName: "image-9.png",
+      },
+    );
+
+    expect(stagedDescriptor).toEqual({
+      storageKey: "staging/uploads/image-9",
+      sourceKind: "upload",
+      mediaType: "image/png",
+      sizeBytes: 3,
+      originalName: "image-9.png",
+    });
+    expect("operation" in stagedDescriptor).toBe(false);
+    expect("channel" in stagedDescriptor).toBe(false);
+  });
+
 });

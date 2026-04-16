@@ -113,7 +113,8 @@ describe("registerImageUploadApiRoute", () => {
         ok: true,
         value: {
           descriptor: {
-            key: "uploads/cat.png",
+            storageKey: "uploads/cat.png",
+            sourceKind: "upload",
             mediaType: "image/png",
             sizeBytes: 4,
           },
@@ -132,7 +133,8 @@ describe("registerImageUploadApiRoute", () => {
       operation: "image.upload",
       value: {
         descriptor: {
-          key: "uploads/cat.png",
+          storageKey: "uploads/cat.png",
+          sourceKind: "upload",
           mediaType: "image/png",
           sizeBytes: 4,
         },
@@ -202,7 +204,8 @@ describe("registerImageUploadApiRoute", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "uploads/cat.png",
+          storageKey: "uploads/cat.png",
+          sourceKind: "upload",
           mediaType: "image/png",
           sizeBytes: 4,
         },
@@ -260,7 +263,8 @@ describe("registerImageUploadApiRoute", () => {
       operation: "image.upload",
       value: {
         descriptor: {
-          key: "uploads/cat.png",
+          storageKey: "uploads/cat.png",
+          sourceKind: "upload",
           mediaType: "image/png",
           sizeBytes: 4,
         },

@@ -7,7 +7,7 @@ Current contract families include:
 
 - `shared` result/error backbone
 - `transport` plus `api` and `ipc` specializations
-- `runtime`, `persistence`, and `storage`
+- `runtime`, `persistence`, `storage`, and `ingestion`
 - `host` context metadata
 - `logging` vocabulary
 - `config` typed configuration concerns

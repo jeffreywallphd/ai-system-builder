@@ -103,6 +103,22 @@ Storage family invariants:
 
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
 
+
+## Ingestion and staged-data semantic layer
+
+The repository now treats ingestion/staged-data as the canonical semantic layer for inbound content.
+
+- Ingestion semantics cover uploads, scrape outputs, selected generated outputs, and similar intake paths.
+- Storage remains the generic artifact capability (bytes + key + adapter mapping).
+- Ingestion contracts provide a transport-neutral staged-data descriptor that can reference storage keys plus intake metadata (source kind, media type, size/checksum, original name when applicable).
+
+This keeps storage generic while preventing image-only/file-only semantic drift in higher-level intake contracts.
+
+Current implementation note:
+
+- Image upload is the active vertical slice and is treated as a specialized ingestion path.
+- This does not imply a full ingestion engine, catalog, or ELT orchestration is implemented yet.
+
 ## Not yet finalized
 
 The following are intentionally open:

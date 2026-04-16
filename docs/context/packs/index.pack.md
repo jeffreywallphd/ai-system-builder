@@ -30,6 +30,7 @@
 - Use structured, meaningful logs with configurable verbosity and stage-level timing for long operations.
 - Keep runtime diagnostics as a strict specialization of shared structured logging contracts (`runtime.*` events, mechanical mapping).
 - Keep persistence and storage contract families mechanically distinct (record-aligned operations vs key-based artifact operations).
+- Use ingestion/staged-data contracts for inbound-content semantics; treat upload flows as specialized intake paths rather than isolated file-operation worlds.
 - Import contracts via family barrels (`modules/contracts/<family>`); avoid deep internal contract imports and flattened catch-all usage.
 - For non-contract modules, avoid root `modules/contracts` imports; consume contracts from specific family barrels.
 - Keep contract anti-drift tests explicit: family invariants in `modules/contracts/<family>/tests` and cross-family invariants in `modules/contracts/tests`.

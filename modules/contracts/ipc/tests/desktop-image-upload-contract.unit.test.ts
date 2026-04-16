@@ -74,7 +74,8 @@ describe("desktop image upload ipc contract", () => {
   it("creates an upload success response that returns storage descriptor details", () => {
     const response = createDesktopImageUploadSuccessResponse(
       {
-        key: " workspace/ws-42/uploads/kitten.png ",
+        storageKey: " workspace/ws-42/uploads/kitten.png ",
+        sourceKind: "upload",
         mediaType: "image/png",
         sizeBytes: 1204,
       },
@@ -87,7 +88,8 @@ describe("desktop image upload ipc contract", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "workspace/ws-42/uploads/kitten.png",
+          storageKey: "workspace/ws-42/uploads/kitten.png",
+          sourceKind: "upload",
           mediaType: "image/png",
           sizeBytes: 1204,
         },

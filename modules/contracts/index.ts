@@ -8,4 +8,5 @@ export * as storage from "./storage";
 export * as persistence from "./persistence";
 export * as host from "./host";
 export * as config from "./config";
+export * as ingestion from "./ingestion";
 export * as imageUpload from "./image-upload";
