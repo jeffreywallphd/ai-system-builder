@@ -1,19 +1,29 @@
 #!/usr/bin/env node
 
-import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { run } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import ts from "typescript";
 
 const runnerDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(runnerDir, "../../..");
 
 const reportRelativePath = "artifacts/test-reports/non-browser-test-report.json";
 const reportPath = path.resolve(repoRoot, reportRelativePath);
+const runtimeRoot = path.resolve(repoRoot, "artifacts/test-runtime/non-browser");
 
 const discoveryRoots = ["modules", "apps/server", "apps/desktop", "apps/thin-client"];
 const validTestFilePattern = /\.test\.[cm]?[jt]sx?$/i;
 const browserOnlyTestPattern = /\.(ui|e2e)\.test\.[cm]?[jt]sx?$/i;
+const browserAppPathPattern = /^(apps\/desktop\/src\/renderer\/|apps\/thin-client\/src\/)/i;
 const ignoredDirectories = new Set([
   ".git",
   ".turbo",
@@ -24,10 +34,12 @@ const ignoredDirectories = new Set([
   "node_modules",
   "out",
 ]);
+const transpileEligiblePattern = /\.[cm]?[jt]sx?$/i;
+const declarationFilePattern = /\.d\.[cm]?ts$/i;
 
-const discoveredTestFiles = [];
-
-const discoveredFiles = new Set();
+const discoveredRuntimeTestFiles = [];
+const discoveredSourceTestFiles = [];
+const runtimeToSourceFile = new Map();
 
 const report = {
   generatedAt: new Date().toISOString(),
@@ -56,75 +68,57 @@ const report = {
 };
 
 const writeReport = () => {
-  report.discoveredFiles = [...discoveredFiles].sort();
+  report.discoveredFiles = [...new Set(discoveredSourceTestFiles)].sort();
   report.discoveredFileCount = report.discoveredFiles.length;
 
   mkdirSync(path.dirname(reportPath), { recursive: true });
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 };
 
-const recordDiscoveredFile = (event) => {
-  if (event && typeof event.file === "string" && event.file.length > 0) {
-    discoveredFiles.add(path.relative(repoRoot, event.file));
-  }
-};
-
 const normalizeToPosixPath = (value) => value.split(path.sep).join("/");
-
-const walkForTests = (startPath) => {
-  const entries = readdirSync(startPath, { withFileTypes: true });
-
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      if (ignoredDirectories.has(entry.name)) {
-        continue;
-      }
-
-      walkForTests(path.join(startPath, entry.name));
-      continue;
-    }
-
-    if (!entry.isFile()) {
-      continue;
-    }
-
-    if (!validTestFilePattern.test(entry.name)) {
-      continue;
-    }
-
-    if (browserOnlyTestPattern.test(entry.name)) {
-      continue;
-    }
-
-    discoveredTestFiles.push(path.join(startPath, entry.name));
+const pathExists = (targetPath) => {
+  try {
+    statSync(targetPath);
+    return true;
+  } catch {
+    return false;
   }
 };
 
-const discoverNonBrowserTests = () => {
-  for (const discoveryRoot of discoveryRoots) {
-    const absoluteRoot = path.join(repoRoot, discoveryRoot);
+const isFilePath = (targetPath) => {
+  try {
+    return statSync(targetPath).isFile();
+  } catch {
+    return false;
+  }
+};
 
-    let exists = false;
-    try {
-      exists = statSync(absoluteRoot).isDirectory();
-    } catch {
-      exists = false;
-    }
+const isDirectoryPath = (targetPath) => {
+  try {
+    return statSync(targetPath).isDirectory();
+  } catch {
+    return false;
+  }
+};
 
-    if (!exists) {
-      continue;
-    }
-
-    walkForTests(absoluteRoot);
+const mapOutputExtension = (sourcePath) => {
+  if (sourcePath.endsWith(".mts")) {
+    return sourcePath.slice(0, -4) + ".mjs";
   }
 
-  discoveredTestFiles.sort((left, right) => left.localeCompare(right));
+  if (sourcePath.endsWith(".cts")) {
+    return sourcePath.slice(0, -4) + ".cjs";
+  }
 
-  report.configuredDiscoveryRoots = discoveryRoots;
-  report.discoveredFiles = discoveredTestFiles.map((filePath) =>
-    normalizeToPosixPath(path.relative(repoRoot, filePath)),
-  );
-  report.discoveredFileCount = discoveredTestFiles.length;
+  if (sourcePath.endsWith(".tsx")) {
+    return sourcePath.slice(0, -4) + ".js";
+  }
+
+  if (sourcePath.endsWith(".ts")) {
+    return sourcePath.slice(0, -3) + ".js";
+  }
+
+  return sourcePath;
 };
 
 const serializeError = (value) => {
@@ -158,70 +152,296 @@ const serializeError = (value) => {
   };
 };
 
-try {
-  discoverNonBrowserTests();
+const writeRuntimeOutput = (runtimeAbsolutePath, sourceText) => {
+  mkdirSync(path.dirname(runtimeAbsolutePath), { recursive: true });
+  writeFileSync(runtimeAbsolutePath, sourceText, "utf8");
+};
 
-  if (discoveredTestFiles.length === 0) {
+const resolveRuntimeSpecifier = (specifier, runtimeAbsolutePath) => {
+  if (!specifier.startsWith("./") && !specifier.startsWith("../")) {
+    return specifier;
+  }
+
+  const canonicalSpecifier = specifier.endsWith("/") ? specifier.slice(0, -1) : specifier;
+  const runtimeDir = path.dirname(runtimeAbsolutePath);
+  const resolvedBase = path.resolve(runtimeDir, canonicalSpecifier);
+  const specifierExtension = path.extname(canonicalSpecifier).toLowerCase();
+
+  if (specifierExtension === ".js" || specifierExtension === ".mjs" || specifierExtension === ".cjs") {
+    return canonicalSpecifier;
+  }
+
+  if (isFilePath(resolvedBase)) {
+    if (
+      specifierExtension === ".json" ||
+      specifierExtension === ".node" ||
+      specifierExtension === ".js" ||
+      specifierExtension === ".mjs" ||
+      specifierExtension === ".cjs"
+    ) {
+      return canonicalSpecifier;
+    }
+  }
+
+  if (pathExists(`${resolvedBase}.js`)) {
+    return `${canonicalSpecifier}.js`;
+  }
+
+  if (pathExists(`${resolvedBase}.mjs`)) {
+    return `${canonicalSpecifier}.mjs`;
+  }
+
+  if (pathExists(`${resolvedBase}.cjs`)) {
+    return `${canonicalSpecifier}.cjs`;
+  }
+
+  if (isDirectoryPath(resolvedBase) && pathExists(path.join(resolvedBase, "index.js"))) {
+    return `${canonicalSpecifier}/index.js`;
+  }
+
+  if (isDirectoryPath(resolvedBase) && pathExists(path.join(resolvedBase, "index.mjs"))) {
+    return `${canonicalSpecifier}/index.mjs`;
+  }
+
+  if (isDirectoryPath(resolvedBase) && pathExists(path.join(resolvedBase, "index.cjs"))) {
+    return `${canonicalSpecifier}/index.cjs`;
+  }
+
+  return canonicalSpecifier;
+};
+
+const rewriteRuntimeImportsInFile = (runtimeAbsolutePath) => {
+  const sourceText = readFileSync(runtimeAbsolutePath, "utf8");
+
+  const rewrittenFromImports = sourceText.replace(
+    /(from\s+)(["'])(\.[^"'()]+)\2/g,
+    (match, prefix, quote, specifier) => {
+      const resolvedSpecifier = resolveRuntimeSpecifier(specifier, runtimeAbsolutePath);
+      return `${prefix}${quote}${resolvedSpecifier}${quote}`;
+    },
+  );
+
+  const rewrittenDynamicImports = rewrittenFromImports.replace(
+    /(import\(\s*)(["'])(\.[^"'()]+)\2(\s*\))/g,
+    (match, prefix, quote, specifier, suffix) => {
+      const resolvedSpecifier = resolveRuntimeSpecifier(specifier, runtimeAbsolutePath);
+      return `${prefix}${quote}${resolvedSpecifier}${quote}${suffix}`;
+    },
+  );
+
+  const rewrittenDirectoryShorthand = rewrittenDynamicImports
+    .replace(/(from\s+["'])\.\.(["'])/g, "$1../index.js$2")
+    .replace(/(from\s+["'])\.\.\/(["'])/g, "$1../index.js$2")
+    .replace(/(from\s+["'])\.(["'])/g, "$1./index.js$2")
+    .replace(/(from\s+["'])\.\/(["'])/g, "$1./index.js$2")
+    .replace(/(import\(\s*["'])\.\.(["']\s*\))/g, "$1../index.js$2")
+    .replace(/(import\(\s*["'])\.\.\/(["']\s*\))/g, "$1../index.js$2")
+    .replace(/(import\(\s*["'])\.(["']\s*\))/g, "$1./index.js$2")
+    .replace(/(import\(\s*["'])\.\/(["']\s*\))/g, "$1./index.js$2");
+
+  if (rewrittenDirectoryShorthand !== sourceText) {
+    writeFileSync(runtimeAbsolutePath, rewrittenDirectoryShorthand, "utf8");
+  }
+};
+
+const rewriteRuntimeImports = (startPath) => {
+  const entries = readdirSync(startPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const absolutePath = path.join(startPath, entry.name);
+
+    if (entry.isDirectory()) {
+      rewriteRuntimeImports(absolutePath);
+      continue;
+    }
+
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    const extension = path.extname(entry.name);
+    if (extension !== "" && !/\.(?:mjs|cjs|js)$/i.test(entry.name)) {
+      continue;
+    }
+
+    rewriteRuntimeImportsInFile(absolutePath);
+  }
+};
+
+const transpileToRuntimeFile = (sourceAbsolutePath, runtimeAbsolutePath) => {
+  const sourceText = readFileSync(sourceAbsolutePath, "utf8");
+  let transpileResult;
+
+  try {
+    transpileResult = ts.transpileModule(sourceText, {
+      fileName: sourceAbsolutePath,
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        jsx: ts.JsxEmit.ReactJSX,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        resolveJsonModule: true,
+        sourceMap: false,
+        inlineSourceMap: false,
+        declaration: false,
+        declarationMap: false,
+        newLine: ts.NewLineKind.LineFeed,
+      },
+    });
+  } catch (error) {
+    const details = serializeError(error);
+    throw new Error(`Failed to transpile ${normalizeToPosixPath(path.relative(repoRoot, sourceAbsolutePath))}: ${details.message}`);
+  }
+
+  writeRuntimeOutput(runtimeAbsolutePath, transpileResult.outputText);
+};
+
+const copyToRuntimeFile = (sourceAbsolutePath, runtimeAbsolutePath) => {
+  const sourceText = readFileSync(sourceAbsolutePath, "utf8");
+  writeRuntimeOutput(runtimeAbsolutePath, sourceText);
+};
+
+const walkAndBuildRuntime = (startPath) => {
+  const entries = readdirSync(startPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const absolutePath = path.join(startPath, entry.name);
+
+    if (entry.isDirectory()) {
+      if (ignoredDirectories.has(entry.name)) {
+        continue;
+      }
+
+      walkAndBuildRuntime(absolutePath);
+      continue;
+    }
+
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    const relativeSourcePath = path.relative(repoRoot, absolutePath);
+    const normalizedSourcePath = normalizeToPosixPath(relativeSourcePath);
+    const relativeRuntimePath = mapOutputExtension(relativeSourcePath);
+    const runtimeAbsolutePath = path.resolve(runtimeRoot, relativeRuntimePath);
+
+    if (transpileEligiblePattern.test(entry.name) && !declarationFilePattern.test(entry.name)) {
+      transpileToRuntimeFile(absolutePath, runtimeAbsolutePath);
+    } else if (
+      (entry.name.endsWith(".json") && entry.name !== "package.json") ||
+      entry.name.endsWith(".node")
+    ) {
+      copyToRuntimeFile(absolutePath, runtimeAbsolutePath);
+    } else {
+      continue;
+    }
+
+    runtimeToSourceFile.set(path.resolve(runtimeAbsolutePath), normalizedSourcePath);
+
+    if (
+      validTestFilePattern.test(entry.name) &&
+      !browserOnlyTestPattern.test(entry.name) &&
+      !browserAppPathPattern.test(normalizedSourcePath)
+    ) {
+      discoveredSourceTestFiles.push(normalizedSourcePath);
+      discoveredRuntimeTestFiles.push(path.resolve(runtimeAbsolutePath));
+    }
+  }
+};
+
+const discoverAndPrepareRuntime = () => {
+  rmSync(runtimeRoot, { recursive: true, force: true });
+  mkdirSync(runtimeRoot, { recursive: true });
+  writeFileSync(
+    path.join(runtimeRoot, "package.json"),
+    `${JSON.stringify({ type: "module" }, null, 2)}\n`,
+    "utf8",
+  );
+
+  for (const discoveryRoot of discoveryRoots) {
+    const absoluteRoot = path.join(repoRoot, discoveryRoot);
+
+    let exists = false;
+    try {
+      exists = statSync(absoluteRoot).isDirectory();
+    } catch {
+      exists = false;
+    }
+
+    if (!exists) {
+      continue;
+    }
+
+    walkAndBuildRuntime(absoluteRoot);
+  }
+
+  discoveredRuntimeTestFiles.sort((left, right) => left.localeCompare(right));
+  discoveredSourceTestFiles.sort((left, right) => left.localeCompare(right));
+  rewriteRuntimeImports(runtimeRoot);
+};
+
+const resolveSourcePath = (maybeRuntimeFile) => {
+  if (typeof maybeRuntimeFile !== "string" || maybeRuntimeFile.length === 0) {
+    return maybeRuntimeFile;
+  }
+
+  const normalized = path.resolve(maybeRuntimeFile);
+  const sourcePath = runtimeToSourceFile.get(normalized);
+  return sourcePath ?? normalizeToPosixPath(path.relative(repoRoot, maybeRuntimeFile));
+};
+
+try {
+  discoverAndPrepareRuntime();
+
+  if (discoveredRuntimeTestFiles.length === 0) {
     throw new Error("No non-browser test files were discovered.");
   }
 
-  const testsStream = run({
-    cwd: repoRoot,
-    files: discoveredTestFiles,
-    isolation: "none",
-  });
+  for (const runtimeTestFile of discoveredRuntimeTestFiles) {
+    await import(pathToFileURL(runtimeTestFile).href);
 
-  for await (const streamEvent of testsStream) {
-    const eventType = streamEvent?.type;
-    const event = streamEvent?.data ?? streamEvent;
+    const testsStream = run({
+      concurrency: true,
+    });
 
-    if (eventType === "test:start") {
-      recordDiscoveredFile(event);
-      continue;
-    }
+    for await (const streamEvent of testsStream) {
+      const eventType = streamEvent?.type;
+      const event = streamEvent?.data ?? streamEvent;
 
-    if (eventType === "test:pass") {
-      recordDiscoveredFile(event);
-      continue;
-    }
+      if (eventType === "test:fail") {
+        report.failures.push({
+          name: event.name,
+          file: resolveSourcePath(event.file),
+          line: event.line,
+          column: event.column,
+          nesting: event.nesting,
+          testNumber: event.testNumber,
+          details: {
+            durationMs: event.details?.duration_ms,
+            type: event.details?.type,
+            error: serializeError(event.details?.error),
+          },
+        });
+        continue;
+      }
 
-    if (eventType === "test:fail") {
-      recordDiscoveredFile(event);
-
-      report.failures.push({
-        name: event.name,
-        file: event.file,
-        line: event.line,
-        column: event.column,
-        nesting: event.nesting,
-        testNumber: event.testNumber,
-        details: {
-          durationMs: event.details?.duration_ms,
-          type: event.details?.type,
-          error: serializeError(event.details?.error),
-        },
-      });
-      continue;
-    }
-
-    if (eventType === "test:summary") {
-      report.summary = {
-        counts: {
-          cancelled: event.counts.cancelled,
-          passed: event.counts.passed,
-          skipped: event.counts.skipped,
-          suites: event.counts.suites,
-          tests: event.counts.tests,
-          todo: event.counts.todo,
-          topLevel: event.counts.topLevel,
-        },
-        durationMs: event.duration_ms,
-        success: event.success,
-      };
+      if (eventType === "test:summary") {
+        report.summary.counts.cancelled += event.counts.cancelled;
+        report.summary.counts.passed += event.counts.passed;
+        report.summary.counts.skipped += event.counts.skipped;
+        report.summary.counts.suites += event.counts.suites;
+        report.summary.counts.tests += event.counts.tests;
+        report.summary.counts.todo += event.counts.todo;
+        report.summary.counts.topLevel += event.counts.topLevel;
+        report.summary.durationMs += event.duration_ms;
+      }
     }
   }
 
-  const didFail = report.failures.length > 0 || report.summary.success === false;
+  report.summary.success = report.failures.length === 0;
+  const didFail = report.summary.success === false;
   report.status = didFail ? "failed" : "passed";
   report.exitCode = didFail ? 1 : 0;
   process.exitCode = report.exitCode;
