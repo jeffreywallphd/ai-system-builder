@@ -6,16 +6,20 @@ import * as contracts from "..";
 
 const CONTRACT_FAMILIES = [
   "api",
+  "artifact",
   "config",
+  "dataset",
   "host",
   "imageUpload",
   "ingestion",
   "ipc",
+  "lineage",
   "logging",
   "persistence",
   "runtime",
   "shared",
   "storage",
+  "transform",
   "transport",
 ] as const;
 

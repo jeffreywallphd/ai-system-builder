@@ -4,6 +4,7 @@ Use this family for transport-neutral staged-data intake semantics.
 
 What belongs here:
 - staged-data semantic identity and metadata (`id`, `sourceKind`, `originalName`, `createdAt`, `metadata`)
+- staged-artifact companion descriptor for artifact-aligned ELT vocabulary without breaking existing staged-data callers
 - registration request/result shapes for staged-data intake flows
 - normalized storage reference attachment as a backing concern (`descriptor.storage`)
 
@@ -15,3 +16,4 @@ How this differs from storage contracts:
 Image upload note:
 - image upload is one specialized intake path that registers staged data semantics
 - it is not the canonical definition of the ingestion model
+- `staged-data-descriptor` remains the compatibility shape; `staged-artifact-descriptor` is the additive artifact-aligned companion shape

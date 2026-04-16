@@ -1,4 +1,7 @@
 export * from "./storage-artifact-key";
+export * from "./storage-zone-kind";
+export * from "./storage-instance-reference";
+export * from "./storage-placement-descriptor";
 export * from "./storage-object-descriptor";
 export * from "./store-artifact-request";
 export * from "./store-artifact-result";

@@ -6,6 +6,7 @@ import {
   createRegisterStagedDataFailureResult,
   createRegisterStagedDataRequest,
   createRegisterStagedDataSuccessResult,
+  createStagedArtifactDescriptorFromStagedDataDescriptor,
   createStagedDataDescriptorFromStorageObjectDescriptor,
   normalizeIngestionSourceKind,
 } from ".";
@@ -75,6 +76,30 @@ describe("ingestion contracts", () => {
         mediaType: "image/png",
         sizeBytes: 42,
       },
+    });
+  });
+
+  it("provides additive staged-artifact vocabulary while preserving staged-data compatibility", () => {
+    const stagedArtifact = createStagedArtifactDescriptorFromStagedDataDescriptor({
+      id: " staged-1 ",
+      sourceKind: " runtime ",
+      storage: {
+        key: " staging/runtime/events-1 ",
+        mediaType: " application/json ",
+      },
+      originalName: " events-1.json ",
+    });
+
+    expect(stagedArtifact).toEqual({
+      id: "staged-1",
+      sourceKind: "runtime",
+      artifactKey: "staging/runtime/events-1",
+      originalName: "events-1.json",
+      mediaType: "application/json",
+      sizeBytes: undefined,
+      checksum: undefined,
+      createdAt: undefined,
+      metadata: undefined,
     });
   });
 
