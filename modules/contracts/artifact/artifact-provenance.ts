@@ -2,16 +2,17 @@ import {
   normalizeIngestionSourceKind,
   type IngestionSourceKind,
 } from "../ingestion";
+import { normalizeArtifactReference, type ArtifactReference } from "./artifact-reference";
 import {
-  normalizeStorageArtifactKey,
-  type StorageArtifactKey,
-} from "../storage";
+  normalizeTransformReference,
+  type TransformReference,
+} from "../transform/transform-reference";
 
 export interface ArtifactProvenance {
   sourceKind?: IngestionSourceKind;
   sourceId?: string;
-  parentArtifactKeys?: StorageArtifactKey[];
-  transformId?: string;
+  parentArtifacts?: ArtifactReference[];
+  transform?: TransformReference;
 }
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -36,9 +37,9 @@ export function normalizeArtifactProvenance(
         ? normalizeIngestionSourceKind(provenance.sourceKind)
         : undefined,
     sourceId: normalizeOptionalText(provenance.sourceId),
-    parentArtifactKeys: provenance.parentArtifactKeys?.map((key) =>
-      normalizeStorageArtifactKey(key)
-    ),
-    transformId: normalizeOptionalText(provenance.transformId),
+    parentArtifacts: provenance.parentArtifacts?.map(normalizeArtifactReference),
+    transform: provenance.transform
+      ? normalizeTransformReference(provenance.transform)
+      : undefined,
   };
 }

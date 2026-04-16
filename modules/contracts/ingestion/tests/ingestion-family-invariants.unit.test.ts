@@ -6,22 +6,20 @@ describe("ingestion family invariants", () => {
   it("exports only ingestion-family surfaces from the family barrel", () => {
     expect(Object.keys(ingestionContracts).sort()).toEqual([
       "INGESTION_SOURCE_KINDS",
-      "createRegisterStagedDataFailureResult",
-      "createRegisterStagedDataRequest",
-      "createRegisterStagedDataSuccessResult",
-      "createStagedArtifactDescriptorFromStagedDataDescriptor",
-      "createStagedDataDescriptorFromStorageObjectDescriptor",
+      "createRegisterStagedArtifactFailureResult",
+      "createRegisterStagedArtifactRequest",
+      "createRegisterStagedArtifactSuccessResult",
+      "createStagedArtifactDescriptorFromStorageObjectDescriptor",
       "isIngestionSourceKind",
       "normalizeIngestionSourceKind",
       "normalizeStagedArtifactDescriptor",
-      "normalizeStagedDataDescriptor",
-      "normalizeStagedDataDescriptorInput",
-      "normalizeStagedDataStorageReference",
+      "normalizeStagedArtifactDescriptorInput",
+      "normalizeStagedArtifactStorageReference",
     ]);
   });
 
-  it("keeps staged-data registration semantics transport-neutral and storage-key aligned", () => {
-    const request = ingestionContracts.createRegisterStagedDataRequest(
+  it("keeps staged-artifact registration semantics transport-neutral and storage-key aligned", () => {
+    const request = ingestionContracts.createRegisterStagedArtifactRequest(
       new Uint8Array([1, 2, 3]),
       {
         descriptor: {
@@ -49,7 +47,7 @@ describe("ingestion family invariants", () => {
       correlationId: undefined,
     });
 
-    const result = ingestionContracts.createRegisterStagedDataSuccessResult({
+    const result = ingestionContracts.createRegisterStagedArtifactSuccessResult({
       storage: {
         key: " staged/uploads/object-1 ",
       },

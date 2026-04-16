@@ -1,20 +1,23 @@
-import {
-  normalizeTransformArtifactReference,
-  type TransformArtifactReference,
-} from "./transform-artifact-reference";
+import { normalizeArtifactReference, type ArtifactReference } from "../artifact";
 import {
   normalizeTransformSpecification,
   type TransformSpecification,
   type TransformParameters,
 } from "./transform-specification";
 
+/**
+ * TransformRecord captures one transform execution instance.
+ *
+ * - `specification.definitionId`: stable transform definition identity.
+ * - `executionId`: runtime execution record identity for one run.
+ */
 export interface TransformRecord<
   TParameters extends TransformParameters = TransformParameters,
 > {
-  id?: string;
+  executionId?: string;
   specification: TransformSpecification<TParameters>;
-  inputs: TransformArtifactReference[];
-  outputs: TransformArtifactReference[];
+  inputs: ArtifactReference[];
+  outputs: ArtifactReference[];
   startedAt?: string;
   completedAt?: string;
 }
@@ -35,10 +38,10 @@ export function normalizeTransformRecord<
 ): TransformRecord<TParameters> {
   return {
     ...record,
-    id: normalizeOptionalText(record.id),
+    executionId: normalizeOptionalText(record.executionId),
     specification: normalizeTransformSpecification(record.specification),
-    inputs: record.inputs.map(normalizeTransformArtifactReference),
-    outputs: record.outputs.map(normalizeTransformArtifactReference),
+    inputs: record.inputs.map(normalizeArtifactReference),
+    outputs: record.outputs.map(normalizeArtifactReference),
     startedAt: normalizeOptionalText(record.startedAt),
     completedAt: normalizeOptionalText(record.completedAt),
   };

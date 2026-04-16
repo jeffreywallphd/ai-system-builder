@@ -1,6 +1,6 @@
 import type {
-  RegisterStagedDataResult,
-  StagedDataMetadata,
+  RegisterStagedArtifactResult,
+  StagedArtifactMetadata,
 } from "../../contracts/ingestion";
 import type { ContractErrorDetails } from "../../contracts/shared";
 
@@ -16,5 +16,5 @@ export interface StoreImageUploadCommandContext {
 
 export type StoreImageUploadUseCaseResult<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
-> = RegisterStagedDataResult<TDetails, TMetadata>;
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
+> = RegisterStagedArtifactResult<TDetails, TMetadata>;

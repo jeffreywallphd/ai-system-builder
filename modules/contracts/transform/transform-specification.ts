@@ -1,18 +1,12 @@
-import {
-  normalizeTransformKind,
-  type TransformKind,
-} from "./transform-kind";
-import {
-  normalizeTransformStage,
-  type TransformStage,
-} from "./transform-stage";
+import { normalizeTransformKind, type TransformKind } from "./transform-kind";
+import { normalizeTransformStage, type TransformStage } from "./transform-stage";
 
 export type TransformParameters = Readonly<Record<string, unknown>>;
 
 export interface TransformSpecification<
   TParameters extends TransformParameters = TransformParameters,
 > {
-  id: string;
+  definitionId: string;
   kind: TransformKind;
   stage: TransformStage;
   name?: string;
@@ -46,7 +40,10 @@ export function normalizeTransformSpecification<
 ): TransformSpecification<TParameters> {
   return {
     ...specification,
-    id: normalizeRequiredText(specification.id, "Transform id"),
+    definitionId: normalizeRequiredText(
+      specification.definitionId,
+      "Transform definition id",
+    ),
     kind: normalizeTransformKind(specification.kind),
     stage: normalizeTransformStage(specification.stage),
     name: normalizeOptionalText(specification.name),

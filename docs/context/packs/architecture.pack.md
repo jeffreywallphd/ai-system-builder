@@ -36,7 +36,7 @@
 - Preserve shared-first UI: reusable components in shared UI, thin platform-specific layers.
 - Follow TypeScript-first runtime posture; external runtimes are adapter extensions, not architecture centers.
 - Keep persistence (structured durable records) distinct from storage (artifact/file/blob concerns).
-- Model inbound content with ingestion/staged-data semantics above storage mechanics so upload/scrape/generated intake paths do not fork parallel vocabularies.
+- Model inbound content with ingestion/staged-artifact semantics above storage mechanics so upload/scrape/generated intake paths do not fork parallel vocabularies.
 - Prefer disciplined simplicity: avoid premature frameworks, plugin systems, and package explosion.
 
 ## Key Constraints
@@ -59,7 +59,7 @@
 - `docs/adr/ADR-0002-typescript-first-runtime-model.md` — TypeScript-first decision.
 - `docs/adr/ADR-0003-host-model-and-transport-separation.md` — host vs transport decision.
 - `docs/adr/ADR-0004-persistence-and-storage-separation.md` — persistence/storage decision.
-- `docs/adr/ADR-0008-ingestion-and-staged-data-semantic-model.md` — ingestion/staged-data semantic direction.
+- `docs/adr/ADR-0008-ingestion-and-staged-artifact-semantic-model.md` — ingestion/staged-artifact semantic direction.
 
 ## Common Over-Inclusions to Avoid
 

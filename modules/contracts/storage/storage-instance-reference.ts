@@ -8,6 +8,7 @@ export const STORAGE_INSTANCE_KINDS = ["filesystem", "object-storage", "memory"]
 export type StorageInstanceKind = (typeof STORAGE_INSTANCE_KINDS)[number];
 
 export interface StorageInstanceReference {
+  /** Zone is intrinsic to the storage instance, not per-artifact placement. */
   id: string;
   kind: StorageInstanceKind;
   zone?: StorageZoneKind;

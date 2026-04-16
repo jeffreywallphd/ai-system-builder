@@ -1,10 +1,10 @@
 import {
-  createRegisterStagedDataFailureResult,
-  createRegisterStagedDataSuccessResult,
-  createStagedDataDescriptorFromStorageObjectDescriptor,
-  type RegisterStagedDataResult,
+  createRegisterStagedArtifactFailureResult,
+  createRegisterStagedArtifactSuccessResult,
+  createStagedArtifactDescriptorFromStorageObjectDescriptor,
+  type RegisterStagedArtifactResult,
   type IngestionSourceKind,
-  type StagedDataMetadata,
+  type StagedArtifactMetadata,
 } from "../../../contracts/ingestion";
 import type { StorageObjectDescriptor } from "../../../contracts/storage";
 import type {
@@ -13,9 +13,9 @@ import type {
   ContractErrorDetails,
 } from "../../../contracts/shared";
 
-export function mapStoreImageUploadToRegisterStagedDataResult<
+export function mapStoreImageUploadToRegisterStagedArtifactResult<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 >(
   result:
     | {
@@ -31,10 +31,10 @@ export function mapStoreImageUploadToRegisterStagedDataResult<
       error: ContractError<TDetails>;
     },
   context?: ContractBoundaryContext,
-): RegisterStagedDataResult<TDetails, TMetadata> {
+): RegisterStagedArtifactResult<TDetails, TMetadata> {
   if (result.ok) {
-    return createRegisterStagedDataSuccessResult(
-      createStagedDataDescriptorFromStorageObjectDescriptor(result.descriptor, {
+    return createRegisterStagedArtifactSuccessResult(
+      createStagedArtifactDescriptorFromStorageObjectDescriptor(result.descriptor, {
         sourceKind: result.sourceKind,
         originalName: result.originalName,
         id: result.id,
@@ -44,5 +44,5 @@ export function mapStoreImageUploadToRegisterStagedDataResult<
     );
   }
 
-  return createRegisterStagedDataFailureResult(result.error, context);
+  return createRegisterStagedArtifactFailureResult(result.error, context);
 }

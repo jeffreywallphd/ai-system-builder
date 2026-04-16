@@ -3,14 +3,15 @@ import {
   type StorageObjectChecksum,
   type StorageArtifactKey,
 } from "../storage";
+import type {
+  StagedArtifactDescriptor,
+  StagedArtifactMetadata,
+} from "../ingestion";
 import {
   normalizeArtifactFormatMetadata,
   type ArtifactFormatMetadata,
 } from "./artifact-format-metadata";
-import {
-  normalizeArtifactKind,
-  type ArtifactKind,
-} from "./artifact-kind";
+import { normalizeArtifactKind, type ArtifactKind } from "./artifact-kind";
 import {
   normalizeArtifactProvenance,
   type ArtifactProvenance,
@@ -59,4 +60,28 @@ export function normalizeArtifactDescriptor<
     format: normalizeArtifactFormatMetadata(descriptor.format),
     provenance: normalizeArtifactProvenance(descriptor.provenance),
   };
+}
+
+export function createArtifactDescriptorFromStagedArtifactDescriptor<
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
+>(
+  descriptor: StagedArtifactDescriptor<TMetadata>,
+): ArtifactDescriptor<TMetadata> {
+  return normalizeArtifactDescriptor({
+    key: descriptor.storage.key,
+    kind: "raw-staged",
+    id: descriptor.id,
+    name: descriptor.originalName,
+    createdAt: descriptor.createdAt,
+    sizeBytes: descriptor.storage.sizeBytes,
+    checksum: descriptor.storage.checksum,
+    format: {
+      mediaType: descriptor.storage.mediaType,
+    },
+    provenance: {
+      sourceKind: descriptor.sourceKind,
+      sourceId: descriptor.id,
+    },
+    metadata: descriptor.metadata,
+  });
 }

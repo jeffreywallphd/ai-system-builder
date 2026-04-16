@@ -2,7 +2,7 @@ import type { StructuredLogEvent } from "../../contracts/logging";
 import { createContractError } from "../../contracts/shared";
 import { IMAGE_UPLOAD_OPERATION } from "../../contracts/image-upload";
 import {
-  type RegisterStagedDataResult,
+  type RegisterStagedArtifactResult,
 } from "../../contracts/ingestion";
 import { createStoreArtifactRequest } from "../../contracts/storage";
 import type { LoggingPort } from "../ports/logging";
@@ -12,7 +12,7 @@ import type {
   StoreImageUploadCommandContext,
   StoreImageUploadUseCaseResult,
 } from "./store-image-upload.types";
-import { mapStoreImageUploadToRegisterStagedDataResult } from "./image-upload/mapStoreImageUploadToRegisterStagedDataResult";
+import { mapStoreImageUploadToRegisterStagedArtifactResult } from "./image-upload/mapStoreImageUploadToRegisterStagedArtifactResult";
 
 export interface StoreImageUploadUseCaseDependencies {
   storage: ArtifactStoragePort;
@@ -20,7 +20,7 @@ export interface StoreImageUploadUseCaseDependencies {
   now?: () => string;
 }
 
-type StoreImageUploadUseCaseFailure = Extract<RegisterStagedDataResult, { ok: false }>;
+type StoreImageUploadUseCaseFailure = Extract<RegisterStagedArtifactResult, { ok: false }>;
 
 const STORE_IMAGE_UPLOAD_USE_CASE = "StoreImageUploadUseCase";
 
@@ -40,7 +40,7 @@ function toFailureResult(
     correlationId?: string;
   },
 ): StoreImageUploadUseCaseFailure {
-  return mapStoreImageUploadToRegisterStagedDataResult(
+  return mapStoreImageUploadToRegisterStagedArtifactResult(
     {
       ok: false,
       error: createContractError(code, message, {
@@ -205,7 +205,7 @@ export class StoreImageUploadUseCase {
       );
 
       if (!storeResult.ok) {
-        const failure = mapStoreImageUploadToRegisterStagedDataResult(
+        const failure = mapStoreImageUploadToRegisterStagedArtifactResult(
           {
             ok: false,
             error: storeResult.error,
@@ -234,7 +234,7 @@ export class StoreImageUploadUseCase {
         return failure;
       }
 
-      const result = mapStoreImageUploadToRegisterStagedDataResult(
+      const result = mapStoreImageUploadToRegisterStagedArtifactResult(
         {
           ok: true,
           descriptor: storeResult.value,

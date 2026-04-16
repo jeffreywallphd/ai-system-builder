@@ -17,6 +17,8 @@ The contract family is intentionally artifact-oriented and key-based:
 - existence check (`has-artifact-request`, `has-artifact-result`)
 - delete operation (`delete-artifact-request`, `delete-artifact-result`)
 
+Zone semantics are intrinsic to storage instances. Placement references instance + key.
+
 Avoid physical path assumptions in this contract layer. Adapter implementations map keys to filesystem/object-storage details.
 
 Storage keys should be normalized through family helpers to keep operation request/result behavior mechanically consistent.

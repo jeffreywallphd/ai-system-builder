@@ -1,7 +1,5 @@
-import {
-  normalizeStorageArtifactKey,
-  type StorageArtifactKey,
-} from "../storage";
+import { normalizeArtifactReference, type ArtifactReference } from "../artifact";
+import { normalizeTransformReference, type TransformReference } from "../transform";
 import {
   normalizeDatasetMaterializationDescriptor,
   type DatasetMaterializationDescriptor,
@@ -19,8 +17,8 @@ export interface DatasetDescriptor<
   id: string;
   name?: string;
   schema?: DatasetSchemaSummary;
-  sourceArtifactKeys?: StorageArtifactKey[];
-  transformIds?: string[];
+  sourceArtifacts?: ArtifactReference[];
+  transforms?: TransformReference[];
   materializations?: DatasetMaterializationDescriptor[];
   createdAt?: string;
   metadata?: TMetadata;
@@ -55,12 +53,8 @@ export function normalizeDatasetDescriptor<
     id: normalizeRequiredText(descriptor.id, "Dataset id"),
     name: normalizeOptionalText(descriptor.name),
     schema: normalizeDatasetSchemaSummary(descriptor.schema),
-    sourceArtifactKeys: descriptor.sourceArtifactKeys?.map((key) =>
-      normalizeStorageArtifactKey(key)
-    ),
-    transformIds: descriptor.transformIds?.map((id) =>
-      normalizeRequiredText(id, "Dataset transform id")
-    ),
+    sourceArtifacts: descriptor.sourceArtifacts?.map(normalizeArtifactReference),
+    transforms: descriptor.transforms?.map(normalizeTransformReference),
     materializations: descriptor.materializations?.map(
       normalizeDatasetMaterializationDescriptor,
     ),

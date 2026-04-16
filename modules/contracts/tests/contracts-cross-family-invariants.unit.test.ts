@@ -26,9 +26,7 @@ import {
   createStoreArtifactRequest,
   normalizeStorageArtifactKey,
 } from "../storage";
-import {
-  createStagedDataDescriptorFromStorageObjectDescriptor,
-} from "../ingestion";
+import { createStagedArtifactDescriptorFromStorageObjectDescriptor } from "../ingestion";
 import { normalizeTransformRecord } from "../transform";
 import { normalizeDatasetDescriptor } from "../dataset";
 import { normalizeLineageRecord } from "../lineage";
@@ -157,7 +155,7 @@ describe("contracts cross-family invariants", () => {
     expect("record" in storageRequest).toBe(false);
   });
 
-  it("keeps ingestion staged-data descriptors aligned to storage descriptors without transport coupling", () => {
+  it("keeps ingestion staged-artifact descriptors aligned to storage descriptors without transport coupling", () => {
     const storageRequest = createStoreArtifactRequest(
       new Uint8Array([1, 2, 3]),
       {
@@ -169,7 +167,7 @@ describe("contracts cross-family invariants", () => {
       },
     );
 
-    const stagedDescriptor = createStagedDataDescriptorFromStorageObjectDescriptor(
+    const stagedDescriptor = createStagedArtifactDescriptorFromStorageObjectDescriptor(
       {
         key: storageRequest.descriptor.key ?? "staging/uploads/image-9",
         mediaType: storageRequest.descriptor.mediaType,
@@ -194,10 +192,10 @@ describe("contracts cross-family invariants", () => {
     expect("channel" in stagedDescriptor).toBe(false);
   });
 
-  it("keeps transform, dataset, and lineage contracts aligned around artifact-key references", () => {
+  it("keeps transform, dataset, and lineage contracts aligned around typed references", () => {
     const transformRecord = normalizeTransformRecord({
       specification: {
-        id: " normalize-orders ",
+        definitionId: " normalize-orders ",
         kind: " normalizatioN ",
         stage: " derivation ",
       },
@@ -207,8 +205,8 @@ describe("contracts cross-family invariants", () => {
 
     const datasetDescriptor = normalizeDatasetDescriptor({
       id: "orders.v1",
-      sourceArtifactKeys: transformRecord.outputs.map((output) => output.key),
-      transformIds: [transformRecord.specification.id],
+      sourceArtifacts: transformRecord.outputs,
+      transforms: [{ definitionId: transformRecord.specification.definitionId }],
       materializations: [
         {
           artifactKey: " dataset/orders/orders.v1.parquet ",
@@ -220,7 +218,7 @@ describe("contracts cross-family invariants", () => {
     const lineage = normalizeLineageRecord({
       nodes: [
         { id: transformRecord.outputs[0].key, kind: "artifact" },
-        { id: transformRecord.specification.id, kind: "transform" },
+        { id: transformRecord.specification.definitionId, kind: "transform" },
         { id: datasetDescriptor.id, kind: "dataset" },
       ],
       edges: [
@@ -231,15 +229,15 @@ describe("contracts cross-family invariants", () => {
         },
         {
           kind: "produced",
-          from: { id: transformRecord.specification.id, kind: "transform" },
+          from: { id: transformRecord.specification.definitionId, kind: "transform" },
           to: { id: datasetDescriptor.id, kind: "dataset" },
         },
       ],
     });
 
     expect(transformRecord.outputs[0].key).toBe("derived/orders/normalized.parquet");
-    expect(datasetDescriptor.sourceArtifactKeys).toEqual([
-      "derived/orders/normalized.parquet",
+    expect(datasetDescriptor.sourceArtifacts).toEqual([
+      { key: "derived/orders/normalized.parquet", label: undefined },
     ]);
     expect(lineage.edges[1]).toMatchObject({
       kind: "produced",
@@ -247,5 +245,4 @@ describe("contracts cross-family invariants", () => {
       to: { id: "orders.v1", kind: "dataset" },
     });
   });
-
 });

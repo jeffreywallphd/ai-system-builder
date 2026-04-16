@@ -9,10 +9,10 @@ describe("transform family invariants", () => {
       "TRANSFORM_STAGES",
       "isTransformKind",
       "isTransformStage",
-      "normalizeTransformArtifactReference",
       "normalizeTransformExecutionSummary",
       "normalizeTransformKind",
       "normalizeTransformRecord",
+      "normalizeTransformReference",
       "normalizeTransformSpecification",
       "normalizeTransformStage",
     ]);
