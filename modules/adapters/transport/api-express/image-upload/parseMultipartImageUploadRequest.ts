@@ -13,7 +13,8 @@ export interface ParsedMultipartImageUploadRequest {
 
 interface MultipartRequestLike {
   headers?: Record<string, string | string[] | undefined>;
-  on?: (event: string, listener: (chunk?: Buffer | string) => void) => void;
+  pipe?: (destination: NodeJS.WritableStream) => NodeJS.WritableStream;
+  on?: (event: string, listener: (chunk?: Buffer | string | Error) => void) => void;
 }
 
 function getHeaderValue(
@@ -41,39 +42,12 @@ function normalizeBusboyHeaders(
   };
 }
 
-async function readRequestBodyBuffer(request: MultipartRequestLike): Promise<Buffer> {
-  if (!request.on) {
-    return Buffer.alloc(0);
-  }
-
-  return await new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-
-    request.on?.("data", (chunk) => {
-      if (typeof chunk === "string") {
-        chunks.push(Buffer.from(chunk));
-        return;
-      }
-
-      if (chunk) {
-        chunks.push(chunk);
-      }
-    });
-
-    request.on?.("end", () => {
-      resolve(Buffer.concat(chunks));
-    });
-
-    request.on?.("error", (error) => {
-      reject(error);
-    });
-  });
-}
-
 export async function parseMultipartImageUploadRequest(
   request: MultipartRequestLike,
 ): Promise<ParsedMultipartImageUploadRequest> {
-  const requestBodyBuffer = await readRequestBodyBuffer(request);
+  if (typeof request.pipe !== "function") {
+    throw new Error("multipart image upload requires a readable request stream.");
+  }
 
   return await new Promise<ParsedMultipartImageUploadRequest>((resolve, reject) => {
     const parser = Busboy({
@@ -100,6 +74,7 @@ export async function parseMultipartImageUploadRequest(
           bytes: new Uint8Array(Buffer.concat(chunks)),
         };
       });
+      stream.on("error", reject);
     });
 
     parser.on("field", (fieldName, value) => {
@@ -109,6 +84,7 @@ export async function parseMultipartImageUploadRequest(
     });
 
     parser.on("error", reject);
+    request.on?.("error", (error) => reject(error instanceof Error ? error : new Error(String(error))));
 
     parser.on("close", () => {
       if (!parsedFile) {
@@ -122,6 +98,6 @@ export async function parseMultipartImageUploadRequest(
       });
     });
 
-    parser.end(requestBodyBuffer);
+    request.pipe(parser);
   });
 }

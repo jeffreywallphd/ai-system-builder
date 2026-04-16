@@ -32,14 +32,12 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
     const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
-        descriptor: {
-          storage: {
-            key: "uploads/kitten.png",
-            mediaType: "image/png",
-            sizeBytes: 4,
-          },
-          sourceKind: "upload",
+        storage: {
+          key: "uploads/kitten.png",
+          mediaType: "image/png",
+          sizeBytes: 4,
         },
+        sourceKind: "upload",
       },
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",
@@ -164,14 +162,12 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
     const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
-        descriptor: {
-          storage: {
-            key: "uploads/cat.png",
-            mediaType: "image/png",
-            sizeBytes: 16,
-          },
-          sourceKind: "upload",
+        storage: {
+          key: "uploads/cat.png",
+          mediaType: "image/png",
+          sizeBytes: 16,
         },
+        sourceKind: "upload",
       },
       requestId: "req-upload-3",
     });

@@ -137,7 +137,7 @@ export function mapStoreImageUploadResultToApiResponse(
   },
 ): ApiImageUploadResponse {
   if (result.ok) {
-    return createApiImageUploadSuccessResponse(result.value.descriptor, {
+    return createApiImageUploadSuccessResponse(result.value, {
       requestId: result.requestId ?? context.requestId,
       correlationId: result.correlationId ?? context.correlationId,
     });
