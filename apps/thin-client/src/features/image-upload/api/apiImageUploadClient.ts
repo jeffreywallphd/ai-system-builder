@@ -63,6 +63,23 @@ function createUploadUrl(apiBaseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/image/upload`;
 }
 
+function createHttpErrorMessage(response: Response): string {
+  const normalizedStatusText = response.statusText.trim();
+  if (normalizedStatusText.length > 0) {
+    return `Image upload failed (${response.status} ${normalizedStatusText}).`;
+  }
+
+  return `Image upload failed (HTTP ${response.status}).`;
+}
+
+async function readApiResponseBody(response: Response): Promise<unknown> {
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
 function toRendererResult(responseBody: unknown): ThinClientImageUploadResult {
   if (!isApiResponseEnvelope(responseBody)) {
     return {
@@ -116,7 +133,17 @@ export function createApiImageUploadClient(
         }),
       });
 
-      const responseBody = (await response.json()) as unknown;
+      const responseBody = await readApiResponseBody(response);
+      if (!response.ok && !isApiResponseEnvelope(responseBody)) {
+        return {
+          ok: false,
+          error: {
+            code: "internal",
+            message: createHttpErrorMessage(response),
+          },
+        };
+      }
+
       return toRendererResult(responseBody);
     },
   };

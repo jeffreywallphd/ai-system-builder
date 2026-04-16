@@ -31,6 +31,7 @@
 - Keep host-context metadata small and serialization-friendly (JSON-serializable values only).
 - Do not encode auth/session/request/window/framework semantics in host-context metadata.
 - `apps/thin-client` is a thin surface over server capabilities, not assumed full parity from day one.
+- The thin-client image-upload proof path is server-backed end to end (feature-local HTTP client → Express route → shared use case → shared storage capability).
 
 ## Key Constraints
 

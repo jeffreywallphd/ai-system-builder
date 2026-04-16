@@ -113,4 +113,42 @@ describe("thin-client useImageUploadFeature", () => {
       "Select one image file before uploading.",
     );
   });
+
+  it("renders server validation feedback when upload fails", async () => {
+    const uploadImage = vi.fn().mockResolvedValue({
+      ok: false,
+      error: {
+        code: "validation",
+        message: "mediaType must be an image media type.",
+      },
+    });
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<HookProbe client={{ uploadImage }} />);
+    });
+
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    const form = container.querySelector("form") as HTMLFormElement;
+    const file = new File([new Uint8Array([1, 2, 3, 4])], "cat.png", { type: "image/png" });
+
+    await act(async () => {
+      setInputFiles(input, [file]);
+    });
+
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(uploadImage).toHaveBeenCalledOnce();
+    expect(container.querySelector("[data-testid='status']")?.textContent).toBe("error");
+    expect(container.querySelector("[data-testid='message']")?.textContent).toBe(
+      "mediaType must be an image media type.",
+    );
+  });
 });

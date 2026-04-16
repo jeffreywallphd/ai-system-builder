@@ -12,6 +12,8 @@
     "make": "electron-forge make",
     "start": "npm run dev",
     "test": "vitest run --environment jsdom",
+    "dev:thin-client": "npm run dev --prefix apps/thin-client",
+    "build:thin-client": "npm run build --prefix apps/thin-client",
     "dev:server": "npm run start:server",
     "start:server": "tsc -p tsconfig.json && node dist/apps/server/src/index.js"
   },
