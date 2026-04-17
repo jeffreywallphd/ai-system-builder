@@ -1,10 +1,9 @@
-import type { ContractBoundaryContext } from "../shared";
 import {
   normalizeArtifactRepoTarget,
   type ArtifactRepoTarget,
 } from "./artifact-repo-target";
 
-export interface StoreArtifactInRepoRequest extends ContractBoundaryContext {
+export interface StoreArtifactInRepoRequest {
   target: ArtifactRepoTarget;
   content: Uint8Array;
   mediaType?: string;
@@ -19,8 +18,6 @@ export function createStoreArtifactInRepoRequest(
     mediaType?: string;
     metadata?: Readonly<Record<string, unknown>>;
     overwrite?: boolean;
-    requestId?: string;
-    correlationId?: string;
   },
 ): StoreArtifactInRepoRequest {
   return {
@@ -29,7 +26,5 @@ export function createStoreArtifactInRepoRequest(
     mediaType: options.mediaType,
     metadata: options.metadata,
     overwrite: options.overwrite,
-    requestId: options.requestId,
-    correlationId: options.correlationId,
   };
 }

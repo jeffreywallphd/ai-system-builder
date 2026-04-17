@@ -4,12 +4,12 @@ import type {
   ArtifactContentRetrievalPort,
   RetrieveArtifactViewerMediaByStorageKeyRequest,
 } from "../../../../application/ports/artifact-content";
-import type { ArtifactStoragePort } from "../../../../application/ports/storage";
+import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
 import { createContractError, createFailureResult, createSuccessResult } from "../../../../contracts/shared";
 import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
 
 export interface CreateFilesystemArtifactContentRetrievalAdapterOptions {
-  storage: Pick<ArtifactStoragePort, "retrieveArtifact">;
+  storage: Pick<ArtifactObjectStoragePort, "retrieveArtifact">;
   artifactCatalogRead: ArtifactCatalogReadPort;
 }
 

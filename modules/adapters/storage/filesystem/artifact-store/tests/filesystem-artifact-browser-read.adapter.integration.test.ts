@@ -7,7 +7,7 @@ import { createStoreArtifactRequest } from "../../../../../contracts/storage";
 import { createLocalArtifactCatalogPersistenceAdapter } from "../../artifact-catalog";
 import {
   createFilesystemArtifactBrowserReadAdapter,
-  createFilesystemArtifactStorageAdapter,
+  createFilesystemArtifactObjectStorageAdapter,
 } from "..";
 
 let tempRoots: string[] = [];
@@ -27,16 +27,16 @@ describe("filesystem artifact browser read adapter", () => {
   it("uses artifact catalog records from explicit catalog seam instead of filesystem traversal", async () => {
     const rootDirectory = await createTempRoot();
     const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
-    const storage = createFilesystemArtifactStorageAdapter({
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
       artifactCatalogAppend: artifactCatalog,
     });
     const browserRead = createFilesystemArtifactBrowserReadAdapter({
       artifactCatalogRead: artifactCatalog,
-      storage,
+      storage: objectStorage,
     });
 
-    await storage.storeArtifact(
+    await objectStorage.storeArtifact(
       createStoreArtifactRequest(new Uint8Array([1, 2, 3]), {
         descriptor: {
           key: "uploads/session/cat.png",
@@ -73,16 +73,16 @@ describe("filesystem artifact browser read adapter", () => {
   it("keeps read/detail/content storage-key-based and path agnostic", async () => {
     const rootDirectory = await createTempRoot();
     const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
-    const storage = createFilesystemArtifactStorageAdapter({
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
       artifactCatalogAppend: artifactCatalog,
     });
     const browserRead = createFilesystemArtifactBrowserReadAdapter({
       artifactCatalogRead: artifactCatalog,
-      storage,
+      storage: objectStorage,
     });
 
-    await storage.storeArtifact(
+    await objectStorage.storeArtifact(
       createStoreArtifactRequest(new Uint8Array([4, 5, 6, 7]), {
         descriptor: {
           key: "uploads/session/dog.png",

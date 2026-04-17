@@ -291,8 +291,6 @@ describe("storage contracts", () => {
       },
       mediaType: "image/png",
       overwrite: true,
-      requestId: "req-repo-1",
-      correlationId: "corr-repo-1",
     });
 
     expect(storeRequest).toEqual({
@@ -306,8 +304,6 @@ describe("storage contracts", () => {
       mediaType: "image/png",
       metadata: undefined,
       overwrite: true,
-      requestId: "req-repo-1",
-      correlationId: "corr-repo-1",
     });
 
     const descriptor = {

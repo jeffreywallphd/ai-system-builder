@@ -9,7 +9,7 @@ import { createLogger, type StructuredLogSink } from "../../../adapters/observab
 import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
-  createFilesystemArtifactStorageAdapter,
+  createFilesystemArtifactObjectStorageAdapter,
   createLocalArtifactCatalogPersistenceAdapter,
 } from "../../../adapters/storage/filesystem";
 import {
@@ -68,7 +68,7 @@ export function composeDesktopHost(
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
-      const storage = createFilesystemArtifactStorageAdapter({
+      const storage = createFilesystemArtifactObjectStorageAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
         host: "desktop",
         logging: loggingPort,

@@ -40,4 +40,6 @@ Generic **artifact-repo storage** contracts for provider/repository/revision/pat
 
 This family is intentionally provider-neutral and small. It is designed so a future Hugging Face adapter can be the first implementation without leaking provider specifics into object-storage contracts.
 
+Repo-family request contracts are payload-only (target/content/options) and do not embed boundary envelope metadata such as request/correlation ids; application-layer request metadata flows via `ApplicationRequestContext` at the port boundary.
+
 Avoid physical path assumptions in this contract layer. Adapter implementations map logical contracts to provider or filesystem details.

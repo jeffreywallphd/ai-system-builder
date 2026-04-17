@@ -4,7 +4,7 @@ import path from "node:path";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { ArtifactCatalogAppendPort } from "../../../../application/ports/artifact-catalog";
-import type { ArtifactStoragePort } from "../../../../application/ports/storage";
+import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
 import type { ContractErrorCode } from "../../../../contracts/shared";
 import { createContractError } from "../../../../contracts/shared";
 import {
@@ -168,9 +168,9 @@ function createContentChecksum(bytes: Uint8Array): StorageObjectChecksum {
   };
 }
 
-export function createFilesystemArtifactStorageAdapter(
+export function createFilesystemArtifactObjectStorageAdapter(
   options: CreateFilesystemArtifactStorageAdapterOptions,
-): ArtifactStoragePort {
+): ArtifactObjectStoragePort {
   if (options.rootDirectory.trim().length === 0) {
     throw new Error("rootDirectory must be a non-empty path.");
   }
@@ -488,4 +488,14 @@ export function createFilesystemArtifactStorageAdapter(
       }
     },
   };
+}
+
+
+/**
+ * Backward-compatible alias for artifact-object storage adapter naming.
+ */
+export function createFilesystemArtifactStorageAdapter(
+  options: CreateFilesystemArtifactStorageAdapterOptions,
+): ArtifactObjectStoragePort {
+  return createFilesystemArtifactObjectStorageAdapter(options);
 }

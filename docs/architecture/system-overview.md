@@ -155,8 +155,8 @@ Transport technologies are adapters, not application definitions.
 ## Persistence and storage posture
 
 - Persistence: structured durable records (default adapter target: Postgres).
-- Storage adapters: a broad architectural category for non-relational durable/semi-durable content concerns.
-- Storage is family-oriented (not one flat abstraction): artifact-object storage and artifact-repo storage are both first-class families.
+- Storage adapters: a broad architectural category for non-relational durable/semi-durable content concerns with a thin shared foundation.
+- Storage is family-oriented (not one flat abstraction): artifact-object storage and artifact-repo storage are peer first-class specialized families.
 - Artifact-object storage centers on artifact keys, bytes, checksums, and artifact metadata.
 - Repo-backed storage centers on provider/repo identity, revision/version semantics, remote visibility/access semantics, and provider-specific import/publication behavior.
 - Shared storage foundation contracts keep family boundaries explicit: `StorageKind` (`artifact-object` | `artifact-repo`), `StorageProviderId`, thin `StorageBackingReference`, and `ArtifactStorageBinding` for internal-artifact linkage.

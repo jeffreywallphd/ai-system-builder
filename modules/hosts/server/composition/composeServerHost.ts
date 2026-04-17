@@ -9,7 +9,7 @@ import { createLogger, type StructuredLogSink } from "../../../adapters/observab
 import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
-  createFilesystemArtifactStorageAdapter,
+  createFilesystemArtifactObjectStorageAdapter,
   createLocalArtifactCatalogPersistenceAdapter,
 } from "../../../adapters/storage/filesystem";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
@@ -67,7 +67,7 @@ export function composeServerHost(
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
-      const storage = createFilesystemArtifactStorageAdapter({
+      const storage = createFilesystemArtifactObjectStorageAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
         host: "server",
         logging: loggingPort,

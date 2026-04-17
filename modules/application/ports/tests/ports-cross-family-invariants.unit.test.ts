@@ -23,6 +23,12 @@ import {
   type StoreArtifactResult,
 } from "../../../contracts/storage";
 import type { StructuredLogEvent } from "../../../contracts/logging";
+import type { ContractBoundaryContext } from "../../../contracts/shared";
+import type {
+  HasArtifactInRepoRequest,
+  RetrieveArtifactFromRepoRequest,
+  StoreArtifactInRepoRequest,
+} from "../../../contracts/storage";
 
 import type { LoggingPort } from "../logging";
 import type { ApplicationRequestContext } from "../application-request-context";
@@ -177,6 +183,9 @@ describe("application ports cross-family invariants", () => {
     expectTypeOf<Parameters<ArtifactRepoStoragePort["storeArtifactInRepo"]>[0]>().not.toExtend<{
       descriptor: { key: string };
     }>();
+    expectTypeOf<StoreArtifactInRepoRequest>().not.toExtend<ContractBoundaryContext>();
+    expectTypeOf<RetrieveArtifactFromRepoRequest>().not.toExtend<ContractBoundaryContext>();
+    expectTypeOf<HasArtifactInRepoRequest>().not.toExtend<ContractBoundaryContext>();
 
     expect("descriptor" in persistenceRequest).toBe(false);
     expect("operation" in storageRequest).toBe(false);

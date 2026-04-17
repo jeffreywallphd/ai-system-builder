@@ -10,7 +10,7 @@ import type {
   ReadArtifactDetailRequest,
 } from "../../../../application/ports/artifact-browser";
 import type { ApplicationRequestContext } from "../../../../application/ports";
-import type { ArtifactStoragePort } from "../../../../application/ports/storage";
+import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
 import {
   createArtifactBrowserLocator,
   type ArtifactBrowseItem,
@@ -33,7 +33,7 @@ export interface FilesystemArtifactBrowserReadAdapter
 
 export interface CreateFilesystemArtifactBrowserReadAdapterOptions {
   artifactCatalogRead: ArtifactCatalogReadPort;
-  storage?: Pick<ArtifactStoragePort, "hasArtifact">;
+  storage?: Pick<ArtifactObjectStoragePort, "hasArtifact">;
 }
 
 function toBrowseItem(record: ArtifactCatalogRecord): ArtifactBrowseItem {

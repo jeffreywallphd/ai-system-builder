@@ -1,7 +1,9 @@
 # Filesystem Artifact Store Adapters
 
-`createFilesystemArtifactStorageAdapter` is a filesystem-backed
-`ArtifactStoragePort` implementation for host-local artifact bytes.
+`createFilesystemArtifactObjectStorageAdapter` is the canonical filesystem-backed
+`ArtifactObjectStoragePort` implementation for host-local artifact bytes.
+
+`createFilesystemArtifactStorageAdapter` remains as a backward-compatible alias.
 
 `createLocalArtifactCatalogPersistenceAdapter` is the local artifact-catalog
 persistence adapter that owns append/browse/read catalog-record behavior.
