@@ -1,6 +1,6 @@
 # Storage Contracts
 
-Shared artifact-storage contracts for non-database content:
+Shared **artifact/object-storage** contracts for non-database content:
 
 - uploads and generated outputs
 - exports and temporary workspace artifacts
@@ -18,6 +18,9 @@ The contract family is intentionally artifact-oriented and key-based:
 - delete operation (`delete-artifact-request`, `delete-artifact-result`)
 
 Zone semantics are intrinsic to storage instances. Placement references instance + key.
+
+This contract family is one storage specialization.
+Repository/provider-backed storage semantics may require additional storage contract families (for example provider/repo identity, revision, visibility, publish/import operations) rather than flattening everything into artifact key/blob contracts.
 
 Avoid physical path assumptions in this contract layer. Adapter implementations map keys to filesystem/object-storage details.
 

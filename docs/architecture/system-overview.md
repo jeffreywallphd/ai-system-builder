@@ -155,7 +155,11 @@ Transport technologies are adapters, not application definitions.
 ## Persistence and storage posture
 
 - Persistence: structured durable records (default adapter target: Postgres).
-- Storage: files/blobs/artifacts/workspaces and other non-relational content.
+- Storage adapters: a broad architectural category for non-relational durable/semi-durable content concerns.
+- Storage is family-oriented (not one flat abstraction): artifact/object storage and repo-backed storage are both valid directions.
+- Artifact/object storage centers on artifact keys, bytes, checksums, and artifact metadata.
+- Repo-backed storage centers on provider/repo identity, revision/version semantics, remote visibility/access semantics, and provider-specific import/publication behavior.
+- Future provider integrations (likely first example: Hugging Face model/dataset repos) should be composed as specialized storage adapters/providers, not flattened into a generic blob-only framing.
 - Ingestion/staged artifact: canonical semantic model for inbound content (uploads, scrape outputs, selected generated outputs, and similar intake paths) above raw storage mechanics.
 
 They are separate architectural concerns even if they share physical disk territory in some host deployments.
@@ -164,6 +168,12 @@ Image upload remains an implemented specialized intake path and should align to 
 The initial image vertical slice now includes both write and read direction:
 - write/intake through image upload as specialized ingestion,
 - read-side artifact browser behavior through image-backed `artifact.browse` (list metadata), `artifact.read` (detail metadata), and `artifact.content.read` (separate content retrieval).
+
+Artifact browser posture:
+
+- the artifact browser is the normalized system browser over internal artifacts across backing-store differences,
+- it is not a filesystem browser,
+- it is not equivalent to provider-native repository browsing surfaces.
 
 ## Packaging restraint
 

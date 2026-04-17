@@ -14,7 +14,8 @@ Inbound content spans multiple intake shapes:
 - user-uploaded content,
 - scraped content,
 - generated outputs selected for retention,
-- API/runtime-driven inbound payloads.
+- API/runtime-driven inbound payloads,
+- content imported from external repo-backed storage providers.
 
 Treating each of these as isolated file operations causes vocabulary and contract drift:
 
@@ -27,13 +28,15 @@ The repository already separates persistence (records) from storage (artifact by
 
 ## Decision
 
-Adopt ingestion/staged-artifact as the canonical higher-level semantic model for inbound content.
+Adopt ingestion/staged-artifact as the canonical higher-level semantic model for inbound content regardless of backing store origin.
 
 ### Direction-setting decisions
 
 - The system moves from isolated upload/file semantics toward a shared ingestion and staged artifact model.
 - Uploaded, scraped, and selected generated/API/runtime inbound content are modeled as staged artifacts.
-- Storage remains a generic capability for artifact bytes and keys, while ingestion contracts define higher-level staged artifact semantics.
+- Storage remains a generic architecture category with specialized storage families; ingestion contracts define higher-level staged artifact semantics above those families.
+- Inbound staged artifacts may originate from local/object-style artifact storage or from repo-backed storage providers.
+- Import from repo-backed providers should normalize into canonical internal staged artifact semantics and descriptor vocabulary.
 - Existing image upload remains a specialized intake path and is aligned to the staged artifact model.
 - Canonical metadata vocabulary for intake outcomes is ingestion-centric (source kind + staged artifact descriptor), not image-only.
 - Early viewer direction is staged artifact inspection (an early data-lake-like surface), not a generic file browser.
@@ -42,6 +45,9 @@ Adopt ingestion/staged-artifact as the canonical higher-level semantic model for
   - `artifact.read` for single-artifact detail/read-model behavior,
   - `artifact.content.read` as a distinct content-retrieval path (separate from browse/detail metadata contracts) with canonical descriptor/reference-oriented content-access semantics.
 - This browser/viewer direction is artifact/catalog oriented and storage-key based; it does not introduce filesystem-path browsing semantics.
+- The system artifact browser is a normalized browser over internal artifacts; it is not a provider-native repository browser.
+- Provider-native browsing/viewing semantics may coexist (for example in external repo UIs), but they do not replace normalized system artifact browser contracts.
+- Publication to repo-backed providers is a separate semantic operation from local byte storage and should be modeled as such in specialized storage/provider flows.
 
 ### ELT progression posture
 
@@ -62,12 +68,13 @@ The image-backed artifact browser/viewer direction should be read as early stage
 
 - Contract vocabulary becomes durable across transports (API/IPC) and hosts (desktop/server).
 - Image upload remains functional while becoming clearly one intake specialization.
-- Future ingestion paths can reuse the same staged artifact descriptor semantics, reducing parallel contract families.
+- Future ingestion paths (including repo-backed imports) can reuse the same staged artifact descriptor semantics, reducing parallel semantic drift.
 - Documentation and context-routing can reference one intake model with minimum-sufficient pack inclusion.
 
 ### Negative
 
 - Teams must distinguish ingestion semantics from storage mechanics instead of using file upload as a catch-all.
+- Teams must keep repo-backed provider import/publication semantics explicit rather than flattening them into local blob assumptions.
 - Additional follow-up ADRs may be needed when metadata cataloging, transformation orchestration, or viewer capabilities become implementation priorities.
 
 ### Follow-up

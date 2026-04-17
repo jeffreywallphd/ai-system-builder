@@ -26,6 +26,7 @@
 - Keep operation identity transport-neutral (`workspace.create` style), with HTTP route details staying adapter-side.
 - Route/controller code must stay thin and delegate use-case behavior inward.
 - Server host composition is separate from transport adaptation.
+- Server host composition may include multiple specialized storage adapter families (artifact/object plus provider/repo-backed storage) and should keep that composition explicit.
 - Pass host metadata inward via `modules/contracts/host` host-context contracts,
   not HTTP framework objects.
 - Keep host-context metadata small and serialization-friendly (JSON-serializable values only).
@@ -38,6 +39,7 @@
 - Do not accumulate business logic in routes/controllers/middleware.
 - Do not encode HTTP semantics into domain/application models.
 - Keep host wiring, transport translation, and application orchestration as separate responsibilities.
+- Do not hide provider-backed storage semantics behind ad hoc route/UI shortcuts; compose provider-backed adapters explicitly in host wiring.
 
 ## Canonical Source Docs
 
