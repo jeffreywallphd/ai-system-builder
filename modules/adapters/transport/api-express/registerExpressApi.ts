@@ -6,14 +6,22 @@ import {
   registerArtifactBrowserApiRoutes,
   type RegisterArtifactBrowserApiRoutesDependencies,
 } from "./artifact-browser/registerArtifactBrowserApiRoutes";
+import {
+  registerArtifactRepoApiRoutes,
+  type RegisterArtifactRepoApiRoutesDependencies,
+} from "./artifact-repo/registerArtifactRepoApiRoutes";
 
 export interface RegisterExpressApiDependencies {
-  app: RegisterImageUploadApiRouteDependencies["app"] & RegisterArtifactBrowserApiRoutesDependencies["app"];
+  app: RegisterImageUploadApiRouteDependencies["app"]
+    & RegisterArtifactBrowserApiRoutesDependencies["app"]
+    & RegisterArtifactRepoApiRoutesDependencies["app"];
   storeImageUploadUseCase: RegisterImageUploadApiRouteDependencies["storeImageUploadUseCase"];
   browseArtifactsUseCase: RegisterArtifactBrowserApiRoutesDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactContentUseCase"];
   artifactMediaViewRetrieval: RegisterArtifactBrowserApiRoutesDependencies["artifactMediaViewRetrieval"];
+  hasArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["hasArtifactInRepoUseCase"];
+  storeArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["storeArtifactInRepoUseCase"];
 }
 
 export function registerExpressApi(
@@ -31,4 +39,12 @@ export function registerExpressApi(
     readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
     artifactMediaViewRetrieval: dependencies.artifactMediaViewRetrieval,
   });
+
+  registerArtifactRepoApiRoutes({
+    app: dependencies.app,
+    hasArtifactInRepoUseCase: dependencies.hasArtifactInRepoUseCase,
+    storeArtifactInRepoUseCase: dependencies.storeArtifactInRepoUseCase,
+  });
 }
+
+

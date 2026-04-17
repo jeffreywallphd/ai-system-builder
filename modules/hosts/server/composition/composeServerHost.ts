@@ -2,8 +2,10 @@ import type { ArtifactRepoStoragePort } from "../../../application/ports/storage
 import type { LoggingPort } from "../../../application/ports/logging";
 import {
   BrowseArtifactsUseCase,
+  HasArtifactInRepoUseCase,
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
+  StoreArtifactInRepoUseCase,
   StoreImageUploadUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
@@ -126,6 +128,13 @@ export function composeServerHost(
         artifactBrowserContentRead: artifactBrowserRead,
       });
 
+      const hasArtifactInRepo = new HasArtifactInRepoUseCase({
+        artifactRepoStorage,
+      });
+      const storeArtifactInRepo = new StoreArtifactInRepoUseCase({
+        artifactRepoStorage,
+      });
+
       registerExpressApi({
         app: registerOptions.app,
         storeImageUploadUseCase,
@@ -133,6 +142,8 @@ export function composeServerHost(
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,
+        hasArtifactInRepoUseCase: hasArtifactInRepo,
+        storeArtifactInRepoUseCase: storeArtifactInRepo,
       });
     },
   };
