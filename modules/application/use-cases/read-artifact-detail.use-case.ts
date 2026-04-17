@@ -11,6 +11,7 @@ import {
 import type { StorageObjectMetadata } from "../../contracts/storage";
 import type { ArtifactBrowserMetadataReadPort } from "../ports/artifact-browser";
 import type {
+  ArtifactBrowserCommandContext,
   ReadArtifactDetailCommand,
   ReadArtifactDetailUseCaseResult,
 } from "./artifact-browser-read.types";
@@ -28,6 +29,7 @@ export class ReadArtifactDetailUseCase {
 
   public async execute<TMetadata extends StorageObjectMetadata = StorageObjectMetadata>(
     command: ReadArtifactDetailCommand,
+    context: ArtifactBrowserCommandContext = {},
   ): Promise<ReadArtifactDetailUseCaseResult<ContractErrorDetails, TMetadata>> {
     let locator;
 
@@ -40,22 +42,23 @@ export class ReadArtifactDetailUseCase {
             reason: error instanceof Error ? error.message : String(error),
           },
         }),
-        command,
+        context,
       );
     }
 
     try {
-      const result = await this.artifactBrowserMetadataRead.readArtifactDetail<TMetadata>({
-        locator,
-        requestId: command.requestId,
-        correlationId: command.correlationId,
-      });
+      const result = await this.artifactBrowserMetadataRead.readArtifactDetail<TMetadata>(
+        {
+          locator,
+        },
+        context,
+      );
 
       if (!result.ok) {
         return result;
       }
 
-      return createSuccessResult(normalizeArtifactReadSuccessValue(result.value), command);
+      return createSuccessResult(normalizeArtifactReadSuccessValue(result.value), context);
     } catch (error) {
       return createFailureResult(
         createContractError("internal", "Unexpected artifact detail read failure.", {
@@ -63,7 +66,7 @@ export class ReadArtifactDetailUseCase {
             reason: error instanceof Error ? error.message : String(error),
           },
         }),
-        command,
+        context,
       );
     }
   }

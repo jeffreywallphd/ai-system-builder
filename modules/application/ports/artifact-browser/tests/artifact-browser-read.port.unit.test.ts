@@ -15,6 +15,7 @@ import {
 import type { StorageObjectMetadata } from "../../../../contracts/storage";
 
 import type {
+  ArtifactBrowserBoundaryContext,
   ArtifactBrowserContentReadPort,
   ArtifactBrowserMetadataReadPort,
   BrowseArtifactsRequest,
@@ -37,6 +38,14 @@ describe("artifact browser application ports", () => {
     >();
     expectTypeOf<Parameters<ArtifactBrowserContentReadPort["readArtifactContent"]>[0]>().toExtend<
       ReadArtifactContentRequest
+    >();
+
+    expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["browseArtifacts"]>[0]>().not.toExtend<{
+      requestId: string;
+      correlationId: string;
+    }>();
+    expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["browseArtifacts"]>[1]>().toExtend<
+      ArtifactBrowserBoundaryContext | undefined
     >();
 
     expectTypeOf<

@@ -3,7 +3,12 @@ import { describe, expect, expectTypeOf, it, testDouble } from "../../../../test
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 
-import { DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL } from "../../../../contracts/ipc";
+import {
+  DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
+  DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
+} from "../../../../contracts/ipc";
 
 import { composeDesktopHost } from "../composeDesktopHost";
 
@@ -59,9 +64,15 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: "/tmp/desktop-image-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledOnce();
-    const [channel, listener] = ipcMain.handle.mock.calls[0] as [string, unknown];
-    expect(channel).toBe(DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(4);
+    const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
+    expect(channels).toEqual([
+      DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value,
+    ]);
+    const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
   });
 

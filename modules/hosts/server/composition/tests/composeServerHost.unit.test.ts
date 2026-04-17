@@ -57,10 +57,13 @@ describe("composeServerHost", () => {
       storageRootDirectory: "/tmp/server-image-upload-test",
     });
 
-    expect(app.post).toHaveBeenCalledOnce();
-    expect(app.post).toHaveBeenCalledWith(
+    expect(app.post).toHaveBeenCalledTimes(4);
+    const registeredPaths = app.post.mock.calls.map((call) => call[0]);
+    expect(registeredPaths).toEqual([
       "/api/image/upload",
-      expect.any(Function),
-    );
+      "/api/artifact/browse",
+      "/api/artifact/read",
+      "/api/artifact/content/read",
+    ]);
   });
 });
