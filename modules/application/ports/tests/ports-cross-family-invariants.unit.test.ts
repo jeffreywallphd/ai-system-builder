@@ -164,6 +164,13 @@ describe("application ports cross-family invariants", () => {
       StoreArtifactResult
     >();
 
+    expectTypeOf<Parameters<ArtifactStoragePort["storeArtifact"]>[1]>().toExtend<
+      ApplicationRequestContext | undefined
+    >();
+    expectTypeOf<Parameters<ArtifactStoragePort["storeArtifact"]>[0]>().not.toExtend<
+      ApplicationRequestContext
+    >();
+
     const persistenceRequest: PersistenceRecordOperationRequest = {
       operation: createPersistenceOperationForRecord("workspace", "save"),
       record: createPersistenceRecordReference("workspace", "ws-42"),

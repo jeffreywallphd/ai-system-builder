@@ -38,6 +38,9 @@ describe("ArtifactStoragePort", () => {
     expectTypeOf<Parameters<ArtifactStoragePort["retrieveArtifact"]>[0]>().toExtend<
       RetrieveArtifactRequest
     >();
+    expectTypeOf<Parameters<ArtifactStoragePort["storeArtifact"]>[1]>().toExtend<
+      ApplicationRequestContext | undefined
+    >();
     expectTypeOf<Parameters<ArtifactStoragePort["hasArtifact"]>[0]>().toExtend<
       HasArtifactRequest
     >();
@@ -70,24 +73,23 @@ describe("ArtifactStoragePort", () => {
         key: "workspace/ws-42/artifacts/output.json",
         mediaType: "application/json",
       },
-      ...context,
     });
-    const retrieveRequest = createRetrieveArtifactRequest(
-      "workspace/ws-42/artifacts/output.json",
-      context,
-    );
-    const hasRequest = createHasArtifactRequest("workspace/ws-42/artifacts/output.json", context);
-    const deleteRequest = createDeleteArtifactRequest(
-      "workspace/ws-42/artifacts/output.json",
-      context,
-    );
+    const retrieveRequest = createRetrieveArtifactRequest("workspace/ws-42/artifacts/output.json");
+    const hasRequest = createHasArtifactRequest("workspace/ws-42/artifacts/output.json");
+    const deleteRequest = createDeleteArtifactRequest("workspace/ws-42/artifacts/output.json");
 
     const storeArtifactCalls: StoreArtifactRequest<unknown>[] = [];
     const retrieveArtifactCalls: RetrieveArtifactRequest[] = [];
     const hasArtifactCalls: HasArtifactRequest[] = [];
     const deleteArtifactCalls: DeleteArtifactRequest[] = [];
-    const storeArtifact: ArtifactStoragePort["storeArtifact"] = async (incomingRequest) => {
+    const storeContexts: Array<ApplicationRequestContext | undefined> = [];
+    const retrieveContexts: Array<ApplicationRequestContext | undefined> = [];
+    const hasContexts: Array<ApplicationRequestContext | undefined> = [];
+    const deleteContexts: Array<ApplicationRequestContext | undefined> = [];
+
+    const storeArtifact: ArtifactStoragePort["storeArtifact"] = async (incomingRequest, incomingContext) => {
       storeArtifactCalls.push(incomingRequest);
+      storeContexts.push(incomingContext);
       return createStoreArtifactSuccessResult(
         {
           key: incomingRequest.descriptor.key ?? "workspace/ws-42/artifacts/output.json",
@@ -99,8 +101,10 @@ describe("ArtifactStoragePort", () => {
     };
     const retrieveArtifact: ArtifactStoragePort["retrieveArtifact"] = async <TContent>(
       incomingRequest: RetrieveArtifactRequest,
+      incomingContext,
     ) => {
       retrieveArtifactCalls.push(incomingRequest);
+      retrieveContexts.push(incomingContext);
       return createRetrieveArtifactSuccessResult(
         {
           key: incomingRequest.key,
@@ -111,8 +115,9 @@ describe("ArtifactStoragePort", () => {
         context,
       );
     };
-    const hasArtifact: ArtifactStoragePort["hasArtifact"] = async (incomingRequest) => {
+    const hasArtifact: ArtifactStoragePort["hasArtifact"] = async (incomingRequest, incomingContext) => {
       hasArtifactCalls.push(incomingRequest);
+      hasContexts.push(incomingContext);
       return createHasArtifactSuccessResult(true, {
         descriptor: {
           key: incomingRequest.key,
@@ -122,8 +127,9 @@ describe("ArtifactStoragePort", () => {
         ...context,
       });
     };
-    const deleteArtifact: ArtifactStoragePort["deleteArtifact"] = async (incomingRequest) => {
+    const deleteArtifact: ArtifactStoragePort["deleteArtifact"] = async (incomingRequest, incomingContext) => {
       deleteArtifactCalls.push(incomingRequest);
+      deleteContexts.push(incomingContext);
       return createDeleteArtifactSuccessResult(true, context);
     };
 
@@ -134,15 +140,19 @@ describe("ArtifactStoragePort", () => {
       deleteArtifact,
     };
 
-    const storeResult = await port.storeArtifact(storeRequest);
-    const retrieveResult = await port.retrieveArtifact(retrieveRequest);
-    const hasResult = await port.hasArtifact(hasRequest);
-    const deleteResult = await port.deleteArtifact(deleteRequest);
+    const storeResult = await port.storeArtifact(storeRequest, context);
+    const retrieveResult = await port.retrieveArtifact(retrieveRequest, context);
+    const hasResult = await port.hasArtifact(hasRequest, context);
+    const deleteResult = await port.deleteArtifact(deleteRequest, context);
 
     expect(storeArtifactCalls).toEqual([storeRequest]);
     expect(retrieveArtifactCalls).toEqual([retrieveRequest]);
     expect(hasArtifactCalls).toEqual([hasRequest]);
     expect(deleteArtifactCalls).toEqual([deleteRequest]);
+    expect(storeContexts).toEqual([context]);
+    expect(retrieveContexts).toEqual([context]);
+    expect(hasContexts).toEqual([context]);
+    expect(deleteContexts).toEqual([context]);
 
     expect(storeResult.ok).toBe(true);
     if (!storeResult.ok) {
@@ -169,5 +179,7 @@ describe("ArtifactStoragePort", () => {
     expect("operation" in retrieveRequest).toBe(false);
     expect("record" in hasRequest).toBe(false);
     expect("operation" in deleteRequest).toBe(false);
+    expect(storeRequest.requestId).toBeUndefined();
+    expect(storeRequest.correlationId).toBeUndefined();
   });
 });

@@ -136,11 +136,12 @@ export function createFilesystemArtifactBrowserReadAdapter(
       }
 
       if (options.storage) {
-        const hasArtifactResult = await options.storage.hasArtifact({
-          key: storageKey,
-          requestId: context.requestId,
-          correlationId: context.correlationId,
-        });
+        const hasArtifactResult = await options.storage.hasArtifact(
+          {
+            key: storageKey,
+          },
+          context,
+        );
 
         if (!hasArtifactResult.ok) {
           return createFailureResult(

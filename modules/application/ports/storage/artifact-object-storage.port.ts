@@ -1,3 +1,4 @@
+import type { ApplicationRequestContext } from "../application-request-context";
 import type {
   DeleteArtifactRequest,
   DeleteArtifactResult,
@@ -15,13 +16,21 @@ import type {
 export interface ArtifactObjectStoragePort {
   storeArtifact<TContent = Uint8Array>(
     request: StoreArtifactRequest<TContent>,
+    context?: ApplicationRequestContext,
   ): Promise<StoreArtifactResult>;
 
   retrieveArtifact<TContent = Uint8Array>(
     request: RetrieveArtifactRequest,
+    context?: ApplicationRequestContext,
   ): Promise<RetrieveArtifactResult<TContent>>;
 
-  hasArtifact(request: HasArtifactRequest): Promise<HasArtifactResult>;
+  hasArtifact(
+    request: HasArtifactRequest,
+    context?: ApplicationRequestContext,
+  ): Promise<HasArtifactResult>;
 
-  deleteArtifact(request: DeleteArtifactRequest): Promise<DeleteArtifactResult>;
+  deleteArtifact(
+    request: DeleteArtifactRequest,
+    context?: ApplicationRequestContext,
+  ): Promise<DeleteArtifactResult>;
 }

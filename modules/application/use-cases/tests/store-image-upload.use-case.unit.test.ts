@@ -95,18 +95,24 @@ describe("StoreImageUploadUseCase", () => {
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",
     });
-    expect(storeArtifact).toHaveBeenCalledWith({
-      descriptor: {
-        mediaType: "image/png",
-        metadata: {
-          originalFileName: "kitten.png",
+    expect(storeArtifact).toHaveBeenCalledWith(
+      {
+        descriptor: {
+          mediaType: "image/png",
+          metadata: {
+            originalFileName: "kitten.png",
+          },
         },
+        content: new Uint8Array([137, 80, 78, 71]),
+        overwrite: undefined,
+        requestId: undefined,
+        correlationId: undefined,
       },
-      content: new Uint8Array([137, 80, 78, 71]),
-      overwrite: undefined,
-      requestId: "req-upload-1",
-      correlationId: "corr-upload-1",
-    });
+      {
+        requestId: "req-upload-1",
+        correlationId: "corr-upload-1",
+      },
+    );
     expect(log).toHaveBeenCalledTimes(2);
     expect(log.mock.calls[0]?.[0]).toMatchObject({
       event: "application.image-upload.store.started",

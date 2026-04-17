@@ -26,7 +26,7 @@
 - Storage is a separate concern from persistence and can include specialized storage families with distinct semantics.
 - Artifact-object storage (keys/bytes/checksums/metadata, including `ArtifactObjectStorageLocator`) is one storage family; do not assume all storage concerns fit this shape.
 - Artifact-repo storage is a valid storage specialization (provider/repository/revision/path plus import/publish behaviors).
-- Treat Hugging Face as the likely first repo-backed storage/provider example; do not frame it as "just another blob store."
+- Hugging Face is now the first implemented artifact-repo provider adapter; do not frame it as "just another blob store" and do not treat it as the definition of the whole family.
 - Ingestion/staged artifact contracts are the canonical higher-level intake semantics for inbound content; storage stays the underlying artifact capability.
 - Persistence contracts stay record-oriented: operation identity + record reference + result/error envelope.
 - Persistence operation names should stay helper-driven and transport-neutral (`lowercase.dot.segments` with no `api.`/`ipc.` prefixes).
@@ -58,6 +58,7 @@
 - Do not assume filesystem placement answers persistence-vs-storage design questions.
 - Keep persistence adapters and storage adapters as distinct responsibilities.
 - Keep provider import semantics and provider publication semantics explicit; do not flatten them into local blob put/get assumptions.
+- For app-layer seams, pass request metadata through `ApplicationRequestContext` and keep storage request payload contracts focused on storage semantics.
 
 ## Canonical Source Docs
 
