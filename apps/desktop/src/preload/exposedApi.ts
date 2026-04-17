@@ -11,6 +11,9 @@ import {
   DESKTOP_ARTIFACT_READ_OPERATION,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_OPERATION,
+  DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_OPERATION,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
@@ -18,6 +21,7 @@ import {
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactMediaViewRequest,
   createDesktopArtifactReadRequest,
+  createDesktopArtifactPublishRequest,
   createDesktopImageUploadRequest,
   type DesktopArtifactBrowseRequest,
   type DesktopArtifactBrowseResponse,
@@ -27,6 +31,8 @@ import {
   type DesktopArtifactMediaViewResponse,
   type DesktopArtifactReadRequest,
   type DesktopArtifactReadResponse,
+  type DesktopArtifactPublishRequest,
+  type DesktopArtifactPublishResponse,
   type DesktopImageUploadRequest,
   type DesktopImageUploadResponse,
 } from "../../../../modules/contracts/ipc";
@@ -71,6 +77,19 @@ export interface DesktopPreloadApi {
     locator: DesktopArtifactBrowserLocator,
     context?: DesktopImageUploadBridgeContext,
   ) => Promise<DesktopArtifactMediaViewResponse>;
+  publishArtifactToRepo: (
+    input: {
+      artifactId: string;
+      target: {
+        provider: string;
+        repository: string;
+        path: string;
+        revision?: string;
+      };
+      mediaType?: string;
+    },
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopArtifactPublishResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -225,6 +244,37 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_MEDIA_VIEW_OPERATION,
         channel: DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact media-view IPC response envelope.",
+      });
+    },
+
+    async publishArtifactToRepo(input, context = {}) {
+      const request: DesktopArtifactPublishRequest = createDesktopArtifactPublishRequest(
+        {
+          artifactId: input.artifactId,
+          target: {
+            provider: input.target.provider,
+            repository: input.target.repository,
+            path: input.target.path,
+            revision: input.target.revision,
+          },
+          mediaType: input.mediaType,
+          verify: true,
+          boundary: {
+            host: "desktop",
+            source: artifactSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactPublishResponse>(response, {
+        operation: DESKTOP_ARTIFACT_PUBLISH_OPERATION,
+        channel: DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop artifact publish IPC response envelope.",
       });
     },
   };

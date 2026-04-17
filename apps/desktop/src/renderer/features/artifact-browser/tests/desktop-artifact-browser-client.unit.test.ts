@@ -37,6 +37,16 @@ describe("desktop artifact browser client", () => {
           bytes: new Uint8Array([1, 2, 3]),
         },
       }),
+      publishArtifactToRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          exists: true,
+        },
+      }),
     };
 
     const createObjectURL = vi.fn().mockReturnValue("blob:desktop-preview");
@@ -91,6 +101,16 @@ describe("desktop artifact browser client", () => {
           bytes: slicedView,
         },
       }),
+      publishArtifactToRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          exists: true,
+        },
+      }),
     };
 
     const createObjectURL = vi.fn().mockReturnValue("blob:desktop-preview");
@@ -107,5 +127,45 @@ describe("desktop artifact browser client", () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     const createdBlob = createObjectURL.mock.calls[0]?.[0] as Blob;
     expect(Array.from(new Uint8Array(await createdBlob.arrayBuffer()))).toEqual([1, 2, 3]);
+  });
+
+  it("publishes artifact backing through preload publish bridge", async () => {
+    window.desktopApi = {
+      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          exists: true,
+        },
+      }),
+    };
+
+    const client = createDesktopArtifactBrowserClient();
+    const result = await client.publishArtifactToHuggingFace({
+      artifactId: "uploads/cat.png",
+      repository: "openai/demo",
+      path: "images/cat.png",
+      revision: "main",
+    });
+
+    expect(window.desktopApi.publishArtifactToRepo).toHaveBeenCalledWith({
+      artifactId: "uploads/cat.png",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+      },
+      mediaType: undefined,
+    });
+    expect(result.exists).toBe(true);
   });
 });

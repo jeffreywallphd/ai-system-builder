@@ -18,12 +18,20 @@ From the repository root:
 
 The preload layer exposes a narrow desktop API at `window.desktopApi` for UI-to-host transport.
 
-Current method:
+Current methods:
 
 - `uploadImage(input, context?)`
   - maps UI-provided upload payload into the `image.upload` IPC request envelope
   - invokes only `ipc.image.upload.request`
   - returns the structured IPC upload response envelope
+- `browseArtifacts(context?)`
+- `readArtifactDetail(locator, context?)`
+- `readArtifactContentDescriptor(locator, context?)`
+- `readArtifactViewerMedia(locator, context?)`
+- `publishArtifactToRepo(input, context?)`
+  - maps UI publish payload into the `artifact.publish` IPC request envelope
+  - invokes only `ipc.artifact.publish.request`
+  - returns structured publish result/failure envelope
 
 Design constraints:
 
@@ -32,12 +40,12 @@ Design constraints:
 
 ## Renderer Upload Component
 
-`src/renderer/App.tsx` provides a plain single-image upload form:
+`src/renderer/App.tsx` provides an Artifacts workflow with upload + artifact browser + publish:
 
 - selects one file from a native file input (`accept="image/*"`)
 - reads file bytes in the renderer (`File.arrayBuffer()` -> `Uint8Array`)
-- calls only `window.desktopApi.uploadImage(...)`
-- renders basic success/error feedback from structured IPC response data
+- calls preload bridge methods (`window.desktopApi.*`) through feature-local clients/hooks
+- renders browse/detail/content preview and Hugging Face publish success/error feedback
 
 Renderer constraints for this slice:
 

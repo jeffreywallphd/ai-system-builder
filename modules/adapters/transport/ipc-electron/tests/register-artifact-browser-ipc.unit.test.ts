@@ -4,10 +4,12 @@ import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   createDesktopArtifactBrowseRequest,
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactMediaViewRequest,
+  createDesktopArtifactPublishRequest,
   createDesktopArtifactReadRequest,
 } from "../../../../contracts/ipc";
 import {
@@ -23,6 +25,7 @@ function createUseCases() {
     readArtifactDetailUseCase: { execute: testDouble.fn() },
     readArtifactContentUseCase: { execute: testDouble.fn() },
     artifactMediaViewRetrieval: { retrieveArtifactViewerMediaByStorageKey: testDouble.fn() },
+    publishArtifactToRepoUseCase: { execute: testDouble.fn() },
   };
 }
 
@@ -64,14 +67,25 @@ describe("registerArtifactBrowserIpc", () => {
       ok: true,
       value: { storageKey: "uploads/a.png", mediaType: "image/png", bytes: new Uint8Array([1]) },
     });
+    (dependencies.publishArtifactToRepoUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+      ok: true,
+      value: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/a.png",
+        revision: "main",
+        exists: true,
+      },
+    });
 
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(4);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(5);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value)).toBe(true);
 
     await handlers.get(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)?.(
       {},
@@ -101,6 +115,18 @@ describe("registerArtifactBrowserIpc", () => {
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
+    await handlers.get(DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value)?.(
+      {},
+      createDesktopArtifactPublishRequest({
+        artifactId: "uploads/a.png",
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/a.png",
+        },
+        boundary: { host: "desktop", source: "desktop.renderer" },
+      }),
+    );
 
     expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
       { artifactKind: "image" },
@@ -118,6 +144,16 @@ describe("registerArtifactBrowserIpc", () => {
       { storageKey: "uploads/a.png" },
       { requestId: undefined, correlationId: undefined },
     );
+    expect(dependencies.publishArtifactToRepoUseCase.execute).toHaveBeenCalledWith({
+      artifactId: "uploads/a.png",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/a.png",
+        revision: undefined,
+      },
+      mediaType: undefined,
+    });
   });
 
   it("maps descriptor-oriented content failures through explicit response helper", () => {

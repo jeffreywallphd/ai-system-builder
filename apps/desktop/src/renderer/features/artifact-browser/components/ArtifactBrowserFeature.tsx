@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { useArtifactBrowserFeature } from "../hooks/useArtifactBrowserFeature";
 
@@ -11,11 +13,19 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     detail,
     content,
     imageViewUrl,
+    publishState,
+    publishedBacking,
     selectedStorageKey,
     viewState,
     selectArtifact,
     refreshArtifacts,
+    publishArtifactToHuggingFace,
   } = useArtifactBrowserFeature(client);
+  const [repository, setRepository] = useState("");
+  const [pathInRepo, setPathInRepo] = useState("");
+  const [revision, setRevision] = useState("main");
+  const [mediaType, setMediaType] = useState("");
+  const [showPublishForm, setShowPublishForm] = useState(false);
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -77,6 +87,73 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <img src={imageViewUrl} alt={detail?.locator.storageKey ?? "Selected artifact"} />
               <figcaption>Image preview for {detail?.locator.storageKey}</figcaption>
             </figure>
+          ) : null}
+
+          {detail ? (
+            <section className="ui-stack ui-stack--sm">
+              <button
+                className="ui-button"
+                type="button"
+                disabled={publishState.status === "loading"}
+                onClick={() => setShowPublishForm((current) => !current)}
+              >
+                Publish to Hugging Face
+              </button>
+              {showPublishForm ? (
+                <>
+                  <label className="ui-stack ui-stack--sm">
+                    <span>Repository</span>
+                    <input className="ui-input" value={repository} onChange={(event) => setRepository(event.target.value)} required />
+                  </label>
+                  <label className="ui-stack ui-stack--sm">
+                    <span>Path in repo</span>
+                    <input className="ui-input" value={pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required />
+                  </label>
+                  <label className="ui-stack ui-stack--sm">
+                    <span>Revision (optional)</span>
+                    <input className="ui-input" value={revision} onChange={(event) => setRevision(event.target.value)} />
+                  </label>
+                  <label className="ui-stack ui-stack--sm">
+                    <span>Media type (optional)</span>
+                    <input className="ui-input" value={mediaType} onChange={(event) => setMediaType(event.target.value)} />
+                  </label>
+                  <button
+                    className="ui-button"
+                    type="button"
+                    disabled={publishState.status === "loading" || repository.trim().length === 0 || pathInRepo.trim().length === 0}
+                    onClick={() => void publishArtifactToHuggingFace({
+                      repository,
+                      path: pathInRepo,
+                      revision: revision.trim() || undefined,
+                      mediaType: mediaType.trim() || undefined,
+                    })}
+                  >
+                    {publishState.status === "loading" ? "Publishing..." : "Publish"}
+                  </button>
+                </>
+              ) : null}
+              {publishState.message ? (
+                <p role={publishState.status === "error" ? "alert" : "status"}>{publishState.message}</p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {publishedBacking ? (
+            <section className="ui-stack ui-stack--sm">
+              <h3>Published Backing</h3>
+              <dl className="ui-grid ui-grid--two">
+                <dt>Provider</dt>
+                <dd>{publishedBacking.provider}</dd>
+                <dt>Repo</dt>
+                <dd>{publishedBacking.repository}</dd>
+                <dt>Path</dt>
+                <dd>{publishedBacking.path}</dd>
+                <dt>Revision</dt>
+                <dd>{publishedBacking.revision ?? "main"}</dd>
+                <dt>Verified</dt>
+                <dd>{publishedBacking.exists ? "yes" : "no"}</dd>
+              </dl>
+            </section>
           ) : null}
         </div>
       </div>

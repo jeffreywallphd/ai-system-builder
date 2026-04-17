@@ -226,6 +226,13 @@ Server host composition now exposes a minimal but usable artifact-repo API slice
 
 This is intentionally partial. It does **not** claim full provider management or provider-native browser parity.
 
+### Current desktop artifact-repo publish path
+
+Desktop host composition also wires the shared `PublishArtifactToRepoUseCase` with filesystem artifact storage, binding persistence, and Hugging Face artifact-repo storage adapter.
+
+- Renderer -> preload bridge -> Electron IPC -> shared publish use case.
+- Publish success persists `ArtifactStorageBinding` (`role = published`) and desktop artifact detail surfaces that backing metadata.
+
 ### Hugging Face provider hardening status
 
 The Hugging Face adapter remains one provider behind the generic artifact-repo port and uses the official `@huggingface/hub` client methods (`fileExists`, `uploadFile`, `downloadFile`) as the only integration path.
@@ -235,3 +242,4 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 - Provider status mapping is explicit (`validation`, `not-found`, `unavailable`, `internal`).
 - Published-backing linkage is persisted as `ArtifactStorageBinding` (`role = published`, `kind = artifact-repo`) after successful publish verification.
 - Artifact detail read flow can surface published-backing metadata from binding records so thin-client detail panels can render durable remote backing state.
+- Published backing data is now hardened with optional structured repo target fields (`repository`, `path`, `revision`) on backing references, with shared encode/decode helpers for locator fallback compatibility.

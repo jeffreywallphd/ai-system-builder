@@ -1,5 +1,6 @@
 import { createContractError } from "../../contracts/shared";
 import {
+  encodeArtifactRepoBackingLocator,
   createHasArtifactInRepoRequest,
   createStoreArtifactInRepoRequest,
 } from "../../contracts/storage";
@@ -98,8 +99,17 @@ export class PublishArtifactToRepoUseCase {
         backing: {
           kind: "artifact-repo",
           provider: command.target.provider,
-          locator: `${command.target.repository}/${targetPath}`,
+          locator: encodeArtifactRepoBackingLocator({
+            repository: command.target.repository,
+            path: targetPath,
+          }),
           revision,
+          target: {
+            provider: command.target.provider,
+            repository: command.target.repository,
+            revision,
+            path: targetPath,
+          },
         },
       },
     });

@@ -2,6 +2,9 @@ import { describe, expect, it } from "../../../testing/node-test";
 
 import {
   DESKTOP_ARTIFACT_BROWSE_OPERATION,
+  DESKTOP_ARTIFACT_PUBLISH_OPERATION,
+  DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_OPERATION,
@@ -14,6 +17,8 @@ import {
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
   createDesktopArtifactBrowseRequest,
+  createDesktopArtifactPublishRequest,
+  createDesktopArtifactPublishSuccessResponse,
   createDesktopArtifactBrowseSuccessResponse,
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactContentReadSuccessResponse,
@@ -26,6 +31,7 @@ import {
   ARTIFACT_CONTENT_READ_OPERATION,
   ARTIFACT_READ_OPERATION,
 } from "../../artifact-browser";
+import { API_ARTIFACT_PUBLISH_OPERATION } from "../../api";
 
 describe("desktop artifact-browser ipc contract", () => {
   it("reuses canonical operation identity and helper-derived channel naming for read operations", () => {
@@ -57,6 +63,13 @@ describe("desktop artifact-browser ipc contract", () => {
     );
     expect(DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL.value).toBe(
       "ipc.artifact.media.view.response",
+    );
+    expect(DESKTOP_ARTIFACT_PUBLISH_OPERATION).toBe(API_ARTIFACT_PUBLISH_OPERATION);
+    expect(DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value).toBe(
+      "ipc.artifact.publish.request",
+    );
+    expect(DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL.value).toBe(
+      "ipc.artifact.publish.response",
     );
   });
 
@@ -160,5 +173,60 @@ describe("desktop artifact-browser ipc contract", () => {
     expect(mediaViewRequest.payload.storageKey).toBe("staged/images/artifact-32");
     expect("path" in readRequest.payload.locator).toBe(false);
     expect("path" in contentRequest.payload.locator).toBe(false);
+  });
+
+  it("defines a publish contract that mirrors the shared publish operation semantics", () => {
+    const request = createDesktopArtifactPublishRequest({
+      artifactId: " uploads/cat.png ",
+      target: {
+        provider: " huggingface ",
+        repository: " openai/demo ",
+        path: " images/cat.png ",
+        revision: " main ",
+      },
+      mediaType: " image/png ",
+      verify: true,
+      boundary: {
+        host: "desktop",
+        source: " desktop.renderer.artifact-browser ",
+      },
+    });
+
+    const response = createDesktopArtifactPublishSuccessResponse({
+      provider: " huggingface ",
+      repository: " openai/demo ",
+      path: " images/cat.png ",
+      revision: " main ",
+      exists: true,
+    });
+
+    expect(request.operation).toBe("artifact.publish");
+    expect(request.payload).toMatchObject({
+      artifactId: "uploads/cat.png",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+      },
+      mediaType: "image/png",
+      verify: true,
+      boundary: {
+        host: "desktop",
+        source: "desktop.renderer.artifact-browser",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Expected publish response to be successful.");
+    }
+
+    expect(response.value).toEqual({
+      provider: "huggingface",
+      repository: "openai/demo",
+      path: "images/cat.png",
+      revision: "main",
+      exists: true,
+    });
   });
 });

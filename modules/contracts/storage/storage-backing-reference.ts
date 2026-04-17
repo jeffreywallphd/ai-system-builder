@@ -6,12 +6,17 @@ import {
   normalizeStorageProviderId,
   type StorageProviderId,
 } from "./storage-provider-id";
+import {
+  normalizeArtifactRepoTarget,
+  type ArtifactRepoTarget,
+} from "./artifact-repo-target";
 
 export interface StorageBackingReference {
   kind: StorageKind;
   provider: StorageProviderId;
   locator: string;
   revision?: string;
+  target?: ArtifactRepoTarget;
 }
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -37,5 +42,11 @@ export function normalizeStorageBackingReference(
     provider: normalizeStorageProviderId(reference.provider),
     locator,
     revision: normalizeOptionalText(reference.revision),
+    target: reference.target
+      ? normalizeArtifactRepoTarget({
+        ...reference.target,
+        provider: reference.target.provider ?? reference.provider,
+      })
+      : undefined,
   };
 }

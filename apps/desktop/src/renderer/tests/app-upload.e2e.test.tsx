@@ -115,6 +115,9 @@ describe("desktop image upload end-to-end", () => {
       artifactMediaViewRetrieval: {
         retrieveArtifactViewerMediaByStorageKey: async () => unavailableResult,
       },
+      publishArtifactToRepoUseCase: {
+        execute: async () => unavailableResult,
+      },
     });
 
     const preloadApi = createDesktopPreloadApi({

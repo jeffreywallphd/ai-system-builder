@@ -2,9 +2,11 @@ import { describe, expect, it, testDouble } from "../../../../../modules/testing
 
 import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
   createDesktopArtifactBrowseSuccessResponse,
+  createDesktopArtifactPublishSuccessResponse,
   createDesktopArtifactMediaViewSuccessResponse,
   createDesktopImageUploadSuccessResponse,
   createIpcChannel,
@@ -76,6 +78,32 @@ describe("desktop preload exposedApi bridge", () => {
     expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
     expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value);
     expect(mediaResponse.ok).toBe(true);
+  });
+
+  it("maps publish bridge calls to artifact publish request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopArtifactPublishSuccessResponse({
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        exists: true,
+      }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    const response = await api.publishArtifactToRepo({
+      artifactId: "uploads/cat.png",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+      },
+    });
+
+    expect(response.ok).toBe(true);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value);
   });
 
   it("throws when IPC returns a response envelope for the wrong operation or channel", async () => {

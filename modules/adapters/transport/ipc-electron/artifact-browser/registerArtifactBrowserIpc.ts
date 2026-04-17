@@ -2,6 +2,8 @@ import type { ArtifactContentRetrievalPort } from "../../../../application/ports
 import type {
   BrowseArtifactsCommand,
   BrowseArtifactsUseCasePort,
+  PublishArtifactToRepoCommand,
+  PublishArtifactToRepoUseCase,
   BrowseArtifactsUseCaseResult,
   ReadArtifactContentCommand,
   ReadArtifactContentUseCasePort,
@@ -15,6 +17,7 @@ import {
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
@@ -32,7 +35,11 @@ import {
   type DesktopArtifactMediaViewResponse,
   type DesktopArtifactReadRequest,
   type DesktopArtifactReadResponse,
+  type DesktopArtifactPublishRequest,
+  type DesktopArtifactPublishResponse,
   DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
+  createDesktopArtifactPublishSuccessResponse,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 export type { IpcMainHandlePort } from "../ipcMainHandlePort";
@@ -43,6 +50,7 @@ export interface RegisterArtifactBrowserIpcDependencies {
   readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
   readArtifactContentUseCase: ReadArtifactContentUseCasePort;
   artifactMediaViewRetrieval: ArtifactContentRetrievalPort;
+  publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
 }
 
 export function mapDesktopArtifactBrowseRequestToCommand(
@@ -77,12 +85,23 @@ export function mapDesktopArtifactMediaViewRequest(
   };
 }
 
+export function mapDesktopArtifactPublishRequestToCommand(
+  request: DesktopArtifactPublishRequest,
+): PublishArtifactToRepoCommand {
+  return {
+    artifactId: request.payload.artifactId,
+    target: request.payload.target,
+    mediaType: request.payload.mediaType,
+  };
+}
+
 export function mapDesktopArtifactRequestContext(
   request:
     | DesktopArtifactBrowseRequest
     | DesktopArtifactReadRequest
     | DesktopArtifactContentReadRequest
-    | DesktopArtifactMediaViewRequest,
+    | DesktopArtifactMediaViewRequest
+    | DesktopArtifactPublishRequest,
 ): { requestId?: string; correlationId?: string } {
   return {
     requestId: request.requestId,
@@ -155,6 +174,26 @@ function mapArtifactMediaViewFailure(
   return createIpcFailureResponse(
     createIpcError(
       DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
+      error.code === "validation" || error.code === "not-found" || error.code === "unavailable"
+        ? error.code
+        : "internal",
+      error.message,
+      {
+        details: error.details,
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapArtifactPublishFailure(
+  request: DesktopArtifactPublishRequest,
+  error: { code: string; message: string; details?: Record<string, unknown> },
+): DesktopArtifactPublishResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
       error.code === "validation" || error.code === "not-found" || error.code === "unavailable"
         ? error.code
         : "internal",
@@ -284,6 +323,27 @@ export function createDesktopArtifactMediaViewIpcHandler(
   };
 }
 
+export function createDesktopArtifactPublishIpcHandler(
+  publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopArtifactPublishRequest,
+  ): Promise<DesktopArtifactPublishResponse> => {
+    const result = await publishArtifactToRepoUseCase.execute(
+      mapDesktopArtifactPublishRequestToCommand(request),
+    );
+    if (!result.ok) {
+      return mapArtifactPublishFailure(request, result.error);
+    }
+
+    return createDesktopArtifactPublishSuccessResponse(result.value, {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+    });
+  };
+}
+
 export function registerArtifactBrowserIpc(
   dependencies: RegisterArtifactBrowserIpcDependencies,
 ): void {
@@ -302,5 +362,9 @@ export function registerArtifactBrowserIpc(
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value,
     createDesktopArtifactMediaViewIpcHandler(dependencies.artifactMediaViewRetrieval),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value,
+    createDesktopArtifactPublishIpcHandler(dependencies.publishArtifactToRepoUseCase),
   );
 }
