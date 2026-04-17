@@ -9,6 +9,7 @@ import {
   createDesktopArtifactReadRequest,
 } from "../../../../contracts/ipc";
 import {
+  mapDesktopArtifactRequestContext,
   mapReadArtifactContentResultToDesktopResponse,
   registerArtifactBrowserIpc,
   type IpcMainHandlePort,
@@ -124,6 +125,21 @@ describe("registerArtifactBrowserIpc", () => {
       },
       requestId: request.requestId,
       correlationId: request.correlationId,
+    });
+  });
+
+  it("maps request correlation metadata with an explicit helper", () => {
+    const request = createDesktopArtifactBrowseRequest({
+      artifactKind: "image",
+      boundary: { host: "desktop", source: "desktop.renderer" },
+    }, {
+      requestId: "req-ipc-1",
+      correlationId: "corr-ipc-1",
+    });
+
+    expect(mapDesktopArtifactRequestContext(request)).toEqual({
+      requestId: "req-ipc-1",
+      correlationId: "corr-ipc-1",
     });
   });
 });

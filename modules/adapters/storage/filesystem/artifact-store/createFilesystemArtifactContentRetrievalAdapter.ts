@@ -1,10 +1,8 @@
 import type { ArtifactCatalogReadPort } from "../../../../application/ports/artifact-catalog";
-import type {
-  ArtifactBrowserBoundaryContext,
-} from "../../../../application/ports/artifact-browser";
+import type { ApplicationRequestContext } from "../../../../application/ports";
 import type {
   ArtifactContentRetrievalPort,
-  RetrieveArtifactContentByStorageKeyRequest,
+  RetrieveArtifactViewerMediaByStorageKeyRequest,
 } from "../../../../application/ports/artifact-content";
 import type { ArtifactStoragePort } from "../../../../application/ports/storage";
 import { createContractError, createFailureResult, createSuccessResult } from "../../../../contracts/shared";
@@ -19,9 +17,9 @@ export function createFilesystemArtifactContentRetrievalAdapter(
   options: CreateFilesystemArtifactContentRetrievalAdapterOptions,
 ): ArtifactContentRetrievalPort {
   return {
-    async retrieveArtifactContentByStorageKey(
-      request: RetrieveArtifactContentByStorageKeyRequest,
-      context: ArtifactBrowserBoundaryContext = {},
+    async retrieveArtifactViewerMediaByStorageKey(
+      request: RetrieveArtifactViewerMediaByStorageKeyRequest,
+      context: ApplicationRequestContext = {},
     ) {
       const storageKey = normalizeStorageArtifactKey(request.storageKey);
       const [catalogResult, retrieveResult] = await Promise.all([

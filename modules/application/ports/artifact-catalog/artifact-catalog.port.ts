@@ -1,5 +1,5 @@
 import type { ContractResult } from "../../../contracts/shared";
-import type { ArtifactBrowserBoundaryContext } from "../artifact-browser";
+import type { ApplicationRequestContext } from "../application-request-context";
 import type { ArtifactCatalogRecord } from "./artifact-catalog-record";
 
 export interface AppendArtifactCatalogRecordRequest {
@@ -17,18 +17,18 @@ export interface ReadArtifactCatalogRecordRequest {
 export interface ArtifactCatalogAppendPort {
   appendArtifactCatalogRecord(
     request: AppendArtifactCatalogRecordRequest,
-    context?: ArtifactBrowserBoundaryContext,
+    context?: ApplicationRequestContext,
   ): Promise<ContractResult<{ storageKey: string }>>;
 }
 
 export interface ArtifactCatalogReadPort {
   browseArtifactCatalogRecords(
     request: BrowseArtifactCatalogRecordsRequest,
-    context?: ArtifactBrowserBoundaryContext,
+    context?: ApplicationRequestContext,
   ): Promise<ContractResult<{ records: ArtifactCatalogRecord[] }>>;
 
   readArtifactCatalogRecord(
     request: ReadArtifactCatalogRecordRequest,
-    context?: ArtifactBrowserBoundaryContext,
+    context?: ApplicationRequestContext,
   ): Promise<ContractResult<{ record: ArtifactCatalogRecord }>>;
 }

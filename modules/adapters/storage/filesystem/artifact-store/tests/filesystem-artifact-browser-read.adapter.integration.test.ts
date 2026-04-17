@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "../../../../../testing/node-test";
 import { createStoreArtifactRequest } from "../../../../../contracts/storage";
-import { createLocalArtifactCatalogAdapter } from "../../artifact-catalog";
+import { createLocalArtifactCatalogPersistenceAdapter } from "../../artifact-catalog";
 import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactStorageAdapter,
@@ -26,7 +26,7 @@ async function createTempRoot(): Promise<string> {
 describe("filesystem artifact browser read adapter", () => {
   it("uses artifact catalog records from explicit catalog seam instead of filesystem traversal", async () => {
     const rootDirectory = await createTempRoot();
-    const artifactCatalog = createLocalArtifactCatalogAdapter({ rootDirectory });
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
     const storage = createFilesystemArtifactStorageAdapter({
       rootDirectory,
       artifactCatalogAppend: artifactCatalog,
@@ -72,7 +72,7 @@ describe("filesystem artifact browser read adapter", () => {
 
   it("keeps read/detail/content storage-key-based and path agnostic", async () => {
     const rootDirectory = await createTempRoot();
-    const artifactCatalog = createLocalArtifactCatalogAdapter({ rootDirectory });
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
     const storage = createFilesystemArtifactStorageAdapter({
       rootDirectory,
       artifactCatalogAppend: artifactCatalog,

@@ -13,7 +13,7 @@ export interface RegisterExpressApiDependencies {
   browseArtifactsUseCase: RegisterArtifactBrowserApiRoutesDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactContentUseCase"];
-  artifactContentRetrieval: RegisterArtifactBrowserApiRoutesDependencies["artifactContentRetrieval"];
+  artifactMediaViewRetrieval: RegisterArtifactBrowserApiRoutesDependencies["artifactMediaViewRetrieval"];
 }
 
 export function registerExpressApi(
@@ -29,6 +29,6 @@ export function registerExpressApi(
     browseArtifactsUseCase: dependencies.browseArtifactsUseCase,
     readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
     readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
-    artifactContentRetrieval: dependencies.artifactContentRetrieval,
+    artifactMediaViewRetrieval: dependencies.artifactMediaViewRetrieval,
   });
 }

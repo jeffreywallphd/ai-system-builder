@@ -25,6 +25,7 @@ import {
 import type { StructuredLogEvent } from "../../../contracts/logging";
 
 import type { LoggingPort } from "../logging";
+import type { ApplicationRequestContext } from "../application-request-context";
 import type {
   PersistenceRecordOperationRequest,
   PersistenceRecordPort,
@@ -255,7 +256,7 @@ describe("application ports cross-family invariants", () => {
     }>();
 
     expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["browseArtifacts"]>[1]>().toExtend<
-      { requestId?: string; correlationId?: string } | undefined
+      ApplicationRequestContext | undefined
     >();
 
     expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["readArtifactDetail"]>[0]>().not.toExtend<{
@@ -264,6 +265,22 @@ describe("application ports cross-family invariants", () => {
     expectTypeOf<Parameters<ArtifactBrowserContentReadPort["readArtifactContent"]>[0]>().not.toExtend<{
       artifactKind: string;
     }>();
+  });
+
+  it("uses generic application request context for artifact catalog/content seams", () => {
+    const artifactCatalogPortSource = readFileSync(
+      resolve("modules/application/ports/artifact-catalog/artifact-catalog.port.ts"),
+      "utf8",
+    );
+    const artifactContentPortSource = readFileSync(
+      resolve("modules/application/ports/artifact-content/artifact-content-retrieval.port.ts"),
+      "utf8",
+    );
+
+    expect(artifactCatalogPortSource).toContain("ApplicationRequestContext");
+    expect(artifactContentPortSource).toContain("ApplicationRequestContext");
+    expect(artifactCatalogPortSource).not.toContain("ArtifactBrowserBoundaryContext");
+    expect(artifactContentPortSource).not.toContain("ArtifactBrowserBoundaryContext");
   });
 
 });

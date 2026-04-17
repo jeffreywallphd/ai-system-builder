@@ -15,12 +15,13 @@ import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
 
 const DEFAULT_CATALOG_FILE = ".catalog/artifact-catalog.ndjson";
 
-export interface CreateLocalArtifactCatalogAdapterOptions {
+export interface CreateLocalArtifactCatalogPersistenceAdapterOptions {
   rootDirectory: string;
   catalogFile?: string;
 }
 
-export interface LocalArtifactCatalogAdapter extends ArtifactCatalogAppendPort, ArtifactCatalogReadPort {}
+export interface LocalArtifactCatalogPersistenceAdapter
+  extends ArtifactCatalogAppendPort, ArtifactCatalogReadPort {}
 
 function normalizeRecord(record: ArtifactCatalogRecord): ArtifactCatalogRecord {
   return {
@@ -61,9 +62,9 @@ function parseRecordLine(line: string): ArtifactCatalogRecord | undefined {
   }
 }
 
-export function createLocalArtifactCatalogAdapter(
-  options: CreateLocalArtifactCatalogAdapterOptions,
-): LocalArtifactCatalogAdapter {
+export function createLocalArtifactCatalogPersistenceAdapter(
+  options: CreateLocalArtifactCatalogPersistenceAdapterOptions,
+): LocalArtifactCatalogPersistenceAdapter {
   const rootDirectory = path.resolve(options.rootDirectory);
   const catalogFile = options.catalogFile ?? DEFAULT_CATALOG_FILE;
   const catalogPath = path.join(rootDirectory, catalogFile);
@@ -136,3 +137,9 @@ export function createLocalArtifactCatalogAdapter(
     },
   };
 }
+
+export type CreateLocalArtifactCatalogAdapterOptions =
+  CreateLocalArtifactCatalogPersistenceAdapterOptions;
+export type LocalArtifactCatalogAdapter = LocalArtifactCatalogPersistenceAdapter;
+
+export const createLocalArtifactCatalogAdapter = createLocalArtifactCatalogPersistenceAdapter;

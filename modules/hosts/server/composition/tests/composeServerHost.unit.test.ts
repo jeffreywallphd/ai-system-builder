@@ -68,6 +68,6 @@ describe("composeServerHost", () => {
       "/api/artifact/content/read",
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
-    expect(registeredGetPaths).toEqual(["/api/artifact/content/view"]);
+    expect(registeredGetPaths).toEqual(["/api/artifact/media/view"]);
   });
 });

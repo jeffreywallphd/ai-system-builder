@@ -3,7 +3,7 @@ import type {
   ArtifactContentReadSuccessValue,
 } from "../../../contracts/artifact-browser";
 import type { ContractResult } from "../../../contracts/shared";
-import type { ArtifactBrowserBoundaryContext } from "./artifact-browser-request-context";
+import type { ApplicationRequestContext } from "../application-request-context";
 
 export interface ReadArtifactContentRequest {
   locator: ArtifactBrowserLocator;
@@ -12,6 +12,6 @@ export interface ReadArtifactContentRequest {
 export interface ArtifactBrowserContentReadPort {
   readArtifactContent(
     request: ReadArtifactContentRequest,
-    context?: ArtifactBrowserBoundaryContext,
+    context?: ApplicationRequestContext,
   ): Promise<ContractResult<ArtifactContentReadSuccessValue>>;
 }

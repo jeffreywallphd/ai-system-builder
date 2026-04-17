@@ -66,7 +66,7 @@ export function useArtifactBrowserFeature(
 
       setDetail(artifactDetail);
       setContent(contentDescriptor);
-      setImageViewUrl(artifactClient.createArtifactImageViewUrl(locator));
+      setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
     } catch (error) {
       setDetail(undefined);
