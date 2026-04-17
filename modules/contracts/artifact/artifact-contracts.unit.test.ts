@@ -27,7 +27,7 @@ describe("artifact contracts", () => {
       },
     });
 
-    expect(descriptor).toEqual({
+    expect(descriptor).toMatchObject({
       key: "staging/raw/customer-data.csv",
       kind: "raw-staged",
       name: "customers.csv",

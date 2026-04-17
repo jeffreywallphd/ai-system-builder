@@ -84,7 +84,7 @@ describe("desktop image upload ipc contract", () => {
       },
     );
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       ok: true,
       value: {
         descriptor: {

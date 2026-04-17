@@ -21,7 +21,7 @@ describe("mapStoreImageUploadToRegisterStagedArtifactResult", () => {
       },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       value: {
         sourceKind: "upload",

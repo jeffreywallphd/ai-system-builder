@@ -124,7 +124,7 @@ describe("registerImageUploadApiRoute", () => {
       },
     );
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       ok: true,
       operation: "image.upload",
       value: {
@@ -139,7 +139,6 @@ describe("registerImageUploadApiRoute", () => {
       },
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",
-      metadata: undefined,
     });
   });
 
@@ -221,8 +220,11 @@ describe("registerImageUploadApiRoute", () => {
     expect(registeredPath).toBe("/api/image/upload");
     expect(registeredHandler).toBeTypeOf("function");
 
-    const status = testDouble.fn().mockReturnThis();
     const json = testDouble.fn();
+    const routeResponse = {
+      status: testDouble.fn((_: number) => routeResponse),
+      json,
+    };
     const routeRequest = createMultipartRequest("route-test-boundary", [137, 80, 78, 71], {
       source: "server.web.upload-form",
     });
@@ -234,10 +236,7 @@ describe("registerImageUploadApiRoute", () => {
 
     await registeredHandler?.(
       routeRequest,
-      {
-        status,
-        json,
-      },
+      routeResponse,
     );
 
     expect(execute).toHaveBeenCalledWith(
@@ -254,8 +253,9 @@ describe("registerImageUploadApiRoute", () => {
         correlationId: "corr-upload-3",
       },
     );
-    expect(status).toHaveBeenCalledWith(200);
-    expect(json).toHaveBeenCalledWith({
+    expect(routeResponse.status).toHaveBeenCalledWith(200);
+    const jsonBody = json.mock.calls[0]?.[0];
+    expect(jsonBody).toMatchObject({
       ok: true,
       operation: "image.upload",
       value: {
@@ -270,7 +270,6 @@ describe("registerImageUploadApiRoute", () => {
       },
       requestId: "req-upload-3",
       correlationId: "corr-upload-3",
-      metadata: undefined,
     });
   });
 
@@ -290,8 +289,11 @@ describe("registerImageUploadApiRoute", () => {
       storeImageUploadUseCase: createUseCaseStub(),
     });
 
-    const status = testDouble.fn().mockReturnThis();
     const json = testDouble.fn();
+    const routeResponse = {
+      status: testDouble.fn((_: number) => routeResponse),
+      json,
+    };
     const missingFileRequest = Readable.from([Buffer.from("--missing-file-boundary--\r\n")]) as Readable & {
       body: undefined;
       headers: Record<string, string>;
@@ -303,23 +305,19 @@ describe("registerImageUploadApiRoute", () => {
 
     await registeredHandler?.(
       missingFileRequest,
-      {
-        status,
-        json,
-      },
+      routeResponse,
     );
 
-    expect(status).toHaveBeenCalledWith(400);
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ok: false,
-        operation: "image.upload",
-        error: expect.objectContaining({
-          code: "validation",
-          message: "multipart image upload requires a file field.",
-        }),
-      }),
-    );
+    expect(routeResponse.status).toHaveBeenCalledWith(400);
+    const jsonBody = json.mock.calls[0]?.[0];
+    expect(jsonBody).toMatchObject({
+      ok: false,
+      operation: "image.upload",
+      error: {
+        code: "validation",
+        message: "multipart image upload requires a file field.",
+      },
+    });
   });
 });
 

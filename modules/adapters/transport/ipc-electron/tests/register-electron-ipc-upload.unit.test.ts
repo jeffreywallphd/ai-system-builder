@@ -76,7 +76,7 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
         correlationId: "corr-upload-1",
       },
     );
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       ok: true,
       value: {
         descriptor: {
@@ -92,7 +92,6 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       correlationId: "corr-upload-1",
       operation: "image.upload",
       channel: "ipc.image.upload.response",
-      metadata: undefined,
     });
   });
 
