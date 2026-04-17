@@ -14,8 +14,8 @@ import {
 } from "../../../adapters/storage/filesystem";
 import {
   registerElectronIpc,
-  type IpcMainHandlePort,
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
+import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
