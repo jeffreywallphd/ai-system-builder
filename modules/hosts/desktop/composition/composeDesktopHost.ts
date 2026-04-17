@@ -8,7 +8,9 @@ import {
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
   createFilesystemArtifactBrowserReadAdapter,
+  createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactStorageAdapter,
+  createLocalArtifactCatalogAdapter,
 } from "../../../adapters/storage/filesystem";
 import {
   registerElectronIpc,
@@ -63,14 +65,23 @@ export function composeDesktopHost(
     loggingPort,
     loggingConfig,
     registerImageUploadIpc(registerOptions) {
+      const artifactCatalog = createLocalArtifactCatalogAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
+      });
       const storage = createFilesystemArtifactStorageAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
         host: "desktop",
         logging: loggingPort,
         now: options.now,
+        artifactCatalogAppend: artifactCatalog,
       });
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
-        rootDirectory: registerOptions.storageRootDirectory,
+        artifactCatalogRead: artifactCatalog,
+        storage,
+      });
+      createFilesystemArtifactContentRetrievalAdapter({
+        storage,
+        artifactCatalogRead: artifactCatalog,
       });
 
       const storeImageUploadUseCase = new StoreImageUploadUseCase({

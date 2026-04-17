@@ -1,3 +1,15 @@
+import type { ArtifactContentRetrievalPort } from "../../../../application/ports/artifact-content";
+import type {
+  BrowseArtifactsCommand,
+  BrowseArtifactsUseCasePort,
+  BrowseArtifactsUseCaseResult,
+  ReadArtifactContentCommand,
+  ReadArtifactContentUseCasePort,
+  ReadArtifactContentUseCaseResult,
+  ReadArtifactDetailCommand,
+  ReadArtifactDetailUseCasePort,
+  ReadArtifactDetailUseCaseResult,
+} from "../../../../application/use-cases";
 import {
   createApiArtifactBrowseFailureResponse,
   createApiArtifactBrowseRequest,
@@ -12,17 +24,6 @@ import {
   type ApiArtifactContentReadResponse,
   type ApiArtifactReadResponse,
 } from "../../../../contracts/api";
-import type {
-  BrowseArtifactsCommand,
-  BrowseArtifactsUseCasePort,
-  BrowseArtifactsUseCaseResult,
-  ReadArtifactContentCommand,
-  ReadArtifactContentUseCasePort,
-  ReadArtifactContentUseCaseResult,
-  ReadArtifactDetailCommand,
-  ReadArtifactDetailUseCasePort,
-  ReadArtifactDetailUseCaseResult,
-} from "../../../../application/use-cases";
 
 interface ArtifactBrowseApiRequestBody {
   artifactKind: "image";
@@ -36,6 +37,7 @@ interface ArtifactReadApiRequestBody {
 
 export interface ExpressRequestLike {
   body?: ArtifactBrowseApiRequestBody | ArtifactReadApiRequestBody;
+  query?: Record<string, string | string[] | undefined>;
   headers?: Record<string, string | string[] | undefined>;
 }
 
@@ -44,20 +46,27 @@ export interface ExpressResponseLike {
   json: (
     body: ApiArtifactBrowseResponse | ApiArtifactReadResponse | ApiArtifactContentReadResponse,
   ) => void;
+  send?: (body: Uint8Array | Buffer) => void;
+  setHeader?: (name: string, value: string) => void;
 }
 
-export interface ExpressPostRoutePort {
+export interface ExpressRoutePort {
   post: (
+    path: string,
+    handler: (request: ExpressRequestLike, response: ExpressResponseLike) => Promise<void>,
+  ) => void;
+  get: (
     path: string,
     handler: (request: ExpressRequestLike, response: ExpressResponseLike) => Promise<void>,
   ) => void;
 }
 
 export interface RegisterArtifactBrowserApiRoutesDependencies {
-  app: ExpressPostRoutePort;
+  app: ExpressRoutePort;
   browseArtifactsUseCase: BrowseArtifactsUseCasePort;
   readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
   readArtifactContentUseCase: ReadArtifactContentUseCasePort;
+  artifactContentRetrieval: ArtifactContentRetrievalPort;
 }
 
 function getRequestHeader(
@@ -65,6 +74,18 @@ function getRequestHeader(
   key: string,
 ): string | undefined {
   const value = headers?.[key];
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
+}
+
+function getQueryValue(
+  query: Record<string, string | string[] | undefined> | undefined,
+  key: string,
+): string | undefined {
+  const value = query?.[key];
   if (Array.isArray(value)) {
     return value[0];
   }
@@ -301,5 +322,53 @@ export function registerArtifactBrowserApiRoutes(
     const result = await dependencies.readArtifactContentUseCase.execute(command, context);
     const apiResponse = mapReadArtifactContentResultToApiResponse(result, context);
     response.status(resolveStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.get("/api/artifact/content/view", async (request, response) => {
+    const requestId = getRequestHeader(request.headers, "x-request-id");
+    const correlationId = getRequestHeader(request.headers, "x-correlation-id");
+    const context = { requestId, correlationId };
+    const storageKey = getQueryValue(request.query, "storageKey")?.trim();
+
+    if (!storageKey) {
+      response.status(400).json(
+        createApiArtifactContentReadFailureResponse(
+          "validation",
+          "storageKey query parameter is required.",
+          context,
+        ),
+      );
+      return;
+    }
+
+    const retrievalResult = await dependencies.artifactContentRetrieval.retrieveArtifactContentByStorageKey(
+      { storageKey },
+      context,
+    );
+
+    if (!retrievalResult.ok) {
+      const code =
+        retrievalResult.error.code === "validation"
+        || retrievalResult.error.code === "not-found"
+        || retrievalResult.error.code === "unavailable"
+          ? retrievalResult.error.code
+          : "internal";
+      const payload = createApiArtifactContentReadFailureResponse(
+        code,
+        retrievalResult.error.message,
+        {
+          details: retrievalResult.error.details,
+          requestId,
+          correlationId,
+        },
+      );
+      response.status(resolveStatusCode(payload)).json(payload);
+      return;
+    }
+
+    response.setHeader?.("content-type", retrievalResult.value.mediaType ?? "application/octet-stream");
+    response.setHeader?.("cache-control", "no-store");
+    response.status(200);
+    response.send?.(Buffer.from(retrievalResult.value.bytes));
   });
 }

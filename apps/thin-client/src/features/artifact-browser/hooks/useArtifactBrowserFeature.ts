@@ -18,6 +18,7 @@ export interface UseArtifactBrowserFeatureResult {
   selectedStorageKey?: string;
   detail?: ThinClientArtifactDetail;
   content?: ThinClientArtifactContentDescriptor;
+  imageViewUrl?: string;
   viewState: ArtifactBrowserViewState;
   selectArtifact: (storageKey: string) => Promise<void>;
 }
@@ -30,6 +31,7 @@ export function useArtifactBrowserFeature(
   const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>();
   const [detail, setDetail] = useState<ThinClientArtifactDetail | undefined>();
   const [content, setContent] = useState<ThinClientArtifactContentDescriptor | undefined>();
+  const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
 
   useEffect(() => {
@@ -64,10 +66,12 @@ export function useArtifactBrowserFeature(
 
       setDetail(artifactDetail);
       setContent(contentDescriptor);
+      setImageViewUrl(artifactClient.createArtifactImageViewUrl(locator));
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
     } catch (error) {
       setDetail(undefined);
       setContent(undefined);
+      setImageViewUrl(undefined);
       setViewState({
         status: "error",
         message: error instanceof Error ? error.message : "Failed to load artifact detail.",
@@ -80,6 +84,7 @@ export function useArtifactBrowserFeature(
     selectedStorageKey,
     detail,
     content,
+    imageViewUrl,
     viewState,
     selectArtifact,
   };
