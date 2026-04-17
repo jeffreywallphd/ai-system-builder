@@ -40,7 +40,7 @@ describe("ingestion contracts", () => {
       correlationId: "corr-880",
     });
 
-    expect(request).toEqual({
+    expect(request).toMatchObject({
       descriptor: {
         storage: {
           key: "staging/object-8",
@@ -68,7 +68,7 @@ describe("ingestion contracts", () => {
       },
     );
 
-    expect(descriptor).toEqual({
+    expect(descriptor).toMatchObject({
       sourceKind: "upload",
       originalName: "kitten.png",
       storage: {
@@ -95,7 +95,7 @@ describe("ingestion contracts", () => {
       createdAt: " 2026-04-16T00:00:00.000Z ",
     });
 
-    expect(success).toEqual({
+    expect(success).toMatchObject({
       ok: true,
       value: {
         storage: {

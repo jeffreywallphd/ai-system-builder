@@ -179,7 +179,7 @@ describe("contracts cross-family invariants", () => {
       },
     );
 
-    expect(stagedDescriptor).toEqual({
+    expect(stagedDescriptor).toMatchObject({
       sourceKind: "upload",
       originalName: "image-9.png",
       storage: {

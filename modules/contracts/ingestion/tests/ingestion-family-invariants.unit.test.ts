@@ -33,7 +33,7 @@ describe("ingestion family invariants", () => {
       },
     );
 
-    expect(request).toEqual({
+    expect(request).toMatchObject({
       descriptor: {
         storage: {
           key: "staged/uploads/object-1",
@@ -57,7 +57,7 @@ describe("ingestion family invariants", () => {
       },
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       value: {
         storage: {

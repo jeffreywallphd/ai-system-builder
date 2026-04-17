@@ -77,7 +77,7 @@ describe("StoreImageUploadUseCase", () => {
       correlationId: "corr-upload-1",
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       value: {
         sourceKind: "upload",

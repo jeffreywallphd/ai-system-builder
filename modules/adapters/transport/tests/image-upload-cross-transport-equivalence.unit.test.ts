@@ -56,8 +56,11 @@ async function invokeApiUploadRoute(
     storeImageUploadUseCase: createApiUseCaseStub(execute),
   });
 
-  const status = testDouble.fn().mockReturnThis();
   const json = testDouble.fn();
+  const routeResponse = {
+    status: testDouble.fn((_: number) => routeResponse),
+    json,
+  };
 
   await registeredHandler?.(
     {
@@ -72,14 +75,11 @@ async function invokeApiUploadRoute(
         "x-correlation-id": "corr-transport-1",
       },
     },
-    {
-      status,
-      json,
-    },
+    routeResponse,
   );
 
   return {
-    status,
+    status: routeResponse.status,
     json,
   };
 }
@@ -219,24 +219,23 @@ describe("image upload cross-transport equivalence", () => {
 
     expect(ipcSuccess.ok).toBe(true);
     expect(apiSuccessCall.status).toHaveBeenCalledWith(200);
-    expect(apiSuccessCall.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ok: true,
-        operation: "image.upload",
-        requestId: "req-transport-2",
-        correlationId: "corr-transport-2",
-        value: {
-          descriptor: {
-            storage: {
-              key: "uploads/cat.png",
-              mediaType: "image/png",
-              sizeBytes: 4,
-            },
-            sourceKind: "upload",
+    const apiSuccessBody = apiSuccessCall.json.mock.calls[0]?.[0];
+    expect(apiSuccessBody).toMatchObject({
+      ok: true,
+      operation: "image.upload",
+      requestId: "req-transport-2",
+      correlationId: "corr-transport-2",
+      value: {
+        descriptor: {
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
-      }),
-    );
+      },
+    });
 
     const ipcFailure = await createDesktopImageUploadIpcHandler(
       createIpcUseCaseStub(
@@ -284,15 +283,14 @@ describe("image upload cross-transport equivalence", () => {
       },
     });
     expect(apiFailureCall.status).toHaveBeenCalledWith(400);
-    expect(apiFailureCall.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ok: false,
-        operation: "image.upload",
-        error: {
-          code: "validation",
-          message: "mediaType must be an image media type.",
-        },
-      }),
-    );
+    const apiFailureBody = apiFailureCall.json.mock.calls[0]?.[0];
+    expect(apiFailureBody).toMatchObject({
+      ok: false,
+      operation: "image.upload",
+      error: {
+        code: "validation",
+        message: "mediaType must be an image media type.",
+      },
+    });
   });
 });

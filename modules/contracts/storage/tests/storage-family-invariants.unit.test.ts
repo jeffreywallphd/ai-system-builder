@@ -6,6 +6,8 @@ describe("storage family invariants", () => {
   it("exports only storage-family surfaces from the family barrel", () => {
     expect(Object.keys(storageContracts).sort()).toEqual([
       "STORAGE_ARTIFACT_KEY_FORMAT_DESCRIPTION",
+      "STORAGE_INSTANCE_KINDS",
+      "STORAGE_ZONE_KINDS",
       "createDeleteArtifactFailureResult",
       "createDeleteArtifactRequest",
       "createDeleteArtifactSuccessResult",
@@ -18,9 +20,9 @@ describe("storage family invariants", () => {
       "createStoreArtifactFailureResult",
       "createStoreArtifactRequest",
       "createStoreArtifactSuccessResult",
+      "isStorageArtifactKey",
       "isStorageInstanceKind",
       "isStorageZoneKind",
-      "isStorageArtifactKey",
       "normalizeStorageArtifactKey",
       "normalizeStorageInstanceKind",
       "normalizeStorageInstanceReference",

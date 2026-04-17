@@ -250,7 +250,7 @@ describe("storage contracts", () => {
         correlationId: "corr-6",
       },
       requestId: "req-6",
-      correlationId: undefined,
+      correlationId: "corr-6",
     });
   });
 

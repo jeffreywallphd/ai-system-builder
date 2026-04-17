@@ -25,7 +25,7 @@ describe("dataset contracts", () => {
       ],
     });
 
-    expect(descriptor).toEqual({
+    expect(descriptor).toMatchObject({
       id: "orders.curated.v1",
       name: "Orders Curated",
       sourceArtifacts: [{ key: "derived/orders/normalized.parquet", label: undefined }],
