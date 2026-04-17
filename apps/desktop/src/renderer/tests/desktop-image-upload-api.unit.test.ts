@@ -9,7 +9,13 @@ describe("desktopApi bridge access", () => {
 
   it("returns the preload-exposed desktop API when present", async () => {
     const uploadImage = vi.fn().mockRejectedValue(new Error("not implemented"));
-    window.desktopApi = { uploadImage };
+    window.desktopApi = {
+      uploadImage,
+      browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+      readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a.png" }, artifactKind: "image" } } }),
+      readArtifactContentDescriptor: async () => ({ ok: true, value: { content: { locator: { storageKey: "uploads/a.png" }, availability: "available", retrieval: "deferred" } } }),
+      readArtifactViewerMedia: async () => ({ ok: true, value: { storageKey: "uploads/a.png", bytes: new Uint8Array([1]) } }),
+    };
 
     const api = getDesktopApi();
 

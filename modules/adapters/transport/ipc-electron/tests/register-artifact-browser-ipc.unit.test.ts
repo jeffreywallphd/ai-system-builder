@@ -3,9 +3,11 @@ import { describe, expect, it, testDouble } from "../../../../testing/node-test"
 import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   createDesktopArtifactBrowseRequest,
   createDesktopArtifactContentReadRequest,
+  createDesktopArtifactMediaViewRequest,
   createDesktopArtifactReadRequest,
 } from "../../../../contracts/ipc";
 import {
@@ -20,6 +22,7 @@ function createUseCases() {
     browseArtifactsUseCase: { execute: testDouble.fn() },
     readArtifactDetailUseCase: { execute: testDouble.fn() },
     readArtifactContentUseCase: { execute: testDouble.fn() },
+    artifactMediaViewRetrieval: { retrieveArtifactViewerMediaByStorageKey: testDouble.fn() },
   };
 }
 
@@ -57,12 +60,18 @@ describe("registerArtifactBrowserIpc", () => {
       },
     });
 
+    (dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+      ok: true,
+      value: { storageKey: "uploads/a.png", mediaType: "image/png", bytes: new Uint8Array([1]) },
+    });
+
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(3);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(4);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value)).toBe(true);
 
     await handlers.get(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)?.(
       {},
@@ -85,6 +94,13 @@ describe("registerArtifactBrowserIpc", () => {
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
+    await handlers.get(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value)?.(
+      {},
+      createDesktopArtifactMediaViewRequest({
+        storageKey: "uploads/a.png",
+        boundary: { host: "desktop", source: "desktop.renderer" },
+      }),
+    );
 
     expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
       { artifactKind: "image" },
@@ -96,6 +112,10 @@ describe("registerArtifactBrowserIpc", () => {
     );
     expect(dependencies.readArtifactContentUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
+      { requestId: undefined, correlationId: undefined },
+    );
+    expect(dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey).toHaveBeenCalledWith(
+      { storageKey: "uploads/a.png" },
       { requestId: undefined, correlationId: undefined },
     );
   });

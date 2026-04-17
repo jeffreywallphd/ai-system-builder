@@ -20,7 +20,7 @@ describe("desktop renderer page composition", () => {
     mountedContainer = undefined;
   });
 
-  it("renders Home page by default and switches to System page via app shell navigation", async () => {
+  it("renders landing Home page by default and switches to Artifacts/System pages", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -29,14 +29,29 @@ describe("desktop renderer page composition", () => {
 
     window.desktopApi = {
       uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
     };
 
     await act(async () => {
       root.render(<App />);
     });
 
-    expect(container.textContent).toContain("Home");
-    expect(container.textContent).toContain("Desktop image upload starter flow.");
+    expect(container.textContent).toContain("Build visual AI workflows from your artifacts");
+
+    const artifactsButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Artifacts",
+    );
+    expect(artifactsButton).toBeDefined();
+
+    await act(async () => {
+      artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Image upload");
+    expect(container.textContent).toContain("Artifact browser (images)");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "System",

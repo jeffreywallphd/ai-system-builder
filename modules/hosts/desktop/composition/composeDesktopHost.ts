@@ -83,8 +83,6 @@ export function composeDesktopHost(
         storage,
         artifactCatalogRead: artifactCatalog,
       });
-      void artifactMediaViewRetrieval;
-
       const storeImageUploadUseCase = new StoreImageUploadUseCase({
         storage,
         logging: loggingPort,
@@ -107,6 +105,7 @@ export function composeDesktopHost(
         browseArtifactsUseCase: browseArtifacts,
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
+        artifactMediaViewRetrieval,
       });
     },
   };

@@ -7,6 +7,9 @@ import {
   DESKTOP_ARTIFACT_CONTENT_READ_OPERATION,
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_OPERATION,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_READ_OPERATION,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
@@ -14,6 +17,7 @@ import {
   createDesktopArtifactBrowseSuccessResponse,
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactContentReadSuccessResponse,
+  createDesktopArtifactMediaViewRequest,
   createDesktopArtifactReadRequest,
   createDesktopArtifactReadSuccessResponse,
 } from "..";
@@ -46,6 +50,13 @@ describe("desktop artifact-browser ipc contract", () => {
     );
     expect(DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL.value).toBe(
       "ipc.artifact.content.read.response",
+    );
+    expect(DESKTOP_ARTIFACT_MEDIA_VIEW_OPERATION).toBe("artifact.media.view");
+    expect(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value).toBe(
+      "ipc.artifact.media.view.request",
+    );
+    expect(DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL.value).toBe(
+      "ipc.artifact.media.view.response",
     );
   });
 
@@ -135,9 +146,18 @@ describe("desktop artifact-browser ipc contract", () => {
       },
     });
 
+    const mediaViewRequest = createDesktopArtifactMediaViewRequest({
+      storageKey: " staged/images/artifact-32 ",
+      boundary: {
+        host: "desktop",
+        source: " desktop.renderer.artifact-media-view ",
+      },
+    });
+
     expect(readRequest.payload.locator.storageKey).toBe("staged/images/artifact-32");
     expect(contentRequest.payload.locator.storageKey).toBe("staged/images/artifact-32");
     expect(browseRequest.payload.artifactKind).toBe("image");
+    expect(mediaViewRequest.payload.storageKey).toBe("staged/images/artifact-32");
     expect("path" in readRequest.payload.locator).toBe(false);
     expect("path" in contentRequest.payload.locator).toBe(false);
   });

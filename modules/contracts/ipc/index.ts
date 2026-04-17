@@ -7,3 +7,5 @@ export * from "./desktop-image-upload-contract";
 export * from "./desktop-artifact-browse-contract";
 export * from "./desktop-artifact-read-contract";
 export * from "./desktop-artifact-content-read-contract";
+
+export * from "./desktop-artifact-media-view-contract";

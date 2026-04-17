@@ -10,8 +10,8 @@ import { createLogger, type StructuredLogSink } from "../../../../../modules/ada
 import { createFilesystemArtifactStorageAdapter } from "../../../../../modules/adapters/storage/filesystem/artifact-store";
 import {
   registerElectronIpc,
-  type IpcMainHandlePort,
 } from "../../../../../modules/adapters/transport/ipc-electron/registerElectronIpc";
+import type { IpcMainHandlePort } from "../../../../../modules/adapters/transport/ipc-electron/ipcMainHandlePort";
 import { StoreImageUploadUseCase } from "../../../../../modules/application/use-cases";
 import { createLoggingConfig } from "../../../../../modules/contracts/config";
 import {
@@ -85,7 +85,7 @@ describe("desktop image upload end-to-end", () => {
       | undefined;
 
     const ipcMain: IpcMainHandlePort = {
-      handle(channel, listener) {
+      handle(channel: string, listener) {
         if (channel === DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value) {
           uploadHandler = listener;
         }
@@ -112,6 +112,9 @@ describe("desktop image upload end-to-end", () => {
       readArtifactContentUseCase: {
         execute: async () => unavailableResult,
       },
+      artifactMediaViewRetrieval: {
+        retrieveArtifactViewerMediaByStorageKey: async () => unavailableResult,
+      },
     });
 
     const preloadApi = createDesktopPreloadApi({
@@ -121,7 +124,7 @@ describe("desktop image upload end-to-end", () => {
             throw new Error("Desktop upload IPC handler was not registered.");
           }
 
-          return uploadHandler({}, request);
+          return uploadHandler({}, request as DesktopImageUploadRequest);
         },
       },
     });
@@ -135,6 +138,11 @@ describe("desktop image upload end-to-end", () => {
     try {
       await act(async () => {
         root.render(<App />);
+      });
+
+      const artifactsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Artifacts");
+      await act(async () => {
+        artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
       });
 
       const input = container.querySelector("input[type='file']") as HTMLInputElement | null;
