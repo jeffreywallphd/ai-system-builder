@@ -9,10 +9,15 @@ import {
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
+import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
-import { composeDesktopHost } from "../composeDesktopHost";
+import { composeDesktopHost, type RegisterDesktopImageUploadIpcOptions } from "../composeDesktopHost";
 
 describe("composeDesktopHost", () => {
+  it("uses the canonical ipc-main handle port type for registration options", () => {
+    expectTypeOf<RegisterDesktopImageUploadIpcOptions["ipcMain"]>().toEqualTypeOf<IpcMainHandlePort>();
+  });
+
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
     const sink = testDouble.fn();
     const host = composeDesktopHost({
