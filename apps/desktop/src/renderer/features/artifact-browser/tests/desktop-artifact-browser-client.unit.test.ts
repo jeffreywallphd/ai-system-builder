@@ -57,6 +57,55 @@ describe("desktop artifact browser client", () => {
     expect(content.retrieval).toBe("deferred");
     expect(window.desktopApi.readArtifactViewerMedia).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const createdBlob = createObjectURL.mock.calls[0]?.[0] as Blob;
+    expect(Array.from(new Uint8Array(await createdBlob.arrayBuffer()))).toEqual([1, 2, 3]);
     expect(mediaUrl).toBe("blob:desktop-preview");
+  });
+
+  it("creates media blob from the typed-array view, not the full backing buffer", async () => {
+    const backingBytes = new Uint8Array([9, 1, 2, 3, 7]);
+    const slicedView = backingBytes.subarray(1, 4);
+
+    window.desktopApi = {
+      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactKind: "image" } },
+      }),
+      readArtifactContentDescriptor: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          content: {
+            locator: { storageKey: "uploads/cat.png" },
+            availability: "available",
+            retrieval: "deferred",
+          },
+        },
+      }),
+      readArtifactViewerMedia: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          storageKey: "uploads/cat.png",
+          mediaType: "image/png",
+          bytes: slicedView,
+        },
+      }),
+    };
+
+    const createObjectURL = vi.fn().mockReturnValue("blob:desktop-preview");
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      writable: true,
+      value: createObjectURL,
+    });
+
+    const client = createDesktopArtifactBrowserClient();
+
+    await client.createArtifactMediaViewUrl({ storageKey: "uploads/cat.png" });
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const createdBlob = createObjectURL.mock.calls[0]?.[0] as Blob;
+    expect(Array.from(new Uint8Array(await createdBlob.arrayBuffer()))).toEqual([1, 2, 3]);
   });
 });
