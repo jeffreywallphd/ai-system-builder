@@ -2,6 +2,11 @@ import { describe, expect, it } from "../../testing/node-test";
 
 import { createApiRequest } from "../api";
 import {
+  normalizeArtifactBrowseSuccessValue,
+  normalizeArtifactContentReadSuccessValue,
+  normalizeArtifactReadSuccessValue,
+} from "../artifact-browser";
+import {
   createIpcChannel,
   createIpcRequest,
   parseIpcChannelValue,
@@ -24,6 +29,7 @@ import {
 } from "../runtime";
 import {
   createStoreArtifactRequest,
+  createStoreArtifactSuccessResult,
   normalizeStorageArtifactKey,
 } from "../storage";
 import { createStagedArtifactDescriptorFromStorageObjectDescriptor } from "../ingestion";
@@ -190,6 +196,62 @@ describe("contracts cross-family invariants", () => {
     });
     expect("operation" in stagedDescriptor).toBe(false);
     expect("channel" in stagedDescriptor).toBe(false);
+  });
+
+  it("keeps artifact-browser read models aligned to storage and ingestion semantics without becoming filesystem browsing", () => {
+    const stored = createStoreArtifactSuccessResult({
+      key: " staged/images/image-33 ",
+      mediaType: "image/png",
+      sizeBytes: 3,
+    });
+    const stagedDescriptor = createStagedArtifactDescriptorFromStorageObjectDescriptor(
+      stored.value,
+      {
+        sourceKind: "upload",
+        originalName: "image-33.png",
+      },
+    );
+
+    const browse = normalizeArtifactBrowseSuccessValue({
+      items: [
+        {
+          storageKey: stagedDescriptor.storage.key,
+          artifactKind: "image",
+          mediaType: stagedDescriptor.storage.mediaType,
+          sizeBytes: stagedDescriptor.storage.sizeBytes,
+          sourceKind: stagedDescriptor.sourceKind,
+          originalName: stagedDescriptor.originalName,
+        },
+      ],
+    });
+    const detail = normalizeArtifactReadSuccessValue({
+      artifact: {
+        locator: {
+          storageKey: stagedDescriptor.storage.key,
+        },
+        artifactKind: "image",
+        mediaType: stagedDescriptor.storage.mediaType,
+        sizeBytes: stagedDescriptor.storage.sizeBytes,
+        sourceKind: stagedDescriptor.sourceKind,
+      },
+    });
+    const content = normalizeArtifactContentReadSuccessValue({
+      content: {
+        locator: {
+          storageKey: stagedDescriptor.storage.key,
+        },
+        mediaType: stagedDescriptor.storage.mediaType,
+        content: new Uint8Array([1, 2, 3]),
+      },
+    });
+
+    expect(browse.items[0].storageKey).toBe("staged/images/image-33");
+    expect(detail.artifact.locator.storageKey).toBe("staged/images/image-33");
+    expect(content.content.locator.storageKey).toBe("staged/images/image-33");
+    expect("path" in browse.items[0]).toBe(false);
+    expect("path" in detail.artifact.locator).toBe(false);
+    expect("content" in browse.items[0]).toBe(false);
+    expect("content" in detail.artifact).toBe(false);
   });
 
   it("keeps transform, dataset, and lineage contracts aligned around typed references", () => {

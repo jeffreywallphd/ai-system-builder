@@ -6,6 +6,7 @@ export * as ipc from "./ipc";
 export * as runtime from "./runtime";
 export * as storage from "./storage";
 export * as artifact from "./artifact";
+export * as artifactBrowser from "./artifact-browser";
 export * as transform from "./transform";
 export * as lineage from "./lineage";
 export * as dataset from "./dataset";

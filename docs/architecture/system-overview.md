@@ -161,6 +161,9 @@ Transport technologies are adapters, not application definitions.
 They are separate architectural concerns even if they share physical disk territory in some host deployments.
 
 Image upload remains an implemented specialized intake path and should align to staged artifact descriptor semantics rather than defining a parallel semantic world.
+The initial image vertical slice now includes both write and read direction:
+- write/intake through image upload as specialized ingestion,
+- read-side artifact browser behavior through image-backed `artifact.browse` (list metadata), `artifact.read` (detail metadata), and `artifact.content.read` (separate content retrieval).
 
 ## Packaging restraint
 

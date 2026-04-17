@@ -123,6 +123,18 @@ Current implementation note:
 - Image upload is the active vertical slice and is treated as a specialized ingestion path.
 - This does not imply a full ingestion engine, catalog, or ELT orchestration is implemented yet.
 
+## Artifact browser read-side direction (initial image-backed slice)
+
+The first read-side browser/viewer slice is image-backed but artifact-shaped.
+
+- `artifact.browse` is a metadata/query concern for catalog-style listing of existing artifacts.
+- `artifact.read` is a single-artifact detail/read-model concern for selected artifact metadata.
+- `artifact.content.read` is a separate artifact-content retrieval concern for media/bytes and must not be collapsed into browse/detail contracts.
+- Browser contracts stay storage-key based and path-agnostic; public browse/view contracts must not expose filesystem paths.
+- This is an early data-lake-like artifact browser/viewer surface, not a claim that full ingestion/catalog/ELT platform capabilities are complete.
+
+This keeps persistence-storage linkage explicit (metadata/read models referencing artifact keys) while preserving separation between structured record/query behavior and artifact byte retrieval behavior.
+
 ## Not yet finalized
 
 The following are intentionally open:

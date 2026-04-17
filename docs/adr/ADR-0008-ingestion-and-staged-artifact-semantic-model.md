@@ -37,6 +37,11 @@ Adopt ingestion/staged-artifact as the canonical higher-level semantic model for
 - Existing image upload remains a specialized intake path and is aligned to the staged artifact model.
 - Canonical metadata vocabulary for intake outcomes is ingestion-centric (source kind + staged artifact descriptor), not image-only.
 - Early viewer direction is staged artifact inspection (an early data-lake-like surface), not a generic file browser.
+- The first end-to-end read-side vertical slice is image-backed artifact browsing and viewing:
+  - `artifact.browse` for catalog/metadata-oriented list behavior,
+  - `artifact.read` for single-artifact detail/read-model behavior,
+  - `artifact.content.read` as a distinct content-retrieval path (separate from browse/detail metadata contracts).
+- This browser/viewer direction is artifact/catalog oriented and storage-key based; it does not introduce filesystem-path browsing semantics.
 
 ### ELT progression posture
 
@@ -49,6 +54,7 @@ This ADR sets semantic direction compatible with future ELT-style progression:
 5. viewing/exploration.
 
 This ADR does **not** commit the repository to implementing a full ELT platform immediately.
+The image-backed artifact browser/viewer direction should be read as early staged-artifact exploration capability, not a claim that full ingestion/catalog/ELT platform maturity is complete.
 
 ## Consequences
 

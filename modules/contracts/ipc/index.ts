@@ -4,3 +4,6 @@ export * from "./ipc-request";
 export * from "./ipc-error";
 export * from "./ipc-response";
 export * from "./desktop-image-upload-contract";
+export * from "./desktop-artifact-browse-contract";
+export * from "./desktop-artifact-read-contract";
+export * from "./desktop-artifact-content-read-contract";

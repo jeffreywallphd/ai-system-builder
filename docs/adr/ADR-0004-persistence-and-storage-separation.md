@@ -30,6 +30,10 @@ Key risk areas to avoid:
 - Persistence operation identity remains helper-driven and record-aligned (`<recordType>.<action>[.<qualifier>...]`) when a record reference is present.
 - Storage identity remains artifact-key-based and path-agnostic through shared key normalization helpers.
 - Persistence and storage contract barrels must export only family-owned surfaces; cross-family leakage is not allowed.
+- Initial artifact-browser read flow should keep concerns split:
+  - browse/list and detail/view operations are metadata/query/read-model concerns aligned to persistence + artifact descriptors,
+  - content retrieval is a distinct artifact-content path for bytes/media retrieval.
+- Linkage between persistence metadata and storage artifacts should be explicit (for example through normalized artifact keys) without collapsing persistence and storage into one concern.
 
 This sets architectural roles without freezing all storage implementation specifics at this stage.
 
