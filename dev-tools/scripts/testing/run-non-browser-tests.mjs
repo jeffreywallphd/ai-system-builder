@@ -54,6 +54,7 @@ const report = {
     counts: {
       cancelled: 0,
       passed: 0,
+      failed: 0,
       skipped: 0,
       suites: 0,
       tests: 0,
@@ -401,42 +402,70 @@ try {
 
   for (const runtimeTestFile of discoveredRuntimeTestFiles) {
     await import(pathToFileURL(runtimeTestFile).href);
+  }
 
-    const testsStream = run({
-      concurrency: true,
-    });
+  const testsStream = run({
+    concurrency: true,
+  });
 
-    for await (const streamEvent of testsStream) {
-      const eventType = streamEvent?.type;
-      const event = streamEvent?.data ?? streamEvent;
+  for await (const streamEvent of testsStream) {
+    const eventType = streamEvent?.type;
+    const event = streamEvent?.data ?? streamEvent;
 
-      if (eventType === "test:fail") {
-        report.failures.push({
-          name: event.name,
-          file: resolveSourcePath(event.file),
-          line: event.line,
-          column: event.column,
-          nesting: event.nesting,
-          testNumber: event.testNumber,
-          details: {
-            durationMs: event.details?.duration_ms,
-            type: event.details?.type,
-            error: serializeError(event.details?.error),
-          },
-        });
+    if (eventType === "test:diagnostic") {      
+      const message = typeof event?.message === "string" ? event.message.trim() : "";
+      const match = /^(?:\W+)?\s*(tests|suites|pass|fail|cancelled|skipped|todo|duration_ms)\s+(.+)$/.exec(message);
+      
+      if(match) {
+        const[, metricName, rawValue] = match;
+
+        switch (metricName) {
+          case "tests":
+            report.summary.counts.tests = Number(rawValue);
+            break;
+          case "suites":
+            report.summary.counts.suites = Number(rawValue);
+            break;
+          case "pass":
+            report.summary.counts.passed = Number(rawValue);
+            break;
+          case "fail":
+            report.summary.counts.failed = Number(rawValue);
+            break;
+          case "cancelled":
+            report.summary.counts.cancelled = Number(rawValue);
+            break;
+          case "skipped":
+            report.summary.counts.skipped = Number(rawValue);
+            break;
+          case "todo":
+            report.summary.counts.todo = Number(rawValue);
+            break;
+          case "duration_ms":
+            report.summary.counts.durationMs = Number(rawValue);
+            break;
+          default:
+            break;
+        }
         continue;
       }
+    }
 
-      if (eventType === "test:summary") {
-        report.summary.counts.cancelled += event.counts.cancelled;
-        report.summary.counts.passed += event.counts.passed;
-        report.summary.counts.skipped += event.counts.skipped;
-        report.summary.counts.suites += event.counts.suites;
-        report.summary.counts.tests += event.counts.tests;
-        report.summary.counts.todo += event.counts.todo;
-        report.summary.counts.topLevel += event.counts.topLevel;
-        report.summary.durationMs += event.duration_ms;
-      }
+    if (eventType === "test:fail") {
+      report.failures.push({
+        name: event.name,
+        file: resolveSourcePath(event.file),
+        line: event.line,
+        column: event.column,
+        nesting: event.nesting,
+        testNumber: event.testNumber,
+        details: {
+          durationMs: event.details?.duration_ms,
+          type: event.details?.type,
+          error: serializeError(event.details?.error),
+        },
+      });
+      continue;
     }
   }
 
@@ -446,10 +475,20 @@ try {
   report.exitCode = didFail ? 1 : 0;
   process.exitCode = report.exitCode;
 } catch (error) {
-  report.status = "startup-failed";
   report.exitCode = 1;
-  report.startupError = serializeError(error);
   process.exitCode = 1;
+  report.startupError = serializeError(error);
+
+  if(
+    report.summary.counts.tests === 0 &&
+    report.summary.counts.suites === 0 &&
+    report.failures.length === 0
+  ) {
+    report.status = "startup-failed";
+  } else {
+    report.status = "failed";
+    report.startupError = serialized;
+  }
 } finally {
   writeReport();
   console.log("Review test report for failure details: artifacts/test-reports/non-browser-test-report.json");
