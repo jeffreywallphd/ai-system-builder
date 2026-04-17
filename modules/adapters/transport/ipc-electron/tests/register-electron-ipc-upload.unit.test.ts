@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
@@ -220,7 +220,10 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
 
 describe("registerElectronIpc top-level aggregator surface", () => {
   it("remains a tiny registration-only aggregator without feature helper re-exports", () => {
-    const aggregatorPath = fileURLToPath(new URL("../registerElectronIpc.ts", import.meta.url));
+    const aggregatorTypeScriptPath = fileURLToPath(new URL("../registerElectronIpc.ts", import.meta.url));
+    const aggregatorPath = existsSync(aggregatorTypeScriptPath)
+      ? aggregatorTypeScriptPath
+      : aggregatorTypeScriptPath.replace(/\.ts$/, ".js");
     const source = readFileSync(aggregatorPath, "utf8");
 
     expect(source).not.toContain("export type");
