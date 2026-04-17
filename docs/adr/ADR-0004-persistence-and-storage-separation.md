@@ -32,7 +32,7 @@ Key risk areas to avoid:
 - Persistence and storage contract barrels must export only family-owned surfaces; cross-family leakage is not allowed.
 - Initial artifact-browser read flow should keep concerns split:
   - browse/list and detail/view operations are metadata/query/read-model concerns aligned to persistence + artifact descriptors,
-  - content retrieval is a distinct artifact-content path for bytes/media retrieval.
+  - content retrieval is a distinct artifact-content path, modeled canonically as descriptor/reference-oriented content access rather than raw-byte-first transport payloads.
 - Linkage between persistence metadata and storage artifacts should be explicit (for example through normalized artifact keys) without collapsing persistence and storage into one concern.
 
 This sets architectural roles without freezing all storage implementation specifics at this stage.

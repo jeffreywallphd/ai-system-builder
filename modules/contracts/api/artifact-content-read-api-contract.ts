@@ -25,9 +25,7 @@ export interface ApiArtifactContentReadRequestPayload {
   boundary: ApiArtifactContentReadBoundaryContext;
 }
 
-export interface ApiArtifactContentReadSuccessValue<TContent = Uint8Array> {
-  read: ArtifactContentReadSuccessValue<TContent>;
-}
+export type ApiArtifactContentReadSuccessValue = ArtifactContentReadSuccessValue;
 
 export type ApiArtifactContentReadRequest = ApiRequest<
   ApiArtifactContentReadRequestPayload,
@@ -35,8 +33,8 @@ export type ApiArtifactContentReadRequest = ApiRequest<
   Record<string, never>
 >;
 
-export type ApiArtifactContentReadResponse<TContent = Uint8Array> = ApiResponse<
-  ApiArtifactContentReadSuccessValue<TContent>,
+export type ApiArtifactContentReadResponse = ApiResponse<
+  ApiArtifactContentReadSuccessValue,
   Record<string, unknown>,
   typeof API_ARTIFACT_CONTENT_READ_OPERATION,
   Record<string, never>
@@ -80,18 +78,16 @@ export function createApiArtifactContentReadRequest(
   );
 }
 
-export function createApiArtifactContentReadSuccessResponse<TContent = Uint8Array>(
-  read: ArtifactContentReadSuccessValue<TContent>,
+export function createApiArtifactContentReadSuccessResponse(
+  value: ArtifactContentReadSuccessValue,
   options?: {
     requestId?: string;
     correlationId?: string;
   },
-): ApiArtifactContentReadResponse<TContent> {
+): ApiArtifactContentReadResponse {
   return createApiSuccessResponse(
     API_ARTIFACT_CONTENT_READ_OPERATION,
-    {
-      read: normalizeArtifactContentReadSuccessValue(read),
-    },
+    normalizeArtifactContentReadSuccessValue(value),
     {
       requestId: options?.requestId,
       correlationId: options?.correlationId,

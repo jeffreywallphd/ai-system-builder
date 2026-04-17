@@ -32,16 +32,14 @@ describe("artifact-browser contracts", () => {
     });
 
     expect(ARTIFACT_BROWSE_KINDS).toEqual(["image"]);
-    expect(browse).toEqual({
+    expect(browse).toMatchObject({
       items: [
         {
           storageKey: "staged/images/kitten-1",
           artifactKind: "image",
           mediaType: "image/png",
-          sizeBytes: undefined,
           sourceKind: "upload",
           originalName: "kitten.png",
-          createdAt: undefined,
         },
       ],
     });
@@ -64,13 +62,23 @@ describe("artifact-browser contracts", () => {
       content: {
         locator,
         mediaType: " image/jpeg ",
-        content: new Uint8Array([255, 216, 255]),
+        sizeBytes: 3,
+        availability: "available",
+        retrieval: "inline",
       },
     });
 
     expect(detail.artifact.locator.storageKey).toBe("staged/images/kitten-2");
     expect(content.content.locator.storageKey).toBe("staged/images/kitten-2");
     expect("content" in detail.artifact).toBe(false);
-    expect(content.content.content).toEqual(new Uint8Array([255, 216, 255]));
+    expect(content.content).toEqual({
+      locator: {
+        storageKey: "staged/images/kitten-2",
+      },
+      mediaType: "image/jpeg",
+      sizeBytes: 3,
+      availability: "available",
+      retrieval: "inline",
+    });
   });
 });

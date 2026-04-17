@@ -49,7 +49,7 @@ describe("desktop artifact-browser ipc contract", () => {
     );
   });
 
-  it("keeps browse and detail payloads metadata-oriented while content-read carries content bytes", () => {
+  it("keeps browse and detail payloads metadata-oriented while content-read stays descriptor-oriented", () => {
     const browseResponse = createDesktopArtifactBrowseSuccessResponse({
       items: [
         {
@@ -73,33 +73,39 @@ describe("desktop artifact-browser ipc contract", () => {
           storageKey: " staged/images/artifact-31 ",
         },
         mediaType: " image/png ",
-        content: new Uint8Array([137, 80, 78, 71]),
+        sizeBytes: 4,
+        availability: "available",
+        retrieval: "deferred",
       },
     });
 
     if (!browseResponse.ok) {
       throw new Error("Expected browse response to be successful.");
     }
-    expect(browseResponse.value.browse.items[0].storageKey).toBe("staged/images/artifact-31");
-    expect("content" in browseResponse.value.browse.items[0]).toBe(false);
+    expect(browseResponse.value.items[0].storageKey).toBe("staged/images/artifact-31");
+    expect("content" in browseResponse.value.items[0]).toBe(false);
 
     if (!readResponse.ok) {
       throw new Error("Expected read response to be successful.");
     }
-    expect(readResponse.value.read.artifact.locator.storageKey).toBe(
+    expect(readResponse.value.artifact.locator.storageKey).toBe(
       "staged/images/artifact-31",
     );
-    expect("content" in readResponse.value.read.artifact).toBe(false);
+    expect("content" in readResponse.value.artifact).toBe(false);
 
     if (!contentResponse.ok) {
       throw new Error("Expected content-read response to be successful.");
     }
-    expect(contentResponse.value.read.content.locator.storageKey).toBe(
+    expect(contentResponse.value.content.locator.storageKey).toBe(
       "staged/images/artifact-31",
     );
-    expect(contentResponse.value.read.content.content).toEqual(
-      new Uint8Array([137, 80, 78, 71]),
-    );
+    expect(contentResponse.value.content).toMatchObject({
+      mediaType: "image/png",
+      sizeBytes: 4,
+      availability: "available",
+      retrieval: "deferred",
+    });
+    expect("bytes" in contentResponse.value.content).toBe(false);
   });
 
   it("keeps read and content-read request locators storage-key based with no filesystem path fields", () => {

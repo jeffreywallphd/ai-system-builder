@@ -241,7 +241,9 @@ describe("contracts cross-family invariants", () => {
           storageKey: stagedDescriptor.storage.key,
         },
         mediaType: stagedDescriptor.storage.mediaType,
-        content: new Uint8Array([1, 2, 3]),
+        sizeBytes: stagedDescriptor.storage.sizeBytes,
+        availability: "available",
+        retrieval: "inline",
       },
     });
 
@@ -252,6 +254,13 @@ describe("contracts cross-family invariants", () => {
     expect("path" in detail.artifact.locator).toBe(false);
     expect("content" in browse.items[0]).toBe(false);
     expect("content" in detail.artifact).toBe(false);
+    expect("bytes" in content.content).toBe(false);
+    expect(content.content).toMatchObject({
+      mediaType: "image/png",
+      sizeBytes: 3,
+      availability: "available",
+      retrieval: "inline",
+    });
   });
 
   it("keeps transform, dataset, and lineage contracts aligned around typed references", () => {

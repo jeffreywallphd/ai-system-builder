@@ -5,6 +5,8 @@ import * as artifactBrowserContracts from "..";
 describe("artifact-browser family invariants", () => {
   it("exports only artifact-browser-family surfaces from the family barrel", () => {
     expect(Object.keys(artifactBrowserContracts).sort()).toEqual([
+      "ARTIFACT_CONTENT_AVAILABILITIES",
+      "ARTIFACT_CONTENT_RETRIEVAL_KINDS",
       "ARTIFACT_BROWSE_KINDS",
       "ARTIFACT_BROWSE_OPERATION",
       "ARTIFACT_CONTENT_READ_OPERATION",
@@ -17,7 +19,7 @@ describe("artifact-browser family invariants", () => {
       "normalizeArtifactContentReadSuccessValue",
       "normalizeArtifactDetailReadModel",
       "normalizeArtifactReadSuccessValue",
-    ]);
+    ].sort());
   });
 
   it("keeps locator fields storage-key based and path-agnostic across read operations", () => {
@@ -33,7 +35,9 @@ describe("artifact-browser family invariants", () => {
     const content = artifactBrowserContracts.normalizeArtifactContentReadSuccessValue({
       content: {
         locator,
-        content: new Uint8Array([1, 2, 3]),
+        sizeBytes: 3,
+        availability: "available",
+        retrieval: "deferred",
       },
     });
 
@@ -41,5 +45,6 @@ describe("artifact-browser family invariants", () => {
     expect(content.content.locator.storageKey).toBe("staged/images/artifact-11");
     expect("path" in detail.artifact.locator).toBe(false);
     expect("path" in content.content.locator).toBe(false);
+    expect("bytes" in content.content).toBe(false);
   });
 });
