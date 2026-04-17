@@ -5,10 +5,11 @@ import { ImageUploadStatus } from "./ImageUploadStatus";
 
 export interface ImageUploadFeatureProps {
   client?: ApiImageUploadClient;
+  onUploadComplete?: (storageKey: string) => void;
 }
 
-export function ImageUploadFeature({ client }: ImageUploadFeatureProps) {
-  const { selectedFile, viewState, onFileChange, onUploadSubmit } = useImageUploadFeature(client);
+export function ImageUploadFeature({ client, onUploadComplete }: ImageUploadFeatureProps) {
+  const { selectedFile, viewState, onFileChange, onUploadSubmit } = useImageUploadFeature(client, onUploadComplete);
 
   return (
     <section className="ui-panel ui-stack ui-stack--sm">

@@ -1,22 +1,4 @@
-import {
-  DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
-  DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
-  DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
-  DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
-  DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
-  DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
-  createDesktopArtifactBrowseSuccessResponse,
-  createDesktopArtifactContentReadSuccessResponse,
-  createDesktopArtifactReadSuccessResponse,
-  createIpcError,
-  createIpcFailureResponse,
-  type DesktopArtifactBrowseRequest,
-  type DesktopArtifactBrowseResponse,
-  type DesktopArtifactContentReadRequest,
-  type DesktopArtifactContentReadResponse,
-  type DesktopArtifactReadRequest,
-  type DesktopArtifactReadResponse,
-} from "../../../../contracts/ipc";
+import type { ArtifactContentRetrievalPort } from "../../../../application/ports/artifact-content";
 import type {
   BrowseArtifactsCommand,
   BrowseArtifactsUseCasePort,
@@ -28,6 +10,30 @@ import type {
   ReadArtifactDetailUseCasePort,
   ReadArtifactDetailUseCaseResult,
 } from "../../../../application/use-cases";
+import {
+  DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
+  createDesktopArtifactBrowseSuccessResponse,
+  createDesktopArtifactContentReadSuccessResponse,
+  createDesktopArtifactMediaViewSuccessResponse,
+  createDesktopArtifactReadSuccessResponse,
+  createIpcError,
+  createIpcFailureResponse,
+  type DesktopArtifactBrowseRequest,
+  type DesktopArtifactBrowseResponse,
+  type DesktopArtifactContentReadRequest,
+  type DesktopArtifactContentReadResponse,
+  type DesktopArtifactMediaViewRequest,
+  type DesktopArtifactMediaViewResponse,
+  type DesktopArtifactReadRequest,
+  type DesktopArtifactReadResponse,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
+} from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 export type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
@@ -36,6 +42,7 @@ export interface RegisterArtifactBrowserIpcDependencies {
   browseArtifactsUseCase: BrowseArtifactsUseCasePort;
   readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
   readArtifactContentUseCase: ReadArtifactContentUseCasePort;
+  artifactMediaViewRetrieval: ArtifactContentRetrievalPort;
 }
 
 export function mapDesktopArtifactBrowseRequestToCommand(
@@ -62,11 +69,20 @@ export function mapDesktopArtifactContentReadRequestToCommand(
   };
 }
 
+export function mapDesktopArtifactMediaViewRequest(
+  request: DesktopArtifactMediaViewRequest,
+): { storageKey: string } {
+  return {
+    storageKey: request.payload.storageKey,
+  };
+}
+
 export function mapDesktopArtifactRequestContext(
   request:
     | DesktopArtifactBrowseRequest
     | DesktopArtifactReadRequest
-    | DesktopArtifactContentReadRequest,
+    | DesktopArtifactContentReadRequest
+    | DesktopArtifactMediaViewRequest,
 ): { requestId?: string; correlationId?: string } {
   return {
     requestId: request.requestId,
@@ -119,6 +135,26 @@ function mapReadArtifactContentFailure(
   return createIpcFailureResponse(
     createIpcError(
       DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
+      error.code === "validation" || error.code === "not-found" || error.code === "unavailable"
+        ? error.code
+        : "internal",
+      error.message,
+      {
+        details: error.details,
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapArtifactMediaViewFailure(
+  request: DesktopArtifactMediaViewRequest,
+  error: { code: string; message: string; details?: Record<string, unknown> },
+): DesktopArtifactMediaViewResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
       error.code === "validation" || error.code === "not-found" || error.code === "unavailable"
         ? error.code
         : "internal",
@@ -225,6 +261,29 @@ export function createDesktopArtifactContentReadIpcHandler(
   };
 }
 
+export function createDesktopArtifactMediaViewIpcHandler(
+  artifactMediaViewRetrieval: ArtifactContentRetrievalPort,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopArtifactMediaViewRequest,
+  ): Promise<DesktopArtifactMediaViewResponse> => {
+    const retrievalResult = await artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey(
+      mapDesktopArtifactMediaViewRequest(request),
+      mapDesktopArtifactRequestContext(request),
+    );
+
+    if (!retrievalResult.ok) {
+      return mapArtifactMediaViewFailure(request, retrievalResult.error);
+    }
+
+    return createDesktopArtifactMediaViewSuccessResponse(retrievalResult.value, {
+      requestId: retrievalResult.requestId ?? request.requestId,
+      correlationId: retrievalResult.correlationId ?? request.correlationId,
+    });
+  };
+}
+
 export function registerArtifactBrowserIpc(
   dependencies: RegisterArtifactBrowserIpcDependencies,
 ): void {
@@ -239,5 +298,9 @@ export function registerArtifactBrowserIpc(
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value,
     createDesktopArtifactContentReadIpcHandler(dependencies.readArtifactContentUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value,
+    createDesktopArtifactMediaViewIpcHandler(dependencies.artifactMediaViewRetrieval),
   );
 }

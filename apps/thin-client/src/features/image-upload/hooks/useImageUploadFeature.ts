@@ -11,7 +11,7 @@ export interface UseImageUploadFeatureResult {
   onUploadSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }
 
-export function useImageUploadFeature(client?: ApiImageUploadClient): UseImageUploadFeatureResult {
+export function useImageUploadFeature(client?: ApiImageUploadClient, onUploadComplete?: (storageKey: string) => void): UseImageUploadFeatureResult {
   const uploadClient = useImageUploadClient(client);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [viewState, setViewState] = useState<UploadViewState>({
@@ -67,6 +67,7 @@ export function useImageUploadFeature(client?: ApiImageUploadClient): UseImageUp
           mediaType: response.value.descriptor.mediaType,
           sizeBytes: response.value.descriptor.sizeBytes,
         });
+        onUploadComplete?.(response.value.descriptor.key);
         return;
       }
 

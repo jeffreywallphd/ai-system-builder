@@ -6,25 +6,32 @@ export interface ArtifactBrowserFeatureProps {
 }
 
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
-  const { items, detail, content, imageViewUrl, selectedStorageKey, viewState, selectArtifact } = useArtifactBrowserFeature(
-    client,
-  );
+  const {
+    items,
+    detail,
+    content,
+    imageViewUrl,
+    selectedStorageKey,
+    viewState,
+    selectArtifact,
+    refreshArtifacts,
+  } = useArtifactBrowserFeature(client);
 
   return (
     <section className="ui-panel ui-stack ui-stack--sm">
-      <h2>Artifact browser (images)</h2>
+      <header className="ui-grid ui-grid--two"><h2>Artifact browser (images)</h2><button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>Refresh</button></header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
 
       <ul className="ui-stack ui-stack--sm">
         {items.map((item) => (
-          <li key={item.storageKey}>
+          <li key={item.originalName ?? item.storageKey}>
             <button
               className="ui-button"
               type="button"
               onClick={() => void selectArtifact(item.storageKey)}
               disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}
             >
-              {item.storageKey}
+              {item.originalName ?? item.storageKey}
             </button>
           </li>
         ))}

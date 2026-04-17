@@ -7,6 +7,7 @@ export interface ThinClientArtifactBrowseItem {
   artifactKind: "image";
   mediaType?: string;
   sizeBytes?: number;
+  originalName?: string;
   createdAt?: string;
 }
 
@@ -15,6 +16,7 @@ export interface ThinClientArtifactDetail {
   artifactKind: "image";
   mediaType?: string;
   sizeBytes?: number;
+  originalName?: string;
   createdAt?: string;
 }
 

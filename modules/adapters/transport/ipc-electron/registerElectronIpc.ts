@@ -14,6 +14,7 @@ export interface RegisterElectronIpcDependencies {
   browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactContentUseCase"];
+  artifactMediaViewRetrieval: RegisterArtifactBrowserIpcDependencies["artifactMediaViewRetrieval"];
 }
 
 export function registerElectronIpc(
@@ -29,5 +30,6 @@ export function registerElectronIpc(
     browseArtifactsUseCase: dependencies.browseArtifactsUseCase,
     readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
     readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
+    artifactMediaViewRetrieval: dependencies.artifactMediaViewRetrieval,
   });
 }

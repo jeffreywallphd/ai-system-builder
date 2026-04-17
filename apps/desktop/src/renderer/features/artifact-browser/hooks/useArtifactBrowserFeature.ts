@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import {
-  type ArtifactBrowserApiClient,
-  type ThinClientArtifactBrowseItem,
-  type ThinClientArtifactContentDescriptor,
-  type ThinClientArtifactDetail,
-} from "../api/apiArtifactBrowserClient";
+import type {
+  DesktopArtifactBrowseItem,
+  DesktopArtifactContentDescriptor,
+  DesktopArtifactDetail,
+} from "../../../lib/desktopApi";
+import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
 
 export interface ArtifactBrowserViewState {
@@ -14,10 +14,10 @@ export interface ArtifactBrowserViewState {
 }
 
 export interface UseArtifactBrowserFeatureResult {
-  items: ThinClientArtifactBrowseItem[];
+  items: DesktopArtifactBrowseItem[];
   selectedStorageKey?: string;
-  detail?: ThinClientArtifactDetail;
-  content?: ThinClientArtifactContentDescriptor;
+  detail?: DesktopArtifactDetail;
+  content?: DesktopArtifactContentDescriptor;
   imageViewUrl?: string;
   viewState: ArtifactBrowserViewState;
   selectArtifact: (storageKey: string) => Promise<void>;
@@ -25,17 +25,17 @@ export interface UseArtifactBrowserFeatureResult {
 }
 
 export function useArtifactBrowserFeature(
-  client?: ArtifactBrowserApiClient,
+  client?: DesktopArtifactBrowserClient,
 ): UseArtifactBrowserFeatureResult {
   const artifactClient = useArtifactBrowserClient(client);
-  const [items, setItems] = useState<ThinClientArtifactBrowseItem[]>([]);
+  const [items, setItems] = useState<DesktopArtifactBrowseItem[]>([]);
   const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>();
-  const [detail, setDetail] = useState<ThinClientArtifactDetail | undefined>();
-  const [content, setContent] = useState<ThinClientArtifactContentDescriptor | undefined>();
+  const [detail, setDetail] = useState<DesktopArtifactDetail | undefined>();
+  const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
 
-  async function refreshArtifacts(): Promise<void> {
+  const refreshArtifacts = useCallback(async () => {
     setViewState({ status: "loading", message: "Loading image artifacts..." });
     try {
       const browseItems = await artifactClient.browseImageArtifacts();
@@ -50,11 +50,11 @@ export function useArtifactBrowserFeature(
         message: error instanceof Error ? error.message : "Failed to load image artifacts.",
       });
     }
-  }
+  }, [artifactClient]);
 
   useEffect(() => {
     void refreshArtifacts();
-  }, [artifactClient]);
+  }, [refreshArtifacts]);
 
   async function selectArtifact(storageKey: string): Promise<void> {
     setSelectedStorageKey(storageKey);
@@ -62,14 +62,15 @@ export function useArtifactBrowserFeature(
 
     try {
       const locator = { storageKey };
-      const [artifactDetail, contentDescriptor] = await Promise.all([
+      const [artifactDetail, contentDescriptor, nextImageViewUrl] = await Promise.all([
         artifactClient.readArtifactDetail(locator),
         artifactClient.readArtifactContent(locator),
+        artifactClient.createArtifactMediaViewUrl(locator),
       ]);
 
       setDetail(artifactDetail);
       setContent(contentDescriptor);
-      setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));
+      setImageViewUrl(nextImageViewUrl);
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
     } catch (error) {
       setDetail(undefined);

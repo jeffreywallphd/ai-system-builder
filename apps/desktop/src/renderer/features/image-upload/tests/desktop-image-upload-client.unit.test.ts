@@ -19,7 +19,13 @@ describe("desktop image upload client", () => {
       },
     });
 
-    window.desktopApi = { uploadImage };
+    window.desktopApi = {
+      uploadImage,
+      browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+      readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a.png" }, artifactKind: "image" } } }),
+      readArtifactContentDescriptor: async () => ({ ok: true, value: { content: { locator: { storageKey: "uploads/a.png" }, availability: "available", retrieval: "deferred" } } }),
+      readArtifactViewerMedia: async () => ({ ok: true, value: { storageKey: "uploads/a.png", bytes: new Uint8Array([1]) } }),
+    };
 
     const client = createDesktopImageUploadClient();
     const input = {
@@ -54,7 +60,13 @@ describe("desktop image upload client", () => {
       },
     });
 
-    window.desktopApi = { uploadImage };
+    window.desktopApi = {
+      uploadImage,
+      browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+      readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a.png" }, artifactKind: "image" } } }),
+      readArtifactContentDescriptor: async () => ({ ok: true, value: { content: { locator: { storageKey: "uploads/a.png" }, availability: "available", retrieval: "deferred" } } }),
+      readArtifactViewerMedia: async () => ({ ok: true, value: { storageKey: "uploads/a.png", bytes: new Uint8Array([1]) } }),
+    };
 
     const client = createDesktopImageUploadClient();
     const response = await client.uploadImage({
