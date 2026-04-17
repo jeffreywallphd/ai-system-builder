@@ -1,3 +1,9 @@
+export * from "./storage-kind";
+export * from "./storage-provider-id";
+export * from "./storage-backing-reference";
+export * from "./artifact-storage-binding";
+
+export * from "./artifact-object-storage-locator";
 export * from "./storage-artifact-key";
 export * from "./storage-zone-kind";
 export * from "./storage-instance-reference";
@@ -11,3 +17,12 @@ export * from "./has-artifact-request";
 export * from "./has-artifact-result";
 export * from "./delete-artifact-request";
 export * from "./delete-artifact-result";
+
+export * from "./artifact-repo-target";
+export * from "./artifact-repo-descriptor";
+export * from "./store-artifact-in-repo-request";
+export * from "./store-artifact-in-repo-result";
+export * from "./retrieve-artifact-from-repo-request";
+export * from "./retrieve-artifact-from-repo-result";
+export * from "./has-artifact-in-repo-request";
+export * from "./has-artifact-in-repo-result";

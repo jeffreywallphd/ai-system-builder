@@ -34,8 +34,8 @@ Adopt ingestion/staged-artifact as the canonical higher-level semantic model for
 
 - The system moves from isolated upload/file semantics toward a shared ingestion and staged artifact model.
 - Uploaded, scraped, and selected generated/API/runtime inbound content are modeled as staged artifacts.
-- Storage remains a generic architecture category with specialized storage families; ingestion contracts define higher-level staged artifact semantics above those families.
-- Inbound staged artifacts may originate from local/object-style artifact storage or from repo-backed storage providers.
+- Storage remains a generic architecture category with specialized storage families (artifact-object and artifact-repo) over a shared storage foundation; ingestion contracts define higher-level staged artifact semantics above those families.
+- Inbound staged artifacts may originate from artifact-object storage (key/blob/object) or from artifact-repo storage (provider/repository/revision/path).
 - Import from repo-backed providers should normalize into canonical internal staged artifact semantics and descriptor vocabulary.
 - Existing image upload remains a specialized intake path and is aligned to the staged artifact model.
 - Canonical metadata vocabulary for intake outcomes is ingestion-centric (source kind + staged artifact descriptor), not image-only.

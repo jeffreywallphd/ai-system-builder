@@ -27,9 +27,9 @@ Key risk areas to avoid:
 - Postgres is the default persistence system for structured durable application data.
 - Persistence and storage are separate architectural concerns.
 - Persistence concerns relational/queryable records and structured state.
-- Storage adapters are a broad category that can contain specialized contract and implementation families.
-- Artifact/object storage remains a first-class storage family centered on artifact keys, bytes, checksums, and artifact metadata.
-- Repo-backed storage is also storage, but with distinct semantics (provider/repo identity, revision/version behavior, remote visibility/access controls, and provider-native publish/import behaviors).
+- Storage adapters are a broad category that contain specialized contract and implementation families with a shared foundation (`StorageKind`, `StorageProviderId`, and thin `StorageBackingReference`).
+- Artifact/object storage remains a first-class storage family centered on artifact keys, bytes, checksums, and artifact metadata (`ArtifactObjectStorageLocator` + store/retrieve/has/delete object contracts).
+- Repo-backed storage is also storage, with distinct semantics (provider/repo identity, revision/version behavior, and path semantics) and dedicated contracts (`ArtifactRepoTarget`, `ArtifactRepoDescriptor`, `store/retrieve/has artifact in repo`).
 - External repo-backed storage must not be collapsed into persistence records and must not be flattened to simple artifact-key/blob semantics.
 - Physical disk location does not remove the need for a storage abstraction.
 - Application logic depends on persistence and storage ports/contracts rather than concrete database or file-path details.
@@ -40,7 +40,7 @@ Key risk areas to avoid:
   - browse/list and detail/view operations are metadata/query/read-model concerns aligned to persistence + artifact descriptors,
   - content retrieval is a distinct artifact-content path, modeled canonically as descriptor/reference-oriented content access rather than raw-byte-first transport payloads.
 - Artifact browser contracts are normalized system-artifact contracts; they are not filesystem traversal contracts and are not provider-native repository browsing contracts.
-- Linkage between persistence metadata and storage artifacts should be explicit (for example through normalized artifact keys) without collapsing persistence and storage into one concern.
+- Linkage between persistence metadata and storage artifacts should be explicit (for example through normalized artifact keys or `ArtifactStorageBinding`) without collapsing persistence and storage into one concern.
 
 This sets architectural roles without freezing all storage implementation specifics at this stage.
 

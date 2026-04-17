@@ -20,12 +20,12 @@ Storage in this repository is a broad adapter category, not one flat contract sh
 
 ### Specialized storage families (direction)
 
-At minimum, storage is expected to distinguish:
+At minimum, storage distinguishes two contract families over a shared foundation (`StorageKind`, `StorageProviderId`, and `StorageBackingReference`):
 
-- **artifact/object storage adapters**
-  - centered on artifact keys, bytes, checksums, and artifact metadata,
+- **artifact-object storage adapters**
+  - centered on artifact keys, bytes, checksums, and artifact metadata (`ArtifactObjectStorageLocator` and store/retrieve/has/delete key-object operations),
   - represented today by key-based artifact storage contracts and filesystem-backed implementations.
-- **repo-backed storage adapters**
+- **artifact-repo storage adapters**
   - centered on provider/repo identity, revision/version semantics, remote visibility/access semantics, and provider-native publish/import behavior,
   - valid storage adapters even though they are not simple key/blob stores.
 
@@ -140,7 +140,7 @@ Current-state note:
 
 Repo-backed providers are a valid storage class under the storage adapter category.
 
-- A likely first provider example is **Hugging Face** (for model/dataset-style repository storage).
+- A likely first provider example is **Hugging Face** (for model/dataset-style repository storage). Hugging Face is planned, not yet implemented in this prompt scope.
 - Treat Hugging Face as repo-backed storage/provider semantics, not as "just another blob store."
 - Import from provider repos and publish to provider repos are distinct operations with provider/revision/visibility semantics.
 - Provider-native repository browsing/viewing semantics may exist, but they do not define internal system artifact-browser contracts.
@@ -178,7 +178,7 @@ The first read-side browser/viewer slice is image-backed but artifact-shaped.
 - External provider-native browsers may coexist, but normalized internal browse/read/content contracts remain the system source of truth.
 - This is an early data-lake-like artifact browser/viewer surface, not a claim that full ingestion/catalog/ELT platform capabilities are complete.
 
-This keeps persistence-storage linkage explicit (metadata/read models referencing artifact keys) while preserving separation between structured record/query behavior and artifact byte retrieval behavior.
+This keeps persistence-storage linkage explicit (metadata/read models referencing artifact keys or `ArtifactStorageBinding` backing references) while preserving separation between structured record/query behavior and artifact byte retrieval behavior.
 
 ## Not yet finalized
 

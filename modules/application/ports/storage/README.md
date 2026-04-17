@@ -1,13 +1,24 @@
-# Storage Port
+# Storage Ports
 
-Application orchestration depends on `ArtifactStoragePort` for artifact/object storage behavior.
+Application orchestration uses specialized storage-family ports.
+
+## Artifact-object storage port
+
+`ArtifactObjectStoragePort` (with backward-compatible alias `ArtifactStoragePort`) covers key/blob/object behavior:
 
 - store artifacts via `StoreArtifactRequest` / `StoreArtifactResult`
 - retrieve artifacts via `RetrieveArtifactRequest` / `RetrieveArtifactResult`
 - check existence via `HasArtifactRequest` / `HasArtifactResult`
 - delete artifacts via `DeleteArtifactRequest` / `DeleteArtifactResult`
 
-This port is intentionally key-based and artifact-oriented; adapters map keys to physical storage details.
+This seam is intentionally key-based and artifact-oriented; adapters map keys to physical storage details.
 
-This is an artifact/object storage port family.
-If repo-backed provider semantics are introduced, they should be modeled through specialized storage ports/contracts instead of forcing all storage into this key/blob shape.
+## Artifact-repo storage port
+
+`ArtifactRepoStoragePort` covers provider/repository/revision/path behavior:
+
+- store artifacts in repo-backed storage via `StoreArtifactInRepoRequest` / `StoreArtifactInRepoResult`
+- retrieve artifacts from repo-backed storage via `RetrieveArtifactFromRepoRequest` / `RetrieveArtifactFromRepoResult`
+- check artifact existence in repo-backed storage via `HasArtifactInRepoRequest` / `HasArtifactInRepoResult`
+
+`ApplicationRequestContext` is the generic application-layer request metadata context used by repo-storage and artifact browser/catalog/content seams.

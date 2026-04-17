@@ -18,7 +18,7 @@ import {
   type StoreArtifactRequest,
   type StoreArtifactResult,
 } from "../../../../contracts/storage";
-import type { ContractBoundaryContext } from "../../../../contracts/shared";
+import type { ApplicationRequestContext } from "../../application-request-context";
 
 import type { ArtifactStoragePort } from "../storage-artifact.port";
 
@@ -60,7 +60,7 @@ describe("ArtifactStoragePort", () => {
   });
 
   it("passes key-based artifact requests through all storage operations", async () => {
-    const context: ContractBoundaryContext = {
+    const context: ApplicationRequestContext = {
       requestId: "req-storage-1",
       correlationId: "corr-storage-1",
     };

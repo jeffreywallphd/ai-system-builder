@@ -22,10 +22,10 @@
 ## Core Guidance
 
 - Postgres is the default persistence target for structured durable application data.
-- Storage adapters are a broad architecture category under `modules/adapters/storage`, not a single flat contract shape.
+- Storage adapters are a broad architecture category under `modules/adapters/storage`, not a single flat contract shape. Shared storage foundation contracts define family-neutral identity (`StorageKind`, `StorageProviderId`, `StorageBackingReference`).
 - Storage is a separate concern from persistence and can include specialized storage families with distinct semantics.
-- Artifact/object storage (keys/bytes/checksums/metadata) is one storage family; do not assume all storage concerns fit this shape.
-- Repo-backed storage is a valid storage specialization (provider/repo identity, revision/version semantics, visibility/access semantics, provider import/publish behaviors).
+- Artifact-object storage (keys/bytes/checksums/metadata, including `ArtifactObjectStorageLocator`) is one storage family; do not assume all storage concerns fit this shape.
+- Artifact-repo storage is a valid storage specialization (provider/repository/revision/path plus import/publish behaviors).
 - Treat Hugging Face as the likely first repo-backed storage/provider example; do not frame it as "just another blob store."
 - Ingestion/staged artifact contracts are the canonical higher-level intake semantics for inbound content; storage stays the underlying artifact capability.
 - Persistence contracts stay record-oriented: operation identity + record reference + result/error envelope.
@@ -47,7 +47,7 @@
 - Do not implement direct filesystem browsing semantics in UI-facing contracts; keep artifact browser locators key-based and path-agnostic.
 - Do not treat provider-native repo browsers (for example Hugging Face UI browsing) as replacements for normalized system artifact-browser contracts.
 - Keep media retrieval on a separate retrieval path; do not collapse byte retrieval into descriptor-oriented artifact-browser contracts.
-- Metadata records and file/blob content are different concerns and should stay separated.
+- Metadata records and file/blob content are different concerns and should stay separated. Use explicit linkage contracts (for example `ArtifactStorageBinding`) instead of flattening families.
 - Application logic should depend on persistence/storage ports and contracts, not direct DB/filesystem details.
 - AppData/server filesystem roots are deployment details, not architecture boundaries.
 - Do not bury file/blob behavior inside runtime adapters or host glue.
