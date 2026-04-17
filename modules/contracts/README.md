@@ -7,6 +7,7 @@ Current contract families include:
 
 - `shared` result/error backbone
 - `transport` plus `api` and `ipc` specializations
+- `artifact-browser` read-side operation and read-model contracts
 - `runtime`, `persistence`, `storage`, and `ingestion`
 - `artifact`, `transform`, `lineage`, and `dataset` for ELT-style data flow
 - `host` context metadata

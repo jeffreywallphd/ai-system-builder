@@ -7,6 +7,7 @@ import * as contracts from "..";
 const CONTRACT_FAMILIES = [
   "api",
   "artifact",
+  "artifactBrowser",
   "config",
   "dataset",
   "host",

@@ -34,6 +34,11 @@
 - Storage key creation/normalization should flow through shared storage key helpers to prevent per-operation key-shape drift.
 - Storage checksums should be computed in concrete storage adapters from persisted bytes and surfaced through descriptor results; checksum support does not imply deduplication behavior.
 - Keep storage family exports scoped to storage contracts only.
+- For artifact-browser read work, keep contracts split by concern:
+  - browse/list contracts are metadata/catalog oriented,
+  - detail/read contracts are artifact read-model oriented,
+  - bytes/media retrieval stays in a separate content-read contract path.
+- Do not implement direct filesystem browsing semantics in UI-facing contracts; keep artifact browser locators key-based and path-agnostic.
 - Metadata records and file/blob content are different concerns and should stay separated.
 - Application logic should depend on persistence/storage ports and contracts, not direct DB/filesystem details.
 - AppData/server filesystem roots are deployment details, not architecture boundaries.
