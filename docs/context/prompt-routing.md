@@ -18,7 +18,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | desktop renderer structure, page/feature/component boundaries, renderer API-client usage | `docs/context/packs/desktop-implementation.pack.md` |
 | desktop renderer CSS/style architecture, shared style layering, token-first styling decisions | `docs/context/packs/desktop-styling.pack.md` |
 | server host lifecycle, Express transport boundaries, thin web client coupling | `docs/context/packs/server-host.pack.md` |
-| persistence vs storage responsibilities, ingestion/staged-data semantics for uploads/scrape/generated intake paths, uploads/downloads/artifacts, filesystem/object storage concerns, AppData/server roots, metadata-vs-file boundaries | `docs/context/packs/persistence-storage.pack.md` |
+| persistence vs storage responsibilities, ingestion/staged-artifact semantics for uploads/scrape/generated intake paths, artifact browser/read/view contracts (list/detail/content separation), uploads/downloads/artifacts, filesystem/object storage concerns, AppData/server roots, metadata-vs-file boundaries | `docs/context/packs/persistence-storage.pack.md` |
 | documentation updates, canonical-vs-context discipline, doc governance | `docs/context/packs/docs-standards.pack.md` |
 | structured logging behavior, diagnosability, log field/level discipline | `docs/context/packs/logging.pack.md` |
 | test strategy, regression coverage, layered testing expectations | `docs/context/packs/testing.pack.md` |

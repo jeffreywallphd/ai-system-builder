@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
 
 import {
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
@@ -11,12 +11,15 @@ import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedA
 
 describe("desktop preload exposedApi uploadImage bridge", () => {
   it("maps bridge input into the desktop upload request envelope and invokes the request channel", async () => {
-    const invoke = vi.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopImageUploadSuccessResponse(
         {
-          key: "uploads/kitten.png",
-          mediaType: "image/png",
-          sizeBytes: 4,
+          sourceKind: "upload",
+          storage: {
+            key: "uploads/kitten.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
         },
         {
           requestId: "req-upload-1",
@@ -66,11 +69,14 @@ describe("desktop preload exposedApi uploadImage bridge", () => {
   });
 
   it("supports preload-owned boundary source overrides without exposing IPC internals to ui callers", async () => {
-    const invoke = vi.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopImageUploadSuccessResponse({
-        key: "uploads/cat.png",
-        mediaType: "image/png",
-        sizeBytes: 8,
+        sourceKind: "upload",
+        storage: {
+          key: "uploads/cat.png",
+          mediaType: "image/png",
+          sizeBytes: 8,
+        },
       }),
     );
     const api = createDesktopPreloadApi({
@@ -94,7 +100,7 @@ describe("desktop preload exposedApi uploadImage bridge", () => {
   });
 
   it("throws when IPC returns a response envelope for the wrong operation or channel", async () => {
-    const invoke = vi.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createIpcFailureResponse(
         createIpcError(
           createIpcChannel("image.archive", "response"),

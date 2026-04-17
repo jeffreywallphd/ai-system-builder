@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import { StoreImageUploadUseCase } from "../../../../application/use-cases";
 import { createFilesystemArtifactStorageAdapter } from "../../../storage/filesystem/artifact-store";
@@ -30,7 +30,7 @@ async function createTempRoot(): Promise<string> {
   return root;
 }
 
-function createLoggingPort(log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined)) {
+function createLoggingPort(log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined)) {
   return {
     log,
   } satisfies LoggingPort;
@@ -39,7 +39,7 @@ function createLoggingPort(log = vi.fn<LoggingPort["log"]>().mockResolvedValue(u
 describe("desktop image upload IPC integration", () => {
   it("handles a real upload request through IPC -> use case -> filesystem adapter and returns success", async () => {
     const rootDirectory = await createTempRoot();
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const useCase = new StoreImageUploadUseCase({
       storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,
@@ -75,11 +75,11 @@ describe("desktop image upload IPC integration", () => {
     expect(response.operation).toBe("image.upload");
     expect(response.requestId).toBe("req-ipc-integration-1");
     expect(response.correlationId).toBe("corr-ipc-integration-1");
-    expect(path.isAbsolute(response.value.descriptor.key)).toBe(false);
-    expect(response.value.descriptor.mediaType).toBe("image/png");
-    expect(response.value.descriptor.sizeBytes).toBe(4);
+    expect(path.isAbsolute(response.value.descriptor.storage.key)).toBe(false);
+    expect(response.value.descriptor.storage.mediaType).toBe("image/png");
+    expect(response.value.descriptor.storage.sizeBytes).toBe(4);
 
-    const writtenBytes = await readFile(path.join(rootDirectory, ...response.value.descriptor.key.split("/")));
+    const writtenBytes = await readFile(path.join(rootDirectory, ...response.value.descriptor.storage.key.split("/")));
     expect(new Uint8Array(writtenBytes)).toEqual(new Uint8Array([137, 80, 78, 71]));
 
     const events = log.mock.calls.map(

@@ -1,7 +1,15 @@
 import type { LoggingPort } from "../../../application/ports/logging";
-import { StoreImageUploadUseCase } from "../../../application/use-cases";
+import {
+  BrowseArtifactsUseCase,
+  ReadArtifactContentUseCase,
+  ReadArtifactDetailUseCase,
+  StoreImageUploadUseCase,
+} from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
-import { createFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
+import {
+  createFilesystemArtifactBrowserReadAdapter,
+  createFilesystemArtifactStorageAdapter,
+} from "../../../adapters/storage/filesystem";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
 import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
@@ -59,6 +67,9 @@ export function composeServerHost(
         logging: loggingPort,
         now: options.now,
       });
+      const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
+      });
 
       const storeImageUploadUseCase = new StoreImageUploadUseCase({
         storage,
@@ -66,9 +77,24 @@ export function composeServerHost(
         now: options.now,
       });
 
+      const browseArtifacts = new BrowseArtifactsUseCase({
+        artifactBrowserMetadataRead: artifactBrowserRead,
+      });
+      const readArtifactDetail = new ReadArtifactDetailUseCase({
+        artifactBrowserMetadataRead: artifactBrowserRead,
+      });
+      const readArtifactContent = new ReadArtifactContentUseCase({
+        artifactBrowserContentRead: artifactBrowserRead,
+      });
+
       registerExpressApi({
         app: registerOptions.app,
         storeImageUploadUseCase,
+        artifactBrowserUseCases: {
+          browseArtifacts,
+          readArtifactDetail,
+          readArtifactContent,
+        },
       });
     },
   };

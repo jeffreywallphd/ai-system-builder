@@ -54,7 +54,7 @@ Examples:
 - generated artifacts (reports, exports, model outputs),
 - images/media/binary payloads,
 - temporary workspace material,
-- cache-like files or staging assets.
+- cache-like files or staging artifacts.
 
 These concerns belong behind storage ports/contracts and adapters (for example in `modules/adapters/storage/`).
 
@@ -64,6 +64,8 @@ Physical location can vary by host mode:
 
 - Desktop mode may store artifacts under OS-specific app data locations.
 - Server mode may store artifacts in configured file paths, mounted volumes, or object/blob services.
+- For the current server app, the default filesystem storage root is resolved from the server app/module location so
+  it is deterministic and not launch-`cwd` dependent; `SERVER_STORAGE_ROOT` remains the explicit override.
 
 Important: physical location choice does **not** remove the architectural need for storage abstraction.
 
@@ -89,7 +91,7 @@ Separate boundaries keep policies clear and change safer.
 
 The shared storage contract vocabulary under `modules/contracts/storage` is intentionally:
 
-- artifact-oriented (uploads, generated outputs, exports, temp workspace assets),
+- artifact-oriented (uploads, generated outputs, exports, temp workspace artifacts),
 - key-based (logical artifact identifiers rather than physical path assumptions),
 - metadata-aware (optional media type, size, checksum, and artifact metadata),
 - operation-scoped (`store`, `retrieve`, `has`, `delete` request/result contracts).
@@ -104,13 +106,15 @@ Storage family invariants:
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
 
 
-## Ingestion and staged-data semantic layer
+## Ingestion and staged artifact semantic layer
 
-The repository now treats ingestion/staged-data as the canonical semantic layer for inbound content.
+The repository now treats ingestion/staged-artifact as the canonical semantic layer for inbound content.
 
-- Ingestion semantics cover uploads, scrape outputs, selected generated outputs, and similar intake paths.
-- Storage remains the generic artifact capability (bytes + key + adapter mapping).
-- Ingestion contracts provide a transport-neutral staged-data descriptor that can reference storage keys plus intake metadata (source kind, media type, size/checksum, original name when applicable).
+- Storage is the artifact capability for bytes + key + adapter mapping.
+- Ingestion is the semantic intake layer for staged artifacts.
+- Artifact is the canonical ELT-side term for stored/flowing data objects.
+- Asset terminology is reserved for composable system parts and larger built systems, not ELT-side data/blob/file material.
+- Ingestion contracts provide a transport-neutral staged artifact descriptor with intake metadata (source kind, media type, size/checksum, original name when applicable).
 
 This keeps storage generic while preventing image-only/file-only semantic drift in higher-level intake contracts.
 
@@ -118,6 +122,19 @@ Current implementation note:
 
 - Image upload is the active vertical slice and is treated as a specialized ingestion path.
 - This does not imply a full ingestion engine, catalog, or ELT orchestration is implemented yet.
+
+## Artifact browser read-side direction (initial image-backed slice)
+
+The first read-side browser/viewer slice is image-backed but artifact-shaped.
+
+- `artifact.browse` is a metadata/query concern for catalog-style listing of existing artifacts.
+- `artifact.read` is a single-artifact detail/read-model concern for selected artifact metadata.
+- `artifact.content.read` is a separate artifact-content retrieval concern and must not be collapsed into browse/detail contracts.
+- Canonical browse/read/content contracts should remain descriptor/reference-oriented at public boundaries (locator + metadata + availability/retrieval hints), not raw-byte-first payload contracts.
+- Browser contracts stay storage-key based and path-agnostic; public browse/view contracts must not expose filesystem paths.
+- This is an early data-lake-like artifact browser/viewer surface, not a claim that full ingestion/catalog/ELT platform capabilities are complete.
+
+This keeps persistence-storage linkage explicit (metadata/read models referencing artifact keys) while preserving separation between structured record/query behavior and artifact byte retrieval behavior.
 
 ## Not yet finalized
 

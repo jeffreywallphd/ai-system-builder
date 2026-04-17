@@ -1,7 +1,7 @@
 import {
-  normalizeStagedDataDescriptor,
-  type StagedDataDescriptor,
-  type StagedDataMetadata,
+  normalizeStagedArtifactDescriptor,
+  type StagedArtifactDescriptor,
+  type StagedArtifactMetadata,
 } from "../ingestion";
 import { IMAGE_UPLOAD_OPERATION } from "../image-upload";
 import {
@@ -43,9 +43,9 @@ export interface DesktopImageUploadRequestPayload {
 }
 
 export interface DesktopImageUploadSuccessValue<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 > {
-  descriptor: StagedDataDescriptor<TMetadata>;
+  descriptor: StagedArtifactDescriptor<TMetadata>;
 }
 
 export type DesktopImageUploadRequest = IpcRequest<
@@ -56,7 +56,7 @@ export type DesktopImageUploadRequest = IpcRequest<
 >;
 
 export type DesktopImageUploadResponse<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 > = IpcResponse<
   DesktopImageUploadSuccessValue<TMetadata>,
   Record<string, unknown>,
@@ -110,9 +110,9 @@ export function createDesktopImageUploadRequest(
 }
 
 export function createDesktopImageUploadSuccessResponse<
-  TMetadata extends StagedDataMetadata = StagedDataMetadata,
+  TMetadata extends StagedArtifactMetadata = StagedArtifactMetadata,
 >(
-  descriptor: StagedDataDescriptor<TMetadata>,
+  descriptor: StagedArtifactDescriptor<TMetadata>,
   options?: {
     requestId?: string;
     correlationId?: string;
@@ -121,7 +121,7 @@ export function createDesktopImageUploadSuccessResponse<
   return createIpcSuccessResponse(
     DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
     {
-      descriptor: normalizeStagedDataDescriptor(descriptor),
+      descriptor: normalizeStagedArtifactDescriptor(descriptor),
     },
     {
       requestId: options?.requestId,

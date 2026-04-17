@@ -1,13 +1,6 @@
 import type { StructuredLogEvent } from "../../contracts/logging";
-import {
-  createContractError,
-  createFailureResult,
-  createSuccessResult,
-} from "../../contracts/shared";
+import { createContractError } from "../../contracts/shared";
 import { IMAGE_UPLOAD_OPERATION } from "../../contracts/image-upload";
-import {
-  createStagedDataDescriptorFromStorageObjectDescriptor,
-} from "../../contracts/ingestion";
 import { createStoreArtifactRequest } from "../../contracts/storage";
 import type { LoggingPort } from "../ports/logging";
 import type { ArtifactStoragePort } from "../ports/storage";
@@ -16,14 +9,13 @@ import type {
   StoreImageUploadCommandContext,
   StoreImageUploadUseCaseResult,
 } from "./store-image-upload.types";
+import { mapStoreImageUploadToRegisterStagedArtifactResult } from "./image-upload/mapStoreImageUploadToRegisterStagedArtifactResult";
 
 export interface StoreImageUploadUseCaseDependencies {
   storage: ArtifactStoragePort;
   logging: LoggingPort;
   now?: () => string;
 }
-
-type StoreImageUploadUseCaseFailure = Extract<StoreImageUploadUseCaseResult, { ok: false }>;
 
 const STORE_IMAGE_UPLOAD_USE_CASE = "StoreImageUploadUseCase";
 
@@ -42,12 +34,15 @@ function toFailureResult(
     requestId?: string;
     correlationId?: string;
   },
-): StoreImageUploadUseCaseFailure {
-  return createFailureResult(
-    createContractError(code, message, {
-      requestId: context.requestId,
-      correlationId: context.correlationId,
-    }),
+): StoreImageUploadUseCaseResult {
+  return mapStoreImageUploadToRegisterStagedArtifactResult(
+    {
+      ok: false,
+      error: createContractError(code, message, {
+        requestId: context.requestId,
+        correlationId: context.correlationId,
+      }),
+    },
     context,
   );
 }
@@ -119,6 +114,9 @@ export class StoreImageUploadUseCase {
 
     if (fileName.length === 0) {
       const failure = toFailureResult("validation", "fileName must be provided.", context);
+      if (failure.ok) {
+        return failure;
+      }
 
       await this.logging.log({
         ...createBaseLogEvent(
@@ -142,6 +140,9 @@ export class StoreImageUploadUseCase {
 
     if (command.bytes.length === 0) {
       const failure = toFailureResult("validation", "bytes must not be empty.", context);
+      if (failure.ok) {
+        return failure;
+      }
 
       await this.logging.log({
         ...createBaseLogEvent(
@@ -169,6 +170,9 @@ export class StoreImageUploadUseCase {
         "mediaType must be an image media type.",
         context,
       );
+      if (failure.ok) {
+        return failure;
+      }
 
       await this.logging.log({
         ...createBaseLogEvent(
@@ -205,8 +209,11 @@ export class StoreImageUploadUseCase {
       );
 
       if (!storeResult.ok) {
-        const failure: StoreImageUploadUseCaseFailure = createFailureResult(
-          storeResult.error,
+        const failure = mapStoreImageUploadToRegisterStagedArtifactResult(
+          {
+            ok: false,
+            error: storeResult.error,
+          },
           context,
         );
 
@@ -231,15 +238,12 @@ export class StoreImageUploadUseCase {
         return failure;
       }
 
-      const result = createSuccessResult(
+      const result = mapStoreImageUploadToRegisterStagedArtifactResult(
         {
-          descriptor: createStagedDataDescriptorFromStorageObjectDescriptor(
-            storeResult.value,
-            {
-              sourceKind: "upload",
-              originalName: fileName,
-            },
-          ),
+          ok: true,
+          descriptor: storeResult.value,
+          sourceKind: "upload",
+          originalName: fileName,
         },
         context,
       );
@@ -264,6 +268,9 @@ export class StoreImageUploadUseCase {
       return result;
     } catch (error) {
       const failure = toFailureResult("internal", "Unexpected storage failure.", context);
+      if (failure.ok) {
+        return failure;
+      }
 
       await this.logging.log({
         ...createBaseLogEvent(

@@ -9,11 +9,15 @@ Shared artifact-storage contracts for non-database content:
 The contract family is intentionally artifact-oriented and key-based:
 
 - key identity helpers (`storage-artifact-key`)
+- storage instance/zone references (`storage-instance-reference`, `storage-zone-kind`)
+- storage placement descriptor (`storage-placement-descriptor`)
 - descriptor metadata (`storage-object-descriptor`)
 - store operation (`store-artifact-request`, `store-artifact-result`)
 - retrieve operation (`retrieve-artifact-request`, `retrieve-artifact-result`)
 - existence check (`has-artifact-request`, `has-artifact-result`)
 - delete operation (`delete-artifact-request`, `delete-artifact-result`)
+
+Zone semantics are intrinsic to storage instances. Placement references instance + key.
 
 Avoid physical path assumptions in this contract layer. Adapter implementations map keys to filesystem/object-storage details.
 

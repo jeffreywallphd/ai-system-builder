@@ -4,8 +4,8 @@ import express from "express";
 
 import { composeServerHost } from "../../../modules/hosts/server";
 
-const DEFAULT_SERVER_PORT = 3010;
-const DEFAULT_STORAGE_ROOT = path.resolve(process.cwd(), ".local", "server-artifacts");
+export const DEFAULT_SERVER_PORT = 3010;
+export const DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME = "server-artifacts";
 
 export interface ServerRuntimeConfig {
   port: number;
@@ -30,6 +30,14 @@ function normalizePort(rawPort: string | undefined): number {
   return parsedPort;
 }
 
+export function resolveDefaultServerStorageRootDirectory(): string {
+  return path.resolve(
+    __dirname,
+    "..",
+    DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
+  );
+}
+
 export function resolveServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env): ServerRuntimeConfig {
   const storageRootFromEnv = env.SERVER_STORAGE_ROOT?.trim();
 
@@ -38,7 +46,7 @@ export function resolveServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env)
     storageRootDirectory:
       storageRootFromEnv && storageRootFromEnv.length > 0
         ? path.resolve(storageRootFromEnv)
-        : DEFAULT_STORAGE_ROOT,
+        : resolveDefaultServerStorageRootDirectory(),
   };
 }
 

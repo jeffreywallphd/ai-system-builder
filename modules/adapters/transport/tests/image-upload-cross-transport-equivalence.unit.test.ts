@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
 import { createDesktopImageUploadRequest } from "../../../contracts/ipc";
 import { createContractError } from "../../../contracts/shared";
@@ -13,31 +13,31 @@ import {
 } from "../api-express/image-upload/registerImageUploadApiRoute";
 
 function createIpcUseCaseStub(
-  executeImpl?: ReturnType<typeof vi.fn<IpcStoreImageUploadUseCasePort["execute"]>>,
+  executeImpl?: ReturnType<typeof testDouble.fn<IpcStoreImageUploadUseCasePort["execute"]>>,
 ): IpcStoreImageUploadUseCasePort {
   return {
     execute:
       executeImpl
-      ?? vi
+      ?? testDouble
         .fn<IpcStoreImageUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
   };
 }
 
 function createApiUseCaseStub(
-  executeImpl?: ReturnType<typeof vi.fn<ApiStoreImageUploadUseCasePort["execute"]>>,
+  executeImpl?: ReturnType<typeof testDouble.fn<ApiStoreImageUploadUseCasePort["execute"]>>,
 ): ApiStoreImageUploadUseCasePort {
   return {
     execute:
       executeImpl
-      ?? vi
+      ?? testDouble
         .fn<ApiStoreImageUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
   };
 }
 
 async function invokeApiUploadRoute(
-  execute: ReturnType<typeof vi.fn<ApiStoreImageUploadUseCasePort["execute"]>>,
+  execute: ReturnType<typeof testDouble.fn<ApiStoreImageUploadUseCasePort["execute"]>>,
 ) {
   let registeredHandler:
     | ((
@@ -46,7 +46,7 @@ async function invokeApiUploadRoute(
     ) => Promise<void>)
     | undefined;
   const app: ExpressPostRoutePort = {
-    post: vi.fn((_, handler) => {
+    post: testDouble.fn((_, handler) => {
       registeredHandler = handler;
     }),
   };
@@ -56,8 +56,11 @@ async function invokeApiUploadRoute(
     storeImageUploadUseCase: createApiUseCaseStub(execute),
   });
 
-  const status = vi.fn().mockReturnThis();
-  const json = vi.fn();
+  const json = testDouble.fn();
+  const routeResponse = {
+    status: testDouble.fn((_: number) => routeResponse),
+    json,
+  };
 
   await registeredHandler?.(
     {
@@ -72,31 +75,28 @@ async function invokeApiUploadRoute(
         "x-correlation-id": "corr-transport-1",
       },
     },
-    {
-      status,
-      json,
-    },
+    routeResponse,
   );
 
   return {
-    status,
+    status: routeResponse.status,
     json,
   };
 }
 
 describe("image upload cross-transport equivalence", () => {
   it("maps equivalent IPC and API upload input into the same application command shape", async () => {
-    const executeFromIpc = vi
+    const executeFromIpc = testDouble
       .fn<IpcStoreImageUploadUseCasePort["execute"]>()
       .mockResolvedValue({
         ok: true,
         value: {
-          descriptor: {
-            storageKey: "uploads/cat.png",
-            sourceKind: "upload",
+          storage: {
+            key: "uploads/cat.png",
             mediaType: "image/png",
             sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
       });
     const ipcHandler = createDesktopImageUploadIpcHandler(createIpcUseCaseStub(executeFromIpc));
@@ -120,17 +120,17 @@ describe("image upload cross-transport equivalence", () => {
       ),
     );
 
-    const executeFromApi = vi
+    const executeFromApi = testDouble
       .fn<ApiStoreImageUploadUseCasePort["execute"]>()
       .mockResolvedValue({
         ok: true,
         value: {
-          descriptor: {
-            storageKey: "uploads/cat.png",
-            sourceKind: "upload",
+          storage: {
+            key: "uploads/cat.png",
             mediaType: "image/png",
             sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
       });
     await invokeApiUploadRoute(executeFromApi);
@@ -168,15 +168,15 @@ describe("image upload cross-transport equivalence", () => {
   it("preserves equivalent success and failure semantics across IPC and API response envelopes", async () => {
     const ipcSuccess = await createDesktopImageUploadIpcHandler(
       createIpcUseCaseStub(
-        vi.fn<IpcStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+        testDouble.fn<IpcStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
           ok: true,
           value: {
-            descriptor: {
-              storageKey: "uploads/cat.png",
-              sourceKind: "upload",
+            storage: {
+              key: "uploads/cat.png",
               mediaType: "image/png",
               sizeBytes: 4,
             },
+            sourceKind: "upload",
           },
           requestId: "req-transport-2",
           correlationId: "corr-transport-2",
@@ -202,15 +202,15 @@ describe("image upload cross-transport equivalence", () => {
     );
 
     const apiSuccessCall = await invokeApiUploadRoute(
-      vi.fn<ApiStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+      testDouble.fn<ApiStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
         ok: true,
         value: {
-          descriptor: {
-            storageKey: "uploads/cat.png",
-            sourceKind: "upload",
+          storage: {
+            key: "uploads/cat.png",
             mediaType: "image/png",
             sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
         requestId: "req-transport-2",
         correlationId: "corr-transport-2",
@@ -219,26 +219,27 @@ describe("image upload cross-transport equivalence", () => {
 
     expect(ipcSuccess.ok).toBe(true);
     expect(apiSuccessCall.status).toHaveBeenCalledWith(200);
-    expect(apiSuccessCall.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ok: true,
-        operation: "image.upload",
-        requestId: "req-transport-2",
-        correlationId: "corr-transport-2",
-        value: {
-          descriptor: {
-            storageKey: "uploads/cat.png",
-            sourceKind: "upload",
+    const apiSuccessBody = apiSuccessCall.json.mock.calls[0]?.[0];
+    expect(apiSuccessBody).toMatchObject({
+      ok: true,
+      operation: "image.upload",
+      requestId: "req-transport-2",
+      correlationId: "corr-transport-2",
+      value: {
+        descriptor: {
+          storage: {
+            key: "uploads/cat.png",
             mediaType: "image/png",
             sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
-      }),
-    );
+      },
+    });
 
     const ipcFailure = await createDesktopImageUploadIpcHandler(
       createIpcUseCaseStub(
-        vi.fn<IpcStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+        testDouble.fn<IpcStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
           ok: false,
           error: createContractError("validation", "mediaType must be an image media type."),
           requestId: "req-transport-3",
@@ -265,7 +266,7 @@ describe("image upload cross-transport equivalence", () => {
     );
 
     const apiFailureCall = await invokeApiUploadRoute(
-      vi.fn<ApiStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+      testDouble.fn<ApiStoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
         ok: false,
         error: createContractError("validation", "mediaType must be an image media type."),
         requestId: "req-transport-3",
@@ -282,15 +283,14 @@ describe("image upload cross-transport equivalence", () => {
       },
     });
     expect(apiFailureCall.status).toHaveBeenCalledWith(400);
-    expect(apiFailureCall.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ok: false,
-        operation: "image.upload",
-        error: {
-          code: "validation",
-          message: "mediaType must be an image media type.",
-        },
-      }),
-    );
+    const apiFailureBody = apiFailureCall.json.mock.calls[0]?.[0];
+    expect(apiFailureBody).toMatchObject({
+      ok: false,
+      operation: "image.upload",
+      error: {
+        code: "validation",
+        message: "mediaType must be an image media type.",
+      },
+    });
   });
 });

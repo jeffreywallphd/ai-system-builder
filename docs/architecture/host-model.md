@@ -102,9 +102,12 @@ Contributors should:
 - It is not assumed to be full feature parity with desktop.
 - It composes pages/features/components in a renderer-oriented structure and calls server APIs over HTTP through feature-local clients.
 - It should remain structurally distinct from the desktop preload-backed path and avoid duplicating host logic.
-- The initial server-backed vertical slice is the image-upload path, where thin-client UI calls an HTTP client,
-  the Express adapter accepts browser-native multipart upload input, delegates to a shared application use case, and
-  storage is handled through the same server host composition seam used by other server flows.
+- The initial server-backed image vertical slice includes both upload and read-side artifact browse/view behavior:
+  - thin-client UI calls server HTTP contracts for image upload plus image-backed artifact browse/detail/content-read,
+  - the Express adapter stays thin and delegates to shared application use cases,
+  - shared server host composition continues to own storage/persistence capability wiring for both write and read flows.
+- Multipart parsing for that server-backed image-upload path stays in the Express transport adapter and should parse
+  the live request stream with Busboy rather than buffering the full request body before parsing.
 
 ## Practical boundaries
 

@@ -54,9 +54,11 @@ describe("useImageUploadFeature", () => {
       ok: true,
       value: {
         descriptor: {
-          key: "uploads/cat.png",
-          mediaType: "image/png",
-          sizeBytes: 4,
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
         },
       },
     });

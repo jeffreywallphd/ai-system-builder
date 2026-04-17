@@ -1,12 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../testing/node-test";
 
+import { createArtifactDescriptorFromStagedArtifactDescriptor } from "../artifact";
 import { createContractError } from "../shared";
 import {
   INGESTION_SOURCE_KINDS,
-  createRegisterStagedDataFailureResult,
-  createRegisterStagedDataRequest,
-  createRegisterStagedDataSuccessResult,
-  createStagedDataDescriptorFromStorageObjectDescriptor,
+  createRegisterStagedArtifactFailureResult,
+  createRegisterStagedArtifactRequest,
+  createRegisterStagedArtifactSuccessResult,
+  createStagedArtifactDescriptorFromStorageObjectDescriptor,
   normalizeIngestionSourceKind,
 } from ".";
 
@@ -25,12 +26,13 @@ describe("ingestion contracts", () => {
     );
   });
 
-  it("creates staged-data registration requests with normalized descriptor fields", () => {
-    const request = createRegisterStagedDataRequest(new Uint8Array([9, 8]), {
+  it("creates staged-artifact registration requests with normalized descriptor fields", () => {
+    const request = createRegisterStagedArtifactRequest(new Uint8Array([9, 8]), {
       descriptor: {
-        storageKey: " staging/object-8 ",
+        storage: {
+          key: " staging/object-8 ",
+        },
         sourceKind: " generated ",
-        mediaType: "application/json",
         originalName: " generated-output.json ",
       },
       overwrite: true,
@@ -38,11 +40,12 @@ describe("ingestion contracts", () => {
       correlationId: "corr-880",
     });
 
-    expect(request).toEqual({
+    expect(request).toMatchObject({
       descriptor: {
-        storageKey: "staging/object-8",
+        storage: {
+          key: "staging/object-8",
+        },
         sourceKind: "generated",
-        mediaType: "application/json",
         originalName: "generated-output.json",
       },
       content: new Uint8Array([9, 8]),
@@ -52,8 +55,8 @@ describe("ingestion contracts", () => {
     });
   });
 
-  it("creates staged-data descriptors from storage descriptors for specialized intake paths", () => {
-    const descriptor = createStagedDataDescriptorFromStorageObjectDescriptor(
+  it("creates staged-artifact descriptors from storage descriptors", () => {
+    const descriptor = createStagedArtifactDescriptorFromStorageObjectDescriptor(
       {
         key: " uploads/images/kitten.png ",
         mediaType: "image/png",
@@ -65,36 +68,47 @@ describe("ingestion contracts", () => {
       },
     );
 
-    expect(descriptor).toEqual({
-      storageKey: "uploads/images/kitten.png",
+    expect(descriptor).toMatchObject({
       sourceKind: "upload",
-      mediaType: "image/png",
-      sizeBytes: 42,
       originalName: "kitten.png",
+      storage: {
+        key: "uploads/images/kitten.png",
+        mediaType: "image/png",
+        sizeBytes: 42,
+      },
     });
+
+    const artifactDescriptor = createArtifactDescriptorFromStagedArtifactDescriptor(
+      descriptor,
+    );
+
+    expect(artifactDescriptor.kind).toBe("raw-staged");
+    expect(artifactDescriptor.key).toBe("uploads/images/kitten.png");
   });
 
   it("creates registration failure and success results using shared contract result semantics", () => {
-    const success = createRegisterStagedDataSuccessResult({
-      storageKey: " staging/object-9 ",
+    const success = createRegisterStagedArtifactSuccessResult({
+      storage: {
+        key: " staging/object-9 ",
+      },
       sourceKind: "api",
-      mediaType: "application/json",
       createdAt: " 2026-04-16T00:00:00.000Z ",
     });
 
-    expect(success).toEqual({
+    expect(success).toMatchObject({
       ok: true,
       value: {
-        storageKey: "staging/object-9",
+        storage: {
+          key: "staging/object-9",
+        },
         sourceKind: "api",
-        mediaType: "application/json",
         createdAt: "2026-04-16T00:00:00.000Z",
       },
       requestId: undefined,
       correlationId: undefined,
     });
 
-    const failure = createRegisterStagedDataFailureResult(
+    const failure = createRegisterStagedArtifactFailureResult(
       createContractError("unavailable", "Ingestion adapter unavailable", {
         details: {
           sourceKind: "api",

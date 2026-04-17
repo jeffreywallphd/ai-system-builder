@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import {
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
@@ -16,12 +16,12 @@ import {
 } from "../image-upload/registerImageUploadIpc";
 
 function createUseCaseStub(
-  executeImpl?: ReturnType<typeof vi.fn<StoreImageUploadUseCasePort["execute"]>>,
+  executeImpl?: ReturnType<typeof testDouble.fn<StoreImageUploadUseCasePort["execute"]>>,
 ): StoreImageUploadUseCasePort {
   return {
     execute:
       executeImpl ??
-      vi
+      testDouble
         .fn<StoreImageUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
   };
@@ -29,15 +29,15 @@ function createUseCaseStub(
 
 describe("registerImageUploadIpc desktop image upload handler", () => {
   it("maps request payload and context into the upload use case and returns a success response", async () => {
-    const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
-        descriptor: {
-          storageKey: "uploads/kitten.png",
-          sourceKind: "upload",
+        storage: {
+          key: "uploads/kitten.png",
           mediaType: "image/png",
           sizeBytes: 4,
         },
+        sourceKind: "upload",
       },
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",
@@ -76,26 +76,27 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
         correlationId: "corr-upload-1",
       },
     );
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       ok: true,
       value: {
         descriptor: {
-          storageKey: "uploads/kitten.png",
+          storage: {
+            key: "uploads/kitten.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 4,
         },
       },
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",
       operation: "image.upload",
       channel: "ipc.image.upload.response",
-      metadata: undefined,
     });
   });
 
   it("maps use-case failures to a structured ipc failure response envelope", async () => {
-    const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: false,
       error: createContractError("validation", "mediaType must be an image media type.", {
         details: {
@@ -152,20 +153,20 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       | ((event: unknown, request: ReturnType<typeof createDesktopImageUploadRequest>) => Promise<unknown>)
       | undefined;
     const ipcMain: IpcMainHandlePort = {
-      handle: vi.fn((channel: string, listener: Parameters<IpcMainHandlePort["handle"]>[1]) => {
+      handle: testDouble.fn((channel: string, listener: Parameters<IpcMainHandlePort["handle"]>[1]) => {
         expect(channel).toBe(DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value);
         registeredHandler = listener;
       }),
     };
-    const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
-        descriptor: {
-          storageKey: "uploads/cat.png",
-          sourceKind: "upload",
+        storage: {
+          key: "uploads/cat.png",
           mediaType: "image/png",
           sizeBytes: 16,
         },
+        sourceKind: "upload",
       },
       requestId: "req-upload-3",
     });
@@ -219,7 +220,10 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
 
 describe("registerElectronIpc top-level aggregator surface", () => {
   it("remains a tiny registration-only aggregator without feature helper re-exports", () => {
-    const aggregatorPath = fileURLToPath(new URL("../registerElectronIpc.ts", import.meta.url));
+    const aggregatorTypeScriptPath = fileURLToPath(new URL("../registerElectronIpc.ts", import.meta.url));
+    const aggregatorPath = existsSync(aggregatorTypeScriptPath)
+      ? aggregatorTypeScriptPath
+      : aggregatorTypeScriptPath.replace(/\.ts$/, ".js");
     const source = readFileSync(aggregatorPath, "utf8");
 
     expect(source).not.toContain("export type");

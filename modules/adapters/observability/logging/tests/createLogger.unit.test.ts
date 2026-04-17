@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import { createLoggingConfig } from "../../../../contracts/config";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
@@ -7,7 +7,7 @@ import { createLogger } from "../createLogger";
 
 describe("createLogger", () => {
   it("emits structured events through the configured sink", async () => {
-    const sink = vi.fn();
+    const sink = testDouble.fn();
     const logger = createLogger({
       host: "desktop",
       component: "upload-use-case",
@@ -42,7 +42,7 @@ describe("createLogger", () => {
   });
 
   it("filters events based on configured level and verbosity", async () => {
-    const sink = vi.fn();
+    const sink = testDouble.fn();
     const logger = createLogger({
       config: createLoggingConfig({
         verbosity: "normal",
@@ -82,8 +82,8 @@ describe("createLogger", () => {
   });
 
   it("handles sink failures without throwing through the application seam", async () => {
-    const sink = vi.fn().mockRejectedValue(new Error("sink unavailable"));
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const sink = testDouble.fn().mockRejectedValue(new Error("sink unavailable"));
+    const consoleErrorSpy = testDouble.spyOn(console, "error").mockImplementation(() => undefined);
 
     const logger = createLogger({
       host: "desktop",

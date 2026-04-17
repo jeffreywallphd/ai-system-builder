@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../testing/node-test";
 
 import { createApiRequest } from "../api";
+import {
+  normalizeArtifactBrowseSuccessValue,
+  normalizeArtifactContentReadSuccessValue,
+  normalizeArtifactReadSuccessValue,
+} from "../artifact-browser";
 import {
   createIpcChannel,
   createIpcRequest,
@@ -24,11 +29,13 @@ import {
 } from "../runtime";
 import {
   createStoreArtifactRequest,
+  createStoreArtifactSuccessResult,
   normalizeStorageArtifactKey,
 } from "../storage";
-import {
-  createStagedDataDescriptorFromStorageObjectDescriptor,
-} from "../ingestion";
+import { createStagedArtifactDescriptorFromStorageObjectDescriptor } from "../ingestion";
+import { normalizeTransformRecord } from "../transform";
+import { normalizeDatasetDescriptor } from "../dataset";
+import { normalizeLineageRecord } from "../lineage";
 import {
   createTransportOperation,
   createTransportRequest,
@@ -154,7 +161,7 @@ describe("contracts cross-family invariants", () => {
     expect("record" in storageRequest).toBe(false);
   });
 
-  it("keeps ingestion staged-data descriptors aligned to storage descriptors without transport coupling", () => {
+  it("keeps ingestion staged-artifact descriptors aligned to storage descriptors without transport coupling", () => {
     const storageRequest = createStoreArtifactRequest(
       new Uint8Array([1, 2, 3]),
       {
@@ -166,7 +173,7 @@ describe("contracts cross-family invariants", () => {
       },
     );
 
-    const stagedDescriptor = createStagedDataDescriptorFromStorageObjectDescriptor(
+    const stagedDescriptor = createStagedArtifactDescriptorFromStorageObjectDescriptor(
       {
         key: storageRequest.descriptor.key ?? "staging/uploads/image-9",
         mediaType: storageRequest.descriptor.mediaType,
@@ -178,15 +185,135 @@ describe("contracts cross-family invariants", () => {
       },
     );
 
-    expect(stagedDescriptor).toEqual({
-      storageKey: "staging/uploads/image-9",
+    expect(stagedDescriptor).toMatchObject({
       sourceKind: "upload",
-      mediaType: "image/png",
-      sizeBytes: 3,
       originalName: "image-9.png",
+      storage: {
+        key: "staging/uploads/image-9",
+        mediaType: "image/png",
+        sizeBytes: 3,
+      },
     });
     expect("operation" in stagedDescriptor).toBe(false);
     expect("channel" in stagedDescriptor).toBe(false);
   });
 
+  it("keeps artifact-browser read models aligned to storage and ingestion semantics without becoming filesystem browsing", () => {
+    const stored = createStoreArtifactSuccessResult({
+      key: " staged/images/image-33 ",
+      mediaType: "image/png",
+      sizeBytes: 3,
+    });
+    const stagedDescriptor = createStagedArtifactDescriptorFromStorageObjectDescriptor(
+      stored.value,
+      {
+        sourceKind: "upload",
+        originalName: "image-33.png",
+      },
+    );
+
+    const browse = normalizeArtifactBrowseSuccessValue({
+      items: [
+        {
+          storageKey: stagedDescriptor.storage.key,
+          artifactKind: "image",
+          mediaType: stagedDescriptor.storage.mediaType,
+          sizeBytes: stagedDescriptor.storage.sizeBytes,
+          sourceKind: stagedDescriptor.sourceKind,
+          originalName: stagedDescriptor.originalName,
+        },
+      ],
+    });
+    const detail = normalizeArtifactReadSuccessValue({
+      artifact: {
+        locator: {
+          storageKey: stagedDescriptor.storage.key,
+        },
+        artifactKind: "image",
+        mediaType: stagedDescriptor.storage.mediaType,
+        sizeBytes: stagedDescriptor.storage.sizeBytes,
+        sourceKind: stagedDescriptor.sourceKind,
+      },
+    });
+    const content = normalizeArtifactContentReadSuccessValue({
+      content: {
+        locator: {
+          storageKey: stagedDescriptor.storage.key,
+        },
+        mediaType: stagedDescriptor.storage.mediaType,
+        sizeBytes: stagedDescriptor.storage.sizeBytes,
+        availability: "available",
+        retrieval: "inline",
+      },
+    });
+
+    expect(browse.items[0].storageKey).toBe("staged/images/image-33");
+    expect(detail.artifact.locator.storageKey).toBe("staged/images/image-33");
+    expect(content.content.locator.storageKey).toBe("staged/images/image-33");
+    expect("path" in browse.items[0]).toBe(false);
+    expect("path" in detail.artifact.locator).toBe(false);
+    expect("content" in browse.items[0]).toBe(false);
+    expect("content" in detail.artifact).toBe(false);
+    expect("bytes" in content.content).toBe(false);
+    expect(content.content).toMatchObject({
+      mediaType: "image/png",
+      sizeBytes: 3,
+      availability: "available",
+      retrieval: "inline",
+    });
+  });
+
+  it("keeps transform, dataset, and lineage contracts aligned around typed references", () => {
+    const transformRecord = normalizeTransformRecord({
+      specification: {
+        definitionId: " normalize-orders ",
+        kind: " normalizatioN ",
+        stage: " derivation ",
+      },
+      inputs: [{ key: " staging/orders/raw.jsonl " }],
+      outputs: [{ key: " derived/orders/normalized.parquet " }],
+    });
+
+    const datasetDescriptor = normalizeDatasetDescriptor({
+      id: "orders.v1",
+      sourceArtifacts: transformRecord.outputs,
+      transforms: [{ definitionId: transformRecord.specification.definitionId }],
+      materializations: [
+        {
+          artifactKey: " dataset/orders/orders.v1.parquet ",
+          format: " parquet ",
+        },
+      ],
+    });
+
+    const lineage = normalizeLineageRecord({
+      nodes: [
+        { id: transformRecord.outputs[0].key, kind: "artifact" },
+        { id: transformRecord.specification.definitionId, kind: "transform" },
+        { id: datasetDescriptor.id, kind: "dataset" },
+      ],
+      edges: [
+        {
+          kind: "derived-from",
+          from: { id: transformRecord.inputs[0].key, kind: "artifact" },
+          to: { id: transformRecord.outputs[0].key, kind: "artifact" },
+        },
+        {
+          kind: "produced",
+          from: { id: transformRecord.specification.definitionId, kind: "transform" },
+          to: { id: datasetDescriptor.id, kind: "dataset" },
+        },
+      ],
+    });
+
+    expect(transformRecord.outputs[0].key).toBe("derived/orders/normalized.parquet");
+    expect(datasetDescriptor.sourceArtifacts).toEqual([
+      { key: "derived/orders/normalized.parquet", label: undefined },
+    ]);
+    expect(lineage.edges[1]).toMatchObject({
+      kind: "produced",
+      from: { id: "normalize-orders", kind: "transform" },
+      to: { id: "orders.v1", kind: "dataset" },
+    });
+  });
 });

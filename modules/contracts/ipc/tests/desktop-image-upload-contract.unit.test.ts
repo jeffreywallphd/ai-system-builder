@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../testing/node-test";
 
 import {
   DESKTOP_IMAGE_UPLOAD_OPERATION,
@@ -74,24 +74,24 @@ describe("desktop image upload ipc contract", () => {
   it("creates an upload success response that returns storage descriptor details", () => {
     const response = createDesktopImageUploadSuccessResponse(
       {
-        storageKey: " workspace/ws-42/uploads/kitten.png ",
+        storage: {
+          key: " workspace/ws-42/uploads/kitten.png ",
+        },
         sourceKind: "upload",
-        mediaType: "image/png",
-        sizeBytes: 1204,
       },
       {
         requestId: "req-upload-2",
       },
     );
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       ok: true,
       value: {
         descriptor: {
-          storageKey: "workspace/ws-42/uploads/kitten.png",
+          storage: {
+            key: "workspace/ws-42/uploads/kitten.png",
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 1204,
         },
       },
       requestId: "req-upload-2",

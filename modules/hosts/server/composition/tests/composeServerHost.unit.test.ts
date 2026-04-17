@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
@@ -7,7 +7,7 @@ import { composeServerHost } from "../composeServerHost";
 
 describe("composeServerHost", () => {
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
-    const sink = vi.fn();
+    const sink = testDouble.fn();
     const host = composeServerHost({
       logging: {
         verbosity: "verbose",
@@ -47,7 +47,7 @@ describe("composeServerHost", () => {
 
   it("registers server image upload routes using a provided app port without creating express", () => {
     const app = {
-      post: vi.fn(),
+      post: testDouble.fn(),
     };
 
     const host = composeServerHost();
@@ -57,10 +57,13 @@ describe("composeServerHost", () => {
       storageRootDirectory: "/tmp/server-image-upload-test",
     });
 
-    expect(app.post).toHaveBeenCalledOnce();
-    expect(app.post).toHaveBeenCalledWith(
+    expect(app.post).toHaveBeenCalledTimes(4);
+    const registeredPaths = app.post.mock.calls.map((call) => call[0]);
+    expect(registeredPaths).toEqual([
       "/api/image/upload",
-      expect.any(Function),
-    );
+      "/api/artifact/browse",
+      "/api/artifact/read",
+      "/api/artifact/content/read",
+    ]);
   });
 });

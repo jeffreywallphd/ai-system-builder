@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import { createContractError } from "../../../../contracts/shared";
 import {
@@ -14,12 +15,12 @@ import {
 } from "../image-upload/registerImageUploadApiRoute";
 
 function createUseCaseStub(
-  executeImpl?: ReturnType<typeof vi.fn<StoreImageUploadUseCasePort["execute"]>>,
+  executeImpl?: ReturnType<typeof testDouble.fn<StoreImageUploadUseCasePort["execute"]>>,
 ): StoreImageUploadUseCasePort {
   return {
     execute:
       executeImpl
-      ?? vi
+      ?? testDouble
         .fn<StoreImageUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
   };
@@ -36,7 +37,7 @@ function createMultipartRequest(
 ): {
   body: undefined;
   headers: Record<string, string>;
-  on: (event: string, listener: (chunk?: Buffer) => void) => void;
+  pipe: (destination: NodeJS.WritableStream) => NodeJS.WritableStream;
 } {
   const fileName = options?.fileName ?? "cat.png";
   const mediaType = options?.mediaType ?? "image/png";
@@ -52,21 +53,16 @@ function createMultipartRequest(
   const end = `\r\n--${boundary}--\r\n`;
   const body = Buffer.concat([Buffer.from(start, "utf8"), Buffer.from(bytes), Buffer.from(end, "utf8")]);
 
-  return {
-    body: undefined,
-    headers: {
-      "content-type": `multipart/form-data; boundary=${boundary}`,
-    },
-    on(event, listener) {
-      if (event === "data") {
-        listener(body);
-      }
-
-      if (event === "end") {
-        listener();
-      }
-    },
+  const request = Readable.from([body]) as Readable & {
+    body: undefined;
+    headers: Record<string, string>;
   };
+  request.body = undefined;
+  request.headers = {
+    "content-type": `multipart/form-data; boundary=${boundary}`,
+  };
+
+  return request;
 }
 
 describe("registerImageUploadApiRoute", () => {
@@ -112,12 +108,12 @@ describe("registerImageUploadApiRoute", () => {
       {
         ok: true,
         value: {
-          descriptor: {
-            storageKey: "uploads/cat.png",
-            sourceKind: "upload",
+          storage: {
+            key: "uploads/cat.png",
             mediaType: "image/png",
             sizeBytes: 4,
           },
+          sourceKind: "upload",
         },
         requestId: "req-upload-1",
         correlationId: "corr-upload-1",
@@ -128,20 +124,21 @@ describe("registerImageUploadApiRoute", () => {
       },
     );
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       ok: true,
       operation: "image.upload",
       value: {
         descriptor: {
-          storageKey: "uploads/cat.png",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 4,
         },
       },
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",
-      metadata: undefined,
     });
   });
 
@@ -194,21 +191,21 @@ describe("registerImageUploadApiRoute", () => {
       | undefined;
 
     const app: ExpressPostRoutePort = {
-      post: vi.fn((path, handler) => {
+      post: testDouble.fn((path, handler) => {
         registeredPath = path;
         registeredHandler = handler;
       }),
     };
 
-    const execute = vi.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
-        descriptor: {
-          storageKey: "uploads/cat.png",
-          sourceKind: "upload",
+        storage: {
+          key: "uploads/cat.png",
           mediaType: "image/png",
           sizeBytes: 4,
         },
+        sourceKind: "upload",
       },
       requestId: "req-upload-3",
       correlationId: "corr-upload-3",
@@ -223,24 +220,23 @@ describe("registerImageUploadApiRoute", () => {
     expect(registeredPath).toBe("/api/image/upload");
     expect(registeredHandler).toBeTypeOf("function");
 
-    const status = vi.fn().mockReturnThis();
-    const json = vi.fn();
+    const json = testDouble.fn();
+    const routeResponse = {
+      status: testDouble.fn((_: number) => routeResponse),
+      json,
+    };
+    const routeRequest = createMultipartRequest("route-test-boundary", [137, 80, 78, 71], {
+      source: "server.web.upload-form",
+    });
+    routeRequest.headers = {
+      "content-type": "multipart/form-data; boundary=route-test-boundary",
+      "x-request-id": "req-upload-3",
+      "x-correlation-id": "corr-upload-3",
+    };
 
     await registeredHandler?.(
-      {
-        ...createMultipartRequest("route-test-boundary", [137, 80, 78, 71], {
-          source: "server.web.upload-form",
-        }),
-        headers: {
-          "content-type": "multipart/form-data; boundary=route-test-boundary",
-          "x-request-id": "req-upload-3",
-          "x-correlation-id": "corr-upload-3",
-        },
-      },
-      {
-        status,
-        json,
-      },
+      routeRequest,
+      routeResponse,
     );
 
     expect(execute).toHaveBeenCalledWith(
@@ -257,21 +253,23 @@ describe("registerImageUploadApiRoute", () => {
         correlationId: "corr-upload-3",
       },
     );
-    expect(status).toHaveBeenCalledWith(200);
-    expect(json).toHaveBeenCalledWith({
+    expect(routeResponse.status).toHaveBeenCalledWith(200);
+    const jsonBody = json.mock.calls[0]?.[0];
+    expect(jsonBody).toMatchObject({
       ok: true,
       operation: "image.upload",
       value: {
         descriptor: {
-          storageKey: "uploads/cat.png",
+          storage: {
+            key: "uploads/cat.png",
+            mediaType: "image/png",
+            sizeBytes: 4,
+          },
           sourceKind: "upload",
-          mediaType: "image/png",
-          sizeBytes: 4,
         },
       },
       requestId: "req-upload-3",
       correlationId: "corr-upload-3",
-      metadata: undefined,
     });
   });
 
@@ -281,7 +279,7 @@ describe("registerImageUploadApiRoute", () => {
       | undefined;
 
     const app: ExpressPostRoutePort = {
-      post: vi.fn((_path, handler) => {
+      post: testDouble.fn((_path, handler) => {
         registeredHandler = handler as typeof registeredHandler;
       }),
     };
@@ -291,44 +289,44 @@ describe("registerImageUploadApiRoute", () => {
       storeImageUploadUseCase: createUseCaseStub(),
     });
 
-    const status = vi.fn().mockReturnThis();
-    const json = vi.fn();
+    const json = testDouble.fn();
+    const routeResponse = {
+      status: testDouble.fn((_: number) => routeResponse),
+      json,
+    };
+    const missingFileRequest = Readable.from([Buffer.from("--missing-file-boundary--\r\n")]) as Readable & {
+      body: undefined;
+      headers: Record<string, string>;
+    };
+    missingFileRequest.body = undefined;
+    missingFileRequest.headers = {
+      "content-type": "multipart/form-data; boundary=missing-file-boundary",
+    };
 
     await registeredHandler?.(
-      {
-        ...createMultipartRequest("missing-file-boundary", [], { source: "thin-client.image-upload.form" }),
-        on(event, listener) {
-          if (event === "data") {
-            listener(Buffer.from("--missing-file-boundary--\r\n"));
-          }
-          if (event === "end") {
-            listener();
-          }
-        },
-      },
-      {
-        status,
-        json,
-      },
+      missingFileRequest,
+      routeResponse,
     );
 
-    expect(status).toHaveBeenCalledWith(400);
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ok: false,
-        operation: "image.upload",
-        error: expect.objectContaining({
-          code: "validation",
-          message: "multipart image upload requires a file field.",
-        }),
-      }),
-    );
+    expect(routeResponse.status).toHaveBeenCalledWith(400);
+    const jsonBody = json.mock.calls[0]?.[0];
+    expect(jsonBody).toMatchObject({
+      ok: false,
+      operation: "image.upload",
+      error: {
+        code: "validation",
+        message: "multipart image upload requires a file field.",
+      },
+    });
   });
 });
 
 describe("registerExpressApi top-level aggregator surface", () => {
   it("remains a tiny registration-only aggregator without feature helper re-exports", () => {
-    const aggregatorPath = fileURLToPath(new URL("../registerExpressApi.ts", import.meta.url));
+    const aggregatorTypeScriptPath = fileURLToPath(new URL("../registerExpressApi.ts", import.meta.url));
+    const aggregatorPath = existsSync(aggregatorTypeScriptPath)
+      ? aggregatorTypeScriptPath
+      : aggregatorTypeScriptPath.replace(/\.ts$/, ".js");
     const source = readFileSync(aggregatorPath, "utf8");
 
     expect(source).not.toContain("export type");

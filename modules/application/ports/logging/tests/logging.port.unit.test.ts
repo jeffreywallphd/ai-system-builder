@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 
@@ -10,7 +10,7 @@ describe("LoggingPort", () => {
   });
 
   it("requires shared StructuredLogEvent input and supports async adapters", async () => {
-    const log = vi.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
+    const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
     const port: LoggingPort = { log };
 
     const event: StructuredLogEvent = {

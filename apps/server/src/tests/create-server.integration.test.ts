@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "../../../../modules/testing/node-test";
 
 import { createServer } from "../createServer";
 
@@ -65,14 +65,16 @@ describe("server app image upload route", () => {
         correlationId: "corr-server-1",
         value: {
           descriptor: {
-            key: expect.stringMatching(/^uploads\/.+\.png$/),
-            mediaType: "image/png",
-            sizeBytes: 4,
+            storage: {
+              key: expect.stringMatching(/^uploads\/.+\.png$/),
+              mediaType: "image/png",
+              sizeBytes: 4,
+            },
           },
         },
       });
 
-      const storedKey = payload.value.descriptor.key as string;
+      const storedKey = payload.value.descriptor.storage.key as string;
       const storedBytes = await readFile(path.join(storageRootDirectory, ...storedKey.split("/")));
       expect(new Uint8Array(storedBytes)).toEqual(new Uint8Array([137, 80, 78, 71]));
     } finally {

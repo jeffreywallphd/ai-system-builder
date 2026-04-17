@@ -1,13 +1,30 @@
 import {
   registerImageUploadIpc,
-  type IpcMainHandlePort,
   type RegisterImageUploadIpcDependencies,
 } from "./image-upload/registerImageUploadIpc";
+import {
+  registerArtifactBrowserIpc,
+  type RegisterArtifactBrowserIpcDependencies,
+} from "./artifact-browser/registerArtifactBrowserIpc";
 
-export type { IpcMainHandlePort };
+export type { IpcMainHandlePort } from "./image-upload/registerImageUploadIpc";
+
+export interface RegisterElectronIpcDependencies {
+  ipcMain: RegisterImageUploadIpcDependencies["ipcMain"];
+  storeImageUploadUseCase: RegisterImageUploadIpcDependencies["storeImageUploadUseCase"];
+  artifactBrowserUseCases: RegisterArtifactBrowserIpcDependencies["useCases"];
+}
 
 export function registerElectronIpc(
-  dependencies: RegisterImageUploadIpcDependencies,
+  dependencies: RegisterElectronIpcDependencies,
 ): void {
-  registerImageUploadIpc(dependencies);
+  registerImageUploadIpc({
+    ipcMain: dependencies.ipcMain,
+    storeImageUploadUseCase: dependencies.storeImageUploadUseCase,
+  });
+
+  registerArtifactBrowserIpc({
+    ipcMain: dependencies.ipcMain,
+    useCases: dependencies.artifactBrowserUseCases,
+  });
 }

@@ -1,7 +1,15 @@
 import type { LoggingPort } from "../../../application/ports/logging";
-import { StoreImageUploadUseCase } from "../../../application/use-cases";
+import {
+  BrowseArtifactsUseCase,
+  ReadArtifactContentUseCase,
+  ReadArtifactDetailUseCase,
+  StoreImageUploadUseCase,
+} from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
-import { createFilesystemArtifactStorageAdapter } from "../../../adapters/storage/filesystem";
+import {
+  createFilesystemArtifactBrowserReadAdapter,
+  createFilesystemArtifactStorageAdapter,
+} from "../../../adapters/storage/filesystem";
 import {
   registerElectronIpc,
   type IpcMainHandlePort,
@@ -61,15 +69,34 @@ export function composeDesktopHost(
         logging: loggingPort,
         now: options.now,
       });
+      const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
+      });
+
       const storeImageUploadUseCase = new StoreImageUploadUseCase({
         storage,
         logging: loggingPort,
         now: options.now,
       });
 
+      const browseArtifacts = new BrowseArtifactsUseCase({
+        artifactBrowserMetadataRead: artifactBrowserRead,
+      });
+      const readArtifactDetail = new ReadArtifactDetailUseCase({
+        artifactBrowserMetadataRead: artifactBrowserRead,
+      });
+      const readArtifactContent = new ReadArtifactContentUseCase({
+        artifactBrowserContentRead: artifactBrowserRead,
+      });
+
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
         storeImageUploadUseCase,
+        artifactBrowserUseCases: {
+          browseArtifacts,
+          readArtifactDetail,
+          readArtifactContent,
+        },
       });
     },
   };

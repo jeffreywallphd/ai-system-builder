@@ -6,6 +6,15 @@ Tests in `ai-system-builder` protect meaningful behavior and architectural inten
 
 They are not written to satisfy vanity coverage metrics or performative CI checks.
 
+## Canonical non-browser runner
+
+- `node:test` is the canonical default runner for non-browser tests.
+- Use `node:assert/strict`-backed assertions for non-browser test coverage.
+- Browser/renderer-focused test tooling is handled separately and is not the non-browser default path.
+- Canonical repo commands:
+  - `npm test` (root default alias for non-browser coverage)
+  - `npm run test:non-browser` (explicit non-browser command)
+
 ## Testing strategy by layer
 
 ## 1) Domain tests (unit-first)

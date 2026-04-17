@@ -10,6 +10,7 @@ import type {
   StoreImageUploadCommandContext,
   StoreImageUploadUseCaseResult,
 } from "../../../../application/use-cases";
+import { parseMultipartImageUploadRequest } from "./parseMultipartImageUploadRequest";
 
 export interface StoreImageUploadUseCasePort {
   execute: (
@@ -20,12 +21,6 @@ export interface StoreImageUploadUseCasePort {
       correlationId?: string;
     },
   ) => Promise<StoreImageUploadUseCaseResult>;
-}
-
-interface MultipartFileLike {
-  originalname: string;
-  mimetype: string;
-  buffer: Uint8Array;
 }
 
 interface ApiImageUploadMultipartRequestBody {
@@ -83,136 +78,6 @@ function normalizeSource(value: string | undefined): string {
   return normalized;
 }
 
-function getMultipartBoundary(contentType: string | undefined): string | null {
-  if (!contentType) {
-    return null;
-  }
-
-  const match = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
-  const boundary = match?.[1] ?? match?.[2];
-  return boundary?.trim() || null;
-}
-
-async function readRequestBodyBuffer(request: ExpressRequestLike): Promise<Buffer> {
-  if (!request.on) {
-    return Buffer.alloc(0);
-  }
-
-  return await new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-
-    request.on?.("data", (chunk) => {
-      if (typeof chunk === "string") {
-        chunks.push(Buffer.from(chunk));
-        return;
-      }
-
-      if (chunk) {
-        chunks.push(chunk);
-      }
-    });
-
-    request.on?.("end", () => {
-      resolve(Buffer.concat(chunks));
-    });
-
-    request.on?.("error", (error) => {
-      reject(error);
-    });
-  });
-}
-
-function parseMultipartContentDisposition(value: string): {
-  name?: string;
-  filename?: string;
-} {
-  const nameMatch = /name="([^"]+)"/.exec(value);
-  const fileNameMatch = /filename="([^"]+)"/.exec(value);
-
-  return {
-    name: nameMatch?.[1],
-    filename: fileNameMatch?.[1],
-  };
-}
-
-function parseMultipartUploadRequest(
-  bodyBuffer: Buffer,
-  boundary: string,
-): {
-  file?: MultipartFileLike;
-  source?: string;
-} {
-  const sourceDelimiter = `--${boundary}`;
-  const content = bodyBuffer.toString("latin1");
-  const rawParts = content
-    .split(sourceDelimiter)
-    .slice(1, -1)
-    .map((part) => part.replace(/^\r\n/, "").replace(/\r\n$/, ""))
-    .filter((part) => part.length > 0);
-
-  let source: string | undefined;
-  let file: MultipartFileLike | undefined;
-
-  for (const rawPart of rawParts) {
-    const headerEnd = rawPart.indexOf("\r\n\r\n");
-    if (headerEnd === -1) {
-      continue;
-    }
-
-    const headersText = rawPart.slice(0, headerEnd);
-    const dataText = rawPart.slice(headerEnd + 4).replace(/\r\n$/, "");
-    const headers = headersText.split("\r\n");
-    const dispositionHeader = headers.find((header) =>
-      header.toLowerCase().startsWith("content-disposition:"),
-    );
-
-    if (!dispositionHeader) {
-      continue;
-    }
-
-    const { name, filename } = parseMultipartContentDisposition(dispositionHeader);
-
-    if (name === "source") {
-      source = dataText;
-      continue;
-    }
-
-    if (name === "file" && filename) {
-      const contentTypeHeader = headers
-        .find((header) => header.toLowerCase().startsWith("content-type:"))
-        ?.split(":")[1]
-        ?.trim();
-
-      file = {
-        originalname: filename,
-        mimetype: contentTypeHeader ?? "application/octet-stream",
-        buffer: new Uint8Array(Buffer.from(dataText, "latin1")),
-      };
-    }
-  }
-
-  return {
-    file,
-    source,
-  };
-}
-
-async function extractMultipartUpload(
-  request: ExpressRequestLike,
-): Promise<{
-  file?: MultipartFileLike;
-  source?: string;
-}> {
-  const boundary = getMultipartBoundary(getRequestHeader(request.headers, "content-type"));
-
-  if (!boundary) {
-    return {};
-  }
-
-  const bodyBuffer = await readRequestBodyBuffer(request);
-  return parseMultipartUploadRequest(bodyBuffer, boundary);
-}
-
 export function mapApiImageUploadRequestBody(
   requestBody: ApiImageUploadJsonRequestBody,
 ): {
@@ -232,23 +97,16 @@ export function mapApiImageUploadRequestBody(
 }
 
 function mapMultipartImageUploadRequest(
-  multipartUpload: {
-    file?: MultipartFileLike;
-    source?: string;
-  },
+  multipartUpload: Awaited<ReturnType<typeof parseMultipartImageUploadRequest>>,
 ): {
   command: StoreImageUploadCommand;
   commandContext: StoreImageUploadCommandContext;
 } {
-  if (!multipartUpload.file) {
-    throw new Error("multipart image upload requires a file field.");
-  }
-
   return {
     command: {
-      fileName: multipartUpload.file.originalname,
-      mediaType: multipartUpload.file.mimetype,
-      bytes: multipartUpload.file.buffer,
+      fileName: multipartUpload.file.originalName,
+      mediaType: multipartUpload.file.mediaType,
+      bytes: multipartUpload.file.bytes,
     },
     commandContext: {
       source: normalizeSource(multipartUpload.source),
@@ -262,9 +120,9 @@ export async function mapApiImageUploadRequest(
   command: StoreImageUploadCommand;
   commandContext: StoreImageUploadCommandContext;
 }> {
-  const multipartBoundary = getMultipartBoundary(getRequestHeader(request.headers, "content-type"));
-  if (multipartBoundary) {
-    const multipartUpload = await extractMultipartUpload(request);
+  const contentType = getRequestHeader(request.headers, "content-type")?.toLowerCase() ?? "";
+  if (contentType.includes("multipart/form-data")) {
+    const multipartUpload = await parseMultipartImageUploadRequest(request);
     return mapMultipartImageUploadRequest(multipartUpload);
   }
 
@@ -279,7 +137,7 @@ export function mapStoreImageUploadResultToApiResponse(
   },
 ): ApiImageUploadResponse {
   if (result.ok) {
-    return createApiImageUploadSuccessResponse(result.value.descriptor, {
+    return createApiImageUploadSuccessResponse(result.value, {
       requestId: result.requestId ?? context.requestId,
       correlationId: result.correlationId ?? context.correlationId,
     });

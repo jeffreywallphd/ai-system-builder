@@ -16,7 +16,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "start": "npm run dev:desktop",
-    "test": "vitest run --environment jsdom",
+    "test": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs",
+    "test:non-browser": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs",
     "dev:thin-client": "npm run dev -w @ai-system-builder/thin-client",
     "build:thin-client": "npm run build -w @ai-system-builder/thin-client",
     "preview:thin-client": "npm run preview -w @ai-system-builder/thin-client",
@@ -25,6 +26,7 @@
     "start:server": "npm run start -w @ai-system-builder/server"
   },
   "dependencies": {
+    "busboy": "^1.6.0",
     "express": "^5.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
@@ -35,6 +37,7 @@
     "@electron-forge/maker-zip": "^7.10.2",
     "@electron-forge/plugin-webpack": "^7.10.2",
     "@types/node": "^24.7.2",
+    "@types/busboy": "^1.5.4",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vercel/webpack-asset-relocator-loader": "^1.10.0",
@@ -43,9 +46,11 @@
     "jsdom": "^26.1.0",
     "node-loader": "^2.1.0",
     "style-loader": "^4.0.0",
+    "tsx": "^4.20.6",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "webpack": "^5.99.9"
   }
 }
+

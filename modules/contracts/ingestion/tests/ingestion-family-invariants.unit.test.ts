@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../testing/node-test";
 
 import * as ingestionContracts from "..";
 
@@ -6,36 +6,39 @@ describe("ingestion family invariants", () => {
   it("exports only ingestion-family surfaces from the family barrel", () => {
     expect(Object.keys(ingestionContracts).sort()).toEqual([
       "INGESTION_SOURCE_KINDS",
-      "createRegisterStagedDataFailureResult",
-      "createRegisterStagedDataRequest",
-      "createRegisterStagedDataSuccessResult",
-      "createStagedDataDescriptorFromStorageObjectDescriptor",
+      "createRegisterStagedArtifactFailureResult",
+      "createRegisterStagedArtifactRequest",
+      "createRegisterStagedArtifactSuccessResult",
+      "createStagedArtifactDescriptorFromStorageObjectDescriptor",
       "isIngestionSourceKind",
       "normalizeIngestionSourceKind",
-      "normalizeStagedDataDescriptor",
-      "normalizeStagedDataDescriptorInput",
+      "normalizeStagedArtifactDescriptor",
+      "normalizeStagedArtifactDescriptorInput",
+      "normalizeStagedArtifactStorageReference",
     ]);
   });
 
-  it("keeps staged-data registration semantics transport-neutral and storage-key aligned", () => {
-    const request = ingestionContracts.createRegisterStagedDataRequest(
+  it("keeps staged-artifact registration semantics transport-neutral and storage-key aligned", () => {
+    const request = ingestionContracts.createRegisterStagedArtifactRequest(
       new Uint8Array([1, 2, 3]),
       {
         descriptor: {
-          storageKey: " staged/uploads/object-1 ",
+          storage: {
+            key: " staged/uploads/object-1 ",
+          },
           sourceKind: " Upload ",
-          mediaType: "image/png",
           originalName: " kitten.png ",
         },
         requestId: "req-ingest-1",
       },
     );
 
-    expect(request).toEqual({
+    expect(request).toMatchObject({
       descriptor: {
-        storageKey: "staged/uploads/object-1",
+        storage: {
+          key: "staged/uploads/object-1",
+        },
         sourceKind: "upload",
-        mediaType: "image/png",
         originalName: "kitten.png",
       },
       content: new Uint8Array([1, 2, 3]),
@@ -44,20 +47,26 @@ describe("ingestion family invariants", () => {
       correlationId: undefined,
     });
 
-    const result = ingestionContracts.createRegisterStagedDataSuccessResult({
-      storageKey: " staged/uploads/object-1 ",
+    const result = ingestionContracts.createRegisterStagedArtifactSuccessResult({
+      storage: {
+        key: " staged/uploads/object-1 ",
+      },
       sourceKind: " upload ",
-      mediaType: "image/png",
-      sizeBytes: 3,
+      metadata: {
+        surface: "test",
+      },
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       value: {
-        storageKey: "staged/uploads/object-1",
+        storage: {
+          key: "staged/uploads/object-1",
+        },
         sourceKind: "upload",
-        mediaType: "image/png",
-        sizeBytes: 3,
+        metadata: {
+          surface: "test",
+        },
       },
       requestId: undefined,
       correlationId: undefined,
