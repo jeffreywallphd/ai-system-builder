@@ -9,6 +9,29 @@
 
 This distinction is required even when both end up on the same machine or disk.
 
+## Storage adapters as a broad architectural category
+
+Storage in this repository is a broad adapter category, not one flat contract shape.
+
+- `modules/adapters/storage/` is the umbrella area for storage adapter families.
+- Storage may contain multiple specialized contract families and implementation families.
+- Shared storage principles still apply (explicit boundaries, adapter-owned infrastructure details, transport/path neutrality at public contracts).
+- Specialization is expected when semantics differ materially.
+
+### Specialized storage families (direction)
+
+At minimum, storage is expected to distinguish:
+
+- **artifact/object storage adapters**
+  - centered on artifact keys, bytes, checksums, and artifact metadata,
+  - represented today by key-based artifact storage contracts and filesystem-backed implementations.
+- **repo-backed storage adapters**
+  - centered on provider/repo identity, revision/version semantics, remote visibility/access semantics, and provider-native publish/import behavior,
+  - valid storage adapters even though they are not simple key/blob stores.
+
+Repo-backed storage is still storage.
+It must not be collapsed into persistence-record concerns and should not be flattened into the same contract shape as artifact/object key-byte operations.
+
 ## Default persistence adapter target
 
 Postgres is the default persistence adapter target for structured records.
@@ -55,8 +78,9 @@ Examples:
 - images/media/binary payloads,
 - temporary workspace material,
 - cache-like files or staging artifacts.
+- provider-backed repository artifacts and package-like content where provider/repo identity and revision/publication semantics are part of storage behavior.
 
-These concerns belong behind storage ports/contracts and adapters (for example in `modules/adapters/storage/`).
+These concerns belong behind storage ports/contracts and adapters (for example in `modules/adapters/storage/`) with contract families matched to semantics.
 
 ## Desktop and server physical mapping
 
@@ -64,6 +88,7 @@ Physical location can vary by host mode:
 
 - Desktop mode may store artifacts under OS-specific app data locations.
 - Server mode may store artifacts in configured file paths, mounted volumes, or object/blob services.
+- Server or hybrid compositions may also include repo-backed providers where the primary storage identity is provider/repository/revision rather than local filesystem path.
 - For the current server app, the default filesystem storage root is resolved from the server app/module location so
   it is deterministic and not launch-`cwd` dependent; `SERVER_STORAGE_ROOT` remains the explicit override.
 
@@ -84,7 +109,7 @@ Separate boundaries keep policies clear and change safer.
 
 - Application/domain should define what must be persisted or stored, not how.
 - Persistence adapters implement structured record behavior.
-- Storage adapters implement artifact/file/blob behavior.
+- Storage adapters implement storage-family behavior (artifact/object, repo-backed, and future specializations as needed).
 - Hosts choose concrete adapter wiring per deployment mode.
 
 ## Shared storage contract baseline
@@ -104,6 +129,21 @@ Storage family invariants:
 - storage family barrels should export storage-only surfaces so artifact usage is predictable and mechanically discoverable.
 
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
+
+Current-state note:
+
+- The currently implemented shared storage contracts are artifact/object-oriented (key/byte operations).
+- This is not a claim that all storage families must use identical contracts.
+- Additional storage contract families are expected as repo-backed adapters are introduced.
+
+## Repo-backed storage direction (forward-looking)
+
+Repo-backed providers are a valid storage class under the storage adapter category.
+
+- A likely first provider example is **Hugging Face** (for model/dataset-style repository storage).
+- Treat Hugging Face as repo-backed storage/provider semantics, not as "just another blob store."
+- Import from provider repos and publish to provider repos are distinct operations with provider/revision/visibility semantics.
+- Provider-native repository browsing/viewing semantics may exist, but they do not define internal system artifact-browser contracts.
 
 
 ## Ingestion and staged artifact semantic layer
@@ -133,6 +173,9 @@ The first read-side browser/viewer slice is image-backed but artifact-shaped.
 - actual image/media bytes for rendering should be delivered through a separate retrieval path that still resolves by storage key at the boundary.
 - Canonical browse/read/content contracts should remain descriptor/reference-oriented at public boundaries (locator + metadata + availability/retrieval hints), not raw-byte-first payload contracts.
 - Browser contracts stay storage-key based and path-agnostic; public browse/view contracts must not expose filesystem paths.
+- The system artifact browser is a normalized browser over internal artifacts; it is not a filesystem browser.
+- The system artifact browser is also not the same as a provider-native browser (for example a Hugging Face repository UI).
+- External provider-native browsers may coexist, but normalized internal browse/read/content contracts remain the system source of truth.
 - This is an early data-lake-like artifact browser/viewer surface, not a claim that full ingestion/catalog/ELT platform capabilities are complete.
 
 This keeps persistence-storage linkage explicit (metadata/read models referencing artifact keys) while preserving separation between structured record/query behavior and artifact byte retrieval behavior.

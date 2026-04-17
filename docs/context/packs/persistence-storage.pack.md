@@ -22,7 +22,11 @@
 ## Core Guidance
 
 - Postgres is the default persistence target for structured durable application data.
-- Storage is a separate concern for files, blobs, uploads, exports, generated artifacts, and temp workspace content.
+- Storage adapters are a broad architecture category under `modules/adapters/storage`, not a single flat contract shape.
+- Storage is a separate concern from persistence and can include specialized storage families with distinct semantics.
+- Artifact/object storage (keys/bytes/checksums/metadata) is one storage family; do not assume all storage concerns fit this shape.
+- Repo-backed storage is a valid storage specialization (provider/repo identity, revision/version semantics, visibility/access semantics, provider import/publish behaviors).
+- Treat Hugging Face as the likely first repo-backed storage/provider example; do not frame it as "just another blob store."
 - Ingestion/staged artifact contracts are the canonical higher-level intake semantics for inbound content; storage stays the underlying artifact capability.
 - Persistence contracts stay record-oriented: operation identity + record reference + result/error envelope.
 - Persistence operation names should stay helper-driven and transport-neutral (`lowercase.dot.segments` with no `api.`/`ipc.` prefixes).
@@ -30,6 +34,7 @@
 - Keep persistence family exports scoped to persistence contracts only.
 - Keep application persistence-port seams operation-aware and record-oriented (not CRUD-generic), with focused anti-drift tests in `modules/application/ports/persistence/tests/`.
 - Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
+- Current shared storage contracts are artifact/object-oriented; future repo-backed storage families may require specialized contract families instead of forced flattening.
 - Shared ingestion contracts (`modules/contracts/ingestion`) should carry staged artifact intake metadata (for example source kind, original name, staged artifact identity) without becoming transport-specific.
 - Storage key creation/normalization should flow through shared storage key helpers to prevent per-operation key-shape drift.
 - Storage checksums should be computed in concrete storage adapters from persisted bytes and surfaced through descriptor results; checksum support does not imply deduplication behavior.
@@ -38,7 +43,10 @@
   - browse/list contracts are metadata/catalog oriented,
   - detail/read contracts are artifact read-model oriented,
   - content retrieval stays in a separate content-read contract path and should remain descriptor/reference-oriented at canonical public boundaries (avoid raw-byte-first canonical payloads).
+- The system artifact browser is a normalized browser over internal artifacts across backing-store differences.
 - Do not implement direct filesystem browsing semantics in UI-facing contracts; keep artifact browser locators key-based and path-agnostic.
+- Do not treat provider-native repo browsers (for example Hugging Face UI browsing) as replacements for normalized system artifact-browser contracts.
+- Keep media retrieval on a separate retrieval path; do not collapse byte retrieval into descriptor-oriented artifact-browser contracts.
 - Metadata records and file/blob content are different concerns and should stay separated.
 - Application logic should depend on persistence/storage ports and contracts, not direct DB/filesystem details.
 - AppData/server filesystem roots are deployment details, not architecture boundaries.
@@ -49,6 +57,7 @@
 - Physical location does not define architecture; boundary ownership does.
 - Do not assume filesystem placement answers persistence-vs-storage design questions.
 - Keep persistence adapters and storage adapters as distinct responsibilities.
+- Keep provider import semantics and provider publication semantics explicit; do not flatten them into local blob put/get assumptions.
 
 ## Canonical Source Docs
 
