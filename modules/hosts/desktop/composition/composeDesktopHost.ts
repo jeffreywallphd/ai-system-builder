@@ -1,17 +1,23 @@
 import type { LoggingPort } from "../../../application/ports/logging";
 import {
   BrowseArtifactsUseCase,
+  PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
   StoreImageUploadUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
+  createArtifactRepoStorageAdapter,
+} from "../../../adapters/storage/artifact-repo";
+import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactObjectStorageAdapter,
   createLocalArtifactCatalogPersistenceAdapter,
+  createLocalArtifactStorageBindingAdapter,
 } from "../../../adapters/storage/filesystem";
+import { createHuggingFaceArtifactRepoStorageAdapter } from "../../../adapters/storage/huggingface";
 import {
   registerElectronIpc,
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
@@ -30,6 +36,10 @@ export interface ComposeDesktopHostOptions {
   logging?: ComposeDesktopHostLoggingOptions;
   logSink?: StructuredLogSink;
   now?: () => string;
+  artifactRepo?: {
+    huggingFaceAccessToken?: string;
+    huggingFaceFetchImplementation?: typeof fetch;
+  };
 }
 
 export interface RegisterDesktopImageUploadIpcOptions {
@@ -68,6 +78,20 @@ export function composeDesktopHost(
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
+      const artifactBindings = createLocalArtifactStorageBindingAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
+      });
+      const artifactRepoStorage = createArtifactRepoStorageAdapter({
+        providers: [
+          {
+            provider: "huggingface",
+            adapter: createHuggingFaceArtifactRepoStorageAdapter({
+              accessToken: options.artifactRepo?.huggingFaceAccessToken,
+              fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
+            }),
+          },
+        ],
+      });
       const storage = createFilesystemArtifactObjectStorageAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
         host: "desktop",
@@ -78,6 +102,7 @@ export function composeDesktopHost(
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
         artifactCatalogRead: artifactCatalog,
         storage,
+        artifactBindingRead: artifactBindings,
       });
       const artifactMediaViewRetrieval = createFilesystemArtifactContentRetrievalAdapter({
         storage,
@@ -98,6 +123,12 @@ export function composeDesktopHost(
       const readArtifactContent = new ReadArtifactContentUseCase({
         artifactBrowserContentRead: artifactBrowserRead,
       });
+      const publishArtifactToRepo = new PublishArtifactToRepoUseCase({
+        artifactStorage: storage,
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        now: options.now,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -106,6 +137,7 @@ export function composeDesktopHost(
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,
+        publishArtifactToRepoUseCase: publishArtifactToRepo,
       });
     },
   };

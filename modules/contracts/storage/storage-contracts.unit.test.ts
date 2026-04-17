@@ -20,6 +20,8 @@ import {
   createRetrieveArtifactFromRepoSuccessResult,
   createHasArtifactInRepoSuccessResult,
   normalizeArtifactStorageBinding,
+  encodeArtifactRepoBackingLocator,
+  decodeArtifactRepoBackingLocator,
 } from ".";
 
 describe("storage contracts", () => {
@@ -330,6 +332,19 @@ describe("storage contracts", () => {
     expect(hasResult.ok).toBe(true);
   });
 
+  it("encodes and decodes artifact-repo backing locators through shared helpers", () => {
+    const locator = encodeArtifactRepoBackingLocator({
+      repository: " openai/demo-artifacts ",
+      path: " images/cat.png ",
+    });
+
+    expect(locator).toBe("openai/demo-artifacts/images/cat.png");
+    expect(decodeArtifactRepoBackingLocator(locator)).toEqual({
+      repository: "openai/demo-artifacts",
+      path: "images/cat.png",
+    });
+  });
+
   it("creates artifact storage bindings against thin shared backing references", () => {
     const binding = normalizeArtifactStorageBinding({
       artifactId: " artifact-42 ",
@@ -350,6 +365,7 @@ describe("storage contracts", () => {
         provider: "huggingface",
         locator: "openai/demo-artifacts/images/cat.png",
         revision: "main",
+        target: undefined,
       },
       role: "imported-source",
       createdAt: "2026-04-17T00:00:00.000Z",

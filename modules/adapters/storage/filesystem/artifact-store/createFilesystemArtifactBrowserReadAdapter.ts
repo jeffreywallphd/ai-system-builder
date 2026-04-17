@@ -24,6 +24,7 @@ import {
   createSuccessResult,
 } from "../../../../contracts/shared";
 import {
+  decodeArtifactRepoBackingLocator,
   normalizeStorageArtifactKey,
   type StorageObjectMetadata,
 } from "../../../../contracts/storage";
@@ -43,18 +44,6 @@ interface PublishedBackingReadModel {
   repository: string;
   path: string;
   revision?: string;
-}
-
-function parsePublishedBackingLocator(locator: string): { repository: string; path: string } | undefined {
-  const segments = locator.split("/").filter((segment) => segment.length > 0);
-  if (segments.length < 3) {
-    return undefined;
-  }
-
-  return {
-    repository: `${segments[0]}/${segments[1]}`,
-    path: segments.slice(2).join("/"),
-  };
 }
 
 async function readPublishedBacking(
@@ -79,7 +68,19 @@ async function readPublishedBacking(
     return undefined;
   }
 
-  const locator = parsePublishedBackingLocator(latestPublishedBinding.backing.locator);
+  const locator = latestPublishedBinding.backing.target?.repository
+    && latestPublishedBinding.backing.target.path
+    ? {
+      repository: latestPublishedBinding.backing.target.repository,
+      path: latestPublishedBinding.backing.target.path,
+    }
+    : (() => {
+      try {
+        return decodeArtifactRepoBackingLocator(latestPublishedBinding.backing.locator);
+      } catch {
+        return undefined;
+      }
+    })();
   if (!locator) {
     return undefined;
   }

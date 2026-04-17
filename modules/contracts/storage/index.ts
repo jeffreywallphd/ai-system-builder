@@ -19,6 +19,7 @@ export * from "./delete-artifact-request";
 export * from "./delete-artifact-result";
 
 export * from "./artifact-repo-target";
+export * from "./artifact-repo-backing-locator";
 export * from "./artifact-repo-descriptor";
 export * from "./store-artifact-in-repo-request";
 export * from "./store-artifact-in-repo-result";

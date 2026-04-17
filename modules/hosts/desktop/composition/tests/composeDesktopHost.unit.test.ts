@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
@@ -8,6 +11,7 @@ import {
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
@@ -70,7 +74,7 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: "/tmp/desktop-image-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(5);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(6);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value,
@@ -78,6 +82,7 @@ describe("composeDesktopHost", () => {
       DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value,
     ]);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
@@ -115,5 +120,14 @@ describe("composeDesktopHost", () => {
     });
 
     expect(sink).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses the shared PublishArtifactToRepoUseCase in desktop host composition", () => {
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js");
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("PublishArtifactToRepoUseCase");
+    expect(source).not.toContain("class DesktopPublish");
   });
 });

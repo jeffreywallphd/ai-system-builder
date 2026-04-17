@@ -213,3 +213,13 @@ Server composition now wires both storage families as peers:
 A minimal artifact-repo API slice is exposed (`artifact-repo.has`, `artifact-repo.store`, `artifact.publish`) through dedicated application use cases.
 
 Thin-client artifact-browser publish flow should call `artifact.publish` as the primary orchestration route (artifact bytes -> provider store -> verify -> published binding write), while lower-level repo-store routes remain secondary infrastructure APIs.
+
+### Desktop-host artifact-repo slice (current)
+
+Desktop composition now mirrors the same publish orchestration path used by server/thin-client:
+
+- local filesystem artifact-object storage for upload/catalog/browser flows,
+- artifact-repo aggregate storage with Hugging Face as first provider adapter,
+- shared `PublishArtifactToRepoUseCase` wired through Electron IPC and preload bridge (`artifact.publish`).
+
+Desktop renderer artifact-browser publish UX should call the preload-backed publish bridge, not raw IPC and not desktop-only business logic.

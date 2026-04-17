@@ -87,6 +87,12 @@ describe("desktop renderer artifact workflow page", () => {
         ok: true,
         value: { storageKey: "uploads/cat.png", mediaType: "image/png", bytes: new Uint8Array([1, 2]) },
       }),
+      publishArtifactToRepo: vi.fn().mockResolvedValue({
+        operation: "artifact.publish",
+        channel: "ipc.artifact.publish.response",
+        ok: true,
+        value: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", exists: true },
+      }),
     };
 
     const { root, container } = mountApp();

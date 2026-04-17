@@ -31,6 +31,8 @@ describe("storage family invariants", () => {
       "createStoreArtifactInRepoSuccessResult",
       "createStoreArtifactRequest",
       "createStoreArtifactSuccessResult",
+      "decodeArtifactRepoBackingLocator",
+      "encodeArtifactRepoBackingLocator",
       "isArtifactStorageBindingRole",
       "isStorageArtifactKey",
       "isStorageInstanceKind",
@@ -75,9 +77,10 @@ describe("storage family invariants", () => {
       provider: "huggingface",
       locator: "openai/demo-artifacts/images/a.png",
       revision: "main",
+      target: undefined,
     });
 
-    expect(Object.keys(backing).sort()).toEqual(["kind", "locator", "provider", "revision"]);
+    expect(Object.keys(backing).sort()).toEqual(["kind", "locator", "provider", "revision", "target"]);
   });
 
   it("keeps artifact-object contracts key/blob oriented", () => {

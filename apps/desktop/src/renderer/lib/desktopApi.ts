@@ -30,6 +30,9 @@ export interface DesktopArtifactDetail {
   sizeBytes?: number;
   originalName?: string;
   createdAt?: string;
+  metadata?: {
+    publishedBacking?: Omit<DesktopPublishedBacking, "exists">;
+  };
 }
 
 export interface DesktopArtifactContentDescriptor {
@@ -45,6 +48,14 @@ export interface DesktopArtifactMediaView {
   mediaType?: string;
   sizeBytes?: number;
   bytes: Uint8Array;
+}
+
+export interface DesktopPublishedBacking {
+  provider: string;
+  repository: string;
+  path: string;
+  revision?: string;
+  exists: boolean;
 }
 
 export type DesktopImageUploadResult =
@@ -72,6 +83,16 @@ interface DesktopApiBridge {
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactViewerMedia: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
+  publishArtifactToRepo: (input: {
+    artifactId: string;
+    target: {
+      provider: string;
+      repository: string;
+      path: string;
+      revision?: string;
+    };
+    mediaType?: string;
+  }) => Promise<unknown>;
 }
 
 declare global {

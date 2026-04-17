@@ -81,6 +81,12 @@ describe("PublishArtifactToRepoUseCase", () => {
           provider: "huggingface",
           locator: "openai/demo-artifacts/images/a.png",
           revision: "main",
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo-artifacts",
+            revision: "main",
+            path: "images/a.png",
+          },
         },
       },
     });

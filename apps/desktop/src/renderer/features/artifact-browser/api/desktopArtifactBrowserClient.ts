@@ -4,6 +4,7 @@ import {
   type DesktopArtifactBrowserLocator,
   type DesktopArtifactContentDescriptor,
   type DesktopArtifactDetail,
+  type DesktopPublishedBacking,
 } from "../../../lib/desktopApi";
 
 export interface DesktopArtifactBrowserClient {
@@ -11,6 +12,13 @@ export interface DesktopArtifactBrowserClient {
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: DesktopArtifactBrowserLocator) => Promise<string>;
+  publishArtifactToHuggingFace: (input: {
+    artifactId: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<DesktopPublishedBacking>;
 }
 
 function ensureSuccess<T>(
@@ -85,6 +93,23 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
       const blobBytes = Uint8Array.from(media.bytes);
       const blob = new Blob([blobBytes], { type: media.mediaType ?? "application/octet-stream" });
       return URL.createObjectURL(blob);
+    },
+
+    async publishArtifactToHuggingFace(input) {
+      return ensureSuccess(
+        await desktopApi.publishArtifactToRepo({
+          artifactId: input.artifactId,
+          target: {
+            provider: "huggingface",
+            repository: input.repository,
+            path: input.path,
+            revision: input.revision,
+          },
+          mediaType: input.mediaType,
+        }),
+        (value) => value as DesktopPublishedBacking,
+        "Failed to publish artifact.",
+      );
     },
   };
 }

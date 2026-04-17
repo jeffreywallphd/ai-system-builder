@@ -4,6 +4,7 @@ import type {
   DesktopArtifactBrowseItem,
   DesktopArtifactContentDescriptor,
   DesktopArtifactDetail,
+  DesktopPublishedBacking,
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
@@ -19,9 +20,17 @@ export interface UseArtifactBrowserFeatureResult {
   detail?: DesktopArtifactDetail;
   content?: DesktopArtifactContentDescriptor;
   imageViewUrl?: string;
+  publishState: ArtifactBrowserViewState;
+  publishedBacking?: DesktopPublishedBacking;
   viewState: ArtifactBrowserViewState;
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
+  publishArtifactToHuggingFace: (input: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<void>;
 }
 
 export function useArtifactBrowserFeature(
@@ -34,6 +43,8 @@ export function useArtifactBrowserFeature(
   const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [publishState, setPublishState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [publishedBacking, setPublishedBacking] = useState<DesktopPublishedBacking | undefined>();
 
   const refreshArtifacts = useCallback(async () => {
     setViewState({ status: "loading", message: "Loading image artifacts..." });
@@ -71,14 +82,58 @@ export function useArtifactBrowserFeature(
       setDetail(artifactDetail);
       setContent(contentDescriptor);
       setImageViewUrl(nextImageViewUrl);
+      const boundPublishedBacking = artifactDetail.metadata?.publishedBacking;
+      setPublishedBacking(
+        boundPublishedBacking
+          ? {
+            ...boundPublishedBacking,
+            exists: false,
+          }
+          : undefined,
+      );
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
     } catch (error) {
       setDetail(undefined);
       setContent(undefined);
       setImageViewUrl(undefined);
+      setPublishedBacking(undefined);
       setViewState({
         status: "error",
         message: error instanceof Error ? error.message : "Failed to load artifact detail.",
+      });
+    }
+  }
+
+  async function publishArtifactToHuggingFace(input: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }): Promise<void> {
+    if (!selectedStorageKey) {
+      setPublishState({ status: "error", message: "Select an artifact before publishing." });
+      return;
+    }
+
+    setPublishState({ status: "loading", message: "Publishing to Hugging Face..." });
+    try {
+      const backing = await artifactClient.publishArtifactToHuggingFace({
+        artifactId: selectedStorageKey,
+        repository: input.repository,
+        path: input.path,
+        revision: input.revision,
+        mediaType: input.mediaType,
+      });
+      setPublishedBacking(backing);
+      setPublishState({
+        status: "success",
+        message: "Published artifact backing to Hugging Face.",
+      });
+      await selectArtifact(selectedStorageKey);
+    } catch (error) {
+      setPublishState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to publish artifact.",
       });
     }
   }
@@ -89,8 +144,11 @@ export function useArtifactBrowserFeature(
     detail,
     content,
     imageViewUrl,
+    publishState,
+    publishedBacking,
     viewState,
     selectArtifact,
     refreshArtifacts,
+    publishArtifactToHuggingFace,
   };
 }

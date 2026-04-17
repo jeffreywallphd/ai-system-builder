@@ -24,6 +24,7 @@ Hosts are implemented under `modules/hosts/` and surfaced through `apps/*` entry
   - preload: narrow secure renderer bridge,
   - renderer: React UI composition only (no filesystem or IPC internals),
   - host composition (`modules/hosts/desktop`): adapter/use-case wiring.
+- Desktop artifact publish uses the same shared application use case path as server/thin-client (`PublishArtifactToRepoUseCase`) and is exposed through preload+IPC transport wiring rather than renderer-side orchestration.
 
 ## Server host
 
