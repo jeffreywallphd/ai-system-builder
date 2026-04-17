@@ -11,3 +11,13 @@ Current composition includes:
 - first artifact-repo provider registration: Hugging Face.
 
 The server host keeps artifact-object and artifact-repo storage families as peer capabilities. It does not flatten them into a single universal storage abstraction.
+
+
+
+Route composition now includes:
+
+- image upload + artifact browser routes over artifact-object storage/catalog stack, and
+- artifact-repo routes (`/api/artifact-repo/has`, `/api/artifact-repo/store`) via dedicated repo-storage use cases.
+
+Current artifact-repo provider registration is Hugging Face only.
+

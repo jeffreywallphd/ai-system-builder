@@ -80,3 +80,11 @@
 - Typical set: `index` + `persistence-storage`.
 - Add `architecture` for cross-layer boundary changes.
 - Add `desktop-host` or `server-host` only when host-specific composition or path wiring changes.
+
+
+
+## Current implementation checkpoint (artifact-repo family)
+
+- Hugging Face adapter write path uses provider commit semantics (not ad hoc upload endpoints) with explicit provider/status mapping.
+- Server host exposes a minimal repo-storage API slice via use cases (`has` and `store`), while keeping artifact-object storage flows separate and intact.
+

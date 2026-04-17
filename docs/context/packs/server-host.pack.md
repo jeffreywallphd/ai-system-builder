@@ -61,3 +61,11 @@
 - Typical set: `index` + `server-host`.
 - Add `architecture` for boundary-sensitive refactors.
 - Add `logging` for startup/request diagnostics and `testing` for route/host integration behavior.
+
+
+
+## Current implementation checkpoint (server host)
+
+- `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has` and `POST /api/artifact-repo/store`.
+- These routes delegate through application use cases; they do not bypass to storage adapters directly.
+

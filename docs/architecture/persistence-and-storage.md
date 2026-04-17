@@ -214,3 +214,22 @@ Contract-family tests should protect this boundary model directly:
 - application persistence-port seam invariants in `modules/application/ports/persistence/tests/` (thin operation-aware record requests/results and no storage-key drift).
 
 If these invariants change, update canonical docs and context packs in the same change.
+
+
+### Current server-exposed artifact-repo operations
+
+Server host composition now exposes a minimal but usable artifact-repo API slice through application use cases (not direct adapter calls):
+
+- `POST /api/artifact-repo/has` -> `HasArtifactInRepoUseCase`
+- `POST /api/artifact-repo/store` -> `StoreArtifactInRepoUseCase`
+
+This is intentionally partial. It does **not** claim full provider management or provider-native browser parity.
+
+### Hugging Face provider hardening status
+
+The Hugging Face adapter remains one provider behind the generic artifact-repo port and now uses a provider-oriented commit flow for writes (commit API with explicit operation payloads) plus resolve-based read/existence checks.
+
+- Provider/repo/path validation is explicit and deterministic.
+- Auth is adapter-boundary-only and required for write operations.
+- Provider status mapping is explicit (`validation`, `not-found`, `unavailable`, `internal`).
+
