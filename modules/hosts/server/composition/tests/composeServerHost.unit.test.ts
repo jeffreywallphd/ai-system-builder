@@ -45,6 +45,33 @@ describe("composeServerHost", () => {
     });
   });
 
+
+
+  it("composes artifact-repo storage with huggingface provider registration", async () => {
+    const fetchMock = testDouble.fn(async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+
+    const host = composeServerHost({
+      artifactRepo: {
+        huggingFaceFetchImplementation: fetchMock,
+      },
+    });
+
+    const result = await host.artifactRepoStorage.hasArtifactInRepo({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/a.png",
+      },
+    });
+
+    expect(host.artifactRepoStorage).toBeDefined();
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected hasArtifactInRepo success result.");
+    }
+    expect(result.value.exists).toBe(false);
+  });
+
   it("registers server image upload routes using a provided app port without creating express", () => {
     const app = {
       post: testDouble.fn(),

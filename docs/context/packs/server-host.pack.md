@@ -27,6 +27,7 @@
 - Route/controller code must stay thin and delegate use-case behavior inward.
 - Server host composition is separate from transport adaptation.
 - Server host composition may include multiple specialized storage adapter families (artifact-object plus artifact-repo storage) and should keep that composition explicit.
+- Current composition includes artifact-object filesystem storage and the first artifact-repo provider adapter registration (Hugging Face).
 - Pass host metadata inward via `modules/contracts/host` host-context contracts,
   not HTTP framework objects.
 - Keep host-context metadata small and serialization-friendly (JSON-serializable values only).

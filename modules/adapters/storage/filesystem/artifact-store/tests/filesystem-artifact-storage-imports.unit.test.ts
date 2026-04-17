@@ -14,6 +14,17 @@ describe("filesystem artifact storage adapter imports", () => {
     expect(source.includes("from \"./createFilesystemArtifactBrowserReadAdapter\"")).toBe(false);
   });
 
+  it("remains in artifact-object family and does not implement artifact-repo operations", () => {
+    const filePath = resolve(
+      "modules/adapters/storage/filesystem/artifact-store/createFilesystemArtifactStorageAdapter.ts",
+    );
+    const source = readFileSync(filePath, "utf8");
+
+    expect(source.includes("storeArtifactInRepo")).toBe(false);
+    expect(source.includes("retrieveArtifactFromRepo")).toBe(false);
+    expect(source.includes("hasArtifactInRepo")).toBe(false);
+  });
+
   it("keeps filesystem storage naming explicitly artifact-object with backward-compatible aliasing", () => {
     const filePath = resolve(
       "modules/adapters/storage/filesystem/artifact-store/createFilesystemArtifactStorageAdapter.ts",

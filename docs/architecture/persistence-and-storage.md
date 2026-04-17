@@ -129,21 +129,35 @@ Specialized storage families then define their own operation contracts:
 
 Storage family invariants:
 
-- shared foundation remains thin and generic rather than object-storage-specific,
-- artifact-object and artifact-repo families are peer first-class specializations,
-- object-family contracts stay key/blob oriented without repo/provider fields,
-- repo-family contracts stay provider/repository/revision/path oriented without key/blob flattening,
-- storage family barrels export storage-only surfaces so family boundaries remain explicit and mechanically discoverable.
+1. Shared foundation remains thin and generic rather than object-storage-specific.
+2. Artifact-object and artifact-repo are peer first-class families.
+3. Object-family contracts stay key/blob oriented without repo/provider fields.
+4. Repo-family contracts stay provider/repository/revision/path oriented without key/blob flattening.
+5. Storage family barrels export storage-only surfaces so family boundaries remain explicit and mechanically discoverable.
 
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
 
-## Repo-backed storage direction (forward-looking)
+## Repo-backed storage direction (current + next)
 
 Repo-backed providers are a valid storage class under the storage adapter category.
 
-- A likely first provider example is **Hugging Face** (for model/dataset-style repository storage). Hugging Face is planned, not yet implemented in this prompt scope.
-- Treat Hugging Face as repo-backed storage/provider semantics, not as "just another blob store."
-- Import from provider repos and publish to provider repos are distinct operations with provider/revision/visibility semantics.
+### Implemented first provider slice
+
+- **Hugging Face** is now the first concrete `artifact-repo` provider adapter implementation.
+- The generic family remains provider-neutral (`ArtifactRepoStoragePort` + repo request/result contracts).
+- A provider-neutral composition seam dispatches by `target.provider`; Hugging Face is currently one registered provider.
+- Initial operations implemented: `hasArtifactInRepo`, `storeArtifactInRepo`, `retrieveArtifactFromRepo`.
+
+### Auth and configuration (minimal by design)
+
+- Token can be provided explicitly at composition boundary.
+- Fallback env vars: `HF_TOKEN`, then `HUGGING_FACE_TOKEN`.
+- Auth handling remains isolated to the provider adapter boundary.
+
+### Practical constraints for this first slice
+
+- This is intentionally a narrow vertical slice, not full provider lifecycle management.
+- Upload path support can vary by provider/repo configuration; behavior should be treated as adapter-level and validated per deployment environment.
 - Provider-native repository browsing/viewing semantics may exist, but they do not define internal system artifact-browser contracts.
 
 

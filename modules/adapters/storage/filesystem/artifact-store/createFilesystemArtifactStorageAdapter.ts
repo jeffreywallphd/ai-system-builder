@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
+import type { ApplicationRequestContext } from "../../../../application/ports";
 import type { ArtifactCatalogAppendPort } from "../../../../application/ports/artifact-catalog";
 import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
 import type { ContractErrorCode } from "../../../../contracts/shared";
@@ -168,6 +169,17 @@ function createContentChecksum(bytes: Uint8Array): StorageObjectChecksum {
   };
 }
 
+
+function resolveRequestContext(
+  request: { requestId?: string; correlationId?: string },
+  context: ApplicationRequestContext | undefined,
+): ApplicationRequestContext {
+  return {
+    requestId: context?.requestId ?? request.requestId,
+    correlationId: context?.correlationId ?? request.correlationId,
+  };
+}
+
 export function createFilesystemArtifactObjectStorageAdapter(
   options: CreateFilesystemArtifactStorageAdapterOptions,
 ): ArtifactObjectStoragePort {
@@ -234,12 +246,10 @@ export function createFilesystemArtifactObjectStorageAdapter(
   return {
     async storeArtifact<TContent = Uint8Array>(
       request: StoreArtifactRequest<TContent>,
+      context: ApplicationRequestContext = {},
     ): Promise<StoreArtifactResult> {
       const startedAt = Date.now();
-      const requestContext = {
-        requestId: request.requestId,
-        correlationId: request.correlationId,
-      };
+      const requestContext = resolveRequestContext(request, context);
       let attemptedKey: string | undefined;
       let attemptedAbsolutePath: string | undefined;
 
@@ -248,8 +258,8 @@ export function createFilesystemArtifactObjectStorageAdapter(
         name: "storage.filesystem.store.started",
         message: "Starting artifact write to local filesystem storage.",
         operation: "storage.artifact.store",
-        requestId: request.requestId,
-        correlationId: request.correlationId,
+        requestId: requestContext.requestId,
+        correlationId: requestContext.correlationId,
         data: {
           keyProvided: typeof request.descriptor.key === "string",
           overwrite: request.overwrite === true,
@@ -300,8 +310,8 @@ export function createFilesystemArtifactObjectStorageAdapter(
               checksum,
             },
           }, {
-            requestId: request.requestId,
-            correlationId: request.correlationId,
+            requestId: requestContext.requestId,
+            correlationId: requestContext.correlationId,
           });
 
           if (!appendResult.ok) {
@@ -314,8 +324,8 @@ export function createFilesystemArtifactObjectStorageAdapter(
           name: "storage.filesystem.store.succeeded",
           message: "Stored artifact in desktop filesystem storage.",
           operation: "storage.artifact.store",
-          requestId: request.requestId,
-          correlationId: request.correlationId,
+          requestId: requestContext.requestId,
+          correlationId: requestContext.correlationId,
           durationMs: Date.now() - startedAt,
           outcome: "success",
           data: {
@@ -349,8 +359,8 @@ export function createFilesystemArtifactObjectStorageAdapter(
           name: "storage.filesystem.store.failed",
           message: "Failed to store artifact in desktop filesystem storage.",
           operation: "storage.artifact.store",
-          requestId: request.requestId,
-          correlationId: request.correlationId,
+          requestId: requestContext.requestId,
+          correlationId: requestContext.correlationId,
           durationMs: Date.now() - startedAt,
           outcome: "failure",
           error: {
@@ -382,7 +392,9 @@ export function createFilesystemArtifactObjectStorageAdapter(
 
     async retrieveArtifact<TContent = Uint8Array>(
       request: RetrieveArtifactRequest,
+      context: ApplicationRequestContext = {},
     ): Promise<RetrieveArtifactResult<TContent>> {
+      const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
         const absolutePath = resolvePathInsideRoot(rootDirectory, key);
@@ -398,27 +410,31 @@ export function createFilesystemArtifactObjectStorageAdapter(
           },
           new Uint8Array(fileContent) as TContent,
           {
-            requestId: request.requestId,
-            correlationId: request.correlationId,
+            requestId: requestContext.requestId,
+            correlationId: requestContext.correlationId,
           },
         );
       } catch (error) {
         const code = toErrorCode(error, "not-found");
         return createRetrieveArtifactFailureResult<TContent>(
           createContractError(code, `Failed to retrieve artifact bytes: ${toErrorMessage(error)}`, {
-            requestId: request.requestId,
-            correlationId: request.correlationId,
+            requestId: requestContext.requestId,
+            correlationId: requestContext.correlationId,
             details: {
               operation: "retrieveArtifact",
               filesystemCode: isFsError(error) ? error.code : undefined,
             },
           }),
-          request,
+          requestContext,
         );
       }
     },
 
-    async hasArtifact(request: HasArtifactRequest): Promise<HasArtifactResult> {
+    async hasArtifact(
+      request: HasArtifactRequest,
+      context: ApplicationRequestContext = {},
+    ): Promise<HasArtifactResult> {
+      const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
         const absolutePath = resolvePathInsideRoot(rootDirectory, key);
@@ -429,33 +445,37 @@ export function createFilesystemArtifactObjectStorageAdapter(
             key,
             sizeBytes: fileStats.size,
           },
-          requestId: request.requestId,
-          correlationId: request.correlationId,
+          requestId: requestContext.requestId,
+          correlationId: requestContext.correlationId,
         });
       } catch (error) {
         if (isFsError(error) && error.code === "ENOENT") {
           return createHasArtifactSuccessResult(false, {
-            requestId: request.requestId,
-            correlationId: request.correlationId,
+            requestId: requestContext.requestId,
+            correlationId: requestContext.correlationId,
           });
         }
 
         const code = toErrorCode(error, "internal");
         return createHasArtifactFailureResult(
           createContractError(code, `Failed to check artifact existence: ${toErrorMessage(error)}`, {
-            requestId: request.requestId,
-            correlationId: request.correlationId,
+            requestId: requestContext.requestId,
+            correlationId: requestContext.correlationId,
             details: {
               operation: "hasArtifact",
               filesystemCode: isFsError(error) ? error.code : undefined,
             },
           }),
-          request,
+          requestContext,
         );
       }
     },
 
-    async deleteArtifact(request: DeleteArtifactRequest): Promise<DeleteArtifactResult> {
+    async deleteArtifact(
+      request: DeleteArtifactRequest,
+      context: ApplicationRequestContext = {},
+    ): Promise<DeleteArtifactResult> {
+      const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
         const absolutePath = resolvePathInsideRoot(rootDirectory, key);
@@ -467,23 +487,23 @@ export function createFilesystemArtifactObjectStorageAdapter(
           await rm(parentDirectory, { recursive: false, force: false }).catch(() => {});
         }
 
-        return createDeleteArtifactSuccessResult(true, request);
+        return createDeleteArtifactSuccessResult(true, requestContext);
       } catch (error) {
         if (isFsError(error) && error.code === "ENOENT") {
-          return createDeleteArtifactSuccessResult(false, request);
+          return createDeleteArtifactSuccessResult(false, requestContext);
         }
 
         const code = toErrorCode(error, "internal");
         return createDeleteArtifactFailureResult(
           createContractError(code, `Failed to delete artifact: ${toErrorMessage(error)}`, {
-            requestId: request.requestId,
-            correlationId: request.correlationId,
+            requestId: requestContext.requestId,
+            correlationId: requestContext.correlationId,
             details: {
               operation: "deleteArtifact",
               filesystemCode: isFsError(error) ? error.code : undefined,
             },
           }),
-          request,
+          requestContext,
         );
       }
     },

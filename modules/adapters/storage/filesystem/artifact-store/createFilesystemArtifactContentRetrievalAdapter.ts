@@ -24,11 +24,12 @@ export function createFilesystemArtifactContentRetrievalAdapter(
       const storageKey = normalizeStorageArtifactKey(request.storageKey);
       const [catalogResult, retrieveResult] = await Promise.all([
         options.artifactCatalogRead.readArtifactCatalogRecord({ storageKey }, context),
-        options.storage.retrieveArtifact({
-          key: storageKey,
-          requestId: context.requestId,
-          correlationId: context.correlationId,
-        }),
+        options.storage.retrieveArtifact(
+          {
+            key: storageKey,
+          },
+          context,
+        ),
       ]);
 
       if (!catalogResult.ok) {

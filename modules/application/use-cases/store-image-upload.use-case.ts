@@ -203,9 +203,8 @@ export class StoreImageUploadUseCase {
               originalFileName: fileName,
             },
           },
-          requestId: context.requestId,
-          correlationId: context.correlationId,
         }),
+        context,
       );
 
       if (!storeResult.ok) {

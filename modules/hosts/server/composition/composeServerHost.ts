@@ -1,3 +1,4 @@
+import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
 import type { LoggingPort } from "../../../application/ports/logging";
 import {
   BrowseArtifactsUseCase,
@@ -7,11 +8,17 @@ import {
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
+  createArtifactRepoStorageAdapter,
+} from "../../../adapters/storage/artifact-repo";
+import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactObjectStorageAdapter,
   createLocalArtifactCatalogPersistenceAdapter,
 } from "../../../adapters/storage/filesystem";
+import {
+  createHuggingFaceArtifactRepoStorageAdapter,
+} from "../../../adapters/storage/huggingface";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
 import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
 import type { ExpressRoutePort } from "../../../adapters/transport/api-express/artifact-browser/registerArtifactBrowserApiRoutes";
@@ -25,10 +32,16 @@ export interface ComposeServerHostLoggingOptions {
   includeDiagnostics?: boolean;
 }
 
+export interface ComposeServerHostArtifactRepoOptions {
+  huggingFaceAccessToken?: string;
+  huggingFaceFetchImplementation?: typeof fetch;
+}
+
 export interface ComposeServerHostOptions {
   logging?: ComposeServerHostLoggingOptions;
   logSink?: StructuredLogSink;
   now?: () => string;
+  artifactRepo?: ComposeServerHostArtifactRepoOptions;
 }
 
 export interface RegisterServerApiOptions {
@@ -39,6 +52,7 @@ export interface RegisterServerApiOptions {
 export interface ServerHostComposition {
   loggingPort: LoggingPort;
   loggingConfig: LoggingConfig;
+  artifactRepoStorage: ArtifactRepoStoragePort;
   registerApi: (options: RegisterServerApiOptions) => void;
 }
 
@@ -60,9 +74,22 @@ export function composeServerHost(
     now: options.now,
   });
 
+  const artifactRepoStorage = createArtifactRepoStorageAdapter({
+    providers: [
+      {
+        provider: "huggingface",
+        adapter: createHuggingFaceArtifactRepoStorageAdapter({
+          accessToken: options.artifactRepo?.huggingFaceAccessToken,
+          fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
+        }),
+      },
+    ],
+  });
+
   return {
     loggingPort,
     loggingConfig,
+    artifactRepoStorage,
     registerApi(registerOptions) {
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
