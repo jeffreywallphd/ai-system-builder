@@ -22,6 +22,7 @@ export interface RegisterExpressApiDependencies {
   artifactMediaViewRetrieval: RegisterArtifactBrowserApiRoutesDependencies["artifactMediaViewRetrieval"];
   hasArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["hasArtifactInRepoUseCase"];
   storeArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["storeArtifactInRepoUseCase"];
+  publishArtifactToRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["publishArtifactToRepoUseCase"];
 }
 
 export function registerExpressApi(
@@ -44,7 +45,7 @@ export function registerExpressApi(
     app: dependencies.app,
     hasArtifactInRepoUseCase: dependencies.hasArtifactInRepoUseCase,
     storeArtifactInRepoUseCase: dependencies.storeArtifactInRepoUseCase,
+    publishArtifactToRepoUseCase: dependencies.publishArtifactToRepoUseCase,
   });
 }
-
 

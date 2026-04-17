@@ -1,16 +1,21 @@
 import type {
   HasArtifactInRepoCommand,
   HasArtifactInRepoUseCasePort,
+  PublishArtifactToRepoUseCase,
   StoreArtifactInRepoCommand,
   StoreArtifactInRepoUseCasePort,
 } from "../../../../application/use-cases";
 import {
+  createApiArtifactPublishFailureResponse,
+  createApiArtifactPublishRequest,
+  createApiArtifactPublishSuccessResponse,
   createApiArtifactRepoHasFailureResponse,
   createApiArtifactRepoHasRequest,
   createApiArtifactRepoHasSuccessResponse,
   createApiArtifactRepoStoreFailureResponse,
   createApiArtifactRepoStoreRequest,
   createApiArtifactRepoStoreSuccessResponse,
+  type ApiArtifactPublishResponse,
   type ApiArtifactRepoHasResponse,
   type ApiArtifactRepoStoreResponse,
 } from "../../../../contracts/api";
@@ -31,14 +36,27 @@ interface ArtifactRepoStoreApiRequestBody extends ArtifactRepoHasApiRequestBody 
   overwrite?: boolean;
 }
 
+interface ArtifactPublishApiRequestBody {
+  artifactId: string;
+  target: {
+    provider: string;
+    repository: string;
+    revision?: string;
+    path?: string;
+  };
+  mediaType?: string;
+  verify?: boolean;
+  source?: string;
+}
+
 export interface ArtifactRepoExpressRequestLike {
-  body?: ArtifactRepoHasApiRequestBody | ArtifactRepoStoreApiRequestBody;
+  body?: unknown;
   headers?: Record<string, string | string[] | undefined>;
 }
 
 export interface ArtifactRepoExpressResponseLike {
   status: (statusCode: number) => ArtifactRepoExpressResponseLike;
-  json: (body: ApiArtifactRepoHasResponse | ApiArtifactRepoStoreResponse) => void;
+  json: (body: ApiArtifactRepoHasResponse | ApiArtifactRepoStoreResponse | ApiArtifactPublishResponse) => void;
 }
 
 export interface ArtifactRepoExpressRoutePort {
@@ -55,6 +73,7 @@ export interface RegisterArtifactRepoApiRoutesDependencies {
   app: ArtifactRepoExpressRoutePort;
   hasArtifactInRepoUseCase: HasArtifactInRepoUseCasePort;
   storeArtifactInRepoUseCase: StoreArtifactInRepoUseCasePort;
+  publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
 }
 
 function getRequestHeader(
@@ -126,6 +145,23 @@ function mapApiStoreRequestToCommand(
 }
 
 function mapStatusCode(response: ApiArtifactRepoHasResponse | ApiArtifactRepoStoreResponse): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error.code) {
+    case "validation":
+      return 400;
+    case "not-found":
+      return 404;
+    case "unavailable":
+      return 503;
+    default:
+      return 500;
+  }
+}
+
+function mapPublishStatusCode(response: ApiArtifactPublishResponse): number {
   if (response.ok) {
     return 200;
   }
@@ -233,5 +269,54 @@ export function registerArtifactRepoApiRoutes(
     const result = await dependencies.storeArtifactInRepoUseCase.execute(command, context);
     const apiResponse = mapStoreResultToApiResponse(result, context);
     response.status(mapStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/artifact/publish", async (request, response) => {
+    const context = mapRequestContext(request);
+    let apiRequest: ReturnType<typeof createApiArtifactPublishRequest>;
+
+    try {
+      apiRequest = createApiArtifactPublishRequest({
+        artifactId: (request.body as ArtifactPublishApiRequestBody).artifactId,
+        target: {
+          provider: (request.body as ArtifactPublishApiRequestBody).target?.provider ?? "",
+          repository: (request.body as ArtifactPublishApiRequestBody).target?.repository ?? "",
+          revision: (request.body as ArtifactPublishApiRequestBody).target?.revision,
+          path: (request.body as ArtifactPublishApiRequestBody).target?.path ?? "",
+        },
+        mediaType: (request.body as ArtifactPublishApiRequestBody).mediaType,
+        verify: (request.body as ArtifactPublishApiRequestBody).verify,
+        source: normalizeSource((request.body as ArtifactPublishApiRequestBody).source),
+      }, context);
+    } catch (error) {
+      const apiResponse = createApiArtifactPublishFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid artifact publish request.",
+        context,
+      );
+      response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.publishArtifactToRepoUseCase.execute({
+      artifactId: apiRequest.payload.artifactId,
+      target: apiRequest.payload.target,
+      mediaType: apiRequest.payload.mediaType,
+    });
+
+    const apiResponse = result.ok
+      ? createApiArtifactPublishSuccessResponse(result.value, context)
+      : createApiArtifactPublishFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+        },
+      );
+    response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
   });
 }

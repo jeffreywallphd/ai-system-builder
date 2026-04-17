@@ -7,7 +7,9 @@ Current scope:
 - minimal React bootstrap (`src/main.tsx`, `src/App.tsx`)
 - page-first composition (`src/pages/HomePage.tsx`)
 - feature-local image upload workflow under `src/features/image-upload/`
+- feature-local artifact browser workflow under `src/features/artifact-browser/`
 - fetch-based HTTP image-upload client that calls the server API route (`/api/image/upload`)
+- artifact publish flow that calls `POST /api/artifact/publish` and surfaces published backing details
 - token-first style baseline under `src/styles/`
 
 The thin-client image-upload path intentionally reuses the server transport + shared application use

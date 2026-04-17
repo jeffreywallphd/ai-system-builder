@@ -85,6 +85,6 @@
 
 ## Current implementation checkpoint (artifact-repo family)
 
-- Hugging Face adapter write path uses provider commit semantics (not ad hoc upload endpoints) with explicit provider/status mapping.
-- Server host exposes a minimal repo-storage API slice via use cases (`has` and `store`), while keeping artifact-object storage flows separate and intact.
-
+- Hugging Face adapter uses official `@huggingface/hub` client methods (`fileExists`, `uploadFile`, `downloadFile`) with an isolated fallback path only when needed.
+- Server host exposes a minimal repo-storage API slice via use cases (`has`, `store`, and `publish`), while keeping artifact-object storage flows separate and intact.
+- Publish flow writes durable `ArtifactStorageBinding` records for published artifact-repo backings.

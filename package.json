@@ -26,6 +26,7 @@
     "start:server": "npm run start -w @ai-system-builder/server"
   },
   "dependencies": {
+    "@huggingface/hub": "^2.11.0",
     "busboy": "^1.6.0",
     "express": "^5.1.0",
     "react": "^19.2.0",
@@ -53,4 +54,3 @@
     "webpack": "^5.99.9"
   }
 }
-

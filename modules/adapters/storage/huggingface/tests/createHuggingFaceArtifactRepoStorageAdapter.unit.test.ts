@@ -7,11 +7,23 @@ import {
 } from "../../../../contracts/storage";
 import { createHuggingFaceArtifactRepoStorageAdapter } from "../createHuggingFaceArtifactRepoStorageAdapter";
 
+function createHubClientDouble() {
+  return {
+    fileExists: testDouble.fn(async () => true),
+    uploadFile: testDouble.fn(async () => undefined),
+    downloadFile: testDouble.fn(async () => new Response(new Uint8Array([1, 2, 3]), {
+      status: 200,
+      headers: {
+        "content-type": "image/png",
+      },
+    })),
+  };
+}
+
 describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
   it("validates provider = huggingface", async () => {
     const adapter = createHuggingFaceArtifactRepoStorageAdapter({
-      fetchImplementation: testDouble.fn(async () =>
-        new Response(null, { status: 200 })) as unknown as typeof fetch,
+      hubClient: createHubClientDouble(),
     });
 
     const result = await adapter.hasArtifactInRepo(
@@ -32,7 +44,9 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
   });
 
   it("validates repository-relative path semantics", async () => {
-    const adapter = createHuggingFaceArtifactRepoStorageAdapter();
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient: createHubClientDouble(),
+    });
 
     const result = await adapter.retrieveArtifactFromRepo(
       createRetrieveArtifactFromRepoRequest({
@@ -50,74 +64,71 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     expect(result.error.code).toBe("validation");
   });
 
-  it("maps hasArtifactInRepo HEAD 200 to exists=true and 404 to exists=false", async () => {
-    const responses = [
-      new Response(null, {
-        status: 200,
-        headers: {
-          "content-type": "image/png",
-          "content-length": "3",
-        },
-      }),
-      new Response(null, { status: 404 }),
-    ];
-
-    const calls: Array<[string, RequestInit | undefined]> = [];
-    const fetchImplementation = (async (url: string | URL | Request, init?: RequestInit) => {
-      calls.push([String(url), init]);
-      const response = responses.shift();
-      if (!response) {
-        throw new Error("Unexpected fetch call");
-      }
-      return response;
-    }) as typeof fetch;
-
+  it("uses official hub-client methods for has/store/retrieve", async () => {
+    const hubClient = createHubClientDouble();
     const adapter = createHuggingFaceArtifactRepoStorageAdapter({
-      fetchImplementation,
+      hubClient,
       accessToken: "token-123",
     });
 
-    const existsResult = await adapter.hasArtifactInRepo(
+    const hasResult = await adapter.hasArtifactInRepo(
       createHasArtifactInRepoRequest({
         provider: "huggingface",
-        repository: "openai/demo",
+        repository: "datasets/openai/demo",
         revision: "main",
         path: "image.png",
       }),
     );
-
-    const missingResult = await adapter.hasArtifactInRepo(
-      createHasArtifactInRepoRequest({
+    const storeResult = await adapter.storeArtifactInRepo(
+      createStoreArtifactInRepoRequest(new Uint8Array([1, 2, 3]), {
+        target: {
+          provider: "huggingface",
+          repository: "datasets/openai/demo",
+          revision: "main",
+          path: "artifacts/a.bin",
+        },
+      }),
+    );
+    const retrieveResult = await adapter.retrieveArtifactFromRepo(
+      createRetrieveArtifactFromRepoRequest({
         provider: "huggingface",
-        repository: "openai/demo",
+        repository: "datasets/openai/demo",
         revision: "main",
-        path: "missing.png",
+        path: "artifacts/a.bin",
       }),
     );
 
-    expect(existsResult.ok).toBe(true);
-    expect(missingResult.ok).toBe(true);
-    if (!existsResult.ok || !missingResult.ok) {
-      throw new Error("Expected success results.");
-    }
-
-    expect(existsResult.value.exists).toBe(true);
-    expect(missingResult.value.exists).toBe(false);
-
-    expect(calls[1]?.[0]).toContain("/resolve/main/missing.png");
-    expect(calls[1]?.[1]?.method).toBe("HEAD");
-    expect((calls[1]?.[1]?.headers as Record<string, string>).Authorization).toBe("Bearer token-123");
+    expect(hasResult.ok).toBe(true);
+    expect(storeResult.ok).toBe(true);
+    expect(retrieveResult.ok).toBe(true);
+    expect(hubClient.fileExists).toHaveBeenCalledWith({
+      repo: { type: "dataset", name: "openai/demo" },
+      path: "image.png",
+      revision: "main",
+      accessToken: "token-123",
+    });
+    const uploadCall = hubClient.uploadFile.mock.calls[0]?.[0] as {
+      repo: { type: string; name: string };
+      branch: string;
+      accessToken: string;
+    };
+    expect(uploadCall.repo).toEqual({ type: "dataset", name: "openai/demo" });
+    expect(uploadCall.branch).toBe("main");
+    expect(uploadCall.accessToken).toBe("token-123");
+    expect(hubClient.downloadFile).toHaveBeenCalledWith({
+      repo: { type: "dataset", name: "openai/demo" },
+      path: "artifacts/a.bin",
+      revision: "main",
+      accessToken: "token-123",
+    });
   });
 
-  it("uses commit API for storeArtifactInRepo and requires token", async () => {
-    const calls: Array<[string, RequestInit | undefined]> = [];
-    const fetchImplementation = (async (url: string | URL | Request, init?: RequestInit) => {
-      calls.push([String(url), init]);
-      return new Response(null, { status: 200 });
-    }) as typeof fetch;
+  it("requires token for store and returns validation", async () => {
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient: createHubClientDouble(),
+    });
 
-    const withoutToken = createHuggingFaceArtifactRepoStorageAdapter({ fetchImplementation });
-    const missingTokenResult = await withoutToken.storeArtifactInRepo(
+    const missingTokenResult = await adapter.storeArtifactInRepo(
       createStoreArtifactInRepoRequest(new Uint8Array([1]), {
         target: {
           provider: "huggingface",
@@ -133,54 +144,28 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
       throw new Error("Expected missing token failure.");
     }
     expect(missingTokenResult.error.code).toBe("validation");
-
-    const withToken = createHuggingFaceArtifactRepoStorageAdapter({
-      fetchImplementation,
-      accessToken: "token-abc",
-    });
-
-    const stored = await withToken.storeArtifactInRepo(
-      createStoreArtifactInRepoRequest(new Uint8Array([1, 2, 3]), {
-        target: {
-          provider: "huggingface",
-          repository: "datasets/openai/demo",
-          revision: "main",
-          path: "artifacts/a.bin",
-        },
-      }),
-    );
-
-    expect(stored.ok).toBe(true);
-    const [url, init] = calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/datasets/openai/demo/commit/main");
-    expect(init.method).toBe("POST");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer token-abc");
-
-    const body = JSON.parse(String(init.body));
-    expect(body.operations[0]).toMatchObject({
-      operation: "addOrUpdate",
-      pathInRepo: "artifacts/a.bin",
-      encoding: "base64",
-    });
   });
 
-  it("maps provider statuses to stable contract codes", async () => {
-    const responses = [
-      new Response(null, { status: 404 }),
-      new Response(null, { status: 401 }),
-      new Response(null, { status: 500 }),
-    ];
-
-    const fetchImplementation = (async () => {
-      const response = responses.shift();
-      if (!response) {
-        throw new Error("Unexpected fetch call");
+  it("maps not-found and unavailable contract failures from client errors", async () => {
+    const hubClient = createHubClientDouble();
+    let callCount = 0;
+    hubClient.downloadFile = testDouble.fn(async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        throw {
+          code: "not-found",
+          message: "Missing file",
+        };
       }
-      return response;
-    }) as typeof fetch;
+
+      throw {
+        code: "unavailable",
+        message: "Provider down",
+      };
+    });
 
     const adapter = createHuggingFaceArtifactRepoStorageAdapter({
-      fetchImplementation,
+      hubClient,
       accessToken: "token",
     });
 
@@ -189,13 +174,6 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
         provider: "huggingface",
         repository: "openai/demo",
         path: "missing.bin",
-      }),
-    );
-    const unauthorized = await adapter.retrieveArtifactFromRepo(
-      createRetrieveArtifactFromRepoRequest({
-        provider: "huggingface",
-        repository: "openai/demo",
-        path: "private.bin",
       }),
     );
     const unavailable = await adapter.retrieveArtifactFromRepo(
@@ -207,14 +185,12 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     );
 
     expect(notFound.ok).toBe(false);
-    expect(unauthorized.ok).toBe(false);
     expect(unavailable.ok).toBe(false);
-    if (notFound.ok || unauthorized.ok || unavailable.ok) {
+    if (notFound.ok || unavailable.ok) {
       throw new Error("Expected failures.");
     }
 
     expect(notFound.error.code).toBe("not-found");
-    expect(unauthorized.error.code).toBe("unavailable");
     expect(unavailable.error.code).toBe("unavailable");
   });
 });

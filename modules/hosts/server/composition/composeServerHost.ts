@@ -3,6 +3,7 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import {
   BrowseArtifactsUseCase,
   HasArtifactInRepoUseCase,
+  PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
   StoreArtifactInRepoUseCase,
@@ -17,6 +18,7 @@ import {
   createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactObjectStorageAdapter,
   createLocalArtifactCatalogPersistenceAdapter,
+  createLocalArtifactStorageBindingAdapter,
 } from "../../../adapters/storage/filesystem";
 import {
   createHuggingFaceArtifactRepoStorageAdapter,
@@ -96,6 +98,9 @@ export function composeServerHost(
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
+      const artifactBindings = createLocalArtifactStorageBindingAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
+      });
       const storage = createFilesystemArtifactObjectStorageAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
         host: "server",
@@ -134,6 +139,12 @@ export function composeServerHost(
       const storeArtifactInRepo = new StoreArtifactInRepoUseCase({
         artifactRepoStorage,
       });
+      const publishArtifactToRepo = new PublishArtifactToRepoUseCase({
+        artifactStorage: storage,
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        now: options.now,
+      });
 
       registerExpressApi({
         app: registerOptions.app,
@@ -144,6 +155,7 @@ export function composeServerHost(
         artifactMediaViewRetrieval,
         hasArtifactInRepoUseCase: hasArtifactInRepo,
         storeArtifactInRepoUseCase: storeArtifactInRepo,
+        publishArtifactToRepoUseCase: publishArtifactToRepo,
       });
     },
   };

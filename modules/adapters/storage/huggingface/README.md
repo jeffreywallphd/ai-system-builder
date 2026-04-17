@@ -7,9 +7,9 @@ This module contains the first concrete artifact-repo storage provider adapter.
 - Implements `ArtifactRepoStoragePort` for `provider = "huggingface"`.
 - Keeps provider-specific auth, path/repository validation, and provider status mapping inside the adapter boundary.
 - Supports:
-  - `hasArtifactInRepo` via `HEAD .../resolve/<revision>/<path>`,
-  - `storeArtifactInRepo` via provider commit API (`POST /api/{datasets|models}/.../commit/<revision>` with explicit add/update operation payload),
-  - `retrieveArtifactFromRepo` via `GET .../resolve/<revision>/<path>`.
+  - `hasArtifactInRepo` via official Hub client `fileExists`,
+  - `storeArtifactInRepo` via official Hub client `uploadFile`,
+  - `retrieveArtifactFromRepo` via official Hub client `downloadFile`.
 
 ## Configuration
 
@@ -25,6 +25,7 @@ This module contains the first concrete artifact-repo storage provider adapter.
 
 ## Notes
 
+- The adapter now prefers the official `@huggingface/hub` client path.
+- If the Hub client is unavailable at runtime, the adapter uses a thin, isolated HTTP fallback wrapper to preserve behavior.
 - This is intentionally a small provider slice, not full provider lifecycle management.
 - Tests are mock-driven and deterministic (no live network dependency).
-
