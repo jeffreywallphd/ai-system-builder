@@ -31,7 +31,7 @@ import type {
   PersistenceRecordPort,
 } from "../persistence";
 import type { RuntimeExecutionPort } from "../runtime";
-import type { ArtifactStoragePort } from "../storage";
+import type { ArtifactRepoStoragePort, ArtifactStoragePort } from "../storage";
 import type {
   ArtifactBrowserContentReadPort,
   ArtifactBrowserMetadataReadPort,
@@ -139,6 +139,9 @@ describe("application ports cross-family invariants", () => {
     expectTypeOf<keyof ArtifactStoragePort>().toEqualTypeOf<
       "storeArtifact" | "retrieveArtifact" | "hasArtifact" | "deleteArtifact"
     >();
+    expectTypeOf<keyof ArtifactRepoStoragePort>().toEqualTypeOf<
+      "storeArtifactInRepo" | "retrieveArtifactFromRepo" | "hasArtifactInRepo"
+    >();
 
     expectTypeOf<PersistenceRecordOperationRequest>().toExtend<{
       operation: PersistenceOperation;
@@ -167,6 +170,13 @@ describe("application ports cross-family invariants", () => {
         key: normalizeStorageArtifactKey("workspace/ws-42/snapshots/state.json"),
       },
     });
+
+    expectTypeOf<Parameters<ArtifactRepoStoragePort["storeArtifactInRepo"]>[1]>().toExtend<
+      ApplicationRequestContext | undefined
+    >();
+    expectTypeOf<Parameters<ArtifactRepoStoragePort["storeArtifactInRepo"]>[0]>().not.toExtend<{
+      descriptor: { key: string };
+    }>();
 
     expect("descriptor" in persistenceRequest).toBe(false);
     expect("operation" in storageRequest).toBe(false);

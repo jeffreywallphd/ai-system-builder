@@ -15,6 +15,11 @@ import {
   createStoreArtifactFailureResult,
   createStoreArtifactRequest,
   createStoreArtifactSuccessResult,
+  createStoreArtifactInRepoRequest,
+  createStoreArtifactInRepoSuccessResult,
+  createRetrieveArtifactFromRepoSuccessResult,
+  createHasArtifactInRepoSuccessResult,
+  normalizeArtifactStorageBinding,
 } from ".";
 
 describe("storage contracts", () => {
@@ -275,4 +280,84 @@ describe("storage contracts", () => {
       key: "staging/artifacts/output-2",
     });
   });
+
+  it("creates repo-family requests and results with repo targets", () => {
+    const storeRequest = createStoreArtifactInRepoRequest(new Uint8Array([7, 8, 9]), {
+      target: {
+        provider: " huggingface ",
+        repository: " openai/demo-artifacts ",
+        revision: " main ",
+        path: " images/cat.png ",
+      },
+      mediaType: "image/png",
+      overwrite: true,
+      requestId: "req-repo-1",
+      correlationId: "corr-repo-1",
+    });
+
+    expect(storeRequest).toEqual({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        revision: "main",
+        path: "images/cat.png",
+      },
+      content: new Uint8Array([7, 8, 9]),
+      mediaType: "image/png",
+      metadata: undefined,
+      overwrite: true,
+      requestId: "req-repo-1",
+      correlationId: "corr-repo-1",
+    });
+
+    const descriptor = {
+      target: storeRequest.target,
+      mediaType: storeRequest.mediaType,
+      sizeBytes: 3,
+      checksum: {
+        algorithm: "sha256",
+        value: "repo123",
+      },
+    } as const;
+
+    const storeResult = createStoreArtifactInRepoSuccessResult(descriptor);
+    const retrieveResult = createRetrieveArtifactFromRepoSuccessResult(
+      descriptor,
+      new Uint8Array([7, 8, 9]),
+    );
+    const hasResult = createHasArtifactInRepoSuccessResult(true, {
+      descriptor,
+    });
+
+    expect(storeResult.ok).toBe(true);
+    expect(retrieveResult.ok).toBe(true);
+    expect(hasResult.ok).toBe(true);
+  });
+
+  it("creates artifact storage bindings against thin shared backing references", () => {
+    const binding = normalizeArtifactStorageBinding({
+      artifactId: " artifact-42 ",
+      backing: {
+        kind: " artifact-repo ",
+        provider: " huggingface ",
+        locator: " openai/demo-artifacts/images/cat.png ",
+        revision: " main ",
+      },
+      role: " imported-source ",
+      createdAt: " 2026-04-17T00:00:00.000Z ",
+    });
+
+    expect(binding).toEqual({
+      artifactId: "artifact-42",
+      backing: {
+        kind: "artifact-repo",
+        provider: "huggingface",
+        locator: "openai/demo-artifacts/images/cat.png",
+        revision: "main",
+      },
+      role: "imported-source",
+      createdAt: "2026-04-17T00:00:00.000Z",
+    });
+  });
+
 });

@@ -116,8 +116,8 @@ Contributors should:
 - Transport adapter registration should be feature-sliced (for example `image-upload/...`) with only tiny top-level aggregators.
 - Host modules may depend on application/contracts/adapters.
 - Transport adapters may be selected by hosts.
-- Hosts may compose multiple specialized storage adapter families (for example artifact/object storage plus repo-backed storage providers) when task scope requires it.
-- Server/desktop host composition should keep those storage-family choices explicit in composition wiring rather than hiding provider semantics behind ad hoc transport/UI shortcuts.
+- Hosts may compose multiple specialized storage adapter families (artifact-object plus artifact-repo providers) when task scope requires it.
+- Server/desktop host composition should keep those storage-family choices explicit in composition wiring (for example future Hugging Face artifact-repo provider composition) rather than hiding provider semantics behind ad hoc transport/UI shortcuts.
 - Business rules remain in domain/application.
 - UI remains separate from host lifecycle internals.
 

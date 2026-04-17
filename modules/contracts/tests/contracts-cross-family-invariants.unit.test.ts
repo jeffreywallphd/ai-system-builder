@@ -30,7 +30,10 @@ import {
 import {
   createStoreArtifactRequest,
   createStoreArtifactSuccessResult,
+  createStoreArtifactInRepoRequest,
   normalizeStorageArtifactKey,
+  normalizeStorageKind,
+  normalizeStorageBackingReference,
 } from "../storage";
 import { createStagedArtifactDescriptorFromStorageObjectDescriptor } from "../ingestion";
 import { normalizeTransformRecord } from "../transform";
@@ -316,4 +319,28 @@ describe("contracts cross-family invariants", () => {
       to: { id: "orders.v1", kind: "dataset" },
     });
   });
+
+  it("keeps shared storage foundation thin across object and repo families", () => {
+    const objectKind = normalizeStorageKind("artifact-object");
+    const repoKind = normalizeStorageKind("artifact-repo");
+
+    const objectBacking = normalizeStorageBackingReference({
+      kind: objectKind,
+      provider: "local-filesystem",
+      locator: "workspace/ws-42/snapshots/state.json",
+    });
+    const repoRequest = createStoreArtifactInRepoRequest(new Uint8Array([1]), {
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "state.json",
+      },
+    });
+
+    expect(objectBacking.kind).toBe("artifact-object");
+    expect(repoKind).toBe("artifact-repo");
+    expect("repository" in objectBacking).toBe(false);
+    expect("key" in repoRequest.target).toBe(false);
+  });
+
 });
