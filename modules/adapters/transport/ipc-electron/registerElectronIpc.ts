@@ -2,15 +2,14 @@ import {
   registerImageUploadIpc,
   type RegisterImageUploadIpcDependencies,
 } from "./image-upload/registerImageUploadIpc";
+import type { IpcMainHandlePort } from "./ipcMainHandlePort";
 import {
   registerArtifactBrowserIpc,
   type RegisterArtifactBrowserIpcDependencies,
 } from "./artifact-browser/registerArtifactBrowserIpc";
 
-export type { IpcMainHandlePort } from "./image-upload/registerImageUploadIpc";
-
 export interface RegisterElectronIpcDependencies {
-  ipcMain: RegisterImageUploadIpcDependencies["ipcMain"];
+  ipcMain: IpcMainHandlePort;
   storeImageUploadUseCase: RegisterImageUploadIpcDependencies["storeImageUploadUseCase"];
   browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];

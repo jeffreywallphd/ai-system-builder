@@ -28,8 +28,8 @@ import type {
   ReadArtifactDetailUseCasePort,
   ReadArtifactDetailUseCaseResult,
 } from "../../../../application/use-cases";
-import type { IpcMainHandlePort } from "../image-upload/registerImageUploadIpc";
-export type { IpcMainHandlePort };
+import type { IpcMainHandlePort } from "../ipcMainHandlePort";
+export type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 export interface RegisterArtifactBrowserIpcDependencies {
   ipcMain: IpcMainHandlePort;

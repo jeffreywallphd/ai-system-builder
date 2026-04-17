@@ -15,6 +15,8 @@ import type {
   StoreImageUploadCommandContext,
   StoreImageUploadUseCaseResult,
 } from "../../../../application/use-cases";
+import type { IpcMainHandlePort } from "../ipcMainHandlePort";
+export type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 export interface StoreImageUploadUseCasePort {
   execute: (
@@ -25,16 +27,6 @@ export interface StoreImageUploadUseCasePort {
       correlationId?: string;
     },
   ) => Promise<StoreImageUploadUseCaseResult>;
-}
-
-export interface IpcMainHandlePort {
-  handle: (
-    channel: string,
-    listener: (
-      event: unknown,
-      request: DesktopImageUploadRequest,
-    ) => Promise<DesktopImageUploadResponse>,
-  ) => void;
 }
 
 export interface RegisterImageUploadIpcDependencies {
