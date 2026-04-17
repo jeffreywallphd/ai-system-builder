@@ -1,6 +1,7 @@
-import { describe, expect, it } from "../../testing/node-test";
+import { describe, expect, expectTypeOf, it } from "../../testing/node-test";
 
 import { createApiRequest } from "../api";
+import type { ContractBoundaryContext } from "../shared";
 import {
   normalizeArtifactBrowseSuccessValue,
   normalizeArtifactContentReadSuccessValue,
@@ -117,6 +118,21 @@ describe("contracts cross-family invariants", () => {
       correlationId: "corr-802",
       host: "server",
     });
+  });
+
+  it("keeps repo-storage request contracts payload-only while context flows at application boundaries", () => {
+    expectTypeOf<ReturnType<typeof createStoreArtifactInRepoRequest>>().not.toExtend<ContractBoundaryContext>();
+
+    const repoRequest = createStoreArtifactInRepoRequest(new Uint8Array([1]), {
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/a.png",
+      },
+    });
+
+    expect("requestId" in repoRequest).toBe(false);
+    expect("correlationId" in repoRequest).toBe(false);
   });
 
   it("keeps persistence record semantics distinct from storage key semantics", () => {

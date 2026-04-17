@@ -7,7 +7,7 @@ import { createStoreArtifactRequest } from "../../../../../contracts/storage";
 import { createLocalArtifactCatalogPersistenceAdapter } from "../../artifact-catalog";
 import {
   createFilesystemArtifactContentRetrievalAdapter,
-  createFilesystemArtifactStorageAdapter,
+  createFilesystemArtifactObjectStorageAdapter,
 } from "..";
 
 let tempRoots: string[] = [];
@@ -27,16 +27,16 @@ describe("filesystem artifact content retrieval adapter", () => {
   it("retrieves viewer media bytes from separate retrieval seam while browse contracts stay descriptor-only", async () => {
     const rootDirectory = await createTempRoot();
     const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
-    const storage = createFilesystemArtifactStorageAdapter({
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
       artifactCatalogAppend: artifactCatalog,
     });
     const mediaRetrieval = createFilesystemArtifactContentRetrievalAdapter({
-      storage,
+      storage: objectStorage,
       artifactCatalogRead: artifactCatalog,
     });
 
-    await storage.storeArtifact(
+    await objectStorage.storeArtifact(
       createStoreArtifactRequest(new Uint8Array([7, 8, 9]), {
         descriptor: {
           key: "uploads/session/view.png",

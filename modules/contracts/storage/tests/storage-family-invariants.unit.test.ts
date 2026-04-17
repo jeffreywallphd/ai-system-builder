@@ -133,6 +133,8 @@ describe("storage family invariants", () => {
       requestId: undefined,
       correlationId: undefined,
     });
+    expect("requestId" in repoRequest).toBe(false);
+    expect("correlationId" in repoRequest).toBe(false);
     expect(repoRequest.target).toEqual({
       provider: "huggingface",
       repository: "openai/demo-artifacts",

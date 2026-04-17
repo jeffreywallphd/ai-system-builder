@@ -5,7 +5,7 @@
 `ai-system-builder` treats **persistence** and **storage** as separate architecture concerns.
 
 - **Persistence**: structured, durable application records and relational/queryable state.
-- **Storage**: file/blob/artifact-oriented content and workspace-like material.
+- **Storage**: a thin shared foundation plus specialized storage families for artifact content and provider/repository-backed material.
 
 This distinction is required even when both end up on the same machine or disk.
 
@@ -114,27 +114,28 @@ Separate boundaries keep policies clear and change safer.
 
 ## Shared storage contract baseline
 
-The shared storage contract vocabulary under `modules/contracts/storage` is intentionally:
+The shared storage contract vocabulary under `modules/contracts/storage` is intentionally thin and family-neutral:
 
-- artifact-oriented (uploads, generated outputs, exports, temp workspace artifacts),
-- key-based (logical artifact identifiers rather than physical path assumptions),
-- metadata-aware (optional media type, size, checksum, and artifact metadata),
-- operation-scoped (`store`, `retrieve`, `has`, `delete` request/result contracts).
+- identity primitives (`StorageKind`, `StorageProviderId`),
+- thin backing references (`StorageBackingReference`),
+- explicit linkage between internal artifacts and concrete backings (`ArtifactStorageBinding`).
+
+The shared baseline does not force every storage family into one request/response shape.
+
+Specialized storage families then define their own operation contracts:
+
+- **artifact-object storage** keeps key/blob/object semantics (`store`/`retrieve`/`has`/`delete` with storage-key descriptors),
+- **artifact-repo storage** keeps provider/repository/revision/path semantics (`store/retrieve/has artifact in repo`).
 
 Storage family invariants:
 
-- artifact identity is logical-key-first and path-agnostic; keys are normalized through shared storage key helpers.
-- storage request/result contracts stay artifact-operation-specific (`store`, `retrieve`, `has`, `delete`) and avoid persistence-style record semantics.
-- checksum metadata in storage descriptors should be generated at the storage adapter boundary from the bytes actually written (for integrity/diagnostics), not treated as deduplication policy.
-- storage family barrels should export storage-only surfaces so artifact usage is predictable and mechanically discoverable.
+- shared foundation remains thin and generic rather than object-storage-specific,
+- artifact-object and artifact-repo families are peer first-class specializations,
+- object-family contracts stay key/blob oriented without repo/provider fields,
+- repo-family contracts stay provider/repository/revision/path oriented without key/blob flattening,
+- storage family barrels export storage-only surfaces so family boundaries remain explicit and mechanically discoverable.
 
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
-
-Current-state note:
-
-- The currently implemented shared storage contracts are artifact/object-oriented (key/byte operations).
-- This is not a claim that all storage families must use identical contracts.
-- Additional storage contract families are expected as repo-backed adapters are introduced.
 
 ## Repo-backed storage direction (forward-looking)
 

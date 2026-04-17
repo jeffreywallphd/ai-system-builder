@@ -33,8 +33,8 @@
 - When persistence contracts include a record reference, operation identity should target that record type (`<recordType>.<action>[.<qualifier>...]`).
 - Keep persistence family exports scoped to persistence contracts only.
 - Keep application persistence-port seams operation-aware and record-oriented (not CRUD-generic), with focused anti-drift tests in `modules/application/ports/persistence/tests/`.
-- Shared storage contracts are key-based and artifact-oriented (`modules/contracts/storage`) and should avoid physical-path assumptions.
-- Current shared storage contracts are artifact/object-oriented; future repo-backed storage families may require specialized contract families instead of forced flattening.
+- Shared storage contracts should stay thin and family-neutral (`modules/contracts/storage`) and should avoid physical-path assumptions.
+- Specialized families define operation contracts: artifact-object for key/blob semantics and artifact-repo for provider/repository/revision/path semantics.
 - Shared ingestion contracts (`modules/contracts/ingestion`) should carry staged artifact intake metadata (for example source kind, original name, staged artifact identity) without becoming transport-specific.
 - Storage key creation/normalization should flow through shared storage key helpers to prevent per-operation key-shape drift.
 - Storage checksums should be computed in concrete storage adapters from persisted bytes and surfaced through descriptor results; checksum support does not imply deduplication behavior.

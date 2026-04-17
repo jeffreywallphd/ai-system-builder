@@ -130,6 +130,13 @@ describe("ArtifactRepoStoragePort", () => {
       path: "images/a.png",
     });
 
+    expect("requestId" in storeRequest).toBe(false);
+    expect("correlationId" in storeRequest).toBe(false);
+    expect("requestId" in retrieveRequest).toBe(false);
+    expect("correlationId" in retrieveRequest).toBe(false);
+    expect("requestId" in hasRequest).toBe(false);
+    expect("correlationId" in hasRequest).toBe(false);
+
     expect("key" in storeRequest.target).toBe(false);
   });
 });
