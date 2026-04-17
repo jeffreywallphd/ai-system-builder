@@ -1,4 +1,4 @@
-export interface ArtifactBrowserBoundaryContext {
+export interface ApplicationRequestContext {
   requestId?: string;
   correlationId?: string;
 }

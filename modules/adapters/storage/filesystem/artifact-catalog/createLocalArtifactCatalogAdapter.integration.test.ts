@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "../../../../testing/node-test";
-import { createLocalArtifactCatalogAdapter } from "./createLocalArtifactCatalogAdapter";
+import { createLocalArtifactCatalogPersistenceAdapter } from "./createLocalArtifactCatalogAdapter";
 
 let tempRoots: string[] = [];
 
@@ -18,10 +18,10 @@ async function createTempRoot(): Promise<string> {
   return root;
 }
 
-describe("createLocalArtifactCatalogAdapter", () => {
+describe("createLocalArtifactCatalogPersistenceAdapter", () => {
   it("appends and reads image catalog metadata through explicit catalog operations", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createLocalArtifactCatalogAdapter({ rootDirectory });
+    const adapter = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
 
     const append = await adapter.appendArtifactCatalogRecord({
       record: {

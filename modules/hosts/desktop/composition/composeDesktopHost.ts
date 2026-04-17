@@ -10,7 +10,7 @@ import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactStorageAdapter,
-  createLocalArtifactCatalogAdapter,
+  createLocalArtifactCatalogPersistenceAdapter,
 } from "../../../adapters/storage/filesystem";
 import {
   registerElectronIpc,
@@ -65,7 +65,7 @@ export function composeDesktopHost(
     loggingPort,
     loggingConfig,
     registerImageUploadIpc(registerOptions) {
-      const artifactCatalog = createLocalArtifactCatalogAdapter({
+      const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
       const storage = createFilesystemArtifactStorageAdapter({
@@ -79,10 +79,11 @@ export function composeDesktopHost(
         artifactCatalogRead: artifactCatalog,
         storage,
       });
-      createFilesystemArtifactContentRetrievalAdapter({
+      const artifactMediaViewRetrieval = createFilesystemArtifactContentRetrievalAdapter({
         storage,
         artifactCatalogRead: artifactCatalog,
       });
+      void artifactMediaViewRetrieval;
 
       const storeImageUploadUseCase = new StoreImageUploadUseCase({
         storage,

@@ -10,7 +10,7 @@ import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactStorageAdapter,
-  createLocalArtifactCatalogAdapter,
+  createLocalArtifactCatalogPersistenceAdapter,
 } from "../../../adapters/storage/filesystem";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
 import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
@@ -64,7 +64,7 @@ export function composeServerHost(
     loggingPort,
     loggingConfig,
     registerApi(registerOptions) {
-      const artifactCatalog = createLocalArtifactCatalogAdapter({
+      const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
       const storage = createFilesystemArtifactStorageAdapter({
@@ -78,7 +78,7 @@ export function composeServerHost(
         artifactCatalogRead: artifactCatalog,
         storage,
       });
-      const artifactContentRetrieval = createFilesystemArtifactContentRetrievalAdapter({
+      const artifactMediaViewRetrieval = createFilesystemArtifactContentRetrievalAdapter({
         storage,
         artifactCatalogRead: artifactCatalog,
       });
@@ -105,7 +105,7 @@ export function composeServerHost(
         browseArtifactsUseCase: browseArtifacts,
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
-        artifactContentRetrieval,
+        artifactMediaViewRetrieval,
       });
     },
   };

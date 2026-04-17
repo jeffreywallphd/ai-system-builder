@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "../../../../testing/node-test";
 import { createSuccessResult, type ContractResult } from "../../../../contracts/shared";
+import type { ApplicationRequestContext } from "../../application-request-context";
 
 import type {
   AppendArtifactCatalogRecordRequest,
@@ -24,6 +25,12 @@ describe("artifact catalog application ports", () => {
     >();
     expectTypeOf<Parameters<ArtifactCatalogReadPort["readArtifactCatalogRecord"]>[0]>().toExtend<
       ReadArtifactCatalogRecordRequest
+    >();
+    expectTypeOf<Parameters<ArtifactCatalogAppendPort["appendArtifactCatalogRecord"]>[1]>().toExtend<
+      ApplicationRequestContext | undefined
+    >();
+    expectTypeOf<Parameters<ArtifactCatalogReadPort["browseArtifactCatalogRecords"]>[1]>().toExtend<
+      ApplicationRequestContext | undefined
     >();
 
     const appendPort: ArtifactCatalogAppendPort = {
@@ -52,5 +59,6 @@ describe("artifact catalog application ports", () => {
     expect(append.ok).toBe(true);
     expect(browse.ok).toBe(true);
     expect(read.ok).toBe(true);
+    expect("requestId" in { artifactKind: "image" }).toBe(false);
   });
 });

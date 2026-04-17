@@ -49,7 +49,7 @@ describe("api artifact browser client", () => {
     const browse = await client.browseImageArtifacts();
     const detail = await client.readArtifactDetail({ storageKey: "uploads/a.png" });
     const content = await client.readArtifactContent({ storageKey: "uploads/a.png" });
-    const imageViewUrl = client.createArtifactImageViewUrl({ storageKey: "uploads/a.png" });
+    const imageViewUrl = client.createArtifactMediaViewUrl({ storageKey: "uploads/a.png" });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -71,6 +71,6 @@ describe("api artifact browser client", () => {
     expect(detail.locator.storageKey).toBe("uploads/a.png");
     expect(content.retrieval).toBe("deferred");
     expect((content as unknown as { bytes?: unknown }).bytes).toBeUndefined();
-    expect(imageViewUrl).toBe("/api/artifact/content/view?storageKey=uploads%2Fa.png");
+    expect(imageViewUrl).toBe("/api/artifact/media/view?storageKey=uploads%2Fa.png");
   });
 });

@@ -42,7 +42,7 @@ describe("ArtifactBrowserFeature", () => {
         availability: "available" as const,
         retrieval: "deferred" as const,
       }),
-      createArtifactImageViewUrl: vi.fn().mockReturnValue("/api/artifact/content/view?storageKey=uploads%2Fcat.png"),
+      createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
     };
 
     const container = document.createElement("div");
@@ -64,9 +64,10 @@ describe("ArtifactBrowserFeature", () => {
 
     expect(client.readArtifactDetail).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
     expect(client.readArtifactContent).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
+    expect(client.createArtifactMediaViewUrl).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
     expect(container.textContent).toContain("Availability");
     expect(container.textContent).toContain("deferred");
     const image = container.querySelector("img") as HTMLImageElement;
-    expect(image.src).toContain("/api/artifact/content/view?storageKey=uploads%2Fcat.png");
+    expect(image.src).toContain("/api/artifact/media/view?storageKey=uploads%2Fcat.png");
   });
 });

@@ -3,15 +3,15 @@
 `createFilesystemArtifactStorageAdapter` is a filesystem-backed
 `ArtifactStoragePort` implementation for host-local artifact bytes.
 
-`createLocalArtifactCatalogAdapter` is the local artifact-catalog metadata adapter
-that owns append/browse/read catalog-record behavior.
+`createLocalArtifactCatalogPersistenceAdapter` is the local artifact-catalog
+persistence adapter that owns append/browse/read catalog-record behavior.
 
 `createFilesystemArtifactBrowserReadAdapter` is an artifact-browser read adapter
 that depends on the catalog seam for metadata reads and optional storage presence
 checks for content descriptor availability.
 
-`createFilesystemArtifactContentRetrievalAdapter` is a separate retrieval adapter
-for actual image bytes used by viewer rendering paths.
+`createFilesystemArtifactContentRetrievalAdapter` is a separate media-view
+retrieval adapter for actual image bytes used by viewer rendering paths.
 
 Current behavior:
 
@@ -20,4 +20,4 @@ Current behavior:
 - serves artifact browser browse/detail/content-read from artifact catalog records,
 - keeps browser contracts storage-key based and path-agnostic,
 - keeps `artifact.content.read` descriptor-oriented,
-- serves actual image bytes through a separate retrieval path.
+- serves actual image bytes through the separate `/artifact/media/view` retrieval path.

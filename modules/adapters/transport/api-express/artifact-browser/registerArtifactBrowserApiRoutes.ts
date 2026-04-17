@@ -66,7 +66,7 @@ export interface RegisterArtifactBrowserApiRoutesDependencies {
   browseArtifactsUseCase: BrowseArtifactsUseCasePort;
   readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
   readArtifactContentUseCase: ReadArtifactContentUseCasePort;
-  artifactContentRetrieval: ArtifactContentRetrievalPort;
+  artifactMediaViewRetrieval: ArtifactContentRetrievalPort;
 }
 
 function getRequestHeader(
@@ -96,6 +96,15 @@ function getQueryValue(
 function normalizeSource(value: string | undefined): string {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : "thin-client.artifact-browser";
+}
+
+function mapArtifactBrowserApiRequestContext(
+  request: ExpressRequestLike,
+): { requestId?: string; correlationId?: string } {
+  return {
+    requestId: getRequestHeader(request.headers, "x-request-id"),
+    correlationId: getRequestHeader(request.headers, "x-correlation-id"),
+  };
 }
 
 function resolveStatusCode(
@@ -169,6 +178,19 @@ export function mapArtifactContentReadApiRequestToCommand(
   );
 
   return { locator: apiRequest.payload.locator };
+}
+
+export function mapArtifactMediaViewApiRequest(
+  request: ExpressRequestLike,
+): {
+  storageKey: string;
+} {
+  const storageKey = getQueryValue(request.query, "storageKey")?.trim();
+  if (!storageKey) {
+    throw new Error("storageKey query parameter is required.");
+  }
+
+  return { storageKey };
 }
 
 export function mapBrowseArtifactsResultToApiResponse(
@@ -247,9 +269,7 @@ export function registerArtifactBrowserApiRoutes(
   dependencies: RegisterArtifactBrowserApiRoutesDependencies,
 ): void {
   dependencies.app.post("/api/artifact/browse", async (request, response) => {
-    const requestId = getRequestHeader(request.headers, "x-request-id");
-    const correlationId = getRequestHeader(request.headers, "x-correlation-id");
-    const context = { requestId, correlationId };
+    const context = mapArtifactBrowserApiRequestContext(request);
 
     let command: BrowseArtifactsCommand;
     try {
@@ -273,9 +293,7 @@ export function registerArtifactBrowserApiRoutes(
   });
 
   dependencies.app.post("/api/artifact/read", async (request, response) => {
-    const requestId = getRequestHeader(request.headers, "x-request-id");
-    const correlationId = getRequestHeader(request.headers, "x-correlation-id");
-    const context = { requestId, correlationId };
+    const context = mapArtifactBrowserApiRequestContext(request);
 
     let command: ReadArtifactDetailCommand;
     try {
@@ -299,9 +317,7 @@ export function registerArtifactBrowserApiRoutes(
   });
 
   dependencies.app.post("/api/artifact/content/read", async (request, response) => {
-    const requestId = getRequestHeader(request.headers, "x-request-id");
-    const correlationId = getRequestHeader(request.headers, "x-correlation-id");
-    const context = { requestId, correlationId };
+    const context = mapArtifactBrowserApiRequestContext(request);
 
     let command: ReadArtifactContentCommand;
     try {
@@ -324,25 +340,24 @@ export function registerArtifactBrowserApiRoutes(
     response.status(resolveStatusCode(apiResponse)).json(apiResponse);
   });
 
-  dependencies.app.get("/api/artifact/content/view", async (request, response) => {
-    const requestId = getRequestHeader(request.headers, "x-request-id");
-    const correlationId = getRequestHeader(request.headers, "x-correlation-id");
-    const context = { requestId, correlationId };
-    const storageKey = getQueryValue(request.query, "storageKey")?.trim();
-
-    if (!storageKey) {
+  dependencies.app.get("/api/artifact/media/view", async (request, response) => {
+    const context = mapArtifactBrowserApiRequestContext(request);
+    let mediaViewRequest: { storageKey: string };
+    try {
+      mediaViewRequest = mapArtifactMediaViewApiRequest(request);
+    } catch (error) {
       response.status(400).json(
         createApiArtifactContentReadFailureResponse(
           "validation",
-          "storageKey query parameter is required.",
+          error instanceof Error ? error.message : "Invalid artifact media-view request.",
           context,
         ),
       );
       return;
     }
 
-    const retrievalResult = await dependencies.artifactContentRetrieval.retrieveArtifactContentByStorageKey(
-      { storageKey },
+    const retrievalResult = await dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey(
+      mediaViewRequest,
       context,
     );
 
@@ -358,8 +373,8 @@ export function registerArtifactBrowserApiRoutes(
         retrievalResult.error.message,
         {
           details: retrievalResult.error.details,
-          requestId,
-          correlationId,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
         },
       );
       response.status(resolveStatusCode(payload)).json(payload);

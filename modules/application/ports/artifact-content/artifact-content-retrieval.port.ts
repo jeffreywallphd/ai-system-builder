@@ -1,7 +1,7 @@
 import type { ContractResult } from "../../../contracts/shared";
-import type { ArtifactBrowserBoundaryContext } from "../artifact-browser";
+import type { ApplicationRequestContext } from "../application-request-context";
 
-export interface RetrieveArtifactContentByStorageKeyRequest {
+export interface RetrieveArtifactViewerMediaByStorageKeyRequest {
   storageKey: string;
 }
 
@@ -13,8 +13,8 @@ export interface ArtifactContentRetrievalValue {
 }
 
 export interface ArtifactContentRetrievalPort {
-  retrieveArtifactContentByStorageKey(
-    request: RetrieveArtifactContentByStorageKeyRequest,
-    context?: ArtifactBrowserBoundaryContext,
+  retrieveArtifactViewerMediaByStorageKey(
+    request: RetrieveArtifactViewerMediaByStorageKeyRequest,
+    context?: ApplicationRequestContext,
   ): Promise<ContractResult<ArtifactContentRetrievalValue>>;
 }

@@ -28,9 +28,8 @@ import type {
   ReadArtifactDetailUseCasePort,
   ReadArtifactDetailUseCaseResult,
 } from "../../../../application/use-cases";
-
-export type { IpcMainHandlePort } from "../image-upload/registerImageUploadIpc";
 import type { IpcMainHandlePort } from "../image-upload/registerImageUploadIpc";
+export type { IpcMainHandlePort };
 
 export interface RegisterArtifactBrowserIpcDependencies {
   ipcMain: IpcMainHandlePort;
@@ -60,6 +59,18 @@ export function mapDesktopArtifactContentReadRequestToCommand(
 ): ReadArtifactContentCommand {
   return {
     locator: request.payload.locator,
+  };
+}
+
+export function mapDesktopArtifactRequestContext(
+  request:
+    | DesktopArtifactBrowseRequest
+    | DesktopArtifactReadRequest
+    | DesktopArtifactContentReadRequest,
+): { requestId?: string; correlationId?: string } {
+  return {
+    requestId: request.requestId,
+    correlationId: request.correlationId,
   };
 }
 
@@ -171,10 +182,10 @@ export function createDesktopArtifactBrowseIpcHandler(
     request: DesktopArtifactBrowseRequest,
   ): Promise<DesktopArtifactBrowseResponse> => {
     const command = mapDesktopArtifactBrowseRequestToCommand(request);
-    const result = await browseArtifactsUseCase.execute(command, {
-      requestId: request.requestId,
-      correlationId: request.correlationId,
-    });
+    const result = await browseArtifactsUseCase.execute(
+      command,
+      mapDesktopArtifactRequestContext(request),
+    );
 
     return mapBrowseArtifactsResultToDesktopResponse(result, request);
   };
@@ -188,10 +199,10 @@ export function createDesktopArtifactReadIpcHandler(
     request: DesktopArtifactReadRequest,
   ): Promise<DesktopArtifactReadResponse> => {
     const command = mapDesktopArtifactReadRequestToCommand(request);
-    const result = await readArtifactDetailUseCase.execute(command, {
-      requestId: request.requestId,
-      correlationId: request.correlationId,
-    });
+    const result = await readArtifactDetailUseCase.execute(
+      command,
+      mapDesktopArtifactRequestContext(request),
+    );
 
     return mapReadArtifactDetailResultToDesktopResponse(result, request);
   };
@@ -205,10 +216,10 @@ export function createDesktopArtifactContentReadIpcHandler(
     request: DesktopArtifactContentReadRequest,
   ): Promise<DesktopArtifactContentReadResponse> => {
     const command = mapDesktopArtifactContentReadRequestToCommand(request);
-    const result = await readArtifactContentUseCase.execute(command, {
-      requestId: request.requestId,
-      correlationId: request.correlationId,
-    });
+    const result = await readArtifactContentUseCase.execute(
+      command,
+      mapDesktopArtifactRequestContext(request),
+    );
 
     return mapReadArtifactContentResultToDesktopResponse(result, request);
   };

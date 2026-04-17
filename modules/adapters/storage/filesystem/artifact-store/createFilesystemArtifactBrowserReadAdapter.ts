@@ -3,13 +3,13 @@ import type {
   ArtifactCatalogRecord,
 } from "../../../../application/ports/artifact-catalog";
 import type {
-  ArtifactBrowserBoundaryContext,
   ArtifactBrowserContentReadPort,
   ArtifactBrowserMetadataReadPort,
   BrowseArtifactsRequest,
   ReadArtifactContentRequest,
   ReadArtifactDetailRequest,
 } from "../../../../application/ports/artifact-browser";
+import type { ApplicationRequestContext } from "../../../../application/ports";
 import type { ArtifactStoragePort } from "../../../../application/ports/storage";
 import {
   createArtifactBrowserLocator,
@@ -81,7 +81,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
   return {
     async browseArtifacts(
       request: BrowseArtifactsRequest,
-      context: ArtifactBrowserBoundaryContext = {},
+      context: ApplicationRequestContext = {},
     ) {
       const browseResult = await options.artifactCatalogRead.browseArtifactCatalogRecords(
         {
@@ -103,7 +103,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
 
     async readArtifactDetail<TMetadata extends StorageObjectMetadata = StorageObjectMetadata>(
       request: ReadArtifactDetailRequest,
-      context: ArtifactBrowserBoundaryContext = {},
+      context: ApplicationRequestContext = {},
     ) {
       const storageKey = normalizeStorageArtifactKey(request.locator.storageKey);
       const readResult = await options.artifactCatalogRead.readArtifactCatalogRecord(
@@ -123,7 +123,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
 
     async readArtifactContent(
       request: ReadArtifactContentRequest,
-      context: ArtifactBrowserBoundaryContext = {},
+      context: ApplicationRequestContext = {},
     ) {
       const storageKey = normalizeStorageArtifactKey(request.locator.storageKey);
       const readResult = await options.artifactCatalogRead.readArtifactCatalogRecord(
