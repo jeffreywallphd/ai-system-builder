@@ -55,11 +55,15 @@ describe("artifact browser read use cases", () => {
       artifactBrowserMetadataRead: createMetadataReadPort({ browseArtifacts }),
     });
 
-    const result = await useCase.execute({
-      artifactKind: "image",
-      requestId: "req-browse-1",
-      correlationId: "corr-browse-1",
-    });
+    const result = await useCase.execute(
+      {
+        artifactKind: "image",
+      },
+      {
+        requestId: "req-browse-1",
+        correlationId: "corr-browse-1",
+      },
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -76,11 +80,15 @@ describe("artifact browser read use cases", () => {
       ],
     });
     expect("content" in result.value.items[0]).toBe(false);
-    expect(browseArtifacts).toHaveBeenCalledWith({
-      artifactKind: "image",
-      requestId: "req-browse-1",
-      correlationId: "corr-browse-1",
-    });
+    expect(browseArtifacts).toHaveBeenCalledWith(
+      {
+        artifactKind: "image",
+      },
+      {
+        requestId: "req-browse-1",
+        correlationId: "corr-browse-1",
+      },
+    );
   });
 
   it("browse validates first-slice artifact kind and avoids calling the port on invalid input", async () => {

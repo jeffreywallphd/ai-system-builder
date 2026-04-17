@@ -244,12 +244,19 @@ describe("application ports cross-family invariants", () => {
       locator: { storageKey: string };
     }>();
 
+    expectTypeOf<BrowseArtifactsRequest>().not.toExtend<{ requestId: string }>();
+    expectTypeOf<BrowseArtifactsRequest>().not.toExtend<{ correlationId: string }>();
+
     expectTypeOf<ReadArtifactDetailRequest>().not.toExtend<{
       locator: { path: string };
     }>();
     expectTypeOf<ReadArtifactContentRequest>().not.toExtend<{
       locator: { path: string };
     }>();
+
+    expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["browseArtifacts"]>[1]>().toExtend<
+      { requestId?: string; correlationId?: string } | undefined
+    >();
 
     expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["readArtifactDetail"]>[0]>().not.toExtend<{
       content: unknown;

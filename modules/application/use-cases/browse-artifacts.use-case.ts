@@ -6,6 +6,7 @@ import {
 } from "../../contracts/shared";
 import type { ArtifactBrowserMetadataReadPort } from "../ports/artifact-browser";
 import type {
+  ArtifactBrowserCommandContext,
   BrowseArtifactsCommand,
   BrowseArtifactsUseCaseResult,
 } from "./artifact-browser-read.types";
@@ -23,6 +24,7 @@ export class BrowseArtifactsUseCase {
 
   public async execute(
     command: BrowseArtifactsCommand,
+    context: ArtifactBrowserCommandContext = {},
   ): Promise<BrowseArtifactsUseCaseResult> {
     if (command.artifactKind !== "image") {
       return createFailureResult(
@@ -30,22 +32,23 @@ export class BrowseArtifactsUseCase {
           "validation",
           `artifactKind must be "image". Received "${String(command.artifactKind)}".`,
         ),
-        command,
+        context,
       );
     }
 
     try {
-      const result = await this.artifactBrowserMetadataRead.browseArtifacts({
-        artifactKind: "image",
-        requestId: command.requestId,
-        correlationId: command.correlationId,
-      });
+      const result = await this.artifactBrowserMetadataRead.browseArtifacts(
+        {
+          artifactKind: "image",
+        },
+        context,
+      );
 
       if (!result.ok) {
         return result;
       }
 
-      return createSuccessResult(normalizeArtifactBrowseSuccessValue(result.value), command);
+      return createSuccessResult(normalizeArtifactBrowseSuccessValue(result.value), context);
     } catch (error) {
       return createFailureResult(
         createContractError("internal", "Unexpected artifact browse failure.", {
@@ -53,7 +56,7 @@ export class BrowseArtifactsUseCase {
             reason: error instanceof Error ? error.message : String(error),
           },
         }),
-        command,
+        context,
       );
     }
   }

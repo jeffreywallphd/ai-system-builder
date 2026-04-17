@@ -6,6 +6,7 @@ import type {
 import type { ContractErrorDetails, ContractResult } from "../../contracts/shared";
 import type { StorageObjectMetadata } from "../../contracts/storage";
 import type {
+  ArtifactBrowserBoundaryContext,
   BrowseArtifactsRequest,
   ReadArtifactContentRequest,
   ReadArtifactDetailRequest,
@@ -16,6 +17,8 @@ export type BrowseArtifactsCommand = BrowseArtifactsRequest;
 export type ReadArtifactDetailCommand = ReadArtifactDetailRequest;
 
 export type ReadArtifactContentCommand = ReadArtifactContentRequest;
+
+export type ArtifactBrowserCommandContext = ArtifactBrowserBoundaryContext;
 
 export type BrowseArtifactsUseCaseResult<
   TDetails extends ContractErrorDetails = ContractErrorDetails,

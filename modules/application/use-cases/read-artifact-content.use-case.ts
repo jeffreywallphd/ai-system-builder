@@ -9,6 +9,7 @@ import {
 } from "../../contracts/shared";
 import type { ArtifactBrowserContentReadPort } from "../ports/artifact-browser";
 import type {
+  ArtifactBrowserCommandContext,
   ReadArtifactContentCommand,
   ReadArtifactContentUseCaseResult,
 } from "./artifact-browser-read.types";
@@ -26,6 +27,7 @@ export class ReadArtifactContentUseCase {
 
   public async execute(
     command: ReadArtifactContentCommand,
+    context: ArtifactBrowserCommandContext = {},
   ): Promise<ReadArtifactContentUseCaseResult> {
     let locator;
 
@@ -38,22 +40,23 @@ export class ReadArtifactContentUseCase {
             reason: error instanceof Error ? error.message : String(error),
           },
         }),
-        command,
+        context,
       );
     }
 
     try {
-      const result = await this.artifactBrowserContentRead.readArtifactContent({
-        locator,
-        requestId: command.requestId,
-        correlationId: command.correlationId,
-      });
+      const result = await this.artifactBrowserContentRead.readArtifactContent(
+        {
+          locator,
+        },
+        context,
+      );
 
       if (!result.ok) {
         return result;
       }
 
-      return createSuccessResult(normalizeArtifactContentReadSuccessValue(result.value), command);
+      return createSuccessResult(normalizeArtifactContentReadSuccessValue(result.value), context);
     } catch (error) {
       return createFailureResult(
         createContractError("internal", "Unexpected artifact content read failure.", {
@@ -61,7 +64,7 @@ export class ReadArtifactContentUseCase {
             reason: error instanceof Error ? error.message : String(error),
           },
         }),
-        command,
+        context,
       );
     }
   }
