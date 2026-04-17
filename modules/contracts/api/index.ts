@@ -9,3 +9,4 @@ export * from "./artifact-content-read-api-contract";
 
 export * from "./artifact-repo-has-api-contract";
 export * from "./artifact-repo-store-api-contract";
+export * from "./artifact-publish-api-contract";

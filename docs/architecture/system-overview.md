@@ -210,5 +210,4 @@ Server composition now wires both storage families as peers:
 - local filesystem artifact-object storage for upload/catalog/browser flows, and
 - artifact-repo aggregate storage with Hugging Face as first provider adapter.
 
-A minimal artifact-repo API slice is exposed (`artifact-repo.has`, `artifact-repo.store`) through dedicated application use cases.
-
+A minimal artifact-repo API slice is exposed (`artifact-repo.has`, `artifact-repo.store`, `artifact.publish`) through dedicated application use cases.

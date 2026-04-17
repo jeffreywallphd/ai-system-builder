@@ -222,14 +222,15 @@ Server host composition now exposes a minimal but usable artifact-repo API slice
 
 - `POST /api/artifact-repo/has` -> `HasArtifactInRepoUseCase`
 - `POST /api/artifact-repo/store` -> `StoreArtifactInRepoUseCase`
+- `POST /api/artifact/publish` -> `PublishArtifactToRepoUseCase` (store + verify + published binding write)
 
 This is intentionally partial. It does **not** claim full provider management or provider-native browser parity.
 
 ### Hugging Face provider hardening status
 
-The Hugging Face adapter remains one provider behind the generic artifact-repo port and now uses a provider-oriented commit flow for writes (commit API with explicit operation payloads) plus resolve-based read/existence checks.
+The Hugging Face adapter remains one provider behind the generic artifact-repo port and now uses the official `@huggingface/hub` client methods (`fileExists`, `uploadFile`, `downloadFile`) as the primary path, with a thin isolated HTTP fallback when the client is unavailable.
 
 - Provider/repo/path validation is explicit and deterministic.
 - Auth is adapter-boundary-only and required for write operations.
 - Provider status mapping is explicit (`validation`, `not-found`, `unavailable`, `internal`).
-
+- Published-backing linkage is persisted as `ArtifactStorageBinding` (`role = published`, `kind = artifact-repo`) after successful publish verification.

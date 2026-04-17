@@ -66,6 +66,5 @@
 
 ## Current implementation checkpoint (server host)
 
-- `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has` and `POST /api/artifact-repo/store`.
+- `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has`, `POST /api/artifact-repo/store`, and `POST /api/artifact/publish`.
 - These routes delegate through application use cases; they do not bypass to storage adapters directly.
-

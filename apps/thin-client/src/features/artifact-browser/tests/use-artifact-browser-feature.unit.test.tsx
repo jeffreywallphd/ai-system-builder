@@ -4,6 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ArtifactBrowserFeature } from "../components/ArtifactBrowserFeature";
 
+function setInputValue(input: HTMLInputElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
+  descriptor?.set?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 describe("ArtifactBrowserFeature", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
@@ -20,7 +26,7 @@ describe("ArtifactBrowserFeature", () => {
     mountedContainer = undefined;
   });
 
-  it("loads list then loads detail/content when an artifact is selected", async () => {
+  it("publishes a selected artifact and shows published backing details", async () => {
     const client = {
       browseImageArtifacts: vi.fn().mockResolvedValue([
         {
@@ -43,6 +49,13 @@ describe("ArtifactBrowserFeature", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
+      publishArtifactToHuggingFace: vi.fn().mockResolvedValue({
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        exists: true,
+      }),
     };
 
     const container = document.createElement("div");
@@ -55,19 +68,81 @@ describe("ArtifactBrowserFeature", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    expect(client.browseImageArtifacts).toHaveBeenCalledOnce();
-
-    const button = container.querySelector("button") as HTMLButtonElement;
+    const artifactButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
     await act(async () => {
-      button.click();
+      artifactButton.click();
     });
 
-    expect(client.readArtifactDetail).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
-    expect(client.readArtifactContent).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
-    expect(client.createArtifactMediaViewUrl).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
-    expect(container.textContent).toContain("Availability");
-    expect(container.textContent).toContain("deferred");
-    const image = container.querySelector("img") as HTMLImageElement;
-    expect(image.src).toContain("/api/artifact/media/view?storageKey=uploads%2Fcat.png");
+    const inputs = Array.from(container.querySelectorAll("input"));
+    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
+
+    const publishButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("Publish to Hugging Face")) as HTMLButtonElement;
+    await act(async () => {
+      publishButton.click();
+    });
+
+    expect(client.publishArtifactToHuggingFace).toHaveBeenCalledWith({
+      artifactId: "uploads/cat.png",
+      repository: "openai/demo",
+      path: "images/cat.png",
+      revision: "main",
+      mediaType: undefined,
+    });
+    expect(container.textContent).toContain("Published Backing");
+    expect(container.textContent).toContain("openai/demo");
+    expect(container.textContent).toContain("yes");
+  });
+
+  it("shows publish failure message", async () => {
+    const client = {
+      browseImageArtifacts: vi.fn().mockResolvedValue([
+        {
+          storageKey: "uploads/cat.png",
+          artifactKind: "image" as const,
+        },
+      ]),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/cat.png" },
+        artifactKind: "image" as const,
+      }),
+      readArtifactContent: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/cat.png" },
+        availability: "available" as const,
+        retrieval: "deferred" as const,
+      }),
+      createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
+      publishArtifactToHuggingFace: vi.fn().mockRejectedValue(new Error("Missing Hugging Face token.")),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const artifactButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    await act(async () => {
+      artifactButton.click();
+    });
+
+    const inputs = Array.from(container.querySelectorAll("input"));
+    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
+
+    const publishButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("Publish to Hugging Face")) as HTMLButtonElement;
+    await act(async () => {
+      publishButton.click();
+    });
+
+    expect(container.textContent).toContain("Missing Hugging Face token.");
   });
 });

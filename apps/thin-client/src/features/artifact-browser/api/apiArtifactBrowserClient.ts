@@ -28,11 +28,26 @@ export interface ThinClientArtifactContentDescriptor {
   retrieval: "inline" | "deferred";
 }
 
+export interface ThinClientPublishedBacking {
+  provider: string;
+  repository: string;
+  path: string;
+  revision?: string;
+  exists: boolean;
+}
+
 export interface ArtifactBrowserApiClient {
   browseImageArtifacts: () => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator) => string;
+  publishArtifactToHuggingFace: (input: {
+    artifactId: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<ThinClientPublishedBacking>;
 }
 
 interface ApiResponseEnvelope {
@@ -136,6 +151,37 @@ export function createApiArtifactBrowserClient(
     createArtifactMediaViewUrl(locator: ArtifactBrowserLocator): string {
       const query = new URLSearchParams({ storageKey: locator.storageKey });
       return createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`);
+    },
+
+    async publishArtifactToHuggingFace(input): Promise<ThinClientPublishedBacking> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/publish"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          artifactId: input.artifactId,
+          target: {
+            provider: "huggingface",
+            repository: input.repository,
+            revision: input.revision,
+            path: input.path,
+          },
+          mediaType: input.mediaType,
+          verify: true,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const backing = value as ThinClientPublishedBacking;
+        if (!backing || typeof backing !== "object") {
+          throw new Error("Artifact publish response is missing backing information.");
+        }
+
+        return backing;
+      });
     },
   };
 }
