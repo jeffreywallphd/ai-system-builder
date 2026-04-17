@@ -21,6 +21,7 @@ const DEFAULT_HUB_BASE_URL = "https://huggingface.co" as const;
 type HuggingFaceRepoType = "dataset" | "model";
 
 class HuggingFaceAdapterValidationError extends Error {}
+class HuggingFaceHubClientUnavailableError extends Error {}
 
 interface ResolvedHuggingFaceTarget {
   readonly repoType: HuggingFaceRepoType;
@@ -71,7 +72,10 @@ export interface CreateHuggingFaceArtifactRepoStorageAdapterOptions {
   hubBaseUrl?: string;
   defaultRepoType?: HuggingFaceRepoType;
   hubClient?: HuggingFaceHubClient;
-  allowHttpFallbackWhenHubClientUnavailable?: boolean;
+  officialHubClientLoader?: (
+    fetchImplementation: typeof fetch,
+    hubBaseUrl: string,
+  ) => Promise<HuggingFaceHubClient>;
 }
 
 function resolveRequestContext(
@@ -156,13 +160,6 @@ function resolveRepoType(
   };
 }
 
-function encodePathSegments(value: string): string {
-  return value
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-}
-
 function resolveTarget(
   target: ArtifactRepoTarget,
   defaultRepoType: HuggingFaceRepoType,
@@ -209,23 +206,6 @@ function extractMediaType(contentType: string | null): string | undefined {
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
-function createResolveUrl(hubBaseUrl: string, target: ResolvedHuggingFaceTarget): string {
-  return `${hubBaseUrl}/${encodePathSegments(target.repositoryName)}/resolve/${encodeURIComponent(target.revision)}/${encodePathSegments(target.pathInRepo)}`;
-}
-
-function createCommitUrl(hubBaseUrl: string, target: ResolvedHuggingFaceTarget): string {
-  const typeSegment = target.repoType === "dataset" ? "datasets" : "models";
-  return `${hubBaseUrl}/api/${typeSegment}/${encodePathSegments(target.repositoryName)}/commit/${encodeURIComponent(target.revision)}`;
-}
-
-function createAuthHeaders(accessToken: string | undefined): Record<string, string> {
-  return accessToken
-    ? {
-      Authorization: `Bearer ${accessToken}`,
-    }
-    : {};
-}
-
 function requireAccessToken(accessToken: string | undefined): string {
   const token = accessToken?.trim();
   if (!token) {
@@ -237,33 +217,25 @@ function requireAccessToken(accessToken: string | undefined): string {
   return token;
 }
 
-async function mapHttpFailure(
-  operation: "hasArtifactInRepo" | "storeArtifactInRepo" | "retrieveArtifactFromRepo",
-  response: Response,
-): Promise<{ code: ContractErrorCode; message: string; details?: Record<string, unknown> }> {
-  const responseBody = response.status >= 400 && response.status < 500
-    ? (await response.text().catch(() => "")).slice(0, 300)
-    : undefined;
-
-  return {
-    code: mapStatusToContractCode(response.status),
-    message: `Hugging Face ${operation} failed with HTTP ${response.status}.`,
-    details: responseBody
-      ? {
-        providerStatus: response.status,
-        providerBody: responseBody,
-      }
-      : {
-        providerStatus: response.status,
-      },
-  };
-}
-
 function toRepoDesignation(target: ResolvedHuggingFaceTarget): HuggingFaceRepoDesignation {
   return {
     type: target.repoType,
     name: target.repositoryName,
   };
+}
+
+function assertHubClient(client: Partial<HuggingFaceHubClient>): HuggingFaceHubClient {
+  if (
+    typeof client.fileExists !== "function"
+    || typeof client.uploadFile !== "function"
+    || typeof client.downloadFile !== "function"
+  ) {
+    throw new HuggingFaceHubClientUnavailableError(
+      "The @huggingface/hub client is unavailable or missing required methods (fileExists/uploadFile/downloadFile).",
+    );
+  }
+
+  return client as HuggingFaceHubClient;
 }
 
 async function loadOfficialHubClient(
@@ -272,126 +244,29 @@ async function loadOfficialHubClient(
 ): Promise<HuggingFaceHubClient> {
   const dynamicImport = new Function("return import('@huggingface/hub');") as () => Promise<unknown>;
   const loaded = await dynamicImport() as Partial<HuggingFaceHubClient>;
-  if (
-    typeof loaded.fileExists !== "function"
-    || typeof loaded.uploadFile !== "function"
-    || typeof loaded.downloadFile !== "function"
-  ) {
-    throw new Error("Loaded @huggingface/hub module is missing required methods.");
-  }
-  const fileExists = loaded.fileExists;
-  const uploadFile = loaded.uploadFile;
-  const downloadFile = loaded.downloadFile;
+  const hubClient = assertHubClient(loaded);
 
   return {
     fileExists(params) {
-      return fileExists({
+      return hubClient.fileExists({
         ...params,
         fetch: params.fetch ?? fetchImplementation,
         hubUrl: params.hubUrl ?? hubBaseUrl,
       });
     },
     uploadFile(params) {
-      return uploadFile({
+      return hubClient.uploadFile({
         ...params,
         fetch: params.fetch ?? fetchImplementation,
         hubUrl: params.hubUrl ?? hubBaseUrl,
       });
     },
     downloadFile(params) {
-      return downloadFile({
+      return hubClient.downloadFile({
         ...params,
         fetch: params.fetch ?? fetchImplementation,
         hubUrl: params.hubUrl ?? hubBaseUrl,
       });
-    },
-  };
-}
-
-function createHttpFallbackHubClient(
-  fetchImplementation: typeof fetch,
-  hubBaseUrl: string,
-): HuggingFaceHubClient {
-  return {
-    async fileExists(params) {
-      const target: ResolvedHuggingFaceTarget = {
-        repoType: params.repo.type,
-        repositoryName: params.repo.name,
-        revision: params.revision ?? DEFAULT_REVISION,
-        pathInRepo: params.path,
-      };
-      const response = await fetchImplementation(createResolveUrl(hubBaseUrl, target), {
-        method: "HEAD",
-        headers: createAuthHeaders(params.accessToken),
-      });
-
-      if (response.ok) {
-        return true;
-      }
-
-      if (response.status === 404) {
-        return false;
-      }
-
-      const failure = await mapHttpFailure("hasArtifactInRepo", response);
-      throw createContractError(failure.code, failure.message, {
-        details: failure.details,
-      });
-    },
-    async uploadFile(params) {
-      const target: ResolvedHuggingFaceTarget = {
-        repoType: params.repo.type,
-        repositoryName: params.repo.name,
-        revision: params.branch ?? DEFAULT_REVISION,
-        pathInRepo: params.file.path,
-      };
-      const response = await fetchImplementation(createCommitUrl(hubBaseUrl, target), {
-        method: "POST",
-        headers: {
-          ...createAuthHeaders(params.accessToken),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          summary: params.commitTitle ?? `Store ${params.file.path} via ai-system-builder artifact-repo adapter`,
-          description: "",
-          operations: [
-            {
-              operation: "addOrUpdate",
-              pathInRepo: params.file.path,
-              content: Buffer.from(params.file.content).toString("base64"),
-              encoding: "base64",
-            },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const failure = await mapHttpFailure("storeArtifactInRepo", response);
-        throw createContractError(failure.code, failure.message, {
-          details: failure.details,
-        });
-      }
-    },
-    async downloadFile(params) {
-      const target: ResolvedHuggingFaceTarget = {
-        repoType: params.repo.type,
-        repositoryName: params.repo.name,
-        revision: params.revision ?? DEFAULT_REVISION,
-        pathInRepo: params.path,
-      };
-      const response = await fetchImplementation(createResolveUrl(hubBaseUrl, target), {
-        method: "GET",
-        headers: createAuthHeaders(params.accessToken),
-      });
-
-      if (!response.ok) {
-        const failure = await mapHttpFailure("retrieveArtifactFromRepo", response);
-        throw createContractError(failure.code, failure.message, {
-          details: failure.details,
-        });
-      }
-
-      return response;
     },
   };
 }
@@ -400,6 +275,41 @@ function mapUnexpectedHubError(
   operation: "hasArtifactInRepo" | "storeArtifactInRepo" | "retrieveArtifactFromRepo",
   error: unknown,
 ) {
+  if (error instanceof HuggingFaceHubClientUnavailableError) {
+    return createContractError("unavailable", error.message, {
+      details: {
+        reason: error.message,
+      },
+    });
+  }
+
+  if (error instanceof HuggingFaceAdapterValidationError) {
+    return createContractError("validation", `Hugging Face ${operation} failed unexpectedly.`, {
+      details: {
+        reason: error.message,
+      },
+    });
+  }
+
+  if (
+    typeof error === "object"
+    && error !== null
+    && "statusCode" in error
+    && typeof (error as { statusCode?: unknown }).statusCode === "number"
+  ) {
+    const statusCode = (error as { statusCode: number }).statusCode;
+    return createContractError(
+      mapStatusToContractCode(statusCode),
+      `Hugging Face ${operation} failed with provider status ${statusCode}.`,
+      {
+        details: {
+          providerStatus: statusCode,
+          reason: "message" in (error as Record<string, unknown>) ? String((error as { message?: unknown }).message) : undefined,
+        },
+      },
+    );
+  }
+
   if (
     typeof error === "object"
     && error !== null
@@ -418,15 +328,11 @@ function mapUnexpectedHubError(
     );
   }
 
-  return createContractError(
-    error instanceof HuggingFaceAdapterValidationError ? "validation" : "internal",
-    `Hugging Face ${operation} failed unexpectedly.`,
-    {
-      details: {
-        reason: error instanceof Error ? error.message : String(error),
-      },
+  return createContractError("internal", `Hugging Face ${operation} failed unexpectedly.`, {
+    details: {
+      reason: error instanceof Error ? error.message : String(error),
     },
-  );
+  });
 }
 
 export function createHuggingFaceArtifactRepoStorageAdapter(
@@ -436,24 +342,21 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
   const fetchImplementation = options.fetchImplementation ?? fetch;
   const hubBaseUrl = options.hubBaseUrl?.replace(/\/$/, "") ?? DEFAULT_HUB_BASE_URL;
   const defaultRepoType = options.defaultRepoType ?? "dataset";
-  const allowHttpFallbackWhenHubClientUnavailable = options.allowHttpFallbackWhenHubClientUnavailable ?? true;
-  const fallbackHubClient = createHttpFallbackHubClient(fetchImplementation, hubBaseUrl);
   const providedHubClient = options.hubClient;
+  const officialHubClientLoader = options.officialHubClientLoader ?? loadOfficialHubClient;
   let lazyHubClientPromise: Promise<HuggingFaceHubClient> | undefined;
 
   async function resolveHubClient(): Promise<HuggingFaceHubClient> {
     if (providedHubClient) {
-      return providedHubClient;
+      return assertHubClient(providedHubClient);
     }
 
     if (!lazyHubClientPromise) {
-      lazyHubClientPromise = loadOfficialHubClient(fetchImplementation, hubBaseUrl)
+      lazyHubClientPromise = officialHubClientLoader(fetchImplementation, hubBaseUrl)
         .catch((error) => {
-          if (!allowHttpFallbackWhenHubClientUnavailable) {
-            throw error;
-          }
-
-          return fallbackHubClient;
+          throw new HuggingFaceHubClientUnavailableError(
+            `Failed to initialize @huggingface/hub client: ${error instanceof Error ? error.message : String(error)}.`,
+          );
         });
     }
 

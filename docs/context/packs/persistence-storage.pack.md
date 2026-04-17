@@ -85,6 +85,6 @@
 
 ## Current implementation checkpoint (artifact-repo family)
 
-- Hugging Face adapter uses official `@huggingface/hub` client methods (`fileExists`, `uploadFile`, `downloadFile`) with an isolated fallback path only when needed.
+- Hugging Face adapter uses official `@huggingface/hub` client methods (`fileExists`, `uploadFile`, `downloadFile`) as the only provider integration path (no handcrafted fallback provider path).
 - Server host exposes a minimal repo-storage API slice via use cases (`has`, `store`, and `publish`), while keeping artifact-object storage flows separate and intact.
 - Publish flow writes durable `ArtifactStorageBinding` records for published artifact-repo backings.

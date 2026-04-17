@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "../../../../../testing/node-test";
 import { createStoreArtifactRequest } from "../../../../../contracts/storage";
 import { createLocalArtifactCatalogPersistenceAdapter } from "../../artifact-catalog";
+import { createLocalArtifactStorageBindingAdapter } from "../../artifact-catalog";
 import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactObjectStorageAdapter,
@@ -107,5 +108,59 @@ describe("filesystem artifact browser read adapter", () => {
       retrieval: "deferred",
     });
     expect("bytes" in content.value.content).toBe(false);
+  });
+
+  it("adds published backing metadata from artifact storage bindings into detail read model", async () => {
+    const rootDirectory = await createTempRoot();
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const artifactBindings = createLocalArtifactStorageBindingAdapter({ rootDirectory });
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      artifactCatalogAppend: artifactCatalog,
+    });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      artifactCatalogRead: artifactCatalog,
+      storage: objectStorage,
+      artifactBindingRead: artifactBindings,
+    });
+
+    await objectStorage.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([9, 8, 7]), {
+        descriptor: {
+          key: "uploads/session/published.png",
+          mediaType: "image/png",
+        },
+      }),
+    );
+    await artifactBindings.upsertArtifactStorageBinding({
+      binding: {
+        artifactId: "uploads/session/published.png",
+        role: "published",
+        createdAt: "2026-04-17T00:00:00.000Z",
+        backing: {
+          kind: "artifact-repo",
+          provider: "huggingface",
+          locator: "openai/demo-artifacts/images/published.png",
+          revision: "main",
+        },
+      },
+    });
+
+    const detail = await browserRead.readArtifactDetail({
+      locator: { storageKey: "uploads/session/published.png" },
+    });
+
+    expect(detail.ok).toBe(true);
+    if (!detail.ok) {
+      throw new Error("Expected detail success.");
+    }
+    expect(detail.value.artifact.metadata).toMatchObject({
+      publishedBacking: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/published.png",
+        revision: "main",
+      },
+    });
   });
 });

@@ -85,4 +85,63 @@ describe("PublishArtifactToRepoUseCase", () => {
       },
     });
   });
+
+  it("upserts published backing records when the same artifact is published again", async () => {
+    const artifactStorage: ArtifactObjectStoragePort = {
+      storeArtifact: testDouble.fn(),
+      retrieveArtifact: testDouble.fn(async () => createRetrieveArtifactSuccessResult({
+        key: "uploads/a.png",
+        mediaType: "image/png",
+        sizeBytes: 3,
+      }, new Uint8Array([1, 2, 3]))),
+      hasArtifact: testDouble.fn(),
+      deleteArtifact: testDouble.fn(),
+    } as unknown as ArtifactObjectStoragePort;
+
+    const artifactRepoStorage: ArtifactRepoStoragePort = {
+      hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
+      storeArtifactInRepo: testDouble.fn(async (request) => createStoreArtifactInRepoSuccessResult({
+        target: request.target,
+        mediaType: request.mediaType,
+        sizeBytes: request.content.byteLength,
+      })),
+      retrieveArtifactFromRepo: testDouble.fn(),
+    } as unknown as ArtifactRepoStoragePort;
+
+    const artifactBindingStorage: ArtifactStorageBindingPort = {
+      upsertArtifactStorageBinding: testDouble.fn(async (request) => ({
+        ok: true,
+        value: { binding: request.binding },
+      })),
+      readArtifactStorageBindings: testDouble.fn(),
+    } as unknown as ArtifactStorageBindingPort;
+
+    const useCase = new PublishArtifactToRepoUseCase({
+      artifactStorage,
+      artifactRepoStorage,
+      artifactBindingStorage,
+      now: () => "2026-04-17T00:00:00.000Z",
+    });
+
+    await useCase.execute({
+      artifactId: "uploads/a.png",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        revision: "main",
+        path: "images/a.png",
+      },
+    });
+    await useCase.execute({
+      artifactId: "uploads/a.png",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        revision: "v2",
+        path: "images/a.png",
+      },
+    });
+
+    expect(artifactBindingStorage.upsertArtifactStorageBinding).toHaveBeenCalledTimes(2);
+  });
 });

@@ -228,9 +228,10 @@ This is intentionally partial. It does **not** claim full provider management or
 
 ### Hugging Face provider hardening status
 
-The Hugging Face adapter remains one provider behind the generic artifact-repo port and now uses the official `@huggingface/hub` client methods (`fileExists`, `uploadFile`, `downloadFile`) as the primary path, with a thin isolated HTTP fallback when the client is unavailable.
+The Hugging Face adapter remains one provider behind the generic artifact-repo port and uses the official `@huggingface/hub` client methods (`fileExists`, `uploadFile`, `downloadFile`) as the only integration path.
 
 - Provider/repo/path validation is explicit and deterministic.
 - Auth is adapter-boundary-only and required for write operations.
 - Provider status mapping is explicit (`validation`, `not-found`, `unavailable`, `internal`).
 - Published-backing linkage is persisted as `ArtifactStorageBinding` (`role = published`, `kind = artifact-repo`) after successful publish verification.
+- Artifact detail read flow can surface published-backing metadata from binding records so thin-client detail panels can render durable remote backing state.
