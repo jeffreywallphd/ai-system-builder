@@ -82,7 +82,8 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         "Failed to read artifact media.",
       );
 
-      const blob = new Blob([media.bytes.buffer], { type: media.mediaType ?? "application/octet-stream" });
+      const blobBytes = Uint8Array.from(media.bytes);
+      const blob = new Blob([blobBytes], { type: media.mediaType ?? "application/octet-stream" });
       return URL.createObjectURL(blob);
     },
   };
