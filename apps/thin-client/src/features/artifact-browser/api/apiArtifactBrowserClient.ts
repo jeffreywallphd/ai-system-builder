@@ -30,6 +30,7 @@ export interface ArtifactBrowserApiClient {
   browseImageArtifacts: () => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
+  createArtifactImageViewUrl: (locator: ArtifactBrowserLocator) => string;
 }
 
 interface ApiResponseEnvelope {
@@ -128,6 +129,11 @@ export function createApiArtifactBrowserClient(
 
         return content;
       });
+    },
+
+    createArtifactImageViewUrl(locator: ArtifactBrowserLocator): string {
+      const query = new URLSearchParams({ storageKey: locator.storageKey });
+      return createApiUrl(apiBaseUrl, `/artifact/content/view?${query.toString()}`);
     },
   };
 }

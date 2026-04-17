@@ -48,6 +48,7 @@ describe("composeServerHost", () => {
   it("registers server image upload routes using a provided app port without creating express", () => {
     const app = {
       post: testDouble.fn(),
+      get: testDouble.fn(),
     };
 
     const host = composeServerHost();
@@ -58,6 +59,7 @@ describe("composeServerHost", () => {
     });
 
     expect(app.post).toHaveBeenCalledTimes(4);
+    expect(app.get).toHaveBeenCalledTimes(1);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/image/upload",
@@ -65,5 +67,7 @@ describe("composeServerHost", () => {
       "/api/artifact/read",
       "/api/artifact/content/read",
     ]);
+    const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
+    expect(registeredGetPaths).toEqual(["/api/artifact/content/view"]);
   });
 });

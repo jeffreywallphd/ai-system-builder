@@ -6,7 +6,7 @@ export interface ArtifactBrowserFeatureProps {
 }
 
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
-  const { items, detail, content, selectedStorageKey, viewState, selectArtifact } = useArtifactBrowserFeature(
+  const { items, detail, content, imageViewUrl, selectedStorageKey, viewState, selectArtifact } = useArtifactBrowserFeature(
     client,
   );
 
@@ -51,6 +51,14 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
           <dd>{content.retrieval}</dd>
         </dl>
       ) : null}
+
+      {imageViewUrl && content?.availability === "available" ? (
+        <figure className="ui-stack ui-stack--sm">
+          <img src={imageViewUrl} alt={detail?.locator.storageKey ?? "Selected artifact"} />
+          <figcaption>Image preview for {detail?.locator.storageKey}</figcaption>
+        </figure>
+      ) : null}
+
     </section>
   );
 }

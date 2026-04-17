@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "../../../../../testing/node-test";
 import { createStoreArtifactRequest } from "../../../../../contracts/storage";
+import { createLocalArtifactCatalogAdapter } from "../../artifact-catalog";
 import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactStorageAdapter,
@@ -23,10 +24,17 @@ async function createTempRoot(): Promise<string> {
 }
 
 describe("filesystem artifact browser read adapter", () => {
-  it("uses metadata catalog records from storage writes instead of filesystem traversal", async () => {
+  it("uses artifact catalog records from explicit catalog seam instead of filesystem traversal", async () => {
     const rootDirectory = await createTempRoot();
-    const storage = createFilesystemArtifactStorageAdapter({ rootDirectory });
-    const browserRead = createFilesystemArtifactBrowserReadAdapter({ rootDirectory });
+    const artifactCatalog = createLocalArtifactCatalogAdapter({ rootDirectory });
+    const storage = createFilesystemArtifactStorageAdapter({
+      rootDirectory,
+      artifactCatalogAppend: artifactCatalog,
+    });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      artifactCatalogRead: artifactCatalog,
+      storage,
+    });
 
     await storage.storeArtifact(
       createStoreArtifactRequest(new Uint8Array([1, 2, 3]), {
@@ -50,7 +58,7 @@ describe("filesystem artifact browser read adapter", () => {
       throw new Error("Expected browse success.");
     }
 
-    expect(browseResult.value.items).toHaveLength(1);
+    expect(browseResult.value.items.length).toBe(1);
     expect(browseResult.value.items[0]).toMatchObject({
       storageKey: "uploads/session/cat.png",
       artifactKind: "image",
@@ -64,8 +72,15 @@ describe("filesystem artifact browser read adapter", () => {
 
   it("keeps read/detail/content storage-key-based and path agnostic", async () => {
     const rootDirectory = await createTempRoot();
-    const storage = createFilesystemArtifactStorageAdapter({ rootDirectory });
-    const browserRead = createFilesystemArtifactBrowserReadAdapter({ rootDirectory });
+    const artifactCatalog = createLocalArtifactCatalogAdapter({ rootDirectory });
+    const storage = createFilesystemArtifactStorageAdapter({
+      rootDirectory,
+      artifactCatalogAppend: artifactCatalog,
+    });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      artifactCatalogRead: artifactCatalog,
+      storage,
+    });
 
     await storage.storeArtifact(
       createStoreArtifactRequest(new Uint8Array([4, 5, 6, 7]), {

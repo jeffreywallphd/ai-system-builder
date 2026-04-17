@@ -8,10 +8,13 @@ import {
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
   createFilesystemArtifactBrowserReadAdapter,
+  createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactStorageAdapter,
+  createLocalArtifactCatalogAdapter,
 } from "../../../adapters/storage/filesystem";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
 import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
+import type { ExpressRoutePort } from "../../../adapters/transport/api-express/artifact-browser/registerArtifactBrowserApiRoutes";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
@@ -29,7 +32,7 @@ export interface ComposeServerHostOptions {
 }
 
 export interface RegisterServerApiOptions {
-  app: ExpressPostRoutePort;
+  app: ExpressPostRoutePort & ExpressRoutePort;
   storageRootDirectory: string;
 }
 
@@ -61,14 +64,23 @@ export function composeServerHost(
     loggingPort,
     loggingConfig,
     registerApi(registerOptions) {
+      const artifactCatalog = createLocalArtifactCatalogAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
+      });
       const storage = createFilesystemArtifactStorageAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
         host: "server",
         logging: loggingPort,
         now: options.now,
+        artifactCatalogAppend: artifactCatalog,
       });
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
-        rootDirectory: registerOptions.storageRootDirectory,
+        artifactCatalogRead: artifactCatalog,
+        storage,
+      });
+      const artifactContentRetrieval = createFilesystemArtifactContentRetrievalAdapter({
+        storage,
+        artifactCatalogRead: artifactCatalog,
       });
 
       const storeImageUploadUseCase = new StoreImageUploadUseCase({
@@ -93,6 +105,7 @@ export function composeServerHost(
         browseArtifactsUseCase: browseArtifacts,
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
+        artifactContentRetrieval,
       });
     },
   };

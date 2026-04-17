@@ -3,7 +3,7 @@ import { mkdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
-import { appendArtifactCatalogRecord } from "./createFilesystemArtifactBrowserReadAdapter";
+import type { ArtifactCatalogAppendPort } from "../../../../application/ports/artifact-catalog";
 import type { ArtifactStoragePort } from "../../../../application/ports/storage";
 import type { ContractErrorCode } from "../../../../contracts/shared";
 import { createContractError } from "../../../../contracts/shared";
@@ -42,6 +42,7 @@ export interface CreateFilesystemArtifactStorageAdapterOptions {
   now?: () => string;
   randomSuffix?: () => string;
   statPath?: typeof stat;
+  artifactCatalogAppend?: ArtifactCatalogAppendPort;
 }
 
 function isFsError(error: unknown): error is NodeJS.ErrnoException {
@@ -282,21 +283,30 @@ export function createFilesystemArtifactStorageAdapter(
           );
         }
 
-        if (isImageMediaType(request.descriptor.mediaType)) {
-          await appendArtifactCatalogRecord(rootDirectory, {
-            storageKey: key,
-            artifactKind: "image",
-            mediaType: request.descriptor.mediaType,
-            sizeBytes: bytes.byteLength,
-            sourceKind: "upload",
-            originalName:
-              typeof (request.descriptor.metadata as { originalFileName?: unknown } | undefined)?.originalFileName
-                === "string"
-                ? (request.descriptor.metadata as { originalFileName?: string }).originalFileName
-                : undefined,
-            createdAt: now(),
-            checksum,
+        if (isImageMediaType(request.descriptor.mediaType) && options.artifactCatalogAppend) {
+          const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
+            record: {
+              storageKey: key,
+              artifactKind: "image",
+              mediaType: request.descriptor.mediaType,
+              sizeBytes: bytes.byteLength,
+              sourceKind: "upload",
+              originalName:
+                typeof (request.descriptor.metadata as { originalFileName?: unknown } | undefined)?.originalFileName
+                  === "string"
+                  ? (request.descriptor.metadata as { originalFileName?: string }).originalFileName
+                  : undefined,
+              createdAt: now(),
+              checksum,
+            },
+          }, {
+            requestId: request.requestId,
+            correlationId: request.correlationId,
           });
+
+          if (!appendResult.ok) {
+            throw new StorageAdapterVerificationError(appendResult.error.message);
+          }
         }
 
         await logBoundaryEvent({
