@@ -211,3 +211,5 @@ Server composition now wires both storage families as peers:
 - artifact-repo aggregate storage with Hugging Face as first provider adapter.
 
 A minimal artifact-repo API slice is exposed (`artifact-repo.has`, `artifact-repo.store`, `artifact.publish`) through dedicated application use cases.
+
+Thin-client artifact-browser publish flow should call `artifact.publish` as the primary orchestration route (artifact bytes -> provider store -> verify -> published binding write), while lower-level repo-store routes remain secondary infrastructure APIs.

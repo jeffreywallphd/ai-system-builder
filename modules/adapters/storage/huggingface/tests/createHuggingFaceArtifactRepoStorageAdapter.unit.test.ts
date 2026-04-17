@@ -21,6 +21,30 @@ function createHubClientDouble() {
 }
 
 describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
+  it("requires official hub client availability when no hub client is provided", async () => {
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      officialHubClientLoader: testDouble.fn(async () => {
+        throw new Error("module not found");
+      }),
+    });
+
+    const result = await adapter.hasArtifactInRepo(
+      createHasArtifactInRepoRequest({
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "a.txt",
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected unavailable failure.");
+    }
+
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.message).toContain("@huggingface/hub");
+  });
+
   it("validates provider = huggingface", async () => {
     const adapter = createHuggingFaceArtifactRepoStorageAdapter({
       hubClient: createHubClientDouble(),
@@ -146,20 +170,20 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     expect(missingTokenResult.error.code).toBe("validation");
   });
 
-  it("maps not-found and unavailable contract failures from client errors", async () => {
+  it("maps provider status errors to explicit contract codes", async () => {
     const hubClient = createHubClientDouble();
     let callCount = 0;
     hubClient.downloadFile = testDouble.fn(async () => {
       callCount += 1;
       if (callCount === 1) {
         throw {
-          code: "not-found",
+          statusCode: 404,
           message: "Missing file",
         };
       }
 
       throw {
-        code: "unavailable",
+        statusCode: 503,
         message: "Provider down",
       };
     });

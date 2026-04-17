@@ -11,6 +11,7 @@ import type {
 } from "../../../../application/ports/artifact-browser";
 import type { ApplicationRequestContext } from "../../../../application/ports";
 import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
+import type { ArtifactStorageBindingPort } from "../../../../application/ports/storage";
 import {
   createArtifactBrowserLocator,
   type ArtifactBrowseItem,
@@ -34,6 +35,61 @@ export interface FilesystemArtifactBrowserReadAdapter
 export interface CreateFilesystemArtifactBrowserReadAdapterOptions {
   artifactCatalogRead: ArtifactCatalogReadPort;
   storage?: Pick<ArtifactObjectStoragePort, "hasArtifact">;
+  artifactBindingRead?: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings">;
+}
+
+interface PublishedBackingReadModel {
+  provider: string;
+  repository: string;
+  path: string;
+  revision?: string;
+}
+
+function parsePublishedBackingLocator(locator: string): { repository: string; path: string } | undefined {
+  const segments = locator.split("/").filter((segment) => segment.length > 0);
+  if (segments.length < 3) {
+    return undefined;
+  }
+
+  return {
+    repository: `${segments[0]}/${segments[1]}`,
+    path: segments.slice(2).join("/"),
+  };
+}
+
+async function readPublishedBacking(
+  options: CreateFilesystemArtifactBrowserReadAdapterOptions,
+  artifactId: string,
+  context: ApplicationRequestContext,
+): Promise<PublishedBackingReadModel | undefined> {
+  if (!options.artifactBindingRead) {
+    return undefined;
+  }
+
+  const bindingsResult = await options.artifactBindingRead.readArtifactStorageBindings({ artifactId }, context);
+  if (!bindingsResult.ok) {
+    return undefined;
+  }
+
+  const latestPublishedBinding = bindingsResult.value.bindings
+    .filter((binding) => binding.role === "published" && binding.backing.kind === "artifact-repo")
+    .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""))[0];
+
+  if (!latestPublishedBinding) {
+    return undefined;
+  }
+
+  const locator = parsePublishedBackingLocator(latestPublishedBinding.backing.locator);
+  if (!locator) {
+    return undefined;
+  }
+
+  return {
+    provider: latestPublishedBinding.backing.provider,
+    repository: locator.repository,
+    path: locator.path,
+    revision: latestPublishedBinding.backing.revision,
+  };
 }
 
 function toBrowseItem(record: ArtifactCatalogRecord): ArtifactBrowseItem {
@@ -115,10 +171,16 @@ export function createFilesystemArtifactBrowserReadAdapter(
         return readResult;
       }
 
-      return createSuccessResult(
-        toDetailValue(readResult.value.record) as ArtifactReadSuccessValue<TMetadata>,
-        context,
-      );
+      const detail = toDetailValue(readResult.value.record) as ArtifactReadSuccessValue<TMetadata>;
+      const publishedBacking = await readPublishedBacking(options, storageKey, context);
+      if (publishedBacking) {
+        detail.artifact.metadata = {
+          ...(detail.artifact.metadata ?? {}),
+          publishedBacking,
+        } as TMetadata;
+      }
+
+      return createSuccessResult(detail, context);
     },
 
     async readArtifactContent(

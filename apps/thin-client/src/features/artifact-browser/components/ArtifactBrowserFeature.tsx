@@ -25,6 +25,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
   const [pathInRepo, setPathInRepo] = useState("");
   const [revision, setRevision] = useState("main");
   const [mediaType, setMediaType] = useState("");
+  const [showPublishForm, setShowPublishForm] = useState(false);
 
   return (
     <section className="ui-panel ui-stack ui-stack--sm">
@@ -77,36 +78,47 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
 
       {detail ? (
         <section className="ui-stack ui-stack--sm">
-          <h3>Publish to Hugging Face</h3>
-          <label className="ui-stack ui-stack--sm">
-            <span>Repository</span>
-            <input className="ui-input" value={repository} onChange={(event) => setRepository(event.target.value)} required />
-          </label>
-          <label className="ui-stack ui-stack--sm">
-            <span>Path in repo</span>
-            <input className="ui-input" value={pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required />
-          </label>
-          <label className="ui-stack ui-stack--sm">
-            <span>Revision (optional)</span>
-            <input className="ui-input" value={revision} onChange={(event) => setRevision(event.target.value)} />
-          </label>
-          <label className="ui-stack ui-stack--sm">
-            <span>Media type (optional)</span>
-            <input className="ui-input" value={mediaType} onChange={(event) => setMediaType(event.target.value)} />
-          </label>
           <button
             className="ui-button"
             type="button"
-            disabled={publishState.status === "loading" || repository.trim().length === 0 || pathInRepo.trim().length === 0}
-            onClick={() => void publishArtifactToHuggingFace({
-              repository,
-              path: pathInRepo,
-              revision: revision.trim() || undefined,
-              mediaType: mediaType.trim() || undefined,
-            })}
+            disabled={publishState.status === "loading"}
+            onClick={() => setShowPublishForm((current) => !current)}
           >
             Publish to Hugging Face
           </button>
+          {showPublishForm ? (
+            <>
+              <label className="ui-stack ui-stack--sm">
+                <span>Repository</span>
+                <input className="ui-input" value={repository} onChange={(event) => setRepository(event.target.value)} required />
+              </label>
+              <label className="ui-stack ui-stack--sm">
+                <span>Path in repo</span>
+                <input className="ui-input" value={pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required />
+              </label>
+              <label className="ui-stack ui-stack--sm">
+                <span>Revision (optional)</span>
+                <input className="ui-input" value={revision} onChange={(event) => setRevision(event.target.value)} />
+              </label>
+              <label className="ui-stack ui-stack--sm">
+                <span>Media type (optional)</span>
+                <input className="ui-input" value={mediaType} onChange={(event) => setMediaType(event.target.value)} />
+              </label>
+              <button
+                className="ui-button"
+                type="button"
+                disabled={publishState.status === "loading" || repository.trim().length === 0 || pathInRepo.trim().length === 0}
+                onClick={() => void publishArtifactToHuggingFace({
+                  repository,
+                  path: pathInRepo,
+                  revision: revision.trim() || undefined,
+                  mediaType: mediaType.trim() || undefined,
+                })}
+              >
+                {publishState.status === "loading" ? "Publishing..." : "Publish"}
+              </button>
+            </>
+          ) : null}
           {publishState.message ? (
             <p role={publishState.status === "error" ? "alert" : "status"}>{publishState.message}</p>
           ) : null}

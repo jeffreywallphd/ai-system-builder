@@ -68,3 +68,4 @@
 
 - `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has`, `POST /api/artifact-repo/store`, and `POST /api/artifact/publish`.
 - These routes delegate through application use cases; they do not bypass to storage adapters directly.
+- Thin-client artifact-browser publish flow should target `POST /api/artifact/publish` as the primary user workflow route.

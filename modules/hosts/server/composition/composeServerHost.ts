@@ -22,6 +22,7 @@ import {
 } from "../../../adapters/storage/filesystem";
 import {
   createHuggingFaceArtifactRepoStorageAdapter,
+  type CreateHuggingFaceArtifactRepoStorageAdapterOptions,
 } from "../../../adapters/storage/huggingface";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
 import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
@@ -39,6 +40,7 @@ export interface ComposeServerHostLoggingOptions {
 export interface ComposeServerHostArtifactRepoOptions {
   huggingFaceAccessToken?: string;
   huggingFaceFetchImplementation?: typeof fetch;
+  huggingFaceHubClient?: CreateHuggingFaceArtifactRepoStorageAdapterOptions["hubClient"];
 }
 
 export interface ComposeServerHostOptions {
@@ -85,6 +87,7 @@ export function composeServerHost(
         adapter: createHuggingFaceArtifactRepoStorageAdapter({
           accessToken: options.artifactRepo?.huggingFaceAccessToken,
           fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
+          hubClient: options.artifactRepo?.huggingFaceHubClient,
         }),
       },
     ],
@@ -111,6 +114,7 @@ export function composeServerHost(
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
         artifactCatalogRead: artifactCatalog,
         storage,
+        artifactBindingRead: artifactBindings,
       });
       const artifactMediaViewRetrieval = createFilesystemArtifactContentRetrievalAdapter({
         storage,

@@ -81,11 +81,21 @@ export function useArtifactBrowserFeature(
       setDetail(artifactDetail);
       setContent(contentDescriptor);
       setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));
+      const boundPublishedBacking = artifactDetail.metadata?.publishedBacking;
+      setPublishedBacking(
+        boundPublishedBacking
+          ? {
+            ...boundPublishedBacking,
+            exists: false,
+          }
+          : undefined,
+      );
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
     } catch (error) {
       setDetail(undefined);
       setContent(undefined);
       setImageViewUrl(undefined);
+      setPublishedBacking(undefined);
       setViewState({
         status: "error",
         message: error instanceof Error ? error.message : "Failed to load artifact detail.",

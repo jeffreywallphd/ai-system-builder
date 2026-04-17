@@ -49,10 +49,16 @@ describe("composeServerHost", () => {
 
   it("composes artifact-repo storage with huggingface provider registration", async () => {
     const fetchMock = testDouble.fn(async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+    const hubClient = {
+      fileExists: testDouble.fn(async () => false),
+      uploadFile: testDouble.fn(async () => undefined),
+      downloadFile: testDouble.fn(async () => new Response(new Uint8Array([]), { status: 200 })),
+    };
 
     const host = composeServerHost({
       artifactRepo: {
         huggingFaceFetchImplementation: fetchMock,
+        huggingFaceHubClient: hubClient,
       },
     });
 

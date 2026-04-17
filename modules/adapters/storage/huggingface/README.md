@@ -25,7 +25,7 @@ This module contains the first concrete artifact-repo storage provider adapter.
 
 ## Notes
 
-- The adapter now prefers the official `@huggingface/hub` client path.
-- If the Hub client is unavailable at runtime, the adapter uses a thin, isolated HTTP fallback wrapper to preserve behavior.
+- The adapter uses only the official `@huggingface/hub` client path.
+- No handcrafted HTTP fallback path exists in this adapter.
 - This is intentionally a small provider slice, not full provider lifecycle management.
 - Tests are mock-driven and deterministic (no live network dependency).

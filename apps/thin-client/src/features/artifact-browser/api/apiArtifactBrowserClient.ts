@@ -18,6 +18,9 @@ export interface ThinClientArtifactDetail {
   sizeBytes?: number;
   originalName?: string;
   createdAt?: string;
+  metadata?: {
+    publishedBacking?: Omit<ThinClientPublishedBacking, "exists">;
+  };
 }
 
 export interface ThinClientArtifactContentDescriptor {

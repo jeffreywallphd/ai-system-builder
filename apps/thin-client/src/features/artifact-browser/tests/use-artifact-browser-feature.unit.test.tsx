@@ -40,6 +40,14 @@ describe("ArtifactBrowserFeature", () => {
         artifactKind: "image" as const,
         mediaType: "image/png",
         sizeBytes: 4,
+        metadata: {
+          publishedBacking: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/cat.png",
+            revision: "main",
+          },
+        },
       }),
       readArtifactContent: vi.fn().mockResolvedValue({
         locator: { storageKey: "uploads/cat.png" },
@@ -74,12 +82,18 @@ describe("ArtifactBrowserFeature", () => {
       artifactButton.click();
     });
 
+    const publishToggleButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Publish to Hugging Face") as HTMLButtonElement;
+    await act(async () => {
+      publishToggleButton.click();
+    });
+
     const inputs = Array.from(container.querySelectorAll("input"));
     setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
     setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
 
     const publishButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("Publish to Hugging Face")) as HTMLButtonElement;
+      .find((button) => button.textContent === "Publish") as HTMLButtonElement;
     await act(async () => {
       publishButton.click();
     });
@@ -132,17 +146,96 @@ describe("ArtifactBrowserFeature", () => {
     await act(async () => {
       artifactButton.click();
     });
+    const publishToggleButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Publish to Hugging Face") as HTMLButtonElement;
+    await act(async () => {
+      publishToggleButton.click();
+    });
 
     const inputs = Array.from(container.querySelectorAll("input"));
     setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
     setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
 
     const publishButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("Publish to Hugging Face")) as HTMLButtonElement;
+      .find((button) => button.textContent === "Publish") as HTMLButtonElement;
     await act(async () => {
       publishButton.click();
     });
 
     expect(container.textContent).toContain("Missing Hugging Face token.");
+  });
+
+  it("disables repeat publish submit while pending", async () => {
+    let resolvePublish: ((value: {
+      provider: string;
+      repository: string;
+      path: string;
+      revision: string;
+      exists: boolean;
+    }) => void) | undefined;
+    const client = {
+      browseImageArtifacts: vi.fn().mockResolvedValue([
+        {
+          storageKey: "uploads/cat.png",
+          artifactKind: "image" as const,
+        },
+      ]),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/cat.png" },
+        artifactKind: "image" as const,
+      }),
+      readArtifactContent: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/cat.png" },
+        availability: "available" as const,
+        retrieval: "deferred" as const,
+      }),
+      createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
+      publishArtifactToHuggingFace: vi.fn().mockImplementation(() => new Promise((resolve) => {
+        resolvePublish = resolve;
+      })),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const artifactButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    await act(async () => {
+      artifactButton.click();
+    });
+    const publishToggleButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Publish to Hugging Face") as HTMLButtonElement;
+    await act(async () => {
+      publishToggleButton.click();
+    });
+
+    const inputs = Array.from(container.querySelectorAll("input"));
+    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
+
+    const publishButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    await act(async () => {
+      publishButton.click();
+    });
+    expect(publishButton.disabled).toBe(true);
+    expect(container.textContent).toContain("Publishing...");
+
+    await act(async () => {
+      resolvePublish?.({
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        exists: true,
+      });
+    });
   });
 });
