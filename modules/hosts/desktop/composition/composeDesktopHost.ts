@@ -92,11 +92,9 @@ export function composeDesktopHost(
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
         storeImageUploadUseCase,
-        artifactBrowserUseCases: {
-          browseArtifacts,
-          readArtifactDetail,
-          readArtifactContent,
-        },
+        browseArtifactsUseCase: browseArtifacts,
+        readArtifactDetailUseCase: readArtifactDetail,
+        readArtifactContentUseCase: readArtifactContent,
       });
     },
   };

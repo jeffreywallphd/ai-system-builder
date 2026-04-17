@@ -90,11 +90,9 @@ export function composeServerHost(
       registerExpressApi({
         app: registerOptions.app,
         storeImageUploadUseCase,
-        artifactBrowserUseCases: {
-          browseArtifacts,
-          readArtifactDetail,
-          readArtifactContent,
-        },
+        browseArtifactsUseCase: browseArtifacts,
+        readArtifactDetailUseCase: readArtifactDetail,
+        readArtifactContentUseCase: readArtifactContent,
       });
     },
   };

@@ -8,14 +8,11 @@ import {
 } from "./artifact-browser/registerArtifactBrowserApiRoutes";
 
 export interface RegisterExpressApiDependencies {
-  app: {
-    post: (
-      path: string,
-      handler: (request: unknown, response: unknown) => Promise<void>,
-    ) => void;
-  };
+  app: RegisterImageUploadApiRouteDependencies["app"] & RegisterArtifactBrowserApiRoutesDependencies["app"];
   storeImageUploadUseCase: RegisterImageUploadApiRouteDependencies["storeImageUploadUseCase"];
-  artifactBrowserUseCases: RegisterArtifactBrowserApiRoutesDependencies["useCases"];
+  browseArtifactsUseCase: RegisterArtifactBrowserApiRoutesDependencies["browseArtifactsUseCase"];
+  readArtifactDetailUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactDetailUseCase"];
+  readArtifactContentUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactContentUseCase"];
 }
 
 export function registerExpressApi(
@@ -28,6 +25,8 @@ export function registerExpressApi(
 
   registerArtifactBrowserApiRoutes({
     app: dependencies.app,
-    useCases: dependencies.artifactBrowserUseCases,
+    browseArtifactsUseCase: dependencies.browseArtifactsUseCase,
+    readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
+    readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
   });
 }
