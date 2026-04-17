@@ -26,11 +26,9 @@ export interface ApiArtifactReadRequestPayload {
   boundary: ApiArtifactReadBoundaryContext;
 }
 
-export interface ApiArtifactReadSuccessValue<
+export type ApiArtifactReadSuccessValue<
   TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
-> {
-  read: ArtifactReadSuccessValue<TMetadata>;
-}
+> = ArtifactReadSuccessValue<TMetadata>;
 
 export type ApiArtifactReadRequest = ApiRequest<
   ApiArtifactReadRequestPayload,
@@ -88,7 +86,7 @@ export function createApiArtifactReadRequest(
 export function createApiArtifactReadSuccessResponse<
   TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
 >(
-  read: ArtifactReadSuccessValue<TMetadata>,
+  value: ArtifactReadSuccessValue<TMetadata>,
   options?: {
     requestId?: string;
     correlationId?: string;
@@ -96,9 +94,7 @@ export function createApiArtifactReadSuccessResponse<
 ): ApiArtifactReadResponse<TMetadata> {
   return createApiSuccessResponse(
     API_ARTIFACT_READ_OPERATION,
-    {
-      read: normalizeArtifactReadSuccessValue(read),
-    },
+    normalizeArtifactReadSuccessValue(value),
     {
       requestId: options?.requestId,
       correlationId: options?.correlationId,

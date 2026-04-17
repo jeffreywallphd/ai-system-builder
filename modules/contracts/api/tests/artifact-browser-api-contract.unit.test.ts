@@ -51,7 +51,9 @@ describe("artifact-browser api contracts", () => {
           storageKey: " staged/images/artifact-21 ",
         },
         mediaType: " image/png ",
-        content: new Uint8Array([137, 80, 78, 71]),
+        sizeBytes: 4,
+        availability: "available",
+        retrieval: "inline",
       },
     });
 
@@ -59,62 +61,57 @@ describe("artifact-browser api contracts", () => {
       ok: true,
       operation: "artifact.browse",
       value: {
-        browse: {
-          items: [
-            {
-              storageKey: "staged/images/artifact-21",
-              artifactKind: "image",
-              mediaType: "image/png",
-            },
-          ],
-        },
+        items: [
+          {
+            storageKey: "staged/images/artifact-21",
+            artifactKind: "image",
+            mediaType: "image/png",
+          },
+        ],
       },
     });
     if (!browseResponse.ok) {
       throw new Error("Expected browse response to be successful.");
     }
-    expect("content" in browseResponse.value.browse.items[0]).toBe(false);
+    expect("content" in browseResponse.value.items[0]).toBe(false);
 
     expect(readResponse).toMatchObject({
       ok: true,
       operation: "artifact.read",
       value: {
-        read: {
-          artifact: {
-            locator: {
-              storageKey: "staged/images/artifact-21",
-            },
-            artifactKind: "image",
-            mediaType: "image/png",
+        artifact: {
+          locator: {
+            storageKey: "staged/images/artifact-21",
           },
+          artifactKind: "image",
+          mediaType: "image/png",
         },
       },
     });
     if (!readResponse.ok) {
       throw new Error("Expected read response to be successful.");
     }
-    expect("content" in readResponse.value.read.artifact).toBe(false);
+    expect("content" in readResponse.value.artifact).toBe(false);
 
     expect(contentResponse).toMatchObject({
       ok: true,
       operation: "artifact.content.read",
       value: {
-        read: {
-          content: {
-            locator: {
-              storageKey: "staged/images/artifact-21",
-            },
-            mediaType: "image/png",
+        content: {
+          locator: {
+            storageKey: "staged/images/artifact-21",
           },
+          mediaType: "image/png",
+          sizeBytes: 4,
+          availability: "available",
+          retrieval: "inline",
         },
       },
     });
     if (!contentResponse.ok) {
       throw new Error("Expected content-read response to be successful.");
     }
-    expect(contentResponse.value.read.content.content).toEqual(
-      new Uint8Array([137, 80, 78, 71]),
-    );
+    expect("bytes" in contentResponse.value.content).toBe(false);
   });
 
   it("keeps locator fields storage-key based and avoids filesystem path fields in request payloads", () => {

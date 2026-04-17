@@ -24,9 +24,7 @@ export interface ApiArtifactBrowseRequestPayload {
   boundary: ApiArtifactBrowseBoundaryContext;
 }
 
-export interface ApiArtifactBrowseSuccessValue {
-  browse: ArtifactBrowseSuccessValue;
-}
+export type ApiArtifactBrowseSuccessValue = ArtifactBrowseSuccessValue;
 
 export type ApiArtifactBrowseRequest = ApiRequest<
   ApiArtifactBrowseRequestPayload,
@@ -92,9 +90,7 @@ export function createApiArtifactBrowseSuccessResponse(
 ): ApiArtifactBrowseResponse {
   return createApiSuccessResponse(
     API_ARTIFACT_BROWSE_OPERATION,
-    {
-      browse: normalizeArtifactBrowseSuccessValue(browse),
-    },
+    normalizeArtifactBrowseSuccessValue(browse),
     {
       requestId: options?.requestId,
       correlationId: options?.correlationId,

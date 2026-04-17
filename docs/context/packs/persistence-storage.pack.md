@@ -37,7 +37,7 @@
 - For artifact-browser read work, keep contracts split by concern:
   - browse/list contracts are metadata/catalog oriented,
   - detail/read contracts are artifact read-model oriented,
-  - bytes/media retrieval stays in a separate content-read contract path.
+  - content retrieval stays in a separate content-read contract path and should remain descriptor/reference-oriented at canonical public boundaries (avoid raw-byte-first canonical payloads).
 - Do not implement direct filesystem browsing semantics in UI-facing contracts; keep artifact browser locators key-based and path-agnostic.
 - Metadata records and file/blob content are different concerns and should stay separated.
 - Application logic should depend on persistence/storage ports and contracts, not direct DB/filesystem details.

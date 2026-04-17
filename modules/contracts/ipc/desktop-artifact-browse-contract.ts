@@ -40,9 +40,7 @@ export interface DesktopArtifactBrowseRequestPayload {
   boundary: DesktopArtifactBrowseBoundaryContext;
 }
 
-export interface DesktopArtifactBrowseSuccessValue {
-  browse: ArtifactBrowseSuccessValue;
-}
+export type DesktopArtifactBrowseSuccessValue = ArtifactBrowseSuccessValue;
 
 export type DesktopArtifactBrowseRequest = IpcRequest<
   DesktopArtifactBrowseRequestPayload,
@@ -110,9 +108,7 @@ export function createDesktopArtifactBrowseSuccessResponse(
 ): DesktopArtifactBrowseResponse {
   return createIpcSuccessResponse(
     DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
-    {
-      browse: normalizeArtifactBrowseSuccessValue(browse),
-    },
+    normalizeArtifactBrowseSuccessValue(browse),
     {
       requestId: options?.requestId,
       correlationId: options?.correlationId,

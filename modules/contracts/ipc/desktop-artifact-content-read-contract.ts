@@ -41,9 +41,7 @@ export interface DesktopArtifactContentReadRequestPayload {
   boundary: DesktopArtifactContentReadBoundaryContext;
 }
 
-export interface DesktopArtifactContentReadSuccessValue<TContent = Uint8Array> {
-  read: ArtifactContentReadSuccessValue<TContent>;
-}
+export type DesktopArtifactContentReadSuccessValue = ArtifactContentReadSuccessValue;
 
 export type DesktopArtifactContentReadRequest = IpcRequest<
   DesktopArtifactContentReadRequestPayload,
@@ -52,8 +50,8 @@ export type DesktopArtifactContentReadRequest = IpcRequest<
   typeof DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value
 >;
 
-export type DesktopArtifactContentReadResponse<TContent = Uint8Array> = IpcResponse<
-  DesktopArtifactContentReadSuccessValue<TContent>,
+export type DesktopArtifactContentReadResponse = IpcResponse<
+  DesktopArtifactContentReadSuccessValue,
   Record<string, unknown>,
   typeof DESKTOP_ARTIFACT_CONTENT_READ_OPERATION,
   Record<string, never>,
@@ -98,18 +96,16 @@ export function createDesktopArtifactContentReadRequest(
   );
 }
 
-export function createDesktopArtifactContentReadSuccessResponse<TContent = Uint8Array>(
-  read: ArtifactContentReadSuccessValue<TContent>,
+export function createDesktopArtifactContentReadSuccessResponse(
+  value: ArtifactContentReadSuccessValue,
   options?: {
     requestId?: string;
     correlationId?: string;
   },
-): DesktopArtifactContentReadResponse<TContent> {
+): DesktopArtifactContentReadResponse {
   return createIpcSuccessResponse(
     DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
-    {
-      read: normalizeArtifactContentReadSuccessValue(read),
-    },
+    normalizeArtifactContentReadSuccessValue(value),
     {
       requestId: options?.requestId,
       correlationId: options?.correlationId,

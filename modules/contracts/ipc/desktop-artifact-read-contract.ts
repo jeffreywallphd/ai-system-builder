@@ -42,11 +42,9 @@ export interface DesktopArtifactReadRequestPayload {
   boundary: DesktopArtifactReadBoundaryContext;
 }
 
-export interface DesktopArtifactReadSuccessValue<
+export type DesktopArtifactReadSuccessValue<
   TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
-> {
-  read: ArtifactReadSuccessValue<TMetadata>;
-}
+> = ArtifactReadSuccessValue<TMetadata>;
 
 export type DesktopArtifactReadRequest = IpcRequest<
   DesktopArtifactReadRequestPayload,
@@ -106,7 +104,7 @@ export function createDesktopArtifactReadRequest(
 export function createDesktopArtifactReadSuccessResponse<
   TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
 >(
-  read: ArtifactReadSuccessValue<TMetadata>,
+  value: ArtifactReadSuccessValue<TMetadata>,
   options?: {
     requestId?: string;
     correlationId?: string;
@@ -114,9 +112,7 @@ export function createDesktopArtifactReadSuccessResponse<
 ): DesktopArtifactReadResponse<TMetadata> {
   return createIpcSuccessResponse(
     DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
-    {
-      read: normalizeArtifactReadSuccessValue(read),
-    },
+    normalizeArtifactReadSuccessValue(value),
     {
       requestId: options?.requestId,
       correlationId: options?.correlationId,

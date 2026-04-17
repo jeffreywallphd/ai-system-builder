@@ -40,7 +40,7 @@ Adopt ingestion/staged-artifact as the canonical higher-level semantic model for
 - The first end-to-end read-side vertical slice is image-backed artifact browsing and viewing:
   - `artifact.browse` for catalog/metadata-oriented list behavior,
   - `artifact.read` for single-artifact detail/read-model behavior,
-  - `artifact.content.read` as a distinct content-retrieval path (separate from browse/detail metadata contracts).
+  - `artifact.content.read` as a distinct content-retrieval path (separate from browse/detail metadata contracts) with canonical descriptor/reference-oriented content-access semantics.
 - This browser/viewer direction is artifact/catalog oriented and storage-key based; it does not introduce filesystem-path browsing semantics.
 
 ### ELT progression posture
