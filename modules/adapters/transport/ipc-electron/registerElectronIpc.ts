@@ -12,7 +12,9 @@ export type { IpcMainHandlePort } from "./image-upload/registerImageUploadIpc";
 export interface RegisterElectronIpcDependencies {
   ipcMain: RegisterImageUploadIpcDependencies["ipcMain"];
   storeImageUploadUseCase: RegisterImageUploadIpcDependencies["storeImageUploadUseCase"];
-  artifactBrowserUseCases: RegisterArtifactBrowserIpcDependencies["useCases"];
+  browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
+  readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
+  readArtifactContentUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactContentUseCase"];
 }
 
 export function registerElectronIpc(
@@ -25,6 +27,8 @@ export function registerElectronIpc(
 
   registerArtifactBrowserIpc({
     ipcMain: dependencies.ipcMain,
-    useCases: dependencies.artifactBrowserUseCases,
+    browseArtifactsUseCase: dependencies.browseArtifactsUseCase,
+    readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
+    readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
   });
 }

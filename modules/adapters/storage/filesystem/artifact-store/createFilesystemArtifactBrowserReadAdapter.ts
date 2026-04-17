@@ -1,10 +1,10 @@
-import { readdir, stat } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import type {
+  ArtifactBrowserBoundaryContext,
   ArtifactBrowserContentReadPort,
   ArtifactBrowserMetadataReadPort,
-  ArtifactBrowserBoundaryContext,
   BrowseArtifactsRequest,
   ReadArtifactContentRequest,
   ReadArtifactDetailRequest,
@@ -12,21 +12,34 @@ import type {
 import {
   createArtifactBrowserLocator,
   type ArtifactBrowseItem,
+  type ArtifactContentReadSuccessValue,
+  type ArtifactReadSuccessValue,
 } from "../../../../contracts/artifact-browser";
 import {
   createContractError,
   createFailureResult,
   createSuccessResult,
 } from "../../../../contracts/shared";
+import {
+  normalizeStorageArtifactKey,
+  type StorageObjectMetadata,
+} from "../../../../contracts/storage";
 
-const IMAGE_EXTENSIONS_TO_MEDIA_TYPE: Readonly<Record<string, string>> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".svg": "image/svg+xml",
-};
+const ARTIFACT_CATALOG_FILE = ".catalog/artifact-browser.ndjson";
+
+interface ArtifactCatalogRecord {
+  storageKey: string;
+  artifactKind: "image";
+  mediaType?: string;
+  sizeBytes?: number;
+  sourceKind?: "upload";
+  originalName?: string;
+  createdAt?: string;
+  checksum?: {
+    algorithm: string;
+    value: string;
+  };
+}
 
 export interface FilesystemArtifactBrowserReadAdapter
   extends ArtifactBrowserMetadataReadPort,
@@ -36,81 +49,112 @@ export interface CreateFilesystemArtifactBrowserReadAdapterOptions {
   rootDirectory: string;
 }
 
-interface ResolvedArtifactFile {
-  storageKey: string;
-  absolutePath: string;
-  mediaType: string;
-  sizeBytes: number;
-  createdAt?: string;
+function toCatalogPath(rootDirectory: string): string {
+  return path.join(rootDirectory, ARTIFACT_CATALOG_FILE);
 }
 
-function toMediaType(filePath: string): string | undefined {
-  return IMAGE_EXTENSIONS_TO_MEDIA_TYPE[path.extname(filePath).toLowerCase()];
-}
-
-function createStorageKey(rootDirectory: string, absolutePath: string): string {
-  return path.relative(rootDirectory, absolutePath).split(path.sep).join("/");
-}
-
-async function walkFiles(directoryPath: string): Promise<string[]> {
-  const entries = await readdir(directoryPath, { withFileTypes: true });
-  const files: string[] = [];
-
-  for (const entry of entries) {
-    const entryPath = path.join(directoryPath, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await walkFiles(entryPath)));
-      continue;
-    }
-
-    if (entry.isFile()) {
-      files.push(entryPath);
-    }
-  }
-
-  return files;
-}
-
-async function resolveArtifactFile(
-  rootDirectory: string,
-  storageKey: string,
-): Promise<ResolvedArtifactFile | undefined> {
-  const normalizedSegments = storageKey
-    .split("/")
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0 && segment !== "." && segment !== "..");
-
-  if (normalizedSegments.length === 0) {
-    return undefined;
-  }
-
-  const absolutePath = path.resolve(rootDirectory, ...normalizedSegments);
-  const relativePath = path.relative(rootDirectory, absolutePath);
-  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    return undefined;
-  }
-
+function parseRecordLine(line: string): ArtifactCatalogRecord | undefined {
   try {
-    const fileStats = await stat(absolutePath);
-    if (!fileStats.isFile()) {
-      return undefined;
-    }
-
-    const mediaType = toMediaType(absolutePath);
-    if (!mediaType) {
+    const parsed = JSON.parse(line) as Partial<ArtifactCatalogRecord>;
+    if (parsed.artifactKind !== "image" || typeof parsed.storageKey !== "string") {
       return undefined;
     }
 
     return {
-      storageKey: normalizedSegments.join("/"),
-      absolutePath,
-      mediaType,
-      sizeBytes: fileStats.size,
-      createdAt: Number.isNaN(fileStats.birthtimeMs) ? undefined : fileStats.birthtime.toISOString(),
+      storageKey: normalizeStorageArtifactKey(parsed.storageKey),
+      artifactKind: "image",
+      mediaType: typeof parsed.mediaType === "string" ? parsed.mediaType : undefined,
+      sizeBytes: typeof parsed.sizeBytes === "number" ? parsed.sizeBytes : undefined,
+      sourceKind: parsed.sourceKind === "upload" ? "upload" : undefined,
+      originalName: typeof parsed.originalName === "string" ? parsed.originalName : undefined,
+      createdAt: typeof parsed.createdAt === "string" ? parsed.createdAt : undefined,
+      checksum:
+        parsed.checksum
+        && typeof parsed.checksum === "object"
+        && typeof parsed.checksum.algorithm === "string"
+        && typeof parsed.checksum.value === "string"
+          ? {
+            algorithm: parsed.checksum.algorithm,
+            value: parsed.checksum.value,
+          }
+          : undefined,
     };
   } catch {
     return undefined;
   }
+}
+
+async function readCatalogRecords(rootDirectory: string): Promise<ArtifactCatalogRecord[]> {
+  const catalogPath = toCatalogPath(rootDirectory);
+  const content = await readFile(catalogPath, "utf8").catch(() => "");
+  if (!content.trim()) {
+    return [];
+  }
+
+  const latestByStorageKey = new Map<string, ArtifactCatalogRecord>();
+  for (const rawLine of content.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    const record = parseRecordLine(line);
+    if (!record) {
+      continue;
+    }
+
+    latestByStorageKey.set(record.storageKey, record);
+  }
+
+  return Array.from(latestByStorageKey.values());
+}
+
+function toBrowseItem(record: ArtifactCatalogRecord): ArtifactBrowseItem {
+  return {
+    storageKey: record.storageKey,
+    artifactKind: "image",
+    mediaType: record.mediaType,
+    sizeBytes: record.sizeBytes,
+    sourceKind: record.sourceKind,
+    originalName: record.originalName,
+    createdAt: record.createdAt,
+  };
+}
+
+function toDetailValue(record: ArtifactCatalogRecord): ArtifactReadSuccessValue {
+  return {
+    artifact: {
+      locator: createArtifactBrowserLocator(record.storageKey),
+      artifactKind: "image",
+      mediaType: record.mediaType,
+      sizeBytes: record.sizeBytes,
+      checksum: record.checksum,
+      sourceKind: record.sourceKind,
+      originalName: record.originalName,
+      createdAt: record.createdAt,
+    },
+  };
+}
+
+function toContentValue(record: ArtifactCatalogRecord): ArtifactContentReadSuccessValue {
+  return {
+    content: {
+      locator: createArtifactBrowserLocator(record.storageKey),
+      mediaType: record.mediaType,
+      sizeBytes: record.sizeBytes,
+      availability: "available",
+      retrieval: "deferred",
+    },
+  };
+}
+
+export async function appendArtifactCatalogRecord(
+  rootDirectory: string,
+  record: ArtifactCatalogRecord,
+): Promise<void> {
+  const catalogPath = toCatalogPath(rootDirectory);
+  await mkdir(path.dirname(catalogPath), { recursive: true });
+  await appendFile(catalogPath, `${JSON.stringify(record)}\n`, "utf8");
 }
 
 export function createFilesystemArtifactBrowserReadAdapter(
@@ -133,91 +177,53 @@ export function createFilesystemArtifactBrowserReadAdapter(
         );
       }
 
-      let files: string[];
-      try {
-        files = await walkFiles(rootDirectory);
-      } catch {
-        files = [];
-      }
-
-      const items: ArtifactBrowseItem[] = [];
-      for (const filePath of files) {
-        const mediaType = toMediaType(filePath);
-        if (!mediaType) {
-          continue;
-        }
-
-        const fileStats = await stat(filePath);
-        items.push({
-          storageKey: createStorageKey(rootDirectory, filePath),
-          artifactKind: "image",
-          mediaType,
-          sizeBytes: fileStats.size,
-          createdAt: Number.isNaN(fileStats.birthtimeMs) ? undefined : fileStats.birthtime.toISOString(),
-        });
-      }
-
-      items.sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
+      const records = await readCatalogRecords(rootDirectory);
+      const items = records
+        .map((record) => toBrowseItem(record))
+        .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
 
       return createSuccessResult({ items }, context);
     },
 
-    async readArtifactDetail(
+    async readArtifactDetail<TMetadata extends StorageObjectMetadata = StorageObjectMetadata>(
       request: ReadArtifactDetailRequest,
       context: ArtifactBrowserBoundaryContext = {},
     ) {
-      const artifact = await resolveArtifactFile(rootDirectory, request.locator.storageKey);
-      if (!artifact) {
+      const storageKey = normalizeStorageArtifactKey(request.locator.storageKey);
+      const record = (await readCatalogRecords(rootDirectory)).find(
+        (entry) => entry.storageKey === storageKey,
+      );
+
+      if (!record) {
         return createFailureResult(
-          createContractError(
-            "not-found",
-            `Artifact not found for storage key \"${request.locator.storageKey}\".`,
-          ),
+          createContractError("not-found", `Artifact not found for storage key \"${storageKey}\".`),
           context,
         );
       }
 
-      return createSuccessResult(
-        {
-          artifact: {
-            locator: createArtifactBrowserLocator(artifact.storageKey),
-            artifactKind: "image",
-            mediaType: artifact.mediaType,
-            sizeBytes: artifact.sizeBytes,
-            createdAt: artifact.createdAt,
-          },
-        },
-        context,
-      );
+      return createSuccessResult(toDetailValue(record) as ArtifactReadSuccessValue<TMetadata>, context);
     },
 
     async readArtifactContent(
       request: ReadArtifactContentRequest,
       context: ArtifactBrowserBoundaryContext = {},
     ) {
-      const artifact = await resolveArtifactFile(rootDirectory, request.locator.storageKey);
-      if (!artifact) {
+      const storageKey = normalizeStorageArtifactKey(request.locator.storageKey);
+      const record = (await readCatalogRecords(rootDirectory)).find(
+        (entry) => entry.storageKey === storageKey,
+      );
+
+      if (!record) {
         return createFailureResult(
           createContractError(
             "not-found",
-            `Artifact content not found for storage key \"${request.locator.storageKey}\".`,
+            `Artifact content not found for storage key \"${storageKey}\".`,
           ),
           context,
         );
       }
 
-      return createSuccessResult(
-        {
-          content: {
-            locator: createArtifactBrowserLocator(artifact.storageKey),
-            mediaType: artifact.mediaType,
-            sizeBytes: artifact.sizeBytes,
-            availability: "available",
-            retrieval: "deferred",
-          },
-        },
-        context,
-      );
+      return createSuccessResult(toContentValue(record), context);
     },
   };
 }

@@ -14,33 +14,15 @@ import {
 } from "../../../../contracts/api";
 import type {
   BrowseArtifactsCommand,
+  BrowseArtifactsUseCasePort,
   BrowseArtifactsUseCaseResult,
   ReadArtifactContentCommand,
+  ReadArtifactContentUseCasePort,
   ReadArtifactContentUseCaseResult,
   ReadArtifactDetailCommand,
+  ReadArtifactDetailUseCasePort,
   ReadArtifactDetailUseCaseResult,
 } from "../../../../application/use-cases";
-
-export interface ArtifactBrowserUseCasePort {
-  browseArtifacts: {
-    execute: (
-      command: BrowseArtifactsCommand,
-      context?: { requestId?: string; correlationId?: string },
-    ) => Promise<BrowseArtifactsUseCaseResult>;
-  };
-  readArtifactDetail: {
-    execute: (
-      command: ReadArtifactDetailCommand,
-      context?: { requestId?: string; correlationId?: string },
-    ) => Promise<ReadArtifactDetailUseCaseResult>;
-  };
-  readArtifactContent: {
-    execute: (
-      command: ReadArtifactContentCommand,
-      context?: { requestId?: string; correlationId?: string },
-    ) => Promise<ReadArtifactContentUseCaseResult>;
-  };
-}
 
 interface ArtifactBrowseApiRequestBody {
   artifactKind: "image";
@@ -73,7 +55,9 @@ export interface ExpressPostRoutePort {
 
 export interface RegisterArtifactBrowserApiRoutesDependencies {
   app: ExpressPostRoutePort;
-  useCases: ArtifactBrowserUseCasePort;
+  browseArtifactsUseCase: BrowseArtifactsUseCasePort;
+  readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
+  readArtifactContentUseCase: ReadArtifactContentUseCasePort;
 }
 
 function getRequestHeader(
@@ -90,9 +74,7 @@ function getRequestHeader(
 
 function normalizeSource(value: string | undefined): string {
   const normalized = value?.trim();
-  return normalized && normalized.length > 0
-    ? normalized
-    : "thin-client.artifact-browser";
+  return normalized && normalized.length > 0 ? normalized : "thin-client.artifact-browser";
 }
 
 function resolveStatusCode(
@@ -114,162 +96,210 @@ function resolveStatusCode(
   }
 }
 
+export function mapArtifactBrowseApiRequestToCommand(
+  requestBody: ArtifactBrowseApiRequestBody,
+  context: { requestId?: string; correlationId?: string },
+): BrowseArtifactsCommand {
+  const apiRequest = createApiArtifactBrowseRequest(
+    {
+      artifactKind: requestBody.artifactKind,
+      boundary: {
+        host: "server",
+        source: normalizeSource(requestBody.source),
+      },
+    },
+    context,
+  );
+
+  return { artifactKind: apiRequest.payload.artifactKind };
+}
+
+export function mapArtifactReadApiRequestToCommand(
+  requestBody: ArtifactReadApiRequestBody,
+  context: { requestId?: string; correlationId?: string },
+): ReadArtifactDetailCommand {
+  const apiRequest = createApiArtifactReadRequest(
+    {
+      locator: requestBody.locator,
+      boundary: {
+        host: "server",
+        source: normalizeSource(requestBody.source),
+      },
+    },
+    context,
+  );
+
+  return { locator: apiRequest.payload.locator };
+}
+
+export function mapArtifactContentReadApiRequestToCommand(
+  requestBody: ArtifactReadApiRequestBody,
+  context: { requestId?: string; correlationId?: string },
+): ReadArtifactContentCommand {
+  const apiRequest = createApiArtifactContentReadRequest(
+    {
+      locator: requestBody.locator,
+      boundary: {
+        host: "server",
+        source: normalizeSource(requestBody.source),
+      },
+    },
+    context,
+  );
+
+  return { locator: apiRequest.payload.locator };
+}
+
+export function mapBrowseArtifactsResultToApiResponse(
+  result: BrowseArtifactsUseCaseResult,
+  context: { requestId?: string; correlationId?: string },
+): ApiArtifactBrowseResponse {
+  if (result.ok) {
+    return createApiArtifactBrowseSuccessResponse(result.value, {
+      requestId: result.requestId ?? context.requestId,
+      correlationId: result.correlationId ?? context.correlationId,
+    });
+  }
+
+  return createApiArtifactBrowseFailureResponse(
+    result.error.code === "validation" || result.error.code === "unavailable"
+      ? result.error.code
+      : "internal",
+    result.error.message,
+    {
+      details: result.error.details,
+      requestId: result.requestId ?? context.requestId,
+      correlationId: result.correlationId ?? context.correlationId,
+    },
+  );
+}
+
+export function mapReadArtifactDetailResultToApiResponse(
+  result: ReadArtifactDetailUseCaseResult,
+  context: { requestId?: string; correlationId?: string },
+): ApiArtifactReadResponse {
+  if (result.ok) {
+    return createApiArtifactReadSuccessResponse(result.value, {
+      requestId: result.requestId ?? context.requestId,
+      correlationId: result.correlationId ?? context.correlationId,
+    });
+  }
+
+  return createApiArtifactReadFailureResponse(
+    result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+      ? result.error.code
+      : "internal",
+    result.error.message,
+    {
+      details: result.error.details,
+      requestId: result.requestId ?? context.requestId,
+      correlationId: result.correlationId ?? context.correlationId,
+    },
+  );
+}
+
+export function mapReadArtifactContentResultToApiResponse(
+  result: ReadArtifactContentUseCaseResult,
+  context: { requestId?: string; correlationId?: string },
+): ApiArtifactContentReadResponse {
+  if (result.ok) {
+    return createApiArtifactContentReadSuccessResponse(result.value, {
+      requestId: result.requestId ?? context.requestId,
+      correlationId: result.correlationId ?? context.correlationId,
+    });
+  }
+
+  return createApiArtifactContentReadFailureResponse(
+    result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+      ? result.error.code
+      : "internal",
+    result.error.message,
+    {
+      details: result.error.details,
+      requestId: result.requestId ?? context.requestId,
+      correlationId: result.correlationId ?? context.correlationId,
+    },
+  );
+}
+
 export function registerArtifactBrowserApiRoutes(
   dependencies: RegisterArtifactBrowserApiRoutesDependencies,
 ): void {
   dependencies.app.post("/api/artifact/browse", async (request, response) => {
     const requestId = getRequestHeader(request.headers, "x-request-id");
     const correlationId = getRequestHeader(request.headers, "x-correlation-id");
+    const context = { requestId, correlationId };
 
-    let browseCommand: BrowseArtifactsCommand;
+    let command: BrowseArtifactsCommand;
     try {
-      const apiRequest = createApiArtifactBrowseRequest(
-        {
-          artifactKind: (request.body as ArtifactBrowseApiRequestBody)?.artifactKind,
-          boundary: {
-            host: "server",
-            source: normalizeSource((request.body as ArtifactBrowseApiRequestBody)?.source),
-          },
-        },
-        { requestId, correlationId },
+      command = mapArtifactBrowseApiRequestToCommand(
+        request.body as ArtifactBrowseApiRequestBody,
+        context,
       );
-      browseCommand = { artifactKind: apiRequest.payload.artifactKind };
     } catch (error) {
       const apiResponse = createApiArtifactBrowseFailureResponse(
         "validation",
         error instanceof Error ? error.message : "Invalid artifact browse request.",
-        { requestId, correlationId },
+        context,
       );
       response.status(resolveStatusCode(apiResponse)).json(apiResponse);
       return;
     }
 
-    const result = await dependencies.useCases.browseArtifacts.execute(browseCommand, {
-      requestId,
-      correlationId,
-    });
-
-    const apiResponse = result.ok
-      ? createApiArtifactBrowseSuccessResponse(result.value, {
-        requestId: result.requestId ?? requestId,
-        correlationId: result.correlationId ?? correlationId,
-      })
-      : createApiArtifactBrowseFailureResponse(
-        result.error.code === "validation" || result.error.code === "unavailable"
-          ? result.error.code
-          : "internal",
-        result.error.message,
-        {
-          details: result.error.details,
-          requestId: result.requestId ?? requestId,
-          correlationId: result.correlationId ?? correlationId,
-        },
-      );
-
+    const result = await dependencies.browseArtifactsUseCase.execute(command, context);
+    const apiResponse = mapBrowseArtifactsResultToApiResponse(result, context);
     response.status(resolveStatusCode(apiResponse)).json(apiResponse);
   });
 
   dependencies.app.post("/api/artifact/read", async (request, response) => {
     const requestId = getRequestHeader(request.headers, "x-request-id");
     const correlationId = getRequestHeader(request.headers, "x-correlation-id");
+    const context = { requestId, correlationId };
 
-    let detailCommand: ReadArtifactDetailCommand;
+    let command: ReadArtifactDetailCommand;
     try {
-      const apiRequest = createApiArtifactReadRequest(
-        {
-          locator: (request.body as ArtifactReadApiRequestBody)?.locator,
-          boundary: {
-            host: "server",
-            source: normalizeSource((request.body as ArtifactReadApiRequestBody)?.source),
-          },
-        },
-        { requestId, correlationId },
+      command = mapArtifactReadApiRequestToCommand(
+        request.body as ArtifactReadApiRequestBody,
+        context,
       );
-      detailCommand = { locator: apiRequest.payload.locator };
     } catch (error) {
       const apiResponse = createApiArtifactReadFailureResponse(
         "validation",
         error instanceof Error ? error.message : "Invalid artifact read request.",
-        { requestId, correlationId },
+        context,
       );
       response.status(resolveStatusCode(apiResponse)).json(apiResponse);
       return;
     }
 
-    const result = await dependencies.useCases.readArtifactDetail.execute(detailCommand, {
-      requestId,
-      correlationId,
-    });
-
-    const apiResponse = result.ok
-      ? createApiArtifactReadSuccessResponse(result.value, {
-        requestId: result.requestId ?? requestId,
-        correlationId: result.correlationId ?? correlationId,
-      })
-      : createApiArtifactReadFailureResponse(
-        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
-          ? result.error.code
-          : "internal",
-        result.error.message,
-        {
-          details: result.error.details,
-          requestId: result.requestId ?? requestId,
-          correlationId: result.correlationId ?? correlationId,
-        },
-      );
-
+    const result = await dependencies.readArtifactDetailUseCase.execute(command, context);
+    const apiResponse = mapReadArtifactDetailResultToApiResponse(result, context);
     response.status(resolveStatusCode(apiResponse)).json(apiResponse);
   });
 
   dependencies.app.post("/api/artifact/content/read", async (request, response) => {
     const requestId = getRequestHeader(request.headers, "x-request-id");
     const correlationId = getRequestHeader(request.headers, "x-correlation-id");
+    const context = { requestId, correlationId };
 
-    let contentCommand: ReadArtifactContentCommand;
+    let command: ReadArtifactContentCommand;
     try {
-      const apiRequest = createApiArtifactContentReadRequest(
-        {
-          locator: (request.body as ArtifactReadApiRequestBody)?.locator,
-          boundary: {
-            host: "server",
-            source: normalizeSource((request.body as ArtifactReadApiRequestBody)?.source),
-          },
-        },
-        { requestId, correlationId },
+      command = mapArtifactContentReadApiRequestToCommand(
+        request.body as ArtifactReadApiRequestBody,
+        context,
       );
-      contentCommand = { locator: apiRequest.payload.locator };
     } catch (error) {
       const apiResponse = createApiArtifactContentReadFailureResponse(
         "validation",
         error instanceof Error ? error.message : "Invalid artifact content-read request.",
-        { requestId, correlationId },
+        context,
       );
       response.status(resolveStatusCode(apiResponse)).json(apiResponse);
       return;
     }
 
-    const result = await dependencies.useCases.readArtifactContent.execute(contentCommand, {
-      requestId,
-      correlationId,
-    });
-
-    const apiResponse = result.ok
-      ? createApiArtifactContentReadSuccessResponse(result.value, {
-        requestId: result.requestId ?? requestId,
-        correlationId: result.correlationId ?? correlationId,
-      })
-      : createApiArtifactContentReadFailureResponse(
-        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
-          ? result.error.code
-          : "internal",
-        result.error.message,
-        {
-          details: result.error.details,
-          requestId: result.requestId ?? requestId,
-          correlationId: result.correlationId ?? correlationId,
-        },
-      );
-
+    const result = await dependencies.readArtifactContentUseCase.execute(command, context);
+    const apiResponse = mapReadArtifactContentResultToApiResponse(result, context);
     response.status(resolveStatusCode(apiResponse)).json(apiResponse);
   });
 }

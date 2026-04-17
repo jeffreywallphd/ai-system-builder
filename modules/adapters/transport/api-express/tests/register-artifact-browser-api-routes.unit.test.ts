@@ -1,34 +1,35 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import {
+  mapArtifactBrowseApiRequestToCommand,
+  mapReadArtifactContentResultToApiResponse,
   registerArtifactBrowserApiRoutes,
-  type ArtifactBrowserUseCasePort,
   type ExpressPostRoutePort,
 } from "../artifact-browser/registerArtifactBrowserApiRoutes";
 
-function createUseCases(): ArtifactBrowserUseCasePort {
+function createUseCases() {
   return {
-    browseArtifacts: { execute: testDouble.fn() },
-    readArtifactDetail: { execute: testDouble.fn() },
-    readArtifactContent: { execute: testDouble.fn() },
-  } as ArtifactBrowserUseCasePort;
+    browseArtifactsUseCase: { execute: testDouble.fn() },
+    readArtifactDetailUseCase: { execute: testDouble.fn() },
+    readArtifactContentUseCase: { execute: testDouble.fn() },
+  };
 }
 
 describe("registerArtifactBrowserApiRoutes", () => {
-  it("registers browse/detail/content routes and delegates to use cases", async () => {
+  it("registers browse/detail/content routes and delegates to focused use case ports", async () => {
     const handlers = new Map<string, Parameters<ExpressPostRoutePort["post"]>[1]>();
     const app: ExpressPostRoutePort = {
-      post: testDouble.fn((path, handler) => {
-        handlers.set(path, handler);
+      post: testDouble.fn((routePath, handler) => {
+        handlers.set(routePath, handler);
       }),
     };
 
-    const useCases = createUseCases();
-    (useCases.browseArtifacts.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+    const dependencies = createUseCases();
+    (dependencies.browseArtifactsUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
       ok: true,
       value: { items: [] },
     });
-    (useCases.readArtifactDetail.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+    (dependencies.readArtifactDetailUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
       ok: true,
       value: {
         artifact: {
@@ -37,7 +38,7 @@ describe("registerArtifactBrowserApiRoutes", () => {
         },
       },
     });
-    (useCases.readArtifactContent.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+    (dependencies.readArtifactContentUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
       ok: true,
       value: {
         content: {
@@ -48,7 +49,7 @@ describe("registerArtifactBrowserApiRoutes", () => {
       },
     });
 
-    registerArtifactBrowserApiRoutes({ app, useCases });
+    registerArtifactBrowserApiRoutes({ app, ...dependencies });
 
     expect(app.post).toHaveBeenCalledTimes(3);
     expect(handlers.has("/api/artifact/browse")).toBe(true);
@@ -73,17 +74,47 @@ describe("registerArtifactBrowserApiRoutes", () => {
       response,
     );
 
-    expect(useCases.browseArtifacts.execute).toHaveBeenCalledWith(
+    expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
       { artifactKind: "image" },
       { requestId: undefined, correlationId: undefined },
     );
-    expect(useCases.readArtifactDetail.execute).toHaveBeenCalledWith(
+    expect(dependencies.readArtifactDetailUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
       { requestId: undefined, correlationId: undefined },
     );
-    expect(useCases.readArtifactContent.execute).toHaveBeenCalledWith(
+    expect(dependencies.readArtifactContentUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
       { requestId: undefined, correlationId: undefined },
     );
+  });
+
+  it("maps api request payload and use case failure responses through explicit helpers", () => {
+    expect(
+      mapArtifactBrowseApiRequestToCommand(
+        { artifactKind: "image", source: " thin-client.browser " },
+        { requestId: "req-1", correlationId: "corr-1" },
+      ),
+    ).toEqual({ artifactKind: "image" });
+
+    const mapped = mapReadArtifactContentResultToApiResponse(
+      {
+        ok: false,
+        error: {
+          code: "not-found",
+          message: "missing",
+          details: { key: "uploads/missing.png" },
+        },
+      },
+      { requestId: "req-2", correlationId: "corr-2" },
+    );
+
+    expect(mapped).toMatchObject({
+      ok: false,
+      error: {
+        code: "not-found",
+      },
+      requestId: "req-2",
+      correlationId: "corr-2",
+    });
   });
 });

@@ -77,7 +77,6 @@ describe("desktop image upload end-to-end", () => {
         randomSuffix: () => "e2e",
       }),
       logging: logger,
-      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
@@ -93,9 +92,26 @@ describe("desktop image upload end-to-end", () => {
       },
     };
 
+    const unavailableResult = {
+      ok: false as const,
+      error: {
+        code: "unavailable" as const,
+        message: "artifact browser disabled in upload-only e2e",
+      },
+    };
+
     registerElectronIpc({
       ipcMain,
       storeImageUploadUseCase: useCase,
+      browseArtifactsUseCase: {
+        execute: async () => unavailableResult,
+      },
+      readArtifactDetailUseCase: {
+        execute: async () => unavailableResult,
+      },
+      readArtifactContentUseCase: {
+        execute: async () => unavailableResult,
+      },
     });
 
     const preloadApi = createDesktopPreloadApi({

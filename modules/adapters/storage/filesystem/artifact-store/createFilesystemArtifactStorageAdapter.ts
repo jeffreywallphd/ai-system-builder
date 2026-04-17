@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
+import { appendArtifactCatalogRecord } from "./createFilesystemArtifactBrowserReadAdapter";
 import type { ArtifactStoragePort } from "../../../../application/ports/storage";
 import type { ContractErrorCode } from "../../../../contracts/shared";
 import { createContractError } from "../../../../contracts/shared";
@@ -153,6 +154,10 @@ function extensionForMediaType(mediaType: string | undefined): string {
   }
 }
 
+function isImageMediaType(mediaType: string | undefined): boolean {
+  return typeof mediaType === "string" && mediaType.toLowerCase().startsWith("image/");
+}
+
 function createContentChecksum(bytes: Uint8Array): StorageObjectChecksum {
   const digest = createHash(STORAGE_CHECKSUM_ALGORITHM).update(bytes).digest("hex");
 
@@ -275,6 +280,23 @@ export function createFilesystemArtifactStorageAdapter(
           throw new StorageAdapterVerificationError(
             `Post-write verification failed: expected ${bytes.byteLength} bytes but found ${writtenStats.size}.`,
           );
+        }
+
+        if (isImageMediaType(request.descriptor.mediaType)) {
+          await appendArtifactCatalogRecord(rootDirectory, {
+            storageKey: key,
+            artifactKind: "image",
+            mediaType: request.descriptor.mediaType,
+            sizeBytes: bytes.byteLength,
+            sourceKind: "upload",
+            originalName:
+              typeof (request.descriptor.metadata as { originalFileName?: unknown } | undefined)?.originalFileName
+                === "string"
+                ? (request.descriptor.metadata as { originalFileName?: string }).originalFileName
+                : undefined,
+            createdAt: now(),
+            checksum,
+          });
         }
 
         await logBoundaryEvent({

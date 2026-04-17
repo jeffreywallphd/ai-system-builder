@@ -9,21 +9,21 @@ import {
   createDesktopArtifactReadRequest,
 } from "../../../../contracts/ipc";
 import {
+  mapReadArtifactContentResultToDesktopResponse,
   registerArtifactBrowserIpc,
-  type ArtifactBrowserUseCasePort,
   type IpcMainHandlePort,
 } from "../artifact-browser/registerArtifactBrowserIpc";
 
-function createUseCases(): ArtifactBrowserUseCasePort {
+function createUseCases() {
   return {
-    browseArtifacts: { execute: testDouble.fn() },
-    readArtifactDetail: { execute: testDouble.fn() },
-    readArtifactContent: { execute: testDouble.fn() },
-  } as ArtifactBrowserUseCasePort;
+    browseArtifactsUseCase: { execute: testDouble.fn() },
+    readArtifactDetailUseCase: { execute: testDouble.fn() },
+    readArtifactContentUseCase: { execute: testDouble.fn() },
+  };
 }
 
 describe("registerArtifactBrowserIpc", () => {
-  it("registers browse/read/content channels and delegates to use cases", async () => {
+  it("registers browse/read/content channels and delegates to focused use case ports", async () => {
     const handlers = new Map<string, Parameters<IpcMainHandlePort["handle"]>[1]>();
     const ipcMain: IpcMainHandlePort = {
       handle: testDouble.fn((channel, listener) => {
@@ -31,12 +31,12 @@ describe("registerArtifactBrowserIpc", () => {
       }),
     };
 
-    const useCases = createUseCases();
-    (useCases.browseArtifacts.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+    const dependencies = createUseCases();
+    (dependencies.browseArtifactsUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
       ok: true,
       value: { items: [] },
     });
-    (useCases.readArtifactDetail.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+    (dependencies.readArtifactDetailUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
       ok: true,
       value: {
         artifact: {
@@ -45,7 +45,7 @@ describe("registerArtifactBrowserIpc", () => {
         },
       },
     });
-    (useCases.readArtifactContent.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+    (dependencies.readArtifactContentUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
       ok: true,
       value: {
         content: {
@@ -56,7 +56,7 @@ describe("registerArtifactBrowserIpc", () => {
       },
     });
 
-    registerArtifactBrowserIpc({ ipcMain, useCases });
+    registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
     expect(ipcMain.handle).toHaveBeenCalledTimes(3);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
@@ -85,17 +85,45 @@ describe("registerArtifactBrowserIpc", () => {
       }),
     );
 
-    expect(useCases.browseArtifacts.execute).toHaveBeenCalledWith(
+    expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
       { artifactKind: "image" },
       { requestId: undefined, correlationId: undefined },
     );
-    expect(useCases.readArtifactDetail.execute).toHaveBeenCalledWith(
+    expect(dependencies.readArtifactDetailUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
       { requestId: undefined, correlationId: undefined },
     );
-    expect(useCases.readArtifactContent.execute).toHaveBeenCalledWith(
+    expect(dependencies.readArtifactContentUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
       { requestId: undefined, correlationId: undefined },
     );
+  });
+
+  it("maps descriptor-oriented content failures through explicit response helper", () => {
+    const request = createDesktopArtifactContentReadRequest({
+      locator: { storageKey: "uploads/missing.png" },
+      boundary: { host: "desktop", source: "desktop.renderer" },
+    });
+
+    const response = mapReadArtifactContentResultToDesktopResponse(
+      {
+        ok: false,
+        error: {
+          code: "not-found",
+          message: "not found",
+          details: { storageKey: "uploads/missing.png" },
+        },
+      },
+      request,
+    );
+
+    expect(response).toMatchObject({
+      ok: false,
+      error: {
+        code: "not-found",
+      },
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+    });
   });
 });

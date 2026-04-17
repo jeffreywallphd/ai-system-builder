@@ -19,47 +19,51 @@ import {
 } from "../../../../contracts/ipc";
 import type {
   BrowseArtifactsCommand,
+  BrowseArtifactsUseCasePort,
   BrowseArtifactsUseCaseResult,
   ReadArtifactContentCommand,
+  ReadArtifactContentUseCasePort,
   ReadArtifactContentUseCaseResult,
   ReadArtifactDetailCommand,
+  ReadArtifactDetailUseCasePort,
   ReadArtifactDetailUseCaseResult,
 } from "../../../../application/use-cases";
 
-export interface ArtifactBrowserUseCasePort {
-  browseArtifacts: {
-    execute: (
-      command: BrowseArtifactsCommand,
-      context?: { requestId?: string; correlationId?: string },
-    ) => Promise<BrowseArtifactsUseCaseResult>;
-  };
-  readArtifactDetail: {
-    execute: (
-      command: ReadArtifactDetailCommand,
-      context?: { requestId?: string; correlationId?: string },
-    ) => Promise<ReadArtifactDetailUseCaseResult>;
-  };
-  readArtifactContent: {
-    execute: (
-      command: ReadArtifactContentCommand,
-      context?: { requestId?: string; correlationId?: string },
-    ) => Promise<ReadArtifactContentUseCaseResult>;
-  };
-}
-
-export interface IpcMainHandlePort {
-  handle: (
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<unknown>,
-  ) => void;
-}
+export type { IpcMainHandlePort } from "../image-upload/registerImageUploadIpc";
+import type { IpcMainHandlePort } from "../image-upload/registerImageUploadIpc";
 
 export interface RegisterArtifactBrowserIpcDependencies {
   ipcMain: IpcMainHandlePort;
-  useCases: ArtifactBrowserUseCasePort;
+  browseArtifactsUseCase: BrowseArtifactsUseCasePort;
+  readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
+  readArtifactContentUseCase: ReadArtifactContentUseCasePort;
 }
 
-function toBrowseFailure(
+export function mapDesktopArtifactBrowseRequestToCommand(
+  request: DesktopArtifactBrowseRequest,
+): BrowseArtifactsCommand {
+  return {
+    artifactKind: request.payload.artifactKind,
+  };
+}
+
+export function mapDesktopArtifactReadRequestToCommand(
+  request: DesktopArtifactReadRequest,
+): ReadArtifactDetailCommand {
+  return {
+    locator: request.payload.locator,
+  };
+}
+
+export function mapDesktopArtifactContentReadRequestToCommand(
+  request: DesktopArtifactContentReadRequest,
+): ReadArtifactContentCommand {
+  return {
+    locator: request.payload.locator,
+  };
+}
+
+function mapBrowseArtifactsFailure(
   request: DesktopArtifactBrowseRequest,
   error: { code: string; message: string; details?: Record<string, unknown> },
 ): DesktopArtifactBrowseResponse {
@@ -77,7 +81,7 @@ function toBrowseFailure(
   );
 }
 
-function toReadFailure(
+function mapReadArtifactFailure(
   request: DesktopArtifactReadRequest,
   error: { code: string; message: string; details?: Record<string, unknown> },
 ): DesktopArtifactReadResponse {
@@ -97,7 +101,7 @@ function toReadFailure(
   );
 }
 
-function toContentFailure(
+function mapReadArtifactContentFailure(
   request: DesktopArtifactContentReadRequest,
   error: { code: string; message: string; details?: Record<string, unknown> },
 ): DesktopArtifactContentReadResponse {
@@ -117,75 +121,96 @@ function toContentFailure(
   );
 }
 
-export function createDesktopArtifactBrowseIpcHandler(useCases: ArtifactBrowserUseCasePort) {
+export function mapBrowseArtifactsResultToDesktopResponse(
+  result: BrowseArtifactsUseCaseResult,
+  request: DesktopArtifactBrowseRequest,
+): DesktopArtifactBrowseResponse {
+  if (!result.ok) {
+    return mapBrowseArtifactsFailure(request, result.error);
+  }
+
+  return createDesktopArtifactBrowseSuccessResponse(result.value, {
+    requestId: result.requestId ?? request.requestId,
+    correlationId: result.correlationId ?? request.correlationId,
+  });
+}
+
+export function mapReadArtifactDetailResultToDesktopResponse(
+  result: ReadArtifactDetailUseCaseResult,
+  request: DesktopArtifactReadRequest,
+): DesktopArtifactReadResponse {
+  if (!result.ok) {
+    return mapReadArtifactFailure(request, result.error);
+  }
+
+  return createDesktopArtifactReadSuccessResponse(result.value, {
+    requestId: result.requestId ?? request.requestId,
+    correlationId: result.correlationId ?? request.correlationId,
+  });
+}
+
+export function mapReadArtifactContentResultToDesktopResponse(
+  result: ReadArtifactContentUseCaseResult,
+  request: DesktopArtifactContentReadRequest,
+): DesktopArtifactContentReadResponse {
+  if (!result.ok) {
+    return mapReadArtifactContentFailure(request, result.error);
+  }
+
+  return createDesktopArtifactContentReadSuccessResponse(result.value, {
+    requestId: result.requestId ?? request.requestId,
+    correlationId: result.correlationId ?? request.correlationId,
+  });
+}
+
+export function createDesktopArtifactBrowseIpcHandler(
+  browseArtifactsUseCase: BrowseArtifactsUseCasePort,
+) {
   return async (
     _event: unknown,
     request: DesktopArtifactBrowseRequest,
   ): Promise<DesktopArtifactBrowseResponse> => {
-    const result = await useCases.browseArtifacts.execute(
-      { artifactKind: request.payload.artifactKind },
-      {
-        requestId: request.requestId,
-        correlationId: request.correlationId,
-      },
-    );
-
-    if (!result.ok) {
-      return toBrowseFailure(request, result.error);
-    }
-
-    return createDesktopArtifactBrowseSuccessResponse(result.value, {
-      requestId: result.requestId ?? request.requestId,
-      correlationId: result.correlationId ?? request.correlationId,
+    const command = mapDesktopArtifactBrowseRequestToCommand(request);
+    const result = await browseArtifactsUseCase.execute(command, {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
     });
+
+    return mapBrowseArtifactsResultToDesktopResponse(result, request);
   };
 }
 
-export function createDesktopArtifactReadIpcHandler(useCases: ArtifactBrowserUseCasePort) {
+export function createDesktopArtifactReadIpcHandler(
+  readArtifactDetailUseCase: ReadArtifactDetailUseCasePort,
+) {
   return async (
     _event: unknown,
     request: DesktopArtifactReadRequest,
   ): Promise<DesktopArtifactReadResponse> => {
-    const result = await useCases.readArtifactDetail.execute(
-      { locator: request.payload.locator },
-      {
-        requestId: request.requestId,
-        correlationId: request.correlationId,
-      },
-    );
-
-    if (!result.ok) {
-      return toReadFailure(request, result.error);
-    }
-
-    return createDesktopArtifactReadSuccessResponse(result.value, {
-      requestId: result.requestId ?? request.requestId,
-      correlationId: result.correlationId ?? request.correlationId,
+    const command = mapDesktopArtifactReadRequestToCommand(request);
+    const result = await readArtifactDetailUseCase.execute(command, {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
     });
+
+    return mapReadArtifactDetailResultToDesktopResponse(result, request);
   };
 }
 
-export function createDesktopArtifactContentReadIpcHandler(useCases: ArtifactBrowserUseCasePort) {
+export function createDesktopArtifactContentReadIpcHandler(
+  readArtifactContentUseCase: ReadArtifactContentUseCasePort,
+) {
   return async (
     _event: unknown,
     request: DesktopArtifactContentReadRequest,
   ): Promise<DesktopArtifactContentReadResponse> => {
-    const result = await useCases.readArtifactContent.execute(
-      { locator: request.payload.locator },
-      {
-        requestId: request.requestId,
-        correlationId: request.correlationId,
-      },
-    );
-
-    if (!result.ok) {
-      return toContentFailure(request, result.error);
-    }
-
-    return createDesktopArtifactContentReadSuccessResponse(result.value, {
-      requestId: result.requestId ?? request.requestId,
-      correlationId: result.correlationId ?? request.correlationId,
+    const command = mapDesktopArtifactContentReadRequestToCommand(request);
+    const result = await readArtifactContentUseCase.execute(command, {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
     });
+
+    return mapReadArtifactContentResultToDesktopResponse(result, request);
   };
 }
 
@@ -194,14 +219,14 @@ export function registerArtifactBrowserIpc(
 ): void {
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value,
-    createDesktopArtifactBrowseIpcHandler(dependencies.useCases),
+    createDesktopArtifactBrowseIpcHandler(dependencies.browseArtifactsUseCase),
   );
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value,
-    createDesktopArtifactReadIpcHandler(dependencies.useCases),
+    createDesktopArtifactReadIpcHandler(dependencies.readArtifactDetailUseCase),
   );
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value,
-    createDesktopArtifactContentReadIpcHandler(dependencies.useCases),
+    createDesktopArtifactContentReadIpcHandler(dependencies.readArtifactContentUseCase),
   );
 }
