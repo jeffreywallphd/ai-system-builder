@@ -31,6 +31,13 @@ import type {
 } from "../persistence";
 import type { RuntimeExecutionPort } from "../runtime";
 import type { ArtifactStoragePort } from "../storage";
+import type {
+  ArtifactBrowserContentReadPort,
+  ArtifactBrowserMetadataReadPort,
+  BrowseArtifactsRequest,
+  ReadArtifactContentRequest,
+  ReadArtifactDetailRequest,
+} from "../artifact-browser";
 
 const PORTS_SCAN_ROOT = resolve("modules/application/ports");
 const IMPORT_PATTERN = /\bfrom\s+["']([^"']+)["']/g;
@@ -221,4 +228,35 @@ describe("application ports cross-family invariants", () => {
     expect("log" in runtimePort).toBe(false);
     expect("execute" in loggingPort).toBe(false);
   });
+  it("keeps artifact browser metadata and content seams distinct and storage-key locator based", () => {
+    expectTypeOf<keyof ArtifactBrowserMetadataReadPort>().toEqualTypeOf<
+      "browseArtifacts" | "readArtifactDetail"
+    >();
+    expectTypeOf<keyof ArtifactBrowserContentReadPort>().toEqualTypeOf<"readArtifactContent">();
+
+    expectTypeOf<BrowseArtifactsRequest>().toExtend<{
+      artifactKind: "image";
+    }>();
+    expectTypeOf<ReadArtifactDetailRequest>().toExtend<{
+      locator: { storageKey: string };
+    }>();
+    expectTypeOf<ReadArtifactContentRequest>().toExtend<{
+      locator: { storageKey: string };
+    }>();
+
+    expectTypeOf<ReadArtifactDetailRequest>().not.toExtend<{
+      locator: { path: string };
+    }>();
+    expectTypeOf<ReadArtifactContentRequest>().not.toExtend<{
+      locator: { path: string };
+    }>();
+
+    expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["readArtifactDetail"]>[0]>().not.toExtend<{
+      content: unknown;
+    }>();
+    expectTypeOf<Parameters<ArtifactBrowserContentReadPort["readArtifactContent"]>[0]>().not.toExtend<{
+      artifactKind: string;
+    }>();
+  });
+
 });
