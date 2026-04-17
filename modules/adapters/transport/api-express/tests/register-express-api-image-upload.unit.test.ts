@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
@@ -323,7 +323,10 @@ describe("registerImageUploadApiRoute", () => {
 
 describe("registerExpressApi top-level aggregator surface", () => {
   it("remains a tiny registration-only aggregator without feature helper re-exports", () => {
-    const aggregatorPath = fileURLToPath(new URL("../registerExpressApi.ts", import.meta.url));
+    const aggregatorTypeScriptPath = fileURLToPath(new URL("../registerExpressApi.ts", import.meta.url));
+    const aggregatorPath = existsSync(aggregatorTypeScriptPath)
+      ? aggregatorTypeScriptPath
+      : aggregatorTypeScriptPath.replace(/\.ts$/, ".js");
     const source = readFileSync(aggregatorPath, "utf8");
 
     expect(source).not.toContain("export type");
