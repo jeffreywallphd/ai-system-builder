@@ -10,7 +10,9 @@ Current scope:
 - feature-local artifact browser workflow under `src/features/artifact-browser/`
 - fetch-based HTTP image-upload client that calls the server API route (`/api/image/upload`)
 - artifact publish flow that calls `POST /api/artifact/publish` and surfaces published backing details
+- artifact publish verification/re-check flow that calls `POST /api/artifact/publish/verify`
 - artifact detail panel can render persisted published backing metadata from server-side binding records
+- artifact-browser publish/re-check state orchestration now uses a shared cross-host hook from `modules/ui/shared`
 - token-first style baseline under `src/styles/`
 
 The thin-client image-upload path intentionally reuses the server transport + shared application use

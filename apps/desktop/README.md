@@ -32,6 +32,10 @@ Current methods:
   - maps UI publish payload into the `artifact.publish` IPC request envelope
   - invokes only `ipc.artifact.publish.request`
   - returns structured publish result/failure envelope
+- `verifyPublishedArtifactBacking(input, context?)`
+  - maps UI verification payload into the `artifact.publish.verify` IPC request envelope
+  - invokes only `ipc.artifact.publish.verify.request`
+  - returns structured verify result/failure envelope
 
 Design constraints:
 
@@ -46,6 +50,8 @@ Design constraints:
 - reads file bytes in the renderer (`File.arrayBuffer()` -> `Uint8Array`)
 - calls preload bridge methods (`window.desktopApi.*`) through feature-local clients/hooks
 - renders browse/detail/content preview and Hugging Face publish success/error feedback
+- supports published-backing re-check and last-verified display from durable binding metadata
+- reuses shared cross-host publish/re-check hook logic from `modules/ui/shared`
 
 Renderer constraints for this slice:
 

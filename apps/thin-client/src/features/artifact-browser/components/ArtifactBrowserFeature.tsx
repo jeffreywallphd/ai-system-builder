@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import type { ArtifactBrowserApiClient } from "../api/apiArtifactBrowserClient";
 import { useArtifactBrowserFeature } from "../hooks/useArtifactBrowserFeature";
 
@@ -15,17 +13,18 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     imageViewUrl,
     publishState,
     publishedBacking,
-    selectedStorageKey,
+    publishForm,
     viewState,
     selectArtifact,
     refreshArtifacts,
     publishArtifactToHuggingFace,
+    recheckPublishedBacking,
+    setRepository,
+    setPathInRepo,
+    setRevision,
+    setMediaType,
+    togglePublishForm,
   } = useArtifactBrowserFeature(client);
-  const [repository, setRepository] = useState("");
-  const [pathInRepo, setPathInRepo] = useState("");
-  const [revision, setRevision] = useState("main");
-  const [mediaType, setMediaType] = useState("");
-  const [showPublishForm, setShowPublishForm] = useState(false);
 
   return (
     <section className="ui-panel ui-stack ui-stack--sm">
@@ -82,38 +81,33 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
             className="ui-button"
             type="button"
             disabled={publishState.status === "loading"}
-            onClick={() => setShowPublishForm((current) => !current)}
+            onClick={togglePublishForm}
           >
             Publish to Hugging Face
           </button>
-          {showPublishForm ? (
+          {publishForm.showPublishForm ? (
             <>
               <label className="ui-stack ui-stack--sm">
                 <span>Repository</span>
-                <input className="ui-input" value={repository} onChange={(event) => setRepository(event.target.value)} required />
+                <input className="ui-input" value={publishForm.repository} onChange={(event) => setRepository(event.target.value)} required />
               </label>
               <label className="ui-stack ui-stack--sm">
                 <span>Path in repo</span>
-                <input className="ui-input" value={pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required />
+                <input className="ui-input" value={publishForm.pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required />
               </label>
               <label className="ui-stack ui-stack--sm">
                 <span>Revision (optional)</span>
-                <input className="ui-input" value={revision} onChange={(event) => setRevision(event.target.value)} />
+                <input className="ui-input" value={publishForm.revision} onChange={(event) => setRevision(event.target.value)} />
               </label>
               <label className="ui-stack ui-stack--sm">
                 <span>Media type (optional)</span>
-                <input className="ui-input" value={mediaType} onChange={(event) => setMediaType(event.target.value)} />
+                <input className="ui-input" value={publishForm.mediaType} onChange={(event) => setMediaType(event.target.value)} />
               </label>
               <button
                 className="ui-button"
                 type="button"
-                disabled={publishState.status === "loading" || repository.trim().length === 0 || pathInRepo.trim().length === 0}
-                onClick={() => void publishArtifactToHuggingFace({
-                  repository,
-                  path: pathInRepo,
-                  revision: revision.trim() || undefined,
-                  mediaType: mediaType.trim() || undefined,
-                })}
+                disabled={publishState.status === "loading" || publishForm.repository.trim().length === 0 || publishForm.pathInRepo.trim().length === 0}
+                onClick={() => void publishArtifactToHuggingFace()}
               >
                 {publishState.status === "loading" ? "Publishing..." : "Publish"}
               </button>
@@ -130,16 +124,21 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
           <h3>Published Backing</h3>
           <dl className="ui-grid ui-grid--two">
             <dt>Provider</dt>
-            <dd>{publishedBacking.provider}</dd>
+            <dd>{publishedBacking.target.provider}</dd>
             <dt>Repo</dt>
-            <dd>{publishedBacking.repository}</dd>
+            <dd>{publishedBacking.target.repository}</dd>
             <dt>Path</dt>
-            <dd>{publishedBacking.path}</dd>
+            <dd>{publishedBacking.target.path}</dd>
             <dt>Revision</dt>
-            <dd>{publishedBacking.revision ?? "main"}</dd>
+            <dd>{publishedBacking.target.revision ?? "main"}</dd>
             <dt>Verified</dt>
-            <dd>{publishedBacking.exists ? "yes" : "no"}</dd>
+            <dd>{publishedBacking.verification.exists ? "yes" : "no"}</dd>
+            <dt>Last verified at</dt>
+            <dd>{publishedBacking.verification.verifiedAt ?? "never"}</dd>
           </dl>
+          <button className="ui-button" type="button" onClick={() => void recheckPublishedBacking()} disabled={publishState.status === "loading"}>
+            Re-check published backing
+          </button>
         </section>
       ) : null}
 

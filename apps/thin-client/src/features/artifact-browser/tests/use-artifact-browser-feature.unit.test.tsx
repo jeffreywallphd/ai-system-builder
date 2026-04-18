@@ -42,10 +42,16 @@ describe("ArtifactBrowserFeature", () => {
         sizeBytes: 4,
         metadata: {
           publishedBacking: {
-            provider: "huggingface",
-            repository: "openai/demo",
-            path: "images/cat.png",
-            revision: "main",
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/cat.png",
+              revision: "main",
+              locator: "openai/demo/images/cat.png",
+            },
+            verification: {
+              exists: false,
+            },
           },
         },
       }),
@@ -58,11 +64,30 @@ describe("ArtifactBrowserFeature", () => {
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
       publishArtifactToHuggingFace: vi.fn().mockResolvedValue({
-        provider: "huggingface",
-        repository: "openai/demo",
-        path: "images/cat.png",
-        revision: "main",
-        exists: true,
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          locator: "openai/demo/images/cat.png",
+        },
+        verification: {
+          exists: true,
+          verifiedAt: "2026-04-17T00:00:00.000Z",
+        },
+      }),
+      verifyPublishedArtifactBacking: vi.fn().mockResolvedValue({
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          locator: "openai/demo/images/cat.png",
+        },
+        verification: {
+          exists: true,
+          verifiedAt: "2026-04-17T00:00:00.000Z",
+        },
       }),
     };
 
@@ -129,6 +154,7 @@ describe("ArtifactBrowserFeature", () => {
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
       publishArtifactToHuggingFace: vi.fn().mockRejectedValue(new Error("Missing Hugging Face token.")),
+      verifyPublishedArtifactBacking: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -167,11 +193,16 @@ describe("ArtifactBrowserFeature", () => {
 
   it("disables repeat publish submit while pending", async () => {
     let resolvePublish: ((value: {
-      provider: string;
-      repository: string;
-      path: string;
-      revision: string;
-      exists: boolean;
+      target: {
+        provider: string;
+        repository: string;
+        path: string;
+        revision: string;
+        locator: string;
+      };
+      verification: {
+        exists: boolean;
+      };
     }) => void) | undefined;
     const client = {
       browseImageArtifacts: vi.fn().mockResolvedValue([
@@ -193,6 +224,7 @@ describe("ArtifactBrowserFeature", () => {
       publishArtifactToHuggingFace: vi.fn().mockImplementation(() => new Promise((resolve) => {
         resolvePublish = resolve;
       })),
+      verifyPublishedArtifactBacking: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -230,12 +262,84 @@ describe("ArtifactBrowserFeature", () => {
 
     await act(async () => {
       resolvePublish?.({
-        provider: "huggingface",
-        repository: "openai/demo",
-        path: "images/cat.png",
-        revision: "main",
-        exists: true,
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          locator: "openai/demo/images/cat.png",
+        },
+        verification: {
+          exists: true,
+        },
       });
     });
+  });
+
+  it("re-checks published backing existence from the artifact detail panel", async () => {
+    const client = {
+      browseImageArtifacts: vi.fn().mockResolvedValue([
+        { storageKey: "uploads/cat.png", artifactKind: "image" as const },
+      ]),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/cat.png" },
+        artifactKind: "image" as const,
+        metadata: {
+          publishedBacking: {
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/cat.png",
+              locator: "openai/demo/images/cat.png",
+            },
+            verification: { exists: false },
+          },
+        },
+      }),
+      readArtifactContent: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/cat.png" },
+        availability: "available" as const,
+        retrieval: "deferred" as const,
+      }),
+      createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn().mockResolvedValue({
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          locator: "openai/demo/images/cat.png",
+        },
+        verification: {
+          exists: true,
+          verifiedAt: "2026-04-18T00:00:00.000Z",
+        },
+      }),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const artifactButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    await act(async () => {
+      artifactButton.click();
+    });
+
+    const recheckButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Re-check published backing") as HTMLButtonElement;
+    await act(async () => {
+      recheckButton.click();
+    });
+
+    expect(client.verifyPublishedArtifactBacking).toHaveBeenCalledWith({ artifactId: "uploads/cat.png" });
+    expect(container.textContent).toContain("Last verified at");
   });
 });

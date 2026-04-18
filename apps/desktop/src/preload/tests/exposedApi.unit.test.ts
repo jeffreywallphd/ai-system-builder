@@ -3,10 +3,12 @@ import { describe, expect, it, testDouble } from "../../../../../modules/testing
 import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
   createDesktopArtifactBrowseSuccessResponse,
   createDesktopArtifactPublishSuccessResponse,
+  createDesktopArtifactPublishVerifySuccessResponse,
   createDesktopArtifactMediaViewSuccessResponse,
   createDesktopImageUploadSuccessResponse,
   createIpcChannel,
@@ -83,11 +85,17 @@ describe("desktop preload exposedApi bridge", () => {
   it("maps publish bridge calls to artifact publish request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopArtifactPublishSuccessResponse({
-        provider: "huggingface",
-        repository: "openai/demo",
-        path: "images/cat.png",
-        revision: "main",
-        exists: true,
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          locator: "openai/demo/images/cat.png",
+        },
+        verification: {
+          exists: true,
+          verifiedAt: "2026-04-17T00:00:00.000Z",
+        },
       }),
     );
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
@@ -126,4 +134,28 @@ describe("desktop preload exposedApi bridge", () => {
       }),
     ).rejects.toThrow("Received invalid desktop image upload IPC response envelope.");
   });
+});
+
+
+it("maps publish verify bridge calls to artifact publish verify request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopArtifactPublishVerifySuccessResponse({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        locator: "openai/demo/images/cat.png",
+      },
+      verification: {
+        exists: true,
+        verifiedAt: "2026-04-17T00:00:00.000Z",
+      },
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.verifyPublishedArtifactBacking({ artifactId: "uploads/cat.png" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value);
 });

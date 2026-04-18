@@ -36,18 +36,26 @@ describe("artifact publish api contract", () => {
 
   it("maps success response through the shared API envelope", () => {
     const response = createApiArtifactPublishSuccessResponse({
-      provider: "huggingface",
-      repository: "openai/demo",
-      path: "images/a.png",
-      revision: "main",
-      exists: true,
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/a.png",
+        revision: "main",
+        locator: "openai/demo/images/a.png",
+      },
+      verification: {
+        exists: true,
+        verifiedAt: "2026-04-17T00:00:00.000Z",
+      },
     });
 
     expect(response).toMatchObject({
       ok: true,
       operation: "artifact.publish",
       value: {
-        exists: true,
+        verification: {
+          exists: true,
+        },
       },
     });
   });

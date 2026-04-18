@@ -5,11 +5,13 @@ import {
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   createDesktopArtifactBrowseRequest,
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactMediaViewRequest,
   createDesktopArtifactPublishRequest,
+  createDesktopArtifactPublishVerifyRequest,
   createDesktopArtifactReadRequest,
 } from "../../../../contracts/ipc";
 import {
@@ -26,6 +28,7 @@ function createUseCases() {
     readArtifactContentUseCase: { execute: testDouble.fn() },
     artifactMediaViewRetrieval: { retrieveArtifactViewerMediaByStorageKey: testDouble.fn() },
     publishArtifactToRepoUseCase: { execute: testDouble.fn() },
+    verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
   };
 }
 
@@ -70,22 +73,39 @@ describe("registerArtifactBrowserIpc", () => {
     (dependencies.publishArtifactToRepoUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
       ok: true,
       value: {
-        provider: "huggingface",
-        repository: "openai/demo",
-        path: "images/a.png",
-        revision: "main",
-        exists: true,
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/a.png",
+          revision: "main",
+          locator: "openai/demo/images/a.png",
+        },
+        verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
+      },
+    });
+    (dependencies.verifyPublishedArtifactBackingUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+      ok: true,
+      value: {
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/a.png",
+          revision: "main",
+          locator: "openai/demo/images/a.png",
+        },
+        verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
       },
     });
 
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(5);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(6);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value)).toBe(true);
 
     await handlers.get(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)?.(
       {},
@@ -127,6 +147,13 @@ describe("registerArtifactBrowserIpc", () => {
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
+    await handlers.get(DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value)?.(
+      {},
+      createDesktopArtifactPublishVerifyRequest({
+        artifactId: "uploads/a.png",
+        boundary: { host: "desktop", source: "desktop.renderer" },
+      }),
+    );
 
     expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
       { artifactKind: "image" },
@@ -153,6 +180,9 @@ describe("registerArtifactBrowserIpc", () => {
         revision: undefined,
       },
       mediaType: undefined,
+    });
+    expect(dependencies.verifyPublishedArtifactBackingUseCase.execute).toHaveBeenCalledWith({
+      artifactId: "uploads/a.png",
     });
   });
 

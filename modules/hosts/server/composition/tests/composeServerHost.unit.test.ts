@@ -91,7 +91,7 @@ describe("composeServerHost", () => {
       storageRootDirectory: "/tmp/server-image-upload-test",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(7);
+    expect(app.post).toHaveBeenCalledTimes(8);
     expect(app.get).toHaveBeenCalledTimes(1);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
@@ -102,6 +102,7 @@ describe("composeServerHost", () => {
       "/api/artifact-repo/has",
       "/api/artifact-repo/store",
       "/api/artifact/publish",
+      "/api/artifact/publish/verify",
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
     expect(registeredGetPaths).toEqual(["/api/artifact/media/view"]);

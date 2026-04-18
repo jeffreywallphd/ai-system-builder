@@ -19,6 +19,9 @@ export interface DesktopArtifactBrowserClient {
     revision?: string;
     mediaType?: string;
   }) => Promise<DesktopPublishedBacking>;
+  verifyPublishedArtifactBacking: (input: {
+    artifactId: string;
+  }) => Promise<DesktopPublishedBacking>;
 }
 
 function ensureSuccess<T>(
@@ -109,6 +112,16 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         }),
         (value) => value as DesktopPublishedBacking,
         "Failed to publish artifact.",
+      );
+    },
+
+    async verifyPublishedArtifactBacking(input) {
+      return ensureSuccess(
+        await desktopApi.verifyPublishedArtifactBacking({
+          artifactId: input.artifactId,
+        }),
+        (value) => value as DesktopPublishedBacking,
+        "Failed to verify published artifact backing.",
       );
     },
   };

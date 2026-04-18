@@ -22,6 +22,8 @@ import {
   normalizeArtifactStorageBinding,
   encodeArtifactRepoBackingLocator,
   decodeArtifactRepoBackingLocator,
+  resolveArtifactRepoBackingTarget,
+  normalizeStorageBackingReference,
 } from ".";
 
 describe("storage contracts", () => {
@@ -233,6 +235,31 @@ describe("storage contracts", () => {
     });
   });
 
+  it("normalizes repo backing verification metadata and resolves structured repo targets", () => {
+    const normalized = normalizeStorageBackingReference({
+      kind: "artifact-repo",
+      provider: "huggingface",
+      locator: " openai/demo/images/a.png ",
+      revision: " main ",
+      verification: {
+        exists: true,
+        verifiedAt: " 2026-04-17T00:00:00.000Z ",
+      },
+    });
+
+    expect(normalized.verification).toEqual({
+      exists: true,
+      verifiedAt: "2026-04-17T00:00:00.000Z",
+    });
+    expect(resolveArtifactRepoBackingTarget(normalized)).toEqual({
+      provider: "huggingface",
+      repository: "openai/demo",
+      path: "images/a.png",
+      revision: "main",
+      locator: "openai/demo/images/a.png",
+    });
+  });
+
   it("creates store failure responses with shared contract error semantics", () => {
     const error = createContractError("unavailable", "Storage backend unavailable", {
       details: {
@@ -365,7 +392,6 @@ describe("storage contracts", () => {
         provider: "huggingface",
         locator: "openai/demo-artifacts/images/cat.png",
         revision: "main",
-        target: undefined,
       },
       role: "imported-source",
       createdAt: "2026-04-17T00:00:00.000Z",

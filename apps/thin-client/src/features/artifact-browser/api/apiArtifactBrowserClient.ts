@@ -19,7 +19,7 @@ export interface ThinClientArtifactDetail {
   originalName?: string;
   createdAt?: string;
   metadata?: {
-    publishedBacking?: Omit<ThinClientPublishedBacking, "exists">;
+    publishedBacking?: ThinClientPublishedBacking;
   };
 }
 
@@ -32,11 +32,17 @@ export interface ThinClientArtifactContentDescriptor {
 }
 
 export interface ThinClientPublishedBacking {
-  provider: string;
-  repository: string;
-  path: string;
-  revision?: string;
-  exists: boolean;
+  target: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator?: string;
+  };
+  verification: {
+    exists: boolean;
+    verifiedAt?: string;
+  };
 }
 
 export interface ArtifactBrowserApiClient {
@@ -50,6 +56,9 @@ export interface ArtifactBrowserApiClient {
     path: string;
     revision?: string;
     mediaType?: string;
+  }) => Promise<ThinClientPublishedBacking>;
+  verifyPublishedArtifactBacking: (input: {
+    artifactId: string;
   }) => Promise<ThinClientPublishedBacking>;
 }
 
@@ -181,6 +190,29 @@ export function createApiArtifactBrowserClient(
         const backing = value as ThinClientPublishedBacking;
         if (!backing || typeof backing !== "object") {
           throw new Error("Artifact publish response is missing backing information.");
+        }
+
+        return backing;
+      });
+    },
+
+    async verifyPublishedArtifactBacking(input): Promise<ThinClientPublishedBacking> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/publish/verify"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          artifactId: input.artifactId,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const backing = value as ThinClientPublishedBacking;
+        if (!backing || typeof backing !== "object") {
+          throw new Error("Artifact publish verify response is missing backing information.");
         }
 
         return backing;

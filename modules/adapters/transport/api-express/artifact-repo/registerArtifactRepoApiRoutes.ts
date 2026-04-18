@@ -4,11 +4,15 @@ import type {
   PublishArtifactToRepoUseCase,
   StoreArtifactInRepoCommand,
   StoreArtifactInRepoUseCasePort,
+  VerifyPublishedArtifactBackingUseCase,
 } from "../../../../application/use-cases";
 import {
   createApiArtifactPublishFailureResponse,
   createApiArtifactPublishRequest,
   createApiArtifactPublishSuccessResponse,
+  createApiArtifactPublishVerifyFailureResponse,
+  createApiArtifactPublishVerifyRequest,
+  createApiArtifactPublishVerifySuccessResponse,
   createApiArtifactRepoHasFailureResponse,
   createApiArtifactRepoHasRequest,
   createApiArtifactRepoHasSuccessResponse,
@@ -16,6 +20,7 @@ import {
   createApiArtifactRepoStoreRequest,
   createApiArtifactRepoStoreSuccessResponse,
   type ApiArtifactPublishResponse,
+  type ApiArtifactPublishVerifyResponse,
   type ApiArtifactRepoHasResponse,
   type ApiArtifactRepoStoreResponse,
 } from "../../../../contracts/api";
@@ -49,6 +54,11 @@ interface ArtifactPublishApiRequestBody {
   source?: string;
 }
 
+interface ArtifactPublishVerifyApiRequestBody {
+  artifactId: string;
+  source?: string;
+}
+
 export interface ArtifactRepoExpressRequestLike {
   body?: unknown;
   headers?: Record<string, string | string[] | undefined>;
@@ -56,7 +66,7 @@ export interface ArtifactRepoExpressRequestLike {
 
 export interface ArtifactRepoExpressResponseLike {
   status: (statusCode: number) => ArtifactRepoExpressResponseLike;
-  json: (body: ApiArtifactRepoHasResponse | ApiArtifactRepoStoreResponse | ApiArtifactPublishResponse) => void;
+  json: (body: ApiArtifactRepoHasResponse | ApiArtifactRepoStoreResponse | ApiArtifactPublishResponse | ApiArtifactPublishVerifyResponse) => void;
 }
 
 export interface ArtifactRepoExpressRoutePort {
@@ -74,6 +84,7 @@ export interface RegisterArtifactRepoApiRoutesDependencies {
   hasArtifactInRepoUseCase: HasArtifactInRepoUseCasePort;
   storeArtifactInRepoUseCase: StoreArtifactInRepoUseCasePort;
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
+  verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
 }
 
 function getRequestHeader(
@@ -161,7 +172,7 @@ function mapStatusCode(response: ApiArtifactRepoHasResponse | ApiArtifactRepoSto
   }
 }
 
-function mapPublishStatusCode(response: ApiArtifactPublishResponse): number {
+function mapPublishStatusCode(response: ApiArtifactPublishResponse | ApiArtifactPublishVerifyResponse): number {
   if (response.ok) {
     return 200;
   }
@@ -307,6 +318,45 @@ export function registerArtifactRepoApiRoutes(
     const apiResponse = result.ok
       ? createApiArtifactPublishSuccessResponse(result.value, context)
       : createApiArtifactPublishFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+        },
+      );
+    response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/artifact/publish/verify", async (request, response) => {
+    const context = mapRequestContext(request);
+    let apiRequest: ReturnType<typeof createApiArtifactPublishVerifyRequest>;
+
+    try {
+      apiRequest = createApiArtifactPublishVerifyRequest({
+        artifactId: (request.body as ArtifactPublishVerifyApiRequestBody).artifactId,
+        source: normalizeSource((request.body as ArtifactPublishVerifyApiRequestBody).source),
+      }, context);
+    } catch (error) {
+      const apiResponse = createApiArtifactPublishVerifyFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid artifact publish-verify request.",
+        context,
+      );
+      response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.verifyPublishedArtifactBackingUseCase.execute({
+      artifactId: apiRequest.payload.artifactId,
+    });
+
+    const apiResponse = result.ok
+      ? createApiArtifactPublishVerifySuccessResponse(result.value, context)
+      : createApiArtifactPublishVerifyFailureResponse(
         result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
           ? result.error.code
           : "internal",

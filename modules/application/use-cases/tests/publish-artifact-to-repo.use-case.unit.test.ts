@@ -65,11 +65,17 @@ describe("PublishArtifactToRepoUseCase", () => {
       throw new Error("Expected publish success.");
     }
     expect(result.value).toEqual({
-      provider: "huggingface",
-      repository: "openai/demo-artifacts",
-      path: "images/a.png",
-      revision: "main",
-      exists: true,
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/a.png",
+        revision: "main",
+        locator: "openai/demo-artifacts/images/a.png",
+      },
+      verification: {
+        exists: true,
+        verifiedAt: "2026-04-17T00:00:00.000Z",
+      },
     });
     expect(artifactBindingStorage.upsertArtifactStorageBinding).toHaveBeenCalledWith({
       binding: {
@@ -86,6 +92,10 @@ describe("PublishArtifactToRepoUseCase", () => {
             repository: "openai/demo-artifacts",
             revision: "main",
             path: "images/a.png",
+          },
+          verification: {
+            exists: true,
+            verifiedAt: "2026-04-17T00:00:00.000Z",
           },
         },
       },

@@ -88,4 +88,4 @@
 - Hugging Face adapter uses official `@huggingface/hub` client methods (`fileExists`, `uploadFile`, `downloadFile`) as the only provider integration path (no handcrafted fallback provider path).
 - Server and desktop hosts expose publish workflow wiring through the shared application use case path (`PublishArtifactToRepoUseCase`), while keeping artifact-object storage flows separate and intact.
 - Publish flow writes durable `ArtifactStorageBinding` records for published artifact-repo backings.
-- Published backing metadata read paths should prefer structured backing target fields when present and use centralized locator decode helpers only as fallback for legacy records.
+- Published backing metadata read paths should prefer structured backing target fields + backing verification metadata (`verification.exists`, `verification.verifiedAt`) when present and use centralized locator decode helpers only as fallback for legacy records.

@@ -12,6 +12,7 @@ import {
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
@@ -74,7 +75,7 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: "/tmp/desktop-image-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(6);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(7);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value,
@@ -83,6 +84,7 @@ describe("composeDesktopHost", () => {
       DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value,
     ]);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");

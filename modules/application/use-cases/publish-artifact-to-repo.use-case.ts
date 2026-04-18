@@ -22,11 +22,17 @@ export interface PublishArtifactToRepoCommand {
 }
 
 export interface PublishArtifactToRepoSuccessValue {
-  provider: string;
-  repository: string;
-  path: string;
-  revision?: string;
-  exists: boolean;
+  target: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator: string;
+  };
+  verification: {
+    exists: boolean;
+    verifiedAt: string;
+  };
 }
 
 export interface PublishArtifactToRepoUseCaseDependencies {
@@ -91,24 +97,30 @@ export class PublishArtifactToRepoUseCase {
     }
 
     const revision = command.target.revision?.trim() || "main";
+    const verifiedAt = this.now();
+    const locator = encodeArtifactRepoBackingLocator({
+      repository: command.target.repository,
+      path: targetPath,
+    });
     const bindingResult = await this.artifactBindingStorage.upsertArtifactStorageBinding({
       binding: {
         artifactId,
         role: "published",
-        createdAt: this.now(),
+        createdAt: verifiedAt,
         backing: {
           kind: "artifact-repo",
           provider: command.target.provider,
-          locator: encodeArtifactRepoBackingLocator({
-            repository: command.target.repository,
-            path: targetPath,
-          }),
+          locator,
           revision,
           target: {
             provider: command.target.provider,
             repository: command.target.repository,
             revision,
             path: targetPath,
+          },
+          verification: {
+            exists: hasResult.value.exists,
+            verifiedAt,
           },
         },
       },
@@ -120,11 +132,17 @@ export class PublishArtifactToRepoUseCase {
     return {
       ok: true as const,
       value: {
-        provider: command.target.provider,
-        repository: command.target.repository,
-        path: targetPath,
-        revision,
-        exists: hasResult.value.exists,
+        target: {
+          provider: command.target.provider,
+          repository: command.target.repository,
+          path: targetPath,
+          revision,
+          locator,
+        },
+        verification: {
+          exists: hasResult.value.exists,
+          verifiedAt,
+        },
       } satisfies PublishArtifactToRepoSuccessValue,
     };
   }

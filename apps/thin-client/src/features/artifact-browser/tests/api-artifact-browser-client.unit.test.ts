@@ -22,6 +22,24 @@ describe("api artifact browser client", () => {
         json: vi.fn().mockResolvedValue({
           ok: true,
           value: {
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/a.png",
+              revision: "main",
+              locator: "openai/demo/images/a.png",
+            },
+            verification: {
+              exists: false,
+              verifiedAt: "2026-04-18T00:00:00.000Z",
+            },
+          },
+        }),
+      });
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
             artifact: {
               locator: { storageKey: "uploads/a.png" },
               artifactKind: "image",
@@ -46,11 +64,17 @@ describe("api artifact browser client", () => {
         json: vi.fn().mockResolvedValue({
           ok: true,
           value: {
-            provider: "huggingface",
-            repository: "openai/demo",
-            path: "images/a.png",
-            revision: "main",
-            exists: true,
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/a.png",
+              revision: "main",
+              locator: "openai/demo/images/a.png",
+            },
+            verification: {
+              exists: true,
+              verifiedAt: "2026-04-17T00:00:00.000Z",
+            },
           },
         }),
       });
@@ -66,6 +90,9 @@ describe("api artifact browser client", () => {
       artifactId: "uploads/a.png",
       repository: "openai/demo",
       path: "images/a.png",
+    });
+    const verified = await client.verifyPublishedArtifactBacking({
+      artifactId: "uploads/a.png",
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -88,12 +115,18 @@ describe("api artifact browser client", () => {
       "/api/artifact/publish",
       expect.objectContaining({ method: "POST" }),
     );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "/api/artifact/publish/verify",
+      expect.objectContaining({ method: "POST" }),
+    );
 
     expect(browse[0].storageKey).toBe("uploads/a.png");
     expect(detail.locator.storageKey).toBe("uploads/a.png");
     expect(content.retrieval).toBe("deferred");
     expect((content as unknown as { bytes?: unknown }).bytes).toBeUndefined();
     expect(imageViewUrl).toBe("/api/artifact/media/view?storageKey=uploads%2Fa.png");
-    expect(publish.exists).toBe(true);
+    expect(publish.verification.exists).toBe(true);
+    expect(verified.verification.exists).toBe(false);
   });
 });

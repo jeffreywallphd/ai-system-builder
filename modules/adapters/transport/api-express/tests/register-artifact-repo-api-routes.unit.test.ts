@@ -36,11 +36,35 @@ describe("registerArtifactRepoApiRoutes", () => {
       execute: testDouble.fn(async () => ({
         ok: true,
         value: {
-          provider: "huggingface",
-          repository: "openai/demo",
-          path: "artifacts/a.bin",
-          revision: "main",
-          exists: true,
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "artifacts/a.bin",
+            revision: "main",
+            locator: "openai/demo/artifacts/a.bin",
+          },
+          verification: {
+            exists: true,
+            verifiedAt: "2026-04-17T00:00:00.000Z",
+          },
+        },
+      })),
+    };
+    const verifyPublishedArtifactBackingUseCase = {
+      execute: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "artifacts/a.bin",
+            revision: "main",
+            locator: "openai/demo/artifacts/a.bin",
+          },
+          verification: {
+            exists: true,
+            verifiedAt: "2026-04-17T00:00:00.000Z",
+          },
         },
       })),
     };
@@ -50,12 +74,14 @@ describe("registerArtifactRepoApiRoutes", () => {
       hasArtifactInRepoUseCase,
       storeArtifactInRepoUseCase,
       publishArtifactToRepoUseCase,
+      verifyPublishedArtifactBackingUseCase,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(3);
+    expect(app.post).toHaveBeenCalledTimes(4);
     expect(handlers.has("/api/artifact-repo/has")).toBe(true);
     expect(handlers.has("/api/artifact-repo/store")).toBe(true);
     expect(handlers.has("/api/artifact/publish")).toBe(true);
+    expect(handlers.has("/api/artifact/publish/verify")).toBe(true);
 
     const response = {
       status: testDouble.fn(() => response),
@@ -144,6 +170,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       hasArtifactInRepoUseCase: { execute: testDouble.fn() },
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
+      verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
     });
 
     const response = {
@@ -190,6 +217,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       hasArtifactInRepoUseCase: { execute: testDouble.fn() },
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
+      verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
     });
 
     const response = {

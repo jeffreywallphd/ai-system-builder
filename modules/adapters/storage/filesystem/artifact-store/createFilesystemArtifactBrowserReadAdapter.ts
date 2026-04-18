@@ -24,8 +24,8 @@ import {
   createSuccessResult,
 } from "../../../../contracts/shared";
 import {
-  decodeArtifactRepoBackingLocator,
   normalizeStorageArtifactKey,
+  resolveArtifactRepoBackingTarget,
   type StorageObjectMetadata,
 } from "../../../../contracts/storage";
 
@@ -40,10 +40,17 @@ export interface CreateFilesystemArtifactBrowserReadAdapterOptions {
 }
 
 interface PublishedBackingReadModel {
-  provider: string;
-  repository: string;
-  path: string;
-  revision?: string;
+  target: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator: string;
+  };
+  verification: {
+    exists: boolean;
+    verifiedAt?: string;
+  };
 }
 
 async function readPublishedBacking(
@@ -68,28 +75,17 @@ async function readPublishedBacking(
     return undefined;
   }
 
-  const locator = latestPublishedBinding.backing.target?.repository
-    && latestPublishedBinding.backing.target.path
-    ? {
-      repository: latestPublishedBinding.backing.target.repository,
-      path: latestPublishedBinding.backing.target.path,
-    }
-    : (() => {
-      try {
-        return decodeArtifactRepoBackingLocator(latestPublishedBinding.backing.locator);
-      } catch {
-        return undefined;
-      }
-    })();
-  if (!locator) {
+  const target = resolveArtifactRepoBackingTarget(latestPublishedBinding.backing);
+  if (!target) {
     return undefined;
   }
 
   return {
-    provider: latestPublishedBinding.backing.provider,
-    repository: locator.repository,
-    path: locator.path,
-    revision: latestPublishedBinding.backing.revision,
+    target,
+    verification: {
+      exists: latestPublishedBinding.backing.verification?.exists ?? false,
+      verifiedAt: latestPublishedBinding.backing.verification?.verifiedAt,
+    },
   };
 }
 

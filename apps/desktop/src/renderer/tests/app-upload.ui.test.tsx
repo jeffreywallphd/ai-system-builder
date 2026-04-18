@@ -91,7 +91,33 @@ describe("desktop renderer artifact workflow page", () => {
         operation: "artifact.publish",
         channel: "ipc.artifact.publish.response",
         ok: true,
-        value: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", exists: true },
+        value: {
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/cat.png",
+            locator: "openai/demo/images/cat.png",
+          },
+          verification: {
+            exists: true,
+          },
+        },
+      }),
+      verifyPublishedArtifactBacking: vi.fn().mockResolvedValue({
+        operation: "artifact.publish.verify",
+        channel: "ipc.artifact.publish.verify.response",
+        ok: true,
+        value: {
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/cat.png",
+            locator: "openai/demo/images/cat.png",
+          },
+          verification: {
+            exists: true,
+          },
+        },
       }),
     };
 
