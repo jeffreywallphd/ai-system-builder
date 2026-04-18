@@ -45,7 +45,12 @@ export interface UseArtifactBrowserFeatureResult {
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
   publishArtifactToHuggingFace: () => Promise<void>;
-  registerArtifactFromHuggingFace: () => Promise<void>;
+  registerArtifactFromHuggingFace: (input?: {
+    repository?: string;
+    pathInRepo?: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<void>;
   registerHuggingFaceNamespace: () => Promise<void>;
   browseHuggingFaceDatasetParquetFiles: (repository: string) => Promise<void>;
   huggingFaceNamespaceDatasets: DesktopHuggingFaceNamespaceDataset[];
@@ -216,16 +221,31 @@ export function useArtifactBrowserFeature(
     }
   }
 
-  async function registerArtifactFromHuggingFace(): Promise<void> {
+  async function registerArtifactFromHuggingFace(
+    input: {
+      repository?: string;
+      pathInRepo?: string;
+      revision?: string;
+      mediaType?: string;
+    } = {},
+  ): Promise<void> {
     setRegisterState({ status: "loading", message: "Registering remote artifact..." });
+    const repository = input.repository ?? registerRepository;
+    const pathInRepo = input.pathInRepo ?? registerPathInRepo;
+    const revision = input.revision ?? registerRevision;
+    const mediaType = input.mediaType ?? registerMediaType;
 
     try {
       const registered = await artifactClient.registerArtifactFromRepo({
-        repository: registerRepository,
-        path: registerPathInRepo,
-        revision: registerRevision,
-        mediaType: registerMediaType || undefined,
+        repository,
+        path: pathInRepo,
+        revision,
+        mediaType: mediaType || undefined,
       });
+      setRegisterRepository(repository);
+      setRegisterPathInRepo(pathInRepo);
+      setRegisterRevision(revision);
+      setRegisterMediaType(mediaType);
       await refreshArtifacts();
       await selectArtifact(registered.artifactId);
       setRegisterState({

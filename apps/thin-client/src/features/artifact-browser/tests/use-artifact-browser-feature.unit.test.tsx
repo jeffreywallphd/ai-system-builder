@@ -474,6 +474,91 @@ describe("ArtifactBrowserFeature", () => {
     expect(container.textContent).toContain("Registered imports/huggingface/openai/demo/main/images/cat.png from Hugging Face.");
   });
 
+  it("registers from dataset parquet list without relying on async form state updates", async () => {
+    const client = {
+      browseImageArtifacts: vi.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { storageKey: "imports/huggingface/openai/demo/main/data/train.parquet", artifactKind: "image" as const },
+        ]),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "imports/huggingface/openai/demo/main/data/train.parquet" },
+        artifactKind: "image" as const,
+      }),
+      readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
+      createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      browseHuggingFaceNamespaceDatasets: vi.fn().mockResolvedValue([
+        { namespace: "openai", repository: "openai/demo" },
+      ]),
+      browseHuggingFaceDatasetParquetFiles: vi.fn().mockResolvedValue([
+        { repository: "openai/demo", path: "data/train.parquet", revision: "main" },
+      ]),
+      registerArtifactFromRepo: vi.fn().mockResolvedValue({
+        artifactId: "imports/huggingface/openai/demo/main/data/train.parquet",
+        backing: {
+          role: "imported-source" as const,
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "data/train.parquet",
+            revision: "main",
+            locator: "openai/demo/data/train.parquet",
+          },
+          verification: {
+            exists: true as const,
+            verifiedAt: "2026-04-18T00:00:00.000Z",
+          },
+        },
+      }),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const registerToggle = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Register from Hugging Face") as HTMLButtonElement;
+    await act(async () => {
+      registerToggle.click();
+    });
+
+    const namespaceInput = Array.from(container.querySelectorAll("input"))[0] as HTMLInputElement;
+    setInputValue(namespaceInput, "openai");
+    const registerNamespaceButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Register namespace") as HTMLButtonElement;
+    await act(async () => {
+      registerNamespaceButton.click();
+    });
+
+    const datasetButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "openai/demo") as HTMLButtonElement;
+    await act(async () => {
+      datasetButton.click();
+    });
+
+    const registerFileButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Register") as HTMLButtonElement;
+    await act(async () => {
+      registerFileButton.click();
+    });
+
+    expect(client.registerArtifactFromRepo).toHaveBeenCalledWith({
+      repository: "openai/demo",
+      path: "data/train.parquet",
+      revision: "main",
+      mediaType: undefined,
+    });
+  });
+
   it("localizes imported artifact bytes from the artifact panel", async () => {
     const client = {
       browseImageArtifacts: vi.fn().mockResolvedValue([

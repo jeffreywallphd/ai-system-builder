@@ -150,9 +150,11 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
                 <li key={`${file.repository}:${file.path}`}>
                   <span>{file.path}</span>
                   <button className="ui-button" type="button" disabled={registerState.status === "loading"} onClick={() => {
-                    setRegisterRepository(file.repository);
-                    setRegisterPathInRepo(file.path);
-                    void registerArtifactFromHuggingFace();
+                    void registerArtifactFromHuggingFace({
+                      repository: file.repository,
+                      pathInRepo: file.path,
+                      revision: file.revision,
+                    });
                   }}>Register</button>
                 </li>
               ))}
