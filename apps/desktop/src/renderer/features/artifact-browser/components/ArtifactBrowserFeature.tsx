@@ -49,6 +49,7 @@ function PublishedBackingPanel(
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
   const {
     items,
+    unregisteredItems,
     selectedStorageKey,
     detail,
     content,
@@ -62,6 +63,8 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     viewState,
     selectArtifact,
     refreshArtifacts,
+    registerUnregisteredArtifact,
+    deleteUnregisteredArtifact,
     publishArtifactToHuggingFace,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
@@ -98,6 +101,33 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               </li>
             ))}
           </ul>
+          <section className="ui-stack ui-stack--sm">
+            <h3>Unregistered Artifacts</h3>
+            <ul className="ui-stack ui-stack--sm">
+              {unregisteredItems.map((item) => (
+                <li key={item.storageKey}>
+                  <p>{item.relativePath}</p>
+                  <small>{item.mediaType ?? "unknown media type"}</small>
+                  <div className="ui-grid ui-grid--two">
+                    <button
+                      className="ui-button"
+                      type="button"
+                      onClick={() => void registerUnregisteredArtifact(item.storageKey)}
+                    >
+                      Register
+                    </button>
+                    <button
+                      className="ui-button"
+                      type="button"
+                      onClick={() => void deleteUnregisteredArtifact(item.storageKey)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
 
         <div className="ui-stack ui-stack--sm">

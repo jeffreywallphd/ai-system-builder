@@ -15,6 +15,12 @@ describe("desktop artifact browser client", () => {
         ok: true,
         value: { items: [{ storageKey: "uploads/cat.png", artifactKind: "image" }] },
       }),
+      browseUnregisteredArtifacts: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { items: [{ storageKey: "uploads/orphan.parquet", relativePath: "orphan.parquet", fileName: "orphan.parquet" }] },
+      }),
+      registerUnregisteredArtifact: vi.fn().mockResolvedValue({ ok: true, value: { storageKey: "uploads/orphan.parquet" } }),
+      deleteUnregisteredArtifact: vi.fn().mockResolvedValue({ ok: true, value: { storageKey: "uploads/orphan.parquet" } }),
       readArtifactDetail: vi.fn().mockResolvedValue({
         ok: true,
         value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactKind: "image" } },
@@ -84,6 +90,36 @@ describe("desktop artifact browser client", () => {
     expect(createdBlob).toBeInstanceOf(Blob);
     expect(mediaUrl).toBe("blob:desktop-preview");
     expect(window.desktopApi.browseArtifacts).toHaveBeenCalledWith({ artifactKind: undefined });
+  });
+
+  it("supports browsing/registering/deleting unregistered artifacts", async () => {
+    window.desktopApi = {
+      uploadArtifact: vi.fn(),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      browseUnregisteredArtifacts: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { items: [{ storageKey: "uploads/orphan.json", relativePath: "orphan.json", fileName: "orphan.json", mediaType: "application/json" }] },
+      }),
+      registerUnregisteredArtifact: vi.fn().mockResolvedValue({ ok: true, value: { storageKey: "uploads/orphan.json" } }),
+      deleteUnregisteredArtifact: vi.fn().mockResolvedValue({ ok: true, value: { storageKey: "uploads/orphan.json" } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
+      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+    };
+
+    const client = createDesktopArtifactBrowserClient();
+    const unregistered = await client.browseUnregisteredArtifacts?.();
+    await client.registerUnregisteredArtifact?.({ storageKey: "uploads/orphan.json" });
+    await client.deleteUnregisteredArtifact?.({ storageKey: "uploads/orphan.json" });
+
+    expect(unregistered).toEqual([
+      expect.objectContaining({ storageKey: "uploads/orphan.json" }),
+    ]);
+    expect(window.desktopApi.registerUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan.json" });
+    expect(window.desktopApi.deleteUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan.json" });
   });
 
   it("creates media blob from the typed-array view, not the full backing buffer", async () => {

@@ -1,10 +1,14 @@
 export * from "./store-artifact-upload.types";
 export * from "./store-artifact-upload.use-case";
 export * from "./artifact-browser-read.types";
+export * from "./artifact-browser-unregistered.types";
 export * from "./artifact-browser-read.use-case-ports";
 export * from "./browse-artifacts.use-case";
+export * from "./browse-unregistered-artifacts.use-case";
 export * from "./read-artifact-detail.use-case";
 export * from "./read-artifact-content.use-case";
+export * from "./register-unregistered-artifact.use-case";
+export * from "./delete-unregistered-artifact.use-case";
 
 export * from "./artifact-repo-storage.use-case-ports";
 export * from "./has-artifact-in-repo.use-case";

@@ -10,7 +10,7 @@ import type {
 describe("artifact browser read use-case ports", () => {
   it("keeps commands separate from application request context", () => {
     expectTypeOf<Parameters<BrowseArtifactsUseCasePort["execute"]>[0]>().toExtend<{
-      artifactKind: "image";
+      artifactKind: string;
     }>();
     expectTypeOf<Parameters<BrowseArtifactsUseCasePort["execute"]>[0]>().not.toExtend<{
       requestId: string;

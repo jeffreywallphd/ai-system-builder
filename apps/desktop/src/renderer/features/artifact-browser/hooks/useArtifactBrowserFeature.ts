@@ -13,6 +13,7 @@ import type {
   DesktopHuggingFaceDatasetParquetFile,
   DesktopHuggingFaceNamespaceDataset,
   DesktopPublishedBacking,
+  DesktopUnregisteredArtifactBrowseItem,
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
@@ -22,6 +23,7 @@ export interface UseArtifactBrowserFeatureResult {
   tokenInput: string;
   tokenState: ArtifactBrowserViewState;
   items: DesktopArtifactBrowseItem[];
+  unregisteredItems: DesktopUnregisteredArtifactBrowseItem[];
   selectedStorageKey?: string;
   detail?: DesktopArtifactDetail;
   content?: DesktopArtifactContentDescriptor;
@@ -44,6 +46,8 @@ export interface UseArtifactBrowserFeatureResult {
   viewState: ArtifactBrowserViewState;
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
+  registerUnregisteredArtifact: (storageKey: string) => Promise<void>;
+  deleteUnregisteredArtifact: (storageKey: string) => Promise<void>;
   publishArtifactToHuggingFace: () => Promise<void>;
   registerArtifactFromHuggingFace: (input?: {
     repository?: string;
@@ -106,6 +110,7 @@ export function useArtifactBrowserFeature(
 
   const artifactClient = useArtifactBrowserClient(client);
   const [items, setItems] = useState<DesktopArtifactBrowseItem[]>([]);
+  const [unregisteredItems, setUnregisteredItems] = useState<DesktopUnregisteredArtifactBrowseItem[]>([]);
   const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>();
   const [detail, setDetail] = useState<DesktopArtifactDetail | undefined>();
   const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
@@ -147,11 +152,17 @@ export function useArtifactBrowserFeature(
   const refreshArtifacts = useCallback(async () => {
     setViewState({ status: "loading", message: "Loading artifacts..." });
     try {
-      const browseItems = await artifactClient.browseArtifacts();
+      const [browseItems, unregistered] = await Promise.all([
+        artifactClient.browseArtifacts(),
+        artifactClient.browseUnregisteredArtifacts?.() ?? Promise.resolve([]),
+      ]);
       setItems(browseItems);
+      setUnregisteredItems(unregistered);
       setViewState({
         status: "success",
-        message: browseItems.length > 0 ? "Loaded artifacts." : "No artifacts found yet.",
+        message: (browseItems.length + unregistered.length) > 0
+          ? "Loaded artifacts."
+          : "No artifacts found yet.",
       });
     } catch (error) {
       setViewState({
@@ -160,6 +171,40 @@ export function useArtifactBrowserFeature(
       });
     }
   }, [artifactClient]);
+
+  async function registerUnregisteredArtifact(storageKey: string): Promise<void> {
+    setViewState({ status: "loading", message: `Registering ${storageKey}...` });
+    try {
+      if (!artifactClient.registerUnregisteredArtifact) {
+        throw new Error("Unregistered artifact register flow is unavailable.");
+      }
+      await artifactClient.registerUnregisteredArtifact({ storageKey });
+      await refreshArtifacts();
+      setViewState({ status: "success", message: `Registered ${storageKey}.` });
+    } catch (error) {
+      setViewState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to register unregistered artifact.",
+      });
+    }
+  }
+
+  async function deleteUnregisteredArtifact(storageKey: string): Promise<void> {
+    setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
+    try {
+      if (!artifactClient.deleteUnregisteredArtifact) {
+        throw new Error("Unregistered artifact delete flow is unavailable.");
+      }
+      await artifactClient.deleteUnregisteredArtifact({ storageKey });
+      await refreshArtifacts();
+      setViewState({ status: "success", message: `Deleted ${storageKey}.` });
+    } catch (error) {
+      setViewState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to delete unregistered artifact.",
+      });
+    }
+  }
 
   useEffect(() => {
     void refreshArtifacts();
@@ -421,6 +466,7 @@ export function useArtifactBrowserFeature(
     tokenInput,
     tokenState,
     items,
+    unregisteredItems,
     selectedStorageKey,
     detail,
     content,
@@ -443,6 +489,8 @@ export function useArtifactBrowserFeature(
     viewState,
     selectArtifact,
     refreshArtifacts,
+    registerUnregisteredArtifact,
+    deleteUnregisteredArtifact,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace,

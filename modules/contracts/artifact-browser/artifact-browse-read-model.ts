@@ -8,9 +8,7 @@ import {
 } from "../storage";
 import type { StorageObjectMetadata } from "../storage";
 
-export const ARTIFACT_BROWSE_KINDS = ["image", "data"] as const;
-
-export type ArtifactBrowseKind = (typeof ARTIFACT_BROWSE_KINDS)[number];
+export type ArtifactBrowseKind = string;
 
 export interface ArtifactBrowseItem {
   storageKey: StorageArtifactKey;
@@ -37,7 +35,12 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 }
 
 function normalizeArtifactBrowseKind(kind: ArtifactBrowseKind): ArtifactBrowseKind {
-  return kind;
+  const normalized = kind.trim();
+  if (normalized.length === 0) {
+    throw new Error("artifactKind must be a non-empty string.");
+  }
+
+  return normalized;
 }
 
 export function normalizeArtifactBrowseItem(item: ArtifactBrowseItem): ArtifactBrowseItem {

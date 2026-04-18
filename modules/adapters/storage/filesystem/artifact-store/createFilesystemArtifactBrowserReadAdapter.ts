@@ -1,10 +1,15 @@
+import { readdir, stat, unlink } from "node:fs/promises";
+import path from "node:path";
+
 import type {
+  ArtifactCatalogAppendPort,
   ArtifactCatalogReadPort,
   ArtifactCatalogRecord,
 } from "../../../../application/ports/artifact-catalog";
 import type {
   ArtifactBrowserContentReadPort,
   ArtifactBrowserMetadataReadPort,
+  ArtifactBrowserUnregisteredPort,
   BrowseArtifactsRequest,
   ReadArtifactContentRequest,
   ReadArtifactDetailRequest,
@@ -32,12 +37,84 @@ import {
 
 export interface FilesystemArtifactBrowserReadAdapter
   extends ArtifactBrowserMetadataReadPort,
-  ArtifactBrowserContentReadPort {}
+  ArtifactBrowserContentReadPort,
+  ArtifactBrowserUnregisteredPort {}
 
 export interface CreateFilesystemArtifactBrowserReadAdapterOptions {
+  rootDirectory: string;
   artifactCatalogRead: ArtifactCatalogReadPort;
+  artifactCatalogAppend: ArtifactCatalogAppendPort;
   storage?: Pick<ArtifactObjectStoragePort, "hasArtifact">;
   artifactBindingRead?: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings">;
+}
+
+const UPLOADS_ROOT_SEGMENT = "uploads";
+
+function toUploadStorageKeyRelativePath(storageKey: string): string | undefined {
+  const normalized = normalizeStorageArtifactKey(storageKey);
+  if (!normalized.startsWith(`${UPLOADS_ROOT_SEGMENT}/`)) {
+    return undefined;
+  }
+
+  return normalized.slice(UPLOADS_ROOT_SEGMENT.length + 1);
+}
+
+function inferMediaTypeFromStorageKey(storageKey: string): string | undefined {
+  const extension = path.extname(storageKey).toLowerCase();
+  switch (extension) {
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".gif":
+      return "image/gif";
+    case ".svg":
+      return "image/svg+xml";
+    case ".json":
+      return "application/json";
+    case ".parquet":
+      return "application/x-parquet";
+    case ".txt":
+      return "text/plain";
+    case ".md":
+      return "text/markdown";
+    case ".pdf":
+      return "application/pdf";
+    default:
+      return undefined;
+  }
+}
+
+function deriveArtifactKind(mediaType: string | undefined): string {
+  return mediaType?.startsWith("image/") ? "image" : "data";
+}
+
+async function listRelativeFilesRecursively(rootDirectory: string): Promise<string[]> {
+  async function walk(absoluteDirectory: string, relativePrefix: string): Promise<string[]> {
+    const entries = await readdir(absoluteDirectory, { withFileTypes: true }).catch(() => []);
+    const discovered: string[] = [];
+    for (const entry of entries) {
+      const relativePath = relativePrefix.length > 0
+        ? `${relativePrefix}/${entry.name}`
+        : entry.name;
+      const absolutePath = path.join(absoluteDirectory, entry.name);
+      if (entry.isDirectory()) {
+        discovered.push(...(await walk(absolutePath, relativePath)));
+        continue;
+      }
+
+      if (entry.isFile()) {
+        discovered.push(relativePath);
+      }
+    }
+
+    return discovered;
+  }
+
+  return walk(rootDirectory, "");
 }
 
 interface RepoBackingReadModel {
@@ -205,6 +282,8 @@ function toContentValue(record: ArtifactCatalogRecord): ArtifactContentReadSucce
 export function createFilesystemArtifactBrowserReadAdapter(
   options: CreateFilesystemArtifactBrowserReadAdapterOptions,
 ): FilesystemArtifactBrowserReadAdapter {
+  const uploadsRoot = path.resolve(options.rootDirectory, UPLOADS_ROOT_SEGMENT);
+
   return {
     async browseArtifacts(
       request: BrowseArtifactsRequest,
@@ -334,6 +413,127 @@ export function createFilesystemArtifactBrowserReadAdapter(
       }
 
       return createSuccessResult(toContentValue(readResult.value.record), context);
+    },
+
+    async browseUnregisteredArtifacts(context: ApplicationRequestContext = {}) {
+      const [catalogResult, uploadRelativePaths] = await Promise.all([
+        options.artifactCatalogRead.browseArtifactCatalogRecords({}, context),
+        listRelativeFilesRecursively(uploadsRoot),
+      ]);
+
+      if (!catalogResult.ok) {
+        return catalogResult;
+      }
+
+      const registeredUploadKeys = new Set(
+        catalogResult.value.records
+          .map((record) => toUploadStorageKeyRelativePath(record.storageKey))
+          .filter((key): key is string => typeof key === "string"),
+      );
+
+      const items = await Promise.all(uploadRelativePaths
+        .filter((relativePath) => !registeredUploadKeys.has(relativePath))
+        .map(async (relativePath) => {
+          const storageKey = normalizeStorageArtifactKey(`${UPLOADS_ROOT_SEGMENT}/${relativePath}`);
+          const fileStats = await stat(path.resolve(uploadsRoot, relativePath)).catch(() => undefined);
+
+          return {
+            storageKey,
+            relativePath,
+            fileName: path.basename(relativePath),
+            mediaType: inferMediaTypeFromStorageKey(storageKey),
+            sizeBytes: fileStats?.isFile() ? fileStats.size : undefined,
+          };
+        }));
+
+      return createSuccessResult({ items }, context);
+    },
+
+    async registerUnregisteredArtifact(request: { storageKey: string }, context: ApplicationRequestContext = {}) {
+      const storageKey = normalizeStorageArtifactKey(request.storageKey);
+      if (!storageKey.startsWith(`${UPLOADS_ROOT_SEGMENT}/`)) {
+        return createFailureResult(
+          createContractError("validation", "Unregistered artifact must be under the uploads/ storage subtree."),
+          context,
+        );
+      }
+
+      const [catalogResult, fileStats] = await Promise.all([
+        options.artifactCatalogRead.browseArtifactCatalogRecords({}, context),
+        stat(path.resolve(options.rootDirectory, storageKey)).catch(() => undefined),
+      ]);
+
+      if (!catalogResult.ok) {
+        return catalogResult;
+      }
+
+      if (!fileStats?.isFile()) {
+        return createFailureResult(
+          createContractError("not-found", `Unregistered artifact file not found for "${storageKey}".`),
+          context,
+        );
+      }
+
+      const alreadyRegistered = catalogResult.value.records.some((record) => record.storageKey === storageKey);
+      if (alreadyRegistered) {
+        return createFailureResult(
+          createContractError("conflict", `Artifact "${storageKey}" is already registered.`),
+          context,
+        );
+      }
+
+      const mediaType = inferMediaTypeFromStorageKey(storageKey);
+      const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
+        record: {
+          storageKey,
+          artifactKind: deriveArtifactKind(mediaType),
+          mediaType,
+          sizeBytes: fileStats.size,
+          sourceKind: "upload",
+          originalName: path.basename(storageKey),
+          createdAt: new Date().toISOString(),
+        },
+      }, context);
+
+      if (!appendResult.ok) {
+        return appendResult;
+      }
+
+      return createSuccessResult({ storageKey }, context);
+    },
+
+    async deleteUnregisteredArtifact(request: { storageKey: string }, context: ApplicationRequestContext = {}) {
+      const storageKey = normalizeStorageArtifactKey(request.storageKey);
+      if (!storageKey.startsWith(`${UPLOADS_ROOT_SEGMENT}/`)) {
+        return createFailureResult(
+          createContractError("validation", "Unregistered artifact must be under the uploads/ storage subtree."),
+          context,
+        );
+      }
+
+      const catalogResult = await options.artifactCatalogRead.browseArtifactCatalogRecords({}, context);
+      if (!catalogResult.ok) {
+        return catalogResult;
+      }
+
+      const alreadyRegistered = catalogResult.value.records.some((record) => record.storageKey === storageKey);
+      if (alreadyRegistered) {
+        return createFailureResult(
+          createContractError("conflict", `Artifact "${storageKey}" is registered and cannot be deleted via unregistered flow.`),
+          context,
+        );
+      }
+
+      try {
+        await unlink(path.resolve(options.rootDirectory, storageKey));
+      } catch {
+        return createFailureResult(
+          createContractError("not-found", `Unregistered artifact file not found for "${storageKey}".`),
+          context,
+        );
+      }
+
+      return createSuccessResult({ storageKey }, context);
     },
   };
 }

@@ -29,7 +29,7 @@ export interface DesktopArtifactRegisterFromRepoRequestPayload {
     revision?: string;
     path: string;
   };
-  artifactKind?: "image" | "data";
+  artifactKind?: string;
   mediaType?: string;
   boundary: DesktopArtifactRegisterFromRepoBoundaryContext;
 }

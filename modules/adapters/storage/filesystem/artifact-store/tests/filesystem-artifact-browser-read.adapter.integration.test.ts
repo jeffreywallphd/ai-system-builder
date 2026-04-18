@@ -33,7 +33,9 @@ describe("filesystem artifact browser read adapter", () => {
       artifactCatalogAppend: artifactCatalog,
     });
     const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
       artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
       storage: objectStorage,
     });
 
@@ -80,7 +82,9 @@ describe("filesystem artifact browser read adapter", () => {
       artifactCatalogAppend: artifactCatalog,
     });
     const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
       artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
       storage: objectStorage,
     });
 
@@ -126,7 +130,9 @@ describe("filesystem artifact browser read adapter", () => {
       artifactCatalogAppend: artifactCatalog,
     });
     const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
       artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
       storage: objectStorage,
     });
 
@@ -166,7 +172,9 @@ describe("filesystem artifact browser read adapter", () => {
       artifactCatalogAppend: artifactCatalog,
     });
     const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
       artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
       storage: objectStorage,
       artifactBindingRead: artifactBindings,
     });
@@ -232,7 +240,9 @@ describe("filesystem artifact browser read adapter", () => {
       artifactCatalogAppend: artifactCatalog,
     });
     const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
       artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
       storage: objectStorage,
       artifactBindingRead: artifactBindings,
     });
@@ -292,7 +302,9 @@ describe("filesystem artifact browser read adapter", () => {
       artifactCatalogAppend: artifactCatalog,
     });
     const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
       artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
       storage: objectStorage,
       artifactBindingRead: artifactBindings,
     });
@@ -377,5 +389,97 @@ describe("filesystem artifact browser read adapter", () => {
         },
       },
     });
+  });
+
+  it("detects unregistered uploaded artifacts by diffing uploads folder against catalog", async () => {
+    const rootDirectory = await createTempRoot();
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      artifactCatalogAppend: artifactCatalog,
+    });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
+      artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
+      storage: objectStorage,
+    });
+
+    await objectStorage.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([1, 2, 3]), {
+        descriptor: { key: "uploads/session/registered.json", mediaType: "application/json" },
+      }),
+    );
+    await mkdir(path.join(rootDirectory, "uploads", "session"), { recursive: true });
+    await writeFile(path.join(rootDirectory, "uploads", "session", "orphan.parquet"), new Uint8Array([7, 8]));
+
+    const result = await browserRead.browseUnregisteredArtifacts();
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected unregistered browse success.");
+    }
+
+    expect(result.value.items.length).toBe(1);
+    expect(result.value.items[0]).toMatchObject({
+      storageKey: "uploads/session/orphan.parquet",
+      relativePath: "session/orphan.parquet",
+      fileName: "orphan.parquet",
+      mediaType: "application/x-parquet",
+    });
+  });
+
+  it("registers an unregistered uploaded artifact into the artifact catalog", async () => {
+    const rootDirectory = await createTempRoot();
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
+      artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
+    });
+
+    await mkdir(path.join(rootDirectory, "uploads", "session"), { recursive: true });
+    await writeFile(path.join(rootDirectory, "uploads", "session", "report.pdf"), new Uint8Array([1, 2, 3, 4]));
+
+    const registerResult = await browserRead.registerUnregisteredArtifact({
+      storageKey: "uploads/session/report.pdf",
+    });
+    expect(registerResult.ok).toBe(true);
+
+    const browseRegistered = await browserRead.browseArtifacts({});
+    expect(browseRegistered.ok).toBe(true);
+    if (!browseRegistered.ok) {
+      throw new Error("Expected browse success.");
+    }
+    expect(browseRegistered.value.items.length).toBe(1);
+    expect(browseRegistered.value.items[0]).toMatchObject({
+      storageKey: "uploads/session/report.pdf",
+      mediaType: "application/pdf",
+      artifactKind: "data",
+    });
+  });
+
+  it("deletes unregistered uploaded artifacts without touching registered catalog artifacts", async () => {
+    const rootDirectory = await createTempRoot();
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
+      artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
+    });
+
+    await mkdir(path.join(rootDirectory, "uploads", "session"), { recursive: true });
+    await writeFile(path.join(rootDirectory, "uploads", "session", "delete-me.txt"), new Uint8Array([1]));
+
+    const deleteResult = await browserRead.deleteUnregisteredArtifact({
+      storageKey: "uploads/session/delete-me.txt",
+    });
+    expect(deleteResult.ok).toBe(true);
+
+    const listResult = await browserRead.browseUnregisteredArtifacts();
+    expect(listResult.ok).toBe(true);
+    if (!listResult.ok) {
+      throw new Error("Expected browse success.");
+    }
+    expect(listResult.value.items.find((item) => item.storageKey === "uploads/session/delete-me.txt")).toBeUndefined();
   });
 });

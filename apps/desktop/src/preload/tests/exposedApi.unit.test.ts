@@ -8,6 +8,9 @@ import {
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
   createDesktopArtifactBrowseSuccessResponse,
   createDesktopArtifactPublishSuccessResponse,
@@ -16,6 +19,9 @@ import {
   createDesktopArtifactRegisterFromRepoSuccessResponse,
   createDesktopArtifactLocalizeFromRepoSuccessResponse,
   createDesktopArtifactMediaViewSuccessResponse,
+  createDesktopArtifactUnregisteredBrowseSuccessResponse,
+  createDesktopArtifactUnregisteredRegisterSuccessResponse,
+  createDesktopArtifactUnregisteredDeleteSuccessResponse,
   createDesktopArtifactUploadSuccessResponse,
   createIpcChannel,
   createIpcError,
@@ -261,4 +267,27 @@ it("maps source-verify bridge calls to artifact source-verify request channel", 
   await api.verifyImportedArtifactSourceBacking({ artifactId: "artifacts/20260418000000-local01" });
 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL.value);
+});
+
+it("maps unregistered artifact browse/register/delete bridge calls to dedicated request channels", async () => {
+  const responses = [
+    createDesktopArtifactUnregisteredBrowseSuccessResponse({ items: [] }),
+    createDesktopArtifactUnregisteredRegisterSuccessResponse({ storageKey: "uploads/orphan.txt" }),
+    createDesktopArtifactUnregisteredDeleteSuccessResponse({ storageKey: "uploads/orphan.txt" }),
+  ];
+  let index = 0;
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
+    const response = responses[index];
+    index += 1;
+    return response;
+  });
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.browseUnregisteredArtifacts();
+  await api.registerUnregisteredArtifact({ storageKey: "uploads/orphan.txt" });
+  await api.deleteUnregisteredArtifact({ storageKey: "uploads/orphan.txt" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[2]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value);
 });

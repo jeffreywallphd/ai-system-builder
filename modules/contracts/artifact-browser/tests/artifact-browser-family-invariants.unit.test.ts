@@ -7,7 +7,6 @@ describe("artifact-browser family invariants", () => {
     expect(Object.keys(artifactBrowserContracts).sort()).toEqual([
       "ARTIFACT_CONTENT_AVAILABILITIES",
       "ARTIFACT_CONTENT_RETRIEVAL_KINDS",
-      "ARTIFACT_BROWSE_KINDS",
       "ARTIFACT_BROWSE_OPERATION",
       "ARTIFACT_CONTENT_READ_OPERATION",
       "ARTIFACT_READ_OPERATION",
@@ -19,6 +18,7 @@ describe("artifact-browser family invariants", () => {
       "normalizeArtifactContentReadSuccessValue",
       "normalizeArtifactDetailReadModel",
       "normalizeArtifactReadSuccessValue",
+      "normalizeUnregisteredArtifactBrowseSuccessValue",
     ].sort());
   });
 

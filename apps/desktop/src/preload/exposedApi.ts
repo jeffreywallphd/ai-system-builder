@@ -32,6 +32,15 @@ import {
   DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_UPLOAD_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_OPERATION,
+  DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_OPERATION,
+  DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_DELETE_OPERATION,
+  DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_DELETE_RESPONSE_CHANNEL,
   createDesktopArtifactBrowseRequest,
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactMediaViewRequest,
@@ -43,6 +52,9 @@ import {
   createDesktopArtifactLocalizeFromRepoRequest,
   createDesktopArtifactUploadRequest,
   createDesktopArtifactUploadPolicyReadRequest,
+  createDesktopArtifactUnregisteredBrowseRequest,
+  createDesktopArtifactUnregisteredRegisterRequest,
+  createDesktopArtifactUnregisteredDeleteRequest,
   type DesktopArtifactBrowseRequest,
   type DesktopArtifactBrowseResponse,
   type DesktopArtifactContentReadRequest,
@@ -64,6 +76,9 @@ import {
   type DesktopArtifactUploadRequest,
   type DesktopArtifactUploadResponse,
   type DesktopArtifactUploadPolicyReadResponse,
+  type DesktopArtifactUnregisteredBrowseResponse,
+  type DesktopArtifactUnregisteredRegisterResponse,
+  type DesktopArtifactUnregisteredDeleteResponse,
   DESKTOP_HUGGING_FACE_TOKEN_GET_OPERATION,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_GET_RESPONSE_CHANNEL,
@@ -140,9 +155,20 @@ export interface DesktopPreloadApi {
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
   browseArtifacts: (
-    input?: { artifactKind?: "image" | "data" },
+    input?: { artifactKind?: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactBrowseResponse>;
+  browseUnregisteredArtifacts: (
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopArtifactUnregisteredBrowseResponse>;
+  registerUnregisteredArtifact: (
+    input: { storageKey: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopArtifactUnregisteredRegisterResponse>;
+  deleteUnregisteredArtifact: (
+    input: { storageKey: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopArtifactUnregisteredDeleteResponse>;
   readArtifactDetail: (
     locator: DesktopArtifactBrowserLocator,
     context?: DesktopArtifactUploadBridgeContext,
@@ -188,7 +214,7 @@ export interface DesktopPreloadApi {
         path: string;
         revision?: string;
       };
-      artifactKind?: "image" | "data";
+      artifactKind?: string;
       mediaType?: string;
     },
     context?: DesktopArtifactUploadBridgeContext,
@@ -398,6 +424,56 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_BROWSE_OPERATION,
         channel: DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact browse IPC response envelope.",
+      });
+    },
+
+    async browseUnregisteredArtifacts(context = {}) {
+      const request = createDesktopArtifactUnregisteredBrowseRequest({
+        boundary: { host: "desktop", source: artifactSource },
+      }, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactUnregisteredBrowseResponse>(response, {
+        operation: DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_OPERATION,
+        channel: DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop unregistered artifact browse IPC response envelope.",
+      });
+    },
+
+    async registerUnregisteredArtifact(input, context = {}) {
+      const request = createDesktopArtifactUnregisteredRegisterRequest({
+        storageKey: input.storageKey,
+        boundary: { host: "desktop", source: artifactSource },
+      }, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactUnregisteredRegisterResponse>(response, {
+        operation: DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_OPERATION,
+        channel: DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop unregistered artifact register IPC response envelope.",
+      });
+    },
+
+    async deleteUnregisteredArtifact(input, context = {}) {
+      const request = createDesktopArtifactUnregisteredDeleteRequest({
+        storageKey: input.storageKey,
+        boundary: { host: "desktop", source: artifactSource },
+      }, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactUnregisteredDeleteResponse>(response, {
+        operation: DESKTOP_ARTIFACT_UNREGISTERED_DELETE_OPERATION,
+        channel: DESKTOP_ARTIFACT_UNREGISTERED_DELETE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop unregistered artifact delete IPC response envelope.",
       });
     },
 

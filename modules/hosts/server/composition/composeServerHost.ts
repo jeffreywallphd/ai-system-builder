@@ -143,7 +143,9 @@ export function composeServerHost(
         artifactCatalogAppend: artifactCatalog,
       });
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
         artifactCatalogRead: artifactCatalog,
+        artifactCatalogAppend: artifactCatalog,
         storage,
         artifactBindingRead: artifactBindings,
       });
