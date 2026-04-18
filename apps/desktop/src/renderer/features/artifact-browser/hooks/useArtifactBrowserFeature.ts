@@ -58,6 +58,25 @@ export interface UseArtifactBrowserFeatureResult {
 export function useArtifactBrowserFeature(
   client?: DesktopArtifactBrowserClient,
 ): UseArtifactBrowserFeatureResult {
+  const withHuggingFaceAuthGuidance = (message: string): string => {
+    const normalized = message.toLowerCase();
+    const mentionsAuth = normalized.includes("hugging face")
+      && (
+        normalized.includes("token")
+        || normalized.includes("auth")
+        || normalized.includes("401")
+        || normalized.includes("403")
+        || normalized.includes("access denied")
+        || normalized.includes("private")
+        || normalized.includes("gated")
+      );
+    if (!mentionsAuth) {
+      return message;
+    }
+
+    return `${message} This Hugging Face repository may require an access token. Configure a Hugging Face token in the host/server environment to access private or gated repos.`;
+  };
+
   const artifactClient = useArtifactBrowserClient(client);
   const [items, setItems] = useState<DesktopArtifactBrowseItem[]>([]);
   const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>();
@@ -163,9 +182,10 @@ export function useArtifactBrowserFeature(
         message: `Registered ${registered.artifactId} from Hugging Face.`,
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to register artifact from repo.";
       setRegisterState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to register artifact from repo.",
+        message: withHuggingFaceAuthGuidance(message),
       });
     }
   }
@@ -189,9 +209,10 @@ export function useArtifactBrowserFeature(
         message: `Localized ${localized.artifactId} to local object storage.`,
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to localize imported artifact.";
       setLocalizeState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to localize imported artifact.",
+        message: withHuggingFaceAuthGuidance(message),
       });
     }
   }
@@ -217,9 +238,10 @@ export function useArtifactBrowserFeature(
         message: "Imported source backing verification refreshed.",
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to verify imported source backing.";
       setSourceVerifyState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to verify imported source backing.",
+        message: withHuggingFaceAuthGuidance(message),
       });
     }
   }

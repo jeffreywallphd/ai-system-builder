@@ -91,6 +91,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       <button className="ui-button" type="button" onClick={toggleRegisterForm} disabled={registerState.status === "loading"}>Register from Hugging Face</button>
       {registerForm.showRegisterForm ? (
         <section className="ui-stack ui-stack--sm">
+          <p role="note">Private or gated Hugging Face repositories may require a host/server token.</p>
           <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={registerForm.repository} onChange={(event) => setRegisterRepository(event.target.value)} required /></label>
           <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={registerForm.pathInRepo} onChange={(event) => setRegisterPathInRepo(event.target.value)} required /></label>
           <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={registerForm.revision} onChange={(event) => setRegisterRevision(event.target.value)} /></label>
@@ -220,6 +221,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <button className="ui-button" type="button" disabled={publishState.status === "loading"} onClick={togglePublishForm}>Publish to Hugging Face</button>
               {publishForm.showPublishForm ? (
                 <>
+                  <p role="note">Private or gated Hugging Face repositories may require a host/server token.</p>
                   <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={publishForm.repository} onChange={(event) => setRepository(event.target.value)} required /></label>
                   <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={publishForm.pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required /></label>
                   <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={publishForm.revision} onChange={(event) => setRevision(event.target.value)} /></label>

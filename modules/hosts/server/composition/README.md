@@ -21,3 +21,9 @@ Route composition now includes:
 
 Current artifact-repo provider registration is Hugging Face only.
 
+## Hugging Face token configuration
+
+- `composeServerHost` passes `options.artifactRepo.huggingFaceAccessToken` into the Hugging Face adapter.
+- If that option is omitted, the adapter falls back to `HF_TOKEN`, then `HUGGING_FACE_TOKEN`.
+- Thin-client artifact-repo operations run through this server host path, so thin-client access to private/gated Hugging Face repos depends on server-side token configuration.
+- Public Hugging Face repos may work without a token; private/gated repos may return explicit auth-required (`unavailable`) errors for register/localize/publish/verify flows.

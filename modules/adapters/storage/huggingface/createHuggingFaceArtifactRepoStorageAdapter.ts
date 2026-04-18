@@ -35,6 +35,11 @@ interface HuggingFaceRepoDesignation {
   name: string;
 }
 
+type HuggingFaceOperation =
+  | "hasArtifactInRepo"
+  | "storeArtifactInRepo"
+  | "retrieveArtifactFromRepo";
+
 interface HuggingFaceHubClient {
   fileExists: (params: {
     repo: HuggingFaceRepoDesignation;
@@ -197,6 +202,99 @@ function mapStatusToContractCode(status: number): ContractErrorCode {
   return "internal";
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getProviderStatusCode(error: unknown): number | undefined {
+  if (!isObjectRecord(error)) {
+    return undefined;
+  }
+
+  const statusCode = error.statusCode;
+  if (typeof statusCode === "number") {
+    return statusCode;
+  }
+
+  const status = error.status;
+  if (typeof status === "number") {
+    return status;
+  }
+
+  return undefined;
+}
+
+function getProviderErrorReason(error: unknown): string | undefined {
+  if (!isObjectRecord(error)) {
+    return undefined;
+  }
+
+  if (typeof error.message === "string" && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (typeof error.error === "string" && error.error.trim().length > 0) {
+    return error.error;
+  }
+
+  return undefined;
+}
+
+function createAuthRequiredError(operation: HuggingFaceOperation): ReturnType<typeof createContractError> {
+  return createContractError(
+    "unavailable",
+    `Hugging Face ${operation} requires authentication, but no access token is configured.`,
+    {
+      details: {
+        provider: HUGGING_FACE_PROVIDER,
+        authIssue: "missing-token",
+        guidance: "Configure HF_TOKEN or HUGGING_FACE_TOKEN in the host/server environment.",
+      },
+    },
+  );
+}
+
+function mapProviderStatusError(
+  operation: HuggingFaceOperation,
+  statusCode: number,
+  accessToken: string | undefined,
+  reason: string | undefined,
+) {
+  if (statusCode === 401 || statusCode === 403) {
+    const tokenMissing = !accessToken?.trim();
+    const message = tokenMissing
+      ? `Hugging Face ${operation} requires an access token for this repository. No token is configured.`
+      : `Hugging Face ${operation} failed authentication (token invalid/insufficient or repository access denied).`;
+
+    return createContractError(
+      "unavailable",
+      message,
+      {
+        details: {
+          provider: HUGGING_FACE_PROVIDER,
+          providerStatus: statusCode,
+          authIssue: tokenMissing ? "missing-token" : "invalid-token-or-access-denied",
+          reason,
+          guidance: tokenMissing
+            ? "Configure HF_TOKEN or HUGGING_FACE_TOKEN in the host/server environment."
+            : "Verify the configured Hugging Face token and repository permissions (private/gated access).",
+        },
+      },
+    );
+  }
+
+  return createContractError(
+    mapStatusToContractCode(statusCode),
+    `Hugging Face ${operation} failed with provider status ${statusCode}.`,
+    {
+      details: {
+        providerStatus: statusCode,
+        reason,
+      },
+    },
+  );
+}
+
 function extractMediaType(contentType: string | null): string | undefined {
   if (!contentType) {
     return undefined;
@@ -204,17 +302,6 @@ function extractMediaType(contentType: string | null): string | undefined {
 
   const normalized = contentType.split(";")[0]?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
-}
-
-function requireAccessToken(accessToken: string | undefined): string {
-  const token = accessToken?.trim();
-  if (!token) {
-    throw new HuggingFaceAdapterValidationError(
-      "Hugging Face access token is required for storeArtifactInRepo. Configure accessToken, HF_TOKEN, or HUGGING_FACE_TOKEN.",
-    );
-  }
-
-  return token;
 }
 
 function toRepoDesignation(target: ResolvedHuggingFaceTarget): HuggingFaceRepoDesignation {
@@ -272,8 +359,9 @@ async function loadOfficialHubClient(
 }
 
 function mapUnexpectedHubError(
-  operation: "hasArtifactInRepo" | "storeArtifactInRepo" | "retrieveArtifactFromRepo",
+  operation: HuggingFaceOperation,
   error: unknown,
+  accessToken: string | undefined,
 ) {
   if (error instanceof HuggingFaceHubClientUnavailableError) {
     return createContractError("unavailable", error.message, {
@@ -291,22 +379,13 @@ function mapUnexpectedHubError(
     });
   }
 
-  if (
-    typeof error === "object"
-    && error !== null
-    && "statusCode" in error
-    && typeof (error as { statusCode?: unknown }).statusCode === "number"
-  ) {
-    const statusCode = (error as { statusCode: number }).statusCode;
-    return createContractError(
-      mapStatusToContractCode(statusCode),
-      `Hugging Face ${operation} failed with provider status ${statusCode}.`,
-      {
-        details: {
-          providerStatus: statusCode,
-          reason: "message" in (error as Record<string, unknown>) ? String((error as { message?: unknown }).message) : undefined,
-        },
-      },
+  const providerStatus = getProviderStatusCode(error);
+  if (providerStatus !== undefined) {
+    return mapProviderStatusError(
+      operation,
+      providerStatus,
+      accessToken,
+      getProviderErrorReason(error),
     );
   }
 
@@ -383,7 +462,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
         return createHasArtifactInRepoSuccessResult(exists, requestContext);
       } catch (error) {
         return createHasArtifactInRepoFailureResult(
-          mapUnexpectedHubError("hasArtifactInRepo", error),
+          mapUnexpectedHubError("hasArtifactInRepo", error, accessToken),
           requestContext,
         );
       }
@@ -397,7 +476,13 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
 
       try {
         const resolvedTarget = resolveTarget(request.target, defaultRepoType);
-        const token = requireAccessToken(accessToken);
+        const token = accessToken?.trim();
+        if (!token) {
+          return createStoreArtifactInRepoFailureResult(
+            createAuthRequiredError("storeArtifactInRepo"),
+            requestContext,
+          );
+        }
         const hubClient = await resolveHubClient();
         await hubClient.uploadFile({
           repo: toRepoDesignation(resolvedTarget),
@@ -420,7 +505,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
         );
       } catch (error) {
         return createStoreArtifactInRepoFailureResult(
-          mapUnexpectedHubError("storeArtifactInRepo", error),
+          mapUnexpectedHubError("storeArtifactInRepo", error, accessToken),
           requestContext,
         );
       }
@@ -441,6 +526,17 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
           revision: resolvedTarget.revision,
           accessToken,
         });
+        if (!response.ok) {
+          return createRetrieveArtifactFromRepoFailureResult(
+            mapProviderStatusError(
+              "retrieveArtifactFromRepo",
+              response.status,
+              accessToken,
+              response.statusText,
+            ),
+            requestContext,
+          );
+        }
 
         const bytes = new Uint8Array(await response.arrayBuffer());
         return createRetrieveArtifactFromRepoSuccessResult(
@@ -454,7 +550,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
         );
       } catch (error) {
         return createRetrieveArtifactFromRepoFailureResult(
-          mapUnexpectedHubError("retrieveArtifactFromRepo", error),
+          mapUnexpectedHubError("retrieveArtifactFromRepo", error, accessToken),
           requestContext,
         );
       }

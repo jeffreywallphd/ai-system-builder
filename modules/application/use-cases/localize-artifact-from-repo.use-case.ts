@@ -94,6 +94,18 @@ export class LocalizeArtifactFromRepoUseCase {
 
     const retrieveResult = await this.artifactRepoStorage.retrieveArtifactFromRepo({ target });
     if (!retrieveResult.ok) {
+      if (retrieveResult.error.code === "unavailable") {
+        return {
+          ok: false as const,
+          error: createContractError(
+            "unavailable",
+            `Failed to localize imported artifact from Hugging Face. ${retrieveResult.error.message}`,
+            {
+              details: retrieveResult.error.details,
+            },
+          ),
+        };
+      }
       return retrieveResult;
     }
 
@@ -161,4 +173,3 @@ export class LocalizeArtifactFromRepoUseCase {
     };
   }
 }
-

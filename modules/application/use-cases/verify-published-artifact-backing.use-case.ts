@@ -95,6 +95,18 @@ export class VerifyPublishedArtifactBackingUseCase {
       }),
     );
     if (!hasResult.ok) {
+      if (hasResult.error.code === "unavailable") {
+        return {
+          ok: false as const,
+          error: createContractError(
+            "unavailable",
+            `Failed to verify published Hugging Face backing access. ${hasResult.error.message}`,
+            {
+              details: hasResult.error.details,
+            },
+          ),
+        };
+      }
       return hasResult;
     }
 
@@ -133,4 +145,3 @@ export class VerifyPublishedArtifactBackingUseCase {
     };
   }
 }
-

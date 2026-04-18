@@ -130,11 +130,11 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       repository: "openai/demo",
       path: "images/cat.png",
       revision: "main",
-      mediaType: undefined,
+      mediaType: "",
     });
     expect(container.textContent).toContain("Published Backing");
     expect(container.textContent).toContain("openai/demo");
-    expect(container.textContent).toContain("Remote backing verified");
+    expect(container.textContent).toContain("Not yet verified");
   });
 
   it("shows publish failure message", async () => {
@@ -193,6 +193,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     expect(container.textContent).toContain("Missing Hugging Face token.");
+    expect(container.textContent).toContain("This Hugging Face repository may require an access token.");
   });
 
   it("re-checks published backing existence from the artifact detail panel", async () => {

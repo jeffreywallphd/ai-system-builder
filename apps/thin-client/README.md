@@ -19,6 +19,13 @@ Current scope:
 - artifact-browser publish/re-check state orchestration now uses a shared cross-host hook from `modules/ui/shared`
 - token-first style baseline under `src/styles/`
 
+## Hugging Face auth behavior
+
+- Thin-client Hugging Face register/localize/publish/verify requests are server-backed.
+- Configure `HF_TOKEN` or `HUGGING_FACE_TOKEN` (or server host `huggingFaceAccessToken`) in the **server** environment for private/gated Hugging Face repositories.
+- Public repositories may work without a token depending on repository visibility/provider policy.
+- Missing/invalid token and access-denied responses are surfaced as explicit auth-required/access-denied errors in UI messaging.
+
 The thin-client image-upload path intentionally reuses the server transport + shared application use
 case path rather than desktop preload wiring.
 
