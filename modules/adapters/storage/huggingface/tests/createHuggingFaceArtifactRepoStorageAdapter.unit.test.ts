@@ -370,4 +370,26 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
       },
     ]);
   });
+
+  it("maps non-browser contract error codes to internal for repo-browser responses", async () => {
+    const fetchImplementation = testDouble.fn(async () => {
+      throw {
+        code: "unauthorized",
+        message: "Provider rejected token",
+      };
+    }) as unknown as HuggingFaceFetchImplementation;
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient: createHubClientDouble(),
+      fetchImplementation,
+    });
+
+    const result = await adapter.listNamespaceDatasets("OpenFinAL");
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected namespace dataset browse failure.");
+    }
+
+    expect(result.error.code).toBe("internal");
+    expect(result.error.message).toContain("Provider rejected token");
+  });
 });
