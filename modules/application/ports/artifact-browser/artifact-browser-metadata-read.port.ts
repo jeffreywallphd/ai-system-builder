@@ -9,7 +9,7 @@ import type { StorageObjectMetadata } from "../../../contracts/storage";
 import type { ApplicationRequestContext } from "../application-request-context";
 
 export interface BrowseArtifactsRequest {
-  artifactKind: ArtifactBrowseKind;
+  artifactKind?: ArtifactBrowseKind;
 }
 
 export interface ReadArtifactDetailRequest {

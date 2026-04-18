@@ -8,7 +8,7 @@ import {
 } from "../storage";
 import type { StorageObjectMetadata } from "../storage";
 
-export const ARTIFACT_BROWSE_KINDS = ["image"] as const;
+export const ARTIFACT_BROWSE_KINDS = ["image", "data"] as const;
 
 export type ArtifactBrowseKind = (typeof ARTIFACT_BROWSE_KINDS)[number];
 

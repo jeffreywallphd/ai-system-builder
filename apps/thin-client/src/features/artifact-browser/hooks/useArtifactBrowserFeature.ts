@@ -145,18 +145,18 @@ export function useArtifactBrowserFeature(
   });
 
   async function refreshArtifacts(): Promise<void> {
-    setViewState({ status: "loading", message: "Loading image artifacts..." });
+    setViewState({ status: "loading", message: "Loading data artifacts..." });
     try {
-      const browseItems = await artifactClient.browseImageArtifacts();
+      const browseItems = await artifactClient.browseArtifacts();
       setItems(browseItems);
       setViewState({
         status: "success",
-        message: browseItems.length > 0 ? "Loaded image artifacts." : "No image artifacts found yet.",
+        message: browseItems.length > 0 ? "Loaded data artifacts." : "No data artifacts found yet.",
       });
     } catch (error) {
       setViewState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to load image artifacts.",
+        message: error instanceof Error ? error.message : "Failed to load data artifacts.",
       });
     }
   }
@@ -205,7 +205,11 @@ export function useArtifactBrowserFeature(
       try {
         const contentDescriptor = await artifactClient.readArtifactContent(locator);
         setContent(contentDescriptor);
-        setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));
+        if (contentDescriptor.mediaType?.startsWith("image/")) {
+          setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));
+        } else {
+          setImageViewUrl(undefined);
+        }
       } catch {
         setContent({
           locator,

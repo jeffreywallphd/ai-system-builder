@@ -27,20 +27,22 @@ function normalizeRecord(record: ArtifactCatalogRecord): ArtifactCatalogRecord {
   return {
     ...record,
     storageKey: normalizeStorageArtifactKey(record.storageKey),
-    artifactKind: "image",
   };
 }
 
 function parseRecordLine(line: string): ArtifactCatalogRecord | undefined {
   try {
     const parsed = JSON.parse(line) as Partial<ArtifactCatalogRecord>;
-    if (parsed.artifactKind !== "image" || typeof parsed.storageKey !== "string") {
+    if (
+      (parsed.artifactKind !== "image" && parsed.artifactKind !== "data")
+      || typeof parsed.storageKey !== "string"
+    ) {
       return undefined;
     }
 
     return normalizeRecord({
       storageKey: parsed.storageKey,
-      artifactKind: "image",
+      artifactKind: parsed.artifactKind,
       mediaType: typeof parsed.mediaType === "string" ? parsed.mediaType : undefined,
       sizeBytes: typeof parsed.sizeBytes === "number" ? parsed.sizeBytes : undefined,
       sourceKind: parsed.sourceKind === "upload" ? "upload" : undefined,
@@ -113,14 +115,22 @@ export function createLocalArtifactCatalogPersistenceAdapter(
     },
 
     async browseArtifactCatalogRecords(request, context = {}) {
-      if (request.artifactKind !== "image") {
+      if (
+        typeof request.artifactKind === "string"
+        && request.artifactKind !== "image"
+        && request.artifactKind !== "data"
+      ) {
         return createFailureResult(
-          createContractError("validation", `artifactKind must be \"image\". Received \"${request.artifactKind}\".`),
+          createContractError("validation", `artifactKind must be one of \"image\" or \"data\". Received \"${request.artifactKind}\".`),
           context,
         );
       }
-
-      return createSuccessResult({ records: await readCatalogRecords() }, context);
+      const records = await readCatalogRecords();
+      return createSuccessResult({
+        records: typeof request.artifactKind === "string"
+          ? records.filter((record) => record.artifactKind === request.artifactKind)
+          : records,
+      }, context);
     },
 
     async readArtifactCatalogRecord(request, context = {}) {

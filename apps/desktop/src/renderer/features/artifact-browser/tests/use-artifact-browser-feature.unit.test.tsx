@@ -28,7 +28,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
 
   it("publishes a selected artifact and shows published backing details", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "uploads/cat.png",
           artifactKind: "image" as const,
@@ -142,7 +142,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
 
   it("shows publish failure message", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "uploads/cat.png",
           artifactKind: "image" as const,
@@ -204,7 +204,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
 
   it("keeps browser card focused on browsing and excludes ingestion controls", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([]),
+      browseArtifacts: vi.fn().mockResolvedValue([]),
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
@@ -235,7 +235,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
 
   it("re-checks published backing existence from the artifact detail panel", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         { storageKey: "uploads/cat.png", artifactKind: "image" as const },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
@@ -308,7 +308,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
 
   it("localizes imported artifact bytes from the artifact panel", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         { storageKey: "artifacts/20260418000000-local01", artifactKind: "image" as const },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
@@ -391,7 +391,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
 
   it("shows source verification and remote-only/localized state cues based on backing state", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "artifacts/20260418000000-local01",
           artifactKind: "image" as const,

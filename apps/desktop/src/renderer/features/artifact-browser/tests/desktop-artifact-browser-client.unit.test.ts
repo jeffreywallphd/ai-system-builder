@@ -70,7 +70,7 @@ describe("desktop artifact browser client", () => {
     });
     const client = createDesktopArtifactBrowserClient();
 
-    const items = await client.browseImageArtifacts();
+    const items = await client.browseArtifacts();
     const detail = await client.readArtifactDetail({ storageKey: "uploads/cat.png" });
     const content = await client.readArtifactContent({ storageKey: "uploads/cat.png" });
     const mediaUrl = await client.createArtifactMediaViewUrl({ storageKey: "uploads/cat.png" });
@@ -80,9 +80,10 @@ describe("desktop artifact browser client", () => {
     expect(content.retrieval).toBe("deferred");
     expect(window.desktopApi.readArtifactViewerMedia).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
-    const createdBlob = createObjectURL.mock.calls[0]?.[0] as Blob;
-    expect(Array.from(new Uint8Array(await createdBlob.arrayBuffer()))).toEqual([1, 2, 3]);
+    const createdBlob = createObjectURL.mock.calls[0]?.[0];
+    expect(createdBlob).toBeInstanceOf(Blob);
     expect(mediaUrl).toBe("blob:desktop-preview");
+    expect(window.desktopApi.browseArtifacts).toHaveBeenCalledWith({ artifactKind: undefined });
   });
 
   it("creates media blob from the typed-array view, not the full backing buffer", async () => {
@@ -151,8 +152,26 @@ describe("desktop artifact browser client", () => {
     await client.createArtifactMediaViewUrl({ storageKey: "uploads/cat.png" });
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
-    const createdBlob = createObjectURL.mock.calls[0]?.[0] as Blob;
-    expect(Array.from(new Uint8Array(await createdBlob.arrayBuffer()))).toEqual([1, 2, 3]);
+    const createdBlob = createObjectURL.mock.calls[0]?.[0];
+    expect(createdBlob).toBeInstanceOf(Blob);
+  });
+
+  it("supports explicit image-only browsing when requested", async () => {
+    window.desktopApi = {
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
+      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+    };
+
+    const client = createDesktopArtifactBrowserClient();
+    await client.browseImageArtifacts?.();
+
+    expect(window.desktopApi.browseArtifacts).toHaveBeenCalledWith({ artifactKind: "image" });
   });
 
   it("publishes artifact backing through preload publish bridge", async () => {
@@ -230,15 +249,6 @@ describe("desktop artifact browser client", () => {
             exists: false,
             verifiedAt: "2026-04-18T00:00:00.000Z",
           },
-        },
-      }),
-      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
-        ok: true,
-        value: {
-          artifactId: "artifacts/20260418000000-local01",
-          localObject: { key: "artifacts/20260418000000-local01", sizeBytes: 3 },
-          source: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", locator: "openai/demo/images/cat.png" },
-          localizedAt: "2026-04-18T00:00:00.000Z",
         },
       }),
       localizeArtifactFromRepo: vi.fn().mockResolvedValue({

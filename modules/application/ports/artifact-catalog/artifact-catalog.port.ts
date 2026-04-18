@@ -7,7 +7,7 @@ export interface AppendArtifactCatalogRecordRequest {
 }
 
 export interface BrowseArtifactCatalogRecordsRequest {
-  artifactKind: ArtifactCatalogRecord["artifactKind"];
+  artifactKind?: ArtifactCatalogRecord["artifactKind"];
 }
 
 export interface ReadArtifactCatalogRecordRequest {

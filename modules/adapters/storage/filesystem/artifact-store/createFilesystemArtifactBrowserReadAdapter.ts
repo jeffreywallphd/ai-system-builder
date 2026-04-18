@@ -127,7 +127,7 @@ async function readLatestRepoBackingByRole(
 function toBrowseItem(record: ArtifactCatalogRecord): ArtifactBrowseItem {
   return {
     storageKey: record.storageKey,
-    artifactKind: "image",
+    artifactKind: record.artifactKind,
     mediaType: record.mediaType,
     sizeBytes: record.sizeBytes,
     sourceKind: record.sourceKind,
@@ -179,7 +179,7 @@ function toDetailValue(record: ArtifactCatalogRecord): ArtifactReadSuccessValue 
   return {
     artifact: {
       locator: createArtifactBrowserLocator(record.storageKey),
-      artifactKind: "image",
+      artifactKind: record.artifactKind,
       mediaType: record.mediaType,
       sizeBytes: record.sizeBytes,
       checksum: record.checksum,

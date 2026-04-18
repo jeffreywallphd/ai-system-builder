@@ -140,7 +140,7 @@ export interface DesktopPreloadApi {
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
   browseArtifacts: (
-    input: { artifactKind: "image" },
+    input: { artifactKind?: "image" | "data" },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactBrowseResponse>;
   readArtifactDetail: (

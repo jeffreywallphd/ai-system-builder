@@ -18,7 +18,8 @@ export interface DesktopArtifactBrowserClient {
   clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
-  browseImageArtifacts: () => Promise<DesktopArtifactBrowseItem[]>;
+  browseArtifacts: (input?: { artifactKind?: "image" | "data" }) => Promise<DesktopArtifactBrowseItem[]>;
+  browseImageArtifacts?: () => Promise<DesktopArtifactBrowseItem[]>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: DesktopArtifactBrowserLocator) => Promise<string>;
@@ -116,15 +117,19 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
       );
     },
 
-    async browseImageArtifacts() {
+    async browseArtifacts(input = {}) {
       return ensureSuccess(
-        await desktopApi.browseArtifacts({ artifactKind: "image" }),
+        await desktopApi.browseArtifacts({ artifactKind: input.artifactKind }),
         (value) => {
           const items = (value as { items?: DesktopArtifactBrowseItem[] } | undefined)?.items;
           return Array.isArray(items) ? items : [];
         },
         "Failed to browse artifacts.",
       );
+    },
+
+    async browseImageArtifacts() {
+      return this.browseArtifacts({ artifactKind: "image" });
     },
 
     async readArtifactDetail(locator) {

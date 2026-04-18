@@ -4,7 +4,7 @@ export interface ArtifactBrowserLocator {
 
 export interface ThinClientArtifactBrowseItem {
   storageKey: string;
-  artifactKind: "image";
+  artifactKind: "image" | "data";
   mediaType?: string;
   sizeBytes?: number;
   originalName?: string;
@@ -22,9 +22,10 @@ export interface ThinClientArtifactBrowseItem {
 
 export interface ThinClientArtifactDetail {
   locator: ArtifactBrowserLocator;
-  artifactKind: "image";
+  artifactKind: "image" | "data";
   mediaType?: string;
   sizeBytes?: number;
+  sourceKind?: string;
   originalName?: string;
   createdAt?: string;
   metadata?: {
@@ -108,7 +109,8 @@ export interface ArtifactBrowserApiClient {
   clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
-  browseImageArtifacts: () => Promise<ThinClientArtifactBrowseItem[]>;
+  browseArtifacts: (input?: { artifactKind?: "image" | "data" }) => Promise<ThinClientArtifactBrowseItem[]>;
+  browseImageArtifacts?: () => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator) => string;
@@ -241,13 +243,13 @@ export function createApiArtifactBrowserClient(
       });
     },
 
-    async browseImageArtifacts(): Promise<ThinClientArtifactBrowseItem[]> {
+    async browseArtifacts(input = {}): Promise<ThinClientArtifactBrowseItem[]> {
       const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/browse"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ artifactKind: "image", source }),
+        body: JSON.stringify({ artifactKind: input.artifactKind, source }),
       });
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
@@ -255,6 +257,10 @@ export function createApiArtifactBrowserClient(
         const items = (value as { items?: ThinClientArtifactBrowseItem[] } | undefined)?.items;
         return Array.isArray(items) ? items : [];
       });
+    },
+
+    async browseImageArtifacts(): Promise<ThinClientArtifactBrowseItem[]> {
+      return this.browseArtifacts({ artifactKind: "image" });
     },
 
     async readArtifactDetail(locator: ArtifactBrowserLocator): Promise<ThinClientArtifactDetail> {
