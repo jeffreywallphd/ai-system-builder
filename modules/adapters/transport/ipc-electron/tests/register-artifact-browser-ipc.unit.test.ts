@@ -294,16 +294,19 @@ describe("registerArtifactBrowserIpc", () => {
     expect(dependencies.verifyImportedArtifactSourceBackingUseCase.execute).toHaveBeenCalledWith({
       artifactId: "uploads/a.png",
     });
-    expect(dependencies.registerArtifactFromRepoUseCase.execute).toHaveBeenCalledWith({
-      target: {
-        provider: "huggingface",
-        repository: "openai/demo",
-        path: "images/a.png",
-        revision: undefined,
+    expect(dependencies.registerArtifactFromRepoUseCase.execute).toHaveBeenCalledWith(
+      {
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/a.png",
+          revision: undefined,
+        },
+        artifactKind: "image",
+        mediaType: undefined,
       },
-      artifactKind: "image",
-      mediaType: undefined,
-    });
+      { requestId: undefined, correlationId: undefined },
+    );
     expect(dependencies.localizeArtifactFromRepoUseCase.execute).toHaveBeenCalledWith({
       artifactId: "artifacts/20260418000000-local01",
     });

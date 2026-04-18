@@ -3,6 +3,7 @@ import { describe, expect, it, testDouble } from "../../../testing/node-test";
 import { createHasArtifactInRepoSuccessResult } from "../../../contracts/storage";
 import { createContractError } from "../../../contracts/shared";
 import type { ArtifactCatalogAppendPort } from "../../ports/artifact-catalog";
+import type { LoggingPort } from "../../ports/logging";
 import type {
   ArtifactRepoStoragePort,
   ArtifactStorageBindingPort,
@@ -12,6 +13,8 @@ import { ArtifactId, type ArtifactIdFactory } from "../../../domain/artifact";
 
 describe("RegisterArtifactFromRepoUseCase", () => {
   it("verifies remote target and writes imported-source binding + catalog record", async () => {
+    const log = testDouble.fn();
+    const logging: LoggingPort = { log };
     const artifactRepoStorage: ArtifactRepoStoragePort = {
       hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
       storeArtifactInRepo: testDouble.fn(),
@@ -37,6 +40,7 @@ describe("RegisterArtifactFromRepoUseCase", () => {
       artifactRepoStorage,
       artifactBindingStorage,
       artifactCatalogAppend,
+      logging,
       now: () => "2026-04-17T00:00:00.000Z",
       createArtifactId: () => ArtifactId.from("artifacts/20260417000000-import001"),
     });
@@ -64,9 +68,13 @@ describe("RegisterArtifactFromRepoUseCase", () => {
         role: "imported-source",
       },
     });
+    const logCalls = (log as ReturnType<typeof testDouble.fn>).mock.calls.map((call) => call[0]);
+    expect(logCalls.some((entry) => entry?.event === "application.huggingface.file-registration.started")).toBe(true);
+    expect(logCalls.some((entry) => entry?.event === "application.huggingface.file-registration.succeeded")).toBe(true);
   });
 
   it("uses artifactIdFactory seam for system-owned id generation", async () => {
+    const logging: LoggingPort = { log: testDouble.fn() };
     const artifactRepoStorage: ArtifactRepoStoragePort = {
       hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
       storeArtifactInRepo: testDouble.fn(),
@@ -95,6 +103,7 @@ describe("RegisterArtifactFromRepoUseCase", () => {
       artifactRepoStorage,
       artifactBindingStorage,
       artifactCatalogAppend,
+      logging,
       now: () => "2026-04-17T00:00:00.000Z",
       artifactIdFactory,
     });
@@ -116,6 +125,8 @@ describe("RegisterArtifactFromRepoUseCase", () => {
   });
 
   it("returns explicit register/import auth guidance when repository access is unavailable", async () => {
+    const log = testDouble.fn();
+    const logging: LoggingPort = { log };
     const artifactRepoStorage: ArtifactRepoStoragePort = {
       hasArtifactInRepo: testDouble.fn(async () => ({
         ok: false as const,
@@ -137,6 +148,7 @@ describe("RegisterArtifactFromRepoUseCase", () => {
       artifactRepoStorage,
       artifactBindingStorage,
       artifactCatalogAppend,
+      logging,
     });
 
     const result = await useCase.execute({
@@ -153,5 +165,7 @@ describe("RegisterArtifactFromRepoUseCase", () => {
     }
     expect(result.error.code).toBe("unavailable");
     expect(result.error.message).toContain("register/import");
+    const logCalls = (log as ReturnType<typeof testDouble.fn>).mock.calls.map((call) => call[0]);
+    expect(logCalls.some((entry) => entry?.event === "application.huggingface.file-registration.failed")).toBe(true);
   });
 });
