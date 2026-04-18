@@ -9,7 +9,7 @@ import {
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
   RegisterArtifactFromRepoUseCase,
-  StoreImageUploadUseCase,
+  StoreArtifactUploadUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
 } from "../../../application/use-cases";
@@ -55,7 +55,7 @@ export interface ComposeDesktopHostOptions {
   };
 }
 
-export interface RegisterDesktopImageUploadIpcOptions {
+export interface RegisterDesktopArtifactUploadIpcOptions {
   ipcMain: IpcMainHandlePort;
   storageRootDirectory: string;
 }
@@ -66,7 +66,7 @@ export interface DesktopHostComposition {
   getHuggingFaceTokenStatus: () => HuggingFaceTokenStatus;
   setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
   clearHuggingFaceToken: () => HuggingFaceTokenStatus;
-  registerImageUploadIpc: (options: RegisterDesktopImageUploadIpcOptions) => void;
+  registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
 }
 
 export function composeDesktopHost(
@@ -103,7 +103,7 @@ export function composeDesktopHost(
     clearHuggingFaceToken() {
       return tokenConfigStore.clearToken();
     },
-    registerImageUploadIpc(registerOptions) {
+    registerArtifactUploadIpc(registerOptions) {
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
@@ -138,7 +138,7 @@ export function composeDesktopHost(
         storage,
         artifactCatalogRead: artifactCatalog,
       });
-      const storeImageUploadUseCase = new StoreImageUploadUseCase({
+      const storeArtifactUploadUseCase = new StoreArtifactUploadUseCase({
         storage,
         logging: loggingPort,
         now: options.now,
@@ -199,7 +199,7 @@ export function composeDesktopHost(
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),
-        storeImageUploadUseCase,
+        storeArtifactUploadUseCase,
         browseArtifactsUseCase: browseArtifacts,
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,

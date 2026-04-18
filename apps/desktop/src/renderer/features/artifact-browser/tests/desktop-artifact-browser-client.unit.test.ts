@@ -10,7 +10,7 @@ describe("desktop artifact browser client", () => {
 
   it("uses descriptor operations plus separate media-view retrieval path", async () => {
     window.desktopApi = {
-      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({
         ok: true,
         value: { items: [{ storageKey: "uploads/cat.png", artifactKind: "image" }] },
@@ -90,7 +90,7 @@ describe("desktop artifact browser client", () => {
     const slicedView = backingBytes.subarray(1, 4);
 
     window.desktopApi = {
-      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockResolvedValue({
         ok: true,
@@ -157,7 +157,7 @@ describe("desktop artifact browser client", () => {
 
   it("publishes artifact backing through preload publish bridge", async () => {
     window.desktopApi = {
-      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
       readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
@@ -210,7 +210,7 @@ describe("desktop artifact browser client", () => {
 
   it("re-checks published artifact backing through preload verify bridge", async () => {
     window.desktopApi = {
-      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
       readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
@@ -265,7 +265,7 @@ describe("desktop artifact browser client", () => {
 
   it("localizes imported artifact bytes through preload localize bridge", async () => {
     window.desktopApi = {
-      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
       readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
@@ -305,7 +305,7 @@ describe("desktop artifact browser client", () => {
 
   it("re-checks imported source backing through preload source-verify bridge", async () => {
     window.desktopApi = {
-      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
       readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),

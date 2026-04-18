@@ -12,7 +12,7 @@ import {
   ReadArtifactDetailUseCase,
   RegisterArtifactFromRepoUseCase,
   StoreArtifactInRepoUseCase,
-  StoreImageUploadUseCase,
+  StoreArtifactUploadUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
 } from "../../../application/use-cases";
@@ -37,7 +37,7 @@ import {
   type HuggingFaceTokenStatus,
 } from "../../shared/huggingFaceTokenConfigStore";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
-import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
+import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/artifact-upload/registerArtifactUploadApiRoute";
 import type { ExpressRoutePort } from "../../../adapters/transport/api-express/artifact-browser/registerArtifactBrowserApiRoutes";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
@@ -152,7 +152,7 @@ export function composeServerHost(
         artifactCatalogRead: artifactCatalog,
       });
 
-      const storeImageUploadUseCase = new StoreImageUploadUseCase({
+      const storeArtifactUploadUseCase = new StoreArtifactUploadUseCase({
         storage,
         logging: loggingPort,
         now: options.now,
@@ -220,7 +220,7 @@ export function composeServerHost(
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),
-        storeImageUploadUseCase,
+        storeArtifactUploadUseCase,
         browseArtifactsUseCase: browseArtifacts,
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,

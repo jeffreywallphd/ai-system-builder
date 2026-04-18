@@ -8,7 +8,7 @@ import {
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
-  DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
   createDesktopArtifactBrowseSuccessResponse,
   createDesktopArtifactPublishSuccessResponse,
   createDesktopArtifactPublishVerifySuccessResponse,
@@ -16,7 +16,7 @@ import {
   createDesktopArtifactRegisterFromRepoSuccessResponse,
   createDesktopArtifactLocalizeFromRepoSuccessResponse,
   createDesktopArtifactMediaViewSuccessResponse,
-  createDesktopImageUploadSuccessResponse,
+  createDesktopArtifactUploadSuccessResponse,
   createIpcChannel,
   createIpcError,
   createIpcFailureResponse,
@@ -39,7 +39,7 @@ describe("desktop preload exposedApi bridge", () => {
 
   it("maps bridge input into desktop upload request envelope and invokes request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
-      createDesktopImageUploadSuccessResponse(
+      createDesktopArtifactUploadSuccessResponse(
         {
           sourceKind: "upload",
           storage: {
@@ -56,7 +56,7 @@ describe("desktop preload exposedApi bridge", () => {
     );
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-    const response = await api.uploadImage(
+    const response = await api.uploadArtifact(
       {
         fileName: " kitten.png ",
         mediaType: " image/png ",
@@ -71,9 +71,9 @@ describe("desktop preload exposedApi bridge", () => {
     expect(response.ok).toBe(true);
     expect(invoke).toHaveBeenCalledTimes(1);
     const [channel, request] = invoke.mock.calls[0] as [string, { operation: string; payload: { boundary: { host: string; source: string } } }];
-    expect(channel).toBe(DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value);
-    expect(request.operation).toBe("image.upload");
-    expect(request.payload.boundary).toEqual({ host: "desktop", source: "desktop.renderer.upload-form" });
+    expect(channel).toBe(DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value);
+    expect(request.operation).toBe("artifact.upload");
+    expect(request.payload.boundary).toEqual({ host: "desktop", source: "desktop.renderer.artifact-upload.form" });
   });
 
   it("maps artifact browse and media-view operations to separate request channels", async () => {
@@ -146,12 +146,12 @@ describe("desktop preload exposedApi bridge", () => {
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
     await expect(
-      api.uploadImage({
+      api.uploadArtifact({
         fileName: "cat.png",
         mediaType: "image/png",
         bytes: new Uint8Array([1]),
       }),
-    ).rejects.toThrow("Received invalid desktop image upload IPC response envelope.");
+    ).rejects.toThrow("Received invalid desktop artifact upload IPC response envelope.");
   });
 });
 

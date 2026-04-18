@@ -11,7 +11,7 @@ const CONTRACT_FAMILIES = [
   "config",
   "dataset",
   "host",
-  "imageUpload",
+  "artifactUpload",
   "ingestion",
   "ipc",
   "lineage",

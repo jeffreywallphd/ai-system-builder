@@ -104,17 +104,17 @@ Contributors should:
 - It composes pages/features/components in a renderer-oriented structure and calls server APIs over HTTP through feature-local clients.
 - It should remain structurally distinct from the desktop preload-backed path and avoid duplicating host logic.
 - The initial server-backed image vertical slice includes both upload and read-side artifact browse/view behavior:
-  - thin-client UI calls server HTTP contracts for image upload plus image-backed artifact browse/detail/content-read,
+  - thin-client UI calls server HTTP contracts for artifact upload plus image-backed artifact browse/detail/content-read,
   - the Express adapter stays thin and delegates to shared application use cases,
   - shared server host composition continues to own storage/persistence capability wiring for both write and read flows.
-- Multipart parsing for that server-backed image-upload path stays in the Express transport adapter and should parse
+- Multipart parsing for that server-backed artifact-upload path stays in the Express transport adapter and should parse
   the live request stream with Busboy rather than buffering the full request body before parsing.
 
 ## Practical boundaries
 
 - Apps own framework bootstrap surfaces (for example `express()` instantiation and app-level middleware).
 - Host modules compose dependencies and register transport adapters against app-provided ports.
-- Transport adapter registration should be feature-sliced (for example `image-upload/...`) with only tiny top-level aggregators.
+- Transport adapter registration should be feature-sliced (for example `artifact-upload/...`) with only tiny top-level aggregators.
 - Host modules may depend on application/contracts/adapters.
 - Transport adapters may be selected by hosts.
 - Hosts may compose multiple specialized storage adapter families (artifact-object plus artifact-repo providers) when task scope requires it.

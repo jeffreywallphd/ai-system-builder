@@ -1,2 +1,2 @@
 export * from "./registerExpressApi";
-export * from "./image-upload";
+export * from "./artifact-upload";

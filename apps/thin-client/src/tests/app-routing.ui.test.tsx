@@ -47,7 +47,7 @@ describe("thin-client routing and page composition", () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Image upload");
+    expect(container.textContent).toContain("Artifact upload");
     expect(container.textContent).toContain("Data Artifact Browser");
     expect(window.location.pathname).toBe("/artifacts");
   });

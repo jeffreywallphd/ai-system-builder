@@ -39,7 +39,7 @@ app.whenReady().then(async () => {
     },
   });
 
-  desktopHost.registerImageUploadIpc({
+  desktopHost.registerArtifactUploadIpc({
     ipcMain,
     storageRootDirectory,
   });

@@ -26,9 +26,12 @@ import {
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_OPERATION,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_RESPONSE_CHANNEL,
-  DESKTOP_IMAGE_UPLOAD_OPERATION,
-  DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
-  DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_UPLOAD_OPERATION,
+  DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_OPERATION,
+  DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UPLOAD_RESPONSE_CHANNEL,
   createDesktopArtifactBrowseRequest,
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactMediaViewRequest,
@@ -38,7 +41,8 @@ import {
   createDesktopArtifactSourceVerifyRequest,
   createDesktopArtifactRegisterFromRepoRequest,
   createDesktopArtifactLocalizeFromRepoRequest,
-  createDesktopImageUploadRequest,
+  createDesktopArtifactUploadRequest,
+  createDesktopArtifactUploadPolicyReadRequest,
   type DesktopArtifactBrowseRequest,
   type DesktopArtifactBrowseResponse,
   type DesktopArtifactContentReadRequest,
@@ -57,8 +61,9 @@ import {
   type DesktopArtifactRegisterFromRepoResponse,
   type DesktopArtifactLocalizeFromRepoRequest,
   type DesktopArtifactLocalizeFromRepoResponse,
-  type DesktopImageUploadRequest,
-  type DesktopImageUploadResponse,
+  type DesktopArtifactUploadRequest,
+  type DesktopArtifactUploadResponse,
+  type DesktopArtifactUploadPolicyReadResponse,
   DESKTOP_HUGGING_FACE_TOKEN_GET_OPERATION,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_GET_RESPONSE_CHANNEL,
@@ -86,14 +91,14 @@ import {
   type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
 } from "../../../../modules/contracts/ipc";
 
-const DEFAULT_UPLOAD_SOURCE = "desktop.renderer.upload-form";
+const DEFAULT_UPLOAD_SOURCE = "desktop.renderer.artifact-upload.form";
 const DEFAULT_ARTIFACT_SOURCE = "desktop.renderer.artifact-browser";
 
 export interface IpcRendererInvokePort {
   invoke: (channel: string, request: unknown) => Promise<unknown>;
 }
 
-export interface DesktopImageUploadBridgeInput {
+export interface DesktopArtifactUploadBridgeInput {
   fileName: string;
   mediaType: string;
   bytes: Uint8Array;
@@ -103,46 +108,49 @@ export interface DesktopArtifactBrowserLocator {
   storageKey: string;
 }
 
-export interface DesktopImageUploadBridgeContext {
+export interface DesktopArtifactUploadBridgeContext {
   requestId?: string;
   correlationId?: string;
 }
 
 export interface DesktopPreloadApi {
   getHuggingFaceTokenStatus: (
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopHuggingFaceTokenGetResponse>;
   setHuggingFaceToken: (
     input: { token: string },
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopHuggingFaceTokenSetResponse>;
   clearHuggingFaceToken: (
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopHuggingFaceTokenClearResponse>;
   browseHuggingFaceNamespaceDatasets: (
     input: { namespace: string },
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopHuggingFaceNamespaceDatasetsBrowseResponse>;
   browseHuggingFaceDatasetParquetFiles: (
     input: { repository: string; revision?: string },
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopHuggingFaceDatasetParquetFilesBrowseResponse>;
-  uploadImage: (
-    input: DesktopImageUploadBridgeInput,
-    context?: DesktopImageUploadBridgeContext,
-  ) => Promise<DesktopImageUploadResponse>;
-  browseArtifacts: (context?: DesktopImageUploadBridgeContext) => Promise<DesktopArtifactBrowseResponse>;
+  uploadArtifact: (
+    input: DesktopArtifactUploadBridgeInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopArtifactUploadResponse>;
+  getArtifactUploadPolicy: (
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
+  browseArtifacts: (context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopArtifactBrowseResponse>;
   readArtifactDetail: (
     locator: DesktopArtifactBrowserLocator,
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactReadResponse>;
   readArtifactContentDescriptor: (
     locator: DesktopArtifactBrowserLocator,
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactContentReadResponse>;
   readArtifactViewerMedia: (
     locator: DesktopArtifactBrowserLocator,
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactMediaViewResponse>;
   publishArtifactToRepo: (
     input: {
@@ -155,19 +163,19 @@ export interface DesktopPreloadApi {
       };
       mediaType?: string;
     },
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactPublishResponse>;
   verifyPublishedArtifactBacking: (
     input: {
       artifactId: string;
     },
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactPublishVerifyResponse>;
   verifyImportedArtifactSourceBacking: (
     input: {
       artifactId: string;
     },
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactSourceVerifyResponse>;
   registerArtifactFromRepo: (
     input: {
@@ -180,13 +188,13 @@ export interface DesktopPreloadApi {
       artifactKind?: "image";
       mediaType?: string;
     },
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactRegisterFromRepoResponse>;
   localizeArtifactFromRepo: (
     input: {
       artifactId: string;
     },
-    context?: DesktopImageUploadBridgeContext,
+    context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactLocalizeFromRepoResponse>;
 }
 
@@ -317,8 +325,8 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async uploadImage(input, context = {}) {
-      const request: DesktopImageUploadRequest = createDesktopImageUploadRequest(
+    async uploadArtifact(input, context = {}) {
+      const request: DesktopArtifactUploadRequest = createDesktopArtifactUploadRequest(
         {
           fileName: input.fileName,
           mediaType: input.mediaType,
@@ -334,14 +342,36 @@ export function createDesktopPreloadApi(
         },
       );
       const response = await dependencies.ipcRenderer.invoke(
-        DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value,
+        DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
         request,
       );
 
-      return assertDesktopEnvelopeResponse<DesktopImageUploadResponse>(response, {
-        operation: DESKTOP_IMAGE_UPLOAD_OPERATION,
-        channel: DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL.value,
-        message: "Received invalid desktop image upload IPC response envelope.",
+      return assertDesktopEnvelopeResponse<DesktopArtifactUploadResponse>(response, {
+        operation: DESKTOP_ARTIFACT_UPLOAD_OPERATION,
+        channel: DESKTOP_ARTIFACT_UPLOAD_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop artifact upload IPC response envelope.",
+      });
+    },
+
+    async getArtifactUploadPolicy(context = {}) {
+      const request = createDesktopArtifactUploadPolicyReadRequest(
+        {
+          boundary: {
+            host: "desktop",
+            source: uploadSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactUploadPolicyReadResponse>(response, {
+        operation: DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_OPERATION,
+        channel: DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop artifact upload policy IPC response envelope.",
       });
     },
 

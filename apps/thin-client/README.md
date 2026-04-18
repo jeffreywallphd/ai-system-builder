@@ -6,9 +6,9 @@ Current scope:
 
 - minimal React bootstrap (`src/main.tsx`, `src/App.tsx`)
 - page-first composition (`src/pages/HomePage.tsx`)
-- feature-local image upload workflow under `src/features/image-upload/`
+- feature-local artifact upload workflow under `src/features/artifact-upload/`
 - feature-local artifact browser workflow under `src/features/artifact-browser/`
-- fetch-based HTTP image-upload client that calls the server API route (`/api/image/upload`)
+- fetch-based HTTP artifact-upload client that calls the server API route (`/api/artifact/upload`)
 - artifact publish flow that calls `POST /api/artifact/publish` and surfaces published backing details
 - artifact publish verification/re-check flow that calls `POST /api/artifact/publish/verify`
 - imported-source verification/re-check flow that calls `POST /api/artifact/source/verify`
@@ -26,7 +26,7 @@ Current scope:
 - Public repositories may work without a token depending on repository visibility/provider policy.
 - Missing/invalid token and access-denied responses are surfaced as explicit auth-required/access-denied errors in UI messaging.
 
-The thin-client image-upload path intentionally reuses the server transport + shared application use
+The thin-client artifact-upload path intentionally reuses the server transport + shared application use
 case path rather than desktop preload wiring.
 
 ## Development wiring
@@ -39,7 +39,7 @@ case path rather than desktop preload wiring.
 
 ## Upload transport
 
-- Thin-client image upload submits browser-native `multipart/form-data`.
+- Thin-client artifact upload submits browser-native `multipart/form-data`.
 - The upload form payload uses:
   - `file`: binary file body
   - `source`: upload source identifier

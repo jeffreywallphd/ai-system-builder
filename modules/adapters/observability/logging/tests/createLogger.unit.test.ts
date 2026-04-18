@@ -25,7 +25,7 @@ describe("createLogger", () => {
       event: "upload.started",
       message: "Upload started",
       component: "",
-      useCase: "store-image-upload",
+      useCase: "store-artifact-upload",
     };
 
     await logger.log(event);

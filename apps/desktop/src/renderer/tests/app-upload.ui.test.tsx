@@ -39,9 +39,9 @@ describe("desktop renderer artifact workflow page", () => {
   });
 
   it("uploads and refreshes artifact listing on the dedicated Artifacts page", async () => {
-    const uploadImage = vi.fn().mockResolvedValue({
-      operation: "image.upload",
-      channel: "ipc.image.upload.response",
+    const uploadArtifact = vi.fn().mockResolvedValue({
+      operation: "artifact.upload",
+      channel: "ipc.artifact.upload.response",
       ok: true,
       value: {
         descriptor: {
@@ -67,7 +67,7 @@ describe("desktop renderer artifact workflow page", () => {
       });
 
     window.desktopApi = {
-      uploadImage,
+      uploadArtifact,
       browseArtifacts,
       readArtifactDetail: vi.fn().mockResolvedValue({
         operation: "artifact.read",
@@ -192,7 +192,7 @@ describe("desktop renderer artifact workflow page", () => {
       (form as HTMLFormElement).dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(uploadImage).toHaveBeenCalledTimes(1);
+    expect(uploadArtifact).toHaveBeenCalledTimes(1);
     expect(browseArtifacts).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("cat.png");
   });

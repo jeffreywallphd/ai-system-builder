@@ -1,7 +1,7 @@
 import {
-  registerImageUploadIpc,
-  type RegisterImageUploadIpcDependencies,
-} from "./image-upload/registerImageUploadIpc";
+  registerArtifactUploadIpc,
+  type RegisterArtifactUploadIpcDependencies,
+} from "./artifact-upload/registerArtifactUploadIpc";
 import type { IpcMainHandlePort } from "./ipcMainHandlePort";
 import {
   registerArtifactBrowserIpc,
@@ -13,7 +13,7 @@ export interface RegisterElectronIpcDependencies {
   getHuggingFaceTokenStatus: RegisterArtifactBrowserIpcDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
-  storeImageUploadUseCase: RegisterImageUploadIpcDependencies["storeImageUploadUseCase"];
+  storeArtifactUploadUseCase: RegisterArtifactUploadIpcDependencies["storeArtifactUploadUseCase"];
   browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactContentUseCase"];
@@ -30,9 +30,9 @@ export interface RegisterElectronIpcDependencies {
 export function registerElectronIpc(
   dependencies: RegisterElectronIpcDependencies,
 ): void {
-  registerImageUploadIpc({
+  registerArtifactUploadIpc({
     ipcMain: dependencies.ipcMain,
-    storeImageUploadUseCase: dependencies.storeImageUploadUseCase,
+    storeArtifactUploadUseCase: dependencies.storeArtifactUploadUseCase,
   });
 
   registerArtifactBrowserIpc({
