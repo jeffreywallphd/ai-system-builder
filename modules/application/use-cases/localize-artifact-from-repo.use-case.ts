@@ -110,6 +110,7 @@ export class LocalizeArtifactFromRepoUseCase {
     if (!storeResult.ok) {
       return storeResult;
     }
+    const localizedSizeBytes = storeResult.value.sizeBytes ?? retrieveResult.value.content.byteLength;
 
     const updatedImported = importedSource.withVerification(
       {
@@ -146,7 +147,7 @@ export class LocalizeArtifactFromRepoUseCase {
         localObject: {
           key: storeResult.value.key,
           mediaType: storeResult.value.mediaType,
-          sizeBytes: storeResult.value.sizeBytes,
+          sizeBytes: localizedSizeBytes,
         },
         source: {
           provider: target.provider,
