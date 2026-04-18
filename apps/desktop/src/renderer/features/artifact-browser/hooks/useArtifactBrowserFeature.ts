@@ -9,6 +9,7 @@ import type {
   DesktopArtifactBrowseItem,
   DesktopArtifactContentDescriptor,
   DesktopArtifactDetail,
+  DesktopLocalizedArtifactFromRepo,
   DesktopPublishedBacking,
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
@@ -22,7 +23,9 @@ export interface UseArtifactBrowserFeatureResult {
   imageViewUrl?: string;
   publishState: ArtifactBrowserViewState;
   registerState: ArtifactBrowserViewState;
+  localizeState: ArtifactBrowserViewState;
   publishedBacking?: DesktopPublishedBacking;
+  localizedArtifact?: DesktopLocalizedArtifactFromRepo;
   publishForm: UseArtifactBrowserPublishLogicResult["publishForm"];
   registerForm: {
     repository: string;
@@ -36,6 +39,7 @@ export interface UseArtifactBrowserFeatureResult {
   refreshArtifacts: () => Promise<void>;
   publishArtifactToHuggingFace: () => Promise<void>;
   registerArtifactFromHuggingFace: () => Promise<void>;
+  localizeArtifactFromRepo: () => Promise<void>;
   recheckPublishedBacking: () => Promise<void>;
   setRepository: (value: string) => void;
   setPathInRepo: (value: string) => void;
@@ -60,6 +64,8 @@ export function useArtifactBrowserFeature(
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [localizeState, setLocalizeState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [localizedArtifact, setLocalizedArtifact] = useState<DesktopLocalizedArtifactFromRepo | undefined>();
   const [registerRepository, setRegisterRepository] = useState("");
   const [registerPathInRepo, setRegisterPathInRepo] = useState("");
   const [registerRevision, setRegisterRevision] = useState("main");
@@ -161,6 +167,31 @@ export function useArtifactBrowserFeature(
     }
   }
 
+  async function localizeArtifactFromRepo(): Promise<void> {
+    if (!selectedStorageKey) {
+      setLocalizeState({ status: "error", message: "Select an artifact before localizing." });
+      return;
+    }
+
+    setLocalizeState({ status: "loading", message: "Localizing imported artifact bytes..." });
+    try {
+      const localized = await artifactClient.localizeArtifactFromRepo({
+        artifactId: selectedStorageKey,
+      });
+      setLocalizedArtifact(localized);
+      await selectArtifact(selectedStorageKey);
+      setLocalizeState({
+        status: "success",
+        message: `Localized ${localized.artifactId} to local object storage.`,
+      });
+    } catch (error) {
+      setLocalizeState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to localize imported artifact.",
+      });
+    }
+  }
+
   return {
     items,
     selectedStorageKey,
@@ -169,7 +200,9 @@ export function useArtifactBrowserFeature(
     imageViewUrl,
     publishState: publishLogic.publishState,
     registerState,
+    localizeState,
     publishedBacking: publishLogic.publishedBacking,
+    localizedArtifact,
     publishForm: publishLogic.publishForm,
     registerForm: {
       repository: registerRepository,
@@ -183,6 +216,7 @@ export function useArtifactBrowserFeature(
     refreshArtifacts,
     publishArtifactToHuggingFace: publishLogic.publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
+    localizeArtifactFromRepo,
     recheckPublishedBacking: publishLogic.recheckPublishedBacking,
     setRepository: publishLogic.setRepository,
     setPathInRepo: publishLogic.setPathInRepo,

@@ -13,3 +13,4 @@ export * from "./artifact-publish-api-contract";
 export * from "./artifact-publish-verify-api-contract";
 
 export * from "./artifact-register-from-repo-api-contract";
+export * from "./artifact-localize-from-repo-api-contract";

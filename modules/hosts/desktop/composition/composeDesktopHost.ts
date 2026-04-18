@@ -1,6 +1,7 @@
 import type { LoggingPort } from "../../../application/ports/logging";
 import {
   BrowseArtifactsUseCase,
+  LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
@@ -142,6 +143,12 @@ export function composeDesktopHost(
         artifactCatalogAppend: artifactCatalog,
         now: options.now,
       });
+      const localizeArtifactFromRepo = new LocalizeArtifactFromRepoUseCase({
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        artifactStorage: storage,
+        now: options.now,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -153,6 +160,7 @@ export function composeDesktopHost(
         publishArtifactToRepoUseCase: publishArtifactToRepo,
         verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
+        localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
       });
     },
   };

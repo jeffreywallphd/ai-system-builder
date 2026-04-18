@@ -3,6 +3,7 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import {
   BrowseArtifactsUseCase,
   HasArtifactInRepoUseCase,
+  LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
@@ -162,6 +163,12 @@ export function composeServerHost(
         artifactCatalogAppend: artifactCatalog,
         now: options.now,
       });
+      const localizeArtifactFromRepo = new LocalizeArtifactFromRepoUseCase({
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        artifactStorage: storage,
+        now: options.now,
+      });
 
       registerExpressApi({
         app: registerOptions.app,
@@ -175,6 +182,7 @@ export function composeServerHost(
         publishArtifactToRepoUseCase: publishArtifactToRepo,
         verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
+        localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
       });
     },
   };

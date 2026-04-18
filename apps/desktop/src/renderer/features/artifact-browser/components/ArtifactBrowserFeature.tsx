@@ -53,7 +53,9 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     imageViewUrl,
     publishState,
     registerState,
+    localizeState,
     publishedBacking,
+    localizedArtifact,
     publishForm,
     registerForm,
     viewState,
@@ -61,6 +63,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     refreshArtifacts,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
+    localizeArtifactFromRepo,
     recheckPublishedBacking,
     setRepository,
     setPathInRepo,
@@ -133,7 +136,43 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <dd>{content.availability}</dd>
               <dt>Retrieval</dt>
               <dd>{content.retrieval}</dd>
+              <dt>Local bytes</dt>
+              <dd>{content.availability === "available" ? "present" : "missing"}</dd>
             </dl>
+          ) : null}
+
+          {detail?.metadata?.importedSourceBacking ? (
+            <section className="ui-stack ui-stack--sm">
+              <h3>Imported Source Backing</h3>
+              <dl className="ui-grid ui-grid--two">
+                <dt>Provider</dt>
+                <dd>{detail.metadata.importedSourceBacking.target.provider}</dd>
+                <dt>Repo</dt>
+                <dd>{detail.metadata.importedSourceBacking.target.repository}</dd>
+                <dt>Path</dt>
+                <dd>{detail.metadata.importedSourceBacking.target.path}</dd>
+                <dt>Revision</dt>
+                <dd>{detail.metadata.importedSourceBacking.target.revision ?? "main"}</dd>
+                <dt>Source verified</dt>
+                <dd>{detail.metadata.importedSourceBacking.verification.exists ? "yes" : "no"}</dd>
+              </dl>
+              {content?.availability === "unavailable" ? (
+                <button
+                  className="ui-button"
+                  type="button"
+                  onClick={() => void localizeArtifactFromRepo()}
+                  disabled={localizeState.status === "loading"}
+                >
+                  {localizeState.status === "loading" ? "Localizing..." : "Localize/download artifact"}
+                </button>
+              ) : null}
+              {localizeState.message ? (
+                <p role={localizeState.status === "error" ? "alert" : "status"}>{localizeState.message}</p>
+              ) : null}
+              {localizedArtifact ? (
+                <p role="status">Localized bytes key: {localizedArtifact.localObject.key}</p>
+              ) : null}
+            </section>
           ) : null}
 
           {imageViewUrl && content?.availability === "available" ? (

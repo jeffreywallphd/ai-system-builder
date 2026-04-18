@@ -40,7 +40,12 @@ describe("PublishArtifactToRepoUseCase", () => {
         ok: true,
         value: { binding: request.binding },
       })),
-      readArtifactStorageBindings: testDouble.fn(),
+      readArtifactStorageBindings: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          bindings: [],
+        },
+      })),
     } as unknown as ArtifactStorageBindingPort;
 
     const useCase = new PublishArtifactToRepoUseCase({
@@ -100,6 +105,9 @@ describe("PublishArtifactToRepoUseCase", () => {
         },
       },
     });
+    expect(artifactBindingStorage.readArtifactStorageBindings).toHaveBeenCalledWith({
+      artifactId: "uploads/a.png",
+    });
   });
 
   it("upserts published backing records when the same artifact is published again", async () => {
@@ -129,7 +137,12 @@ describe("PublishArtifactToRepoUseCase", () => {
         ok: true,
         value: { binding: request.binding },
       })),
-      readArtifactStorageBindings: testDouble.fn(),
+      readArtifactStorageBindings: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          bindings: [],
+        },
+      })),
     } as unknown as ArtifactStorageBindingPort;
 
     const useCase = new PublishArtifactToRepoUseCase({

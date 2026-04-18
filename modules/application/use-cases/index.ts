@@ -14,3 +14,4 @@ export * from "./publish-artifact-to-repo.use-case";
 export * from "./verify-published-artifact-backing.use-case";
 
 export * from "./register-artifact-from-repo.use-case";
+export * from "./localize-artifact-from-repo.use-case";

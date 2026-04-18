@@ -1,6 +1,7 @@
 import type {
   HasArtifactInRepoCommand,
   HasArtifactInRepoUseCasePort,
+  LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
   StoreArtifactInRepoCommand,
   StoreArtifactInRepoUseCasePort,
@@ -14,6 +15,9 @@ import {
   createApiArtifactPublishVerifyFailureResponse,
   createApiArtifactPublishVerifyRequest,
   createApiArtifactPublishVerifySuccessResponse,
+  createApiArtifactLocalizeFromRepoFailureResponse,
+  createApiArtifactLocalizeFromRepoRequest,
+  createApiArtifactLocalizeFromRepoSuccessResponse,
   createApiArtifactRegisterFromRepoFailureResponse,
   createApiArtifactRegisterFromRepoRequest,
   createApiArtifactRegisterFromRepoSuccessResponse,
@@ -25,6 +29,7 @@ import {
   createApiArtifactRepoStoreSuccessResponse,
   type ApiArtifactPublishResponse,
   type ApiArtifactPublishVerifyResponse,
+  type ApiArtifactLocalizeFromRepoResponse,
   type ApiArtifactRegisterFromRepoResponse,
   type ApiArtifactRepoHasResponse,
   type ApiArtifactRepoStoreResponse,
@@ -64,6 +69,11 @@ interface ArtifactPublishVerifyApiRequestBody {
   source?: string;
 }
 
+interface ArtifactLocalizeFromRepoApiRequestBody {
+  artifactId: string;
+  source?: string;
+}
+
 interface ArtifactRegisterFromRepoApiRequestBody {
   target: {
     provider: string;
@@ -83,7 +93,14 @@ export interface ArtifactRepoExpressRequestLike {
 
 export interface ArtifactRepoExpressResponseLike {
   status: (statusCode: number) => ArtifactRepoExpressResponseLike;
-  json: (body: ApiArtifactRepoHasResponse | ApiArtifactRepoStoreResponse | ApiArtifactPublishResponse | ApiArtifactPublishVerifyResponse | ApiArtifactRegisterFromRepoResponse) => void;
+  json: (body:
+    | ApiArtifactRepoHasResponse
+    | ApiArtifactRepoStoreResponse
+    | ApiArtifactPublishResponse
+    | ApiArtifactPublishVerifyResponse
+    | ApiArtifactLocalizeFromRepoResponse
+    | ApiArtifactRegisterFromRepoResponse
+  ) => void;
 }
 
 export interface ArtifactRepoExpressRoutePort {
@@ -103,6 +120,7 @@ export interface RegisterArtifactRepoApiRoutesDependencies {
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
   registerArtifactFromRepoUseCase: Pick<RegisterArtifactFromRepoUseCase, "execute">;
+  localizeArtifactFromRepoUseCase: Pick<LocalizeArtifactFromRepoUseCase, "execute">;
 }
 
 function getRequestHeader(
@@ -190,7 +208,13 @@ function mapStatusCode(response: ApiArtifactRepoHasResponse | ApiArtifactRepoSto
   }
 }
 
-function mapPublishStatusCode(response: ApiArtifactPublishResponse | ApiArtifactPublishVerifyResponse | ApiArtifactRegisterFromRepoResponse): number {
+function mapPublishStatusCode(
+  response:
+    | ApiArtifactPublishResponse
+    | ApiArtifactPublishVerifyResponse
+    | ApiArtifactLocalizeFromRepoResponse
+    | ApiArtifactRegisterFromRepoResponse,
+): number {
   if (response.ok) {
     return 200;
   }
@@ -423,6 +447,45 @@ export function registerArtifactRepoApiRoutes(
     const apiResponse = result.ok
       ? createApiArtifactRegisterFromRepoSuccessResponse(result.value, context)
       : createApiArtifactRegisterFromRepoFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+        },
+      );
+
+    response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/artifact/localize-from-repo", async (request, response) => {
+    const context = mapRequestContext(request);
+    let apiRequest: ReturnType<typeof createApiArtifactLocalizeFromRepoRequest>;
+
+    try {
+      apiRequest = createApiArtifactLocalizeFromRepoRequest({
+        artifactId: (request.body as ArtifactLocalizeFromRepoApiRequestBody).artifactId ?? "",
+        source: normalizeSource((request.body as ArtifactLocalizeFromRepoApiRequestBody).source),
+      }, context);
+    } catch (error) {
+      const apiResponse = createApiArtifactLocalizeFromRepoFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid artifact localize-from-repo request.",
+        context,
+      );
+      response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.localizeArtifactFromRepoUseCase.execute({
+      artifactId: apiRequest.payload.artifactId,
+    });
+    const apiResponse = result.ok
+      ? createApiArtifactLocalizeFromRepoSuccessResponse(result.value, context)
+      : createApiArtifactLocalizeFromRepoFailureResponse(
         result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
           ? result.error.code
           : "internal",

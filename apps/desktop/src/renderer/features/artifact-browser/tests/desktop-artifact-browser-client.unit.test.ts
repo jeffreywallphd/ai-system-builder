@@ -51,6 +51,15 @@ describe("desktop artifact browser client", () => {
           verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
         },
       }),
+      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-local01",
+          localObject: { key: "artifacts/20260418000000-local01", sizeBytes: 3 },
+          source: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", locator: "openai/demo/images/cat.png" },
+          localizedAt: "2026-04-18T00:00:00.000Z",
+        },
+      }),
     };
 
     const createObjectURL = vi.fn().mockReturnValue("blob:desktop-preview");
@@ -119,6 +128,15 @@ describe("desktop artifact browser client", () => {
           verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
         },
       }),
+      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-local01",
+          localObject: { key: "artifacts/20260418000000-local01", sizeBytes: 3 },
+          source: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", locator: "openai/demo/images/cat.png" },
+          localizedAt: "2026-04-18T00:00:00.000Z",
+        },
+      }),
     };
 
     const createObjectURL = vi.fn().mockReturnValue("blob:desktop-preview");
@@ -156,6 +174,15 @@ describe("desktop artifact browser client", () => {
         value: {
           target: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", revision: "main", locator: "openai/demo/images/cat.png" },
           verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
+        },
+      }),
+      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-local01",
+          localObject: { key: "artifacts/20260418000000-local01", sizeBytes: 3 },
+          source: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", locator: "openai/demo/images/cat.png" },
+          localizedAt: "2026-04-18T00:00:00.000Z",
         },
       }),
     };
@@ -205,6 +232,24 @@ describe("desktop artifact browser client", () => {
           },
         },
       }),
+      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-local01",
+          localObject: { key: "artifacts/20260418000000-local01", sizeBytes: 3 },
+          source: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", locator: "openai/demo/images/cat.png" },
+          localizedAt: "2026-04-18T00:00:00.000Z",
+        },
+      }),
+      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-local01",
+          localObject: { key: "artifacts/20260418000000-local01", sizeBytes: 3 },
+          source: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", locator: "openai/demo/images/cat.png" },
+          localizedAt: "2026-04-18T00:00:00.000Z",
+        },
+      }),
     };
 
     const client = createDesktopArtifactBrowserClient();
@@ -216,5 +261,45 @@ describe("desktop artifact browser client", () => {
       artifactId: "uploads/cat.png",
     });
     expect(result.verification.exists).toBe(false);
+  });
+
+  it("localizes imported artifact bytes through preload localize bridge", async () => {
+    window.desktopApi = {
+      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
+      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-local01",
+          localObject: {
+            key: "artifacts/20260418000000-local01",
+            mediaType: "image/png",
+            sizeBytes: 3,
+          },
+          source: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/cat.png",
+            locator: "openai/demo/images/cat.png",
+          },
+          localizedAt: "2026-04-18T00:00:00.000Z",
+        },
+      }),
+    };
+
+    const client = createDesktopArtifactBrowserClient();
+    const result = await client.localizeArtifactFromRepo({
+      artifactId: "artifacts/20260418000000-local01",
+    });
+
+    expect(window.desktopApi.localizeArtifactFromRepo).toHaveBeenCalledWith({
+      artifactId: "artifacts/20260418000000-local01",
+    });
+    expect(result.localObject.key).toBe("artifacts/20260418000000-local01");
   });
 });

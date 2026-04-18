@@ -64,6 +64,23 @@ export interface ThinClientRegisteredArtifactFromRepo {
   };
 }
 
+export interface ThinClientLocalizedArtifactFromRepo {
+  artifactId: string;
+  localObject: {
+    key: string;
+    mediaType?: string;
+    sizeBytes: number;
+  };
+  source: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator: string;
+  };
+  localizedAt: string;
+}
+
 export interface ArtifactBrowserApiClient {
   browseImageArtifacts: () => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
@@ -85,6 +102,9 @@ export interface ArtifactBrowserApiClient {
     revision?: string;
     mediaType?: string;
   }) => Promise<ThinClientRegisteredArtifactFromRepo>;
+  localizeArtifactFromRepo: (input: {
+    artifactId: string;
+  }) => Promise<ThinClientLocalizedArtifactFromRepo>;
 }
 
 interface ApiResponseEnvelope {
@@ -271,6 +291,29 @@ export function createApiArtifactBrowserClient(
         }
 
         return registered;
+      });
+    },
+
+    async localizeArtifactFromRepo(input): Promise<ThinClientLocalizedArtifactFromRepo> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/localize-from-repo"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          artifactId: input.artifactId,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const localized = value as ThinClientLocalizedArtifactFromRepo;
+        if (!localized || typeof localized !== "object") {
+          throw new Error("Artifact localize-from-repo response is missing localization information.");
+        }
+
+        return localized;
       });
     },
   };

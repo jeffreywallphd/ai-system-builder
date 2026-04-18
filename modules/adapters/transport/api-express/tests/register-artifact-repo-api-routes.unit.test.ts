@@ -72,7 +72,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       execute: testDouble.fn(async () => ({
         ok: true,
         value: {
-          artifactId: "imports/huggingface/openai/demo/main/artifacts/a.bin",
+          artifactId: "artifacts/20260418000000-import001",
           backing: {
             role: "imported-source",
             target: {
@@ -90,6 +90,27 @@ describe("registerArtifactRepoApiRoutes", () => {
         },
       })),
     };
+    const localizeArtifactFromRepoUseCase = {
+      execute: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-local01",
+          localObject: {
+            key: "artifacts/20260418000000-local01",
+            mediaType: "image/png",
+            sizeBytes: 3,
+          },
+          source: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "artifacts/a.bin",
+            revision: "main",
+            locator: "openai/demo/artifacts/a.bin",
+          },
+          localizedAt: "2026-04-18T00:00:00.000Z",
+        },
+      })),
+    };
 
     registerArtifactRepoApiRoutes({
       app,
@@ -98,14 +119,16 @@ describe("registerArtifactRepoApiRoutes", () => {
       publishArtifactToRepoUseCase,
       verifyPublishedArtifactBackingUseCase,
       registerArtifactFromRepoUseCase,
+      localizeArtifactFromRepoUseCase,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(5);
+    expect(app.post).toHaveBeenCalledTimes(6);
     expect(handlers.has("/api/artifact-repo/has")).toBe(true);
     expect(handlers.has("/api/artifact-repo/store")).toBe(true);
     expect(handlers.has("/api/artifact/publish")).toBe(true);
     expect(handlers.has("/api/artifact/publish/verify")).toBe(true);
     expect(handlers.has("/api/artifact/register-from-repo")).toBe(true);
+    expect(handlers.has("/api/artifact/localize-from-repo")).toBe(true);
 
     const response = {
       status: testDouble.fn(() => response),
@@ -179,6 +202,19 @@ describe("registerArtifactRepoApiRoutes", () => {
       mediaType: undefined,
     });
     expect(response.status).toHaveBeenCalledWith(200);
+
+    await handlers.get("/api/artifact/localize-from-repo")?.(
+      {
+        body: {
+          artifactId: "artifacts/20260418000000-local01",
+        },
+        headers: {},
+      },
+      response,
+    );
+    expect(localizeArtifactFromRepoUseCase.execute).toHaveBeenCalledWith({
+      artifactId: "artifacts/20260418000000-local01",
+    });
   });
 
   it("returns validation error envelope for invalid store payload", async () => {
@@ -196,6 +232,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
       registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
+      localizeArtifactFromRepoUseCase: { execute: testDouble.fn() },
     });
 
     const response = {
@@ -244,6 +281,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
       registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
+      localizeArtifactFromRepoUseCase: { execute: testDouble.fn() },
     });
 
     const response = {

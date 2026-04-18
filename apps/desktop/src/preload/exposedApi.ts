@@ -20,6 +20,9 @@ import {
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_OPERATION,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_OPERATION,
+  DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_RESPONSE_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_OPERATION,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
@@ -30,6 +33,7 @@ import {
   createDesktopArtifactPublishRequest,
   createDesktopArtifactPublishVerifyRequest,
   createDesktopArtifactRegisterFromRepoRequest,
+  createDesktopArtifactLocalizeFromRepoRequest,
   createDesktopImageUploadRequest,
   type DesktopArtifactBrowseRequest,
   type DesktopArtifactBrowseResponse,
@@ -45,6 +49,8 @@ import {
   type DesktopArtifactPublishVerifyResponse,
   type DesktopArtifactRegisterFromRepoRequest,
   type DesktopArtifactRegisterFromRepoResponse,
+  type DesktopArtifactLocalizeFromRepoRequest,
+  type DesktopArtifactLocalizeFromRepoResponse,
   type DesktopImageUploadRequest,
   type DesktopImageUploadResponse,
 } from "../../../../modules/contracts/ipc";
@@ -121,6 +127,12 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopImageUploadBridgeContext,
   ) => Promise<DesktopArtifactRegisterFromRepoResponse>;
+  localizeArtifactFromRepo: (
+    input: {
+      artifactId: string;
+    },
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopArtifactLocalizeFromRepoResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -355,6 +367,29 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_REGISTER_FROM_REPO_OPERATION,
         channel: DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact register-from-repo IPC response envelope.",
+      });
+    },
+
+    async localizeArtifactFromRepo(input, context = {}) {
+      const request: DesktopArtifactLocalizeFromRepoRequest = createDesktopArtifactLocalizeFromRepoRequest(
+        {
+          artifactId: input.artifactId,
+          boundary: {
+            host: "desktop",
+            source: artifactSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactLocalizeFromRepoResponse>(response, {
+        operation: DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_OPERATION,
+        channel: DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop artifact localize-from-repo IPC response envelope.",
       });
     },
   };

@@ -74,3 +74,4 @@
 
 
 - Server route surface now includes `POST /api/artifact/register-from-repo` delegating to shared application use-case orchestration.
+- Server route surface now also includes `POST /api/artifact/localize-from-repo` for explicit localization/download of imported artifacts through shared application orchestration.
