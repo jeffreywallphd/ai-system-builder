@@ -27,16 +27,21 @@ async function createMainWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  const storageRootDirectory = path.join(app.getPath("userData"), "artifacts");
   const desktopHost = composeDesktopHost({
     logging: {
       verbosity: process.env.LOG_VERBOSITY,
       level: "info",
     },
+    artifactRepo: {
+      huggingFaceAccessToken: process.env.HF_TOKEN ?? process.env.HUGGING_FACE_TOKEN,
+      huggingFaceTokenConfigFilePath: path.join(storageRootDirectory, "config", "hugging-face-token.json"),
+    },
   });
 
   desktopHost.registerImageUploadIpc({
     ipcMain,
-    storageRootDirectory: path.join(app.getPath("userData"), "artifacts"),
+    storageRootDirectory,
   });
 
   await createMainWindow();

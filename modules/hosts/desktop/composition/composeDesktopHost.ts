@@ -24,6 +24,10 @@ import {
 } from "../../../adapters/storage/filesystem";
 import { createHuggingFaceArtifactRepoStorageAdapter } from "../../../adapters/storage/huggingface";
 import {
+  createHuggingFaceTokenConfigStore,
+  type HuggingFaceTokenStatus,
+} from "../../shared/huggingFaceTokenConfigStore";
+import {
   registerElectronIpc,
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
@@ -43,6 +47,7 @@ export interface ComposeDesktopHostOptions {
   now?: () => string;
   artifactRepo?: {
     huggingFaceAccessToken?: string;
+    huggingFaceTokenConfigFilePath?: string;
     huggingFaceFetchImplementation?: typeof fetch;
   };
 }
@@ -55,6 +60,9 @@ export interface RegisterDesktopImageUploadIpcOptions {
 export interface DesktopHostComposition {
   loggingPort: LoggingPort;
   loggingConfig: LoggingConfig;
+  getHuggingFaceTokenStatus: () => HuggingFaceTokenStatus;
+  setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
+  clearHuggingFaceToken: () => HuggingFaceTokenStatus;
   registerImageUploadIpc: (options: RegisterDesktopImageUploadIpcOptions) => void;
 }
 
@@ -75,10 +83,23 @@ export function composeDesktopHost(
     sink: options.logSink,
     now: options.now,
   });
+  const tokenConfigStore = createHuggingFaceTokenConfigStore({
+    filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/desktop/hugging-face-token.json",
+    fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
+  });
 
   return {
     loggingPort,
     loggingConfig,
+    getHuggingFaceTokenStatus() {
+      return tokenConfigStore.getStatus();
+    },
+    setHuggingFaceToken(token: string) {
+      return tokenConfigStore.setToken(token);
+    },
+    clearHuggingFaceToken() {
+      return tokenConfigStore.clearToken();
+    },
     registerImageUploadIpc(registerOptions) {
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
@@ -91,7 +112,7 @@ export function composeDesktopHost(
           {
             provider: "huggingface",
             adapter: createHuggingFaceArtifactRepoStorageAdapter({
-              accessToken: options.artifactRepo?.huggingFaceAccessToken,
+              accessTokenProvider: () => tokenConfigStore.getToken(),
               fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
             }),
           },
@@ -160,6 +181,9 @@ export function composeDesktopHost(
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
+        getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
+        setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
+        clearHuggingFaceToken: () => tokenConfigStore.clearToken(),
         storeImageUploadUseCase,
         browseArtifactsUseCase: browseArtifacts,
         readArtifactDetailUseCase: readArtifactDetail,

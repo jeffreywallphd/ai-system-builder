@@ -101,7 +101,7 @@ export function useArtifactBrowserPublishLogic<TDetail extends ArtifactDetailWit
       return message;
     }
 
-    return `${message} This Hugging Face repository may require an access token. Configure a Hugging Face token in the host/server environment to access private or gated repos.`;
+    return `${message} This Hugging Face repository may require an access token. Configure a Hugging Face token in this page's token settings to access private or gated repos.`;
   };
 
   const [publishState, setPublishState] = useState<ArtifactBrowserViewState>({ status: "idle" });

@@ -78,6 +78,30 @@ describe("composeServerHost", () => {
     expect(result.value.exists).toBe(false);
   });
 
+  it("uses updated host token configuration for Hugging Face store operations", async () => {
+    const hubClient = {
+      fileExists: testDouble.fn(async () => true),
+      uploadFile: testDouble.fn(async () => undefined),
+      downloadFile: testDouble.fn(async () => new Response(new Uint8Array([1]), { status: 200 })),
+    };
+    const host = composeServerHost({
+      artifactRepo: {
+        huggingFaceHubClient: hubClient,
+      },
+    });
+    host.setHuggingFaceToken("hf_token_updated");
+    await host.artifactRepoStorage.storeArtifactInRepo({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/a.png",
+      },
+      content: new Uint8Array([1, 2, 3]),
+    });
+    const uploadCall = hubClient.uploadFile.mock.calls[0]?.[0] as { accessToken?: string };
+    expect(uploadCall.accessToken).toBe("hf_token_updated");
+  });
+
   it("registers server image upload routes using a provided app port without creating express", () => {
     const app = {
       post: testDouble.fn(),
@@ -91,14 +115,15 @@ describe("composeServerHost", () => {
       storageRootDirectory: "/tmp/server-image-upload-test",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(11);
-    expect(app.get).toHaveBeenCalledTimes(1);
+    expect(app.post).toHaveBeenCalledTimes(12);
+    expect(app.get).toHaveBeenCalledTimes(2);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/image/upload",
       "/api/artifact/browse",
       "/api/artifact/read",
       "/api/artifact/content/read",
+      "/api/config/huggingface-token",
       "/api/artifact-repo/has",
       "/api/artifact-repo/store",
       "/api/artifact/publish",
@@ -108,6 +133,6 @@ describe("composeServerHost", () => {
       "/api/artifact/localize-from-repo",
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
-    expect(registeredGetPaths).toEqual(["/api/artifact/media/view"]);
+    expect(registeredGetPaths).toEqual(["/api/artifact/media/view", "/api/config/huggingface-token"]);
   });
 });

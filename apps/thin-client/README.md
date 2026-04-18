@@ -57,3 +57,11 @@ From this workspace directly:
 - `npm run dev`
 - `npm run build`
 - `npm run preview`
+
+
+## Hugging Face token configuration UI
+
+- Artifact Browser now includes a **Hugging Face token** section that shows configured/not-configured status and masked token state.
+- Use **Save token** to configure/update token and **Clear token** to remove it.
+- Token source of truth is server-side config (`/api/config/huggingface-token`), not browser-local state.
+- Auth-required artifact errors now direct users to this in-product token settings path.

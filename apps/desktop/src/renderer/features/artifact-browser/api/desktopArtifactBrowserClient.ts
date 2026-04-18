@@ -7,9 +7,13 @@ import {
   type DesktopLocalizedArtifactFromRepo,
   type DesktopPublishedBacking,
   type DesktopRegisteredArtifactFromRepo,
+  type DesktopHuggingFaceTokenStatus,
 } from "../../../lib/desktopApi";
 
 export interface DesktopArtifactBrowserClient {
+  getHuggingFaceTokenStatus: () => Promise<DesktopHuggingFaceTokenStatus>;
+  setHuggingFaceToken: (input: { token: string }) => Promise<DesktopHuggingFaceTokenStatus>;
+  clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
   browseImageArtifacts: () => Promise<DesktopArtifactBrowseItem[]>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
@@ -59,6 +63,30 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
   const desktopApi = getDesktopApi();
 
   return {
+    async getHuggingFaceTokenStatus() {
+      return ensureSuccess(
+        await desktopApi.getHuggingFaceTokenStatus(),
+        (value) => value as DesktopHuggingFaceTokenStatus,
+        "Failed to read Hugging Face token status.",
+      );
+    },
+
+    async setHuggingFaceToken(input) {
+      return ensureSuccess(
+        await desktopApi.setHuggingFaceToken({ token: input.token }),
+        (value) => value as DesktopHuggingFaceTokenStatus,
+        "Failed to store Hugging Face token.",
+      );
+    },
+
+    async clearHuggingFaceToken() {
+      return ensureSuccess(
+        await desktopApi.clearHuggingFaceToken(),
+        (value) => value as DesktopHuggingFaceTokenStatus,
+        "Failed to clear Hugging Face token.",
+      );
+    },
+
     async browseImageArtifacts() {
       return ensureSuccess(
         await desktopApi.browseArtifacts(),

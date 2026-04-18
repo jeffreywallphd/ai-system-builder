@@ -111,7 +111,20 @@ export interface ArtifactRepoExpressResponseLike {
     | ApiArtifactSourceVerifyResponse
     | ApiArtifactLocalizeFromRepoResponse
     | ApiArtifactRegisterFromRepoResponse
+    | HuggingFaceTokenConfigApiResponse
   ) => void;
+}
+
+interface HuggingFaceTokenConfigApiResponse {
+  ok: boolean;
+  value?: {
+    configured: boolean;
+    maskedToken?: string;
+  };
+  error?: {
+    code: "validation" | "internal";
+    message: string;
+  };
 }
 
 export interface ArtifactRepoExpressRoutePort {
@@ -122,10 +135,27 @@ export interface ArtifactRepoExpressRoutePort {
       response: ArtifactRepoExpressResponseLike,
     ) => Promise<void>,
   ) => void;
+  get?: (
+    path: string,
+    handler: (
+      request: ArtifactRepoExpressRequestLike,
+      response: ArtifactRepoExpressResponseLike,
+    ) => Promise<void>,
+  ) => void;
+  delete?: (
+    path: string,
+    handler: (
+      request: ArtifactRepoExpressRequestLike,
+      response: ArtifactRepoExpressResponseLike,
+    ) => Promise<void>,
+  ) => void;
 }
 
 export interface RegisterArtifactRepoApiRoutesDependencies {
   app: ArtifactRepoExpressRoutePort;
+  getHuggingFaceTokenStatus: () => { configured: boolean; maskedToken?: string };
+  setHuggingFaceToken: (token: string) => { configured: boolean; maskedToken?: string };
+  clearHuggingFaceToken: () => { configured: boolean; maskedToken?: string };
   hasArtifactInRepoUseCase: HasArtifactInRepoUseCasePort;
   storeArtifactInRepoUseCase: StoreArtifactInRepoUseCasePort;
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
@@ -294,6 +324,44 @@ function mapStoreResultToApiResponse(
 export function registerArtifactRepoApiRoutes(
   dependencies: RegisterArtifactRepoApiRoutesDependencies,
 ): void {
+  dependencies.app.get?.("/api/config/huggingface-token", async (_request, response) => {
+    const apiResponse: HuggingFaceTokenConfigApiResponse = {
+      ok: true,
+      value: dependencies.getHuggingFaceTokenStatus(),
+    };
+    response.status(200).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/config/huggingface-token", async (request, response) => {
+    try {
+      const token = typeof (request.body as { token?: unknown } | undefined)?.token === "string"
+        ? (request.body as { token: string }).token
+        : "";
+      const apiResponse: HuggingFaceTokenConfigApiResponse = {
+        ok: true,
+        value: dependencies.setHuggingFaceToken(token),
+      };
+      response.status(200).json(apiResponse);
+    } catch (error) {
+      const failureResponse: HuggingFaceTokenConfigApiResponse = {
+        ok: false,
+        error: {
+          code: "validation",
+          message: error instanceof Error ? error.message : "Invalid Hugging Face token request.",
+        },
+      };
+      response.status(400).json(failureResponse);
+    }
+  });
+
+  dependencies.app.delete?.("/api/config/huggingface-token", async (_request, response) => {
+    const apiResponse: HuggingFaceTokenConfigApiResponse = {
+      ok: true,
+      value: dependencies.clearHuggingFaceToken(),
+    };
+    response.status(200).json(apiResponse);
+  });
+
   dependencies.app.post("/api/artifact-repo/has", async (request, response) => {
     const context = mapRequestContext(request);
     let command: HasArtifactInRepoCommand;

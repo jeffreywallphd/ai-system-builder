@@ -91,6 +91,9 @@ export interface ThinClientLocalizedArtifactFromRepo {
 }
 
 export interface ArtifactBrowserApiClient {
+  getHuggingFaceTokenStatus: () => Promise<{ configured: boolean; maskedToken?: string }>;
+  setHuggingFaceToken: (input: { token: string }) => Promise<{ configured: boolean; maskedToken?: string }>;
+  clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
   browseImageArtifacts: () => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
@@ -159,6 +162,34 @@ export function createApiArtifactBrowserClient(
   const source = options.source ?? "thin-client.artifact-browser";
 
   return {
+    async getHuggingFaceTokenStatus() {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+        method: "GET",
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => value as { configured: boolean; maskedToken?: string });
+    },
+
+    async setHuggingFaceToken(input) {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ token: input.token }),
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => value as { configured: boolean; maskedToken?: string });
+    },
+
+    async clearHuggingFaceToken() {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+        method: "DELETE",
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => value as { configured: boolean; maskedToken?: string });
+    },
+
     async browseImageArtifacts(): Promise<ThinClientArtifactBrowseItem[]> {
       const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/browse"), {
         method: "POST",

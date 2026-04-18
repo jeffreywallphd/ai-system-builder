@@ -16,6 +16,9 @@ import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowser
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
 
 export interface UseArtifactBrowserFeatureResult {
+  huggingFaceTokenStatus: { configured: boolean; maskedToken?: string };
+  tokenInput: string;
+  tokenState: ArtifactBrowserViewState;
   items: DesktopArtifactBrowseItem[];
   selectedStorageKey?: string;
   detail?: DesktopArtifactDetail;
@@ -53,6 +56,9 @@ export interface UseArtifactBrowserFeatureResult {
   setRegisterRevision: (value: string) => void;
   setRegisterMediaType: (value: string) => void;
   toggleRegisterForm: () => void;
+  setTokenInput: (value: string) => void;
+  saveHuggingFaceToken: () => Promise<void>;
+  clearHuggingFaceToken: () => Promise<void>;
 }
 
 export function useArtifactBrowserFeature(
@@ -74,7 +80,7 @@ export function useArtifactBrowserFeature(
       return message;
     }
 
-    return `${message} This Hugging Face repository may require an access token. Configure a Hugging Face token in the host/server environment to access private or gated repos.`;
+    return `${message} This Hugging Face repository may require an access token. Open Hugging Face token settings in this page to configure desktop-host access for private or gated repos.`;
   };
 
   const artifactClient = useArtifactBrowserClient(client);
@@ -93,6 +99,11 @@ export function useArtifactBrowserFeature(
   const [registerRevision, setRegisterRevision] = useState("main");
   const [registerMediaType, setRegisterMediaType] = useState("");
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [tokenInput, setTokenInput] = useState("");
+  const [tokenState, setTokenState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [huggingFaceTokenStatus, setHuggingFaceTokenStatus] = useState<{ configured: boolean; maskedToken?: string }>({
+    configured: false,
+  });
 
   const publishLogic = useArtifactBrowserPublishLogic<DesktopArtifactDetail>({
     selectedStorageKey,
@@ -127,7 +138,34 @@ export function useArtifactBrowserFeature(
 
   useEffect(() => {
     void refreshArtifacts();
+    void artifactClient.getHuggingFaceTokenStatus().then(setHuggingFaceTokenStatus).catch(() => {
+      setHuggingFaceTokenStatus({ configured: false });
+    });
   }, [refreshArtifacts]);
+
+  async function saveHuggingFaceToken(): Promise<void> {
+    setTokenState({ status: "loading", message: "Saving Hugging Face token..." });
+    try {
+      const status = await artifactClient.setHuggingFaceToken({ token: tokenInput });
+      setHuggingFaceTokenStatus(status);
+      setTokenInput("");
+      setTokenState({ status: "success", message: "Hugging Face token saved." });
+    } catch (error) {
+      setTokenState({ status: "error", message: error instanceof Error ? error.message : "Failed to save Hugging Face token." });
+    }
+  }
+
+  async function clearHuggingFaceToken(): Promise<void> {
+    setTokenState({ status: "loading", message: "Removing Hugging Face token..." });
+    try {
+      const status = await artifactClient.clearHuggingFaceToken();
+      setHuggingFaceTokenStatus(status);
+      setTokenInput("");
+      setTokenState({ status: "success", message: "Hugging Face token removed." });
+    } catch (error) {
+      setTokenState({ status: "error", message: error instanceof Error ? error.message : "Failed to remove Hugging Face token." });
+    }
+  }
 
   async function selectArtifact(storageKey: string): Promise<void> {
     setSelectedStorageKey(storageKey);
@@ -257,6 +295,9 @@ export function useArtifactBrowserFeature(
   }
 
   return {
+    huggingFaceTokenStatus,
+    tokenInput,
+    tokenState,
     items,
     selectedStorageKey,
     detail,
@@ -294,5 +335,8 @@ export function useArtifactBrowserFeature(
     setRegisterRevision,
     setRegisterMediaType,
     toggleRegisterForm: () => setShowRegisterForm((current) => !current),
+    setTokenInput,
+    saveHuggingFaceToken,
+    clearHuggingFaceToken,
   };
 }

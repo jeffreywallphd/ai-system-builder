@@ -33,3 +33,9 @@ This module contains the first concrete artifact-repo storage provider adapter.
 - No handcrafted HTTP fallback path exists in this adapter.
 - This is intentionally a small provider slice, not full provider lifecycle management.
 - Tests are mock-driven and deterministic (no live network dependency).
+
+
+## Runtime token source
+
+- Adapter now supports `accessTokenProvider` for host-managed token config, allowing token updates without rebuilding adapter wiring.
+- Fallback precedence remains: explicit `accessToken` option, then `HF_TOKEN`, then `HUGGING_FACE_TOKEN` when no provider is supplied.

@@ -20,10 +20,23 @@ import {
   createIpcChannel,
   createIpcError,
   createIpcFailureResponse,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
+  createDesktopHuggingFaceTokenGetSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
 describe("desktop preload exposedApi bridge", () => {
+  it("maps hugging face token status bridge calls to dedicated request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopHuggingFaceTokenGetSuccessResponse({ configured: true, maskedToken: "••••1234" }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.getHuggingFaceTokenStatus();
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value);
+  });
+
   it("maps bridge input into desktop upload request envelope and invokes request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopImageUploadSuccessResponse(
