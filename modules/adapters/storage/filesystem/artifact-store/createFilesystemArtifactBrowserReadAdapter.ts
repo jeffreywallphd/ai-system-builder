@@ -53,6 +53,16 @@ interface PublishedBackingReadModel {
   };
 }
 
+function withPublishedBackingMetadata<TMetadata extends StorageObjectMetadata>(
+  metadata: TMetadata | undefined,
+  publishedBacking: PublishedBackingReadModel,
+): TMetadata {
+  return {
+    ...(metadata ?? {}),
+    publishedBacking,
+  } as unknown as TMetadata;
+}
+
 async function readPublishedBacking(
   options: CreateFilesystemArtifactBrowserReadAdapterOptions,
   artifactId: string,
@@ -171,10 +181,10 @@ export function createFilesystemArtifactBrowserReadAdapter(
       const detail = toDetailValue(readResult.value.record) as ArtifactReadSuccessValue<TMetadata>;
       const publishedBacking = await readPublishedBacking(options, storageKey, context);
       if (publishedBacking) {
-        detail.artifact.metadata = {
-          ...(detail.artifact.metadata ?? {}),
+        detail.artifact.metadata = withPublishedBackingMetadata(
+          detail.artifact.metadata as TMetadata | undefined,
           publishedBacking,
-        } as TMetadata;
+        );
       }
 
       return createSuccessResult(detail, context);

@@ -24,4 +24,25 @@ describe("artifact browser TypeScript regression guards", () => {
     expect(source).toContain("setPublishedBackingFromDetail: (detail: TDetail | undefined) => void;");
     expect(source).toContain("): UseArtifactBrowserPublishLogicResult<TDetail> {");
   });
+
+  it("keeps artifact-browser filesystem metadata merge guarded with unknown-to-generic narrowing", () => {
+    const source = readSourceFile(
+      "modules/adapters/storage/filesystem/artifact-store/createFilesystemArtifactBrowserReadAdapter.ts",
+    );
+
+    expect(source).toContain("function withPublishedBackingMetadata<TMetadata extends StorageObjectMetadata>(");
+    expect(source).toContain("} as unknown as TMetadata;");
+    expect(source).toContain("detail.artifact.metadata = withPublishedBackingMetadata(");
+  });
+
+  it("keeps desktop artifact IPC failure mapping channel-specific per response contract", () => {
+    const source = readSourceFile(
+      "modules/adapters/transport/ipc-electron/artifact-browser/registerArtifactBrowserIpc.ts",
+    );
+
+    expect(source).toContain("function mapPublishFailure(");
+    expect(source).toContain("function mapPublishVerifyFailure(");
+    expect(source).toContain("DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL");
+    expect(source).toContain("DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL");
+  });
 });
