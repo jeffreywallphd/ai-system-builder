@@ -15,6 +15,9 @@ export interface RegisterElectronIpcDependencies {
   clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
   storeArtifactUploadUseCase: RegisterArtifactUploadIpcDependencies["storeArtifactUploadUseCase"];
   browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
+  browseUnregisteredArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseUnregisteredArtifactsUseCase"];
+  registerUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["registerUnregisteredArtifactUseCase"];
+  deleteUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteUnregisteredArtifactUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactContentUseCase"];
   artifactMediaViewRetrieval: RegisterArtifactBrowserIpcDependencies["artifactMediaViewRetrieval"];
@@ -41,6 +44,9 @@ export function registerElectronIpc(
     setHuggingFaceToken: dependencies.setHuggingFaceToken,
     clearHuggingFaceToken: dependencies.clearHuggingFaceToken,
     browseArtifactsUseCase: dependencies.browseArtifactsUseCase,
+    browseUnregisteredArtifactsUseCase: dependencies.browseUnregisteredArtifactsUseCase,
+    registerUnregisteredArtifactUseCase: dependencies.registerUnregisteredArtifactUseCase,
+    deleteUnregisteredArtifactUseCase: dependencies.deleteUnregisteredArtifactUseCase,
     readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
     readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
     artifactMediaViewRetrieval: dependencies.artifactMediaViewRetrieval,

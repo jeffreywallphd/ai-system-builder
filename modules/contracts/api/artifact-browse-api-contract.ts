@@ -51,14 +51,6 @@ function normalizeRequiredTextField(value: string, fieldName: string): string {
 function normalizeApiArtifactBrowsePayload(
   payload: ApiArtifactBrowseRequestPayload,
 ): ApiArtifactBrowseRequestPayload {
-  if (
-    typeof payload.artifactKind === "string"
-    && payload.artifactKind !== "image"
-    && payload.artifactKind !== "data"
-  ) {
-    throw new Error(`artifactKind must be one of "image" or "data". Received "${payload.artifactKind}".`);
-  }
-
   return {
     artifactKind: payload.artifactKind,
     boundary: {

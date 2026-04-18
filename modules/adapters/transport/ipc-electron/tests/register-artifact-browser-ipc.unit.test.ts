@@ -3,6 +3,9 @@ import { describe, expect, it, testDouble } from "../../../../testing/node-test"
 import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
@@ -41,6 +44,9 @@ import {
 function createUseCases() {
   return {
     browseArtifactsUseCase: { execute: testDouble.fn() },
+    browseUnregisteredArtifactsUseCase: { execute: testDouble.fn() },
+    registerUnregisteredArtifactUseCase: { execute: testDouble.fn() },
+    deleteUnregisteredArtifactUseCase: { execute: testDouble.fn() },
     readArtifactDetailUseCase: { execute: testDouble.fn() },
     readArtifactContentUseCase: { execute: testDouble.fn() },
     artifactMediaViewRetrieval: { retrieveArtifactViewerMediaByStorageKey: testDouble.fn() },
@@ -173,13 +179,16 @@ describe("registerArtifactBrowserIpc", () => {
 
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(14);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(17);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value)).toBe(true);
@@ -302,7 +311,7 @@ describe("registerArtifactBrowserIpc", () => {
           path: "images/a.png",
           revision: undefined,
         },
-        artifactKind: "image",
+        artifactKind: undefined,
         mediaType: undefined,
       },
       { requestId: undefined, correlationId: undefined },

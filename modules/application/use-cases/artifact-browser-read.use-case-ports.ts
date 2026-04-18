@@ -7,6 +7,14 @@ import type {
   ReadArtifactDetailUseCaseResult,
   ArtifactBrowserCommandContext,
 } from "./artifact-browser-read.types";
+import type {
+  ArtifactBrowserUnregisteredCommandContext,
+  BrowseUnregisteredArtifactsUseCaseResult,
+  DeleteUnregisteredArtifactCommand,
+  DeleteUnregisteredArtifactUseCaseResult,
+  RegisterUnregisteredArtifactCommand,
+  RegisterUnregisteredArtifactUseCaseResult,
+} from "./artifact-browser-unregistered.types";
 
 export interface BrowseArtifactsUseCasePort {
   execute: (
@@ -27,4 +35,24 @@ export interface ReadArtifactContentUseCasePort {
     command: ReadArtifactContentCommand,
     context?: ArtifactBrowserCommandContext,
   ) => Promise<ReadArtifactContentUseCaseResult>;
+}
+
+export interface BrowseUnregisteredArtifactsUseCasePort {
+  execute: (
+    context?: ArtifactBrowserUnregisteredCommandContext,
+  ) => Promise<BrowseUnregisteredArtifactsUseCaseResult>;
+}
+
+export interface RegisterUnregisteredArtifactUseCasePort {
+  execute: (
+    command: RegisterUnregisteredArtifactCommand,
+    context?: ArtifactBrowserUnregisteredCommandContext,
+  ) => Promise<RegisterUnregisteredArtifactUseCaseResult>;
+}
+
+export interface DeleteUnregisteredArtifactUseCasePort {
+  execute: (
+    command: DeleteUnregisteredArtifactCommand,
+    context?: ArtifactBrowserUnregisteredCommandContext,
+  ) => Promise<DeleteUnregisteredArtifactUseCaseResult>;
 }

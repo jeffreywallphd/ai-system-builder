@@ -285,6 +285,60 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     expect(container.textContent).toContain("upload");
   });
 
+  it("renders Unregistered Artifacts section and wires Register/Delete actions", async () => {
+    const client = {
+      browseArtifacts: vi.fn().mockResolvedValue([]),
+      browseUnregisteredArtifacts: vi.fn().mockResolvedValue([
+        {
+          storageKey: "uploads/orphan/report.pdf",
+          relativePath: "orphan/report.pdf",
+          fileName: "report.pdf",
+          mediaType: "application/pdf",
+        },
+      ]),
+      registerUnregisteredArtifact: vi.fn().mockResolvedValue({ storageKey: "uploads/orphan/report.pdf" }),
+      deleteUnregisteredArtifact: vi.fn().mockResolvedValue({ storageKey: "uploads/orphan/report.pdf" }),
+      readArtifactDetail: vi.fn(),
+      readArtifactContent: vi.fn(),
+      createArtifactMediaViewUrl: vi.fn(),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn(),
+      clearHuggingFaceToken: vi.fn(),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    expect(container.textContent).toContain("Unregistered Artifacts");
+    expect(container.textContent).toContain("orphan/report.pdf");
+
+    const registerButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Register") as HTMLButtonElement;
+    const deleteButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Delete") as HTMLButtonElement;
+
+    await act(async () => {
+      registerButton.click();
+    });
+    await act(async () => {
+      deleteButton.click();
+    });
+
+    expect(client.registerUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan/report.pdf" });
+    expect(client.deleteUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan/report.pdf" });
+  });
+
 
   it("re-checks published backing existence from the artifact detail panel", async () => {
     const client = {

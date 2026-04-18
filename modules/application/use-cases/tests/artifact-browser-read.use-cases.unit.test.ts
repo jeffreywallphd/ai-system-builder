@@ -91,24 +91,19 @@ describe("artifact browser read use cases", () => {
     );
   });
 
-  it("browse validates first-slice artifact kind and avoids calling the port on invalid input", async () => {
+  it("browse passes through generic artifact kind filters without image/data restriction", async () => {
     const browseArtifacts = testDouble.fn<ArtifactBrowserMetadataReadPort["browseArtifacts"]>();
+    browseArtifacts.mockResolvedValue({ ok: true, value: { items: [] } });
     const useCase = new BrowseArtifactsUseCase({
       artifactBrowserMetadataRead: createMetadataReadPort({ browseArtifacts }),
     });
 
     const result = await useCase.execute({
-      artifactKind: "document" as "image",
+      artifactKind: "document",
     });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected validation failure.");
-    }
-
-    expect(result.error.code).toBe("validation");
-    expect(result.error.message).toContain('artifactKind must be one of "image" or "data"');
-    expect(browseArtifacts).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(browseArtifacts).toHaveBeenCalledWith({ artifactKind: "document" }, {});
   });
 
   it("detail returns one artifact metadata/read-model result by locator", async () => {

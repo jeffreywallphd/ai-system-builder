@@ -16,7 +16,7 @@ export interface DesktopUploadedImageDescriptor {
 
 export interface DesktopArtifactBrowseItem {
   storageKey: string;
-  artifactKind: "image" | "data";
+  artifactKind: string;
   mediaType?: string;
   sizeBytes?: number;
   originalName?: string;
@@ -34,7 +34,7 @@ export interface DesktopArtifactBrowseItem {
 
 export interface DesktopArtifactDetail {
   locator: DesktopArtifactBrowserLocator;
-  artifactKind: "image" | "data";
+  artifactKind: string;
   mediaType?: string;
   sizeBytes?: number;
   sourceKind?: string;
@@ -125,7 +125,10 @@ interface DesktopApiBridge {
   browseHuggingFaceDatasetParquetFiles: (input: { repository: string; revision?: string }) => Promise<unknown>;
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<unknown>;
   getArtifactUploadPolicy: () => Promise<unknown>;
-  browseArtifacts: (input?: { artifactKind?: "image" | "data" }) => Promise<unknown>;
+  browseArtifacts: (input?: { artifactKind?: string }) => Promise<unknown>;
+  browseUnregisteredArtifacts?: () => Promise<unknown>;
+  registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
+  deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactViewerMedia: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
@@ -152,7 +155,7 @@ interface DesktopApiBridge {
       path: string;
       revision?: string;
     };
-    artifactKind?: "image" | "data";
+    artifactKind?: string;
     mediaType?: string;
   }) => Promise<unknown>;
   localizeArtifactFromRepo: (input: {
@@ -208,4 +211,12 @@ export interface DesktopRegisteredArtifactFromRepo {
       verifiedAt: string;
     };
   };
+}
+
+export interface DesktopUnregisteredArtifactBrowseItem {
+  storageKey: string;
+  relativePath: string;
+  fileName: string;
+  mediaType?: string;
+  sizeBytes?: number;
 }

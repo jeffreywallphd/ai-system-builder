@@ -6,6 +6,7 @@ import {
   type DesktopArtifactDetail,
   type DesktopLocalizedArtifactFromRepo,
   type DesktopPublishedBacking,
+  type DesktopUnregisteredArtifactBrowseItem,
   type DesktopRegisteredArtifactFromRepo,
   type DesktopHuggingFaceTokenStatus,
   type DesktopHuggingFaceNamespaceDataset,
@@ -19,6 +20,9 @@ export interface DesktopArtifactBrowserClient {
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
   browseArtifacts: (input?: { artifactKind?: DesktopArtifactBrowseItem["artifactKind"] }) => Promise<DesktopArtifactBrowseItem[]>;
+  browseUnregisteredArtifacts?: () => Promise<DesktopUnregisteredArtifactBrowseItem[]>;
+  registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;
+  deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: DesktopArtifactBrowserLocator) => Promise<string>;
@@ -124,6 +128,42 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
           return Array.isArray(items) ? items : [];
         },
         "Failed to browse artifacts.",
+      );
+    },
+
+    async browseUnregisteredArtifacts() {
+      if (!desktopApi.browseUnregisteredArtifacts) {
+        return [];
+      }
+      return ensureSuccess(
+        await desktopApi.browseUnregisteredArtifacts(),
+        (value) => {
+          const items = (value as { items?: DesktopUnregisteredArtifactBrowseItem[] } | undefined)?.items;
+          return Array.isArray(items) ? items : [];
+        },
+        "Failed to browse unregistered artifacts.",
+      );
+    },
+
+    async registerUnregisteredArtifact(input) {
+      if (!desktopApi.registerUnregisteredArtifact) {
+        throw new Error("Desktop preload unregistered artifact register bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.registerUnregisteredArtifact({ storageKey: input.storageKey }),
+        (value) => value as { storageKey: string },
+        "Failed to register unregistered artifact.",
+      );
+    },
+
+    async deleteUnregisteredArtifact(input) {
+      if (!desktopApi.deleteUnregisteredArtifact) {
+        throw new Error("Desktop preload unregistered artifact delete bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.deleteUnregisteredArtifact({ storageKey: input.storageKey }),
+        (value) => value as { storageKey: string },
+        "Failed to delete unregistered artifact.",
       );
     },
 

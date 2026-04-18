@@ -34,7 +34,8 @@ function parseRecordLine(line: string): ArtifactCatalogRecord | undefined {
   try {
     const parsed = JSON.parse(line) as Partial<ArtifactCatalogRecord>;
     if (
-      (parsed.artifactKind !== "image" && parsed.artifactKind !== "data")
+      typeof parsed.artifactKind !== "string"
+      || parsed.artifactKind.trim().length === 0
       || typeof parsed.storageKey !== "string"
     ) {
       return undefined;
@@ -115,16 +116,6 @@ export function createLocalArtifactCatalogPersistenceAdapter(
     },
 
     async browseArtifactCatalogRecords(request, context = {}) {
-      if (
-        typeof request.artifactKind === "string"
-        && request.artifactKind !== "image"
-        && request.artifactKind !== "data"
-      ) {
-        return createFailureResult(
-          createContractError("validation", `artifactKind must be one of \"image\" or \"data\". Received \"${request.artifactKind}\".`),
-          context,
-        );
-      }
       const records = await readCatalogRecords();
       return createSuccessResult({
         records: typeof request.artifactKind === "string"

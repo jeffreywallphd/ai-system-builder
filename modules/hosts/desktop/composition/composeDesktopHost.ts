@@ -2,14 +2,17 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
+  BrowseUnregisteredArtifactsUseCase,
   BrowseHuggingFaceDatasetParquetFilesUseCase,
   BrowseHuggingFaceNamespaceDatasetsUseCase,
   LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
+  RegisterUnregisteredArtifactUseCase,
   RegisterArtifactFromRepoUseCase,
   StoreArtifactUploadUseCase,
+  DeleteUnregisteredArtifactUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
 } from "../../../application/use-cases";
@@ -130,7 +133,9 @@ export function composeDesktopHost(
         artifactCatalogAppend: artifactCatalog,
       });
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
+        rootDirectory: registerOptions.storageRootDirectory,
         artifactCatalogRead: artifactCatalog,
+        artifactCatalogAppend: artifactCatalog,
         storage,
         artifactBindingRead: artifactBindings,
       });
@@ -152,6 +157,15 @@ export function composeDesktopHost(
       });
       const readArtifactContent = new ReadArtifactContentUseCase({
         artifactBrowserContentRead: artifactBrowserRead,
+      });
+      const browseUnregisteredArtifacts = new BrowseUnregisteredArtifactsUseCase({
+        artifactBrowserUnregistered: artifactBrowserRead,
+      });
+      const registerUnregisteredArtifact = new RegisterUnregisteredArtifactUseCase({
+        artifactBrowserUnregistered: artifactBrowserRead,
+      });
+      const deleteUnregisteredArtifact = new DeleteUnregisteredArtifactUseCase({
+        artifactBrowserUnregistered: artifactBrowserRead,
       });
       const publishArtifactToRepo = new PublishArtifactToRepoUseCase({
         artifactStorage: storage,
@@ -201,6 +215,9 @@ export function composeDesktopHost(
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),
         storeArtifactUploadUseCase,
         browseArtifactsUseCase: browseArtifacts,
+        browseUnregisteredArtifactsUseCase: browseUnregisteredArtifacts,
+        registerUnregisteredArtifactUseCase: registerUnregisteredArtifact,
+        deleteUnregisteredArtifactUseCase: deleteUnregisteredArtifact,
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,

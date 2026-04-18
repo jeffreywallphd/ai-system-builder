@@ -1,7 +1,6 @@
 import { describe, expect, it } from "../../testing/node-test";
 
 import {
-  ARTIFACT_BROWSE_KINDS,
   ARTIFACT_BROWSE_OPERATION,
   ARTIFACT_CONTENT_READ_OPERATION,
   ARTIFACT_READ_OPERATION,
@@ -31,7 +30,6 @@ describe("artifact-browser contracts", () => {
       ],
     });
 
-    expect(ARTIFACT_BROWSE_KINDS).toEqual(["image", "data"]);
     expect(browse).toMatchObject({
       items: [
         {

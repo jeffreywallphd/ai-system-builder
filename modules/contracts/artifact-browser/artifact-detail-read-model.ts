@@ -11,7 +11,6 @@ import {
   type ArtifactBrowserLocator,
 } from "./artifact-browser-locator";
 import {
-  ARTIFACT_BROWSE_KINDS,
   type ArtifactBrowseKind,
 } from "./artifact-browse-read-model";
 
@@ -45,12 +44,13 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 }
 
 function normalizeArtifactKind(kind: ArtifactBrowseKind): ArtifactBrowseKind {
-  if ((ARTIFACT_BROWSE_KINDS as readonly string[]).includes(kind)) {
-    return kind;
+  const normalized = kind.trim();
+  if (normalized.length > 0) {
+    return normalized;
   }
 
   throw new Error(
-    `Artifact browse kind must be one of ${ARTIFACT_BROWSE_KINDS.join(", ")}. Received "${kind}".`,
+    `Artifact browse kind must be a non-empty string. Received "${kind}".`,
   );
 }
 
