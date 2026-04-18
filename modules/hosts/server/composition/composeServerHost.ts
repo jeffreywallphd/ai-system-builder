@@ -30,6 +30,7 @@ import {
 import {
   createHuggingFaceArtifactRepoStorageAdapter,
   type CreateHuggingFaceArtifactRepoStorageAdapterOptions,
+  type HuggingFaceFetchImplementation,
 } from "../../../adapters/storage/huggingface";
 import {
   createHuggingFaceTokenConfigStore,
@@ -51,7 +52,7 @@ export interface ComposeServerHostLoggingOptions {
 export interface ComposeServerHostArtifactRepoOptions {
   huggingFaceAccessToken?: string;
   huggingFaceTokenConfigFilePath?: string;
-  huggingFaceFetchImplementation?: typeof fetch;
+  huggingFaceFetchImplementation?: HuggingFaceFetchImplementation;
   huggingFaceHubClient?: CreateHuggingFaceArtifactRepoStorageAdapterOptions["hubClient"];
 }
 

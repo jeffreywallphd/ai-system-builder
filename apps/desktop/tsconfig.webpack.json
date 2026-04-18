@@ -1,7 +1,8 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "incremental": false
+    "incremental": false,
+    "noEmit": false
   },
   "include": [
     "../../modules/**/*.ts",
