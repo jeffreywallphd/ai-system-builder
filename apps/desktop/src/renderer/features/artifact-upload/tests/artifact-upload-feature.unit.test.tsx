@@ -28,7 +28,7 @@ describe("ArtifactUploadFeature", () => {
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn(),
       clearHuggingFaceToken: vi.fn(),
-      browseImageArtifacts: vi.fn(),
+      browseArtifacts: vi.fn(),
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn(),

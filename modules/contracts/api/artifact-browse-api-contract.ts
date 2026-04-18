@@ -20,7 +20,7 @@ export interface ApiArtifactBrowseBoundaryContext {
 }
 
 export interface ApiArtifactBrowseRequestPayload {
-  artifactKind: ArtifactBrowseKind;
+  artifactKind?: ArtifactBrowseKind;
   boundary: ApiArtifactBrowseBoundaryContext;
 }
 
@@ -51,12 +51,16 @@ function normalizeRequiredTextField(value: string, fieldName: string): string {
 function normalizeApiArtifactBrowsePayload(
   payload: ApiArtifactBrowseRequestPayload,
 ): ApiArtifactBrowseRequestPayload {
-  if (payload.artifactKind !== "image") {
-    throw new Error(`artifactKind must be "image". Received "${payload.artifactKind}".`);
+  if (
+    typeof payload.artifactKind === "string"
+    && payload.artifactKind !== "image"
+    && payload.artifactKind !== "data"
+  ) {
+    throw new Error(`artifactKind must be one of "image" or "data". Received "${payload.artifactKind}".`);
   }
 
   return {
-    artifactKind: "image",
+    artifactKind: payload.artifactKind,
     boundary: {
       host: "server",
       source: normalizeRequiredTextField(payload.boundary.source, "boundary.source"),

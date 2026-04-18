@@ -26,7 +26,7 @@ import {
 } from "../../../../contracts/api";
 
 interface ArtifactBrowseApiRequestBody {
-  artifactKind: "image";
+  artifactKind?: "image" | "data";
   source?: string;
 }
 

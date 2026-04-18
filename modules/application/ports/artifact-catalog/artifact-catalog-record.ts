@@ -2,7 +2,7 @@ import type { StorageObjectChecksum } from "../../../contracts/storage";
 
 export interface ArtifactCatalogRecord {
   storageKey: string;
-  artifactKind: "image";
+  artifactKind: "image" | "data";
   mediaType?: string;
   sizeBytes?: number;
   sourceKind?: "upload";

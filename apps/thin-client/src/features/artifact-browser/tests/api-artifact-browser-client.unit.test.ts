@@ -47,24 +47,6 @@ describe("api artifact browser client", () => {
         json: vi.fn().mockResolvedValue({
           ok: true,
           value: {
-            target: {
-              provider: "huggingface",
-              repository: "openai/demo",
-              path: "images/a.png",
-              revision: "main",
-              locator: "openai/demo/images/a.png",
-            },
-            verification: {
-              exists: true,
-              verifiedAt: "2026-04-18T00:00:00.000Z",
-            },
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        json: vi.fn().mockResolvedValue({
-          ok: true,
-          value: {
             artifact: {
               locator: { storageKey: "uploads/a.png" },
               artifactKind: "image",
@@ -81,6 +63,24 @@ describe("api artifact browser client", () => {
               locator: { storageKey: "uploads/a.png" },
               availability: "available",
               retrieval: "deferred",
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/a.png",
+              revision: "main",
+              locator: "openai/demo/images/a.png",
+            },
+            verification: {
+              exists: true,
+              verifiedAt: "2026-04-18T00:00:00.000Z",
             },
           },
         }),
@@ -149,7 +149,7 @@ describe("api artifact browser client", () => {
     const tokenStatus = await client.getHuggingFaceTokenStatus();
     const tokenSaved = await client.setHuggingFaceToken({ token: "hf_1234" });
     const tokenCleared = await client.clearHuggingFaceToken();
-    const browse = await client.browseImageArtifacts();
+    const browse = await client.browseArtifacts();
     const detail = await client.readArtifactDetail({ storageKey: "uploads/a.png" });
     const content = await client.readArtifactContent({ storageKey: "uploads/a.png" });
     const imageViewUrl = client.createArtifactMediaViewUrl({ storageKey: "uploads/a.png" });
@@ -186,7 +186,10 @@ describe("api artifact browser client", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
       "/api/artifact/browse",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ artifactKind: undefined, source: "thin-client.artifact-browser" }),
+      }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       5,
@@ -228,8 +231,8 @@ describe("api artifact browser client", () => {
     expect((content as unknown as { bytes?: unknown }).bytes).toBeUndefined();
     expect(imageViewUrl).toBe("/api/artifact/media/view?storageKey=uploads%2Fa.png");
     expect(publish.verification.exists).toBe(true);
-    expect(verified.verification.exists).toBe(false);
-    expect(sourceVerified.verification.exists).toBe(true);
+    expect(verified.verification.exists).toBe(true);
+    expect(sourceVerified.verification.exists).toBe(false);
     expect(localized.localObject.key).toBe("artifacts/20260418000000-local01");
   });
 });

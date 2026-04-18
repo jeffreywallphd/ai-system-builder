@@ -36,7 +36,7 @@ export interface DesktopArtifactBrowseBoundaryContext {
 }
 
 export interface DesktopArtifactBrowseRequestPayload {
-  artifactKind: ArtifactBrowseKind;
+  artifactKind?: ArtifactBrowseKind;
   boundary: DesktopArtifactBrowseBoundaryContext;
 }
 
@@ -69,12 +69,16 @@ function normalizeRequiredTextField(value: string, fieldName: string): string {
 function normalizeDesktopArtifactBrowsePayload(
   payload: DesktopArtifactBrowseRequestPayload,
 ): DesktopArtifactBrowseRequestPayload {
-  if (payload.artifactKind !== "image") {
-    throw new Error(`artifactKind must be "image". Received "${payload.artifactKind}".`);
+  if (
+    typeof payload.artifactKind === "string"
+    && payload.artifactKind !== "image"
+    && payload.artifactKind !== "data"
+  ) {
+    throw new Error(`artifactKind must be one of "image" or "data". Received "${payload.artifactKind}".`);
   }
 
   return {
-    artifactKind: "image",
+    artifactKind: payload.artifactKind,
     boundary: {
       host: "desktop",
       source: normalizeRequiredTextField(payload.boundary.source, "boundary.source"),

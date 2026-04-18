@@ -107,7 +107,7 @@ describe("artifact browser read use cases", () => {
     }
 
     expect(result.error.code).toBe("validation");
-    expect(result.error.message).toContain('artifactKind must be "image"');
+    expect(result.error.message).toContain('artifactKind must be one of "image" or "data"');
     expect(browseArtifacts).not.toHaveBeenCalled();
   });
 

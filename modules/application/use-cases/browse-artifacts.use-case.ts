@@ -26,11 +26,15 @@ export class BrowseArtifactsUseCase {
     command: BrowseArtifactsCommand,
     context: ArtifactBrowserCommandContext = {},
   ): Promise<BrowseArtifactsUseCaseResult> {
-    if (command.artifactKind !== "image") {
+    if (
+      typeof command.artifactKind === "string"
+      && command.artifactKind !== "image"
+      && command.artifactKind !== "data"
+    ) {
       return createFailureResult(
         createContractError(
           "validation",
-          `artifactKind must be "image". Received "${String(command.artifactKind)}".`,
+          `artifactKind must be one of "image" or "data". Received "${String(command.artifactKind)}".`,
         ),
         context,
       );
@@ -39,7 +43,7 @@ export class BrowseArtifactsUseCase {
     try {
       const result = await this.artifactBrowserMetadataRead.browseArtifacts(
         {
-          artifactKind: "image",
+          artifactKind: command.artifactKind,
         },
         context,
       );

@@ -28,7 +28,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("publishes a selected artifact and shows published backing details", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "uploads/cat.png",
           artifactKind: "image" as const,
@@ -142,7 +142,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("shows publish failure message", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "uploads/cat.png",
           artifactKind: "image" as const,
@@ -204,7 +204,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("saves and clears Hugging Face token from token settings", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([]),
+      browseArtifacts: vi.fn().mockResolvedValue([]),
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
@@ -256,7 +256,7 @@ describe("ArtifactBrowserFeature", () => {
       };
     }) => void) | undefined;
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "uploads/cat.png",
           artifactKind: "image" as const,
@@ -334,7 +334,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("re-checks published backing existence from the artifact detail panel", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         { storageKey: "uploads/cat.png", artifactKind: "image" as const },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
@@ -406,7 +406,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("registers an artifact from Hugging Face and selects it", async () => {
     const client = {
-      browseImageArtifacts: vi.fn()
+      browseArtifacts: vi.fn()
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
           { storageKey: "imports/huggingface/openai/demo/main/images/cat.png", artifactKind: "image" as const },
@@ -479,7 +479,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("renders dataset cards with per-card file viewer and register actions", async () => {
     const client = {
-      browseImageArtifacts: vi.fn()
+      browseArtifacts: vi.fn()
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
           { storageKey: "imports/huggingface/openai/demo/main/data/train.parquet", artifactKind: "image" as const },
@@ -582,7 +582,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("renders per-card dataset file errors", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([]),
+      browseArtifacts: vi.fn().mockResolvedValue([]),
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
@@ -634,7 +634,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("localizes imported artifact bytes from the artifact panel", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         { storageKey: "artifacts/20260418000000-local01", artifactKind: "image" as const },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
@@ -717,7 +717,7 @@ describe("ArtifactBrowserFeature", () => {
 
   it("shows source verification and remote-only/localized state cues based on backing state", async () => {
     const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([
+      browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "artifacts/20260418000000-local01",
           artifactKind: "image" as const,

@@ -108,12 +108,16 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <dd>{detail.locator.storageKey}</dd>
               <dt>Media type</dt>
               <dd>{detail.mediaType ?? "unknown"}</dd>
+              <dt>Artifact kind</dt>
+              <dd>{detail.artifactKind}</dd>
+              <dt>Source</dt>
+              <dd>{detail.sourceKind ?? "unknown"}</dd>
               <dt>Size bytes</dt>
               <dd>{detail.sizeBytes ?? "unknown"}</dd>
               <dt>Created at</dt>
               <dd>{detail.createdAt ?? "unknown"}</dd>
             </dl>
-          ) : (<p className="ui-text-muted">Select an image artifact to inspect metadata and preview.</p>)}
+          ) : (<p className="ui-text-muted">Select a data artifact to inspect metadata and preview availability.</p>)}
 
           {content ? (
             <dl className="ui-grid ui-grid--two">
