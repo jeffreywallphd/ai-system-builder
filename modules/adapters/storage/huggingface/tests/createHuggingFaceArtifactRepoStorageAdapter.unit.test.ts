@@ -375,6 +375,10 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
         sizeBytes: 321,
       },
     ]);
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://huggingface.co/api/datasets/OpenFinAL/financial-news/tree/main?recursive=1",
+      { headers: {} },
+    );
   });
 
   it("maps non-browser contract error codes to internal for repo-browser responses", async () => {

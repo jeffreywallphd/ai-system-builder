@@ -515,6 +515,21 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
     return normalized;
   }
 
+  function toDatasetTreeBrowsePath(repository: string, revision: string): string {
+    const [namespace, ...datasetNameSegments] = repository.split("/");
+    const datasetName = datasetNameSegments.join("/");
+    if (!namespace?.trim() || !datasetName.trim()) {
+      throw new HuggingFaceAdapterValidationError(
+        "repository must include namespace and dataset name (for example: owner/repo).",
+      );
+    }
+
+    const encodedNamespace = encodeURIComponent(namespace.trim());
+    const encodedDatasetName = encodeURIComponent(datasetName.trim());
+    const encodedRevision = encodeURIComponent(revision);
+    return `/api/datasets/${encodedNamespace}/${encodedDatasetName}/tree/${encodedRevision}?recursive=1`;
+  }
+
   async function fetchJsonFromHub<T>(path: string, operation: HuggingFaceOperation, context: ApplicationRequestContext): Promise<T> {
     const headers: Record<string, string> = {};
     const token = getAccessToken()?.trim();
@@ -706,9 +721,8 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
     try {
       const repository = normalizeDatasetRepository(input.repository);
       const revision = input.revision?.trim() || DEFAULT_REVISION;
-      const encodedRevision = encodeURIComponent(revision);
       const payload = await fetchJsonFromHub<Array<{ path?: unknown; type?: unknown; size?: unknown }>>(
-        `/api/datasets/${encodeURIComponent(repository)}/tree/${encodedRevision}?recursive=1`,
+        toDatasetTreeBrowsePath(repository, revision),
         "listDatasetParquetFiles",
         requestContext,
       );
