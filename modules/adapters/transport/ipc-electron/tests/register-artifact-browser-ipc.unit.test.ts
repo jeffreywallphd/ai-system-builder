@@ -2,10 +2,14 @@ import { describe, expect, it, testDouble } from "../../../../testing/node-test"
 
 import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   createDesktopArtifactBrowseRequest,
   createDesktopArtifactContentReadRequest,
@@ -15,6 +19,8 @@ import {
   createDesktopArtifactReadRequest,
 } from "../../../../contracts/ipc";
 import {
+  createDesktopArtifactPublishIpcHandler,
+  createDesktopArtifactPublishVerifyIpcHandler,
   mapDesktopArtifactRequestContext,
   mapReadArtifactContentResultToDesktopResponse,
   registerArtifactBrowserIpc,
@@ -227,5 +233,80 @@ describe("registerArtifactBrowserIpc", () => {
       requestId: "req-ipc-1",
       correlationId: "corr-ipc-1",
     });
+  });
+
+  it("maps publish and publish-verify failures to operation-specific IPC response channels", async () => {
+    const publishRequest = createDesktopArtifactPublishRequest({
+      artifactId: "uploads/a.png",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/a.png",
+      },
+      boundary: { host: "desktop", source: "desktop.renderer" },
+    }, {
+      requestId: "req-publish",
+      correlationId: "corr-publish",
+    });
+    const publishVerifyRequest = createDesktopArtifactPublishVerifyRequest({
+      artifactId: "uploads/a.png",
+      boundary: { host: "desktop", source: "desktop.renderer" },
+    }, {
+      requestId: "req-verify",
+      correlationId: "corr-verify",
+    });
+
+    const publishHandler = createDesktopArtifactPublishIpcHandler({
+      execute: testDouble.fn().mockResolvedValue({
+        ok: false,
+        error: {
+          code: "validation",
+          message: "target.path must be set",
+          details: { field: "target.path" },
+        },
+      }),
+    });
+    const publishVerifyHandler = createDesktopArtifactPublishVerifyIpcHandler({
+      execute: testDouble.fn().mockResolvedValue({
+        ok: false,
+        error: {
+          code: "not-found",
+          message: "No published backing exists",
+          details: { artifactId: "uploads/a.png" },
+        },
+      }),
+    });
+
+    const publishFailure = await publishHandler({}, publishRequest);
+    const verifyFailure = await publishVerifyHandler({}, publishVerifyRequest);
+
+    expect(publishFailure).toMatchObject({
+      ok: false,
+      channel: DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL.value,
+      operation: DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL.operation,
+      error: {
+        channel: DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL.value,
+        operation: DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL.operation,
+        code: "validation",
+        details: { field: "target.path" },
+      },
+      metadata: undefined,
+    });
+
+    expect(verifyFailure).toMatchObject({
+      ok: false,
+      channel: DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL.value,
+      operation: DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL.operation,
+      error: {
+        channel: DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL.value,
+        operation: DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL.operation,
+        code: "not-found",
+        details: { artifactId: "uploads/a.png" },
+      },
+      metadata: undefined,
+    });
+
+    expect(publishFailure.channel).not.toBe(DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL.value);
+    expect(verifyFailure.channel).not.toBe(DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL.value);
   });
 });

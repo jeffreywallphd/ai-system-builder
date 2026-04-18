@@ -127,24 +127,126 @@ export function mapDesktopArtifactRequestContext(
 }
 
 function mapIpcFailure(
-  channel: typeof DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL
-    | typeof DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL
-    | typeof DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL
-    | typeof DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL
-    | typeof DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL
-    | typeof DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
-  request: { requestId?: string; correlationId?: string },
-  error: { code: string; message: string; details?: Record<string, unknown> },
+  code: string,
 ) {
+  return code === "validation" || code === "not-found" || code === "unavailable"
+    ? code
+    : "internal";
+}
+
+function toMutableErrorDetails(
+  details: Readonly<Record<string, unknown>> | undefined,
+): Record<string, unknown> | undefined {
+  if (!details) {
+    return undefined;
+  }
+
+  return {
+    ...details,
+  };
+}
+
+function mapBrowseFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopArtifactBrowseResponse {
   return createIpcFailureResponse(
     createIpcError(
-      channel,
-      error.code === "validation" || error.code === "not-found" || error.code === "unavailable"
-        ? error.code
-        : "internal",
+      DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
       error.message,
       {
-        details: error.details,
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapReadFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopArtifactReadResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapContentReadFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopArtifactContentReadResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapMediaViewFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopArtifactMediaViewResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapPublishFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopArtifactPublishResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapPublishVerifyFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopArtifactPublishVerifyResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
         requestId: request.requestId,
         correlationId: request.correlationId,
       },
@@ -157,7 +259,7 @@ export function mapBrowseArtifactsResultToDesktopResponse(
   request: DesktopArtifactBrowseRequest,
 ): DesktopArtifactBrowseResponse {
   if (!result.ok) {
-    return mapIpcFailure(DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL, request, result.error);
+    return mapBrowseFailure(request, result.error);
   }
 
   return createDesktopArtifactBrowseSuccessResponse(result.value, {
@@ -171,7 +273,7 @@ export function mapReadArtifactDetailResultToDesktopResponse(
   request: DesktopArtifactReadRequest,
 ): DesktopArtifactReadResponse {
   if (!result.ok) {
-    return mapIpcFailure(DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL, request, result.error);
+    return mapReadFailure(request, result.error);
   }
 
   return createDesktopArtifactReadSuccessResponse(result.value, {
@@ -185,7 +287,7 @@ export function mapReadArtifactContentResultToDesktopResponse(
   request: DesktopArtifactContentReadRequest,
 ): DesktopArtifactContentReadResponse {
   if (!result.ok) {
-    return mapIpcFailure(DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL, request, result.error);
+    return mapContentReadFailure(request, result.error);
   }
 
   return createDesktopArtifactContentReadSuccessResponse(result.value, {
@@ -255,7 +357,7 @@ export function createDesktopArtifactMediaViewIpcHandler(
     );
 
     if (!retrievalResult.ok) {
-      return mapIpcFailure(DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL, request, retrievalResult.error);
+      return mapMediaViewFailure(request, retrievalResult.error);
     }
 
     return createDesktopArtifactMediaViewSuccessResponse(retrievalResult.value, {
@@ -276,7 +378,7 @@ export function createDesktopArtifactPublishIpcHandler(
       mapDesktopArtifactPublishRequestToCommand(request),
     );
     if (!result.ok) {
-      return mapIpcFailure(DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL, request, result.error);
+      return mapPublishFailure(request, result.error);
     }
 
     return createDesktopArtifactPublishSuccessResponse(result.value, {
@@ -297,7 +399,7 @@ export function createDesktopArtifactPublishVerifyIpcHandler(
       mapDesktopArtifactPublishVerifyRequestToCommand(request),
     );
     if (!result.ok) {
-      return mapIpcFailure(DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL, request, result.error);
+      return mapPublishVerifyFailure(request, result.error);
     }
 
     return createDesktopArtifactPublishVerifySuccessResponse(result.value, {
