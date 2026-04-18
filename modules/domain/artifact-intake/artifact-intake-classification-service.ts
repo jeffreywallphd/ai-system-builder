@@ -1,10 +1,10 @@
-import type { ArtifactKind } from "../../contracts/artifact";
 import type { ArtifactIntakeCandidate } from "./artifact-intake-candidate";
 import type { AcceptedArtifactUploadPolicy } from "./accepted-artifact-upload-policy";
+import type { ArtifactIntakeFamily } from "./artifact-intake-family";
 
 export interface ArtifactIntakeClassification {
   accepted: boolean;
-  artifactKind: ArtifactKind;
+  artifactFamily: ArtifactIntakeFamily;
   reason?: string;
 }
 
@@ -17,8 +17,20 @@ function extensionOf(fileName: string): string {
   return fileName.slice(dot).toLowerCase();
 }
 
-function classifyArtifactKind(_mediaType: string): ArtifactKind {
-  return "raw-staged";
+function classifyArtifactFamily(mediaType: string): ArtifactIntakeFamily {
+  if (mediaType.startsWith("image/")) {
+    return "image";
+  }
+
+  if (mediaType.startsWith("text/")) {
+    return "text";
+  }
+
+  if (mediaType === "application/json") {
+    return "json";
+  }
+
+  return "binary";
 }
 
 export function classifyArtifactIntakeCandidate(
@@ -26,15 +38,15 @@ export function classifyArtifactIntakeCandidate(
   policy: AcceptedArtifactUploadPolicy,
 ): ArtifactIntakeClassification {
   if (candidate.fileName.length === 0) {
-    return { accepted: false, artifactKind: "raw-staged", reason: "fileName must be provided." };
+    return { accepted: false, artifactFamily: "binary", reason: "fileName must be provided." };
   }
 
   if (candidate.mediaType.length === 0) {
-    return { accepted: false, artifactKind: "raw-staged", reason: "mediaType must be provided." };
+    return { accepted: false, artifactFamily: "binary", reason: "mediaType must be provided." };
   }
 
   if (candidate.bytesLength <= 0) {
-    return { accepted: false, artifactKind: "raw-staged", reason: "bytes must not be empty." };
+    return { accepted: false, artifactFamily: "binary", reason: "bytes must not be empty." };
   }
 
   const extension = extensionOf(candidate.fileName);
@@ -44,13 +56,13 @@ export function classifyArtifactIntakeCandidate(
   if (!mediaTypeAccepted && !extensionAccepted) {
     return {
       accepted: false,
-      artifactKind: classifyArtifactKind(candidate.mediaType),
+      artifactFamily: classifyArtifactFamily(candidate.mediaType),
       reason: `Artifact type is not accepted: ${candidate.mediaType}.`,
     };
   }
 
   return {
     accepted: true,
-    artifactKind: classifyArtifactKind(candidate.mediaType),
+    artifactFamily: classifyArtifactFamily(candidate.mediaType),
   };
 }

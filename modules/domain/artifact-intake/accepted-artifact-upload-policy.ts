@@ -25,7 +25,3 @@ export function createDefaultAcceptedArtifactUploadPolicy(): AcceptedArtifactUpl
     acceptedExtensions: [".png", ".jpg", ".jpeg", ".webp", ".txt", ".json"],
   });
 }
-
-export function toHtmlFileAcceptAttribute(policy: AcceptedArtifactUploadPolicy): string {
-  return [...policy.acceptedExtensions, ...policy.acceptedMediaTypes].join(",");
-}

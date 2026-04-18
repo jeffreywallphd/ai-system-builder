@@ -124,7 +124,7 @@ interface DesktopApiBridge {
   browseHuggingFaceDatasetParquetFiles: (input: { repository: string; revision?: string }) => Promise<unknown>;
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<unknown>;
   getArtifactUploadPolicy: () => Promise<unknown>;
-  browseArtifacts: () => Promise<unknown>;
+  browseArtifacts: (input: { artifactKind: "image" }) => Promise<unknown>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactViewerMedia: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
@@ -151,7 +151,7 @@ interface DesktopApiBridge {
       path: string;
       revision?: string;
     };
-    artifactKind?: "image";
+    artifactKind: "image";
     mediaType?: string;
   }) => Promise<unknown>;
   localizeArtifactFromRepo: (input: {

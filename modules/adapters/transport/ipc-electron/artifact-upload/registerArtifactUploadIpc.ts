@@ -17,6 +17,7 @@ import type {
   StoreArtifactUploadCommandContext,
   StoreArtifactUploadUseCaseResult,
 } from "../../../../application/use-cases";
+import type { ArtifactUploadAcceptedTypePolicy } from "../../../../contracts/artifact-upload";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 export type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
@@ -29,10 +30,7 @@ export interface StoreArtifactUploadUseCasePort {
       correlationId?: string;
     },
   ) => Promise<StoreArtifactUploadUseCaseResult>;
-  getAcceptedUploadPolicy: () => {
-    acceptedMediaTypes: readonly string[];
-    acceptedExtensions: readonly string[];
-  };
+  getAcceptedUploadPolicy: () => ArtifactUploadAcceptedTypePolicy;
 }
 
 export interface RegisterArtifactUploadIpcDependencies {

@@ -141,6 +141,7 @@ describe("StoreArtifactUploadUseCase", () => {
 
     const result = await useCase.execute(
       createCommand({
+        fileName: "kitten.pdf",
         mediaType: "application/pdf",
       }),
       createCommandContext(),

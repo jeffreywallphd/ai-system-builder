@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { toHtmlFileAcceptAttribute } from "../../../../../../../modules/contracts/artifact-upload";
 
 import { useArtifactUploadClient } from "./useArtifactUploadClient";
 import type { ArtifactUploadClient } from "../api/desktopArtifactUploadClient";
@@ -22,7 +23,7 @@ export function useArtifactUploadFeature(client?: ArtifactUploadClient, onUpload
 
   useEffect(() => {
     void uploadClient.getAcceptedTypes().then((policy) => {
-      setAcceptedFileTypes([...policy.acceptedExtensions, ...policy.acceptedMediaTypes].join(","));
+      setAcceptedFileTypes(toHtmlFileAcceptAttribute(policy));
     }).catch(() => {
       setAcceptedFileTypes("*");
     });
