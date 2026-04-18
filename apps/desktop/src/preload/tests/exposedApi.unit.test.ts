@@ -5,12 +5,14 @@ import {
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
   createDesktopArtifactBrowseSuccessResponse,
   createDesktopArtifactPublishSuccessResponse,
   createDesktopArtifactPublishVerifySuccessResponse,
   createDesktopArtifactRegisterFromRepoSuccessResponse,
+  createDesktopArtifactLocalizeFromRepoSuccessResponse,
   createDesktopArtifactMediaViewSuccessResponse,
   createDesktopImageUploadSuccessResponse,
   createIpcChannel,
@@ -193,4 +195,30 @@ it("maps register-from-repo bridge calls to artifact register-from-repo request 
   });
 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value);
+});
+
+it("maps localize-from-repo bridge calls to artifact localize-from-repo request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopArtifactLocalizeFromRepoSuccessResponse({
+      artifactId: "artifacts/20260418000000-local01",
+      localObject: {
+        key: "artifacts/20260418000000-local01",
+        mediaType: "image/png",
+        sizeBytes: 3,
+      },
+      source: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        locator: "openai/demo/images/cat.png",
+      },
+      localizedAt: "2026-04-18T00:00:00.000Z",
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.localizeArtifactFromRepo({ artifactId: "artifacts/20260418000000-local01" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value);
 });

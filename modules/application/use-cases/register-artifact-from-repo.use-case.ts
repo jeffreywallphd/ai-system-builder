@@ -4,8 +4,8 @@ import { createContractError } from "../../contracts/shared";
 import {
   createHasArtifactInRepoRequest,
   encodeArtifactRepoBackingLocator,
-  normalizeStorageArtifactKey,
 } from "../../contracts/storage";
+import { Artifact, ArtifactBacking, ArtifactId } from "../../domain/artifact";
 
 export interface RegisterArtifactFromRepoCommand {
   target: {
@@ -41,6 +41,7 @@ export interface RegisterArtifactFromRepoUseCaseDependencies {
   artifactBindingStorage: ArtifactStorageBindingPort;
   artifactCatalogAppend: ArtifactCatalogAppendPort;
   now?: () => string;
+  createArtifactId?: () => ArtifactId;
 }
 
 export class RegisterArtifactFromRepoUseCase {
@@ -48,12 +49,14 @@ export class RegisterArtifactFromRepoUseCase {
   private readonly artifactBindingStorage: ArtifactStorageBindingPort;
   private readonly artifactCatalogAppend: ArtifactCatalogAppendPort;
   private readonly now: () => string;
+  private readonly createArtifactId: () => ArtifactId;
 
   public constructor(dependencies: RegisterArtifactFromRepoUseCaseDependencies) {
     this.artifactRepoStorage = dependencies.artifactRepoStorage;
     this.artifactBindingStorage = dependencies.artifactBindingStorage;
     this.artifactCatalogAppend = dependencies.artifactCatalogAppend;
     this.now = dependencies.now ?? (() => new Date().toISOString());
+    this.createArtifactId = dependencies.createArtifactId ?? (() => ArtifactId.generate());
   }
 
   public async execute(command: RegisterArtifactFromRepoCommand) {
@@ -90,15 +93,14 @@ export class RegisterArtifactFromRepoUseCase {
       };
     }
 
-    const artifactId = normalizeStorageArtifactKey(
-      `imports/${provider}/${repository}/${revision}/${path}`,
-    );
+    // Internal artifact identity is system-owned; repo coordinates remain backing metadata.
+    const artifactId = this.createArtifactId();
     const verifiedAt = this.now();
     const locator = encodeArtifactRepoBackingLocator({ repository, path });
 
     const appendResult = await this.artifactCatalogAppend.appendArtifactCatalogRecord({
       record: {
-        storageKey: artifactId,
+        storageKey: artifactId.toString(),
         artifactKind: command.artifactKind ?? "image",
         mediaType: command.mediaType?.trim() || undefined,
         originalName: path,
@@ -109,28 +111,40 @@ export class RegisterArtifactFromRepoUseCase {
       return appendResult;
     }
 
-    const bindingResult = await this.artifactBindingStorage.upsertArtifactStorageBinding({
-      binding: {
-        artifactId,
+    const artifact = Artifact.create({
+      id: artifactId,
+      artifactKind: command.artifactKind ?? "image",
+    });
+    artifact.attachOrUpdateBacking(
+      ArtifactBacking.from({
+        kind: "artifact-repo",
+        provider,
+        locator,
         role: "imported-source",
         createdAt: verifiedAt,
-        backing: {
-          kind: "artifact-repo",
+        revision,
+        target: {
           provider,
-          locator,
+          repository,
+          path,
           revision,
-          target: {
-            provider,
-            repository,
-            path,
-            revision,
-          },
-          verification: {
-            exists: true,
-            verifiedAt,
-          },
         },
-      },
+        verification: {
+          exists: true,
+          verifiedAt,
+        },
+      }),
+    );
+    const importedSource = artifact.latestBackingForRole("imported-source");
+    if (!importedSource) {
+      return {
+        ok: false as const,
+        error: createContractError("internal", "Imported-source backing could not be constructed."),
+      };
+    }
+
+    const bindingResult = await this.artifactBindingStorage.upsertArtifactStorageBinding({
+      binding: importedSource.toStorageBinding(artifact.id.toString()),
     });
 
     if (!bindingResult.ok) {
@@ -140,7 +154,7 @@ export class RegisterArtifactFromRepoUseCase {
     return {
       ok: true as const,
       value: {
-        artifactId,
+        artifactId: artifact.id.toString(),
         backing: {
           role: "imported-source",
           target: {
@@ -159,3 +173,4 @@ export class RegisterArtifactFromRepoUseCase {
     };
   }
 }
+

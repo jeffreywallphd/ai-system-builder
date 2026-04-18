@@ -7,7 +7,7 @@ describe("api artifact browser client", () => {
     vi.unstubAllGlobals();
   });
 
-  it("calls browse/detail/content endpoints and maps descriptor-oriented responses", async () => {
+  it("calls browse/detail/content/publish/verify/localize endpoints and maps responses", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -18,24 +18,6 @@ describe("api artifact browser client", () => {
           },
         }),
       })
-      .mockResolvedValueOnce({
-        json: vi.fn().mockResolvedValue({
-          ok: true,
-          value: {
-            target: {
-              provider: "huggingface",
-              repository: "openai/demo",
-              path: "images/a.png",
-              revision: "main",
-              locator: "openai/demo/images/a.png",
-            },
-            verification: {
-              exists: false,
-              verifiedAt: "2026-04-18T00:00:00.000Z",
-            },
-          },
-        }),
-      });
       .mockResolvedValueOnce({
         json: vi.fn().mockResolvedValue({
           ok: true,
@@ -77,6 +59,45 @@ describe("api artifact browser client", () => {
             },
           },
         }),
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/a.png",
+              revision: "main",
+              locator: "openai/demo/images/a.png",
+            },
+            verification: {
+              exists: false,
+              verifiedAt: "2026-04-18T00:00:00.000Z",
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
+            artifactId: "artifacts/20260418000000-local01",
+            localObject: {
+              key: "artifacts/20260418000000-local01",
+              mediaType: "image/png",
+              sizeBytes: 3,
+            },
+            source: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/a.png",
+              revision: "main",
+              locator: "openai/demo/images/a.png",
+            },
+            localizedAt: "2026-04-18T00:00:00.000Z",
+          },
+        }),
       });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -93,6 +114,9 @@ describe("api artifact browser client", () => {
     });
     const verified = await client.verifyPublishedArtifactBacking({
       artifactId: "uploads/a.png",
+    });
+    const localized = await client.localizeArtifactFromRepo({
+      artifactId: "artifacts/20260418000000-local01",
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -120,6 +144,11 @@ describe("api artifact browser client", () => {
       "/api/artifact/publish/verify",
       expect.objectContaining({ method: "POST" }),
     );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      "/api/artifact/localize-from-repo",
+      expect.objectContaining({ method: "POST" }),
+    );
 
     expect(browse[0].storageKey).toBe("uploads/a.png");
     expect(detail.locator.storageKey).toBe("uploads/a.png");
@@ -128,5 +157,6 @@ describe("api artifact browser client", () => {
     expect(imageViewUrl).toBe("/api/artifact/media/view?storageKey=uploads%2Fa.png");
     expect(publish.verification.exists).toBe(true);
     expect(verified.verification.exists).toBe(false);
+    expect(localized.localObject.key).toBe("artifacts/20260418000000-local01");
   });
 });

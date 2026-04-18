@@ -7,6 +7,7 @@ import type {
   ArtifactStorageBindingPort,
 } from "../../ports/storage";
 import { RegisterArtifactFromRepoUseCase } from "../register-artifact-from-repo.use-case";
+import { ArtifactId } from "../../../domain/artifact";
 
 describe("RegisterArtifactFromRepoUseCase", () => {
   it("verifies remote target and writes imported-source binding + catalog record", async () => {
@@ -36,6 +37,7 @@ describe("RegisterArtifactFromRepoUseCase", () => {
       artifactBindingStorage,
       artifactCatalogAppend,
       now: () => "2026-04-17T00:00:00.000Z",
+      createArtifactId: () => ArtifactId.from("artifacts/20260417000000-import001"),
     });
 
     const result = await useCase.execute({
@@ -53,13 +55,14 @@ describe("RegisterArtifactFromRepoUseCase", () => {
       throw new Error("Expected register from repo success.");
     }
 
-    expect(result.value.artifactId).toBe("imports/huggingface/openai/demo/main/images/a.png");
+    expect(result.value.artifactId).toBe("artifacts/20260417000000-import001");
     const upsertCall = (artifactBindingStorage.upsertArtifactStorageBinding as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
     expect(upsertCall).toMatchObject({
       binding: {
-        artifactId: "imports/huggingface/openai/demo/main/images/a.png",
+        artifactId: "artifacts/20260417000000-import001",
         role: "imported-source",
       },
     });
   });
 });
+

@@ -18,6 +18,7 @@ describe("desktopApi bridge access", () => {
       publishArtifactToRepo: async () => ({ ok: true, value: { target: { provider: "huggingface", repository: "openai/demo", path: "images/a.png", locator: "openai/demo/images/a.png" }, verification: { exists: true } } }),
       verifyPublishedArtifactBacking: async () => ({ ok: true, value: { target: { provider: "huggingface", repository: "openai/demo", path: "images/a.png", locator: "openai/demo/images/a.png" }, verification: { exists: true } } }),
       registerArtifactFromRepo: async () => ({ ok: true, value: { artifactId: "imports/huggingface/openai/demo/main/images/a.png", backing: { role: "imported-source", target: { provider: "huggingface", repository: "openai/demo", path: "images/a.png", revision: "main", locator: "openai/demo/images/a.png" }, verification: { exists: true, verifiedAt: "2026-04-18T00:00:00.000Z" } } } }),
+      localizeArtifactFromRepo: async () => ({ ok: true, value: { artifactId: "artifacts/20260418000000-local01", localObject: { key: "artifacts/20260418000000-local01", sizeBytes: 1 }, source: { provider: "huggingface", repository: "openai/demo", path: "images/a.png", locator: "openai/demo/images/a.png" }, localizedAt: "2026-04-18T00:00:00.000Z" } }),
     };
 
     const api = getDesktopApi();

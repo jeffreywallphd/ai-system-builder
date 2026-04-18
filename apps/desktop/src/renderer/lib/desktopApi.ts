@@ -65,6 +65,23 @@ export interface DesktopPublishedBacking {
   };
 }
 
+export interface DesktopLocalizedArtifactFromRepo {
+  artifactId: string;
+  localObject: {
+    key: string;
+    mediaType?: string;
+    sizeBytes: number;
+  };
+  source: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator: string;
+  };
+  localizedAt: string;
+}
+
 export type DesktopImageUploadResult =
   | {
       ok: true;
@@ -112,6 +129,9 @@ interface DesktopApiBridge {
     };
     artifactKind?: "image";
     mediaType?: string;
+  }) => Promise<unknown>;
+  localizeArtifactFromRepo: (input: {
+    artifactId: string;
   }) => Promise<unknown>;
 }
 

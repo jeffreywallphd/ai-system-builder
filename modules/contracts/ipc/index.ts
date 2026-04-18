@@ -13,3 +13,4 @@ export * from "./desktop-artifact-publish-contract";
 export * from "./desktop-artifact-publish-verify-contract";
 
 export * from "./desktop-artifact-register-from-repo-contract";
+export * from "./desktop-artifact-localize-from-repo-contract";

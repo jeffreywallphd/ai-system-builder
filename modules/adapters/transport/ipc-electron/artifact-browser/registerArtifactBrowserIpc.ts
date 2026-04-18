@@ -2,6 +2,8 @@ import type { ArtifactContentRetrievalPort } from "../../../../application/ports
 import type {
   BrowseArtifactsCommand,
   BrowseArtifactsUseCasePort,
+  LocalizeArtifactFromRepoCommand,
+  LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoCommand,
   PublishArtifactToRepoUseCase,
   RegisterArtifactFromRepoCommand,
@@ -24,6 +26,7 @@ import {
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
@@ -31,6 +34,7 @@ import {
   DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_RESPONSE_CHANNEL,
   createDesktopArtifactBrowseSuccessResponse,
   createDesktopArtifactContentReadSuccessResponse,
   createDesktopArtifactMediaViewSuccessResponse,
@@ -38,6 +42,7 @@ import {
   createDesktopArtifactPublishSuccessResponse,
   createDesktopArtifactPublishVerifySuccessResponse,
   createDesktopArtifactRegisterFromRepoSuccessResponse,
+  createDesktopArtifactLocalizeFromRepoSuccessResponse,
   createIpcError,
   createIpcFailureResponse,
   type DesktopArtifactBrowseRequest,
@@ -54,6 +59,8 @@ import {
   type DesktopArtifactPublishVerifyResponse,
   type DesktopArtifactRegisterFromRepoRequest,
   type DesktopArtifactRegisterFromRepoResponse,
+  type DesktopArtifactLocalizeFromRepoRequest,
+  type DesktopArtifactLocalizeFromRepoResponse,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 export type { IpcMainHandlePort } from "../ipcMainHandlePort";
@@ -67,6 +74,7 @@ export interface RegisterArtifactBrowserIpcDependencies {
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
   registerArtifactFromRepoUseCase: Pick<RegisterArtifactFromRepoUseCase, "execute">;
+  localizeArtifactFromRepoUseCase: Pick<LocalizeArtifactFromRepoUseCase, "execute">;
 }
 
 export function mapDesktopArtifactBrowseRequestToCommand(
@@ -129,6 +137,14 @@ export function mapDesktopArtifactRegisterFromRepoRequestToCommand(
   };
 }
 
+export function mapDesktopArtifactLocalizeFromRepoRequestToCommand(
+  request: DesktopArtifactLocalizeFromRepoRequest,
+): LocalizeArtifactFromRepoCommand {
+  return {
+    artifactId: request.payload.artifactId,
+  };
+}
+
 export function mapDesktopArtifactRequestContext(
   request:
     | DesktopArtifactBrowseRequest
@@ -137,7 +153,8 @@ export function mapDesktopArtifactRequestContext(
     | DesktopArtifactMediaViewRequest
     | DesktopArtifactPublishRequest
     | DesktopArtifactPublishVerifyRequest
-    | DesktopArtifactRegisterFromRepoRequest,
+    | DesktopArtifactRegisterFromRepoRequest
+    | DesktopArtifactLocalizeFromRepoRequest,
 ): { requestId?: string; correlationId?: string } {
   return {
     requestId: request.requestId,
@@ -447,6 +464,24 @@ function mapRegisterFromRepoFailure(
   );
 }
 
+function mapLocalizeFromRepoFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopArtifactLocalizeFromRepoResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
 export function createDesktopArtifactRegisterFromRepoIpcHandler(
   registerArtifactFromRepoUseCase: Pick<RegisterArtifactFromRepoUseCase, "execute">,
 ) {
@@ -463,6 +498,28 @@ export function createDesktopArtifactRegisterFromRepoIpcHandler(
     }
 
     return createDesktopArtifactRegisterFromRepoSuccessResponse(result.value, {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+    });
+  };
+}
+
+export function createDesktopArtifactLocalizeFromRepoIpcHandler(
+  localizeArtifactFromRepoUseCase: Pick<LocalizeArtifactFromRepoUseCase, "execute">,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopArtifactLocalizeFromRepoRequest,
+  ): Promise<DesktopArtifactLocalizeFromRepoResponse> => {
+    const result = await localizeArtifactFromRepoUseCase.execute(
+      mapDesktopArtifactLocalizeFromRepoRequestToCommand(request),
+    );
+
+    if (!result.ok) {
+      return mapLocalizeFromRepoFailure(request, result.error);
+    }
+
+    return createDesktopArtifactLocalizeFromRepoSuccessResponse(result.value, {
       requestId: request.requestId,
       correlationId: request.correlationId,
     });
@@ -499,5 +556,9 @@ export function registerArtifactBrowserIpc(
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value,
     createDesktopArtifactRegisterFromRepoIpcHandler(dependencies.registerArtifactFromRepoUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value,
+    createDesktopArtifactLocalizeFromRepoIpcHandler(dependencies.localizeArtifactFromRepoUseCase),
   );
 }

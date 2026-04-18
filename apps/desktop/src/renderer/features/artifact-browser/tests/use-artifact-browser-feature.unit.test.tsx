@@ -90,6 +90,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         },
       }),
       registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -157,6 +158,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       publishArtifactToHuggingFace: vi.fn().mockRejectedValue(new Error("Missing Hugging Face token.")),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -233,6 +235,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         },
       }),
       registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -293,6 +296,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
           },
         },
       }),
+      localizeArtifactFromRepo: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -328,5 +332,85 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       mediaType: undefined,
     });
     expect(container.textContent).toContain("Registered imports/huggingface/openai/demo/main/images/cat.png from Hugging Face.");
+  });
+
+  it("localizes imported artifact bytes from the artifact panel", async () => {
+    const client = {
+      browseImageArtifacts: vi.fn().mockResolvedValue([
+        { storageKey: "artifacts/20260418000000-local01", artifactKind: "image" as const },
+      ]),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "artifacts/20260418000000-local01" },
+        artifactKind: "image" as const,
+        metadata: {
+          importedSourceBacking: {
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/cat.png",
+              revision: "main",
+            },
+            verification: { exists: true },
+          },
+        },
+      }),
+      readArtifactContent: vi.fn()
+        .mockResolvedValueOnce({
+          locator: { storageKey: "artifacts/20260418000000-local01" },
+          availability: "unavailable" as const,
+          retrieval: "deferred" as const,
+        })
+        .mockResolvedValueOnce({
+          locator: { storageKey: "artifacts/20260418000000-local01" },
+          availability: "available" as const,
+          retrieval: "deferred" as const,
+        }),
+      createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
+        artifactId: "artifacts/20260418000000-local01",
+        localObject: {
+          key: "artifacts/20260418000000-local01",
+          mediaType: "image/png",
+          sizeBytes: 3,
+        },
+        source: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          locator: "openai/demo/images/cat.png",
+        },
+        localizedAt: "2026-04-18T00:00:00.000Z",
+      }),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const artifactButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("artifacts/20260418000000-local01")) as HTMLButtonElement;
+    await act(async () => {
+      artifactButton.click();
+    });
+
+    const localizeButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Localize/download artifact") as HTMLButtonElement;
+    await act(async () => {
+      localizeButton.click();
+    });
+
+    expect(client.localizeArtifactFromRepo).toHaveBeenCalledWith({
+      artifactId: "artifacts/20260418000000-local01",
+    });
+    expect(container.textContent).toContain("Localized artifacts/20260418000000-local01 to local object storage.");
   });
 });

@@ -4,6 +4,7 @@ import {
   type DesktopArtifactBrowserLocator,
   type DesktopArtifactContentDescriptor,
   type DesktopArtifactDetail,
+  type DesktopLocalizedArtifactFromRepo,
   type DesktopPublishedBacking,
   type DesktopRegisteredArtifactFromRepo,
 } from "../../../lib/desktopApi";
@@ -29,6 +30,9 @@ export interface DesktopArtifactBrowserClient {
     revision?: string;
     mediaType?: string;
   }) => Promise<DesktopRegisteredArtifactFromRepo>;
+  localizeArtifactFromRepo: (input: {
+    artifactId: string;
+  }) => Promise<DesktopLocalizedArtifactFromRepo>;
 }
 
 function ensureSuccess<T>(
@@ -146,6 +150,16 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         }),
         (value) => value as DesktopRegisteredArtifactFromRepo,
         "Failed to register artifact from repo.",
+      );
+    },
+
+    async localizeArtifactFromRepo(input) {
+      return ensureSuccess(
+        await desktopApi.localizeArtifactFromRepo({
+          artifactId: input.artifactId,
+        }),
+        (value) => value as DesktopLocalizedArtifactFromRepo,
+        "Failed to localize artifact from repo.",
       );
     },
   };

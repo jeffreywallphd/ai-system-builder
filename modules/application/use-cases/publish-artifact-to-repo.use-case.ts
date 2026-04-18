@@ -4,6 +4,11 @@ import {
   createHasArtifactInRepoRequest,
   createStoreArtifactInRepoRequest,
 } from "../../contracts/storage";
+import {
+  Artifact,
+  ArtifactBacking,
+  ArtifactId,
+} from "../../domain/artifact";
 import type {
   ArtifactObjectStoragePort,
   ArtifactRepoStoragePort,
@@ -56,11 +61,17 @@ export class PublishArtifactToRepoUseCase {
   }
 
   public async execute(command: PublishArtifactToRepoCommand) {
-    const artifactId = command.artifactId.trim();
-    if (!artifactId) {
+    let artifactId: ArtifactId;
+    try {
+      artifactId = ArtifactId.from(command.artifactId);
+    } catch (error) {
       return {
         ok: false as const,
-        error: createContractError("validation", "artifactId must be a non-empty string."),
+        error: createContractError("validation", "artifactId must be a non-empty string.", {
+          details: {
+            reason: error instanceof Error ? error.message : String(error),
+          },
+        }),
       };
     }
 
@@ -73,7 +84,7 @@ export class PublishArtifactToRepoUseCase {
     }
 
     const localResult = await this.artifactStorage.retrieveArtifact({
-      key: artifactId,
+      key: artifactId.toString(),
     });
     if (!localResult.ok) {
       return localResult;
@@ -102,28 +113,49 @@ export class PublishArtifactToRepoUseCase {
       repository: command.target.repository,
       path: targetPath,
     });
-    const bindingResult = await this.artifactBindingStorage.upsertArtifactStorageBinding({
-      binding: {
-        artifactId,
+    const existingBindingsResult = await this.artifactBindingStorage.readArtifactStorageBindings({
+      artifactId: artifactId.toString(),
+    });
+    if (!existingBindingsResult.ok) {
+      return existingBindingsResult;
+    }
+
+    const artifact = Artifact.fromStorageBindings({
+      artifactId: artifactId.toString(),
+      artifactKind: "image",
+      bindings: existingBindingsResult.value.bindings,
+    });
+    artifact.attachOrUpdateBacking(
+      ArtifactBacking.from({
+        kind: "artifact-repo",
+        provider: command.target.provider,
+        locator,
         role: "published",
         createdAt: verifiedAt,
-        backing: {
-          kind: "artifact-repo",
+        revision,
+        target: {
           provider: command.target.provider,
-          locator,
+          repository: command.target.repository,
+          path: targetPath,
           revision,
-          target: {
-            provider: command.target.provider,
-            repository: command.target.repository,
-            revision,
-            path: targetPath,
-          },
-          verification: {
-            exists: hasResult.value.exists,
-            verifiedAt,
-          },
         },
-      },
+        verification: {
+          exists: hasResult.value.exists,
+          verifiedAt,
+        },
+      }),
+    );
+
+    const latestPublishedBacking = artifact.latestBackingForRole("published");
+    if (!latestPublishedBacking) {
+      return {
+        ok: false as const,
+        error: createContractError("internal", "Published backing could not be constructed."),
+      };
+    }
+
+    const bindingResult = await this.artifactBindingStorage.upsertArtifactStorageBinding({
+      binding: latestPublishedBacking.toStorageBinding(artifact.id.toString()),
     });
     if (!bindingResult.ok) {
       return bindingResult;
@@ -147,3 +179,4 @@ export class PublishArtifactToRepoUseCase {
     };
   }
 }
+

@@ -119,6 +119,48 @@ describe("desktop renderer artifact workflow page", () => {
           },
         },
       }),
+      registerArtifactFromRepo: vi.fn().mockResolvedValue({
+        operation: "artifact.register.from-repo",
+        channel: "ipc.artifact.register.from-repo.response",
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-import001",
+          backing: {
+            role: "imported-source",
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/cat.png",
+              revision: "main",
+              locator: "openai/demo/images/cat.png",
+            },
+            verification: {
+              exists: true,
+              verifiedAt: "2026-04-18T00:00:00.000Z",
+            },
+          },
+        },
+      }),
+      localizeArtifactFromRepo: vi.fn().mockResolvedValue({
+        operation: "artifact.localize.from-repo",
+        channel: "ipc.artifact.localize.from-repo.response",
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-local01",
+          localObject: {
+            key: "artifacts/20260418000000-local01",
+            mediaType: "image/png",
+            sizeBytes: 2,
+          },
+          source: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/cat.png",
+            locator: "openai/demo/images/cat.png",
+          },
+          localizedAt: "2026-04-18T00:00:00.000Z",
+        },
+      }),
     };
 
     const { root, container } = mountApp();

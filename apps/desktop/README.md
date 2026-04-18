@@ -36,6 +36,14 @@ Current methods:
   - maps UI verification payload into the `artifact.publish.verify` IPC request envelope
   - invokes only `ipc.artifact.publish.verify.request`
   - returns structured verify result/failure envelope
+- `registerArtifactFromRepo(input, context?)`
+  - maps UI register payload into the `artifact.register.from-repo` IPC request envelope
+  - invokes only `ipc.artifact.register.from-repo.request`
+  - returns structured register result/failure envelope
+- `localizeArtifactFromRepo(input, context?)`
+  - maps UI localize payload into the `artifact.localize.from-repo` IPC request envelope
+  - invokes only `ipc.artifact.localize.from-repo.request`
+  - returns structured localize result/failure envelope
 
 Design constraints:
 
@@ -51,6 +59,7 @@ Design constraints:
 - calls preload bridge methods (`window.desktopApi.*`) through feature-local clients/hooks
 - renders browse/detail/content preview and Hugging Face publish success/error feedback
 - supports published-backing re-check and last-verified display from durable binding metadata
+- supports imported-source inspection and explicit localize/download action when local bytes are missing
 - reuses shared cross-host publish/re-check hook logic from `modules/ui/shared`
 
 Renderer constraints for this slice:
@@ -58,6 +67,3 @@ Renderer constraints for this slice:
 - no direct filesystem access from UI
 - no direct IPC channel usage from UI
 - no styling expansion beyond the existing minimal renderer structure
-
-
-- artifact register/import flow via preload/IPC (`artifact.register.from-repo`) using the same shared application use-case path as server/thin-client

@@ -12,6 +12,8 @@ Current scope:
 - artifact publish flow that calls `POST /api/artifact/publish` and surfaces published backing details
 - artifact publish verification/re-check flow that calls `POST /api/artifact/publish/verify`
 - artifact detail panel can render persisted published backing metadata from server-side binding records
+- artifact register/import flow that calls `POST /api/artifact/register-from-repo` and refreshes artifact-browser selection on success
+- imported artifact localize/download flow that calls `POST /api/artifact/localize-from-repo` when remote-source artifacts do not yet have local bytes
 - artifact-browser publish/re-check state orchestration now uses a shared cross-host hook from `modules/ui/shared`
 - token-first style baseline under `src/styles/`
 
@@ -46,6 +48,3 @@ From this workspace directly:
 - `npm run dev`
 - `npm run build`
 - `npm run preview`
-
-
-- artifact register/import flow that calls `POST /api/artifact/register-from-repo` using repo/path/revision input and refreshes artifact-browser selection on success

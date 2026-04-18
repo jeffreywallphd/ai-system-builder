@@ -1,9 +1,8 @@
 import { createContractError } from "../../contracts/shared";
 import {
   createHasArtifactInRepoRequest,
-  resolveArtifactRepoBackingTarget,
-  type ArtifactStorageBinding,
 } from "../../contracts/storage";
+import { Artifact, ArtifactId } from "../../domain/artifact";
 import type {
   ArtifactRepoStoragePort,
   ArtifactStorageBindingPort,
@@ -33,12 +32,6 @@ export interface VerifyPublishedArtifactBackingUseCaseDependencies {
   now?: () => string;
 }
 
-function pickLatestPublishedBinding(bindings: ArtifactStorageBinding[]): ArtifactStorageBinding | undefined {
-  return bindings
-    .filter((binding) => binding.role === "published" && binding.backing.kind === "artifact-repo")
-    .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""))[0];
-}
-
 export class VerifyPublishedArtifactBackingUseCase {
   private readonly artifactRepoStorage: ArtifactRepoStoragePort;
   private readonly artifactBindingStorage: ArtifactStorageBindingPort;
@@ -51,28 +44,41 @@ export class VerifyPublishedArtifactBackingUseCase {
   }
 
   public async execute(command: VerifyPublishedArtifactBackingCommand) {
-    const artifactId = command.artifactId.trim();
-    if (!artifactId) {
+    let artifactId: ArtifactId;
+    try {
+      artifactId = ArtifactId.from(command.artifactId);
+    } catch (error) {
       return {
         ok: false as const,
-        error: createContractError("validation", "artifactId must be a non-empty string."),
+        error: createContractError("validation", "artifactId must be a non-empty string.", {
+          details: {
+            reason: error instanceof Error ? error.message : String(error),
+          },
+        }),
       };
     }
 
-    const readBindingsResult = await this.artifactBindingStorage.readArtifactStorageBindings({ artifactId });
+    const readBindingsResult = await this.artifactBindingStorage.readArtifactStorageBindings({
+      artifactId: artifactId.toString(),
+    });
     if (!readBindingsResult.ok) {
       return readBindingsResult;
     }
 
-    const latestBinding = pickLatestPublishedBinding(readBindingsResult.value.bindings);
-    if (!latestBinding) {
+    const artifact = Artifact.fromStorageBindings({
+      artifactId: artifactId.toString(),
+      artifactKind: "image",
+      bindings: readBindingsResult.value.bindings,
+    });
+    const latestPublishedBacking = artifact.latestBackingForRole("published");
+    if (!latestPublishedBacking) {
       return {
         ok: false as const,
         error: createContractError("not-found", "No published backing exists for this artifact."),
       };
     }
 
-    const target = resolveArtifactRepoBackingTarget(latestBinding.backing);
+    const target = latestPublishedBacking.resolvedTarget();
     if (!target) {
       return {
         ok: false as const,
@@ -93,24 +99,17 @@ export class VerifyPublishedArtifactBackingUseCase {
     }
 
     const verifiedAt = this.now();
-    const upsertResult = await this.artifactBindingStorage.upsertArtifactStorageBinding({
-      binding: {
-        ...latestBinding,
-        createdAt: verifiedAt,
-        backing: {
-          ...latestBinding.backing,
-          target: {
-            provider: target.provider,
-            repository: target.repository,
-            path: target.path,
-            revision: target.revision,
-          },
-          verification: {
-            exists: hasResult.value.exists,
-            verifiedAt,
-          },
-        },
+    const updatedBacking = latestPublishedBacking.withVerification(
+      {
+        exists: hasResult.value.exists,
+        verifiedAt,
       },
+      verifiedAt,
+    );
+    artifact.attachOrUpdateBacking(updatedBacking);
+
+    const upsertResult = await this.artifactBindingStorage.upsertArtifactStorageBinding({
+      binding: updatedBacking.toStorageBinding(artifact.id.toString()),
     });
     if (!upsertResult.ok) {
       return upsertResult;
@@ -119,7 +118,13 @@ export class VerifyPublishedArtifactBackingUseCase {
     return {
       ok: true as const,
       value: {
-        target,
+        target: {
+          provider: target.provider,
+          repository: target.repository,
+          path: target.path,
+          revision: target.revision,
+          locator: latestPublishedBacking.locator,
+        },
         verification: {
           exists: hasResult.value.exists,
           verifiedAt,
@@ -128,3 +133,4 @@ export class VerifyPublishedArtifactBackingUseCase {
     };
   }
 }
+

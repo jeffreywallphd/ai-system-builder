@@ -73,4 +73,51 @@ describe("VerifyPublishedArtifactBackingUseCase", () => {
     });
     expect(artifactBindingStorage.upsertArtifactStorageBinding).toHaveBeenCalled();
   });
+
+  it("supports legacy published rows that only have locator-encoded repo targets", async () => {
+    const artifactRepoStorage: ArtifactRepoStoragePort = {
+      hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
+      storeArtifactInRepo: testDouble.fn(),
+      retrieveArtifactFromRepo: testDouble.fn(),
+    } as unknown as ArtifactRepoStoragePort;
+
+    const artifactBindingStorage: ArtifactStorageBindingPort = {
+      readArtifactStorageBindings: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          bindings: [
+            {
+              artifactId: "imports/huggingface/openai/demo/main/images/a.png",
+              role: "published",
+              createdAt: "2026-04-16T00:00:00.000Z",
+              backing: {
+                kind: "artifact-repo",
+                provider: "huggingface",
+                locator: "openai/demo/images/a.png",
+                revision: "main",
+              },
+            },
+          ],
+        },
+      })),
+      upsertArtifactStorageBinding: testDouble.fn(async (request) => ({
+        ok: true,
+        value: { binding: request.binding },
+      })),
+    } as unknown as ArtifactStorageBindingPort;
+
+    const useCase = new VerifyPublishedArtifactBackingUseCase({
+      artifactRepoStorage,
+      artifactBindingStorage,
+      now: () => "2026-04-17T00:00:00.000Z",
+    });
+
+    const result = await useCase.execute({ artifactId: "imports/huggingface/openai/demo/main/images/a.png" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected verify success.");
+    }
+    expect(result.value.target.repository).toBe("openai/demo");
+    expect(result.value.target.path).toBe("images/a.png");
+  });
 });
