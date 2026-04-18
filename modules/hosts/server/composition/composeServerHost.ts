@@ -173,9 +173,13 @@ export function composeServerHost(
       });
       const browseHuggingFaceNamespaceDatasets = new BrowseHuggingFaceNamespaceDatasetsUseCase({
         repoBrowser: huggingFaceArtifactRepoStorage,
+        logging: loggingPort,
+        now: options.now,
       });
       const browseHuggingFaceDatasetParquetFiles = new BrowseHuggingFaceDatasetParquetFilesUseCase({
         repoBrowser: huggingFaceArtifactRepoStorage,
+        logging: loggingPort,
+        now: options.now,
       });
       const storeArtifactInRepo = new StoreArtifactInRepoUseCase({
         artifactRepoStorage,
@@ -200,6 +204,7 @@ export function composeServerHost(
         artifactRepoStorage,
         artifactBindingStorage: artifactBindings,
         artifactCatalogAppend: artifactCatalog,
+        logging: loggingPort,
         now: options.now,
         artifactIdFactory: new SystemArtifactIdFactory(),
       });

@@ -119,8 +119,8 @@ describe("ArtifactBrowserFeature", () => {
     });
 
     const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
+    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
 
     const publishButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Publish") as HTMLButtonElement;
@@ -189,8 +189,8 @@ describe("ArtifactBrowserFeature", () => {
     });
 
     const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
+    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
 
     const publishButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Publish") as HTMLButtonElement;
@@ -305,8 +305,8 @@ describe("ArtifactBrowserFeature", () => {
     });
 
     const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
+    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
 
     const publishButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Publish") as HTMLButtonElement;
@@ -417,6 +417,9 @@ describe("ArtifactBrowserFeature", () => {
       }),
       readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn().mockResolvedValue({
@@ -456,8 +459,8 @@ describe("ArtifactBrowserFeature", () => {
     });
 
     const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
+    setInputValue(inputs[2] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[3] as HTMLInputElement, "images/cat.png");
 
     const registerButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Register") as HTMLButtonElement;
@@ -487,6 +490,9 @@ describe("ArtifactBrowserFeature", () => {
       }),
       readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       browseHuggingFaceNamespaceDatasets: vi.fn().mockResolvedValue([
@@ -531,7 +537,7 @@ describe("ArtifactBrowserFeature", () => {
       registerToggle.click();
     });
 
-    const namespaceInput = Array.from(container.querySelectorAll("input"))[0] as HTMLInputElement;
+    const namespaceInput = Array.from(container.querySelectorAll("input"))[1] as HTMLInputElement;
     setInputValue(namespaceInput, "openai");
     const registerNamespaceButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Register namespace") as HTMLButtonElement;
@@ -689,6 +695,9 @@ describe("ArtifactBrowserFeature", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       verifyImportedSourceBacking: vi.fn().mockResolvedValue({

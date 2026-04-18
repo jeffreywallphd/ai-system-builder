@@ -668,11 +668,14 @@ export function registerArtifactRepoApiRoutes(
       return;
     }
 
-    const result = await dependencies.registerArtifactFromRepoUseCase.execute({
-      target: apiRequest.payload.target,
-      artifactKind: apiRequest.payload.artifactKind,
-      mediaType: apiRequest.payload.mediaType,
-    });
+    const result = await dependencies.registerArtifactFromRepoUseCase.execute(
+      {
+        target: apiRequest.payload.target,
+        artifactKind: apiRequest.payload.artifactKind,
+        mediaType: apiRequest.payload.mediaType,
+      },
+      context,
+    );
 
     const apiResponse = result.ok
       ? createApiArtifactRegisterFromRepoSuccessResponse(result.value, context)

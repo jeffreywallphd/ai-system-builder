@@ -173,6 +173,7 @@ export function composeDesktopHost(
         artifactRepoStorage,
         artifactBindingStorage: artifactBindings,
         artifactCatalogAppend: artifactCatalog,
+        logging: loggingPort,
         now: options.now,
         artifactIdFactory: new SystemArtifactIdFactory(),
       });
@@ -184,9 +185,13 @@ export function composeDesktopHost(
       });
       const browseHuggingFaceNamespaceDatasets = new BrowseHuggingFaceNamespaceDatasetsUseCase({
         repoBrowser: huggingFaceArtifactRepoStorage,
+        logging: loggingPort,
+        now: options.now,
       });
       const browseHuggingFaceDatasetParquetFiles = new BrowseHuggingFaceDatasetParquetFilesUseCase({
         repoBrowser: huggingFaceArtifactRepoStorage,
+        logging: loggingPort,
+        now: options.now,
       });
 
       registerElectronIpc({

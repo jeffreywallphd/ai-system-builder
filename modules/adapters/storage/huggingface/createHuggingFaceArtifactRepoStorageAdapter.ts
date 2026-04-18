@@ -728,7 +728,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
           path: typeof entry.path === "string" ? entry.path.trim() : "",
           sizeBytes: typeof entry.size === "number" ? entry.size : undefined,
         }))
-        .filter((entry) => entry.path.toLowerCase().endsWith(".parquet"))
+        .filter((entry) => entry.path.length > 0)
         .map((entry) => ({
           repository,
           path: entry.path,

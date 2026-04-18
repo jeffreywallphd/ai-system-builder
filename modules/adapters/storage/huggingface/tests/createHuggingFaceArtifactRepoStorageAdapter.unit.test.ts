@@ -335,7 +335,7 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     expect(fetchImplementation).toHaveBeenCalled();
   });
 
-  it("lists parquet files for a dataset repository", async () => {
+  it("lists dataset repository files", async () => {
     const fetchImplementation = testDouble.fn(async () => new Response(JSON.stringify([
       { path: "data/train-00000.parquet", type: "file", size: 1234 },
       { path: "data/README.md", type: "file", size: 45 },
@@ -352,7 +352,7 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
-      throw new Error("Expected dataset parquet browse success.");
+      throw new Error("Expected dataset file browse success.");
     }
 
     expect(result.value.files).toEqual([
@@ -361,6 +361,12 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
         path: "data/train-00000.parquet",
         revision: "main",
         sizeBytes: 1234,
+      },
+      {
+        repository: "OpenFinAL/financial-news",
+        path: "data/README.md",
+        revision: "main",
+        sizeBytes: 45,
       },
       {
         repository: "OpenFinAL/financial-news",

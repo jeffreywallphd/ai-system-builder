@@ -55,6 +55,7 @@ export interface UseArtifactBrowserFeatureResult {
   browseHuggingFaceDatasetParquetFiles: (repository: string) => Promise<void>;
   huggingFaceNamespaceDatasets: ThinClientHuggingFaceNamespaceDataset[];
   huggingFaceDatasetParquetFiles: ThinClientHuggingFaceDatasetParquetFile[];
+  datasetFilesState: ArtifactBrowserViewState;
   selectedHuggingFaceDataset?: string;
   localizeArtifactFromRepo: () => Promise<void>;
   recheckPublishedBacking: () => Promise<void>;
@@ -116,6 +117,7 @@ export function useArtifactBrowserFeature(
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [huggingFaceNamespaceDatasets, setHuggingFaceNamespaceDatasets] = useState<ThinClientHuggingFaceNamespaceDataset[]>([]);
   const [huggingFaceDatasetParquetFiles, setHuggingFaceDatasetParquetFiles] = useState<ThinClientHuggingFaceDatasetParquetFile[]>([]);
+  const [datasetFilesState, setDatasetFilesState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [selectedHuggingFaceDataset, setSelectedHuggingFaceDataset] = useState<string | undefined>();
   const [tokenInput, setTokenInput] = useState("");
   const [tokenState, setTokenState] = useState<ArtifactBrowserViewState>({ status: "idle" });
@@ -272,6 +274,7 @@ export function useArtifactBrowserFeature(
       });
       setHuggingFaceNamespaceDatasets(datasets);
       setHuggingFaceDatasetParquetFiles([]);
+      setDatasetFilesState({ status: "idle", message: "Select a dataset to view files." });
       setSelectedHuggingFaceDataset(undefined);
       setRegisterState({
         status: "success",
@@ -286,7 +289,8 @@ export function useArtifactBrowserFeature(
   }
 
   async function browseHuggingFaceDatasetParquetFiles(repository: string): Promise<void> {
-    setRegisterState({ status: "loading", message: `Loading parquet files for ${repository}...` });
+    setDatasetFilesState({ status: "loading", message: `Loading files for ${repository}...` });
+    setRegisterState({ status: "loading", message: `Loading files for ${repository}...` });
     try {
       if (!artifactClient.browseHuggingFaceDatasetParquetFiles) {
         throw new Error("Dataset file browsing is unavailable for this client.");
@@ -298,12 +302,17 @@ export function useArtifactBrowserFeature(
       setSelectedHuggingFaceDataset(repository);
       setRegisterRepository(repository);
       setHuggingFaceDatasetParquetFiles(files);
+      setDatasetFilesState({
+        status: "success",
+        message: files.length > 0 ? `Loaded ${files.length} file(s).` : "No files found for this dataset.",
+      });
       setRegisterState({
         status: "success",
-        message: files.length > 0 ? `Loaded ${files.length} parquet file(s).` : "No parquet files found for this dataset.",
+        message: files.length > 0 ? `Loaded ${files.length} file(s).` : "No files found for this dataset.",
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load parquet files.";
+      const message = error instanceof Error ? error.message : "Failed to load dataset files.";
+      setDatasetFilesState({ status: "error", message: withHuggingFaceAuthGuidance(message) });
       setRegisterState({ status: "error", message: withHuggingFaceAuthGuidance(message) });
     }
   }
@@ -407,6 +416,7 @@ export function useArtifactBrowserFeature(
     browseHuggingFaceDatasetParquetFiles,
     huggingFaceNamespaceDatasets,
     huggingFaceDatasetParquetFiles,
+    datasetFilesState,
     selectedHuggingFaceDataset,
     localizeArtifactFromRepo,
     recheckPublishedBacking,

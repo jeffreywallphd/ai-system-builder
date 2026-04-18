@@ -73,6 +73,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     browseHuggingFaceDatasetParquetFiles,
     huggingFaceNamespaceDatasets,
     huggingFaceDatasetParquetFiles,
+    datasetFilesState,
     selectedHuggingFaceDataset,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
@@ -139,8 +140,13 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               ))}
             </ul>
           )}
-          <h4>Dataset parquet files {selectedHuggingFaceDataset ? `(${selectedHuggingFaceDataset})` : ""}</h4>
-          {huggingFaceDatasetParquetFiles.length === 0 ? <p className="ui-text-muted">Select a dataset to view parquet files.</p> : (
+          <h4>Dataset files {selectedHuggingFaceDataset ? `(${selectedHuggingFaceDataset})` : ""}</h4>
+          {datasetFilesState.status === "loading" ? <p role="status">Loading dataset files…</p> : null}
+          {datasetFilesState.status === "error" ? <p role="alert">{datasetFilesState.message ?? "Failed to load dataset files."}</p> : null}
+          {huggingFaceDatasetParquetFiles.length === 0 && datasetFilesState.status !== "loading" && datasetFilesState.status !== "error" ? (
+            <p className="ui-text-muted">{selectedHuggingFaceDataset ? "No files found for this dataset." : "Select a dataset to view files."}</p>
+          ) : null}
+          {huggingFaceDatasetParquetFiles.length > 0 ? (
             <ul className="ui-stack ui-stack--sm">
               {huggingFaceDatasetParquetFiles.map((file) => (
                 <li key={`${file.repository}:${file.path}`}>
@@ -155,7 +161,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
           <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={registerForm.repository} onChange={(event) => setRegisterRepository(event.target.value)} required /></label>
           <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={registerForm.pathInRepo} onChange={(event) => setRegisterPathInRepo(event.target.value)} required /></label>
           <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={registerForm.revision} onChange={(event) => setRegisterRevision(event.target.value)} /></label>

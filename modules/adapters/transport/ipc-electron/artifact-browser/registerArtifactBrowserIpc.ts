@@ -687,6 +687,7 @@ export function createDesktopArtifactRegisterFromRepoIpcHandler(
   ): Promise<DesktopArtifactRegisterFromRepoResponse> => {
     const result = await registerArtifactFromRepoUseCase.execute(
       mapDesktopArtifactRegisterFromRepoRequestToCommand(request),
+      mapDesktopArtifactRequestContext(request),
     );
 
     if (!result.ok) {
