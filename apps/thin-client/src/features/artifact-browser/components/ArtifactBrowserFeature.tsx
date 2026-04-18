@@ -99,7 +99,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
 
   return (
     <section className="ui-panel ui-stack ui-stack--sm">
-      <header className="ui-grid ui-grid--two"><h2>Artifact browser (images)</h2><button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>Refresh</button></header>
+      <header className="ui-grid ui-grid--two"><h2>Data Artifact Browser</h2><button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>Refresh</button></header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
       <section className="ui-stack ui-stack--sm">
         <h3>Hugging Face token</h3>

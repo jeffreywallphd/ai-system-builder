@@ -48,7 +48,7 @@ describe("thin-client routing and page composition", () => {
     });
 
     expect(container.textContent).toContain("Image upload");
-    expect(container.textContent).toContain("Artifact browser (images)");
+    expect(container.textContent).toContain("Data Artifact Browser");
     expect(window.location.pathname).toBe("/artifacts");
   });
 });

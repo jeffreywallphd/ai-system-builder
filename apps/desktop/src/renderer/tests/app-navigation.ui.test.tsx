@@ -55,7 +55,7 @@ describe("desktop renderer page composition", () => {
     });
 
     expect(container.textContent).toContain("Image upload");
-    expect(container.textContent).toContain("Artifact browser (images)");
+    expect(container.textContent).toContain("Data Artifact Browser");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "System",
