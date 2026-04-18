@@ -56,7 +56,9 @@ export interface UseArtifactBrowserPublishLogicDependencies<TDetail extends Arti
   client: ArtifactBrowserPublishClient;
 }
 
-export interface UseArtifactBrowserPublishLogicResult {
+export interface UseArtifactBrowserPublishLogicResult<
+  TDetail extends ArtifactDetailWithPublishedBacking = ArtifactDetailWithPublishedBacking,
+> {
   publishState: ArtifactBrowserViewState;
   publishedBacking?: PublishedBackingView;
   publishForm: {
@@ -78,7 +80,7 @@ export interface UseArtifactBrowserPublishLogicResult {
 
 export function useArtifactBrowserPublishLogic<TDetail extends ArtifactDetailWithPublishedBacking>(
   dependencies: UseArtifactBrowserPublishLogicDependencies<TDetail>,
-): UseArtifactBrowserPublishLogicResult {
+): UseArtifactBrowserPublishLogicResult<TDetail> {
   const [publishState, setPublishState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [publishedBacking, setPublishedBacking] = useState<PublishedBackingView | undefined>();
   const [repository, setRepository] = useState("");

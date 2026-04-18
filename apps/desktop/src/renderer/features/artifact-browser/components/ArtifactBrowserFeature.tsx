@@ -8,6 +8,7 @@ export interface ArtifactBrowserFeatureProps {
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
   const {
     items,
+    selectedStorageKey,
     detail,
     content,
     imageViewUrl,
