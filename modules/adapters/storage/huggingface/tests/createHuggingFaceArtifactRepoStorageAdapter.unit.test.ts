@@ -147,7 +147,7 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     });
   });
 
-  it("requires token for store and returns validation", async () => {
+  it("requires token for store and returns explicit unavailable auth-required error", async () => {
     const adapter = createHuggingFaceArtifactRepoStorageAdapter({
       hubClient: createHubClientDouble(),
     });
@@ -167,7 +167,8 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     if (missingTokenResult.ok) {
       throw new Error("Expected missing token failure.");
     }
-    expect(missingTokenResult.error.code).toBe("validation");
+    expect(missingTokenResult.error.code).toBe("unavailable");
+    expect(missingTokenResult.error.message).toContain("requires authentication");
   });
 
   it("maps provider status errors to explicit contract codes", async () => {
@@ -216,5 +217,93 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
 
     expect(notFound.error.code).toBe("not-found");
     expect(unavailable.error.code).toBe("unavailable");
+  });
+
+  it("maps provider 401 without token to clear auth-required unavailable failure", async () => {
+    const hubClient = createHubClientDouble();
+    hubClient.fileExists = testDouble.fn(async () => {
+      throw {
+        statusCode: 401,
+        message: "Unauthorized",
+      };
+    });
+
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient,
+    });
+
+    const result = await adapter.hasArtifactInRepo(
+      createHasArtifactInRepoRequest({
+        provider: "huggingface",
+        repository: "openai/private-demo",
+        path: "a.bin",
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected unavailable auth-required failure.");
+    }
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.message).toContain("No token is configured");
+    expect(result.error.code).not.toBe("not-found");
+  });
+
+  it("maps provider 403 with token to invalid-token-or-access-denied unavailable failure", async () => {
+    const hubClient = createHubClientDouble();
+    hubClient.downloadFile = testDouble.fn(async () => {
+      throw {
+        statusCode: 403,
+        message: "Forbidden",
+      };
+    });
+
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient,
+      accessToken: "hf_xxx",
+    });
+
+    const result = await adapter.retrieveArtifactFromRepo(
+      createRetrieveArtifactFromRepoRequest({
+        provider: "huggingface",
+        repository: "openai/private-demo",
+        path: "a.bin",
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected unavailable access-denied failure.");
+    }
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.message).toContain("invalid/insufficient");
+    expect(result.error.code).not.toBe("not-found");
+  });
+
+  it("maps non-ok download response statuses (401/403 family) without reporting not-found", async () => {
+    const hubClient = createHubClientDouble();
+    hubClient.downloadFile = testDouble.fn(async () => new Response(null, {
+      status: 401,
+      statusText: "Unauthorized",
+    }));
+
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient,
+    });
+
+    const result = await adapter.retrieveArtifactFromRepo(
+      createRetrieveArtifactFromRepoRequest({
+        provider: "huggingface",
+        repository: "openai/private-demo",
+        path: "a.bin",
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected unavailable auth-required failure.");
+    }
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.message).toContain("access token");
   });
 });

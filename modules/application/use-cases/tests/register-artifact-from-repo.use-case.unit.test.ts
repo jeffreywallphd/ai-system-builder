@@ -1,6 +1,7 @@
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
 import { createHasArtifactInRepoSuccessResult } from "../../../contracts/storage";
+import { createContractError } from "../../../contracts/shared";
 import type { ArtifactCatalogAppendPort } from "../../ports/artifact-catalog";
 import type {
   ArtifactRepoStoragePort,
@@ -113,5 +114,44 @@ describe("RegisterArtifactFromRepoUseCase", () => {
     expect(artifactIdFactory.createArtifactId).toHaveBeenCalledTimes(1);
     expect(result.value.artifactId).toBe("artifacts/20260418000000-factory001");
   });
-});
 
+  it("returns explicit register/import auth guidance when repository access is unavailable", async () => {
+    const artifactRepoStorage: ArtifactRepoStoragePort = {
+      hasArtifactInRepo: testDouble.fn(async () => ({
+        ok: false as const,
+        error: createContractError("unavailable", "Hugging Face hasArtifactInRepo requires an access token for this repository. No token is configured."),
+      })),
+      storeArtifactInRepo: testDouble.fn(),
+      retrieveArtifactFromRepo: testDouble.fn(),
+    } as unknown as ArtifactRepoStoragePort;
+
+    const artifactBindingStorage: ArtifactStorageBindingPort = {
+      readArtifactStorageBindings: testDouble.fn(),
+      upsertArtifactStorageBinding: testDouble.fn(),
+    } as unknown as ArtifactStorageBindingPort;
+    const artifactCatalogAppend: ArtifactCatalogAppendPort = {
+      appendArtifactCatalogRecord: testDouble.fn(),
+    };
+
+    const useCase = new RegisterArtifactFromRepoUseCase({
+      artifactRepoStorage,
+      artifactBindingStorage,
+      artifactCatalogAppend,
+    });
+
+    const result = await useCase.execute({
+      target: {
+        provider: "huggingface",
+        repository: "openai/private-demo",
+        path: "images/a.png",
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected unavailable failure.");
+    }
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.message).toContain("register/import");
+  });
+});

@@ -88,6 +88,18 @@ export class RegisterArtifactFromRepoUseCase {
     );
 
     if (!hasResult.ok) {
+      if (hasResult.error.code === "unavailable") {
+        return {
+          ok: false as const,
+          error: createContractError(
+            "unavailable",
+            `Failed to verify Hugging Face repository access for register/import. ${hasResult.error.message}`,
+            {
+              details: hasResult.error.details,
+            },
+          ),
+        };
+      }
       return hasResult;
     }
 
@@ -181,4 +193,3 @@ export class RegisterArtifactFromRepoUseCase {
     };
   }
 }
-

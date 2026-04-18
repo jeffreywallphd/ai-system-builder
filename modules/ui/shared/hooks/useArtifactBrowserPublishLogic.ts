@@ -85,6 +85,25 @@ export interface UseArtifactBrowserPublishLogicResult<
 export function useArtifactBrowserPublishLogic<TDetail extends ArtifactDetailWithPublishedBacking>(
   dependencies: UseArtifactBrowserPublishLogicDependencies<TDetail>,
 ): UseArtifactBrowserPublishLogicResult<TDetail> {
+  const withHuggingFaceAuthGuidance = (message: string): string => {
+    const normalized = message.toLowerCase();
+    const mentionsAuth = normalized.includes("hugging face")
+      && (
+        normalized.includes("token")
+        || normalized.includes("auth")
+        || normalized.includes("401")
+        || normalized.includes("403")
+        || normalized.includes("access denied")
+        || normalized.includes("private")
+        || normalized.includes("gated")
+      );
+    if (!mentionsAuth) {
+      return message;
+    }
+
+    return `${message} This Hugging Face repository may require an access token. Configure a Hugging Face token in the host/server environment to access private or gated repos.`;
+  };
+
   const [publishState, setPublishState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [publishedBacking, setPublishedBacking] = useState<PublishedBackingView | undefined>();
   const [repository, setRepository] = useState("");
@@ -123,9 +142,10 @@ export function useArtifactBrowserPublishLogic<TDetail extends ArtifactDetailWit
       const refreshedDetail = await dependencies.readSelectedArtifactDetail();
       setPublishedBackingFromDetail(refreshedDetail);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to publish artifact.";
       setPublishState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to publish artifact.",
+        message: withHuggingFaceAuthGuidance(message),
       });
     }
   }
@@ -151,9 +171,10 @@ export function useArtifactBrowserPublishLogic<TDetail extends ArtifactDetailWit
       const refreshedDetail = await dependencies.readSelectedArtifactDetail();
       setPublishedBackingFromDetail(refreshedDetail);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to verify published backing.";
       setPublishState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to verify published backing.",
+        message: withHuggingFaceAuthGuidance(message),
       });
     }
   }
