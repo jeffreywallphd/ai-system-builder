@@ -121,7 +121,13 @@ describe("desktop image upload end-to-end", () => {
       verifyPublishedArtifactBackingUseCase: {
         execute: async () => unavailableResult,
       },
+      verifyImportedArtifactSourceBackingUseCase: {
+        execute: async () => unavailableResult,
+      },
       registerArtifactFromRepoUseCase: {
+        execute: async () => unavailableResult,
+      },
+      localizeArtifactFromRepoUseCase: {
         execute: async () => unavailableResult,
       },
     });

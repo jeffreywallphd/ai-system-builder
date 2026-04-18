@@ -403,7 +403,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     const localizeButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Localize/download artifact") as HTMLButtonElement;
+      .find((button) => button.textContent === "Localize artifact") as HTMLButtonElement;
     await act(async () => {
       localizeButton.click();
     });
@@ -412,5 +412,91 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       artifactId: "artifacts/20260418000000-local01",
     });
     expect(container.textContent).toContain("Localized artifacts/20260418000000-local01 to local object storage.");
+  });
+
+  it("shows source verification and remote-only/localized state cues based on backing state", async () => {
+    const client = {
+      browseImageArtifacts: vi.fn().mockResolvedValue([
+        {
+          storageKey: "artifacts/20260418000000-local01",
+          artifactKind: "image" as const,
+          metadata: {
+            backingState: {
+              hasImportedSourceBacking: true,
+              hasPublishedBacking: true,
+              hasLocalObjectAvailable: false,
+              isLocalized: false,
+              isRemoteOnly: true,
+            },
+          },
+        },
+      ]),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "artifacts/20260418000000-local01" },
+        artifactKind: "image" as const,
+        metadata: {
+          importedSourceBacking: {
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/cat.png",
+              revision: "main",
+            },
+            verification: { exists: true, verifiedAt: "2026-04-18T00:00:00.000Z" },
+          },
+          publishedBacking: {
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo-public",
+              path: "images/cat.png",
+              revision: "main",
+            },
+            verification: { exists: true, verifiedAt: "2026-04-18T00:00:00.000Z" },
+          },
+        },
+      }),
+      readArtifactContent: vi.fn().mockResolvedValue({
+        locator: { storageKey: "artifacts/20260418000000-local01" },
+        availability: "unavailable" as const,
+        retrieval: "deferred" as const,
+      }),
+      createArtifactMediaViewUrl: vi.fn().mockResolvedValue(""),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      verifyImportedSourceBacking: vi.fn().mockResolvedValue({
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+        },
+        verification: { exists: true, verifiedAt: "2026-04-19T00:00:00.000Z" },
+      }),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    expect(container.textContent).toContain("Remote only");
+    expect(container.textContent).toContain("Published");
+
+    const artifactButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("artifacts/20260418000000-local01")) as HTMLButtonElement;
+    await act(async () => {
+      artifactButton.click();
+    });
+
+    expect(container.textContent).toContain("Remote-only artifact. Local preview is unavailable until localization.");
+    expect(container.textContent).toContain("Re-check source backing");
+    expect(container.textContent).toContain("Localize artifact");
   });
 });

@@ -6,6 +6,7 @@ import {
   normalizeStorageArtifactKey,
   type StorageArtifactKey,
 } from "../storage";
+import type { StorageObjectMetadata } from "../storage";
 
 export const ARTIFACT_BROWSE_KINDS = ["image"] as const;
 
@@ -19,6 +20,7 @@ export interface ArtifactBrowseItem {
   sourceKind?: IngestionSourceKind;
   originalName?: string;
   createdAt?: string;
+  metadata?: StorageObjectMetadata;
 }
 
 export interface ArtifactBrowseSuccessValue {

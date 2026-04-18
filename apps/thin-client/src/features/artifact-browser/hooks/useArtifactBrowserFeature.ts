@@ -24,6 +24,7 @@ export interface UseArtifactBrowserFeatureResult {
   publishState: ArtifactBrowserViewState;
   registerState: ArtifactBrowserViewState;
   localizeState: ArtifactBrowserViewState;
+  sourceVerifyState: ArtifactBrowserViewState;
   publishedBacking?: ThinClientPublishedBacking;
   localizedArtifact?: ThinClientLocalizedArtifactFromRepo;
   publishForm: UseArtifactBrowserPublishLogicResult["publishForm"];
@@ -41,6 +42,7 @@ export interface UseArtifactBrowserFeatureResult {
   registerArtifactFromHuggingFace: () => Promise<void>;
   localizeArtifactFromRepo: () => Promise<void>;
   recheckPublishedBacking: () => Promise<void>;
+  recheckSourceBacking: () => Promise<void>;
   setRepository: (value: string) => void;
   setPathInRepo: (value: string) => void;
   setRevision: (value: string) => void;
@@ -65,6 +67,7 @@ export function useArtifactBrowserFeature(
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [localizeState, setLocalizeState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [sourceVerifyState, setSourceVerifyState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [localizedArtifact, setLocalizedArtifact] = useState<ThinClientLocalizedArtifactFromRepo | undefined>();
   const [registerRepository, setRegisterRepository] = useState("");
   const [registerPathInRepo, setRegisterPathInRepo] = useState("");
@@ -179,6 +182,7 @@ export function useArtifactBrowserFeature(
         artifactId: selectedStorageKey,
       });
       setLocalizedArtifact(localized);
+      await refreshArtifacts();
       await selectArtifact(selectedStorageKey);
       setLocalizeState({
         status: "success",
@@ -192,6 +196,44 @@ export function useArtifactBrowserFeature(
     }
   }
 
+  async function recheckSourceBacking(): Promise<void> {
+    if (!selectedStorageKey) {
+      setSourceVerifyState({ status: "error", message: "Select an artifact before verification." });
+      return;
+    }
+
+    setSourceVerifyState({ status: "loading", message: "Verifying imported source backing..." });
+    try {
+      if (!artifactClient.verifyImportedSourceBacking) {
+        throw new Error("Source verification is unavailable for this client.");
+      }
+      await artifactClient.verifyImportedSourceBacking({
+        artifactId: selectedStorageKey,
+      });
+      await refreshArtifacts();
+      await selectArtifact(selectedStorageKey);
+      setSourceVerifyState({
+        status: "success",
+        message: "Imported source backing verification refreshed.",
+      });
+    } catch (error) {
+      setSourceVerifyState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to verify imported source backing.",
+      });
+    }
+  }
+
+  async function publishArtifactToHuggingFace(): Promise<void> {
+    await publishLogic.publishArtifactToHuggingFace();
+    await refreshArtifacts();
+  }
+
+  async function recheckPublishedBacking(): Promise<void> {
+    await publishLogic.recheckPublishedBacking();
+    await refreshArtifacts();
+  }
+
   return {
     items,
     selectedStorageKey,
@@ -201,6 +243,7 @@ export function useArtifactBrowserFeature(
     publishState: publishLogic.publishState,
     registerState,
     localizeState,
+    sourceVerifyState,
     publishedBacking: publishLogic.publishedBacking,
     localizedArtifact,
     publishForm: publishLogic.publishForm,
@@ -214,10 +257,11 @@ export function useArtifactBrowserFeature(
     viewState,
     selectArtifact,
     refreshArtifacts,
-    publishArtifactToHuggingFace: publishLogic.publishArtifactToHuggingFace,
+    publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
     localizeArtifactFromRepo,
-    recheckPublishedBacking: publishLogic.recheckPublishedBacking,
+    recheckPublishedBacking,
+    recheckSourceBacking,
     setRepository: publishLogic.setRepository,
     setPathInRepo: publishLogic.setPathInRepo,
     setRevision: publishLogic.setRevision,

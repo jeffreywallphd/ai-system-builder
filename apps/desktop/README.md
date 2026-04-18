@@ -36,6 +36,10 @@ Current methods:
   - maps UI verification payload into the `artifact.publish.verify` IPC request envelope
   - invokes only `ipc.artifact.publish.verify.request`
   - returns structured verify result/failure envelope
+- `verifyImportedArtifactSourceBacking(input, context?)`
+  - maps UI imported-source verification payload into the `artifact.source.verify` IPC request envelope
+  - invokes only `ipc.artifact.source.verify.request`
+  - returns structured source-verify result/failure envelope
 - `registerArtifactFromRepo(input, context?)`
   - maps UI register payload into the `artifact.register.from-repo` IPC request envelope
   - invokes only `ipc.artifact.register.from-repo.request`
@@ -59,7 +63,9 @@ Design constraints:
 - calls preload bridge methods (`window.desktopApi.*`) through feature-local clients/hooks
 - renders browse/detail/content preview and Hugging Face publish success/error feedback
 - supports published-backing re-check and last-verified display from durable binding metadata
+- supports imported-source re-check and separate source verification status display
 - supports imported-source inspection and explicit localize/download action when local bytes are missing
+- surfaces artifact-first backing-state cues (`Remote only`, `Localized`, `Published`) plus local object availability/localization state
 - reuses shared cross-host publish/re-check hook logic from `modules/ui/shared`
 
 Renderer constraints for this slice:

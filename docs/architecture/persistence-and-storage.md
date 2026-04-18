@@ -189,6 +189,7 @@ The first read-side browser/viewer slice is image-backed but artifact-shaped.
 - actual image/media bytes for rendering should be delivered through a separate retrieval path that still resolves by storage key at the boundary.
 - Canonical browse/read/content contracts should remain descriptor/reference-oriented at public boundaries (locator + metadata + availability/retrieval hints), not raw-byte-first payload contracts.
 - Browser contracts stay storage-key based and path-agnostic; public browse/view contracts must not expose filesystem paths.
+- Browser list/read models may include artifact/backing-state metadata (for example remote-only/localized/published cues) while preserving artifact-first semantics and path-agnostic contracts.
 - The system artifact browser is a normalized browser over internal artifacts; it is not a filesystem browser.
 - The system artifact browser is also not the same as a provider-native browser (for example a Hugging Face repository UI).
 - External provider-native browsers may coexist, but normalized internal browse/read/content contracts remain the system source of truth.
@@ -255,6 +256,7 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 ### Repo-backing authority update (April 2026)
 
 - New publish and register-from-repo writes must populate structured `backing.target` fields (`provider`, `repository`, `path`, `revision`) on `ArtifactStorageBinding`.
-- Read and verify paths now treat structured target data as authoritative and only fall back to locator decoding for legacy bindings that predate structured targets.
+- Read and verify/update paths now treat structured target data as authoritative and only fall back to locator decoding for legacy bindings that predate structured targets; legacy verify/update flows should backfill structured targets when possible.
 - Remote registration now writes `role = imported-source` bindings (not `published`) to preserve backing semantics.
 - Imported artifacts can now be explicitly localized/downloaded through shared orchestration (`artifact.localize.from-repo`) while keeping artifact browser as the primary surface.
+- Imported-source verification is exposed as a separate shared operation (`artifact.source.verify`) so source backing status can be refreshed distinctly from published backing status.

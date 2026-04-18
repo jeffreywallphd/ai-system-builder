@@ -21,6 +21,15 @@ export interface DesktopArtifactBrowseItem {
   sizeBytes?: number;
   originalName?: string;
   createdAt?: string;
+  metadata?: {
+    backingState?: {
+      hasImportedSourceBacking: boolean;
+      hasPublishedBacking: boolean;
+      hasLocalObjectAvailable: boolean;
+      isLocalized: boolean;
+      isRemoteOnly: boolean;
+    };
+  };
 }
 
 export interface DesktopArtifactDetail {
@@ -118,6 +127,9 @@ interface DesktopApiBridge {
     mediaType?: string;
   }) => Promise<unknown>;
   verifyPublishedArtifactBacking: (input: {
+    artifactId: string;
+  }) => Promise<unknown>;
+  verifyImportedArtifactSourceBacking?: (input: {
     artifactId: string;
   }) => Promise<unknown>;
   registerArtifactFromRepo: (input: {

@@ -302,4 +302,43 @@ describe("desktop artifact browser client", () => {
     });
     expect(result.localObject.key).toBe("artifacts/20260418000000-local01");
   });
+
+  it("re-checks imported source backing through preload source-verify bridge", async () => {
+    window.desktopApi = {
+      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyImportedArtifactSourceBacking: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/cat.png",
+            revision: "main",
+            locator: "openai/demo/images/cat.png",
+          },
+          verification: {
+            exists: true,
+            verifiedAt: "2026-04-18T00:00:00.000Z",
+          },
+        },
+      }),
+      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+    };
+
+    const client = createDesktopArtifactBrowserClient();
+    const result = await client.verifyImportedSourceBacking({
+      artifactId: "artifacts/20260418000000-local01",
+    });
+
+    expect(window.desktopApi.verifyImportedArtifactSourceBacking).toHaveBeenCalledWith({
+      artifactId: "artifacts/20260418000000-local01",
+    });
+    expect(result.verification.exists).toBe(true);
+  });
 });

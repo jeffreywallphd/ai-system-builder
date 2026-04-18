@@ -54,6 +54,16 @@ interface RepoBackingReadModel {
   };
 }
 
+interface ArtifactBrowserStateMetadata {
+  backingState: {
+    hasImportedSourceBacking: boolean;
+    hasPublishedBacking: boolean;
+    hasLocalObjectAvailable: boolean;
+    isLocalized: boolean;
+    isRemoteOnly: boolean;
+  };
+}
+
 function withPublishedBackingMetadata<TMetadata extends StorageObjectMetadata>(
   metadata: TMetadata | undefined,
   repoBackings: {
@@ -64,6 +74,16 @@ function withPublishedBackingMetadata<TMetadata extends StorageObjectMetadata>(
   return {
     ...(metadata ?? {}),
     ...repoBackings,
+  } as unknown as TMetadata;
+}
+
+function withArtifactStateMetadata<TMetadata extends StorageObjectMetadata>(
+  metadata: TMetadata | undefined,
+  stateMetadata: ArtifactBrowserStateMetadata,
+): TMetadata {
+  return {
+    ...(metadata ?? {}),
+    ...stateMetadata,
   } as unknown as TMetadata;
 }
 
@@ -113,6 +133,45 @@ function toBrowseItem(record: ArtifactCatalogRecord): ArtifactBrowseItem {
     sourceKind: record.sourceKind,
     originalName: record.originalName,
     createdAt: record.createdAt,
+  };
+}
+
+async function readLocalObjectAvailability(
+  options: CreateFilesystemArtifactBrowserReadAdapterOptions,
+  artifactId: string,
+  context: ApplicationRequestContext,
+): Promise<boolean> {
+  if (!options.storage) {
+    return false;
+  }
+
+  const hasArtifactResult = await options.storage.hasArtifact({ key: artifactId }, context);
+  return hasArtifactResult.ok && hasArtifactResult.value.exists;
+}
+
+async function readBrowseStateMetadata(
+  options: CreateFilesystemArtifactBrowserReadAdapterOptions,
+  artifactId: string,
+  context: ApplicationRequestContext,
+): Promise<ArtifactBrowserStateMetadata | undefined> {
+  const [publishedBacking, importedSourceBacking, hasLocalObjectAvailable] = await Promise.all([
+    readLatestRepoBackingByRole(options, artifactId, context, "published"),
+    readLatestRepoBackingByRole(options, artifactId, context, "imported-source"),
+    readLocalObjectAvailability(options, artifactId, context),
+  ]);
+
+  const hasImportedSourceBacking = Boolean(importedSourceBacking);
+  const hasPublishedBacking = Boolean(publishedBacking);
+  const isLocalized = hasImportedSourceBacking && hasLocalObjectAvailable;
+  const isRemoteOnly = hasImportedSourceBacking && !hasLocalObjectAvailable;
+  return {
+    backingState: {
+      hasImportedSourceBacking,
+      hasPublishedBacking,
+      hasLocalObjectAvailable,
+      isLocalized,
+      isRemoteOnly,
+    },
   };
 }
 
@@ -166,7 +225,19 @@ export function createFilesystemArtifactBrowserReadAdapter(
         .map((record) => toBrowseItem(record))
         .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
 
-      return createSuccessResult({ items }, context);
+      const enrichedItems = await Promise.all(items.map(async (item) => {
+        const stateMetadata = await readBrowseStateMetadata(options, item.storageKey, context);
+        if (!stateMetadata) {
+          return item;
+        }
+
+        return {
+          ...item,
+          metadata: withArtifactStateMetadata(item.metadata, stateMetadata),
+        };
+      }));
+
+      return createSuccessResult({ items: enrichedItems }, context);
     },
 
     async readArtifactDetail<TMetadata extends StorageObjectMetadata = StorageObjectMetadata>(

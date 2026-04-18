@@ -68,6 +68,24 @@ describe("registerArtifactRepoApiRoutes", () => {
         },
       })),
     };
+    const verifyImportedArtifactSourceBackingUseCase = {
+      execute: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "artifacts/a.bin",
+            revision: "main",
+            locator: "openai/demo/artifacts/a.bin",
+          },
+          verification: {
+            exists: true,
+            verifiedAt: "2026-04-17T00:00:00.000Z",
+          },
+        },
+      })),
+    };
     const registerArtifactFromRepoUseCase = {
       execute: testDouble.fn(async () => ({
         ok: true,
@@ -118,15 +136,17 @@ describe("registerArtifactRepoApiRoutes", () => {
       storeArtifactInRepoUseCase,
       publishArtifactToRepoUseCase,
       verifyPublishedArtifactBackingUseCase,
+      verifyImportedArtifactSourceBackingUseCase,
       registerArtifactFromRepoUseCase,
       localizeArtifactFromRepoUseCase,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(6);
+    expect(app.post).toHaveBeenCalledTimes(7);
     expect(handlers.has("/api/artifact-repo/has")).toBe(true);
     expect(handlers.has("/api/artifact-repo/store")).toBe(true);
     expect(handlers.has("/api/artifact/publish")).toBe(true);
     expect(handlers.has("/api/artifact/publish/verify")).toBe(true);
+    expect(handlers.has("/api/artifact/source/verify")).toBe(true);
     expect(handlers.has("/api/artifact/register-from-repo")).toBe(true);
     expect(handlers.has("/api/artifact/localize-from-repo")).toBe(true);
 
@@ -203,6 +223,19 @@ describe("registerArtifactRepoApiRoutes", () => {
     });
     expect(response.status).toHaveBeenCalledWith(200);
 
+    await handlers.get("/api/artifact/source/verify")?.(
+      {
+        body: {
+          artifactId: "uploads/a.bin",
+        },
+        headers: {},
+      },
+      response,
+    );
+    expect(verifyImportedArtifactSourceBackingUseCase.execute).toHaveBeenCalledWith({
+      artifactId: "uploads/a.bin",
+    });
+
     await handlers.get("/api/artifact/localize-from-repo")?.(
       {
         body: {
@@ -231,6 +264,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
+      verifyImportedArtifactSourceBackingUseCase: { execute: testDouble.fn() },
       registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
       localizeArtifactFromRepoUseCase: { execute: testDouble.fn() },
     });
@@ -280,6 +314,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
+      verifyImportedArtifactSourceBackingUseCase: { execute: testDouble.fn() },
       registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
       localizeArtifactFromRepoUseCase: { execute: testDouble.fn() },
     });

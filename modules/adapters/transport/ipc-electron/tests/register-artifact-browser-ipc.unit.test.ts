@@ -10,6 +10,7 @@ import {
   DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
@@ -18,6 +19,7 @@ import {
   createDesktopArtifactMediaViewRequest,
   createDesktopArtifactPublishRequest,
   createDesktopArtifactPublishVerifyRequest,
+  createDesktopArtifactSourceVerifyRequest,
   createDesktopArtifactRegisterFromRepoRequest,
   createDesktopArtifactLocalizeFromRepoRequest,
   createDesktopArtifactReadRequest,
@@ -39,6 +41,7 @@ function createUseCases() {
     artifactMediaViewRetrieval: { retrieveArtifactViewerMediaByStorageKey: testDouble.fn() },
     publishArtifactToRepoUseCase: { execute: testDouble.fn() },
     verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
+    verifyImportedArtifactSourceBackingUseCase: { execute: testDouble.fn() },
     registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
     localizeArtifactFromRepoUseCase: { execute: testDouble.fn() },
   };
@@ -108,6 +111,19 @@ describe("registerArtifactBrowserIpc", () => {
         verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
       },
     });
+    (dependencies.verifyImportedArtifactSourceBackingUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+      ok: true,
+      value: {
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/a.png",
+          revision: "main",
+          locator: "openai/demo/images/a.png",
+        },
+        verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
+      },
+    });
     (dependencies.registerArtifactFromRepoUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
       ok: true,
       value: {
@@ -147,13 +163,14 @@ describe("registerArtifactBrowserIpc", () => {
 
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(8);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(9);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value)).toBe(true);
 
@@ -204,6 +221,13 @@ describe("registerArtifactBrowserIpc", () => {
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
+    await handlers.get(DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL.value)?.(
+      {},
+      createDesktopArtifactSourceVerifyRequest({
+        artifactId: "uploads/a.png",
+        boundary: { host: "desktop", source: "desktop.renderer" },
+      }),
+    );
     await handlers.get(DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value)?.(
       {},
       createDesktopArtifactRegisterFromRepoRequest({
@@ -250,6 +274,9 @@ describe("registerArtifactBrowserIpc", () => {
       mediaType: undefined,
     });
     expect(dependencies.verifyPublishedArtifactBackingUseCase.execute).toHaveBeenCalledWith({
+      artifactId: "uploads/a.png",
+    });
+    expect(dependencies.verifyImportedArtifactSourceBackingUseCase.execute).toHaveBeenCalledWith({
       artifactId: "uploads/a.png",
     });
     expect(dependencies.registerArtifactFromRepoUseCase.execute).toHaveBeenCalledWith({

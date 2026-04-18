@@ -127,5 +127,5 @@ If host code starts accumulating business logic, move that logic inward before i
 
 ### Current host parity for repo-backed artifact workflows
 
-- Server API and desktop IPC/preload both expose shared publish, verify, register-from-repo, and localize-from-repo use cases.
+- Server API and desktop IPC/preload both expose shared publish, published-verify, source-verify, register-from-repo, and localize-from-repo use cases.
 - Thin-client and desktop renderer surfaces remain host-specific UI layers but call into the same shared application workflow path.

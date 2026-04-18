@@ -49,6 +49,8 @@ export interface ArtifactRepoBackingTarget {
 export function resolveArtifactRepoBackingTarget(
   backing: Pick<StorageBackingReference, "provider" | "locator" | "revision" | "target">,
 ): ArtifactRepoBackingTarget | undefined {
+  // Structured target is authoritative for current writes. Locator decode remains
+  // compatibility-only for legacy bindings that predate structured target fields.
   if (backing.target?.repository && backing.target.path) {
     return {
       provider: backing.target.provider,

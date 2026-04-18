@@ -3,6 +3,7 @@ import type {
   HasArtifactInRepoUseCasePort,
   LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
+  VerifyImportedArtifactSourceBackingUseCase,
   StoreArtifactInRepoCommand,
   StoreArtifactInRepoUseCasePort,
   VerifyPublishedArtifactBackingUseCase,
@@ -15,6 +16,9 @@ import {
   createApiArtifactPublishVerifyFailureResponse,
   createApiArtifactPublishVerifyRequest,
   createApiArtifactPublishVerifySuccessResponse,
+  createApiArtifactSourceVerifyFailureResponse,
+  createApiArtifactSourceVerifyRequest,
+  createApiArtifactSourceVerifySuccessResponse,
   createApiArtifactLocalizeFromRepoFailureResponse,
   createApiArtifactLocalizeFromRepoRequest,
   createApiArtifactLocalizeFromRepoSuccessResponse,
@@ -29,6 +33,7 @@ import {
   createApiArtifactRepoStoreSuccessResponse,
   type ApiArtifactPublishResponse,
   type ApiArtifactPublishVerifyResponse,
+  type ApiArtifactSourceVerifyResponse,
   type ApiArtifactLocalizeFromRepoResponse,
   type ApiArtifactRegisterFromRepoResponse,
   type ApiArtifactRepoHasResponse,
@@ -69,6 +74,11 @@ interface ArtifactPublishVerifyApiRequestBody {
   source?: string;
 }
 
+interface ArtifactSourceVerifyApiRequestBody {
+  artifactId: string;
+  source?: string;
+}
+
 interface ArtifactLocalizeFromRepoApiRequestBody {
   artifactId: string;
   source?: string;
@@ -98,6 +108,7 @@ export interface ArtifactRepoExpressResponseLike {
     | ApiArtifactRepoStoreResponse
     | ApiArtifactPublishResponse
     | ApiArtifactPublishVerifyResponse
+    | ApiArtifactSourceVerifyResponse
     | ApiArtifactLocalizeFromRepoResponse
     | ApiArtifactRegisterFromRepoResponse
   ) => void;
@@ -119,6 +130,7 @@ export interface RegisterArtifactRepoApiRoutesDependencies {
   storeArtifactInRepoUseCase: StoreArtifactInRepoUseCasePort;
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
+  verifyImportedArtifactSourceBackingUseCase: Pick<VerifyImportedArtifactSourceBackingUseCase, "execute">;
   registerArtifactFromRepoUseCase: Pick<RegisterArtifactFromRepoUseCase, "execute">;
   localizeArtifactFromRepoUseCase: Pick<LocalizeArtifactFromRepoUseCase, "execute">;
 }
@@ -399,6 +411,45 @@ export function registerArtifactRepoApiRoutes(
     const apiResponse = result.ok
       ? createApiArtifactPublishVerifySuccessResponse(result.value, context)
       : createApiArtifactPublishVerifyFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+        },
+      );
+    response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/artifact/source/verify", async (request, response) => {
+    const context = mapRequestContext(request);
+    let apiRequest: ReturnType<typeof createApiArtifactSourceVerifyRequest>;
+
+    try {
+      apiRequest = createApiArtifactSourceVerifyRequest({
+        artifactId: (request.body as ArtifactSourceVerifyApiRequestBody).artifactId,
+        source: normalizeSource((request.body as ArtifactSourceVerifyApiRequestBody).source),
+      }, context);
+    } catch (error) {
+      const apiResponse = createApiArtifactSourceVerifyFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid artifact source-verify request.",
+        context,
+      );
+      response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.verifyImportedArtifactSourceBackingUseCase.execute({
+      artifactId: apiRequest.payload.artifactId,
+    });
+
+    const apiResponse = result.ok
+      ? createApiArtifactSourceVerifySuccessResponse(result.value, context)
+      : createApiArtifactSourceVerifyFailureResponse(
         result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
           ? result.error.code
           : "internal",

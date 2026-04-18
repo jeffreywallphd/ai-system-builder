@@ -21,6 +21,7 @@ This created boundary ambiguity:
 Introduce a small artifact domain slice under `modules/domain/artifact/`:
 
 - `ArtifactId` as canonical internal id value object (system-owned for new registrations/imports),
+- `SystemArtifactIdFactory` as the id-generation policy seam used by application composition/use cases,
 - `ArtifactBacking` as backing/source role + verification value object,
 - `Artifact` as lightweight entity for backing attach/update/dedup decisions.
 
@@ -28,12 +29,14 @@ Apply this domain model in:
 
 - `PublishArtifactToRepoUseCase`,
 - `VerifyPublishedArtifactBackingUseCase`,
+- `VerifyImportedArtifactSourceBackingUseCase`,
 - `RegisterArtifactFromRepoUseCase`.
 
 Add shared import-usefulness step:
 
 - `LocalizeArtifactFromRepoUseCase` for explicit download/localize of imported artifacts,
 - exposed through server API, desktop IPC/preload, thin-client and desktop artifact-browser clients/UI.
+- imported-source verification re-check (`artifact.source.verify`) follows the same shared application path through server + desktop transports.
 
 ## Consequences
 
@@ -42,7 +45,7 @@ Add shared import-usefulness step:
 - Internal artifact identity is now explicit and system-owned for new import/register writes.
 - Backing/source identity remains backing metadata (`provider/repository/path/revision`), not canonical artifact identity.
 - Backing role and verification updates are centralized and reused across publish/verify/register/localize workflows.
-- Artifact browser remains the primary surface, now with explicit imported-source + localize progression.
+- Artifact browser remains the primary surface, now with explicit imported-source/published/local-object state clarity and post-localize progression.
 
 ### Negative
 

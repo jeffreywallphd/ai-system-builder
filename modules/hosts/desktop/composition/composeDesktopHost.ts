@@ -1,4 +1,5 @@
 import type { LoggingPort } from "../../../application/ports/logging";
+import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
   LocalizeArtifactFromRepoUseCase,
@@ -7,6 +8,7 @@ import {
   ReadArtifactDetailUseCase,
   RegisterArtifactFromRepoUseCase,
   StoreImageUploadUseCase,
+  VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
@@ -137,11 +139,17 @@ export function composeDesktopHost(
         artifactBindingStorage: artifactBindings,
         now: options.now,
       });
+      const verifyImportedArtifactSourceBacking = new VerifyImportedArtifactSourceBackingUseCase({
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        now: options.now,
+      });
       const registerArtifactFromRepo = new RegisterArtifactFromRepoUseCase({
         artifactRepoStorage,
         artifactBindingStorage: artifactBindings,
         artifactCatalogAppend: artifactCatalog,
         now: options.now,
+        artifactIdFactory: new SystemArtifactIdFactory(),
       });
       const localizeArtifactFromRepo = new LocalizeArtifactFromRepoUseCase({
         artifactRepoStorage,
@@ -159,6 +167,7 @@ export function composeDesktopHost(
         artifactMediaViewRetrieval,
         publishArtifactToRepoUseCase: publishArtifactToRepo,
         verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
+        verifyImportedArtifactSourceBackingUseCase: verifyImportedArtifactSourceBacking,
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
       });

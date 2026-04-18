@@ -5,7 +5,13 @@ import {
   createHasArtifactInRepoRequest,
   encodeArtifactRepoBackingLocator,
 } from "../../contracts/storage";
-import { Artifact, ArtifactBacking, ArtifactId } from "../../domain/artifact";
+import {
+  Artifact,
+  ArtifactBacking,
+  ArtifactId,
+  SystemArtifactIdFactory,
+  type ArtifactIdFactory,
+} from "../../domain/artifact";
 
 export interface RegisterArtifactFromRepoCommand {
   target: {
@@ -41,6 +47,7 @@ export interface RegisterArtifactFromRepoUseCaseDependencies {
   artifactBindingStorage: ArtifactStorageBindingPort;
   artifactCatalogAppend: ArtifactCatalogAppendPort;
   now?: () => string;
+  artifactIdFactory?: ArtifactIdFactory;
   createArtifactId?: () => ArtifactId;
 }
 
@@ -56,7 +63,8 @@ export class RegisterArtifactFromRepoUseCase {
     this.artifactBindingStorage = dependencies.artifactBindingStorage;
     this.artifactCatalogAppend = dependencies.artifactCatalogAppend;
     this.now = dependencies.now ?? (() => new Date().toISOString());
-    this.createArtifactId = dependencies.createArtifactId ?? (() => ArtifactId.generate());
+    const artifactIdFactory = dependencies.artifactIdFactory ?? new SystemArtifactIdFactory();
+    this.createArtifactId = dependencies.createArtifactId ?? (() => artifactIdFactory.createArtifactId());
   }
 
   public async execute(command: RegisterArtifactFromRepoCommand) {

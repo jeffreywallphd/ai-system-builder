@@ -1,6 +1,8 @@
 import { Fragment } from "react";
 
 import {
+  deriveArtifactBackingState,
+  deriveArtifactListStatusLabels,
   derivePublishedBackingDisplayRows,
   derivePublishedBackingVerificationPresentation,
   type PublishedBackingView,
@@ -54,6 +56,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     publishState,
     registerState,
     localizeState,
+    sourceVerifyState,
     publishedBacking,
     localizedArtifact,
     publishForm,
@@ -65,6 +68,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     registerArtifactFromHuggingFace,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
+    recheckSourceBacking,
     setRepository,
     setPathInRepo,
     setRevision,
@@ -76,6 +80,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     setRegisterMediaType,
     toggleRegisterForm,
   } = useArtifactBrowserFeature(client);
+  const backingState = deriveArtifactBackingState(detail, content);
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -110,6 +115,9 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
                 <button className="ui-button" type="button" onClick={() => void selectArtifact(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
                   {item.originalName ?? item.storageKey}
                 </button>
+                {item.metadata?.backingState ? (
+                  <small>{deriveArtifactListStatusLabels(item.metadata.backingState).join(" · ")}</small>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -141,6 +149,21 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
             </dl>
           ) : null}
 
+          {detail ? (
+            <section className="ui-stack ui-stack--sm">
+              <h3>Local Object State</h3>
+              <dl className="ui-grid ui-grid--two">
+                <dt>Local object availability</dt>
+                <dd>{backingState.hasLocalObjectAvailable ? "available" : "not available"}</dd>
+                <dt>Localization state</dt>
+                <dd>{backingState.isLocalized ? "localized" : backingState.isRemoteOnly ? "not localized" : "n/a"}</dd>
+              </dl>
+              {backingState.isRemoteOnly ? (
+                <p role="status">Remote-only artifact. Local preview is unavailable until localization.</p>
+              ) : null}
+            </section>
+          ) : null}
+
           {detail?.metadata?.importedSourceBacking ? (
             <section className="ui-stack ui-stack--sm">
               <h3>Imported Source Backing</h3>
@@ -155,16 +178,29 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
                 <dd>{detail.metadata.importedSourceBacking.target.revision ?? "main"}</dd>
                 <dt>Source verified</dt>
                 <dd>{detail.metadata.importedSourceBacking.verification.exists ? "yes" : "no"}</dd>
+                <dt>Source checked</dt>
+                <dd>{detail.metadata.importedSourceBacking.verification.verifiedAt ?? "never"}</dd>
               </dl>
-              {content?.availability === "unavailable" ? (
+              <button
+                className="ui-button"
+                type="button"
+                onClick={() => void recheckSourceBacking()}
+                disabled={sourceVerifyState.status === "loading"}
+              >
+                {sourceVerifyState.status === "loading" ? "Checking source..." : "Re-check source backing"}
+              </button>
+              {backingState.hasImportedSourceBacking && !backingState.hasLocalObjectAvailable ? (
                 <button
                   className="ui-button"
                   type="button"
                   onClick={() => void localizeArtifactFromRepo()}
                   disabled={localizeState.status === "loading"}
                 >
-                  {localizeState.status === "loading" ? "Localizing..." : "Localize/download artifact"}
+                  {localizeState.status === "loading" ? "Localizing..." : "Localize artifact"}
                 </button>
+              ) : null}
+              {sourceVerifyState.message ? (
+                <p role={sourceVerifyState.status === "error" ? "alert" : "status"}>{sourceVerifyState.message}</p>
               ) : null}
               {localizeState.message ? (
                 <p role={localizeState.status === "error" ? "alert" : "status"}>{localizeState.message}</p>
@@ -184,18 +220,24 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
 
           {detail ? (
             <section className="ui-stack ui-stack--sm">
-              <button className="ui-button" type="button" disabled={publishState.status === "loading"} onClick={togglePublishForm}>Publish to Hugging Face</button>
-              {publishForm.showPublishForm ? (
+              {backingState.hasLocalObjectAvailable ? (
                 <>
-                  <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={publishForm.repository} onChange={(event) => setRepository(event.target.value)} required /></label>
-                  <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={publishForm.pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required /></label>
-                  <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={publishForm.revision} onChange={(event) => setRevision(event.target.value)} /></label>
-                  <label className="ui-stack ui-stack--sm"><span>Media type (optional)</span><input className="ui-input" value={publishForm.mediaType} onChange={(event) => setMediaType(event.target.value)} /></label>
-                  <button className="ui-button" type="button" disabled={publishState.status === "loading" || publishForm.repository.trim().length === 0 || publishForm.pathInRepo.trim().length === 0} onClick={() => void publishArtifactToHuggingFace()}>
-                    {publishState.status === "loading" ? "Publishing..." : "Publish"}
-                  </button>
+                  <button className="ui-button" type="button" disabled={publishState.status === "loading"} onClick={togglePublishForm}>Publish to Hugging Face</button>
+                  {publishForm.showPublishForm ? (
+                    <>
+                      <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={publishForm.repository} onChange={(event) => setRepository(event.target.value)} required /></label>
+                      <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={publishForm.pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required /></label>
+                      <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={publishForm.revision} onChange={(event) => setRevision(event.target.value)} /></label>
+                      <label className="ui-stack ui-stack--sm"><span>Media type (optional)</span><input className="ui-input" value={publishForm.mediaType} onChange={(event) => setMediaType(event.target.value)} /></label>
+                      <button className="ui-button" type="button" disabled={publishState.status === "loading" || publishForm.repository.trim().length === 0 || publishForm.pathInRepo.trim().length === 0} onClick={() => void publishArtifactToHuggingFace()}>
+                        {publishState.status === "loading" ? "Publishing..." : "Publish"}
+                      </button>
+                    </>
+                  ) : null}
                 </>
-              ) : null}
+              ) : (
+                <p role="status">Publish is available after local bytes are present.</p>
+              )}
               {publishState.message ? (<p role={publishState.status === "error" ? "alert" : "status"}>{publishState.message}</p>) : null}
             </section>
           ) : null}

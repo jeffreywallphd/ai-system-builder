@@ -235,4 +235,100 @@ describe("filesystem artifact browser read adapter", () => {
       },
     });
   });
+
+  it("surfaces imported-source and published backings distinctly and adds browse state metadata", async () => {
+    const rootDirectory = await createTempRoot();
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const artifactBindings = createLocalArtifactStorageBindingAdapter({ rootDirectory });
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      artifactCatalogAppend: artifactCatalog,
+    });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      artifactCatalogRead: artifactCatalog,
+      storage: objectStorage,
+      artifactBindingRead: artifactBindings,
+    });
+
+    await objectStorage.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([1, 2, 3, 4]), {
+        descriptor: {
+          key: "artifacts/20260418000000-local01",
+          mediaType: "image/png",
+        },
+      }),
+    );
+    await artifactBindings.upsertArtifactStorageBinding({
+      binding: {
+        artifactId: "artifacts/20260418000000-local01",
+        role: "imported-source",
+        createdAt: "2026-04-17T00:00:00.000Z",
+        backing: {
+          kind: "artifact-repo",
+          provider: "huggingface",
+          locator: "openai/demo/images/local01.png",
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/local01.png",
+            revision: "main",
+          },
+        },
+      },
+    });
+    await artifactBindings.upsertArtifactStorageBinding({
+      binding: {
+        artifactId: "artifacts/20260418000000-local01",
+        role: "published",
+        createdAt: "2026-04-18T00:00:00.000Z",
+        backing: {
+          kind: "artifact-repo",
+          provider: "huggingface",
+          locator: "openai/demo-public/images/local01.png",
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo-public",
+            path: "images/local01.png",
+            revision: "main",
+          },
+        },
+      },
+    });
+
+    const browse = await browserRead.browseArtifacts({ artifactKind: "image" });
+    const detail = await browserRead.readArtifactDetail({
+      locator: { storageKey: "artifacts/20260418000000-local01" },
+    });
+
+    expect(browse.ok).toBe(true);
+    if (!browse.ok) {
+      throw new Error("Expected browse success.");
+    }
+    expect(browse.value.items[0]?.metadata).toMatchObject({
+      backingState: {
+        hasImportedSourceBacking: true,
+        hasPublishedBacking: true,
+        hasLocalObjectAvailable: true,
+        isLocalized: true,
+        isRemoteOnly: false,
+      },
+    });
+
+    expect(detail.ok).toBe(true);
+    if (!detail.ok) {
+      throw new Error("Expected detail success.");
+    }
+    expect(detail.value.artifact.metadata).toMatchObject({
+      importedSourceBacking: {
+        target: {
+          repository: "openai/demo",
+        },
+      },
+      publishedBacking: {
+        target: {
+          repository: "openai/demo-public",
+        },
+      },
+    });
+  });
 });

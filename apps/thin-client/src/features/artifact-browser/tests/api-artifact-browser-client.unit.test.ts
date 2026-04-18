@@ -22,6 +22,24 @@ describe("api artifact browser client", () => {
         json: vi.fn().mockResolvedValue({
           ok: true,
           value: {
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "images/a.png",
+              revision: "main",
+              locator: "openai/demo/images/a.png",
+            },
+            verification: {
+              exists: true,
+              verifiedAt: "2026-04-18T00:00:00.000Z",
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
             artifact: {
               locator: { storageKey: "uploads/a.png" },
               artifactKind: "image",
@@ -115,6 +133,9 @@ describe("api artifact browser client", () => {
     const verified = await client.verifyPublishedArtifactBacking({
       artifactId: "uploads/a.png",
     });
+    const sourceVerified = await client.verifyImportedSourceBacking({
+      artifactId: "uploads/a.png",
+    });
     const localized = await client.localizeArtifactFromRepo({
       artifactId: "artifacts/20260418000000-local01",
     });
@@ -146,6 +167,11 @@ describe("api artifact browser client", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       6,
+      "/api/artifact/source/verify",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      7,
       "/api/artifact/localize-from-repo",
       expect.objectContaining({ method: "POST" }),
     );
@@ -157,6 +183,7 @@ describe("api artifact browser client", () => {
     expect(imageViewUrl).toBe("/api/artifact/media/view?storageKey=uploads%2Fa.png");
     expect(publish.verification.exists).toBe(true);
     expect(verified.verification.exists).toBe(false);
+    expect(sourceVerified.verification.exists).toBe(true);
     expect(localized.localObject.key).toBe("artifacts/20260418000000-local01");
   });
 });

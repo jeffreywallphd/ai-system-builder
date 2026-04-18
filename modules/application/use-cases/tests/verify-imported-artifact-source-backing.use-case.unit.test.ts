@@ -1,16 +1,13 @@
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
 import { createHasArtifactInRepoSuccessResult } from "../../../contracts/storage";
-import type {
-  ArtifactRepoStoragePort,
-  ArtifactStorageBindingPort,
-} from "../../ports/storage";
-import { VerifyPublishedArtifactBackingUseCase } from "../verify-published-artifact-backing.use-case";
+import type { ArtifactRepoStoragePort, ArtifactStorageBindingPort } from "../../ports/storage";
+import { VerifyImportedArtifactSourceBackingUseCase } from "../verify-imported-artifact-source-backing.use-case";
 
-describe("VerifyPublishedArtifactBackingUseCase", () => {
-  it("re-checks remote existence and updates published binding verification metadata", async () => {
+describe("VerifyImportedArtifactSourceBackingUseCase", () => {
+  it("re-checks remote imported source and updates verification metadata", async () => {
     const artifactRepoStorage: ArtifactRepoStoragePort = {
-      hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(false)),
+      hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
       storeArtifactInRepo: testDouble.fn(),
       retrieveArtifactFromRepo: testDouble.fn(),
     } as unknown as ArtifactRepoStoragePort;
@@ -21,9 +18,9 @@ describe("VerifyPublishedArtifactBackingUseCase", () => {
         value: {
           bindings: [
             {
-              artifactId: "uploads/a.png",
-              role: "published",
-              createdAt: "2026-04-16T00:00:00.000Z",
+              artifactId: "artifacts/20260418000000-local01",
+              role: "imported-source",
+              createdAt: "2026-04-17T00:00:00.000Z",
               backing: {
                 kind: "artifact-repo",
                 provider: "huggingface",
@@ -45,38 +42,28 @@ describe("VerifyPublishedArtifactBackingUseCase", () => {
       })),
     } as unknown as ArtifactStorageBindingPort;
 
-    const useCase = new VerifyPublishedArtifactBackingUseCase({
+    const useCase = new VerifyImportedArtifactSourceBackingUseCase({
       artifactRepoStorage,
       artifactBindingStorage,
-      now: () => "2026-04-17T00:00:00.000Z",
+      now: () => "2026-04-18T00:00:00.000Z",
     });
 
-    const result = await useCase.execute({ artifactId: "uploads/a.png" });
+    const result = await useCase.execute({ artifactId: "artifacts/20260418000000-local01" });
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
-      throw new Error("Expected verify success.");
+      throw new Error("Expected source verify success.");
     }
-
-    expect(result.value).toEqual({
-      target: {
-        provider: "huggingface",
-        repository: "openai/demo",
-        path: "images/a.png",
-        revision: "main",
-        locator: "openai/demo/images/a.png",
-      },
-      verification: {
-        exists: false,
-        verifiedAt: "2026-04-17T00:00:00.000Z",
-      },
+    expect(result.value.verification).toEqual({
+      exists: true,
+      verifiedAt: "2026-04-18T00:00:00.000Z",
     });
     expect(artifactBindingStorage.upsertArtifactStorageBinding).toHaveBeenCalled();
   });
 
-  it("supports legacy published rows that only have locator-encoded repo targets", async () => {
+  it("supports legacy imported-source rows that only have locator-encoded targets", async () => {
     const artifactRepoStorage: ArtifactRepoStoragePort = {
-      hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
+      hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(false)),
       storeArtifactInRepo: testDouble.fn(),
       retrieveArtifactFromRepo: testDouble.fn(),
     } as unknown as ArtifactRepoStoragePort;
@@ -88,7 +75,7 @@ describe("VerifyPublishedArtifactBackingUseCase", () => {
           bindings: [
             {
               artifactId: "imports/huggingface/openai/demo/main/images/a.png",
-              role: "published",
+              role: "imported-source",
               createdAt: "2026-04-16T00:00:00.000Z",
               backing: {
                 kind: "artifact-repo",
@@ -106,16 +93,16 @@ describe("VerifyPublishedArtifactBackingUseCase", () => {
       })),
     } as unknown as ArtifactStorageBindingPort;
 
-    const useCase = new VerifyPublishedArtifactBackingUseCase({
+    const useCase = new VerifyImportedArtifactSourceBackingUseCase({
       artifactRepoStorage,
       artifactBindingStorage,
-      now: () => "2026-04-17T00:00:00.000Z",
+      now: () => "2026-04-18T00:00:00.000Z",
     });
 
     const result = await useCase.execute({ artifactId: "imports/huggingface/openai/demo/main/images/a.png" });
     expect(result.ok).toBe(true);
     if (!result.ok) {
-      throw new Error("Expected verify success.");
+      throw new Error("Expected source verify success.");
     }
     expect(result.value.target.repository).toBe("openai/demo");
     expect(result.value.target.path).toBe("images/a.png");
