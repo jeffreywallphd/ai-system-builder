@@ -55,6 +55,8 @@ interface HuggingFaceRepoDesignation {
   name: string;
 }
 
+type HuggingFaceRepoBrowserErrorCode = "validation" | "not-found" | "unavailable" | "internal";
+
 type HuggingFaceOperation =
   | "hasArtifactInRepo"
   | "storeArtifactInRepo"
@@ -437,19 +439,41 @@ function mapUnexpectedHubError(
   });
 }
 
+function toRepoBrowserError(error: ReturnType<typeof mapUnexpectedHubError>): {
+  code: HuggingFaceRepoBrowserErrorCode;
+  message: string;
+  details?: Readonly<Record<string, unknown>>;
+} {
+  const narrowedCode: HuggingFaceRepoBrowserErrorCode = (
+    error.code === "validation"
+    || error.code === "not-found"
+    || error.code === "unavailable"
+    || error.code === "internal"
+  )
+    ? error.code
+    : "internal";
+
+  return {
+    code: narrowedCode,
+    message: error.message,
+    details: error.details,
+  };
+}
+
 export function createHuggingFaceArtifactRepoStorageAdapter(
   options: CreateHuggingFaceArtifactRepoStorageAdapterOptions = {},
 ): ArtifactRepoStoragePort & HuggingFaceRepoBrowserPort {
   const fallbackToken = options.accessToken ?? process.env.HF_TOKEN ?? process.env.HUGGING_FACE_TOKEN;
   const accessTokenProvider = options.accessTokenProvider;
   const getAccessToken = () => accessTokenProvider?.() ?? fallbackToken;
-  const fetchImplementation = options.fetchImplementation
+  const maybeFetchImplementation = options.fetchImplementation
     ?? (globalThis as { fetch?: HuggingFaceFetchImplementation }).fetch;
-  if (!fetchImplementation) {
+  if (!maybeFetchImplementation) {
     throw new HuggingFaceHubClientUnavailableError(
       "Fetch implementation is unavailable. Provide options.fetchImplementation or a global fetch implementation.",
     );
   }
+  const resolvedFetchImplementation: HuggingFaceFetchImplementation = maybeFetchImplementation;
   const hubBaseUrl = options.hubBaseUrl?.replace(/\/$/, "") ?? DEFAULT_HUB_BASE_URL;
   const defaultRepoType = options.defaultRepoType ?? "dataset";
   const providedHubClient = options.hubClient;
@@ -462,7 +486,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
     }
 
     if (!lazyHubClientPromise) {
-      lazyHubClientPromise = officialHubClientLoader(fetchImplementation, hubBaseUrl)
+      lazyHubClientPromise = officialHubClientLoader(resolvedFetchImplementation, hubBaseUrl)
         .catch((error) => {
           throw new HuggingFaceHubClientUnavailableError(
             `Failed to initialize @huggingface/hub client: ${error instanceof Error ? error.message : String(error)}.`,
@@ -498,7 +522,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
       headers.authorization = `Bearer ${token}`;
     }
 
-    const response = await fetchImplementation(`${hubBaseUrl}${path}`, { headers });
+    const response = await resolvedFetchImplementation(`${hubBaseUrl}${path}`, { headers });
     if (!response.ok) {
       throw mapProviderStatusError(operation, response.status, token, response.statusText);
     }
@@ -645,7 +669,9 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
       if (!Array.isArray(payload)) {
         return {
           ok: false as const,
-          error: createContractError("internal", "Unexpected Hugging Face datasets response shape."),
+          error: toRepoBrowserError(
+            createContractError("internal", "Unexpected Hugging Face datasets response shape."),
+          ),
           ...requestContext,
         };
       }
@@ -666,7 +692,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
     } catch (error) {
       return {
         ok: false as const,
-        error: mapUnexpectedHubError("listNamespaceDatasets", error, getAccessToken()),
+        error: toRepoBrowserError(mapUnexpectedHubError("listNamespaceDatasets", error, getAccessToken())),
         ...requestContext,
       };
     }
@@ -689,7 +715,9 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
       if (!Array.isArray(payload)) {
         return {
           ok: false as const,
-          error: createContractError("internal", "Unexpected Hugging Face dataset tree response shape."),
+          error: toRepoBrowserError(
+            createContractError("internal", "Unexpected Hugging Face dataset tree response shape."),
+          ),
           ...requestContext,
         };
       }
@@ -720,7 +748,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
     } catch (error) {
       return {
         ok: false as const,
-        error: mapUnexpectedHubError("listDatasetParquetFiles", error, getAccessToken()),
+        error: toRepoBrowserError(mapUnexpectedHubError("listDatasetParquetFiles", error, getAccessToken())),
         ...requestContext,
       };
     }
