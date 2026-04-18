@@ -110,14 +110,15 @@ export function composeDesktopHost(
       const artifactBindings = createLocalArtifactStorageBindingAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
+      const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter({
+        accessTokenProvider: () => tokenConfigStore.getToken(),
+        fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
+      });
       const artifactRepoStorage = createArtifactRepoStorageAdapter({
         providers: [
           {
             provider: "huggingface",
-            adapter: createHuggingFaceArtifactRepoStorageAdapter({
-              accessTokenProvider: () => tokenConfigStore.getToken(),
-              fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
-            }),
+            adapter: huggingFaceArtifactRepoStorage,
           },
         ],
       });
@@ -182,10 +183,10 @@ export function composeDesktopHost(
         now: options.now,
       });
       const browseHuggingFaceNamespaceDatasets = new BrowseHuggingFaceNamespaceDatasetsUseCase({
-        repoBrowser: artifactRepoStorage,
+        repoBrowser: huggingFaceArtifactRepoStorage,
       });
       const browseHuggingFaceDatasetParquetFiles = new BrowseHuggingFaceDatasetParquetFilesUseCase({
-        repoBrowser: artifactRepoStorage,
+        repoBrowser: huggingFaceArtifactRepoStorage,
       });
 
       registerElectronIpc({

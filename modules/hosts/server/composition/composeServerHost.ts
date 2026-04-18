@@ -100,15 +100,17 @@ export function composeServerHost(
     fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
   });
 
+  const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter({
+    accessTokenProvider: () => tokenConfigStore.getToken(),
+    fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
+    hubClient: options.artifactRepo?.huggingFaceHubClient,
+  });
+
   const artifactRepoStorage = createArtifactRepoStorageAdapter({
     providers: [
       {
         provider: "huggingface",
-        adapter: createHuggingFaceArtifactRepoStorageAdapter({
-          accessTokenProvider: () => tokenConfigStore.getToken(),
-          fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
-          hubClient: options.artifactRepo?.huggingFaceHubClient,
-        }),
+        adapter: huggingFaceArtifactRepoStorage,
       },
     ],
   });
@@ -170,10 +172,10 @@ export function composeServerHost(
         artifactRepoStorage,
       });
       const browseHuggingFaceNamespaceDatasets = new BrowseHuggingFaceNamespaceDatasetsUseCase({
-        repoBrowser: artifactRepoStorage,
+        repoBrowser: huggingFaceArtifactRepoStorage,
       });
       const browseHuggingFaceDatasetParquetFiles = new BrowseHuggingFaceDatasetParquetFilesUseCase({
-        repoBrowser: artifactRepoStorage,
+        repoBrowser: huggingFaceArtifactRepoStorage,
       });
       const storeArtifactInRepo = new StoreArtifactInRepoUseCase({
         artifactRepoStorage,
