@@ -17,11 +17,7 @@ function extensionOf(fileName: string): string {
   return fileName.slice(dot).toLowerCase();
 }
 
-function classifyArtifactKind(mediaType: string): ArtifactKind {
-  if (mediaType.startsWith("image/")) {
-    return "image";
-  }
-
+function classifyArtifactKind(_mediaType: string): ArtifactKind {
   return "raw-staged";
 }
 
