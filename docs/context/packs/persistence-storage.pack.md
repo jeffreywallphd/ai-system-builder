@@ -92,6 +92,8 @@
 
 
 - Current artifact-browser read adapters should prefer structured repo target fields for backing metadata and use locator decode only for compatibility with legacy rows.
+- Current verify/update flows should also prefer structured repo target fields and only decode locator for compatibility; updates should backfill structured targets when available.
 - Remote registration slice now exists (`artifact.register.from-repo`): verify remote target, create internal catalog record, persist `imported-source` binding.
 - New registration writes use system-owned internal artifact ids; provider/repository/path/revision remain backing/source identity.
 - Imported artifacts can now be explicitly localized (`artifact.localize.from-repo`) to create local artifact-object bytes when only remote-source backing exists.
+- Imported-source verification can now be re-checked independently (`artifact.source.verify`) while preserving artifact-first read/detail semantics.

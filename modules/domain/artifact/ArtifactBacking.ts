@@ -170,26 +170,28 @@ export class ArtifactBacking {
   }
 
   public withVerification(verification: ArtifactBackingVerification, createdAt?: string): ArtifactBacking {
+    const resolvedTarget = this.resolvedTarget();
     return ArtifactBacking.from({
       kind: this.kind,
       provider: this.provider,
       locator: this.locator,
       role: this.role,
       revision: this.revision,
-      target: this.target,
+      target: resolvedTarget,
       verification,
       createdAt: createdAt ?? this.createdAt,
     });
   }
 
   public withCreatedAt(createdAt: string): ArtifactBacking {
+    const resolvedTarget = this.resolvedTarget();
     return ArtifactBacking.from({
       kind: this.kind,
       provider: this.provider,
       locator: this.locator,
       role: this.role,
       revision: this.revision,
-      target: this.target,
+      target: resolvedTarget,
       verification: this.verification,
       createdAt,
     });
@@ -204,6 +206,8 @@ export class ArtifactBacking {
       return undefined;
     }
 
+    // Fallback decode for legacy bindings only. New writes should carry
+    // structured target data on backing.target.
     try {
       const decoded = decodeArtifactRepoBackingLocator(this.locator);
       return {

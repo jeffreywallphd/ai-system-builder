@@ -9,6 +9,15 @@ export interface ThinClientArtifactBrowseItem {
   sizeBytes?: number;
   originalName?: string;
   createdAt?: string;
+  metadata?: {
+    backingState?: {
+      hasImportedSourceBacking: boolean;
+      hasPublishedBacking: boolean;
+      hasLocalObjectAvailable: boolean;
+      isLocalized: boolean;
+      isRemoteOnly: boolean;
+    };
+  };
 }
 
 export interface ThinClientArtifactDetail {
@@ -94,6 +103,9 @@ export interface ArtifactBrowserApiClient {
     mediaType?: string;
   }) => Promise<ThinClientPublishedBacking>;
   verifyPublishedArtifactBacking: (input: {
+    artifactId: string;
+  }) => Promise<ThinClientPublishedBacking>;
+  verifyImportedSourceBacking?: (input: {
     artifactId: string;
   }) => Promise<ThinClientPublishedBacking>;
   registerArtifactFromRepo: (input: {
@@ -258,6 +270,29 @@ export function createApiArtifactBrowserClient(
         const backing = value as ThinClientPublishedBacking;
         if (!backing || typeof backing !== "object") {
           throw new Error("Artifact publish verify response is missing backing information.");
+        }
+
+        return backing;
+      });
+    },
+
+    async verifyImportedSourceBacking(input): Promise<ThinClientPublishedBacking> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/source/verify"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          artifactId: input.artifactId,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const backing = value as ThinClientPublishedBacking;
+        if (!backing || typeof backing !== "object") {
+          throw new Error("Artifact source verify response is missing backing information.");
         }
 
         return backing;

@@ -8,6 +8,8 @@ import type {
   PublishArtifactToRepoUseCase,
   RegisterArtifactFromRepoCommand,
   RegisterArtifactFromRepoUseCase,
+  VerifyImportedArtifactSourceBackingCommand,
+  VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingCommand,
   VerifyPublishedArtifactBackingUseCase,
   BrowseArtifactsUseCaseResult,
@@ -25,6 +27,7 @@ import {
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
@@ -33,6 +36,7 @@ import {
   DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_SOURCE_VERIFY_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_RESPONSE_CHANNEL,
   createDesktopArtifactBrowseSuccessResponse,
@@ -41,6 +45,7 @@ import {
   createDesktopArtifactReadSuccessResponse,
   createDesktopArtifactPublishSuccessResponse,
   createDesktopArtifactPublishVerifySuccessResponse,
+  createDesktopArtifactSourceVerifySuccessResponse,
   createDesktopArtifactRegisterFromRepoSuccessResponse,
   createDesktopArtifactLocalizeFromRepoSuccessResponse,
   createIpcError,
@@ -57,6 +62,8 @@ import {
   type DesktopArtifactPublishResponse,
   type DesktopArtifactPublishVerifyRequest,
   type DesktopArtifactPublishVerifyResponse,
+  type DesktopArtifactSourceVerifyRequest,
+  type DesktopArtifactSourceVerifyResponse,
   type DesktopArtifactRegisterFromRepoRequest,
   type DesktopArtifactRegisterFromRepoResponse,
   type DesktopArtifactLocalizeFromRepoRequest,
@@ -73,6 +80,7 @@ export interface RegisterArtifactBrowserIpcDependencies {
   artifactMediaViewRetrieval: ArtifactContentRetrievalPort;
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
+  verifyImportedArtifactSourceBackingUseCase: Pick<VerifyImportedArtifactSourceBackingUseCase, "execute">;
   registerArtifactFromRepoUseCase: Pick<RegisterArtifactFromRepoUseCase, "execute">;
   localizeArtifactFromRepoUseCase: Pick<LocalizeArtifactFromRepoUseCase, "execute">;
 }
@@ -127,6 +135,14 @@ export function mapDesktopArtifactPublishVerifyRequestToCommand(
   };
 }
 
+export function mapDesktopArtifactSourceVerifyRequestToCommand(
+  request: DesktopArtifactSourceVerifyRequest,
+): VerifyImportedArtifactSourceBackingCommand {
+  return {
+    artifactId: request.payload.artifactId,
+  };
+}
+
 export function mapDesktopArtifactRegisterFromRepoRequestToCommand(
   request: DesktopArtifactRegisterFromRepoRequest,
 ): RegisterArtifactFromRepoCommand {
@@ -153,6 +169,7 @@ export function mapDesktopArtifactRequestContext(
     | DesktopArtifactMediaViewRequest
     | DesktopArtifactPublishRequest
     | DesktopArtifactPublishVerifyRequest
+    | DesktopArtifactSourceVerifyRequest
     | DesktopArtifactRegisterFromRepoRequest
     | DesktopArtifactLocalizeFromRepoRequest,
 ): { requestId?: string; correlationId?: string } {
@@ -279,6 +296,24 @@ function mapPublishVerifyFailure(
   return createIpcFailureResponse(
     createIpcError(
       DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapSourceVerifyFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopArtifactSourceVerifyResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_ARTIFACT_SOURCE_VERIFY_RESPONSE_CHANNEL,
       mapIpcFailure(error.code),
       error.message,
       {
@@ -445,6 +480,27 @@ export function createDesktopArtifactPublishVerifyIpcHandler(
   };
 }
 
+export function createDesktopArtifactSourceVerifyIpcHandler(
+  verifyImportedArtifactSourceBackingUseCase: Pick<VerifyImportedArtifactSourceBackingUseCase, "execute">,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopArtifactSourceVerifyRequest,
+  ): Promise<DesktopArtifactSourceVerifyResponse> => {
+    const result = await verifyImportedArtifactSourceBackingUseCase.execute(
+      mapDesktopArtifactSourceVerifyRequestToCommand(request),
+    );
+    if (!result.ok) {
+      return mapSourceVerifyFailure(request, result.error);
+    }
+
+    return createDesktopArtifactSourceVerifySuccessResponse(result.value, {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+    });
+  };
+}
+
 
 function mapRegisterFromRepoFailure(
   request: { requestId?: string; correlationId?: string },
@@ -552,6 +608,10 @@ export function registerArtifactBrowserIpc(
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value,
     createDesktopArtifactPublishVerifyIpcHandler(dependencies.verifyPublishedArtifactBackingUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL.value,
+    createDesktopArtifactSourceVerifyIpcHandler(dependencies.verifyImportedArtifactSourceBackingUseCase),
   );
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value,

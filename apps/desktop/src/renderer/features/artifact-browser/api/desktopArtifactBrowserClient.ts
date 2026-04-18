@@ -24,6 +24,9 @@ export interface DesktopArtifactBrowserClient {
   verifyPublishedArtifactBacking: (input: {
     artifactId: string;
   }) => Promise<DesktopPublishedBacking>;
+  verifyImportedSourceBacking?: (input: {
+    artifactId: string;
+  }) => Promise<DesktopPublishedBacking>;
   registerArtifactFromRepo: (input: {
     repository: string;
     path: string;
@@ -133,6 +136,19 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         }),
         (value) => value as DesktopPublishedBacking,
         "Failed to verify published artifact backing.",
+      );
+    },
+
+    async verifyImportedSourceBacking(input) {
+      if (!desktopApi.verifyImportedArtifactSourceBacking) {
+        throw new Error("Desktop preload source verification bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.verifyImportedArtifactSourceBacking({
+          artifactId: input.artifactId,
+        }),
+        (value) => value as DesktopPublishedBacking,
+        "Failed to verify imported source backing.",
       );
     },
 

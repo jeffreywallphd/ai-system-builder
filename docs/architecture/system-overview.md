@@ -232,10 +232,13 @@ Desktop renderer artifact-browser publish/re-check UX should call the preload-ba
 - In addition to publish/re-check, the system now supports first-slice remote registration (`artifact.register.from-repo`) through shared application use-case wiring.
 - Registration verifies remote existence and creates an internal catalog + `imported-source` binding so the artifact browser can treat the remote artifact as an internal artifact record.
 - New registration writes now use system-owned internal artifact ids; provider/repository/path/revision remain backing metadata (not canonical artifact identity).
+- Artifact id generation policy is now behind a small system-owned seam (`SystemArtifactIdFactory`) used by composition/use cases; `ArtifactId` remains the value object.
 - This is a narrow registration/import slice; it is not a full provider repo browser or sync engine.
 
 ### Artifact import usefulness step (current)
 
 - Imported artifacts without local bytes now support explicit localization (`artifact.localize.from-repo`) through shared application logic.
 - Localization keeps artifact browser central: select artifact -> inspect imported-source backing + local availability -> localize/download when needed.
+- Imported-source backing verification can be re-checked explicitly (`artifact.source.verify`) without changing artifact identity or collapsing source/published concepts.
+- Artifact browser list/detail now surfaces minimal backing-state cues (`Remote only`, `Localized`, `Published`) while keeping artifacts as the core entity.
 - This is an incremental usefulness step for the current image-focused slice, not full remote sync or provider-native browsing parity.

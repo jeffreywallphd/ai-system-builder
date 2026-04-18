@@ -7,7 +7,7 @@ import type {
   ArtifactStorageBindingPort,
 } from "../../ports/storage";
 import { RegisterArtifactFromRepoUseCase } from "../register-artifact-from-repo.use-case";
-import { ArtifactId } from "../../../domain/artifact";
+import { ArtifactId, type ArtifactIdFactory } from "../../../domain/artifact";
 
 describe("RegisterArtifactFromRepoUseCase", () => {
   it("verifies remote target and writes imported-source binding + catalog record", async () => {
@@ -63,6 +63,55 @@ describe("RegisterArtifactFromRepoUseCase", () => {
         role: "imported-source",
       },
     });
+  });
+
+  it("uses artifactIdFactory seam for system-owned id generation", async () => {
+    const artifactRepoStorage: ArtifactRepoStoragePort = {
+      hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
+      storeArtifactInRepo: testDouble.fn(),
+      retrieveArtifactFromRepo: testDouble.fn(),
+    } as unknown as ArtifactRepoStoragePort;
+
+    const artifactBindingStorage: ArtifactStorageBindingPort = {
+      readArtifactStorageBindings: testDouble.fn(),
+      upsertArtifactStorageBinding: testDouble.fn(async (request) => ({
+        ok: true,
+        value: { binding: request.binding },
+      })),
+    } as unknown as ArtifactStorageBindingPort;
+
+    const artifactCatalogAppend: ArtifactCatalogAppendPort = {
+      appendArtifactCatalogRecord: testDouble.fn(async (request) => ({
+        ok: true,
+        value: { storageKey: request.record.storageKey },
+      })),
+    };
+    const artifactIdFactory: ArtifactIdFactory = {
+      createArtifactId: testDouble.fn(() => ArtifactId.from("artifacts/20260418000000-factory001")),
+    };
+
+    const useCase = new RegisterArtifactFromRepoUseCase({
+      artifactRepoStorage,
+      artifactBindingStorage,
+      artifactCatalogAppend,
+      now: () => "2026-04-17T00:00:00.000Z",
+      artifactIdFactory,
+    });
+
+    const result = await useCase.execute({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/a.png",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected register from repo success.");
+    }
+    expect(artifactIdFactory.createArtifactId).toHaveBeenCalledTimes(1);
+    expect(result.value.artifactId).toBe("artifacts/20260418000000-factory001");
   });
 });
 

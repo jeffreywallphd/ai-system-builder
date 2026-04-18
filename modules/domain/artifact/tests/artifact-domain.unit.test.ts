@@ -3,7 +3,7 @@ import {
   encodeArtifactRepoBackingLocator,
   type ArtifactStorageBinding,
 } from "../../../contracts/storage";
-import { Artifact, ArtifactBacking, ArtifactId } from "..";
+import { Artifact, ArtifactBacking, ArtifactId, SystemArtifactIdFactory } from "..";
 
 describe("ArtifactId", () => {
   it("normalizes text and compares by canonical internal id", () => {
@@ -26,6 +26,12 @@ describe("ArtifactId", () => {
 
   it("rejects invalid ids", () => {
     expect(() => ArtifactId.from("../outside")).toThrow();
+  });
+
+  it("keeps id generation policy behind system artifact id factory seam", () => {
+    const artifactIdFactory = new SystemArtifactIdFactory();
+    const created = artifactIdFactory.createArtifactId();
+    expect(created.toString().startsWith("artifacts/")).toBe(true);
   });
 });
 

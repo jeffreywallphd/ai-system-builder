@@ -13,10 +13,13 @@ import {
   DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_OPERATION,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_OPERATION,
+  DESKTOP_ARTIFACT_SOURCE_VERIFY_OPERATION,
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_SOURCE_VERIFY_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_OPERATION,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL,
@@ -32,6 +35,7 @@ import {
   createDesktopArtifactReadRequest,
   createDesktopArtifactPublishRequest,
   createDesktopArtifactPublishVerifyRequest,
+  createDesktopArtifactSourceVerifyRequest,
   createDesktopArtifactRegisterFromRepoRequest,
   createDesktopArtifactLocalizeFromRepoRequest,
   createDesktopImageUploadRequest,
@@ -47,6 +51,8 @@ import {
   type DesktopArtifactPublishResponse,
   type DesktopArtifactPublishVerifyRequest,
   type DesktopArtifactPublishVerifyResponse,
+  type DesktopArtifactSourceVerifyRequest,
+  type DesktopArtifactSourceVerifyResponse,
   type DesktopArtifactRegisterFromRepoRequest,
   type DesktopArtifactRegisterFromRepoResponse,
   type DesktopArtifactLocalizeFromRepoRequest,
@@ -114,6 +120,12 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopImageUploadBridgeContext,
   ) => Promise<DesktopArtifactPublishVerifyResponse>;
+  verifyImportedArtifactSourceBacking: (
+    input: {
+      artifactId: string;
+    },
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopArtifactSourceVerifyResponse>;
   registerArtifactFromRepo: (
     input: {
       target: {
@@ -341,6 +353,29 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_PUBLISH_VERIFY_OPERATION,
         channel: DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact publish verify IPC response envelope.",
+      });
+    },
+
+    async verifyImportedArtifactSourceBacking(input, context = {}) {
+      const request: DesktopArtifactSourceVerifyRequest = createDesktopArtifactSourceVerifyRequest(
+        {
+          artifactId: input.artifactId,
+          boundary: {
+            host: "desktop",
+            source: artifactSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactSourceVerifyResponse>(response, {
+        operation: DESKTOP_ARTIFACT_SOURCE_VERIFY_OPERATION,
+        channel: DESKTOP_ARTIFACT_SOURCE_VERIFY_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop artifact source verify IPC response envelope.",
       });
     },
 

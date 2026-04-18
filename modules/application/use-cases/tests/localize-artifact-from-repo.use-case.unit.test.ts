@@ -103,5 +103,19 @@ describe("LocalizeArtifactFromRepoUseCase", () => {
       },
     });
     expect(artifactBindingStorage.upsertArtifactStorageBinding).toHaveBeenCalledTimes(2);
+    const importedSourceUpsertCall = (artifactBindingStorage.upsertArtifactStorageBinding as ReturnType<typeof testDouble.fn>)
+      .mock.calls
+      .find((call) => call[0]?.binding?.role === "imported-source");
+    expect(importedSourceUpsertCall?.[0]).toMatchObject({
+      binding: {
+        role: "imported-source",
+        backing: {
+          target: {
+            repository: "openai/demo",
+            path: "images/a.png",
+          },
+        },
+      },
+    });
   });
 });

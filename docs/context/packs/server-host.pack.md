@@ -67,9 +67,11 @@
 ## Current implementation checkpoint (server host)
 
 - `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has`, `POST /api/artifact-repo/store`, `POST /api/artifact/publish`, and `POST /api/artifact/publish/verify`.
+- `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has`, `POST /api/artifact-repo/store`, `POST /api/artifact/publish`, `POST /api/artifact/publish/verify`, and `POST /api/artifact/source/verify`.
 - These routes delegate through application use cases; they do not bypass to storage adapters directly.
 - Thin-client artifact-browser publish flow should target `POST /api/artifact/publish` as the primary user workflow route.
 - Thin-client artifact-browser re-check flow should target `POST /api/artifact/publish/verify` to update durable verification state/time without republishing bytes.
+- Thin-client artifact-browser source re-check flow should target `POST /api/artifact/source/verify` for imported-source backing verification refresh.
 - Desktop host uses the same shared `PublishArtifactToRepoUseCase` path via IPC/preload transport (separate host/transport wiring, shared application orchestration).
 
 
