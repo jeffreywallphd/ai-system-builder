@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it, testDouble } from "../../../../test
 
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
+import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
 import { composeServerHost } from "../composeServerHost";
 
@@ -48,7 +49,7 @@ describe("composeServerHost", () => {
 
 
   it("composes artifact-repo storage with huggingface provider registration", async () => {
-    const fetchMock = testDouble.fn(async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+    const fetchMock = testDouble.fn(async () => new Response(null, { status: 404 })) as unknown as HuggingFaceFetchImplementation;
     const hubClient = {
       fileExists: testDouble.fn(async () => false),
       uploadFile: testDouble.fn(async () => undefined),

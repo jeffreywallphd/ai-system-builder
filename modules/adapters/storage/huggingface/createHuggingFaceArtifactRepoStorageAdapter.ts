@@ -23,6 +23,26 @@ type HuggingFaceRepoType = "dataset" | "model";
 class HuggingFaceAdapterValidationError extends Error {}
 class HuggingFaceHubClientUnavailableError extends Error {}
 
+export interface HuggingFaceFetchResponseHeaders {
+  get: (header: string) => string | null;
+}
+
+export interface HuggingFaceFetchResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: HuggingFaceFetchResponseHeaders;
+  arrayBuffer: () => Promise<ArrayBuffer>;
+  json: <T = unknown>() => Promise<T>;
+}
+
+export type HuggingFaceFetchImplementation = (
+  input: string,
+  init?: {
+    headers?: Record<string, string>;
+  },
+) => Promise<HuggingFaceFetchResponse>;
+
 interface ResolvedHuggingFaceTarget {
   readonly repoType: HuggingFaceRepoType;
   readonly repositoryName: string;
@@ -49,7 +69,7 @@ interface HuggingFaceHubClient {
     revision?: string;
     accessToken?: string;
     hubUrl?: string;
-    fetch?: typeof fetch;
+    fetch?: HuggingFaceFetchImplementation;
   }) => Promise<boolean>;
   uploadFile: (params: {
     repo: HuggingFaceRepoDesignation;
@@ -61,7 +81,7 @@ interface HuggingFaceHubClient {
     commitTitle?: string;
     accessToken?: string;
     hubUrl?: string;
-    fetch?: typeof fetch;
+    fetch?: HuggingFaceFetchImplementation;
   }) => Promise<unknown>;
   downloadFile: (params: {
     repo: HuggingFaceRepoDesignation;
@@ -69,19 +89,19 @@ interface HuggingFaceHubClient {
     revision?: string;
     accessToken?: string;
     hubUrl?: string;
-    fetch?: typeof fetch;
-  }) => Promise<Response>;
+    fetch?: HuggingFaceFetchImplementation;
+  }) => Promise<HuggingFaceFetchResponse>;
 }
 
 export interface CreateHuggingFaceArtifactRepoStorageAdapterOptions {
   accessToken?: string;
   accessTokenProvider?: () => string | undefined;
-  fetchImplementation?: typeof fetch;
+  fetchImplementation?: HuggingFaceFetchImplementation;
   hubBaseUrl?: string;
   defaultRepoType?: HuggingFaceRepoType;
   hubClient?: HuggingFaceHubClient;
   officialHubClientLoader?: (
-    fetchImplementation: typeof fetch,
+    fetchImplementation: HuggingFaceFetchImplementation,
     hubBaseUrl: string,
   ) => Promise<HuggingFaceHubClient>;
 }
@@ -329,7 +349,7 @@ function assertHubClient(client: Partial<HuggingFaceHubClient>): HuggingFaceHubC
 }
 
 async function loadOfficialHubClient(
-  fetchImplementation: typeof fetch,
+  fetchImplementation: HuggingFaceFetchImplementation,
   hubBaseUrl: string,
 ): Promise<HuggingFaceHubClient> {
   const dynamicImport = new Function("return import('@huggingface/hub');") as () => Promise<unknown>;
@@ -423,7 +443,13 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
   const fallbackToken = options.accessToken ?? process.env.HF_TOKEN ?? process.env.HUGGING_FACE_TOKEN;
   const accessTokenProvider = options.accessTokenProvider;
   const getAccessToken = () => accessTokenProvider?.() ?? fallbackToken;
-  const fetchImplementation = options.fetchImplementation ?? fetch;
+  const fetchImplementation = options.fetchImplementation
+    ?? (globalThis as { fetch?: HuggingFaceFetchImplementation }).fetch;
+  if (!fetchImplementation) {
+    throw new HuggingFaceHubClientUnavailableError(
+      "Fetch implementation is unavailable. Provide options.fetchImplementation or a global fetch implementation.",
+    );
+  }
   const hubBaseUrl = options.hubBaseUrl?.replace(/\/$/, "") ?? DEFAULT_HUB_BASE_URL;
   const defaultRepoType = options.defaultRepoType ?? "dataset";
   const providedHubClient = options.hubClient;

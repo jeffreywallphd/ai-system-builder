@@ -4,6 +4,9 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "../../../modules/testing/node-test";
 
 type DesktopWebpackTsConfig = {
+  compilerOptions?: {
+    noEmit?: boolean;
+  };
   include?: string[];
   exclude?: string[];
 };
@@ -31,5 +34,10 @@ describe("desktop webpack TypeScript config", () => {
     expect(exclude).toContain("../../modules/**/*.test.ts");
     expect(exclude).toContain("../../modules/**/*.test.tsx");
     expect(exclude).toContain("../../modules/**/tests/**");
+  });
+
+  it("does not disable emit for webpack main TypeScript compilation", () => {
+    const config = loadDesktopWebpackTsConfig();
+    expect(config.compilerOptions?.noEmit).not.toBe(true);
   });
 });

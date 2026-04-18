@@ -5,7 +5,10 @@ import {
   createRetrieveArtifactFromRepoRequest,
   createStoreArtifactInRepoRequest,
 } from "../../../../contracts/storage";
-import { createHuggingFaceArtifactRepoStorageAdapter } from "../createHuggingFaceArtifactRepoStorageAdapter";
+import {
+  createHuggingFaceArtifactRepoStorageAdapter,
+  type HuggingFaceFetchImplementation,
+} from "../createHuggingFaceArtifactRepoStorageAdapter";
 
 function createHubClientDouble() {
   return {
@@ -312,7 +315,7 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
       { id: "OpenFinAL/financial-news" },
       { id: "OpenFinAL/other-dataset" },
       { id: "OtherOrg/not-included" },
-    ]), { status: 200 })) as unknown as typeof fetch;
+    ]), { status: 200 })) as unknown as HuggingFaceFetchImplementation;
     const adapter = createHuggingFaceArtifactRepoStorageAdapter({
       hubClient: createHubClientDouble(),
       fetchImplementation,
@@ -337,7 +340,7 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
       { path: "data/train-00000.parquet", type: "file", size: 1234 },
       { path: "data/README.md", type: "file", size: 45 },
       { path: "data/sub/test-00000.parquet", type: "file", size: 321 },
-    ]), { status: 200 })) as unknown as typeof fetch;
+    ]), { status: 200 })) as unknown as HuggingFaceFetchImplementation;
     const adapter = createHuggingFaceArtifactRepoStorageAdapter({
       hubClient: createHubClientDouble(),
       fetchImplementation,

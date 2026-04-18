@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
+import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
 import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
@@ -25,11 +27,20 @@ import {
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
-import { composeDesktopHost, type RegisterDesktopImageUploadIpcOptions } from "../composeDesktopHost";
+import {
+  composeDesktopHost,
+  type ComposeDesktopHostOptions,
+  type RegisterDesktopImageUploadIpcOptions,
+} from "../composeDesktopHost";
 
 describe("composeDesktopHost", () => {
   it("uses the canonical ipc-main handle port type for registration options", () => {
     expectTypeOf<RegisterDesktopImageUploadIpcOptions["ipcMain"]>().toEqualTypeOf<IpcMainHandlePort>();
+  });
+
+  it("uses the shared huggingface fetch implementation seam type instead of DOM-global fetch typing", () => {
+    expectTypeOf<NonNullable<ComposeDesktopHostOptions["artifactRepo"]>["huggingFaceFetchImplementation"]>()
+      .toEqualTypeOf<HuggingFaceFetchImplementation | undefined>();
   });
 
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
@@ -141,12 +152,26 @@ describe("composeDesktopHost", () => {
   });
 
   it("reuses the shared PublishArtifactToRepoUseCase in desktop host composition", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
     const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js");
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
     const source = readFileSync(sourcePath, "utf8");
 
     expect(source).toContain("PublishArtifactToRepoUseCase");
     expect(source).not.toContain("class DesktopPublish");
+  });
+
+  it("keeps desktop composition source free of DOM-global fetch typing to stay webpack main emit-safe", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).not.toContain("typeof fetch");
   });
 
   it("stores and exposes desktop Hugging Face token status", () => {

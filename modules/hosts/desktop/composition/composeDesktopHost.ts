@@ -25,6 +25,7 @@ import {
   createLocalArtifactStorageBindingAdapter,
 } from "../../../adapters/storage/filesystem";
 import { createHuggingFaceArtifactRepoStorageAdapter } from "../../../adapters/storage/huggingface";
+import type { HuggingFaceFetchImplementation } from "../../../adapters/storage/huggingface";
 import {
   createHuggingFaceTokenConfigStore,
   type HuggingFaceTokenStatus,
@@ -50,7 +51,7 @@ export interface ComposeDesktopHostOptions {
   artifactRepo?: {
     huggingFaceAccessToken?: string;
     huggingFaceTokenConfigFilePath?: string;
-    huggingFaceFetchImplementation?: typeof fetch;
+    huggingFaceFetchImplementation?: HuggingFaceFetchImplementation;
   };
 }
 
