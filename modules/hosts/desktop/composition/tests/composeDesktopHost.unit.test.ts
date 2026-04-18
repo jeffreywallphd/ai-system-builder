@@ -174,6 +174,20 @@ describe("composeDesktopHost", () => {
     expect(source).not.toContain("typeof fetch");
   });
 
+  it("wires Hugging Face browse use-cases to the dedicated Hugging Face adapter seam", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter");
+    expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
+    expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
+    expect(source).not.toContain("repoBrowser: artifactRepoStorage");
+  });
+
   it("stores and exposes desktop Hugging Face token status", () => {
     const host = composeDesktopHost();
     expect(host.getHuggingFaceTokenStatus().configured).toBe(false);

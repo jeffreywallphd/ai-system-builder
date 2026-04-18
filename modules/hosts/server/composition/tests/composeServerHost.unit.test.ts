@@ -1,3 +1,7 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
@@ -137,5 +141,19 @@ describe("composeServerHost", () => {
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
     expect(registeredGetPaths).toEqual(["/api/artifact/media/view", "/api/config/huggingface-token"]);
+  });
+
+  it("wires Hugging Face browse use-cases to the dedicated Hugging Face adapter seam", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeServerHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter");
+    expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
+    expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
+    expect(source).not.toContain("repoBrowser: artifactRepoStorage");
   });
 });
