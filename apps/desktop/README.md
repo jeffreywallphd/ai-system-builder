@@ -58,3 +58,6 @@ Renderer constraints for this slice:
 - no direct filesystem access from UI
 - no direct IPC channel usage from UI
 - no styling expansion beyond the existing minimal renderer structure
+
+
+- artifact register/import flow via preload/IPC (`artifact.register.from-repo`) using the same shared application use-case path as server/thin-client

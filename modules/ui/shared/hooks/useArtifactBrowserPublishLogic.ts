@@ -1,5 +1,9 @@
 import { useState } from "react";
 
+import {
+  derivePublishedBackingFromDetail,
+} from "./artifactBrowserPublishView";
+
 export interface ArtifactBrowserViewState {
   status: "idle" | "loading" | "success" | "error";
   message?: string;
@@ -155,7 +159,7 @@ export function useArtifactBrowserPublishLogic<TDetail extends ArtifactDetailWit
   }
 
   function setPublishedBackingFromDetail(detail: TDetail | undefined): void {
-    setPublishedBacking(detail?.metadata?.publishedBacking);
+    setPublishedBacking(derivePublishedBackingFromDetail(detail));
   }
 
   return {

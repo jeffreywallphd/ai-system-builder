@@ -5,6 +5,7 @@ import type {
   StoreArtifactInRepoCommand,
   StoreArtifactInRepoUseCasePort,
   VerifyPublishedArtifactBackingUseCase,
+  RegisterArtifactFromRepoUseCase,
 } from "../../../../application/use-cases";
 import {
   createApiArtifactPublishFailureResponse,
@@ -13,6 +14,9 @@ import {
   createApiArtifactPublishVerifyFailureResponse,
   createApiArtifactPublishVerifyRequest,
   createApiArtifactPublishVerifySuccessResponse,
+  createApiArtifactRegisterFromRepoFailureResponse,
+  createApiArtifactRegisterFromRepoRequest,
+  createApiArtifactRegisterFromRepoSuccessResponse,
   createApiArtifactRepoHasFailureResponse,
   createApiArtifactRepoHasRequest,
   createApiArtifactRepoHasSuccessResponse,
@@ -21,6 +25,7 @@ import {
   createApiArtifactRepoStoreSuccessResponse,
   type ApiArtifactPublishResponse,
   type ApiArtifactPublishVerifyResponse,
+  type ApiArtifactRegisterFromRepoResponse,
   type ApiArtifactRepoHasResponse,
   type ApiArtifactRepoStoreResponse,
 } from "../../../../contracts/api";
@@ -59,6 +64,18 @@ interface ArtifactPublishVerifyApiRequestBody {
   source?: string;
 }
 
+interface ArtifactRegisterFromRepoApiRequestBody {
+  target: {
+    provider: string;
+    repository: string;
+    revision?: string;
+    path?: string;
+  };
+  artifactKind?: "image";
+  mediaType?: string;
+  source?: string;
+}
+
 export interface ArtifactRepoExpressRequestLike {
   body?: unknown;
   headers?: Record<string, string | string[] | undefined>;
@@ -66,7 +83,7 @@ export interface ArtifactRepoExpressRequestLike {
 
 export interface ArtifactRepoExpressResponseLike {
   status: (statusCode: number) => ArtifactRepoExpressResponseLike;
-  json: (body: ApiArtifactRepoHasResponse | ApiArtifactRepoStoreResponse | ApiArtifactPublishResponse | ApiArtifactPublishVerifyResponse) => void;
+  json: (body: ApiArtifactRepoHasResponse | ApiArtifactRepoStoreResponse | ApiArtifactPublishResponse | ApiArtifactPublishVerifyResponse | ApiArtifactRegisterFromRepoResponse) => void;
 }
 
 export interface ArtifactRepoExpressRoutePort {
@@ -85,6 +102,7 @@ export interface RegisterArtifactRepoApiRoutesDependencies {
   storeArtifactInRepoUseCase: StoreArtifactInRepoUseCasePort;
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
+  registerArtifactFromRepoUseCase: Pick<RegisterArtifactFromRepoUseCase, "execute">;
 }
 
 function getRequestHeader(
@@ -172,7 +190,7 @@ function mapStatusCode(response: ApiArtifactRepoHasResponse | ApiArtifactRepoSto
   }
 }
 
-function mapPublishStatusCode(response: ApiArtifactPublishResponse | ApiArtifactPublishVerifyResponse): number {
+function mapPublishStatusCode(response: ApiArtifactPublishResponse | ApiArtifactPublishVerifyResponse | ApiArtifactRegisterFromRepoResponse): number {
   if (response.ok) {
     return 200;
   }
@@ -367,6 +385,55 @@ export function registerArtifactRepoApiRoutes(
           correlationId: context.correlationId,
         },
       );
+    response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/artifact/register-from-repo", async (request, response) => {
+    const context = mapRequestContext(request);
+    let apiRequest: ReturnType<typeof createApiArtifactRegisterFromRepoRequest>;
+
+    try {
+      apiRequest = createApiArtifactRegisterFromRepoRequest({
+        target: {
+          provider: (request.body as ArtifactRegisterFromRepoApiRequestBody).target?.provider ?? "",
+          repository: (request.body as ArtifactRegisterFromRepoApiRequestBody).target?.repository ?? "",
+          revision: (request.body as ArtifactRegisterFromRepoApiRequestBody).target?.revision,
+          path: (request.body as ArtifactRegisterFromRepoApiRequestBody).target?.path ?? "",
+        },
+        artifactKind: (request.body as ArtifactRegisterFromRepoApiRequestBody).artifactKind ?? "image",
+        mediaType: (request.body as ArtifactRegisterFromRepoApiRequestBody).mediaType,
+        source: normalizeSource((request.body as ArtifactRegisterFromRepoApiRequestBody).source),
+      }, context);
+    } catch (error) {
+      const apiResponse = createApiArtifactRegisterFromRepoFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid artifact register-from-repo request.",
+        context,
+      );
+      response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.registerArtifactFromRepoUseCase.execute({
+      target: apiRequest.payload.target,
+      artifactKind: apiRequest.payload.artifactKind,
+      mediaType: apiRequest.payload.mediaType,
+    });
+
+    const apiResponse = result.ok
+      ? createApiArtifactRegisterFromRepoSuccessResponse(result.value, context)
+      : createApiArtifactRegisterFromRepoFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+        },
+      );
+
     response.status(mapPublishStatusCode(apiResponse)).json(apiResponse);
   });
 }

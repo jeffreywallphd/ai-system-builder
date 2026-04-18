@@ -20,6 +20,7 @@ export interface ThinClientArtifactDetail {
   createdAt?: string;
   metadata?: {
     publishedBacking?: ThinClientPublishedBacking;
+    importedSourceBacking?: ThinClientPublishedBacking;
   };
 }
 
@@ -45,6 +46,24 @@ export interface ThinClientPublishedBacking {
   };
 }
 
+export interface ThinClientRegisteredArtifactFromRepo {
+  artifactId: string;
+  backing: {
+    role: "imported-source";
+    target: {
+      provider: string;
+      repository: string;
+      path: string;
+      revision: string;
+      locator?: string;
+    };
+    verification: {
+      exists: true;
+      verifiedAt: string;
+    };
+  };
+}
+
 export interface ArtifactBrowserApiClient {
   browseImageArtifacts: () => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
@@ -60,6 +79,12 @@ export interface ArtifactBrowserApiClient {
   verifyPublishedArtifactBacking: (input: {
     artifactId: string;
   }) => Promise<ThinClientPublishedBacking>;
+  registerArtifactFromRepo: (input: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<ThinClientRegisteredArtifactFromRepo>;
 }
 
 interface ApiResponseEnvelope {
@@ -216,6 +241,36 @@ export function createApiArtifactBrowserClient(
         }
 
         return backing;
+      });
+    },
+
+    async registerArtifactFromRepo(input): Promise<ThinClientRegisteredArtifactFromRepo> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/register-from-repo"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          target: {
+            provider: "huggingface",
+            repository: input.repository,
+            revision: input.revision,
+            path: input.path,
+          },
+          artifactKind: "image",
+          mediaType: input.mediaType,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const registered = value as ThinClientRegisteredArtifactFromRepo;
+        if (!registered || typeof registered !== "object") {
+          throw new Error("Artifact register-from-repo response is missing registration information.");
+        }
+
+        return registered;
       });
     },
   };

@@ -35,6 +35,7 @@ describe("desktop renderer page composition", () => {
       readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
       publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
       verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
+      registerArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
     };
 
     await act(async () => {

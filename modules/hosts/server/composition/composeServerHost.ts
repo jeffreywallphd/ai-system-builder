@@ -6,6 +6,7 @@ import {
   PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
+  RegisterArtifactFromRepoUseCase,
   StoreArtifactInRepoUseCase,
   StoreImageUploadUseCase,
   VerifyPublishedArtifactBackingUseCase,
@@ -155,6 +156,12 @@ export function composeServerHost(
         artifactBindingStorage: artifactBindings,
         now: options.now,
       });
+      const registerArtifactFromRepo = new RegisterArtifactFromRepoUseCase({
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        artifactCatalogAppend: artifactCatalog,
+        now: options.now,
+      });
 
       registerExpressApi({
         app: registerOptions.app,
@@ -167,6 +174,7 @@ export function composeServerHost(
         storeArtifactInRepoUseCase: storeArtifactInRepo,
         publishArtifactToRepoUseCase: publishArtifactToRepo,
         verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
+        registerArtifactFromRepoUseCase: registerArtifactFromRepo,
       });
     },
   };

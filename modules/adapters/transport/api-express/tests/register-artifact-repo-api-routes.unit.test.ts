@@ -68,6 +68,28 @@ describe("registerArtifactRepoApiRoutes", () => {
         },
       })),
     };
+    const registerArtifactFromRepoUseCase = {
+      execute: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          artifactId: "imports/huggingface/openai/demo/main/artifacts/a.bin",
+          backing: {
+            role: "imported-source",
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "artifacts/a.bin",
+              revision: "main",
+              locator: "openai/demo/artifacts/a.bin",
+            },
+            verification: {
+              exists: true,
+              verifiedAt: "2026-04-17T00:00:00.000Z",
+            },
+          },
+        },
+      })),
+    };
 
     registerArtifactRepoApiRoutes({
       app,
@@ -75,13 +97,15 @@ describe("registerArtifactRepoApiRoutes", () => {
       storeArtifactInRepoUseCase,
       publishArtifactToRepoUseCase,
       verifyPublishedArtifactBackingUseCase,
+      registerArtifactFromRepoUseCase,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(4);
+    expect(app.post).toHaveBeenCalledTimes(5);
     expect(handlers.has("/api/artifact-repo/has")).toBe(true);
     expect(handlers.has("/api/artifact-repo/store")).toBe(true);
     expect(handlers.has("/api/artifact/publish")).toBe(true);
     expect(handlers.has("/api/artifact/publish/verify")).toBe(true);
+    expect(handlers.has("/api/artifact/register-from-repo")).toBe(true);
 
     const response = {
       status: testDouble.fn(() => response),
@@ -171,6 +195,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
+      registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
     });
 
     const response = {
@@ -218,6 +243,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
+      registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
     });
 
     const response = {

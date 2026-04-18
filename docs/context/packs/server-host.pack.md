@@ -71,3 +71,6 @@
 - Thin-client artifact-browser publish flow should target `POST /api/artifact/publish` as the primary user workflow route.
 - Thin-client artifact-browser re-check flow should target `POST /api/artifact/publish/verify` to update durable verification state/time without republishing bytes.
 - Desktop host uses the same shared `PublishArtifactToRepoUseCase` path via IPC/preload transport (separate host/transport wiring, shared application orchestration).
+
+
+- Server route surface now includes `POST /api/artifact/register-from-repo` delegating to shared application use-case orchestration.

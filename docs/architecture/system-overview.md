@@ -223,3 +223,10 @@ Desktop composition now mirrors the same publish orchestration path used by serv
 - shared publish/verify use cases wired through Electron IPC and preload bridge (`artifact.publish`, `artifact.publish.verify`).
 
 Desktop renderer artifact-browser publish/re-check UX should call the preload-backed bridge and shared hook logic, not raw IPC and not desktop-only business logic.
+
+
+### Artifact repo registration slice (current)
+
+- In addition to publish/re-check, the system now supports first-slice remote registration (`artifact.register.from-repo`) through shared application use-case wiring.
+- Registration verifies remote existence and creates an internal catalog + `imported-source` binding so the artifact browser can treat the remote artifact as an internal artifact record.
+- This is a narrow registration/import slice; it is not a full provider repo browser or sync engine.

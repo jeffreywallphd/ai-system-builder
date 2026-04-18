@@ -26,6 +26,7 @@ import {
 import {
   normalizeStorageArtifactKey,
   resolveArtifactRepoBackingTarget,
+  type ArtifactStorageBindingRole,
   type StorageObjectMetadata,
 } from "../../../../contracts/storage";
 
@@ -39,7 +40,7 @@ export interface CreateFilesystemArtifactBrowserReadAdapterOptions {
   artifactBindingRead?: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings">;
 }
 
-interface PublishedBackingReadModel {
+interface RepoBackingReadModel {
   target: {
     provider: string;
     repository: string;
@@ -55,19 +56,23 @@ interface PublishedBackingReadModel {
 
 function withPublishedBackingMetadata<TMetadata extends StorageObjectMetadata>(
   metadata: TMetadata | undefined,
-  publishedBacking: PublishedBackingReadModel,
+  repoBackings: {
+    publishedBacking?: RepoBackingReadModel;
+    importedSourceBacking?: RepoBackingReadModel;
+  },
 ): TMetadata {
   return {
     ...(metadata ?? {}),
-    publishedBacking,
+    ...repoBackings,
   } as unknown as TMetadata;
 }
 
-async function readPublishedBacking(
+async function readLatestRepoBackingByRole(
   options: CreateFilesystemArtifactBrowserReadAdapterOptions,
   artifactId: string,
   context: ApplicationRequestContext,
-): Promise<PublishedBackingReadModel | undefined> {
+  role: ArtifactStorageBindingRole,
+): Promise<RepoBackingReadModel | undefined> {
   if (!options.artifactBindingRead) {
     return undefined;
   }
@@ -78,7 +83,7 @@ async function readPublishedBacking(
   }
 
   const latestPublishedBinding = bindingsResult.value.bindings
-    .filter((binding) => binding.role === "published" && binding.backing.kind === "artifact-repo")
+    .filter((binding) => binding.role === role && binding.backing.kind === "artifact-repo")
     .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""))[0];
 
   if (!latestPublishedBinding) {
@@ -179,11 +184,17 @@ export function createFilesystemArtifactBrowserReadAdapter(
       }
 
       const detail = toDetailValue(readResult.value.record) as ArtifactReadSuccessValue<TMetadata>;
-      const publishedBacking = await readPublishedBacking(options, storageKey, context);
-      if (publishedBacking) {
+          const [publishedBacking, importedSourceBacking] = await Promise.all([
+        readLatestRepoBackingByRole(options, storageKey, context, "published"),
+        readLatestRepoBackingByRole(options, storageKey, context, "imported-source"),
+      ]);
+      if (publishedBacking || importedSourceBacking) {
         detail.artifact.metadata = withPublishedBackingMetadata(
           detail.artifact.metadata as TMetadata | undefined,
-          publishedBacking,
+          {
+            ...(publishedBacking ? { publishedBacking } : {}),
+            ...(importedSourceBacking ? { importedSourceBacking } : {}),
+          },
         );
       }
 
@@ -224,6 +235,23 @@ export function createFilesystemArtifactBrowserReadAdapter(
         }
 
         if (!hasArtifactResult.value.exists) {
+          const importedSourceBacking = await readLatestRepoBackingByRole(
+            options,
+            storageKey,
+            context,
+            "imported-source",
+          );
+          if (importedSourceBacking) {
+            return createSuccessResult({
+              content: {
+                locator: createArtifactBrowserLocator(storageKey),
+                mediaType: readResult.value.record.mediaType,
+                sizeBytes: readResult.value.record.sizeBytes,
+                availability: "unavailable",
+                retrieval: "deferred",
+              },
+            }, context);
+          }
           return createFailureResult(
             createContractError(
               "not-found",

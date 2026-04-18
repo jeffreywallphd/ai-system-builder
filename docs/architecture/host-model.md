@@ -123,3 +123,9 @@ Contributors should:
 - UI remains separate from host lifecycle internals.
 
 If host code starts accumulating business logic, move that logic inward before it becomes entrenched.
+
+
+### Current host parity for repo-backed artifact workflows
+
+- Server API and desktop IPC/preload both expose shared publish, verify, and register-from-repo use cases.
+- Thin-client and desktop renderer surfaces remain host-specific UI layers but call into the same shared application workflow path.

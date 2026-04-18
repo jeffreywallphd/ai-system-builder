@@ -4,6 +4,7 @@ import {
   PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
+  RegisterArtifactFromRepoUseCase,
   StoreImageUploadUseCase,
   VerifyPublishedArtifactBackingUseCase,
 } from "../../../application/use-cases";
@@ -135,6 +136,12 @@ export function composeDesktopHost(
         artifactBindingStorage: artifactBindings,
         now: options.now,
       });
+      const registerArtifactFromRepo = new RegisterArtifactFromRepoUseCase({
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        artifactCatalogAppend: artifactCatalog,
+        now: options.now,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -145,6 +152,7 @@ export function composeDesktopHost(
         artifactMediaViewRetrieval,
         publishArtifactToRepoUseCase: publishArtifactToRepo,
         verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
+        registerArtifactFromRepoUseCase: registerArtifactFromRepo,
       });
     },
   };

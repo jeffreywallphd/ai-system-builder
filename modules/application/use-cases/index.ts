@@ -12,3 +12,5 @@ export * from "./store-artifact-in-repo.use-case";
 export * from "./retrieve-artifact-from-repo.use-case";
 export * from "./publish-artifact-to-repo.use-case";
 export * from "./verify-published-artifact-backing.use-case";
+
+export * from "./register-artifact-from-repo.use-case";

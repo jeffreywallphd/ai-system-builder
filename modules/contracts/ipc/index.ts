@@ -11,3 +11,5 @@ export * from "./desktop-artifact-content-read-contract";
 export * from "./desktop-artifact-media-view-contract";
 export * from "./desktop-artifact-publish-contract";
 export * from "./desktop-artifact-publish-verify-contract";
+
+export * from "./desktop-artifact-register-from-repo-contract";

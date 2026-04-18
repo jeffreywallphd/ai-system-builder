@@ -89,6 +89,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
           verifiedAt: "2026-04-17T00:00:00.000Z",
         },
       }),
+      registerArtifactFromRepo: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -132,7 +133,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
     expect(container.textContent).toContain("Published Backing");
     expect(container.textContent).toContain("openai/demo");
-    expect(container.textContent).toContain("yes");
+    expect(container.textContent).toContain("Remote backing verified");
   });
 
   it("shows publish failure message", async () => {
@@ -155,6 +156,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
       publishArtifactToHuggingFace: vi.fn().mockRejectedValue(new Error("Missing Hugging Face token.")),
       verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -230,6 +232,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
           verifiedAt: "2026-04-18T00:00:00.000Z",
         },
       }),
+      registerArtifactFromRepo: vi.fn(),
     };
 
     const container = document.createElement("div");
@@ -255,6 +258,75 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     expect(client.verifyPublishedArtifactBacking).toHaveBeenCalledWith({ artifactId: "uploads/cat.png" });
-    expect(container.textContent).toContain("Last verified at");
+    expect(container.textContent).toContain("Last checked:");
+  });
+
+  it("registers an artifact from Hugging Face and selects it", async () => {
+    const client = {
+      browseImageArtifacts: vi.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { storageKey: "imports/huggingface/openai/demo/main/images/cat.png", artifactKind: "image" as const },
+        ]),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "imports/huggingface/openai/demo/main/images/cat.png" },
+        artifactKind: "image" as const,
+      }),
+      readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
+      createArtifactMediaViewUrl: vi.fn().mockRejectedValue(new Error("missing local bytes")),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn().mockResolvedValue({
+        artifactId: "imports/huggingface/openai/demo/main/images/cat.png",
+        backing: {
+          role: "imported-source" as const,
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/cat.png",
+            revision: "main",
+            locator: "openai/demo/images/cat.png",
+          },
+          verification: {
+            exists: true as const,
+            verifiedAt: "2026-04-18T00:00:00.000Z",
+          },
+        },
+      }),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const registerToggle = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Register from Hugging Face") as HTMLButtonElement;
+    await act(async () => {
+      registerToggle.click();
+    });
+
+    const inputs = Array.from(container.querySelectorAll("input"));
+    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
+
+    const registerButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Register") as HTMLButtonElement;
+    await act(async () => {
+      registerButton.click();
+    });
+
+    expect(client.registerArtifactFromRepo).toHaveBeenCalledWith({
+      repository: "openai/demo",
+      path: "images/cat.png",
+      revision: "main",
+      mediaType: undefined,
+    });
+    expect(container.textContent).toContain("Registered imports/huggingface/openai/demo/main/images/cat.png from Hugging Face.");
   });
 });

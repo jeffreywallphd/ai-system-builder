@@ -1,8 +1,47 @@
+import { Fragment } from "react";
+
+import {
+  derivePublishedBackingDisplayRows,
+  derivePublishedBackingVerificationPresentation,
+  type PublishedBackingView,
+} from "../../../../../../../modules/ui/shared";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { useArtifactBrowserFeature } from "../hooks/useArtifactBrowserFeature";
 
 export interface ArtifactBrowserFeatureProps {
   client?: DesktopArtifactBrowserClient;
+}
+
+function PublishedBackingPanel(
+  props: {
+    publishedBacking: PublishedBackingView;
+    loading: boolean;
+    onRecheck: () => void;
+  },
+) {
+  const verification = derivePublishedBackingVerificationPresentation(props.publishedBacking);
+  const rows = derivePublishedBackingDisplayRows(props.publishedBacking);
+
+  return (
+    <section className="ui-stack ui-stack--sm">
+      <h3>Published Backing</h3>
+      <dl className="ui-grid ui-grid--two">
+        {rows.map((row) => (
+          <Fragment key={row.label}>
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </Fragment>
+        ))}
+        <dt>Verification</dt>
+        <dd>{verification.statusLabel}</dd>
+        <dt>Checked</dt>
+        <dd>{verification.lastCheckedLabel}</dd>
+      </dl>
+      <button className="ui-button" type="button" onClick={props.onRecheck} disabled={props.loading}>
+        Re-check published backing
+      </button>
+    </section>
+  );
 }
 
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
@@ -13,18 +52,26 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     content,
     imageViewUrl,
     publishState,
+    registerState,
     publishedBacking,
     publishForm,
+    registerForm,
     viewState,
     selectArtifact,
     refreshArtifacts,
     publishArtifactToHuggingFace,
+    registerArtifactFromHuggingFace,
     recheckPublishedBacking,
     setRepository,
     setPathInRepo,
     setRevision,
     setMediaType,
     togglePublishForm,
+    setRegisterRepository,
+    setRegisterPathInRepo,
+    setRegisterRevision,
+    setRegisterMediaType,
+    toggleRegisterForm,
   } = useArtifactBrowserFeature(client);
 
   return (
@@ -37,18 +84,27 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       </header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
 
+      <button className="ui-button" type="button" onClick={toggleRegisterForm} disabled={registerState.status === "loading"}>Register from Hugging Face</button>
+      {registerForm.showRegisterForm ? (
+        <section className="ui-stack ui-stack--sm">
+          <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={registerForm.repository} onChange={(event) => setRegisterRepository(event.target.value)} required /></label>
+          <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={registerForm.pathInRepo} onChange={(event) => setRegisterPathInRepo(event.target.value)} required /></label>
+          <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={registerForm.revision} onChange={(event) => setRegisterRevision(event.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span>Media type (optional)</span><input className="ui-input" value={registerForm.mediaType} onChange={(event) => setRegisterMediaType(event.target.value)} /></label>
+          <button className="ui-button" type="button" disabled={registerState.status === "loading" || registerForm.repository.trim().length === 0 || registerForm.pathInRepo.trim().length === 0} onClick={() => void registerArtifactFromHuggingFace()}>
+            {registerState.status === "loading" ? "Registering..." : "Register"}
+          </button>
+          {registerState.message ? <p role={registerState.status === "error" ? "alert" : "status"}>{registerState.message}</p> : null}
+        </section>
+      ) : null}
+
       <div className="ui-grid ui-grid--two">
         <div className="ui-stack ui-stack--sm">
           <h3>Artifacts</h3>
           <ul className="ui-stack ui-stack--sm">
             {items.map((item) => (
               <li key={item.storageKey}>
-                <button
-                  className="ui-button"
-                  type="button"
-                  onClick={() => void selectArtifact(item.storageKey)}
-                  disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}
-                >
+                <button className="ui-button" type="button" onClick={() => void selectArtifact(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
                   {item.originalName ?? item.storageKey}
                 </button>
               </li>
@@ -69,9 +125,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <dt>Created at</dt>
               <dd>{detail.createdAt ?? "unknown"}</dd>
             </dl>
-          ) : (
-            <p className="ui-text-muted">Select an image artifact to inspect metadata and preview.</p>
-          )}
+          ) : (<p className="ui-text-muted">Select an image artifact to inspect metadata and preview.</p>)}
 
           {content ? (
             <dl className="ui-grid ui-grid--two">
@@ -91,69 +145,28 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
 
           {detail ? (
             <section className="ui-stack ui-stack--sm">
-              <button
-                className="ui-button"
-                type="button"
-                disabled={publishState.status === "loading"}
-                onClick={togglePublishForm}
-              >
-                Publish to Hugging Face
-              </button>
+              <button className="ui-button" type="button" disabled={publishState.status === "loading"} onClick={togglePublishForm}>Publish to Hugging Face</button>
               {publishForm.showPublishForm ? (
                 <>
-                  <label className="ui-stack ui-stack--sm">
-                    <span>Repository</span>
-                    <input className="ui-input" value={publishForm.repository} onChange={(event) => setRepository(event.target.value)} required />
-                  </label>
-                  <label className="ui-stack ui-stack--sm">
-                    <span>Path in repo</span>
-                    <input className="ui-input" value={publishForm.pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required />
-                  </label>
-                  <label className="ui-stack ui-stack--sm">
-                    <span>Revision (optional)</span>
-                    <input className="ui-input" value={publishForm.revision} onChange={(event) => setRevision(event.target.value)} />
-                  </label>
-                  <label className="ui-stack ui-stack--sm">
-                    <span>Media type (optional)</span>
-                    <input className="ui-input" value={publishForm.mediaType} onChange={(event) => setMediaType(event.target.value)} />
-                  </label>
-                  <button
-                    className="ui-button"
-                    type="button"
-                    disabled={publishState.status === "loading" || publishForm.repository.trim().length === 0 || publishForm.pathInRepo.trim().length === 0}
-                    onClick={() => void publishArtifactToHuggingFace()}
-                  >
+                  <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={publishForm.repository} onChange={(event) => setRepository(event.target.value)} required /></label>
+                  <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={publishForm.pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} required /></label>
+                  <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={publishForm.revision} onChange={(event) => setRevision(event.target.value)} /></label>
+                  <label className="ui-stack ui-stack--sm"><span>Media type (optional)</span><input className="ui-input" value={publishForm.mediaType} onChange={(event) => setMediaType(event.target.value)} /></label>
+                  <button className="ui-button" type="button" disabled={publishState.status === "loading" || publishForm.repository.trim().length === 0 || publishForm.pathInRepo.trim().length === 0} onClick={() => void publishArtifactToHuggingFace()}>
                     {publishState.status === "loading" ? "Publishing..." : "Publish"}
                   </button>
                 </>
               ) : null}
-              {publishState.message ? (
-                <p role={publishState.status === "error" ? "alert" : "status"}>{publishState.message}</p>
-              ) : null}
+              {publishState.message ? (<p role={publishState.status === "error" ? "alert" : "status"}>{publishState.message}</p>) : null}
             </section>
           ) : null}
 
           {publishedBacking ? (
-            <section className="ui-stack ui-stack--sm">
-              <h3>Published Backing</h3>
-              <dl className="ui-grid ui-grid--two">
-                <dt>Provider</dt>
-                <dd>{publishedBacking.target.provider}</dd>
-                <dt>Repo</dt>
-                <dd>{publishedBacking.target.repository}</dd>
-                <dt>Path</dt>
-                <dd>{publishedBacking.target.path}</dd>
-                <dt>Revision</dt>
-                <dd>{publishedBacking.target.revision ?? "main"}</dd>
-                <dt>Verified</dt>
-                <dd>{publishedBacking.verification.exists ? "yes" : "no"}</dd>
-                <dt>Last verified at</dt>
-                <dd>{publishedBacking.verification.verifiedAt ?? "never"}</dd>
-              </dl>
-              <button className="ui-button" type="button" onClick={() => void recheckPublishedBacking()} disabled={publishState.status === "loading"}>
-                Re-check published backing
-              </button>
-            </section>
+            <PublishedBackingPanel
+              publishedBacking={publishedBacking}
+              loading={publishState.status === "loading"}
+              onRecheck={() => void recheckPublishedBacking()}
+            />
           ) : null}
         </div>
       </div>

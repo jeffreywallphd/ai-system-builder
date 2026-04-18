@@ -118,6 +118,12 @@ describe("desktop image upload end-to-end", () => {
       publishArtifactToRepoUseCase: {
         execute: async () => unavailableResult,
       },
+      verifyPublishedArtifactBackingUseCase: {
+        execute: async () => unavailableResult,
+      },
+      registerArtifactFromRepoUseCase: {
+        execute: async () => unavailableResult,
+      },
     });
 
     const preloadApi = createDesktopPreloadApi({
