@@ -113,7 +113,7 @@ describe("server app artifact upload route", () => {
       const uploadFormData = new FormData();
       uploadFormData.append(
         "file",
-        new File([new Uint8Array([37, 80, 68, 70])], "cat.pdf", { type: "application/pdf" }),
+        new File([new Uint8Array([80, 75, 3, 4])], "cat.zip", { type: "application/zip" }),
       );
       uploadFormData.append("source", "server.integration.test.invalid-media-type");
 
@@ -129,7 +129,7 @@ describe("server app artifact upload route", () => {
         operation: "artifact.upload",
         error: {
           code: "validation",
-          message: "Artifact type is not accepted: application/pdf.",
+          message: "Artifact type is not accepted: application/zip.",
           kind: "client",
         },
       });

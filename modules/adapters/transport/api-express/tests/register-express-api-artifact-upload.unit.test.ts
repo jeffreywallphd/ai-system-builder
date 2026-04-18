@@ -23,6 +23,12 @@ function createUseCaseStub(
       ?? testDouble
         .fn<StoreArtifactUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
+    getAcceptedUploadPolicy: testDouble
+      .fn<StoreArtifactUploadUseCasePort["getAcceptedUploadPolicy"]>()
+      .mockImplementation(() => ({
+        acceptedMediaTypes: ["image/png"],
+        acceptedExtensions: [".png"],
+      })),
   };
 }
 
@@ -191,6 +197,7 @@ describe("registerArtifactUploadApiRoute", () => {
       | undefined;
 
     const app: ExpressPostRoutePort = {
+      get: testDouble.fn(),
       post: testDouble.fn((path, handler) => {
         registeredPath = path;
         registeredHandler = handler;
@@ -279,6 +286,7 @@ describe("registerArtifactUploadApiRoute", () => {
       | undefined;
 
     const app: ExpressPostRoutePort = {
+      get: testDouble.fn(),
       post: testDouble.fn((_path, handler) => {
         registeredHandler = handler as typeof registeredHandler;
       }),

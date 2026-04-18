@@ -103,8 +103,8 @@ describe("desktop artifact upload IPC integration", () => {
     const handler = createDesktopArtifactUploadIpcHandler(useCase);
     const request = createDesktopArtifactUploadRequest(
       {
-        fileName: "brochure.pdf",
-        mediaType: "application/pdf",
+        fileName: "brochure.zip",
+        mediaType: "application/zip",
         bytes: new Uint8Array([1, 2, 3]),
         boundary: {
           host: "desktop",
@@ -125,7 +125,7 @@ describe("desktop artifact upload IPC integration", () => {
       channel: "ipc.artifact.upload.response",
       error: {
         code: "validation",
-        message: "Artifact type is not accepted: application/pdf.",
+        message: "Artifact type is not accepted: application/zip.",
         details: undefined,
         requestId: "req-ipc-integration-2",
         correlationId: "corr-ipc-integration-2",
