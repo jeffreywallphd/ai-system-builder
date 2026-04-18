@@ -20,6 +20,8 @@ import {
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
@@ -81,11 +83,13 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: "/tmp/desktop-image-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(13);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(15);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value,

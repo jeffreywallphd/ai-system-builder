@@ -24,6 +24,8 @@ export interface RegisterExpressApiDependencies {
   readArtifactContentUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactContentUseCase"];
   artifactMediaViewRetrieval: RegisterArtifactBrowserApiRoutesDependencies["artifactMediaViewRetrieval"];
   hasArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["hasArtifactInRepoUseCase"];
+  browseHuggingFaceNamespaceDatasetsUseCase: RegisterArtifactRepoApiRoutesDependencies["browseHuggingFaceNamespaceDatasetsUseCase"];
+  browseHuggingFaceDatasetParquetFilesUseCase: RegisterArtifactRepoApiRoutesDependencies["browseHuggingFaceDatasetParquetFilesUseCase"];
   storeArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["storeArtifactInRepoUseCase"];
   publishArtifactToRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["publishArtifactToRepoUseCase"];
   verifyPublishedArtifactBackingUseCase: RegisterArtifactRepoApiRoutesDependencies["verifyPublishedArtifactBackingUseCase"];
@@ -54,6 +56,8 @@ export function registerExpressApi(
     setHuggingFaceToken: dependencies.setHuggingFaceToken,
     clearHuggingFaceToken: dependencies.clearHuggingFaceToken,
     hasArtifactInRepoUseCase: dependencies.hasArtifactInRepoUseCase,
+    browseHuggingFaceNamespaceDatasetsUseCase: dependencies.browseHuggingFaceNamespaceDatasetsUseCase,
+    browseHuggingFaceDatasetParquetFilesUseCase: dependencies.browseHuggingFaceDatasetParquetFilesUseCase,
     storeArtifactInRepoUseCase: dependencies.storeArtifactInRepoUseCase,
     publishArtifactToRepoUseCase: dependencies.publishArtifactToRepoUseCase,
     verifyPublishedArtifactBackingUseCase: dependencies.verifyPublishedArtifactBackingUseCase,

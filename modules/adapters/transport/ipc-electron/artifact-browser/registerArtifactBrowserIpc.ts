@@ -1,6 +1,10 @@
 import type { ArtifactContentRetrievalPort } from "../../../../application/ports/artifact-content";
 import type {
   BrowseArtifactsCommand,
+  BrowseHuggingFaceDatasetParquetFilesCommand,
+  BrowseHuggingFaceDatasetParquetFilesUseCase,
+  BrowseHuggingFaceNamespaceDatasetsCommand,
+  BrowseHuggingFaceNamespaceDatasetsUseCase,
   BrowseArtifactsUseCasePort,
   LocalizeArtifactFromRepoCommand,
   LocalizeArtifactFromRepoUseCase,
@@ -83,6 +87,16 @@ import {
   type DesktopHuggingFaceTokenSetResponse,
   type DesktopHuggingFaceTokenClearRequest,
   type DesktopHuggingFaceTokenClearResponse,
+  DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_RESPONSE_CHANNEL,
+  createDesktopHuggingFaceNamespaceDatasetsBrowseSuccessResponse,
+  createDesktopHuggingFaceDatasetParquetFilesBrowseSuccessResponse,
+  type DesktopHuggingFaceNamespaceDatasetsBrowseRequest,
+  type DesktopHuggingFaceNamespaceDatasetsBrowseResponse,
+  type DesktopHuggingFaceDatasetParquetFilesBrowseRequest,
+  type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 export type { IpcMainHandlePort } from "../ipcMainHandlePort";
@@ -97,6 +111,8 @@ export interface RegisterArtifactBrowserIpcDependencies {
   readArtifactContentUseCase: ReadArtifactContentUseCasePort;
   artifactMediaViewRetrieval: ArtifactContentRetrievalPort;
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
+  browseHuggingFaceNamespaceDatasetsUseCase: Pick<BrowseHuggingFaceNamespaceDatasetsUseCase, "execute">;
+  browseHuggingFaceDatasetParquetFilesUseCase: Pick<BrowseHuggingFaceDatasetParquetFilesUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
   verifyImportedArtifactSourceBackingUseCase: Pick<VerifyImportedArtifactSourceBackingUseCase, "execute">;
   registerArtifactFromRepoUseCase: Pick<RegisterArtifactFromRepoUseCase, "execute">;
@@ -194,6 +210,32 @@ export function mapDesktopArtifactRequestContext(
   return {
     requestId: request.requestId,
     correlationId: request.correlationId,
+  };
+}
+
+function mapDesktopHuggingFaceBrowseRequestContext(
+  request: DesktopHuggingFaceNamespaceDatasetsBrowseRequest | DesktopHuggingFaceDatasetParquetFilesBrowseRequest,
+): { requestId?: string; correlationId?: string } {
+  return {
+    requestId: request.requestId,
+    correlationId: request.correlationId,
+  };
+}
+
+function mapDesktopHuggingFaceNamespaceDatasetsRequestToCommand(
+  request: DesktopHuggingFaceNamespaceDatasetsBrowseRequest,
+): BrowseHuggingFaceNamespaceDatasetsCommand {
+  return {
+    namespace: request.payload.namespace,
+  };
+}
+
+function mapDesktopHuggingFaceDatasetParquetFilesRequestToCommand(
+  request: DesktopHuggingFaceDatasetParquetFilesBrowseRequest,
+): BrowseHuggingFaceDatasetParquetFilesCommand {
+  return {
+    repository: request.payload.repository,
+    revision: request.payload.revision,
   };
 }
 
@@ -332,6 +374,42 @@ function mapSourceVerifyFailure(
   return createIpcFailureResponse(
     createIpcError(
       DESKTOP_ARTIFACT_SOURCE_VERIFY_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapHuggingFaceNamespaceDatasetsFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopHuggingFaceNamespaceDatasetsBrowseResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapHuggingFaceDatasetParquetFilesFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopHuggingFaceDatasetParquetFilesBrowseResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_RESPONSE_CHANNEL,
       mapIpcFailure(error.code),
       error.message,
       {
@@ -519,6 +597,50 @@ export function createDesktopArtifactSourceVerifyIpcHandler(
   };
 }
 
+export function createDesktopHuggingFaceNamespaceDatasetsBrowseIpcHandler(
+  browseUseCase: Pick<BrowseHuggingFaceNamespaceDatasetsUseCase, "execute">,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopHuggingFaceNamespaceDatasetsBrowseRequest,
+  ): Promise<DesktopHuggingFaceNamespaceDatasetsBrowseResponse> => {
+    const result = await browseUseCase.execute(
+      mapDesktopHuggingFaceNamespaceDatasetsRequestToCommand(request),
+      mapDesktopHuggingFaceBrowseRequestContext(request),
+    );
+    if (!result.ok) {
+      return mapHuggingFaceNamespaceDatasetsFailure(request, result.error);
+    }
+
+    return createDesktopHuggingFaceNamespaceDatasetsBrowseSuccessResponse(result.value, {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+    });
+  };
+}
+
+export function createDesktopHuggingFaceDatasetParquetFilesBrowseIpcHandler(
+  browseUseCase: Pick<BrowseHuggingFaceDatasetParquetFilesUseCase, "execute">,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopHuggingFaceDatasetParquetFilesBrowseRequest,
+  ): Promise<DesktopHuggingFaceDatasetParquetFilesBrowseResponse> => {
+    const result = await browseUseCase.execute(
+      mapDesktopHuggingFaceDatasetParquetFilesRequestToCommand(request),
+      mapDesktopHuggingFaceBrowseRequestContext(request),
+    );
+    if (!result.ok) {
+      return mapHuggingFaceDatasetParquetFilesFailure(request, result.error);
+    }
+
+    return createDesktopHuggingFaceDatasetParquetFilesBrowseSuccessResponse(result.value, {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+    });
+  };
+}
+
 
 function mapRegisterFromRepoFailure(
   request: { requestId?: string; correlationId?: string },
@@ -609,6 +731,14 @@ export function registerArtifactBrowserIpc(
       dependencies.getHuggingFaceTokenStatus(),
       { requestId: request.requestId, correlationId: request.correlationId },
     ),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value,
+    createDesktopHuggingFaceNamespaceDatasetsBrowseIpcHandler(dependencies.browseHuggingFaceNamespaceDatasetsUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value,
+    createDesktopHuggingFaceDatasetParquetFilesBrowseIpcHandler(dependencies.browseHuggingFaceDatasetParquetFilesUseCase),
   );
   dependencies.ipcMain.handle(
     DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value,

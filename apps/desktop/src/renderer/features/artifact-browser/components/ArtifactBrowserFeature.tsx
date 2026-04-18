@@ -69,6 +69,11 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     refreshArtifacts,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
+    registerHuggingFaceNamespace,
+    browseHuggingFaceDatasetParquetFiles,
+    huggingFaceNamespaceDatasets,
+    huggingFaceDatasetParquetFiles,
+    selectedHuggingFaceDataset,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
     recheckSourceBacking,
@@ -78,6 +83,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     setMediaType,
     togglePublishForm,
     setRegisterRepository,
+    setRegisterNamespace,
     setRegisterPathInRepo,
     setRegisterRevision,
     setRegisterMediaType,
@@ -121,6 +127,37 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       {registerForm.showRegisterForm ? (
         <section className="ui-stack ui-stack--sm">
           <p role="note">Private or gated Hugging Face repositories may require a desktop-host token.</p>
+          <label className="ui-stack ui-stack--sm"><span>Namespace (user/org)</span><input className="ui-input" value={registerForm.namespace} onChange={(event) => setRegisterNamespace(event.target.value)} placeholder="OpenFinAL" required /></label>
+          <button className="ui-button" type="button" disabled={registerState.status === "loading" || registerForm.namespace.trim().length === 0} onClick={() => void registerHuggingFaceNamespace()}>
+            Register namespace
+          </button>
+          <h4>Namespace datasets</h4>
+          {huggingFaceNamespaceDatasets.length === 0 ? <p className="ui-text-muted">No datasets loaded yet.</p> : (
+            <ul className="ui-stack ui-stack--sm">
+              {huggingFaceNamespaceDatasets.map((dataset) => (
+                <li key={dataset.repository}>
+                  <button className="ui-button" type="button" disabled={registerState.status === "loading"} onClick={() => void browseHuggingFaceDatasetParquetFiles(dataset.repository)}>
+                    {dataset.repository}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <h4>Dataset parquet files {selectedHuggingFaceDataset ? `(${selectedHuggingFaceDataset})` : ""}</h4>
+          {huggingFaceDatasetParquetFiles.length === 0 ? <p className="ui-text-muted">Select a dataset to view parquet files.</p> : (
+            <ul className="ui-stack ui-stack--sm">
+              {huggingFaceDatasetParquetFiles.map((file) => (
+                <li key={`${file.repository}:${file.path}`}>
+                  <span>{file.path}</span>
+                  <button className="ui-button" type="button" disabled={registerState.status === "loading"} onClick={() => {
+                    setRegisterRepository(file.repository);
+                    setRegisterPathInRepo(file.path);
+                    void registerArtifactFromHuggingFace();
+                  }}>Register</button>
+                </li>
+              ))}
+            </ul>
+          )}
           <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={registerForm.repository} onChange={(event) => setRegisterRepository(event.target.value)} required /></label>
           <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={registerForm.pathInRepo} onChange={(event) => setRegisterPathInRepo(event.target.value)} required /></label>
           <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={registerForm.revision} onChange={(event) => setRegisterRevision(event.target.value)} /></label>

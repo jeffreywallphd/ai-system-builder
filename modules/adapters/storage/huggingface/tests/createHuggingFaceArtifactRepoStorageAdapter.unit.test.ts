@@ -306,4 +306,65 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     expect(result.error.code).toBe("unavailable");
     expect(result.error.message).toContain("access token");
   });
+
+  it("lists namespace datasets through Hugging Face datasets API", async () => {
+    const fetchImplementation = testDouble.fn(async () => new Response(JSON.stringify([
+      { id: "OpenFinAL/financial-news" },
+      { id: "OpenFinAL/other-dataset" },
+      { id: "OtherOrg/not-included" },
+    ]), { status: 200 })) as unknown as typeof fetch;
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient: createHubClientDouble(),
+      fetchImplementation,
+      accessToken: "hf_token",
+    });
+
+    const result = await adapter.listNamespaceDatasets("OpenFinAL");
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected namespace dataset browse success.");
+    }
+
+    expect(result.value.datasets).toEqual([
+      { namespace: "OpenFinAL", repository: "OpenFinAL/financial-news" },
+      { namespace: "OpenFinAL", repository: "OpenFinAL/other-dataset" },
+    ]);
+    expect(fetchImplementation).toHaveBeenCalled();
+  });
+
+  it("lists parquet files for a dataset repository", async () => {
+    const fetchImplementation = testDouble.fn(async () => new Response(JSON.stringify([
+      { path: "data/train-00000.parquet", type: "file", size: 1234 },
+      { path: "data/README.md", type: "file", size: 45 },
+      { path: "data/sub/test-00000.parquet", type: "file", size: 321 },
+    ]), { status: 200 })) as unknown as typeof fetch;
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient: createHubClientDouble(),
+      fetchImplementation,
+    });
+
+    const result = await adapter.listDatasetParquetFiles({
+      repository: "OpenFinAL/financial-news",
+      revision: "main",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected dataset parquet browse success.");
+    }
+
+    expect(result.value.files).toEqual([
+      {
+        repository: "OpenFinAL/financial-news",
+        path: "data/train-00000.parquet",
+        revision: "main",
+        sizeBytes: 1234,
+      },
+      {
+        repository: "OpenFinAL/financial-news",
+        path: "data/sub/test-00000.parquet",
+        revision: "main",
+        sizeBytes: 321,
+      },
+    ]);
+  });
 });
