@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { toHtmlFileAcceptAttribute } from "../../../../../../../modules/contracts/artifact-upload";
 
 import { useArtifactUploadClient } from "./useArtifactUploadClient";
 import type { ArtifactUploadClient } from "../api/desktopArtifactUploadClient";
 import type { UploadViewState } from "../components/ArtifactUploadStatus";
+import { toHtmlFileAcceptAttribute } from "./toHtmlFileAcceptAttribute";
 
 export interface UseArtifactUploadFeatureResult {
   selectedFile: File | null;

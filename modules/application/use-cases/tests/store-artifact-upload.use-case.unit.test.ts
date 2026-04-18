@@ -129,7 +129,7 @@ describe("StoreArtifactUploadUseCase", () => {
     });
   });
 
-  it("fails validation for non-image media types and logs a failed outcome", async () => {
+  it("fails validation for unsupported media types and logs a failed outcome", async () => {
     const storeArtifact = testDouble.fn<ArtifactStoragePort["storeArtifact"]>();
     const storage = createStoragePort({ storeArtifact });
     const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
@@ -141,8 +141,8 @@ describe("StoreArtifactUploadUseCase", () => {
 
     const result = await useCase.execute(
       createCommand({
-        fileName: "kitten.pdf",
-        mediaType: "application/pdf",
+        fileName: "kitten.zip",
+        mediaType: "application/zip",
       }),
       createCommandContext(),
     );
@@ -152,7 +152,7 @@ describe("StoreArtifactUploadUseCase", () => {
       throw new Error("Expected media type validation failure.");
     }
     expect(result.error.code).toBe("validation");
-    expect(result.error.message).toBe("Artifact type is not accepted: application/pdf.");
+    expect(result.error.message).toBe("Artifact type is not accepted: application/zip.");
     expect(storeArtifact).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledTimes(2);
     expect(log.mock.calls[0]?.[0]).toMatchObject({

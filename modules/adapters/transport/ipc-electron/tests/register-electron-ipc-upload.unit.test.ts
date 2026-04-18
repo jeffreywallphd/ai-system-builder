@@ -24,6 +24,12 @@ function createUseCaseStub(
       testDouble
         .fn<StoreArtifactUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
+    getAcceptedUploadPolicy: testDouble
+      .fn<StoreArtifactUploadUseCasePort["getAcceptedUploadPolicy"]>()
+      .mockImplementation(() => ({
+        acceptedMediaTypes: ["image/png"],
+        acceptedExtensions: [".png"],
+      })),
   };
 }
 
@@ -148,14 +154,17 @@ describe("registerArtifactUploadIpc desktop artifact upload handler", () => {
     });
   });
 
-  it("registers only the upload request channel and delegates handler execution", async () => {
+  it("registers upload channels and delegates upload handler execution", async () => {
     let registeredHandler:
       | ((event: unknown, request: ReturnType<typeof createDesktopArtifactUploadRequest>) => Promise<unknown>)
       | undefined;
+    const registeredChannels: string[] = [];
     const ipcMain: IpcMainHandlePort = {
       handle: testDouble.fn((channel: string, listener: Parameters<IpcMainHandlePort["handle"]>[1]) => {
-        expect(channel).toBe(DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value);
-        registeredHandler = listener;
+        registeredChannels.push(channel);
+        if (channel === DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value) {
+          registeredHandler = listener;
+        }
       }),
     };
     const execute = testDouble.fn<StoreArtifactUploadUseCasePort["execute"]>().mockResolvedValue({
@@ -176,7 +185,8 @@ describe("registerArtifactUploadIpc desktop artifact upload handler", () => {
       storeArtifactUploadUseCase: createUseCaseStub(execute),
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(1);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(2);
+    expect(registeredChannels).toContain(DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value);
     expect(registeredHandler).toBeDefined();
     const request = createDesktopArtifactUploadRequest(
       {

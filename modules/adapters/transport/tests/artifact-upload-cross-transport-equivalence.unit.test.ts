@@ -33,6 +33,12 @@ function createApiUseCaseStub(
       ?? testDouble
         .fn<ApiStoreArtifactUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
+    getAcceptedUploadPolicy: testDouble
+      .fn<ApiStoreArtifactUploadUseCasePort["getAcceptedUploadPolicy"]>()
+      .mockImplementation(() => ({
+        acceptedMediaTypes: ["image/png"],
+        acceptedExtensions: [".png"],
+      })),
   };
 }
 
@@ -46,6 +52,7 @@ async function invokeApiUploadRoute(
     ) => Promise<void>)
     | undefined;
   const app: ExpressPostRoutePort = {
+    get: testDouble.fn(),
     post: testDouble.fn((_, handler) => {
       registeredHandler = handler;
     }),

@@ -10,7 +10,7 @@ interface HookProbeProps {
 }
 
 function HookProbe({ client }: HookProbeProps) {
-  const { selectedFile, viewState, onFileChange, onUploadSubmit } = useArtifactUploadFeature(client);
+  const { selectedFile, viewState, acceptedFileTypes, onFileChange, onUploadSubmit } = useArtifactUploadFeature(client);
 
   return (
     <form onSubmit={(event) => void onUploadSubmit(event)}>
@@ -20,6 +20,7 @@ function HookProbe({ client }: HookProbeProps) {
       <p data-testid="status">{viewState.status}</p>
       <p data-testid="message">{viewState.message ?? ""}</p>
       <p data-testid="stored-key">{viewState.key ?? ""}</p>
+      <p data-testid="accepted-file-types">{acceptedFileTypes}</p>
     </form>
   );
 }
@@ -62,6 +63,10 @@ describe("useArtifactUploadFeature", () => {
         },
       },
     });
+    const getAcceptedTypes = vi.fn().mockResolvedValue({
+      acceptedExtensions: [".png", ".md"],
+      acceptedMediaTypes: ["image/png", "text/markdown"],
+    });
 
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -70,7 +75,7 @@ describe("useArtifactUploadFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<HookProbe client={{ uploadArtifact }} />);
+      root.render(<HookProbe client={{ uploadArtifact, getAcceptedTypes }} />);
     });
 
     const input = container.querySelector("input[type='file']") as HTMLInputElement;
@@ -89,10 +94,17 @@ describe("useArtifactUploadFeature", () => {
     expect(container.querySelector("[data-testid='selected-file']")?.textContent).toBe("cat.png");
     expect(container.querySelector("[data-testid='status']")?.textContent).toBe("success");
     expect(container.querySelector("[data-testid='stored-key']")?.textContent).toBe("uploads/cat.png");
+    expect(container.querySelector("[data-testid='accepted-file-types']")?.textContent).toBe(
+      ".png,.md,image/png,text/markdown",
+    );
   });
 
   it("reports validation error when submit is attempted without selecting a file", async () => {
     const uploadArtifact = vi.fn();
+    const getAcceptedTypes = vi.fn().mockResolvedValue({
+      acceptedExtensions: [".pdf"],
+      acceptedMediaTypes: ["application/pdf"],
+    });
 
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -101,7 +113,7 @@ describe("useArtifactUploadFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<HookProbe client={{ uploadArtifact }} />);
+      root.render(<HookProbe client={{ uploadArtifact, getAcceptedTypes }} />);
     });
 
     const form = container.querySelector("form") as HTMLFormElement;
@@ -113,7 +125,7 @@ describe("useArtifactUploadFeature", () => {
     expect(uploadArtifact).not.toHaveBeenCalled();
     expect(container.querySelector("[data-testid='status']")?.textContent).toBe("error");
     expect(container.querySelector("[data-testid='message']")?.textContent).toBe(
-      "Select one image file before uploading.",
+      "Select one artifact file before uploading.",
     );
   });
 });
