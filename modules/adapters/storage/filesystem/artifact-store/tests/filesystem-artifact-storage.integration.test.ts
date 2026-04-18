@@ -250,6 +250,61 @@ describe("desktop filesystem artifact-object storage adapter integration", () =>
     expect(new Uint8Array(writtenBytes)).toEqual(new Uint8Array([255, 216, 255]));
   });
 
+  it("preserves markdown extension when generating a key from original upload metadata", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      now: () => "2026-04-14T12:00:00.000Z",
+      randomSuffix: () => "abc123",
+    });
+
+    const result = await adapter.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([35, 32, 72, 101]), {
+        descriptor: {
+          mediaType: "text/markdown",
+          metadata: {
+            originalFileName: "architecture-document-scope-boundaries.md",
+          },
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected generated markdown-key store success.");
+    }
+
+    expect(result.value.key).toBe("uploads/20260414120000000-abc123.md");
+  });
+
+  it("preserves json extension when generating a key from original upload metadata", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      now: () => "2026-04-14T12:00:00.000Z",
+      randomSuffix: () => "json123",
+    });
+
+    const result = await adapter.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([123, 125]), {
+        descriptor: {
+          mediaType: "application/json",
+          metadata: {
+            originalFileName: "schema.json",
+          },
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected generated json-key store success.");
+    }
+
+    expect(result.value.key).toBe("uploads/20260414120000000-json123.json");
+    expect(result.value.key.endsWith(".bin")).toBe(false);
+  });
+
   it("returns a structured conflict failure when overwrite is disabled and key already exists", async () => {
     const rootDirectory = await createTempRoot();
     const adapter = createFilesystemArtifactObjectStorageAdapter({
