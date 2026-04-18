@@ -29,6 +29,10 @@ import {
   createHuggingFaceArtifactRepoStorageAdapter,
   type CreateHuggingFaceArtifactRepoStorageAdapterOptions,
 } from "../../../adapters/storage/huggingface";
+import {
+  createHuggingFaceTokenConfigStore,
+  type HuggingFaceTokenStatus,
+} from "../../shared/huggingFaceTokenConfigStore";
 import { registerExpressApi } from "../../../adapters/transport/api-express/registerExpressApi";
 import type { ExpressPostRoutePort } from "../../../adapters/transport/api-express/image-upload/registerImageUploadApiRoute";
 import type { ExpressRoutePort } from "../../../adapters/transport/api-express/artifact-browser/registerArtifactBrowserApiRoutes";
@@ -44,6 +48,7 @@ export interface ComposeServerHostLoggingOptions {
 
 export interface ComposeServerHostArtifactRepoOptions {
   huggingFaceAccessToken?: string;
+  huggingFaceTokenConfigFilePath?: string;
   huggingFaceFetchImplementation?: typeof fetch;
   huggingFaceHubClient?: CreateHuggingFaceArtifactRepoStorageAdapterOptions["hubClient"];
 }
@@ -64,6 +69,9 @@ export interface ServerHostComposition {
   loggingPort: LoggingPort;
   loggingConfig: LoggingConfig;
   artifactRepoStorage: ArtifactRepoStoragePort;
+  getHuggingFaceTokenStatus: () => HuggingFaceTokenStatus;
+  setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
+  clearHuggingFaceToken: () => HuggingFaceTokenStatus;
   registerApi: (options: RegisterServerApiOptions) => void;
 }
 
@@ -84,13 +92,17 @@ export function composeServerHost(
     sink: options.logSink,
     now: options.now,
   });
+  const tokenConfigStore = createHuggingFaceTokenConfigStore({
+    filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/server/hugging-face-token.json",
+    fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
+  });
 
   const artifactRepoStorage = createArtifactRepoStorageAdapter({
     providers: [
       {
         provider: "huggingface",
         adapter: createHuggingFaceArtifactRepoStorageAdapter({
-          accessToken: options.artifactRepo?.huggingFaceAccessToken,
+          accessTokenProvider: () => tokenConfigStore.getToken(),
           fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
           hubClient: options.artifactRepo?.huggingFaceHubClient,
         }),
@@ -102,6 +114,15 @@ export function composeServerHost(
     loggingPort,
     loggingConfig,
     artifactRepoStorage,
+    getHuggingFaceTokenStatus() {
+      return tokenConfigStore.getStatus();
+    },
+    setHuggingFaceToken(token: string) {
+      return tokenConfigStore.setToken(token);
+    },
+    clearHuggingFaceToken() {
+      return tokenConfigStore.clearToken();
+    },
     registerApi(registerOptions) {
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
@@ -180,6 +201,9 @@ export function composeServerHost(
 
       registerExpressApi({
         app: registerOptions.app,
+        getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
+        setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
+        clearHuggingFaceToken: () => tokenConfigStore.clearToken(),
         storeImageUploadUseCase,
         browseArtifactsUseCase: browseArtifacts,
         readArtifactDetailUseCase: readArtifactDetail,

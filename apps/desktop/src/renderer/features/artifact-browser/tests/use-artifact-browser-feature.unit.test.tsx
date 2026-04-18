@@ -63,6 +63,9 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
       publishArtifactToHuggingFace: vi.fn().mockResolvedValue({
         target: {
           provider: "huggingface",
@@ -155,6 +158,9 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
       publishArtifactToHuggingFace: vi.fn().mockRejectedValue(new Error("Missing Hugging Face token.")),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn(),
@@ -196,6 +202,46 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     expect(container.textContent).toContain("This Hugging Face repository may require an access token.");
   });
 
+  it("saves and clears Hugging Face token from token settings", async () => {
+    const client = {
+      browseImageArtifacts: vi.fn().mockResolvedValue([]),
+      readArtifactDetail: vi.fn(),
+      readArtifactContent: vi.fn(),
+      createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••9999" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const tokenInput = container.querySelector("input[type='password']") as HTMLInputElement;
+    setInputValue(tokenInput, "hf_9999");
+    const saveButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Save token") as HTMLButtonElement;
+    await act(async () => {
+      saveButton.click();
+    });
+    expect(client.setHuggingFaceToken).toHaveBeenCalledWith({ token: "hf_9999" });
+    expect(container.textContent).toContain("Hugging Face token saved.");
+
+    const clearButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Clear token") as HTMLButtonElement;
+    await act(async () => {
+      clearButton.click();
+    });
+    expect(client.clearHuggingFaceToken).toHaveBeenCalled();
+  });
+
   it("re-checks published backing existence from the artifact detail panel", async () => {
     const client = {
       browseImageArtifacts: vi.fn().mockResolvedValue([
@@ -222,6 +268,9 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn().mockResolvedValue({
         target: {
@@ -278,6 +327,9 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       }),
       readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
       createArtifactMediaViewUrl: vi.fn().mockRejectedValue(new Error("missing local bytes")),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn().mockResolvedValue({
@@ -367,6 +419,9 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
           retrieval: "deferred" as const,
         }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn(),

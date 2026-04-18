@@ -57,6 +57,10 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
       verbosity: options.env?.LOG_VERBOSITY,
       level: "info",
     },
+    artifactRepo: {
+      huggingFaceAccessToken: options.env?.HF_TOKEN ?? options.env?.HUGGING_FACE_TOKEN,
+      huggingFaceTokenConfigFilePath: path.join(config.storageRootDirectory, "config", "hugging-face-token.json"),
+    },
   });
 
   const app = express();

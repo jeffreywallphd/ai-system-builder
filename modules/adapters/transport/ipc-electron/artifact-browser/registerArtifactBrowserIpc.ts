@@ -68,12 +68,30 @@ import {
   type DesktopArtifactRegisterFromRepoResponse,
   type DesktopArtifactLocalizeFromRepoRequest,
   type DesktopArtifactLocalizeFromRepoResponse,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_RESPONSE_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_SET_RESPONSE_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_CLEAR_RESPONSE_CHANNEL,
+  createDesktopHuggingFaceTokenGetSuccessResponse,
+  createDesktopHuggingFaceTokenSetSuccessResponse,
+  createDesktopHuggingFaceTokenClearSuccessResponse,
+  type DesktopHuggingFaceTokenGetRequest,
+  type DesktopHuggingFaceTokenGetResponse,
+  type DesktopHuggingFaceTokenSetRequest,
+  type DesktopHuggingFaceTokenSetResponse,
+  type DesktopHuggingFaceTokenClearRequest,
+  type DesktopHuggingFaceTokenClearResponse,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 export type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 export interface RegisterArtifactBrowserIpcDependencies {
   ipcMain: IpcMainHandlePort;
+  getHuggingFaceTokenStatus: () => { configured: boolean; maskedToken?: string };
+  setHuggingFaceToken: (token: string) => { configured: boolean; maskedToken?: string };
+  clearHuggingFaceToken: () => { configured: boolean; maskedToken?: string };
   browseArtifactsUseCase: BrowseArtifactsUseCasePort;
   readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
   readArtifactContentUseCase: ReadArtifactContentUseCasePort;
@@ -585,6 +603,41 @@ export function createDesktopArtifactLocalizeFromRepoIpcHandler(
 export function registerArtifactBrowserIpc(
   dependencies: RegisterArtifactBrowserIpcDependencies,
 ): void {
+  dependencies.ipcMain.handle(
+    DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
+    async (_event: unknown, request: DesktopHuggingFaceTokenGetRequest): Promise<DesktopHuggingFaceTokenGetResponse> => createDesktopHuggingFaceTokenGetSuccessResponse(
+      dependencies.getHuggingFaceTokenStatus(),
+      { requestId: request.requestId, correlationId: request.correlationId },
+    ),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value,
+    async (_event: unknown, request: DesktopHuggingFaceTokenSetRequest): Promise<DesktopHuggingFaceTokenSetResponse> => {
+      try {
+        return createDesktopHuggingFaceTokenSetSuccessResponse(
+          dependencies.setHuggingFaceToken(request.payload.token),
+          { requestId: request.requestId, correlationId: request.correlationId },
+        );
+      } catch (error) {
+        return createIpcFailureResponse(
+          createIpcError(
+            DESKTOP_HUGGING_FACE_TOKEN_SET_RESPONSE_CHANNEL,
+            "validation",
+            error instanceof Error ? error.message : "Invalid Hugging Face token.",
+            { requestId: request.requestId, correlationId: request.correlationId },
+          ),
+        );
+      }
+    },
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value,
+    async (_event: unknown, request: DesktopHuggingFaceTokenClearRequest): Promise<DesktopHuggingFaceTokenClearResponse> => createDesktopHuggingFaceTokenClearSuccessResponse(
+      dependencies.clearHuggingFaceToken(),
+      { requestId: request.requestId, correlationId: request.correlationId },
+    ),
+  );
+
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value,
     createDesktopArtifactBrowseIpcHandler(dependencies.browseArtifactsUseCase),

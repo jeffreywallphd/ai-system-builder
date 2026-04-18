@@ -77,3 +77,6 @@
 
 - Server route surface now includes `POST /api/artifact/register-from-repo` delegating to shared application use-case orchestration.
 - Server route surface now also includes `POST /api/artifact/localize-from-repo` for explicit localization/download of imported artifacts through shared application orchestration.
+
+
+- Server host route surface now includes Hugging Face token config endpoints (`GET/POST/DELETE /api/config/huggingface-token`) so thin-client users can recover from auth-required artifact errors without leaving the product.

@@ -73,6 +73,7 @@ interface HuggingFaceHubClient {
 
 export interface CreateHuggingFaceArtifactRepoStorageAdapterOptions {
   accessToken?: string;
+  accessTokenProvider?: () => string | undefined;
   fetchImplementation?: typeof fetch;
   hubBaseUrl?: string;
   defaultRepoType?: HuggingFaceRepoType;
@@ -417,7 +418,9 @@ function mapUnexpectedHubError(
 export function createHuggingFaceArtifactRepoStorageAdapter(
   options: CreateHuggingFaceArtifactRepoStorageAdapterOptions = {},
 ): ArtifactRepoStoragePort {
-  const accessToken = options.accessToken ?? process.env.HF_TOKEN ?? process.env.HUGGING_FACE_TOKEN;
+  const fallbackToken = options.accessToken ?? process.env.HF_TOKEN ?? process.env.HUGGING_FACE_TOKEN;
+  const accessTokenProvider = options.accessTokenProvider;
+  const getAccessToken = () => accessTokenProvider?.() ?? fallbackToken;
   const fetchImplementation = options.fetchImplementation ?? fetch;
   const hubBaseUrl = options.hubBaseUrl?.replace(/\/$/, "") ?? DEFAULT_HUB_BASE_URL;
   const defaultRepoType = options.defaultRepoType ?? "dataset";
@@ -456,13 +459,13 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
           repo: toRepoDesignation(resolvedTarget),
           path: resolvedTarget.pathInRepo,
           revision: resolvedTarget.revision,
-          accessToken,
+          accessToken: getAccessToken(),
         });
 
         return createHasArtifactInRepoSuccessResult(exists, requestContext);
       } catch (error) {
         return createHasArtifactInRepoFailureResult(
-          mapUnexpectedHubError("hasArtifactInRepo", error, accessToken),
+          mapUnexpectedHubError("hasArtifactInRepo", error, getAccessToken()),
           requestContext,
         );
       }
@@ -476,7 +479,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
 
       try {
         const resolvedTarget = resolveTarget(request.target, defaultRepoType);
-        const token = accessToken?.trim();
+        const token = getAccessToken()?.trim();
         if (!token) {
           return createStoreArtifactInRepoFailureResult(
             createAuthRequiredError("storeArtifactInRepo"),
@@ -505,7 +508,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
         );
       } catch (error) {
         return createStoreArtifactInRepoFailureResult(
-          mapUnexpectedHubError("storeArtifactInRepo", error, accessToken),
+          mapUnexpectedHubError("storeArtifactInRepo", error, getAccessToken()),
           requestContext,
         );
       }
@@ -524,14 +527,14 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
           repo: toRepoDesignation(resolvedTarget),
           path: resolvedTarget.pathInRepo,
           revision: resolvedTarget.revision,
-          accessToken,
+          accessToken: getAccessToken(),
         });
         if (!response.ok) {
           return createRetrieveArtifactFromRepoFailureResult(
             mapProviderStatusError(
               "retrieveArtifactFromRepo",
               response.status,
-              accessToken,
+              getAccessToken(),
               response.statusText,
             ),
             requestContext,
@@ -550,7 +553,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
         );
       } catch (error) {
         return createRetrieveArtifactFromRepoFailureResult(
-          mapUnexpectedHubError("retrieveArtifactFromRepo", error, accessToken),
+          mapUnexpectedHubError("retrieveArtifactFromRepo", error, getAccessToken()),
           requestContext,
         );
       }

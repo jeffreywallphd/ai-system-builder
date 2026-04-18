@@ -49,6 +49,9 @@ function PublishedBackingPanel(
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
   const {
     items,
+    huggingFaceTokenStatus,
+    tokenInput,
+    tokenState,
     selectedStorageKey,
     detail,
     content,
@@ -79,6 +82,9 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     setRegisterRevision,
     setRegisterMediaType,
     toggleRegisterForm,
+    setTokenInput,
+    saveHuggingFaceToken,
+    clearHuggingFaceToken,
   } = useArtifactBrowserFeature(client);
   const backingState = deriveArtifactBackingState(detail, content);
 
@@ -91,6 +97,25 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
         </button>
       </header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
+      <section className="ui-stack ui-stack--sm">
+        <h3>Hugging Face token</h3>
+        <p role="status">
+          Status: {huggingFaceTokenStatus.configured ? `configured (${huggingFaceTokenStatus.maskedToken ?? "••••"})` : "not configured"}
+        </p>
+        <label className="ui-stack ui-stack--sm">
+          <span>Access token</span>
+          <input className="ui-input" type="password" value={tokenInput} onChange={(event) => setTokenInput(event.target.value)} placeholder="hf_..." />
+        </label>
+        <div className="ui-grid ui-grid--two">
+          <button className="ui-button" type="button" onClick={() => void saveHuggingFaceToken()} disabled={tokenState.status === "loading" || tokenInput.trim().length === 0}>
+            {tokenState.status === "loading" ? "Saving..." : "Save token"}
+          </button>
+          <button className="ui-button" type="button" onClick={() => void clearHuggingFaceToken()} disabled={tokenState.status === "loading" || !huggingFaceTokenStatus.configured}>
+            Clear token
+          </button>
+        </div>
+        {tokenState.message ? <p role={tokenState.status === "error" ? "alert" : "status"}>{tokenState.message}</p> : null}
+      </section>
 
       <button className="ui-button" type="button" onClick={toggleRegisterForm} disabled={registerState.status === "loading"}>Register from Hugging Face</button>
       {registerForm.showRegisterForm ? (

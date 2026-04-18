@@ -59,6 +59,21 @@ import {
   type DesktopArtifactLocalizeFromRepoResponse,
   type DesktopImageUploadRequest,
   type DesktopImageUploadResponse,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_OPERATION,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_RESPONSE_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_SET_OPERATION,
+  DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_SET_RESPONSE_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_CLEAR_OPERATION,
+  DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_CLEAR_RESPONSE_CHANNEL,
+  createDesktopHuggingFaceTokenGetRequest,
+  createDesktopHuggingFaceTokenSetRequest,
+  createDesktopHuggingFaceTokenClearRequest,
+  type DesktopHuggingFaceTokenGetResponse,
+  type DesktopHuggingFaceTokenSetResponse,
+  type DesktopHuggingFaceTokenClearResponse,
 } from "../../../../modules/contracts/ipc";
 
 const DEFAULT_UPLOAD_SOURCE = "desktop.renderer.upload-form";
@@ -84,6 +99,16 @@ export interface DesktopImageUploadBridgeContext {
 }
 
 export interface DesktopPreloadApi {
+  getHuggingFaceTokenStatus: (
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopHuggingFaceTokenGetResponse>;
+  setHuggingFaceToken: (
+    input: { token: string },
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopHuggingFaceTokenSetResponse>;
+  clearHuggingFaceToken: (
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopHuggingFaceTokenClearResponse>;
   uploadImage: (
     input: DesktopImageUploadBridgeInput,
     context?: DesktopImageUploadBridgeContext,
@@ -182,6 +207,51 @@ export function createDesktopPreloadApi(
   const artifactSource = dependencies.artifactSource ?? DEFAULT_ARTIFACT_SOURCE;
 
   return {
+    async getHuggingFaceTokenStatus(context = {}) {
+      const request = createDesktopHuggingFaceTokenGetRequest(context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopHuggingFaceTokenGetResponse>(response, {
+        operation: DESKTOP_HUGGING_FACE_TOKEN_GET_OPERATION,
+        channel: DESKTOP_HUGGING_FACE_TOKEN_GET_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop Hugging Face token status IPC response envelope.",
+      });
+    },
+
+    async setHuggingFaceToken(input, context = {}) {
+      const request = createDesktopHuggingFaceTokenSetRequest(
+        { token: input.token },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopHuggingFaceTokenSetResponse>(response, {
+        operation: DESKTOP_HUGGING_FACE_TOKEN_SET_OPERATION,
+        channel: DESKTOP_HUGGING_FACE_TOKEN_SET_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop Hugging Face token set IPC response envelope.",
+      });
+    },
+
+    async clearHuggingFaceToken(context = {}) {
+      const request = createDesktopHuggingFaceTokenClearRequest(context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopHuggingFaceTokenClearResponse>(response, {
+        operation: DESKTOP_HUGGING_FACE_TOKEN_CLEAR_OPERATION,
+        channel: DESKTOP_HUGGING_FACE_TOKEN_CLEAR_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop Hugging Face token clear IPC response envelope.",
+      });
+    },
+
     async uploadImage(input, context = {}) {
       const request: DesktopImageUploadRequest = createDesktopImageUploadRequest(
         {

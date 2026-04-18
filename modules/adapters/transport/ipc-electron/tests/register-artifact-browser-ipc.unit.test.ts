@@ -23,6 +23,9 @@ import {
   createDesktopArtifactRegisterFromRepoRequest,
   createDesktopArtifactLocalizeFromRepoRequest,
   createDesktopArtifactReadRequest,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import {
   createDesktopArtifactPublishIpcHandler,
@@ -44,6 +47,9 @@ function createUseCases() {
     verifyImportedArtifactSourceBackingUseCase: { execute: testDouble.fn() },
     registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
     localizeArtifactFromRepoUseCase: { execute: testDouble.fn() },
+    getHuggingFaceTokenStatus: testDouble.fn(() => ({ configured: false })),
+    setHuggingFaceToken: testDouble.fn(() => ({ configured: true, maskedToken: "••••1234" })),
+    clearHuggingFaceToken: testDouble.fn(() => ({ configured: false })),
   };
 }
 
@@ -163,7 +169,10 @@ describe("registerArtifactBrowserIpc", () => {
 
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(9);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(12);
+    expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value)).toBe(true);

@@ -10,6 +10,9 @@ import {
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
+  getHuggingFaceTokenStatus: RegisterArtifactBrowserIpcDependencies["getHuggingFaceTokenStatus"];
+  setHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["setHuggingFaceToken"];
+  clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
   storeImageUploadUseCase: RegisterImageUploadIpcDependencies["storeImageUploadUseCase"];
   browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
@@ -32,6 +35,9 @@ export function registerElectronIpc(
 
   registerArtifactBrowserIpc({
     ipcMain: dependencies.ipcMain,
+    getHuggingFaceTokenStatus: dependencies.getHuggingFaceTokenStatus,
+    setHuggingFaceToken: dependencies.setHuggingFaceToken,
+    clearHuggingFaceToken: dependencies.clearHuggingFaceToken,
     browseArtifactsUseCase: dependencies.browseArtifactsUseCase,
     readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
     readArtifactContentUseCase: dependencies.readArtifactContentUseCase,

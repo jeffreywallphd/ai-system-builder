@@ -80,3 +80,10 @@ Renderer constraints for this slice:
 - Configure `HF_TOKEN` or `HUGGING_FACE_TOKEN` (or desktop host `huggingFaceAccessToken`) in the **desktop host** environment for private/gated Hugging Face repositories.
 - Public repositories may work without a token depending on repository visibility/provider policy.
 - Missing/invalid token and access-denied responses are surfaced with explicit auth guidance in UI messaging.
+
+
+## Hugging Face token configuration UI
+
+- Desktop Artifact Browser now includes a **Hugging Face token** section with masked configured-state display.
+- Use **Save token** / **Clear token** in renderer; desktop host persists the token and reuses it for register/localize/publish/verify flows.
+- Public Hugging Face repos may work without token; private/gated repos may require token configuration.

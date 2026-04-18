@@ -17,6 +17,9 @@ import {
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
@@ -78,10 +81,13 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: "/tmp/desktop-image-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(10);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(13);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value,
@@ -137,5 +143,15 @@ describe("composeDesktopHost", () => {
 
     expect(source).toContain("PublishArtifactToRepoUseCase");
     expect(source).not.toContain("class DesktopPublish");
+  });
+
+  it("stores and exposes desktop Hugging Face token status", () => {
+    const host = composeDesktopHost();
+    expect(host.getHuggingFaceTokenStatus().configured).toBe(false);
+    const saved = host.setHuggingFaceToken("hf_desktop_token");
+    expect(saved.configured).toBe(true);
+    expect(saved.maskedToken).toBe("••••oken");
+    const cleared = host.clearHuggingFaceToken();
+    expect(cleared.configured).toBe(false);
   });
 });

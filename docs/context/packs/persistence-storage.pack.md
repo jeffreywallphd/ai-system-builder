@@ -97,3 +97,6 @@
 - New registration writes use system-owned internal artifact ids; provider/repository/path/revision remain backing/source identity.
 - Imported artifacts can now be explicitly localized (`artifact.localize.from-repo`) to create local artifact-object bytes when only remote-source backing exists.
 - Imported-source verification can now be re-checked independently (`artifact.source.verify`) while preserving artifact-first read/detail semantics.
+
+
+- Hugging Face token config now follows a host-side persisted config seam (server-storage-root for thin client and desktop AppData for desktop host) and is consumed dynamically by artifact-repo operations; do not fall back to client-only token state as source of truth.

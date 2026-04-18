@@ -8,9 +8,17 @@ import {
 describe("registerArtifactRepoApiRoutes", () => {
   it("registers has/store routes and delegates to focused repo-storage use cases", async () => {
     const handlers = new Map<string, Parameters<ArtifactRepoExpressRoutePort["post"]>[1]>();
+    const getHandlers = new Map<string, NonNullable<ArtifactRepoExpressRoutePort["get"]> extends (...args: infer T) => unknown ? T[1] : never>();
+    const deleteHandlers = new Map<string, NonNullable<ArtifactRepoExpressRoutePort["delete"]> extends (...args: infer T) => unknown ? T[1] : never>();
     const app: ArtifactRepoExpressRoutePort = {
       post: testDouble.fn((routePath, handler) => {
         handlers.set(routePath, handler);
+      }),
+      get: testDouble.fn((routePath, handler) => {
+        getHandlers.set(routePath, handler);
+      }),
+      delete: testDouble.fn((routePath, handler) => {
+        deleteHandlers.set(routePath, handler);
       }),
     };
 
@@ -132,6 +140,9 @@ describe("registerArtifactRepoApiRoutes", () => {
 
     registerArtifactRepoApiRoutes({
       app,
+      getHuggingFaceTokenStatus: () => ({ configured: false }),
+      setHuggingFaceToken: () => ({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: () => ({ configured: false }),
       hasArtifactInRepoUseCase,
       storeArtifactInRepoUseCase,
       publishArtifactToRepoUseCase,
@@ -141,7 +152,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       localizeArtifactFromRepoUseCase,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(7);
+    expect(app.post).toHaveBeenCalledTimes(8);
     expect(handlers.has("/api/artifact-repo/has")).toBe(true);
     expect(handlers.has("/api/artifact-repo/store")).toBe(true);
     expect(handlers.has("/api/artifact/publish")).toBe(true);
@@ -149,6 +160,8 @@ describe("registerArtifactRepoApiRoutes", () => {
     expect(handlers.has("/api/artifact/source/verify")).toBe(true);
     expect(handlers.has("/api/artifact/register-from-repo")).toBe(true);
     expect(handlers.has("/api/artifact/localize-from-repo")).toBe(true);
+    expect(getHandlers.has("/api/config/huggingface-token")).toBe(true);
+    expect(deleteHandlers.has("/api/config/huggingface-token")).toBe(true);
 
     const response = {
       status: testDouble.fn(() => response),
@@ -245,6 +258,15 @@ describe("registerArtifactRepoApiRoutes", () => {
       },
       response,
     );
+
+    await getHandlers.get("/api/config/huggingface-token")?.(
+      { headers: {} },
+      response,
+    );
+    await deleteHandlers.get("/api/config/huggingface-token")?.(
+      { headers: {} },
+      response,
+    );
     expect(localizeArtifactFromRepoUseCase.execute).toHaveBeenCalledWith({
       artifactId: "artifacts/20260418000000-local01",
     });
@@ -260,6 +282,9 @@ describe("registerArtifactRepoApiRoutes", () => {
 
     registerArtifactRepoApiRoutes({
       app,
+      getHuggingFaceTokenStatus: () => ({ configured: false }),
+      setHuggingFaceToken: () => ({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: () => ({ configured: false }),
       hasArtifactInRepoUseCase: { execute: testDouble.fn() },
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
@@ -310,6 +335,9 @@ describe("registerArtifactRepoApiRoutes", () => {
 
     registerArtifactRepoApiRoutes({
       app,
+      getHuggingFaceTokenStatus: () => ({ configured: false }),
+      setHuggingFaceToken: () => ({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: () => ({ configured: false }),
       hasArtifactInRepoUseCase: { execute: testDouble.fn() },
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },

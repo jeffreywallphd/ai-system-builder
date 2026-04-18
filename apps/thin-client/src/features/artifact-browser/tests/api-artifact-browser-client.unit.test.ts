@@ -14,6 +14,31 @@ describe("api artifact browser client", () => {
         json: vi.fn().mockResolvedValue({
           ok: true,
           value: {
+            configured: false,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
+            configured: true,
+            maskedToken: "••••1234",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
+            configured: false,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
             items: [{ storageKey: "uploads/a.png", artifactKind: "image", mediaType: "image/png" }],
           },
         }),
@@ -121,6 +146,9 @@ describe("api artifact browser client", () => {
 
     const client = createApiArtifactBrowserClient({ apiBaseUrl: "/api" });
 
+    const tokenStatus = await client.getHuggingFaceTokenStatus();
+    const tokenSaved = await client.setHuggingFaceToken({ token: "hf_1234" });
+    const tokenCleared = await client.clearHuggingFaceToken();
     const browse = await client.browseImageArtifacts();
     const detail = await client.readArtifactDetail({ storageKey: "uploads/a.png" });
     const content = await client.readArtifactContent({ storageKey: "uploads/a.png" });
@@ -142,40 +170,58 @@ describe("api artifact browser client", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/api/artifact/browse",
-      expect.objectContaining({ method: "POST" }),
+      "/api/config/huggingface-token",
+      expect.objectContaining({ method: "GET" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "/api/artifact/read",
+      "/api/config/huggingface-token",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "/api/artifact/content/read",
-      expect.objectContaining({ method: "POST" }),
+      "/api/config/huggingface-token",
+      expect.objectContaining({ method: "DELETE" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/artifact/publish",
+      "/api/artifact/browse",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       5,
-      "/api/artifact/publish/verify",
+      "/api/artifact/read",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       6,
-      "/api/artifact/source/verify",
+      "/api/artifact/content/read",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       7,
+      "/api/artifact/publish",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      8,
+      "/api/artifact/publish/verify",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      9,
+      "/api/artifact/source/verify",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      10,
       "/api/artifact/localize-from-repo",
       expect.objectContaining({ method: "POST" }),
     );
 
+    expect(tokenStatus.configured).toBe(false);
+    expect(tokenSaved.maskedToken).toBe("••••1234");
+    expect(tokenCleared.configured).toBe(false);
     expect(browse[0].storageKey).toBe("uploads/a.png");
     expect(detail.locator.storageKey).toBe("uploads/a.png");
     expect(content.retrieval).toBe("deferred");

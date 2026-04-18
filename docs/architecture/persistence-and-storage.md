@@ -260,3 +260,11 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 - Remote registration now writes `role = imported-source` bindings (not `published`) to preserve backing semantics.
 - Imported artifacts can now be explicitly localized/downloaded through shared orchestration (`artifact.localize.from-repo`) while keeping artifact browser as the primary surface.
 - Imported-source verification is exposed as a separate shared operation (`artifact.source.verify`) so source backing status can be refreshed distinctly from published backing status.
+
+
+## Hugging Face token persistence
+
+- Hugging Face token configuration is stored as host-side config, not browser-only state.
+- Server path persists token under server storage root config directory and surfaces masked status to thin client.
+- Desktop path persists token under desktop AppData artifact config directory and surfaces masked status to renderer via preload/IPC.
+- Hugging Face artifact-repo storage adapter resolves token dynamically from this config seam for publish/register/localize/verify workflows.

@@ -129,3 +129,11 @@ If host code starts accumulating business logic, move that logic inward before i
 
 - Server API and desktop IPC/preload both expose shared publish, published-verify, source-verify, register-from-repo, and localize-from-repo use cases.
 - Thin-client and desktop renderer surfaces remain host-specific UI layers but call into the same shared application workflow path.
+
+
+## Hugging Face token host configuration
+
+- Server host now exposes a persisted Hugging Face token config seam for thin-client users (`GET/POST/DELETE /api/config/huggingface-token`).
+- Desktop host exposes equivalent token config through preload/IPC so renderer flows can save/update/clear token without environment restarts.
+- Artifact register/localize/publish/verify flows read token from host config at execution time; users no longer need to re-enter token per action.
+- Public repositories may work without token; private/gated repositories can require one.

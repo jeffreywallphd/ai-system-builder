@@ -111,6 +111,9 @@ export interface DesktopImageUploadApi {
 }
 
 interface DesktopApiBridge {
+  getHuggingFaceTokenStatus: () => Promise<unknown>;
+  setHuggingFaceToken: (input: { token: string }) => Promise<unknown>;
+  clearHuggingFaceToken: () => Promise<unknown>;
   uploadImage: (input: DesktopImageUploadInput) => Promise<unknown>;
   browseArtifacts: () => Promise<unknown>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
@@ -159,6 +162,11 @@ export function getDesktopApi(): DesktopApiBridge {
   }
 
   return window.desktopApi;
+}
+
+export interface DesktopHuggingFaceTokenStatus {
+  configured: boolean;
+  maskedToken?: string;
 }
 
 

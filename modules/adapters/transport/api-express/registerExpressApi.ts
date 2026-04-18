@@ -15,6 +15,9 @@ export interface RegisterExpressApiDependencies {
   app: RegisterImageUploadApiRouteDependencies["app"]
     & RegisterArtifactBrowserApiRoutesDependencies["app"]
     & RegisterArtifactRepoApiRoutesDependencies["app"];
+  getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
+  setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
+  clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
   storeImageUploadUseCase: RegisterImageUploadApiRouteDependencies["storeImageUploadUseCase"];
   browseArtifactsUseCase: RegisterArtifactBrowserApiRoutesDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactDetailUseCase"];
@@ -47,6 +50,9 @@ export function registerExpressApi(
 
   registerArtifactRepoApiRoutes({
     app: dependencies.app,
+    getHuggingFaceTokenStatus: dependencies.getHuggingFaceTokenStatus,
+    setHuggingFaceToken: dependencies.setHuggingFaceToken,
+    clearHuggingFaceToken: dependencies.clearHuggingFaceToken,
     hasArtifactInRepoUseCase: dependencies.hasArtifactInRepoUseCase,
     storeArtifactInRepoUseCase: dependencies.storeArtifactInRepoUseCase,
     publishArtifactToRepoUseCase: dependencies.publishArtifactToRepoUseCase,
