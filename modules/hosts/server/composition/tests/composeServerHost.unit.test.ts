@@ -115,7 +115,7 @@ describe("composeServerHost", () => {
       storageRootDirectory: "/tmp/server-image-upload-test",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(12);
+    expect(app.post).toHaveBeenCalledTimes(14);
     expect(app.get).toHaveBeenCalledTimes(2);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
@@ -125,6 +125,8 @@ describe("composeServerHost", () => {
       "/api/artifact/content/read",
       "/api/config/huggingface-token",
       "/api/artifact-repo/has",
+      "/api/huggingface/namespace/datasets",
+      "/api/huggingface/dataset/parquet-files",
       "/api/artifact-repo/store",
       "/api/artifact/publish",
       "/api/artifact/publish/verify",

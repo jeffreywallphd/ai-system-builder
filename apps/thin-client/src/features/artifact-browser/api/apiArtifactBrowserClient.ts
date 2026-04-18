@@ -90,10 +90,24 @@ export interface ThinClientLocalizedArtifactFromRepo {
   localizedAt: string;
 }
 
+export interface ThinClientHuggingFaceNamespaceDataset {
+  namespace: string;
+  repository: string;
+}
+
+export interface ThinClientHuggingFaceDatasetParquetFile {
+  repository: string;
+  path: string;
+  revision: string;
+  sizeBytes?: number;
+}
+
 export interface ArtifactBrowserApiClient {
   getHuggingFaceTokenStatus: () => Promise<{ configured: boolean; maskedToken?: string }>;
   setHuggingFaceToken: (input: { token: string }) => Promise<{ configured: boolean; maskedToken?: string }>;
   clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
+  browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
+  browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
   browseImageArtifacts: () => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
@@ -188,6 +202,43 @@ export function createApiArtifactBrowserClient(
       });
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, (value) => value as { configured: boolean; maskedToken?: string });
+    },
+
+    async browseHuggingFaceNamespaceDatasets(input) {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/huggingface/namespace/datasets"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          namespace: input.namespace,
+          source,
+        }),
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const datasets = (value as { datasets?: ThinClientHuggingFaceNamespaceDataset[] } | undefined)?.datasets;
+        return Array.isArray(datasets) ? datasets : [];
+      });
+    },
+
+    async browseHuggingFaceDatasetParquetFiles(input) {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          repository: input.repository,
+          revision: input.revision,
+          source,
+        }),
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const files = (value as { files?: ThinClientHuggingFaceDatasetParquetFile[] } | undefined)?.files;
+        return Array.isArray(files) ? files : [];
+      });
     },
 
     async browseImageArtifacts(): Promise<ThinClientArtifactBrowseItem[]> {

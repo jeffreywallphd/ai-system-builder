@@ -74,6 +74,16 @@ import {
   type DesktopHuggingFaceTokenGetResponse,
   type DesktopHuggingFaceTokenSetResponse,
   type DesktopHuggingFaceTokenClearResponse,
+  DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_OPERATION,
+  DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_OPERATION,
+  DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_RESPONSE_CHANNEL,
+  createDesktopHuggingFaceNamespaceDatasetsBrowseRequest,
+  createDesktopHuggingFaceDatasetParquetFilesBrowseRequest,
+  type DesktopHuggingFaceNamespaceDatasetsBrowseResponse,
+  type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
 } from "../../../../modules/contracts/ipc";
 
 const DEFAULT_UPLOAD_SOURCE = "desktop.renderer.upload-form";
@@ -109,6 +119,14 @@ export interface DesktopPreloadApi {
   clearHuggingFaceToken: (
     context?: DesktopImageUploadBridgeContext,
   ) => Promise<DesktopHuggingFaceTokenClearResponse>;
+  browseHuggingFaceNamespaceDatasets: (
+    input: { namespace: string },
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopHuggingFaceNamespaceDatasetsBrowseResponse>;
+  browseHuggingFaceDatasetParquetFiles: (
+    input: { repository: string; revision?: string },
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopHuggingFaceDatasetParquetFilesBrowseResponse>;
   uploadImage: (
     input: DesktopImageUploadBridgeInput,
     context?: DesktopImageUploadBridgeContext,
@@ -249,6 +267,53 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_HUGGING_FACE_TOKEN_CLEAR_OPERATION,
         channel: DESKTOP_HUGGING_FACE_TOKEN_CLEAR_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop Hugging Face token clear IPC response envelope.",
+      });
+    },
+
+    async browseHuggingFaceNamespaceDatasets(input, context = {}) {
+      const request = createDesktopHuggingFaceNamespaceDatasetsBrowseRequest(
+        {
+          namespace: input.namespace,
+          boundary: {
+            host: "desktop",
+            source: artifactSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopHuggingFaceNamespaceDatasetsBrowseResponse>(response, {
+        operation: DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_OPERATION,
+        channel: DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop Hugging Face namespace datasets IPC response envelope.",
+      });
+    },
+
+    async browseHuggingFaceDatasetParquetFiles(input, context = {}) {
+      const request = createDesktopHuggingFaceDatasetParquetFilesBrowseRequest(
+        {
+          repository: input.repository,
+          revision: input.revision,
+          boundary: {
+            host: "desktop",
+            source: artifactSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopHuggingFaceDatasetParquetFilesBrowseResponse>(response, {
+        operation: DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_OPERATION,
+        channel: DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop Hugging Face dataset parquet-files IPC response envelope.",
       });
     },
 

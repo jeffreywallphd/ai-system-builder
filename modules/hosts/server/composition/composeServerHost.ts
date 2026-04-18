@@ -3,6 +3,8 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
+  BrowseHuggingFaceDatasetParquetFilesUseCase,
+  BrowseHuggingFaceNamespaceDatasetsUseCase,
   HasArtifactInRepoUseCase,
   LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
@@ -166,6 +168,12 @@ export function composeServerHost(
       const hasArtifactInRepo = new HasArtifactInRepoUseCase({
         artifactRepoStorage,
       });
+      const browseHuggingFaceNamespaceDatasets = new BrowseHuggingFaceNamespaceDatasetsUseCase({
+        repoBrowser: artifactRepoStorage,
+      });
+      const browseHuggingFaceDatasetParquetFiles = new BrowseHuggingFaceDatasetParquetFilesUseCase({
+        repoBrowser: artifactRepoStorage,
+      });
       const storeArtifactInRepo = new StoreArtifactInRepoUseCase({
         artifactRepoStorage,
       });
@@ -210,6 +218,8 @@ export function composeServerHost(
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,
         hasArtifactInRepoUseCase: hasArtifactInRepo,
+        browseHuggingFaceNamespaceDatasetsUseCase: browseHuggingFaceNamespaceDatasets,
+        browseHuggingFaceDatasetParquetFilesUseCase: browseHuggingFaceDatasetParquetFiles,
         storeArtifactInRepoUseCase: storeArtifactInRepo,
         publishArtifactToRepoUseCase: publishArtifactToRepo,
         verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,

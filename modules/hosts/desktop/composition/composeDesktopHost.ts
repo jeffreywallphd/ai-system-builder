@@ -2,6 +2,8 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
+  BrowseHuggingFaceDatasetParquetFilesUseCase,
+  BrowseHuggingFaceNamespaceDatasetsUseCase,
   LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
@@ -178,6 +180,12 @@ export function composeDesktopHost(
         artifactStorage: storage,
         now: options.now,
       });
+      const browseHuggingFaceNamespaceDatasets = new BrowseHuggingFaceNamespaceDatasetsUseCase({
+        repoBrowser: artifactRepoStorage,
+      });
+      const browseHuggingFaceDatasetParquetFiles = new BrowseHuggingFaceDatasetParquetFilesUseCase({
+        repoBrowser: artifactRepoStorage,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -190,6 +198,8 @@ export function composeDesktopHost(
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,
         publishArtifactToRepoUseCase: publishArtifactToRepo,
+        browseHuggingFaceNamespaceDatasetsUseCase: browseHuggingFaceNamespaceDatasets,
+        browseHuggingFaceDatasetParquetFilesUseCase: browseHuggingFaceDatasetParquetFiles,
         verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
         verifyImportedArtifactSourceBackingUseCase: verifyImportedArtifactSourceBacking,
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,

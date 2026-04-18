@@ -114,6 +114,8 @@ interface DesktopApiBridge {
   getHuggingFaceTokenStatus: () => Promise<unknown>;
   setHuggingFaceToken: (input: { token: string }) => Promise<unknown>;
   clearHuggingFaceToken: () => Promise<unknown>;
+  browseHuggingFaceNamespaceDatasets: (input: { namespace: string }) => Promise<unknown>;
+  browseHuggingFaceDatasetParquetFiles: (input: { repository: string; revision?: string }) => Promise<unknown>;
   uploadImage: (input: DesktopImageUploadInput) => Promise<unknown>;
   browseArtifacts: () => Promise<unknown>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
@@ -167,6 +169,18 @@ export function getDesktopApi(): DesktopApiBridge {
 export interface DesktopHuggingFaceTokenStatus {
   configured: boolean;
   maskedToken?: string;
+}
+
+export interface DesktopHuggingFaceNamespaceDataset {
+  namespace: string;
+  repository: string;
+}
+
+export interface DesktopHuggingFaceDatasetParquetFile {
+  repository: string;
+  path: string;
+  revision: string;
+  sizeBytes?: number;
 }
 
 

@@ -3,6 +3,8 @@ import type {
   HasArtifactInRepoUseCasePort,
   LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
+  BrowseHuggingFaceNamespaceDatasetsUseCase,
+  BrowseHuggingFaceDatasetParquetFilesUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   StoreArtifactInRepoCommand,
   StoreArtifactInRepoUseCasePort,
@@ -31,6 +33,12 @@ import {
   createApiArtifactRepoStoreFailureResponse,
   createApiArtifactRepoStoreRequest,
   createApiArtifactRepoStoreSuccessResponse,
+  createApiHuggingFaceDatasetParquetFilesBrowseFailureResponse,
+  createApiHuggingFaceDatasetParquetFilesBrowseRequest,
+  createApiHuggingFaceDatasetParquetFilesBrowseSuccessResponse,
+  createApiHuggingFaceNamespaceDatasetsBrowseFailureResponse,
+  createApiHuggingFaceNamespaceDatasetsBrowseRequest,
+  createApiHuggingFaceNamespaceDatasetsBrowseSuccessResponse,
   type ApiArtifactPublishResponse,
   type ApiArtifactPublishVerifyResponse,
   type ApiArtifactSourceVerifyResponse,
@@ -38,6 +46,8 @@ import {
   type ApiArtifactRegisterFromRepoResponse,
   type ApiArtifactRepoHasResponse,
   type ApiArtifactRepoStoreResponse,
+  type ApiHuggingFaceDatasetParquetFilesBrowseResponse,
+  type ApiHuggingFaceNamespaceDatasetsBrowseResponse,
 } from "../../../../contracts/api";
 
 interface ArtifactRepoHasApiRequestBody {
@@ -157,6 +167,8 @@ export interface RegisterArtifactRepoApiRoutesDependencies {
   setHuggingFaceToken: (token: string) => { configured: boolean; maskedToken?: string };
   clearHuggingFaceToken: () => { configured: boolean; maskedToken?: string };
   hasArtifactInRepoUseCase: HasArtifactInRepoUseCasePort;
+  browseHuggingFaceNamespaceDatasetsUseCase: Pick<BrowseHuggingFaceNamespaceDatasetsUseCase, "execute">;
+  browseHuggingFaceDatasetParquetFilesUseCase: Pick<BrowseHuggingFaceDatasetParquetFilesUseCase, "execute">;
   storeArtifactInRepoUseCase: StoreArtifactInRepoUseCasePort;
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
@@ -256,6 +268,25 @@ function mapPublishStatusCode(
     | ApiArtifactPublishVerifyResponse
     | ApiArtifactLocalizeFromRepoResponse
     | ApiArtifactRegisterFromRepoResponse,
+): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error.code) {
+    case "validation":
+      return 400;
+    case "not-found":
+      return 404;
+    case "unavailable":
+      return 503;
+    default:
+      return 500;
+  }
+}
+
+function mapBrowseStatusCode(
+  response: ApiHuggingFaceNamespaceDatasetsBrowseResponse | ApiHuggingFaceDatasetParquetFilesBrowseResponse,
 ): number {
   if (response.ok) {
     return 200;
@@ -381,6 +412,86 @@ export function registerArtifactRepoApiRoutes(
     const result = await dependencies.hasArtifactInRepoUseCase.execute(command, context);
     const apiResponse = mapHasResultToApiResponse(result, context);
     response.status(mapStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/huggingface/namespace/datasets", async (request, response) => {
+    const context = mapRequestContext(request);
+    let apiRequest: ReturnType<typeof createApiHuggingFaceNamespaceDatasetsBrowseRequest>;
+
+    try {
+      apiRequest = createApiHuggingFaceNamespaceDatasetsBrowseRequest({
+        namespace: (request.body as { namespace?: string } | undefined)?.namespace ?? "",
+        source: normalizeSource((request.body as { source?: string } | undefined)?.source),
+      }, context);
+    } catch (error) {
+      const apiResponse = createApiHuggingFaceNamespaceDatasetsBrowseFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid Hugging Face namespace browse request.",
+        context,
+      );
+      response.status(mapBrowseStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.browseHuggingFaceNamespaceDatasetsUseCase.execute({
+      namespace: apiRequest.payload.namespace,
+    }, context);
+    const apiResponse = result.ok
+      ? createApiHuggingFaceNamespaceDatasetsBrowseSuccessResponse(result.value, context)
+      : createApiHuggingFaceNamespaceDatasetsBrowseFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details ? { ...result.error.details } : undefined,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+        },
+      );
+
+    response.status(mapBrowseStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/huggingface/dataset/parquet-files", async (request, response) => {
+    const context = mapRequestContext(request);
+    let apiRequest: ReturnType<typeof createApiHuggingFaceDatasetParquetFilesBrowseRequest>;
+
+    try {
+      apiRequest = createApiHuggingFaceDatasetParquetFilesBrowseRequest({
+        repository: (request.body as { repository?: string } | undefined)?.repository ?? "",
+        revision: (request.body as { revision?: string } | undefined)?.revision,
+        source: normalizeSource((request.body as { source?: string } | undefined)?.source),
+      }, context);
+    } catch (error) {
+      const apiResponse = createApiHuggingFaceDatasetParquetFilesBrowseFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid Hugging Face dataset file browse request.",
+        context,
+      );
+      response.status(mapBrowseStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.browseHuggingFaceDatasetParquetFilesUseCase.execute({
+      repository: apiRequest.payload.repository,
+      revision: apiRequest.payload.revision,
+    }, context);
+    const apiResponse = result.ok
+      ? createApiHuggingFaceDatasetParquetFilesBrowseSuccessResponse(result.value, context)
+      : createApiHuggingFaceDatasetParquetFilesBrowseFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details ? { ...result.error.details } : undefined,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+        },
+      );
+
+    response.status(mapBrowseStatusCode(apiResponse)).json(apiResponse);
   });
 
   dependencies.app.post("/api/artifact-repo/store", async (request, response) => {

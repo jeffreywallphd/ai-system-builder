@@ -25,6 +25,12 @@ describe("registerArtifactRepoApiRoutes", () => {
     const hasArtifactInRepoUseCase = {
       execute: testDouble.fn(async () => ({ ok: true, value: { exists: true } })),
     };
+    const browseHuggingFaceNamespaceDatasetsUseCase = {
+      execute: testDouble.fn(async () => ({ ok: true, value: { namespace: "openai", datasets: [] } })),
+    };
+    const browseHuggingFaceDatasetParquetFilesUseCase = {
+      execute: testDouble.fn(async () => ({ ok: true, value: { repository: "openai/demo", revision: "main", files: [] } })),
+    };
     const storeArtifactInRepoUseCase = {
       execute: testDouble.fn(async () => ({
         ok: true,
@@ -144,6 +150,8 @@ describe("registerArtifactRepoApiRoutes", () => {
       setHuggingFaceToken: () => ({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: () => ({ configured: false }),
       hasArtifactInRepoUseCase,
+      browseHuggingFaceNamespaceDatasetsUseCase,
+      browseHuggingFaceDatasetParquetFilesUseCase,
       storeArtifactInRepoUseCase,
       publishArtifactToRepoUseCase,
       verifyPublishedArtifactBackingUseCase,
@@ -152,9 +160,11 @@ describe("registerArtifactRepoApiRoutes", () => {
       localizeArtifactFromRepoUseCase,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(8);
+    expect(app.post).toHaveBeenCalledTimes(10);
     expect(handlers.has("/api/artifact-repo/has")).toBe(true);
     expect(handlers.has("/api/artifact-repo/store")).toBe(true);
+    expect(handlers.has("/api/huggingface/namespace/datasets")).toBe(true);
+    expect(handlers.has("/api/huggingface/dataset/parquet-files")).toBe(true);
     expect(handlers.has("/api/artifact/publish")).toBe(true);
     expect(handlers.has("/api/artifact/publish/verify")).toBe(true);
     expect(handlers.has("/api/artifact/source/verify")).toBe(true);
@@ -286,6 +296,8 @@ describe("registerArtifactRepoApiRoutes", () => {
       setHuggingFaceToken: () => ({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: () => ({ configured: false }),
       hasArtifactInRepoUseCase: { execute: testDouble.fn() },
+      browseHuggingFaceNamespaceDatasetsUseCase: { execute: testDouble.fn() },
+      browseHuggingFaceDatasetParquetFilesUseCase: { execute: testDouble.fn() },
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
@@ -339,6 +351,8 @@ describe("registerArtifactRepoApiRoutes", () => {
       setHuggingFaceToken: () => ({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: () => ({ configured: false }),
       hasArtifactInRepoUseCase: { execute: testDouble.fn() },
+      browseHuggingFaceNamespaceDatasetsUseCase: { execute: testDouble.fn() },
+      browseHuggingFaceDatasetParquetFilesUseCase: { execute: testDouble.fn() },
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },

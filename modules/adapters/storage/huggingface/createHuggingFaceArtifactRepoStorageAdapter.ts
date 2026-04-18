@@ -1,5 +1,5 @@
 import type { ApplicationRequestContext } from "../../../application/ports";
-import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
+import type { ArtifactRepoStoragePort, HuggingFaceRepoBrowserPort } from "../../../application/ports/storage";
 import { createContractError, type ContractErrorCode } from "../../../contracts/shared";
 import {
   createHasArtifactInRepoFailureResult,
@@ -38,7 +38,9 @@ interface HuggingFaceRepoDesignation {
 type HuggingFaceOperation =
   | "hasArtifactInRepo"
   | "storeArtifactInRepo"
-  | "retrieveArtifactFromRepo";
+  | "retrieveArtifactFromRepo"
+  | "listNamespaceDatasets"
+  | "listDatasetParquetFiles";
 
 interface HuggingFaceHubClient {
   fileExists: (params: {
@@ -417,7 +419,7 @@ function mapUnexpectedHubError(
 
 export function createHuggingFaceArtifactRepoStorageAdapter(
   options: CreateHuggingFaceArtifactRepoStorageAdapterOptions = {},
-): ArtifactRepoStoragePort {
+): ArtifactRepoStoragePort & HuggingFaceRepoBrowserPort {
   const fallbackToken = options.accessToken ?? process.env.HF_TOKEN ?? process.env.HUGGING_FACE_TOKEN;
   const accessTokenProvider = options.accessTokenProvider;
   const getAccessToken = () => accessTokenProvider?.() ?? fallbackToken;
@@ -443,6 +445,49 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
     }
 
     return lazyHubClientPromise;
+  }
+
+  function normalizeNamespace(namespace: string): string {
+    const normalized = namespace.trim();
+    if (!normalized) {
+      throw new HuggingFaceAdapterValidationError("namespace must be a non-empty string.");
+    }
+    return normalized;
+  }
+
+  function normalizeDatasetRepository(repository: string): string {
+    const normalized = repository.trim().replace(/^datasets\//i, "");
+    if (!normalized || !normalized.includes("/")) {
+      throw new HuggingFaceAdapterValidationError(
+        "repository must include namespace and dataset name (for example: owner/repo).",
+      );
+    }
+    return normalized;
+  }
+
+  async function fetchJsonFromHub<T>(path: string, operation: HuggingFaceOperation, context: ApplicationRequestContext): Promise<T> {
+    const headers: Record<string, string> = {};
+    const token = getAccessToken()?.trim();
+    if (token) {
+      headers.authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetchImplementation(`${hubBaseUrl}${path}`, { headers });
+    if (!response.ok) {
+      throw mapProviderStatusError(operation, response.status, token, response.statusText);
+    }
+
+    try {
+      return await response.json() as T;
+    } catch (error) {
+      throw createContractError("internal", `Hugging Face ${operation} returned invalid JSON.`, {
+        details: {
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+          reason: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
   }
 
   return {
@@ -556,6 +601,97 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
           mapUnexpectedHubError("retrieveArtifactFromRepo", error, getAccessToken()),
           requestContext,
         );
+      }
+    },
+
+    async listNamespaceDatasets(namespace, context: ApplicationRequestContext = {}) {
+      const requestContext = resolveRequestContext(context);
+
+      try {
+        const normalizedNamespace = normalizeNamespace(namespace);
+        const payload = await fetchJsonFromHub<Array<{ id?: unknown }>>(
+          `/api/datasets?author=${encodeURIComponent(normalizedNamespace)}&limit=100`,
+          "listNamespaceDatasets",
+          requestContext,
+        );
+        if (!Array.isArray(payload)) {
+          return {
+            ok: false as const,
+            error: createContractError("internal", "Unexpected Hugging Face datasets response shape."),
+            ...requestContext,
+          };
+        }
+
+        const datasets = payload
+          .map((entry) => (typeof entry.id === "string" ? entry.id.trim() : ""))
+          .filter((repository) => repository.length > 0 && repository.startsWith(`${normalizedNamespace}/`))
+          .map((repository) => ({ namespace: normalizedNamespace, repository }));
+
+        return {
+          ok: true as const,
+          value: {
+            namespace: normalizedNamespace,
+            datasets,
+          },
+          ...requestContext,
+        };
+      } catch (error) {
+        return {
+          ok: false as const,
+          error: mapUnexpectedHubError("listNamespaceDatasets", error, getAccessToken()),
+          ...requestContext,
+        };
+      }
+    },
+
+    async listDatasetParquetFiles(input, context: ApplicationRequestContext = {}) {
+      const requestContext = resolveRequestContext(context);
+      try {
+        const repository = normalizeDatasetRepository(input.repository);
+        const revision = input.revision?.trim() || DEFAULT_REVISION;
+        const encodedRevision = encodeURIComponent(revision);
+        const payload = await fetchJsonFromHub<Array<{ path?: unknown; type?: unknown; size?: unknown }>>(
+          `/api/datasets/${encodeURIComponent(repository)}/tree/${encodedRevision}?recursive=1`,
+          "listDatasetParquetFiles",
+          requestContext,
+        );
+        if (!Array.isArray(payload)) {
+          return {
+            ok: false as const,
+            error: createContractError("internal", "Unexpected Hugging Face dataset tree response shape."),
+            ...requestContext,
+          };
+        }
+
+        const files = payload
+          .filter((entry) => (entry.type === "file" || typeof entry.type !== "string"))
+          .map((entry) => ({
+            path: typeof entry.path === "string" ? entry.path.trim() : "",
+            sizeBytes: typeof entry.size === "number" ? entry.size : undefined,
+          }))
+          .filter((entry) => entry.path.toLowerCase().endsWith(".parquet"))
+          .map((entry) => ({
+            repository,
+            path: entry.path,
+            revision,
+            sizeBytes: entry.sizeBytes,
+          }));
+
+        return {
+          ok: true as const,
+          value: {
+            repository,
+            revision,
+            files,
+          },
+          ...requestContext,
+        };
+      } catch (error) {
+        return {
+          ok: false as const,
+          error: mapUnexpectedHubError("listDatasetParquetFiles", error, getAccessToken()),
+          ...requestContext,
+        };
       }
     },
   };

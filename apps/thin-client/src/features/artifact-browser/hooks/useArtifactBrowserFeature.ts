@@ -10,6 +10,8 @@ import {
   type ThinClientArtifactBrowseItem,
   type ThinClientArtifactContentDescriptor,
   type ThinClientArtifactDetail,
+  type ThinClientHuggingFaceDatasetParquetFile,
+  type ThinClientHuggingFaceNamespaceDataset,
   type ThinClientLocalizedArtifactFromRepo,
   type ThinClientPublishedBacking,
 } from "../api/apiArtifactBrowserClient";
@@ -32,6 +34,7 @@ export interface UseArtifactBrowserFeatureResult {
   localizedArtifact?: ThinClientLocalizedArtifactFromRepo;
   publishForm: UseArtifactBrowserPublishLogicResult["publishForm"];
   registerForm: {
+    namespace: string;
     repository: string;
     pathInRepo: string;
     revision: string;
@@ -43,6 +46,11 @@ export interface UseArtifactBrowserFeatureResult {
   refreshArtifacts: () => Promise<void>;
   publishArtifactToHuggingFace: () => Promise<void>;
   registerArtifactFromHuggingFace: () => Promise<void>;
+  registerHuggingFaceNamespace: () => Promise<void>;
+  browseHuggingFaceDatasetParquetFiles: (repository: string) => Promise<void>;
+  huggingFaceNamespaceDatasets: ThinClientHuggingFaceNamespaceDataset[];
+  huggingFaceDatasetParquetFiles: ThinClientHuggingFaceDatasetParquetFile[];
+  selectedHuggingFaceDataset?: string;
   localizeArtifactFromRepo: () => Promise<void>;
   recheckPublishedBacking: () => Promise<void>;
   recheckSourceBacking: () => Promise<void>;
@@ -52,6 +60,7 @@ export interface UseArtifactBrowserFeatureResult {
   setMediaType: (value: string) => void;
   togglePublishForm: () => void;
   setRegisterRepository: (value: string) => void;
+  setRegisterNamespace: (value: string) => void;
   setRegisterPathInRepo: (value: string) => void;
   setRegisterRevision: (value: string) => void;
   setRegisterMediaType: (value: string) => void;
@@ -95,10 +104,14 @@ export function useArtifactBrowserFeature(
   const [sourceVerifyState, setSourceVerifyState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [localizedArtifact, setLocalizedArtifact] = useState<ThinClientLocalizedArtifactFromRepo | undefined>();
   const [registerRepository, setRegisterRepository] = useState("");
+  const [registerNamespace, setRegisterNamespace] = useState("");
   const [registerPathInRepo, setRegisterPathInRepo] = useState("");
   const [registerRevision, setRegisterRevision] = useState("main");
   const [registerMediaType, setRegisterMediaType] = useState("");
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [huggingFaceNamespaceDatasets, setHuggingFaceNamespaceDatasets] = useState<ThinClientHuggingFaceNamespaceDataset[]>([]);
+  const [huggingFaceDatasetParquetFiles, setHuggingFaceDatasetParquetFiles] = useState<ThinClientHuggingFaceDatasetParquetFile[]>([]);
+  const [selectedHuggingFaceDataset, setSelectedHuggingFaceDataset] = useState<string | undefined>();
   const [tokenInput, setTokenInput] = useState("");
   const [tokenState, setTokenState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [huggingFaceTokenStatus, setHuggingFaceTokenStatus] = useState<{ configured: boolean; maskedToken?: string }>({
@@ -228,6 +241,53 @@ export function useArtifactBrowserFeature(
     }
   }
 
+  async function registerHuggingFaceNamespace(): Promise<void> {
+    setRegisterState({ status: "loading", message: "Loading namespace datasets..." });
+    try {
+      if (!artifactClient.browseHuggingFaceNamespaceDatasets) {
+        throw new Error("Namespace browsing is unavailable for this client.");
+      }
+      const datasets = await artifactClient.browseHuggingFaceNamespaceDatasets({
+        namespace: registerNamespace,
+      });
+      setHuggingFaceNamespaceDatasets(datasets);
+      setHuggingFaceDatasetParquetFiles([]);
+      setSelectedHuggingFaceDataset(undefined);
+      setRegisterState({
+        status: "success",
+        message: datasets.length > 0
+          ? `Registered namespace ${registerNamespace} and loaded datasets.`
+          : `Registered namespace ${registerNamespace}. No datasets found.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load namespace datasets.";
+      setRegisterState({ status: "error", message: withHuggingFaceAuthGuidance(message) });
+    }
+  }
+
+  async function browseHuggingFaceDatasetParquetFiles(repository: string): Promise<void> {
+    setRegisterState({ status: "loading", message: `Loading parquet files for ${repository}...` });
+    try {
+      if (!artifactClient.browseHuggingFaceDatasetParquetFiles) {
+        throw new Error("Dataset file browsing is unavailable for this client.");
+      }
+      const files = await artifactClient.browseHuggingFaceDatasetParquetFiles({
+        repository,
+        revision: registerRevision,
+      });
+      setSelectedHuggingFaceDataset(repository);
+      setRegisterRepository(repository);
+      setHuggingFaceDatasetParquetFiles(files);
+      setRegisterState({
+        status: "success",
+        message: files.length > 0 ? `Loaded ${files.length} parquet file(s).` : "No parquet files found for this dataset.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load parquet files.";
+      setRegisterState({ status: "error", message: withHuggingFaceAuthGuidance(message) });
+    }
+  }
+
   async function localizeArtifactFromRepo(): Promise<void> {
     if (!selectedStorageKey) {
       setLocalizeState({ status: "error", message: "Select an artifact before localizing." });
@@ -311,6 +371,7 @@ export function useArtifactBrowserFeature(
     localizedArtifact,
     publishForm: publishLogic.publishForm,
     registerForm: {
+      namespace: registerNamespace,
       repository: registerRepository,
       pathInRepo: registerPathInRepo,
       revision: registerRevision,
@@ -322,6 +383,11 @@ export function useArtifactBrowserFeature(
     refreshArtifacts,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
+    registerHuggingFaceNamespace,
+    browseHuggingFaceDatasetParquetFiles,
+    huggingFaceNamespaceDatasets,
+    huggingFaceDatasetParquetFiles,
+    selectedHuggingFaceDataset,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
     recheckSourceBacking,
@@ -331,6 +397,7 @@ export function useArtifactBrowserFeature(
     setMediaType: publishLogic.setMediaType,
     togglePublishForm: publishLogic.togglePublishForm,
     setRegisterRepository,
+    setRegisterNamespace,
     setRegisterPathInRepo,
     setRegisterRevision,
     setRegisterMediaType,

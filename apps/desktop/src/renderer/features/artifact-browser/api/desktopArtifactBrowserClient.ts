@@ -8,12 +8,16 @@ import {
   type DesktopPublishedBacking,
   type DesktopRegisteredArtifactFromRepo,
   type DesktopHuggingFaceTokenStatus,
+  type DesktopHuggingFaceNamespaceDataset,
+  type DesktopHuggingFaceDatasetParquetFile,
 } from "../../../lib/desktopApi";
 
 export interface DesktopArtifactBrowserClient {
   getHuggingFaceTokenStatus: () => Promise<DesktopHuggingFaceTokenStatus>;
   setHuggingFaceToken: (input: { token: string }) => Promise<DesktopHuggingFaceTokenStatus>;
   clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
+  browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
+  browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
   browseImageArtifacts: () => Promise<DesktopArtifactBrowseItem[]>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
@@ -84,6 +88,31 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         await desktopApi.clearHuggingFaceToken(),
         (value) => value as DesktopHuggingFaceTokenStatus,
         "Failed to clear Hugging Face token.",
+      );
+    },
+
+    async browseHuggingFaceNamespaceDatasets(input) {
+      return ensureSuccess(
+        await desktopApi.browseHuggingFaceNamespaceDatasets({ namespace: input.namespace }),
+        (value) => {
+          const datasets = (value as { datasets?: DesktopHuggingFaceNamespaceDataset[] } | undefined)?.datasets;
+          return Array.isArray(datasets) ? datasets : [];
+        },
+        "Failed to browse Hugging Face namespace datasets.",
+      );
+    },
+
+    async browseHuggingFaceDatasetParquetFiles(input) {
+      return ensureSuccess(
+        await desktopApi.browseHuggingFaceDatasetParquetFiles({
+          repository: input.repository,
+          revision: input.revision,
+        }),
+        (value) => {
+          const files = (value as { files?: DesktopHuggingFaceDatasetParquetFile[] } | undefined)?.files;
+          return Array.isArray(files) ? files : [];
+        },
+        "Failed to browse Hugging Face dataset parquet files.",
       );
     },
 
