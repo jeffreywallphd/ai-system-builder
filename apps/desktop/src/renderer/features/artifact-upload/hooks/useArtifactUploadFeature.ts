@@ -4,6 +4,7 @@ import { useArtifactUploadClient } from "./useArtifactUploadClient";
 import type { ArtifactUploadClient } from "../api/desktopArtifactUploadClient";
 import type { UploadViewState } from "../components/ArtifactUploadStatus";
 import { toHtmlFileAcceptAttribute } from "./toHtmlFileAcceptAttribute";
+import { resolveArtifactUploadMediaType } from "./resolveArtifactUploadMediaType";
 
 export interface UseArtifactUploadFeatureResult {
   selectedFile: File | null;
@@ -66,7 +67,10 @@ export function useArtifactUploadFeature(client?: ArtifactUploadClient, onUpload
     try {
       const response = await uploadClient.uploadArtifact({
         fileName: selectedFile.name,
-        mediaType: selectedFile.type,
+        mediaType: resolveArtifactUploadMediaType({
+          fileName: selectedFile.name,
+          browserMediaType: selectedFile.type,
+        }),
         bytes: new Uint8Array(await selectedFile.arrayBuffer()),
       });
 

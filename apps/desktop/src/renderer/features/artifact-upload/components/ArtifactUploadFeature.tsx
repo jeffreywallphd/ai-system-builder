@@ -1,14 +1,17 @@
 import type { ArtifactUploadClient } from "../api/desktopArtifactUploadClient";
+import type { DesktopArtifactBrowserClient } from "../../artifact-browser/api/desktopArtifactBrowserClient";
 import { useArtifactUploadFeature } from "../hooks/useArtifactUploadFeature";
 import { ArtifactUploadForm } from "./ArtifactUploadForm";
 import { ArtifactUploadStatus } from "./ArtifactUploadStatus";
+import { ArtifactIngestionControls } from "./ArtifactIngestionControls";
 
 export interface ArtifactUploadFeatureProps {
   client?: ArtifactUploadClient;
+  ingestionClient?: DesktopArtifactBrowserClient;
   onUploadComplete?: (storageKey: string) => void;
 }
 
-export function ArtifactUploadFeature({ client, onUploadComplete }: ArtifactUploadFeatureProps) {
+export function ArtifactUploadFeature({ client, ingestionClient, onUploadComplete }: ArtifactUploadFeatureProps) {
   const { selectedFile, viewState, acceptedFileTypes, onFileChange, onUploadSubmit } = useArtifactUploadFeature(client, onUploadComplete);
 
   return (
@@ -22,6 +25,7 @@ export function ArtifactUploadFeature({ client, onUploadComplete }: ArtifactUplo
         onSubmit={(event) => void onUploadSubmit(event)}
       />
       <ArtifactUploadStatus viewState={viewState} />
+      <ArtifactIngestionControls client={ingestionClient} onRegistered={onUploadComplete} />
     </section>
   );
 }

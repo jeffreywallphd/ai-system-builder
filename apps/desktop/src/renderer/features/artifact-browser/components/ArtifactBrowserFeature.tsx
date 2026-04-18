@@ -49,33 +49,20 @@ function PublishedBackingPanel(
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
   const {
     items,
-    huggingFaceTokenStatus,
-    tokenInput,
-    tokenState,
     selectedStorageKey,
     detail,
     content,
     imageViewUrl,
     publishState,
-    registerState,
     localizeState,
     sourceVerifyState,
     publishedBacking,
     localizedArtifact,
     publishForm,
-    registerForm,
     viewState,
     selectArtifact,
     refreshArtifacts,
     publishArtifactToHuggingFace,
-    registerArtifactFromHuggingFace,
-    registerHuggingFaceNamespace,
-    browseHuggingFaceDatasetParquetFiles,
-    closeHuggingFaceDatasetParquetFiles,
-    huggingFaceNamespaceDatasets,
-    getHuggingFaceDatasetParquetFiles,
-    getHuggingFaceDatasetFilesState,
-    expandedHuggingFaceDataset,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
     recheckSourceBacking,
@@ -84,15 +71,6 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     setRevision,
     setMediaType,
     togglePublishForm,
-    setRegisterRepository,
-    setRegisterNamespace,
-    setRegisterPathInRepo,
-    setRegisterRevision,
-    setRegisterMediaType,
-    toggleRegisterForm,
-    setTokenInput,
-    saveHuggingFaceToken,
-    clearHuggingFaceToken,
   } = useArtifactBrowserFeature(client);
   const backingState = deriveArtifactBackingState(detail, content);
 
@@ -105,100 +83,6 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
         </button>
       </header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
-      <section className="ui-stack ui-stack--sm">
-        <h3>Hugging Face token</h3>
-        <p role="status">
-          Status: {huggingFaceTokenStatus.configured ? `configured (${huggingFaceTokenStatus.maskedToken ?? "••••"})` : "not configured"}
-        </p>
-        <label className="ui-stack ui-stack--sm">
-          <span>Access token</span>
-          <input className="ui-input" type="password" value={tokenInput} onChange={(event) => setTokenInput(event.target.value)} placeholder="hf_..." />
-        </label>
-        <div className="ui-grid ui-grid--two">
-          <button className="ui-button" type="button" onClick={() => void saveHuggingFaceToken()} disabled={tokenState.status === "loading" || tokenInput.trim().length === 0}>
-            {tokenState.status === "loading" ? "Saving..." : "Save token"}
-          </button>
-          <button className="ui-button" type="button" onClick={() => void clearHuggingFaceToken()} disabled={tokenState.status === "loading" || !huggingFaceTokenStatus.configured}>
-            Clear token
-          </button>
-        </div>
-        {tokenState.message ? <p role={tokenState.status === "error" ? "alert" : "status"}>{tokenState.message}</p> : null}
-      </section>
-
-      <button className="ui-button" type="button" onClick={toggleRegisterForm} disabled={registerState.status === "loading"}>Register from Hugging Face</button>
-      {registerForm.showRegisterForm ? (
-        <section className="ui-stack ui-stack--sm">
-          <p role="note">Private or gated Hugging Face repositories may require a desktop-host token.</p>
-          <label className="ui-stack ui-stack--sm"><span>Namespace (user/org)</span><input className="ui-input" value={registerForm.namespace} onChange={(event) => setRegisterNamespace(event.target.value)} placeholder="OpenFinAL" required /></label>
-          <button className="ui-button" type="button" disabled={registerState.status === "loading" || registerForm.namespace.trim().length === 0} onClick={() => void registerHuggingFaceNamespace()}>
-            Register namespace
-          </button>
-          <h4>Namespace datasets</h4>
-          {huggingFaceNamespaceDatasets.length === 0 ? <p className="ui-text-muted">No datasets loaded yet.</p> : (
-            <ul className="ui-stack ui-stack--sm">
-              {huggingFaceNamespaceDatasets.map((dataset) => (
-                <li key={dataset.repository} className="ui-panel ui-stack ui-stack--sm">
-                  <header className="ui-grid ui-grid--two">
-                    <strong>{dataset.repository}</strong>
-                    <button
-                      className="ui-button"
-                      type="button"
-                      disabled={registerState.status === "loading"}
-                      onClick={() => void browseHuggingFaceDatasetParquetFiles(dataset.repository)}
-                    >
-                      View Files
-                    </button>
-                  </header>
-                  {expandedHuggingFaceDataset === dataset.repository ? (
-                    <section className="ui-stack ui-stack--sm">
-                      <div className="ui-grid ui-grid--two">
-                        <h5>Dataset files</h5>
-                        <button className="ui-button" type="button" onClick={closeHuggingFaceDatasetParquetFiles}>
-                          Close
-                        </button>
-                      </div>
-                      {getHuggingFaceDatasetFilesState(dataset.repository).status === "loading" ? <p role="status">Loading dataset files…</p> : null}
-                      {getHuggingFaceDatasetFilesState(dataset.repository).status === "error" ? (
-                        <p role="alert">{getHuggingFaceDatasetFilesState(dataset.repository).message ?? "Failed to load dataset files."}</p>
-                      ) : null}
-                      {getHuggingFaceDatasetParquetFiles(dataset.repository).length === 0
-                        && getHuggingFaceDatasetFilesState(dataset.repository).status !== "loading"
-                        && getHuggingFaceDatasetFilesState(dataset.repository).status !== "error" ? (
-                          <p className="ui-text-muted">No files found for this dataset.</p>
-                        ) : null}
-                      {getHuggingFaceDatasetParquetFiles(dataset.repository).length > 0 ? (
-                        <ul className="ui-stack ui-stack--sm">
-                          {getHuggingFaceDatasetParquetFiles(dataset.repository).map((file) => (
-                            <li key={`${file.repository}:${file.path}`}>
-                              <span>{file.path}</span>
-                              <button className="ui-button" type="button" disabled={registerState.status === "loading"} onClick={() => {
-                                void registerArtifactFromHuggingFace({
-                                  repository: file.repository,
-                                  pathInRepo: file.path,
-                                  revision: file.revision,
-                                });
-                              }}>Register</button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </section>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-          <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={registerForm.repository} onChange={(event) => setRegisterRepository(event.target.value)} required /></label>
-          <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={registerForm.pathInRepo} onChange={(event) => setRegisterPathInRepo(event.target.value)} required /></label>
-          <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={registerForm.revision} onChange={(event) => setRegisterRevision(event.target.value)} /></label>
-          <label className="ui-stack ui-stack--sm"><span>Media type (optional)</span><input className="ui-input" value={registerForm.mediaType} onChange={(event) => setRegisterMediaType(event.target.value)} /></label>
-          <button className="ui-button" type="button" disabled={registerState.status === "loading" || registerForm.repository.trim().length === 0 || registerForm.pathInRepo.trim().length === 0} onClick={() => void registerArtifactFromHuggingFace()}>
-            {registerState.status === "loading" ? "Registering..." : "Register"}
-          </button>
-          {registerState.message ? <p role={registerState.status === "error" ? "alert" : "status"}>{registerState.message}</p> : null}
-        </section>
-      ) : null}
-
       <div className="ui-grid ui-grid--two">
         <div className="ui-stack ui-stack--sm">
           <h3>Artifacts</h3>

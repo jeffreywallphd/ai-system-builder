@@ -119,8 +119,8 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
+    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
 
     const publishButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Publish") as HTMLButtonElement;
@@ -189,8 +189,8 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
+    setInputValue(inputs[0] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[1] as HTMLInputElement, "images/cat.png");
 
     const publishButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Publish") as HTMLButtonElement;
@@ -202,15 +202,15 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     expect(container.textContent).toContain("This Hugging Face repository may require an access token.");
   });
 
-  it("saves and clears Hugging Face token from token settings", async () => {
+  it("keeps browser card focused on browsing and excludes ingestion controls", async () => {
     const client = {
       browseImageArtifacts: vi.fn().mockResolvedValue([]),
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
-      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••9999" }),
-      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn(),
+      clearHuggingFaceToken: vi.fn(),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn(),
@@ -222,25 +222,16 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     const root = createRoot(container);
     mountedRoot = root;
     mountedContainer = container;
+
     await act(async () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    const tokenInput = container.querySelector("input[type='password']") as HTMLInputElement;
-    setInputValue(tokenInput, "hf_9999");
-    const saveButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Save token") as HTMLButtonElement;
-    await act(async () => {
-      saveButton.click();
-    });
-    expect(client.setHuggingFaceToken).toHaveBeenCalledWith({ token: "hf_9999" });
-    expect(container.textContent).toContain("Hugging Face token saved.");
-
-    const clearButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Clear token") as HTMLButtonElement;
-    await act(async () => {
-      clearButton.click();
-    });
-    expect(client.clearHuggingFaceToken).toHaveBeenCalled();
+    expect(container.textContent).toContain("Data Artifact Browser");
+    expect(container.textContent).not.toContain("Hugging Face token");
+    expect(container.textContent).not.toContain("Register from Hugging Face");
   });
+
 
   it("re-checks published backing existence from the artifact detail panel", async () => {
     const client = {
@@ -314,233 +305,6 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     expect(container.textContent).toContain("Last checked:");
   });
 
-  it("registers an artifact from Hugging Face and selects it", async () => {
-    const client = {
-      browseImageArtifacts: vi.fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { storageKey: "imports/huggingface/openai/demo/main/images/cat.png", artifactKind: "image" as const },
-        ]),
-      readArtifactDetail: vi.fn().mockResolvedValue({
-        locator: { storageKey: "imports/huggingface/openai/demo/main/images/cat.png" },
-        artifactKind: "image" as const,
-      }),
-      readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
-      createArtifactMediaViewUrl: vi.fn().mockRejectedValue(new Error("missing local bytes")),
-      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
-      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
-      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
-      publishArtifactToHuggingFace: vi.fn(),
-      verifyPublishedArtifactBacking: vi.fn(),
-      registerArtifactFromRepo: vi.fn().mockResolvedValue({
-        artifactId: "imports/huggingface/openai/demo/main/images/cat.png",
-        backing: {
-          role: "imported-source" as const,
-          target: {
-            provider: "huggingface",
-            repository: "openai/demo",
-            path: "images/cat.png",
-            revision: "main",
-            locator: "openai/demo/images/cat.png",
-          },
-          verification: {
-            exists: true as const,
-            verifiedAt: "2026-04-18T00:00:00.000Z",
-          },
-        },
-      }),
-      localizeArtifactFromRepo: vi.fn(),
-    };
-
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-    mountedRoot = root;
-    mountedContainer = container;
-
-    await act(async () => {
-      root.render(<ArtifactBrowserFeature client={client} />);
-    });
-
-    const registerToggle = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Register from Hugging Face") as HTMLButtonElement;
-    await act(async () => {
-      registerToggle.click();
-    });
-
-    const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[2] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[3] as HTMLInputElement, "images/cat.png");
-
-    const registerButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Register") as HTMLButtonElement;
-    await act(async () => {
-      registerButton.click();
-    });
-
-    expect(client.registerArtifactFromRepo).toHaveBeenCalledWith({
-      repository: "openai/demo",
-      path: "images/cat.png",
-      revision: "main",
-      mediaType: undefined,
-    });
-    expect(container.textContent).toContain("Registered imports/huggingface/openai/demo/main/images/cat.png from Hugging Face.");
-  });
-
-  it("renders dataset cards with per-card file viewer and register actions", async () => {
-    const client = {
-      browseImageArtifacts: vi.fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { storageKey: "imports/huggingface/openai/demo/main/data/train.parquet", artifactKind: "image" as const },
-        ]),
-      readArtifactDetail: vi.fn().mockResolvedValue({
-        locator: { storageKey: "imports/huggingface/openai/demo/main/data/train.parquet" },
-        artifactKind: "image" as const,
-      }),
-      readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
-      createArtifactMediaViewUrl: vi.fn().mockRejectedValue(new Error("missing local bytes")),
-      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
-      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
-      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
-      publishArtifactToHuggingFace: vi.fn(),
-      verifyPublishedArtifactBacking: vi.fn(),
-      browseHuggingFaceNamespaceDatasets: vi.fn().mockResolvedValue([
-        { namespace: "openai", repository: "openai/demo" },
-      ]),
-      browseHuggingFaceDatasetParquetFiles: vi.fn().mockResolvedValue([
-        { repository: "openai/demo", path: "data/train.parquet", revision: "main" },
-      ]),
-      registerArtifactFromRepo: vi.fn().mockResolvedValue({
-        artifactId: "imports/huggingface/openai/demo/main/data/train.parquet",
-        backing: {
-          role: "imported-source" as const,
-          target: {
-            provider: "huggingface",
-            repository: "openai/demo",
-            path: "data/train.parquet",
-            revision: "main",
-            locator: "openai/demo/data/train.parquet",
-          },
-          verification: {
-            exists: true as const,
-            verifiedAt: "2026-04-18T00:00:00.000Z",
-          },
-        },
-      }),
-      localizeArtifactFromRepo: vi.fn(),
-    };
-
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-    mountedRoot = root;
-    mountedContainer = container;
-
-    await act(async () => {
-      root.render(<ArtifactBrowserFeature client={client} />);
-    });
-
-    const registerToggle = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Register from Hugging Face") as HTMLButtonElement;
-    await act(async () => {
-      registerToggle.click();
-    });
-
-    const namespaceInput = Array.from(container.querySelectorAll("input"))[1] as HTMLInputElement;
-    setInputValue(namespaceInput, "openai");
-    const registerNamespaceButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Register namespace") as HTMLButtonElement;
-    await act(async () => {
-      registerNamespaceButton.click();
-    });
-
-    const datasetButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "View Files") as HTMLButtonElement;
-    await act(async () => {
-      datasetButton.click();
-    });
-
-    expect(client.browseHuggingFaceDatasetParquetFiles).toHaveBeenCalledWith({
-      repository: "openai/demo",
-      revision: "main",
-    });
-    expect(container.textContent).toContain("Dataset files");
-    expect(container.textContent).toContain("data/train.parquet");
-
-    const registerFileButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Register") as HTMLButtonElement;
-    await act(async () => {
-      registerFileButton.click();
-    });
-
-    expect(client.registerArtifactFromRepo).toHaveBeenCalledWith({
-      repository: "openai/demo",
-      path: "data/train.parquet",
-      revision: "main",
-      mediaType: undefined,
-    });
-
-    const closeButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Close") as HTMLButtonElement;
-    await act(async () => {
-      closeButton.click();
-    });
-
-    expect(container.textContent).not.toContain("Dataset files");
-  });
-
-  it("renders per-card dataset file errors", async () => {
-    const client = {
-      browseImageArtifacts: vi.fn().mockResolvedValue([]),
-      readArtifactDetail: vi.fn(),
-      readArtifactContent: vi.fn(),
-      createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
-      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
-      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
-      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
-      publishArtifactToHuggingFace: vi.fn(),
-      verifyPublishedArtifactBacking: vi.fn(),
-      browseHuggingFaceNamespaceDatasets: vi.fn().mockResolvedValue([
-        { namespace: "openai", repository: "openai/demo" },
-      ]),
-      browseHuggingFaceDatasetParquetFiles: vi.fn().mockRejectedValue(new Error("Failed to load dataset files.")),
-      registerArtifactFromRepo: vi.fn(),
-      localizeArtifactFromRepo: vi.fn(),
-    };
-
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-    mountedRoot = root;
-    mountedContainer = container;
-
-    await act(async () => {
-      root.render(<ArtifactBrowserFeature client={client} />);
-    });
-
-    const registerToggle = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Register from Hugging Face") as HTMLButtonElement;
-    await act(async () => {
-      registerToggle.click();
-    });
-
-    const namespaceInput = Array.from(container.querySelectorAll("input"))[1] as HTMLInputElement;
-    setInputValue(namespaceInput, "openai");
-    const registerNamespaceButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Register namespace") as HTMLButtonElement;
-    await act(async () => {
-      registerNamespaceButton.click();
-    });
-
-    const datasetButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "View Files") as HTMLButtonElement;
-    await act(async () => {
-      datasetButton.click();
-    });
-
-    expect(container.textContent).toContain("Failed to load dataset files.");
-  });
 
   it("localizes imported artifact bytes from the artifact panel", async () => {
     const client = {

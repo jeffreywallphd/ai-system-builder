@@ -55,11 +55,9 @@ describe("useArtifactUploadFeature", () => {
       ok: true,
       value: {
         descriptor: {
-          storage: {
-            key: "uploads/cat.png",
-            mediaType: "image/png",
-            sizeBytes: 4,
-          },
+          key: "uploads/cat.png",
+          mediaType: "image/png",
+          sizeBytes: 4,
         },
       },
     });
@@ -82,6 +80,9 @@ describe("useArtifactUploadFeature", () => {
     const form = container.querySelector("form") as HTMLFormElement;
 
     const file = new File([new Uint8Array([1, 2, 3, 4])], "cat.png", { type: "image/png" });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+    });
 
     await act(async () => {
       setInputFiles(input, [file]);
@@ -127,5 +128,91 @@ describe("useArtifactUploadFeature", () => {
     expect(container.querySelector("[data-testid='message']")?.textContent).toBe(
       "Select one artifact file before uploading.",
     );
+  });
+
+  it("falls back to text/markdown when browser file type metadata is empty", async () => {
+    const uploadArtifact = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        descriptor: {
+          key: "uploads/doc.md",
+          mediaType: "text/markdown",
+          sizeBytes: 4,
+        },
+      },
+    });
+    const getAcceptedTypes = vi.fn().mockResolvedValue({
+      acceptedExtensions: [".md"],
+      acceptedMediaTypes: ["text/markdown"],
+    });
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<HookProbe client={{ uploadArtifact, getAcceptedTypes }} />);
+    });
+
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    const form = container.querySelector("form") as HTMLFormElement;
+    const file = new File([new Uint8Array([35, 32, 84, 101])], "doc.md", { type: "" });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () => new Uint8Array([35, 32, 84, 101]).buffer,
+    });
+
+    await act(async () => {
+      setInputFiles(input, [file]);
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(container.querySelector("[data-testid='status']")?.textContent).toBe("success");
+  });
+
+  it("falls back to application/json when browser file type metadata is empty", async () => {
+    const uploadArtifact = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        descriptor: {
+          key: "uploads/schema.json",
+          mediaType: "application/json",
+          sizeBytes: 2,
+        },
+      },
+    });
+    const getAcceptedTypes = vi.fn().mockResolvedValue({
+      acceptedExtensions: [".json"],
+      acceptedMediaTypes: ["application/json"],
+    });
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<HookProbe client={{ uploadArtifact, getAcceptedTypes }} />);
+    });
+
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    const form = container.querySelector("form") as HTMLFormElement;
+    const file = new File([new Uint8Array([123, 125])], "schema.json", { type: "" });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () => new Uint8Array([123, 125]).buffer,
+    });
+
+    await act(async () => {
+      setInputFiles(input, [file]);
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(container.querySelector("[data-testid='status']")?.textContent).toBe("success");
   });
 });

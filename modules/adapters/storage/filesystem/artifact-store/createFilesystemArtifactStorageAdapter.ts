@@ -156,6 +156,24 @@ function extensionForMediaType(mediaType: string | undefined): string {
   }
 }
 
+function extensionFromOriginalFileName(originalFileName: string | undefined): string | undefined {
+  if (typeof originalFileName !== "string") {
+    return undefined;
+  }
+
+  const normalized = path.basename(originalFileName.trim());
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  const dot = normalized.lastIndexOf(".");
+  if (dot <= 0 || dot === normalized.length - 1) {
+    return undefined;
+  }
+
+  return normalized.slice(dot + 1).toLowerCase();
+}
+
 function isImageMediaType(mediaType: string | undefined): boolean {
   return typeof mediaType === "string" && mediaType.toLowerCase().startsWith("image/");
 }
@@ -236,10 +254,14 @@ export function createFilesystemArtifactObjectStorageAdapter(
     }
   }
 
-  function createGeneratedKey(mediaType: string | undefined): string {
+  function createGeneratedKey(input: {
+    mediaType: string | undefined;
+    originalFileName: string | undefined;
+  }): string {
     const compactTimestamp = now().replace(/[-:.TZ]/g, "");
+    const extension = extensionFromOriginalFileName(input.originalFileName) ?? extensionForMediaType(input.mediaType);
     return normalizeStorageArtifactKey(
-      `uploads/${compactTimestamp}-${randomSuffix()}.${extensionForMediaType(mediaType)}`,
+      `uploads/${compactTimestamp}-${randomSuffix()}.${extension}`,
     );
   }
 
@@ -267,9 +289,16 @@ export function createFilesystemArtifactObjectStorageAdapter(
       });
 
       try {
+        const originalFileName =
+          typeof (request.descriptor.metadata as { originalFileName?: unknown } | undefined)?.originalFileName === "string"
+            ? (request.descriptor.metadata as { originalFileName?: string }).originalFileName
+            : undefined;
         const key = request.descriptor.key
           ? normalizeStorageArtifactKey(request.descriptor.key)
-          : createGeneratedKey(request.descriptor.mediaType);
+          : createGeneratedKey({
+            mediaType: request.descriptor.mediaType,
+            originalFileName,
+          });
         attemptedKey = key;
         const bytes = toBytes(request.content);
         const checksum = createContentChecksum(bytes);
@@ -301,11 +330,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
               mediaType: request.descriptor.mediaType,
               sizeBytes: bytes.byteLength,
               sourceKind: "upload",
-              originalName:
-                typeof (request.descriptor.metadata as { originalFileName?: unknown } | undefined)?.originalFileName
-                  === "string"
-                  ? (request.descriptor.metadata as { originalFileName?: string }).originalFileName
-                  : undefined,
+              originalName: originalFileName,
               createdAt: now(),
               checksum,
             },
