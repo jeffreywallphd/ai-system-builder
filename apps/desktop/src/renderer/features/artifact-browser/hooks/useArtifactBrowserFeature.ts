@@ -53,10 +53,11 @@ export interface UseArtifactBrowserFeatureResult {
   }) => Promise<void>;
   registerHuggingFaceNamespace: () => Promise<void>;
   browseHuggingFaceDatasetParquetFiles: (repository: string) => Promise<void>;
+  closeHuggingFaceDatasetParquetFiles: () => void;
   huggingFaceNamespaceDatasets: DesktopHuggingFaceNamespaceDataset[];
-  huggingFaceDatasetParquetFiles: DesktopHuggingFaceDatasetParquetFile[];
-  datasetFilesState: ArtifactBrowserViewState;
-  selectedHuggingFaceDataset?: string;
+  getHuggingFaceDatasetParquetFiles: (repository: string) => DesktopHuggingFaceDatasetParquetFile[];
+  getHuggingFaceDatasetFilesState: (repository: string) => ArtifactBrowserViewState;
+  expandedHuggingFaceDataset?: string;
   localizeArtifactFromRepo: () => Promise<void>;
   recheckPublishedBacking: () => Promise<void>;
   recheckSourceBacking: () => Promise<void>;
@@ -79,6 +80,11 @@ export interface UseArtifactBrowserFeatureResult {
 export function useArtifactBrowserFeature(
   client?: DesktopArtifactBrowserClient,
 ): UseArtifactBrowserFeatureResult {
+  type DatasetFilesPanelState = {
+    files: DesktopHuggingFaceDatasetParquetFile[];
+    state: ArtifactBrowserViewState;
+  };
+
   const withHuggingFaceAuthGuidance = (message: string): string => {
     const normalized = message.toLowerCase();
     const mentionsAuth = normalized.includes("hugging face")
@@ -116,9 +122,8 @@ export function useArtifactBrowserFeature(
   const [registerMediaType, setRegisterMediaType] = useState("");
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [huggingFaceNamespaceDatasets, setHuggingFaceNamespaceDatasets] = useState<DesktopHuggingFaceNamespaceDataset[]>([]);
-  const [huggingFaceDatasetParquetFiles, setHuggingFaceDatasetParquetFiles] = useState<DesktopHuggingFaceDatasetParquetFile[]>([]);
-  const [datasetFilesState, setDatasetFilesState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [selectedHuggingFaceDataset, setSelectedHuggingFaceDataset] = useState<string | undefined>();
+  const [datasetFilesByRepository, setDatasetFilesByRepository] = useState<Record<string, DatasetFilesPanelState>>({});
+  const [expandedHuggingFaceDataset, setExpandedHuggingFaceDataset] = useState<string | undefined>();
   const [tokenInput, setTokenInput] = useState("");
   const [tokenState, setTokenState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [huggingFaceTokenStatus, setHuggingFaceTokenStatus] = useState<{ configured: boolean; maskedToken?: string }>({
@@ -273,9 +278,8 @@ export function useArtifactBrowserFeature(
         namespace: registerNamespace,
       });
       setHuggingFaceNamespaceDatasets(datasets);
-      setHuggingFaceDatasetParquetFiles([]);
-      setDatasetFilesState({ status: "idle", message: "Select a dataset to view files." });
-      setSelectedHuggingFaceDataset(undefined);
+      setDatasetFilesByRepository({});
+      setExpandedHuggingFaceDataset(undefined);
       setRegisterState({
         status: "success",
         message: datasets.length > 0
@@ -289,8 +293,14 @@ export function useArtifactBrowserFeature(
   }
 
   async function browseHuggingFaceDatasetParquetFiles(repository: string): Promise<void> {
-    setDatasetFilesState({ status: "loading", message: `Loading files for ${repository}...` });
-    setRegisterState({ status: "loading", message: `Loading files for ${repository}...` });
+    setExpandedHuggingFaceDataset(repository);
+    setDatasetFilesByRepository((current) => ({
+      ...current,
+      [repository]: {
+        files: current[repository]?.files ?? [],
+        state: { status: "loading", message: `Loading files for ${repository}...` },
+      },
+    }));
     try {
       if (!artifactClient.browseHuggingFaceDatasetParquetFiles) {
         throw new Error("Dataset file browsing is unavailable for this client.");
@@ -299,22 +309,39 @@ export function useArtifactBrowserFeature(
         repository,
         revision: registerRevision,
       });
-      setSelectedHuggingFaceDataset(repository);
       setRegisterRepository(repository);
-      setHuggingFaceDatasetParquetFiles(files);
-      setDatasetFilesState({
-        status: "success",
-        message: files.length > 0 ? `Loaded ${files.length} file(s).` : "No files found for this dataset.",
-      });
-      setRegisterState({
-        status: "success",
-        message: files.length > 0 ? `Loaded ${files.length} file(s).` : "No files found for this dataset.",
-      });
+      setDatasetFilesByRepository((current) => ({
+        ...current,
+        [repository]: {
+          files,
+          state: {
+            status: "success",
+            message: files.length > 0 ? `Loaded ${files.length} file(s).` : "No files found for this dataset.",
+          },
+        },
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load dataset files.";
-      setDatasetFilesState({ status: "error", message: withHuggingFaceAuthGuidance(message) });
-      setRegisterState({ status: "error", message: withHuggingFaceAuthGuidance(message) });
+      setDatasetFilesByRepository((current) => ({
+        ...current,
+        [repository]: {
+          files: current[repository]?.files ?? [],
+          state: { status: "error", message: withHuggingFaceAuthGuidance(message) },
+        },
+      }));
     }
+  }
+
+  function closeHuggingFaceDatasetParquetFiles(): void {
+    setExpandedHuggingFaceDataset(undefined);
+  }
+
+  function getHuggingFaceDatasetParquetFiles(repository: string): DesktopHuggingFaceDatasetParquetFile[] {
+    return datasetFilesByRepository[repository]?.files ?? [];
+  }
+
+  function getHuggingFaceDatasetFilesState(repository: string): ArtifactBrowserViewState {
+    return datasetFilesByRepository[repository]?.state ?? { status: "idle", message: "Select View Files to load files." };
   }
 
   async function localizeArtifactFromRepo(): Promise<void> {
@@ -414,10 +441,11 @@ export function useArtifactBrowserFeature(
     registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace,
     browseHuggingFaceDatasetParquetFiles,
+    closeHuggingFaceDatasetParquetFiles,
     huggingFaceNamespaceDatasets,
-    huggingFaceDatasetParquetFiles,
-    datasetFilesState,
-    selectedHuggingFaceDataset,
+    getHuggingFaceDatasetParquetFiles,
+    getHuggingFaceDatasetFilesState,
+    expandedHuggingFaceDataset,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
     recheckSourceBacking,
