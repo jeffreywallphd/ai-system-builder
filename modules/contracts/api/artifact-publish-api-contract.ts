@@ -18,11 +18,17 @@ export interface ApiArtifactPublishRequestPayload {
 }
 
 export interface ApiArtifactPublishResponseValue {
-  provider: string;
-  repository: string;
-  path: string;
-  revision?: string;
-  exists: boolean;
+  target: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator: string;
+  };
+  verification: {
+    exists: boolean;
+    verifiedAt?: string;
+  };
 }
 
 export type ApiArtifactPublishRequest = ApiRequest<

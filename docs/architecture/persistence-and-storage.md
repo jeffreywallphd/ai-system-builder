@@ -147,6 +147,7 @@ Repo-backed providers are a valid storage class under the storage adapter catego
 - The generic family remains provider-neutral (`ArtifactRepoStoragePort` + repo request/result contracts).
 - A provider-neutral composition seam dispatches by `target.provider`; Hugging Face is currently one registered provider.
 - Initial operations implemented: `hasArtifactInRepo`, `storeArtifactInRepo`, `retrieveArtifactFromRepo`.
+- Published/re-check verification metadata is persisted on `ArtifactStorageBinding.backing.verification` (`exists`, `verifiedAt`) for durable read-side status.
 
 ### Auth and configuration (minimal by design)
 
@@ -242,4 +243,7 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 - Provider status mapping is explicit (`validation`, `not-found`, `unavailable`, `internal`).
 - Published-backing linkage is persisted as `ArtifactStorageBinding` (`role = published`, `kind = artifact-repo`) after successful publish verification.
 - Artifact detail read flow can surface published-backing metadata from binding records so thin-client detail panels can render durable remote backing state.
-- Published backing data is now hardened with optional structured repo target fields (`repository`, `path`, `revision`) on backing references, with shared encode/decode helpers for locator fallback compatibility.
+- Published backing data is now hardened as a structured target + verification model:
+  - `target` (`provider`, `repository`, `path`, `revision`, `locator`)
+  - `verification` (`exists`, `verifiedAt`)
+- Locator fallback compatibility remains supported through centralized backing-target resolution helpers for legacy rows.

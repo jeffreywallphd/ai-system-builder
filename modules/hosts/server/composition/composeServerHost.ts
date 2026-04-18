@@ -8,6 +8,7 @@ import {
   ReadArtifactDetailUseCase,
   StoreArtifactInRepoUseCase,
   StoreImageUploadUseCase,
+  VerifyPublishedArtifactBackingUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -149,6 +150,11 @@ export function composeServerHost(
         artifactBindingStorage: artifactBindings,
         now: options.now,
       });
+      const verifyPublishedArtifactBacking = new VerifyPublishedArtifactBackingUseCase({
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        now: options.now,
+      });
 
       registerExpressApi({
         app: registerOptions.app,
@@ -160,6 +166,7 @@ export function composeServerHost(
         hasArtifactInRepoUseCase: hasArtifactInRepo,
         storeArtifactInRepoUseCase: storeArtifactInRepo,
         publishArtifactToRepoUseCase: publishArtifactToRepo,
+        verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
       });
     },
   };

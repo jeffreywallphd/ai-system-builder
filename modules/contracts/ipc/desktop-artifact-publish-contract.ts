@@ -44,11 +44,17 @@ export interface DesktopArtifactPublishRequestPayload {
 }
 
 export interface DesktopArtifactPublishSuccessValue {
-  provider: string;
-  repository: string;
-  path: string;
-  revision?: string;
-  exists: boolean;
+  target: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator: string;
+  };
+  verification: {
+    exists: boolean;
+    verifiedAt?: string;
+  };
 }
 
 export type DesktopArtifactPublishRequest = IpcRequest<
@@ -122,11 +128,17 @@ export function createDesktopArtifactPublishSuccessResponse(
   return createIpcSuccessResponse(
     DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
     {
-      provider: normalizeRequiredTextField(value.provider, "provider"),
-      repository: normalizeRequiredTextField(value.repository, "repository"),
-      path: normalizeRequiredTextField(value.path, "path"),
-      revision: value.revision?.trim() || undefined,
-      exists: value.exists,
+      target: {
+        provider: normalizeRequiredTextField(value.target.provider, "target.provider"),
+        repository: normalizeRequiredTextField(value.target.repository, "target.repository"),
+        path: normalizeRequiredTextField(value.target.path, "target.path"),
+        revision: value.target.revision?.trim() || undefined,
+        locator: normalizeRequiredTextField(value.target.locator, "target.locator"),
+      },
+      verification: {
+        exists: value.verification.exists,
+        verifiedAt: value.verification.verifiedAt?.trim() || undefined,
+      },
     },
     {
       requestId: options?.requestId,

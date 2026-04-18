@@ -52,6 +52,7 @@ describe("storage family invariants", () => {
       "normalizeStoragePlacementDescriptor",
       "normalizeStorageProviderId",
       "normalizeStorageZoneKind",
+      "resolveArtifactRepoBackingTarget",
     ]);
   });
 
@@ -77,10 +78,9 @@ describe("storage family invariants", () => {
       provider: "huggingface",
       locator: "openai/demo-artifacts/images/a.png",
       revision: "main",
-      target: undefined,
     });
 
-    expect(Object.keys(backing).sort()).toEqual(["kind", "locator", "provider", "revision", "target"]);
+    expect(Object.keys(backing).sort()).toEqual(["kind", "locator", "provider", "revision"]);
   });
 
   it("keeps artifact-object contracts key/blob oriented", () => {

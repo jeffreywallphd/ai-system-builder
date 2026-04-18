@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 
 import {
+  useArtifactBrowserPublishLogic,
+  type ArtifactBrowserViewState,
+  type UseArtifactBrowserPublishLogicResult,
+} from "../../../../../../modules/ui/shared";
+import {
   type ArtifactBrowserApiClient,
   type ThinClientArtifactBrowseItem,
   type ThinClientArtifactContentDescriptor,
@@ -8,11 +13,6 @@ import {
   type ThinClientPublishedBacking,
 } from "../api/apiArtifactBrowserClient";
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
-
-export interface ArtifactBrowserViewState {
-  status: "idle" | "loading" | "success" | "error";
-  message?: string;
-}
 
 export interface UseArtifactBrowserFeatureResult {
   items: ThinClientArtifactBrowseItem[];
@@ -22,15 +22,17 @@ export interface UseArtifactBrowserFeatureResult {
   imageViewUrl?: string;
   publishState: ArtifactBrowserViewState;
   publishedBacking?: ThinClientPublishedBacking;
+  publishForm: UseArtifactBrowserPublishLogicResult["publishForm"];
   viewState: ArtifactBrowserViewState;
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
-  publishArtifactToHuggingFace: (input: {
-    repository: string;
-    path: string;
-    revision?: string;
-    mediaType?: string;
-  }) => Promise<void>;
+  publishArtifactToHuggingFace: () => Promise<void>;
+  recheckPublishedBacking: () => Promise<void>;
+  setRepository: (value: string) => void;
+  setPathInRepo: (value: string) => void;
+  setRevision: (value: string) => void;
+  setMediaType: (value: string) => void;
+  togglePublishForm: () => void;
 }
 
 export function useArtifactBrowserFeature(
@@ -43,8 +45,20 @@ export function useArtifactBrowserFeature(
   const [content, setContent] = useState<ThinClientArtifactContentDescriptor | undefined>();
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [publishState, setPublishState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [publishedBacking, setPublishedBacking] = useState<ThinClientPublishedBacking | undefined>();
+
+  const publishLogic = useArtifactBrowserPublishLogic<ThinClientArtifactDetail>({
+    selectedStorageKey,
+    client: artifactClient,
+    async readSelectedArtifactDetail() {
+      if (!selectedStorageKey) {
+        return undefined;
+      }
+
+      const artifactDetail = await artifactClient.readArtifactDetail({ storageKey: selectedStorageKey });
+      setDetail(artifactDetail);
+      return artifactDetail;
+    },
+  });
 
   async function refreshArtifacts(): Promise<void> {
     setViewState({ status: "loading", message: "Loading image artifacts..." });
@@ -81,58 +95,16 @@ export function useArtifactBrowserFeature(
       setDetail(artifactDetail);
       setContent(contentDescriptor);
       setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));
-      const boundPublishedBacking = artifactDetail.metadata?.publishedBacking;
-      setPublishedBacking(
-        boundPublishedBacking
-          ? {
-            ...boundPublishedBacking,
-            exists: false,
-          }
-          : undefined,
-      );
+      publishLogic.setPublishedBackingFromDetail(artifactDetail);
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
     } catch (error) {
       setDetail(undefined);
       setContent(undefined);
       setImageViewUrl(undefined);
-      setPublishedBacking(undefined);
+      publishLogic.setPublishedBackingFromDetail(undefined);
       setViewState({
         status: "error",
         message: error instanceof Error ? error.message : "Failed to load artifact detail.",
-      });
-    }
-  }
-
-  async function publishArtifactToHuggingFace(input: {
-    repository: string;
-    path: string;
-    revision?: string;
-    mediaType?: string;
-  }): Promise<void> {
-    if (!selectedStorageKey) {
-      setPublishState({ status: "error", message: "Select an artifact before publishing." });
-      return;
-    }
-
-    setPublishState({ status: "loading", message: "Publishing to Hugging Face..." });
-    try {
-      const backing = await artifactClient.publishArtifactToHuggingFace({
-        artifactId: selectedStorageKey,
-        repository: input.repository,
-        path: input.path,
-        revision: input.revision,
-        mediaType: input.mediaType,
-      });
-      setPublishedBacking(backing);
-      setPublishState({
-        status: "success",
-        message: "Published artifact backing to Hugging Face.",
-      });
-      await selectArtifact(selectedStorageKey);
-    } catch (error) {
-      setPublishState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Failed to publish artifact.",
       });
     }
   }
@@ -143,11 +115,18 @@ export function useArtifactBrowserFeature(
     detail,
     content,
     imageViewUrl,
-    publishState,
-    publishedBacking,
+    publishState: publishLogic.publishState,
+    publishedBacking: publishLogic.publishedBacking,
+    publishForm: publishLogic.publishForm,
     viewState,
     selectArtifact,
     refreshArtifacts,
-    publishArtifactToHuggingFace,
+    publishArtifactToHuggingFace: publishLogic.publishArtifactToHuggingFace,
+    recheckPublishedBacking: publishLogic.recheckPublishedBacking,
+    setRepository: publishLogic.setRepository,
+    setPathInRepo: publishLogic.setPathInRepo,
+    setRevision: publishLogic.setRevision,
+    setMediaType: publishLogic.setMediaType,
+    togglePublishForm: publishLogic.togglePublishForm,
   };
 }

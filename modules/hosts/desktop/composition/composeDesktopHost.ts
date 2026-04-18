@@ -5,6 +5,7 @@ import {
   ReadArtifactContentUseCase,
   ReadArtifactDetailUseCase,
   StoreImageUploadUseCase,
+  VerifyPublishedArtifactBackingUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -129,6 +130,11 @@ export function composeDesktopHost(
         artifactBindingStorage: artifactBindings,
         now: options.now,
       });
+      const verifyPublishedArtifactBacking = new VerifyPublishedArtifactBackingUseCase({
+        artifactRepoStorage,
+        artifactBindingStorage: artifactBindings,
+        now: options.now,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -138,6 +144,7 @@ export function composeDesktopHost(
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,
         publishArtifactToRepoUseCase: publishArtifactToRepo,
+        verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
       });
     },
   };

@@ -210,9 +210,9 @@ Server composition now wires both storage families as peers:
 - local filesystem artifact-object storage for upload/catalog/browser flows, and
 - artifact-repo aggregate storage with Hugging Face as first provider adapter.
 
-A minimal artifact-repo API slice is exposed (`artifact-repo.has`, `artifact-repo.store`, `artifact.publish`) through dedicated application use cases.
+A minimal artifact-repo API slice is exposed (`artifact-repo.has`, `artifact-repo.store`, `artifact.publish`, `artifact.publish.verify`) through dedicated application use cases.
 
-Thin-client artifact-browser publish flow should call `artifact.publish` as the primary orchestration route (artifact bytes -> provider store -> verify -> published binding write), while lower-level repo-store routes remain secondary infrastructure APIs.
+Thin-client artifact-browser publish flow should call `artifact.publish` as the primary orchestration route (artifact bytes -> provider store -> verify -> published binding write), while follow-up verification should call `artifact.publish.verify` (remote existence re-check without republish).
 
 ### Desktop-host artifact-repo slice (current)
 
@@ -220,6 +220,6 @@ Desktop composition now mirrors the same publish orchestration path used by serv
 
 - local filesystem artifact-object storage for upload/catalog/browser flows,
 - artifact-repo aggregate storage with Hugging Face as first provider adapter,
-- shared `PublishArtifactToRepoUseCase` wired through Electron IPC and preload bridge (`artifact.publish`).
+- shared publish/verify use cases wired through Electron IPC and preload bridge (`artifact.publish`, `artifact.publish.verify`).
 
-Desktop renderer artifact-browser publish UX should call the preload-backed publish bridge, not raw IPC and not desktop-only business logic.
+Desktop renderer artifact-browser publish/re-check UX should call the preload-backed bridge and shared hook logic, not raw IPC and not desktop-only business logic.

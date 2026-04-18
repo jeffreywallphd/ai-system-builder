@@ -5,6 +5,9 @@ import {
   DESKTOP_ARTIFACT_PUBLISH_OPERATION,
   DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_OPERATION,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_OPERATION,
@@ -70,6 +73,13 @@ describe("desktop artifact-browser ipc contract", () => {
     );
     expect(DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL.value).toBe(
       "ipc.artifact.publish.response",
+    );
+    expect(DESKTOP_ARTIFACT_PUBLISH_VERIFY_OPERATION).toBe("artifact.publish.verify");
+    expect(DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value).toBe(
+      "ipc.artifact.publish.verify.request",
+    );
+    expect(DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL.value).toBe(
+      "ipc.artifact.publish.verify.response",
     );
   });
 
@@ -193,11 +203,17 @@ describe("desktop artifact-browser ipc contract", () => {
     });
 
     const response = createDesktopArtifactPublishSuccessResponse({
-      provider: " huggingface ",
-      repository: " openai/demo ",
-      path: " images/cat.png ",
-      revision: " main ",
-      exists: true,
+      target: {
+        provider: " huggingface ",
+        repository: " openai/demo ",
+        path: " images/cat.png ",
+        revision: " main ",
+        locator: " openai/demo/images/cat.png ",
+      },
+      verification: {
+        exists: true,
+        verifiedAt: " 2026-04-17T00:00:00.000Z ",
+      },
     });
 
     expect(request.operation).toBe("artifact.publish");
@@ -222,11 +238,17 @@ describe("desktop artifact-browser ipc contract", () => {
     }
 
     expect(response.value).toEqual({
-      provider: "huggingface",
-      repository: "openai/demo",
-      path: "images/cat.png",
-      revision: "main",
-      exists: true,
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        locator: "openai/demo/images/cat.png",
+      },
+      verification: {
+        exists: true,
+        verifiedAt: "2026-04-17T00:00:00.000Z",
+      },
     });
   });
 });

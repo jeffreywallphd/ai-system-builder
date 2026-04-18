@@ -17,6 +17,10 @@ export interface StorageBackingReference {
   locator: string;
   revision?: string;
   target?: ArtifactRepoTarget;
+  verification?: {
+    exists: boolean;
+    verifiedAt?: string;
+  };
 }
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -37,16 +41,25 @@ export function normalizeStorageBackingReference(
     throw new Error("Storage backing locator must be a non-empty string.");
   }
 
+  const target = reference.target
+    ? normalizeArtifactRepoTarget({
+      ...reference.target,
+      provider: reference.target.provider ?? reference.provider,
+    })
+    : undefined;
+  const verification = reference.verification
+    ? {
+      exists: reference.verification.exists,
+      verifiedAt: normalizeOptionalText(reference.verification.verifiedAt),
+    }
+    : undefined;
+
   return {
     kind: normalizeStorageKind(reference.kind),
     provider: normalizeStorageProviderId(reference.provider),
     locator,
     revision: normalizeOptionalText(reference.revision),
-    target: reference.target
-      ? normalizeArtifactRepoTarget({
-        ...reference.target,
-        provider: reference.target.provider ?? reference.provider,
-      })
-      : undefined,
+    ...(target ? { target } : {}),
+    ...(verification ? { verification } : {}),
   };
 }

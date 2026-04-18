@@ -162,10 +162,16 @@ describe("filesystem artifact browser read adapter", () => {
     }
     expect(detail.value.artifact.metadata).toMatchObject({
       publishedBacking: {
-        provider: "huggingface",
-        repository: "openai/demo-artifacts",
-        path: "images/published.png",
-        revision: "main",
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo-artifacts",
+          path: "images/published.png",
+          revision: "main",
+          locator: "openai/demo-artifacts/images/published.png",
+        },
+        verification: {
+          exists: false,
+        },
       },
     });
   });
@@ -216,10 +222,16 @@ describe("filesystem artifact browser read adapter", () => {
     }
     expect(detail.value.artifact.metadata).toMatchObject({
       publishedBacking: {
-        provider: "huggingface",
-        repository: "openai/demo-artifacts",
-        path: "images/legacy.png",
-        revision: "main",
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo-artifacts",
+          path: "images/legacy.png",
+          revision: "main",
+          locator: "openai/demo-artifacts/images/legacy.png",
+        },
+        verification: {
+          exists: false,
+        },
       },
     });
   });

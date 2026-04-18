@@ -40,11 +40,15 @@ describe("desktop artifact browser client", () => {
       publishArtifactToRepo: vi.fn().mockResolvedValue({
         ok: true,
         value: {
-          provider: "huggingface",
-          repository: "openai/demo",
-          path: "images/cat.png",
-          revision: "main",
-          exists: true,
+          target: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", revision: "main", locator: "openai/demo/images/cat.png" },
+          verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
+        },
+      }),
+      verifyPublishedArtifactBacking: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          target: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", revision: "main", locator: "openai/demo/images/cat.png" },
+          verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
         },
       }),
     };
@@ -104,11 +108,15 @@ describe("desktop artifact browser client", () => {
       publishArtifactToRepo: vi.fn().mockResolvedValue({
         ok: true,
         value: {
-          provider: "huggingface",
-          repository: "openai/demo",
-          path: "images/cat.png",
-          revision: "main",
-          exists: true,
+          target: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", revision: "main", locator: "openai/demo/images/cat.png" },
+          verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
+        },
+      }),
+      verifyPublishedArtifactBacking: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          target: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", revision: "main", locator: "openai/demo/images/cat.png" },
+          verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
         },
       }),
     };
@@ -139,11 +147,15 @@ describe("desktop artifact browser client", () => {
       publishArtifactToRepo: vi.fn().mockResolvedValue({
         ok: true,
         value: {
-          provider: "huggingface",
-          repository: "openai/demo",
-          path: "images/cat.png",
-          revision: "main",
-          exists: true,
+          target: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", revision: "main", locator: "openai/demo/images/cat.png" },
+          verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
+        },
+      }),
+      verifyPublishedArtifactBacking: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          target: { provider: "huggingface", repository: "openai/demo", path: "images/cat.png", revision: "main", locator: "openai/demo/images/cat.png" },
+          verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
         },
       }),
     };
@@ -166,6 +178,43 @@ describe("desktop artifact browser client", () => {
       },
       mediaType: undefined,
     });
-    expect(result.exists).toBe(true);
+    expect(result.verification.exists).toBe(true);
+  });
+
+  it("re-checks published artifact backing through preload verify bridge", async () => {
+    window.desktopApi = {
+      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/cat.png",
+            revision: "main",
+            locator: "openai/demo/images/cat.png",
+          },
+          verification: {
+            exists: false,
+            verifiedAt: "2026-04-18T00:00:00.000Z",
+          },
+        },
+      }),
+    };
+
+    const client = createDesktopArtifactBrowserClient();
+    const result = await client.verifyPublishedArtifactBacking({
+      artifactId: "uploads/cat.png",
+    });
+
+    expect(window.desktopApi.verifyPublishedArtifactBacking).toHaveBeenCalledWith({
+      artifactId: "uploads/cat.png",
+    });
+    expect(result.verification.exists).toBe(false);
   });
 });
