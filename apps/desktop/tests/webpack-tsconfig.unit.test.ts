@@ -5,6 +5,7 @@ import { describe, expect, it } from "../../../modules/testing/node-test";
 
 type DesktopWebpackTsConfig = {
   include?: string[];
+  exclude?: string[];
 };
 
 function loadDesktopWebpackTsConfig(): DesktopWebpackTsConfig {
@@ -21,5 +22,14 @@ describe("desktop webpack TypeScript config", () => {
     expect(include).toContain("../../modules/**/*.ts");
     expect(include).toContain("../../modules/**/*.tsx");
     expect(include).toContain("../../modules/**/*.d.ts");
+  });
+
+  it("excludes module test files from webpack compilation to keep desktop runtime builds emit-safe", () => {
+    const config = loadDesktopWebpackTsConfig();
+    const exclude = config.exclude ?? [];
+
+    expect(exclude).toContain("../../modules/**/*.test.ts");
+    expect(exclude).toContain("../../modules/**/*.test.tsx");
+    expect(exclude).toContain("../../modules/**/tests/**");
   });
 });

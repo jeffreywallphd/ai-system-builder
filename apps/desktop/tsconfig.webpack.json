@@ -12,6 +12,9 @@
     "src/**/*.d.ts"
   ],
   "exclude": [
+    "../../modules/**/*.test.ts",
+    "../../modules/**/*.test.tsx",
+    "../../modules/**/tests/**",
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/**/tests/**"
