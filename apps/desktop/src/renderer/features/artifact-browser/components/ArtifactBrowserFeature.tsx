@@ -77,7 +77,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <header className="ui-grid ui-grid--two">
-        <h2 className="ui-panel__title">Data Artifact Browser</h2>
+        <h2 className="ui-panel__title">Artifact Browser</h2>
         <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>
           Refresh
         </button>
@@ -117,7 +117,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <dt>Created at</dt>
               <dd>{detail.createdAt ?? "unknown"}</dd>
             </dl>
-          ) : (<p className="ui-text-muted">Select a data artifact to inspect metadata and preview availability.</p>)}
+          ) : (<p className="ui-text-muted">Select an artifact to inspect metadata and preview availability.</p>)}
 
           {content ? (
             <dl className="ui-grid ui-grid--two">

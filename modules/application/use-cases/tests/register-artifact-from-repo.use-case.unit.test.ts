@@ -62,10 +62,17 @@ describe("RegisterArtifactFromRepoUseCase", () => {
 
     expect(result.value.artifactId).toBe("artifacts/20260417000000-import001");
     const upsertCall = (artifactBindingStorage.upsertArtifactStorageBinding as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
+    const appendCall = (artifactCatalogAppend.appendArtifactCatalogRecord as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
     expect(upsertCall).toMatchObject({
       binding: {
         artifactId: "artifacts/20260417000000-import001",
         role: "imported-source",
+      },
+    });
+    expect(appendCall).toMatchObject({
+      record: {
+        storageKey: "artifacts/20260417000000-import001",
+        artifactKind: "image",
       },
     });
     const logCalls = (log as ReturnType<typeof testDouble.fn>).mock.calls.map((call) => call[0]);
@@ -122,6 +129,12 @@ describe("RegisterArtifactFromRepoUseCase", () => {
     }
     expect(artifactIdFactory.createArtifactId).toHaveBeenCalledTimes(1);
     expect(result.value.artifactId).toBe("artifacts/20260418000000-factory001");
+    const appendCall = (artifactCatalogAppend.appendArtifactCatalogRecord as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
+    expect(appendCall).toMatchObject({
+      record: {
+        artifactKind: "data",
+      },
+    });
   });
 
   it("returns explicit register/import auth guidance when repository access is unavailable", async () => {

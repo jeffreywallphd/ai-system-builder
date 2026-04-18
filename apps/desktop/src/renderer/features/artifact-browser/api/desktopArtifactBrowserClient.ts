@@ -18,8 +18,7 @@ export interface DesktopArtifactBrowserClient {
   clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
-  browseArtifacts: (input?: { artifactKind?: "image" | "data" }) => Promise<DesktopArtifactBrowseItem[]>;
-  browseImageArtifacts?: () => Promise<DesktopArtifactBrowseItem[]>;
+  browseArtifacts: (input?: { artifactKind?: DesktopArtifactBrowseItem["artifactKind"] }) => Promise<DesktopArtifactBrowseItem[]>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: DesktopArtifactBrowserLocator) => Promise<string>;
@@ -128,10 +127,6 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
       );
     },
 
-    async browseImageArtifacts() {
-      return this.browseArtifacts({ artifactKind: "image" });
-    },
-
     async readArtifactDetail(locator) {
       return ensureSuccess(
         await desktopApi.readArtifactDetail(locator),
@@ -223,7 +218,6 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
             path: input.path,
             revision: input.revision,
           },
-          artifactKind: "image",
           mediaType: input.mediaType,
         }),
         (value) => value as DesktopRegisteredArtifactFromRepo,

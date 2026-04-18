@@ -29,7 +29,7 @@ export interface DesktopArtifactRegisterFromRepoRequestPayload {
     revision?: string;
     path: string;
   };
-  artifactKind?: "image";
+  artifactKind?: "image" | "data";
   mediaType?: string;
   boundary: DesktopArtifactRegisterFromRepoBoundaryContext;
 }
@@ -86,7 +86,7 @@ function normalizePayload(
       revision: payload.target.revision?.trim() || undefined,
       path: normalizeRequiredTextField(payload.target.path, "target.path"),
     },
-    artifactKind: payload.artifactKind ?? "image",
+    artifactKind: payload.artifactKind,
     mediaType: payload.mediaType?.trim() || undefined,
     boundary: {
       host: "desktop",
