@@ -630,7 +630,10 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
       }
     },
 
-    async listNamespaceDatasets(namespace, context: ApplicationRequestContext = {}) {
+    async listNamespaceDatasets(
+      namespace: string,
+      context: ApplicationRequestContext = {},
+    ) {
       const requestContext = resolveRequestContext(context);
 
       try {
@@ -670,7 +673,10 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
       }
     },
 
-    async listDatasetParquetFiles(input, context: ApplicationRequestContext = {}) {
+    async listDatasetParquetFiles(
+      input: { repository: string; revision?: string },
+      context: ApplicationRequestContext = {},
+    ) {
       const requestContext = resolveRequestContext(context);
       try {
         const repository = normalizeDatasetRepository(input.repository);
