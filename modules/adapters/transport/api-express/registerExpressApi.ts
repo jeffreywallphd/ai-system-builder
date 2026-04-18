@@ -24,6 +24,7 @@ export interface RegisterExpressApiDependencies {
   storeArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["storeArtifactInRepoUseCase"];
   publishArtifactToRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["publishArtifactToRepoUseCase"];
   verifyPublishedArtifactBackingUseCase: RegisterArtifactRepoApiRoutesDependencies["verifyPublishedArtifactBackingUseCase"];
+  registerArtifactFromRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["registerArtifactFromRepoUseCase"];
 }
 
 export function registerExpressApi(
@@ -48,5 +49,6 @@ export function registerExpressApi(
     storeArtifactInRepoUseCase: dependencies.storeArtifactInRepoUseCase,
     publishArtifactToRepoUseCase: dependencies.publishArtifactToRepoUseCase,
     verifyPublishedArtifactBackingUseCase: dependencies.verifyPublishedArtifactBackingUseCase,
+    registerArtifactFromRepoUseCase: dependencies.registerArtifactFromRepoUseCase,
   });
 }

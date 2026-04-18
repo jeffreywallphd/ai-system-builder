@@ -17,6 +17,9 @@ import {
   DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTER_FROM_REPO_OPERATION,
+  DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_OPERATION,
   DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
   DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
@@ -26,6 +29,7 @@ import {
   createDesktopArtifactReadRequest,
   createDesktopArtifactPublishRequest,
   createDesktopArtifactPublishVerifyRequest,
+  createDesktopArtifactRegisterFromRepoRequest,
   createDesktopImageUploadRequest,
   type DesktopArtifactBrowseRequest,
   type DesktopArtifactBrowseResponse,
@@ -39,6 +43,8 @@ import {
   type DesktopArtifactPublishResponse,
   type DesktopArtifactPublishVerifyRequest,
   type DesktopArtifactPublishVerifyResponse,
+  type DesktopArtifactRegisterFromRepoRequest,
+  type DesktopArtifactRegisterFromRepoResponse,
   type DesktopImageUploadRequest,
   type DesktopImageUploadResponse,
 } from "../../../../modules/contracts/ipc";
@@ -102,6 +108,19 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopImageUploadBridgeContext,
   ) => Promise<DesktopArtifactPublishVerifyResponse>;
+  registerArtifactFromRepo: (
+    input: {
+      target: {
+        provider: string;
+        repository: string;
+        path: string;
+        revision?: string;
+      };
+      artifactKind?: "image";
+      mediaType?: string;
+    },
+    context?: DesktopImageUploadBridgeContext,
+  ) => Promise<DesktopArtifactRegisterFromRepoResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -310,6 +329,32 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_PUBLISH_VERIFY_OPERATION,
         channel: DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact publish verify IPC response envelope.",
+      });
+    },
+
+
+    async registerArtifactFromRepo(input, context = {}) {
+      const request: DesktopArtifactRegisterFromRepoRequest = createDesktopArtifactRegisterFromRepoRequest(
+        {
+          target: input.target,
+          artifactKind: input.artifactKind ?? "image",
+          mediaType: input.mediaType,
+          boundary: {
+            host: "desktop",
+            source: artifactSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactRegisterFromRepoResponse>(response, {
+        operation: DESKTOP_ARTIFACT_REGISTER_FROM_REPO_OPERATION,
+        channel: DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop artifact register-from-repo IPC response envelope.",
       });
     },
   };

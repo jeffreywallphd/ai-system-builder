@@ -5,6 +5,7 @@ import {
   type DesktopArtifactContentDescriptor,
   type DesktopArtifactDetail,
   type DesktopPublishedBacking,
+  type DesktopRegisteredArtifactFromRepo,
 } from "../../../lib/desktopApi";
 
 export interface DesktopArtifactBrowserClient {
@@ -22,6 +23,12 @@ export interface DesktopArtifactBrowserClient {
   verifyPublishedArtifactBacking: (input: {
     artifactId: string;
   }) => Promise<DesktopPublishedBacking>;
+  registerArtifactFromRepo: (input: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<DesktopRegisteredArtifactFromRepo>;
 }
 
 function ensureSuccess<T>(
@@ -122,6 +129,23 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         }),
         (value) => value as DesktopPublishedBacking,
         "Failed to verify published artifact backing.",
+      );
+    },
+
+    async registerArtifactFromRepo(input) {
+      return ensureSuccess(
+        await desktopApi.registerArtifactFromRepo({
+          target: {
+            provider: "huggingface",
+            repository: input.repository,
+            path: input.path,
+            revision: input.revision,
+          },
+          artifactKind: "image",
+          mediaType: input.mediaType,
+        }),
+        (value) => value as DesktopRegisteredArtifactFromRepo,
+        "Failed to register artifact from repo.",
       );
     },
   };

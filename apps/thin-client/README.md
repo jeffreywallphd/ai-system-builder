@@ -46,3 +46,6 @@ From this workspace directly:
 - `npm run dev`
 - `npm run build`
 - `npm run preview`
+
+
+- artifact register/import flow that calls `POST /api/artifact/register-from-repo` using repo/path/revision input and refreshes artifact-browser selection on success

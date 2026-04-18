@@ -247,3 +247,10 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
   - `target` (`provider`, `repository`, `path`, `revision`, `locator`)
   - `verification` (`exists`, `verifiedAt`)
 - Locator fallback compatibility remains supported through centralized backing-target resolution helpers for legacy rows.
+
+
+### Repo-backing authority update (April 2026)
+
+- New publish and register-from-repo writes must populate structured `backing.target` fields (`provider`, `repository`, `path`, `revision`) on `ArtifactStorageBinding`.
+- Read and verify paths now treat structured target data as authoritative and only fall back to locator decoding for legacy bindings that predate structured targets.
+- Remote registration now writes `role = imported-source` bindings (not `published`) to preserve backing semantics.

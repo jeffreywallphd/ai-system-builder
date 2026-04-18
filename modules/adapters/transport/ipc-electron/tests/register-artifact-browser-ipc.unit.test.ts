@@ -10,12 +10,14 @@ import {
   DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   createDesktopArtifactBrowseRequest,
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactMediaViewRequest,
   createDesktopArtifactPublishRequest,
   createDesktopArtifactPublishVerifyRequest,
+  createDesktopArtifactRegisterFromRepoRequest,
   createDesktopArtifactReadRequest,
 } from "../../../../contracts/ipc";
 import {
@@ -35,6 +37,7 @@ function createUseCases() {
     artifactMediaViewRetrieval: { retrieveArtifactViewerMediaByStorageKey: testDouble.fn() },
     publishArtifactToRepoUseCase: { execute: testDouble.fn() },
     verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
+    registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
   };
 }
 
@@ -102,16 +105,34 @@ describe("registerArtifactBrowserIpc", () => {
         verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
       },
     });
+    (dependencies.registerArtifactFromRepoUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+      ok: true,
+      value: {
+        artifactId: "imports/huggingface/openai/demo/main/images/a.png",
+        backing: {
+          role: "imported-source",
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            path: "images/a.png",
+            revision: "main",
+            locator: "openai/demo/images/a.png",
+          },
+          verification: { exists: true, verifiedAt: "2026-04-17T00:00:00.000Z" },
+        },
+      },
+    });
 
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(6);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(7);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value)).toBe(true);
 
     await handlers.get(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)?.(
       {},
@@ -160,6 +181,17 @@ describe("registerArtifactBrowserIpc", () => {
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
+    await handlers.get(DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value)?.(
+      {},
+      createDesktopArtifactRegisterFromRepoRequest({
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/a.png",
+        },
+        boundary: { host: "desktop", source: "desktop.renderer" },
+      }),
+    );
 
     expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
       { artifactKind: "image" },
@@ -189,6 +221,16 @@ describe("registerArtifactBrowserIpc", () => {
     });
     expect(dependencies.verifyPublishedArtifactBackingUseCase.execute).toHaveBeenCalledWith({
       artifactId: "uploads/a.png",
+    });
+    expect(dependencies.registerArtifactFromRepoUseCase.execute).toHaveBeenCalledWith({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/a.png",
+        revision: undefined,
+      },
+      artifactKind: "image",
+      mediaType: undefined,
     });
   });
 

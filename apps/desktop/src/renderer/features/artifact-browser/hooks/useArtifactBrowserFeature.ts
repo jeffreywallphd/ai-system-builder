@@ -21,18 +21,32 @@ export interface UseArtifactBrowserFeatureResult {
   content?: DesktopArtifactContentDescriptor;
   imageViewUrl?: string;
   publishState: ArtifactBrowserViewState;
+  registerState: ArtifactBrowserViewState;
   publishedBacking?: DesktopPublishedBacking;
   publishForm: UseArtifactBrowserPublishLogicResult["publishForm"];
+  registerForm: {
+    repository: string;
+    pathInRepo: string;
+    revision: string;
+    mediaType: string;
+    showRegisterForm: boolean;
+  };
   viewState: ArtifactBrowserViewState;
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
   publishArtifactToHuggingFace: () => Promise<void>;
+  registerArtifactFromHuggingFace: () => Promise<void>;
   recheckPublishedBacking: () => Promise<void>;
   setRepository: (value: string) => void;
   setPathInRepo: (value: string) => void;
   setRevision: (value: string) => void;
   setMediaType: (value: string) => void;
   togglePublishForm: () => void;
+  setRegisterRepository: (value: string) => void;
+  setRegisterPathInRepo: (value: string) => void;
+  setRegisterRevision: (value: string) => void;
+  setRegisterMediaType: (value: string) => void;
+  toggleRegisterForm: () => void;
 }
 
 export function useArtifactBrowserFeature(
@@ -45,6 +59,12 @@ export function useArtifactBrowserFeature(
   const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [registerRepository, setRegisterRepository] = useState("");
+  const [registerPathInRepo, setRegisterPathInRepo] = useState("");
+  const [registerRevision, setRegisterRevision] = useState("main");
+  const [registerMediaType, setRegisterMediaType] = useState("");
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
 
   const publishLogic = useArtifactBrowserPublishLogic<DesktopArtifactDetail>({
     selectedStorageKey,
@@ -87,16 +107,23 @@ export function useArtifactBrowserFeature(
 
     try {
       const locator = { storageKey };
-      const [artifactDetail, contentDescriptor, nextImageViewUrl] = await Promise.all([
-        artifactClient.readArtifactDetail(locator),
-        artifactClient.readArtifactContent(locator),
-        artifactClient.createArtifactMediaViewUrl(locator),
-      ]);
+      const artifactDetail = await artifactClient.readArtifactDetail(locator);
 
       setDetail(artifactDetail);
-      setContent(contentDescriptor);
-      setImageViewUrl(nextImageViewUrl);
       publishLogic.setPublishedBackingFromDetail(artifactDetail);
+
+      try {
+        const [contentDescriptor, nextImageViewUrl] = await Promise.all([
+          artifactClient.readArtifactContent(locator),
+          artifactClient.createArtifactMediaViewUrl(locator),
+        ]);
+        setContent(contentDescriptor);
+        setImageViewUrl(nextImageViewUrl);
+      } catch {
+        setContent({ locator, availability: "unavailable", retrieval: "deferred" });
+        setImageViewUrl(undefined);
+      }
+
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
     } catch (error) {
       setDetail(undefined);
@@ -110,6 +137,30 @@ export function useArtifactBrowserFeature(
     }
   }
 
+  async function registerArtifactFromHuggingFace(): Promise<void> {
+    setRegisterState({ status: "loading", message: "Registering remote artifact..." });
+
+    try {
+      const registered = await artifactClient.registerArtifactFromRepo({
+        repository: registerRepository,
+        path: registerPathInRepo,
+        revision: registerRevision,
+        mediaType: registerMediaType || undefined,
+      });
+      await refreshArtifacts();
+      await selectArtifact(registered.artifactId);
+      setRegisterState({
+        status: "success",
+        message: `Registered ${registered.artifactId} from Hugging Face.`,
+      });
+    } catch (error) {
+      setRegisterState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to register artifact from repo.",
+      });
+    }
+  }
+
   return {
     items,
     selectedStorageKey,
@@ -117,17 +168,31 @@ export function useArtifactBrowserFeature(
     content,
     imageViewUrl,
     publishState: publishLogic.publishState,
+    registerState,
     publishedBacking: publishLogic.publishedBacking,
     publishForm: publishLogic.publishForm,
+    registerForm: {
+      repository: registerRepository,
+      pathInRepo: registerPathInRepo,
+      revision: registerRevision,
+      mediaType: registerMediaType,
+      showRegisterForm,
+    },
     viewState,
     selectArtifact,
     refreshArtifacts,
     publishArtifactToHuggingFace: publishLogic.publishArtifactToHuggingFace,
+    registerArtifactFromHuggingFace,
     recheckPublishedBacking: publishLogic.recheckPublishedBacking,
     setRepository: publishLogic.setRepository,
     setPathInRepo: publishLogic.setPathInRepo,
     setRevision: publishLogic.setRevision,
     setMediaType: publishLogic.setMediaType,
     togglePublishForm: publishLogic.togglePublishForm,
+    setRegisterRepository,
+    setRegisterPathInRepo,
+    setRegisterRevision,
+    setRegisterMediaType,
+    toggleRegisterForm: () => setShowRegisterForm((current) => !current),
   };
 }

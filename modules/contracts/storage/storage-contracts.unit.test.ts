@@ -260,6 +260,28 @@ describe("storage contracts", () => {
     });
   });
 
+  it("prefers structured repo target over locator decoding when both are present", () => {
+    const resolved = resolveArtifactRepoBackingTarget({
+      provider: "huggingface",
+      locator: "legacy-owner/legacy-repo/legacy/path.png",
+      revision: "main",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/current.png",
+        revision: "main",
+      },
+    });
+
+    expect(resolved).toEqual({
+      provider: "huggingface",
+      repository: "openai/demo",
+      path: "images/current.png",
+      revision: "main",
+      locator: "legacy-owner/legacy-repo/legacy/path.png",
+    });
+  });
+
   it("creates store failure responses with shared contract error semantics", () => {
     const error = createContractError("unavailable", "Storage backend unavailable", {
       details: {

@@ -32,6 +32,7 @@ export interface DesktopArtifactDetail {
   createdAt?: string;
   metadata?: {
     publishedBacking?: DesktopPublishedBacking;
+    importedSourceBacking?: DesktopPublishedBacking;
   };
 }
 
@@ -102,6 +103,16 @@ interface DesktopApiBridge {
   verifyPublishedArtifactBacking: (input: {
     artifactId: string;
   }) => Promise<unknown>;
+  registerArtifactFromRepo: (input: {
+    target: {
+      provider: string;
+      repository: string;
+      path: string;
+      revision?: string;
+    };
+    artifactKind?: "image";
+    mediaType?: string;
+  }) => Promise<unknown>;
 }
 
 declare global {
@@ -116,4 +127,23 @@ export function getDesktopApi(): DesktopApiBridge {
   }
 
   return window.desktopApi;
+}
+
+
+export interface DesktopRegisteredArtifactFromRepo {
+  artifactId: string;
+  backing: {
+    role: "imported-source";
+    target: {
+      provider: string;
+      repository: string;
+      path: string;
+      revision: string;
+      locator?: string;
+    };
+    verification: {
+      exists: true;
+      verifiedAt: string;
+    };
+  };
 }

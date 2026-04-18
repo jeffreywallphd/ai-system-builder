@@ -89,3 +89,7 @@
 - Server and desktop hosts expose publish workflow wiring through the shared application use case path (`PublishArtifactToRepoUseCase`), while keeping artifact-object storage flows separate and intact.
 - Publish flow writes durable `ArtifactStorageBinding` records for published artifact-repo backings.
 - Published backing metadata read paths should prefer structured backing target fields + backing verification metadata (`verification.exists`, `verification.verifiedAt`) when present and use centralized locator decode helpers only as fallback for legacy records.
+
+
+- Current artifact-browser read adapters should prefer structured repo target fields for backing metadata and use locator decode only for compatibility with legacy rows.
+- Remote registration slice now exists (`artifact.register.from-repo`): verify remote target, create internal catalog record, persist `imported-source` binding.
