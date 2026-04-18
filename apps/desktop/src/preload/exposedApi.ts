@@ -139,7 +139,10 @@ export interface DesktopPreloadApi {
   getArtifactUploadPolicy: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
-  browseArtifacts: (context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopArtifactBrowseResponse>;
+  browseArtifacts: (
+    input: { artifactKind: "image" },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopArtifactBrowseResponse>;
   readArtifactDetail: (
     locator: DesktopArtifactBrowserLocator,
     context?: DesktopArtifactUploadBridgeContext,
@@ -185,7 +188,7 @@ export interface DesktopPreloadApi {
         path: string;
         revision?: string;
       };
-      artifactKind?: "image";
+      artifactKind: "image";
       mediaType?: string;
     },
     context?: DesktopArtifactUploadBridgeContext,
@@ -375,10 +378,10 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async browseArtifacts(context = {}) {
+    async browseArtifacts(input, context = {}) {
       const request: DesktopArtifactBrowseRequest = createDesktopArtifactBrowseRequest(
         {
-          artifactKind: "image",
+          artifactKind: input.artifactKind,
           boundary: {
             host: "desktop",
             source: artifactSource,
@@ -549,7 +552,7 @@ export function createDesktopPreloadApi(
       const request: DesktopArtifactRegisterFromRepoRequest = createDesktopArtifactRegisterFromRepoRequest(
         {
           target: input.target,
-          artifactKind: input.artifactKind ?? "image",
+          artifactKind: input.artifactKind,
           mediaType: input.mediaType,
           boundary: {
             host: "desktop",

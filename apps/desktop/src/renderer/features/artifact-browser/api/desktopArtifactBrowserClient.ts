@@ -118,7 +118,7 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async browseImageArtifacts() {
       return ensureSuccess(
-        await desktopApi.browseArtifacts(),
+        await desktopApi.browseArtifacts({ artifactKind: "image" }),
         (value) => {
           const items = (value as { items?: DesktopArtifactBrowseItem[] } | undefined)?.items;
           return Array.isArray(items) ? items : [];

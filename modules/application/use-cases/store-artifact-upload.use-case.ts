@@ -1,6 +1,7 @@
 import type { StructuredLogEvent } from "../../contracts/logging";
 import { createContractError } from "../../contracts/shared";
 import { ARTIFACT_UPLOAD_OPERATION } from "../../contracts/artifact-upload";
+import type { ArtifactUploadAcceptedTypePolicy } from "../../contracts/artifact-upload";
 import { createStoreArtifactRequest } from "../../contracts/storage";
 import {
   classifyArtifactIntakeCandidate,
@@ -16,6 +17,7 @@ import type {
   StoreArtifactUploadUseCaseResult,
 } from "./store-artifact-upload.types";
 import { mapStoreArtifactUploadToRegisterStagedArtifactResult } from "./artifact-upload/mapStoreArtifactUploadToRegisterStagedArtifactResult";
+import { mapAcceptedArtifactUploadPolicyToContract } from "./artifact-upload/mapAcceptedArtifactUploadPolicyToContract";
 
 export interface StoreArtifactUploadUseCaseDependencies {
   storage: ArtifactStoragePort;
@@ -87,8 +89,8 @@ export class StoreArtifactUploadUseCase {
     this.acceptedUploadPolicy = dependencies.acceptedUploadPolicy ?? createDefaultAcceptedArtifactUploadPolicy();
   }
 
-  public getAcceptedUploadPolicy(): AcceptedArtifactUploadPolicy {
-    return this.acceptedUploadPolicy;
+  public getAcceptedUploadPolicy(): ArtifactUploadAcceptedTypePolicy {
+    return mapAcceptedArtifactUploadPolicyToContract(this.acceptedUploadPolicy);
   }
 
   public async execute(
@@ -153,7 +155,7 @@ export class StoreArtifactUploadUseCase {
             mediaType: candidate.mediaType,
             metadata: {
               originalFileName: candidate.fileName,
-              artifactKind: classification.artifactKind,
+              artifactFamily: classification.artifactFamily,
             },
           },
         }),
@@ -206,7 +208,7 @@ export class StoreArtifactUploadUseCase {
           key: storeResult.value.key,
           mediaType: storeResult.value.mediaType,
           sizeBytes: storeResult.value.sizeBytes,
-          artifactKind: classification.artifactKind,
+          artifactFamily: classification.artifactFamily,
         },
       });
 

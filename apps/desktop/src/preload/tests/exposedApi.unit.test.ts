@@ -93,10 +93,11 @@ describe("desktop preload exposedApi bridge", () => {
     });
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-    await api.browseArtifacts();
+    await api.browseArtifacts({ artifactKind: "image" });
     const mediaResponse = await api.readArtifactViewerMedia({ storageKey: "uploads/cat.png" });
 
     expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
+    expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactKind?: string } } | undefined)?.payload?.artifactKind).toBe("image");
     expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value);
     expect(mediaResponse.ok).toBe(true);
   });
@@ -207,9 +208,11 @@ it("maps register-from-repo bridge calls to artifact register-from-repo request 
       repository: "openai/demo",
       path: "images/cat.png",
     },
+    artifactKind: "image",
   });
 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value);
+  expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactKind?: string } } | undefined)?.payload?.artifactKind).toBe("image");
 });
 
 it("maps localize-from-repo bridge calls to artifact localize-from-repo request channel", async () => {

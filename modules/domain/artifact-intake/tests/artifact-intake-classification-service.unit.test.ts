@@ -6,7 +6,7 @@ import {
 } from "..";
 
 describe("artifact intake classification service", () => {
-  it("classifies accepted image uploads as raw-staged lifecycle artifacts", () => {
+  it("classifies accepted image uploads into the image intake family", () => {
     const result = classifyArtifactIntakeCandidate(
       createArtifactIntakeCandidate({
         fileName: "cat.png",
@@ -18,11 +18,11 @@ describe("artifact intake classification service", () => {
 
     expect(result).toEqual({
       accepted: true,
-      artifactKind: "raw-staged",
+      artifactFamily: "image",
     });
   });
 
-  it("keeps rejected media-type classifications in raw-staged lifecycle state", () => {
+  it("classifies rejected uploads by intake family independently from lifecycle state", () => {
     const result = classifyArtifactIntakeCandidate(
       createArtifactIntakeCandidate({
         fileName: "cat.pdf",
@@ -33,7 +33,7 @@ describe("artifact intake classification service", () => {
     );
 
     expect(result.accepted).toBe(false);
-    expect(result.artifactKind).toBe("raw-staged");
+    expect(result.artifactFamily).toBe("binary");
     expect(result.reason).toContain("Artifact type is not accepted");
   });
 });
