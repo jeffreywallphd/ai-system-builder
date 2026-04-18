@@ -516,215 +516,221 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
     }
   }
 
-  return {
-    async hasArtifactInRepo(
-      request: HasArtifactInRepoRequest,
-      context: ApplicationRequestContext = {},
-    ) {
-      const requestContext = resolveRequestContext(context);
+  const hasArtifactInRepo: ArtifactRepoStoragePort["hasArtifactInRepo"] = async (
+    request: HasArtifactInRepoRequest,
+    context: ApplicationRequestContext = {},
+  ) => {
+    const requestContext = resolveRequestContext(context);
 
-      try {
-        const resolvedTarget = resolveTarget(request.target, defaultRepoType);
-        const hubClient = await resolveHubClient();
-        const exists = await hubClient.fileExists({
-          repo: toRepoDesignation(resolvedTarget),
-          path: resolvedTarget.pathInRepo,
-          revision: resolvedTarget.revision,
-          accessToken: getAccessToken(),
-        });
+    try {
+      const resolvedTarget = resolveTarget(request.target, defaultRepoType);
+      const hubClient = await resolveHubClient();
+      const exists = await hubClient.fileExists({
+        repo: toRepoDesignation(resolvedTarget),
+        path: resolvedTarget.pathInRepo,
+        revision: resolvedTarget.revision,
+        accessToken: getAccessToken(),
+      });
 
-        return createHasArtifactInRepoSuccessResult(exists, requestContext);
-      } catch (error) {
-        return createHasArtifactInRepoFailureResult(
-          mapUnexpectedHubError("hasArtifactInRepo", error, getAccessToken()),
-          requestContext,
-        );
-      }
-    },
+      return createHasArtifactInRepoSuccessResult(exists, requestContext);
+    } catch (error) {
+      return createHasArtifactInRepoFailureResult(
+        mapUnexpectedHubError("hasArtifactInRepo", error, getAccessToken()),
+        requestContext,
+      );
+    }
+  };
 
-    async storeArtifactInRepo(
-      request: StoreArtifactInRepoRequest,
-      context: ApplicationRequestContext = {},
-    ) {
-      const requestContext = resolveRequestContext(context);
+  const storeArtifactInRepo: ArtifactRepoStoragePort["storeArtifactInRepo"] = async (
+    request: StoreArtifactInRepoRequest,
+    context: ApplicationRequestContext = {},
+  ) => {
+    const requestContext = resolveRequestContext(context);
 
-      try {
-        const resolvedTarget = resolveTarget(request.target, defaultRepoType);
-        const token = getAccessToken()?.trim();
-        if (!token) {
-          return createStoreArtifactInRepoFailureResult(
-            createAuthRequiredError("storeArtifactInRepo"),
-            requestContext,
-          );
-        }
-        const hubClient = await resolveHubClient();
-        await hubClient.uploadFile({
-          repo: toRepoDesignation(resolvedTarget),
-          file: {
-            path: resolvedTarget.pathInRepo,
-            content: request.content,
-          },
-          branch: resolvedTarget.revision,
-          commitTitle: `Store ${resolvedTarget.pathInRepo} via ai-system-builder artifact-repo adapter`,
-          accessToken: token,
-        });
-
-        return createStoreArtifactInRepoSuccessResult(
-          {
-            target: request.target,
-            mediaType: request.mediaType,
-            sizeBytes: request.content.byteLength,
-          },
-          requestContext,
-        );
-      } catch (error) {
+    try {
+      const resolvedTarget = resolveTarget(request.target, defaultRepoType);
+      const token = getAccessToken()?.trim();
+      if (!token) {
         return createStoreArtifactInRepoFailureResult(
-          mapUnexpectedHubError("storeArtifactInRepo", error, getAccessToken()),
+          createAuthRequiredError("storeArtifactInRepo"),
           requestContext,
         );
       }
-    },
-
-    async retrieveArtifactFromRepo(
-      request: RetrieveArtifactFromRepoRequest,
-      context: ApplicationRequestContext = {},
-    ) {
-      const requestContext = resolveRequestContext(context);
-
-      try {
-        const resolvedTarget = resolveTarget(request.target, defaultRepoType);
-        const hubClient = await resolveHubClient();
-        const response = await hubClient.downloadFile({
-          repo: toRepoDesignation(resolvedTarget),
+      const hubClient = await resolveHubClient();
+      await hubClient.uploadFile({
+        repo: toRepoDesignation(resolvedTarget),
+        file: {
           path: resolvedTarget.pathInRepo,
-          revision: resolvedTarget.revision,
-          accessToken: getAccessToken(),
-        });
-        if (!response.ok) {
-          return createRetrieveArtifactFromRepoFailureResult(
-            mapProviderStatusError(
-              "retrieveArtifactFromRepo",
-              response.status,
-              getAccessToken(),
-              response.statusText,
-            ),
-            requestContext,
-          );
-        }
+          content: request.content,
+        },
+        branch: resolvedTarget.revision,
+        commitTitle: `Store ${resolvedTarget.pathInRepo} via ai-system-builder artifact-repo adapter`,
+        accessToken: token,
+      });
 
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        return createRetrieveArtifactFromRepoSuccessResult(
-          {
-            target: request.target,
-            mediaType: extractMediaType(response.headers.get("content-type")),
-            sizeBytes: bytes.byteLength,
-          },
-          bytes,
-          requestContext,
-        );
-      } catch (error) {
+      return createStoreArtifactInRepoSuccessResult(
+        {
+          target: request.target,
+          mediaType: request.mediaType,
+          sizeBytes: request.content.byteLength,
+        },
+        requestContext,
+      );
+    } catch (error) {
+      return createStoreArtifactInRepoFailureResult(
+        mapUnexpectedHubError("storeArtifactInRepo", error, getAccessToken()),
+        requestContext,
+      );
+    }
+  };
+
+  const retrieveArtifactFromRepo: ArtifactRepoStoragePort["retrieveArtifactFromRepo"] = async (
+    request: RetrieveArtifactFromRepoRequest,
+    context: ApplicationRequestContext = {},
+  ) => {
+    const requestContext = resolveRequestContext(context);
+
+    try {
+      const resolvedTarget = resolveTarget(request.target, defaultRepoType);
+      const hubClient = await resolveHubClient();
+      const response = await hubClient.downloadFile({
+        repo: toRepoDesignation(resolvedTarget),
+        path: resolvedTarget.pathInRepo,
+        revision: resolvedTarget.revision,
+        accessToken: getAccessToken(),
+      });
+      if (!response.ok) {
         return createRetrieveArtifactFromRepoFailureResult(
-          mapUnexpectedHubError("retrieveArtifactFromRepo", error, getAccessToken()),
+          mapProviderStatusError(
+            "retrieveArtifactFromRepo",
+            response.status,
+            getAccessToken(),
+            response.statusText,
+          ),
           requestContext,
         );
       }
-    },
 
-    async listNamespaceDatasets(
-      namespace: string,
-      context: ApplicationRequestContext = {},
-    ) {
-      const requestContext = resolveRequestContext(context);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      return createRetrieveArtifactFromRepoSuccessResult(
+        {
+          target: request.target,
+          mediaType: extractMediaType(response.headers.get("content-type")),
+          sizeBytes: bytes.byteLength,
+        },
+        bytes,
+        requestContext,
+      );
+    } catch (error) {
+      return createRetrieveArtifactFromRepoFailureResult(
+        mapUnexpectedHubError("retrieveArtifactFromRepo", error, getAccessToken()),
+        requestContext,
+      );
+    }
+  };
 
-      try {
-        const normalizedNamespace = normalizeNamespace(namespace);
-        const payload = await fetchJsonFromHub<Array<{ id?: unknown }>>(
-          `/api/datasets?author=${encodeURIComponent(normalizedNamespace)}&limit=100`,
-          "listNamespaceDatasets",
-          requestContext,
-        );
-        if (!Array.isArray(payload)) {
-          return {
-            ok: false as const,
-            error: createContractError("internal", "Unexpected Hugging Face datasets response shape."),
-            ...requestContext,
-          };
-        }
+  const listNamespaceDatasets: HuggingFaceRepoBrowserPort["listNamespaceDatasets"] = async (
+    namespace: string,
+    context: ApplicationRequestContext = {},
+  ) => {
+    const requestContext = resolveRequestContext(context);
 
-        const datasets = payload
-          .map((entry) => (typeof entry.id === "string" ? entry.id.trim() : ""))
-          .filter((repository) => repository.length > 0 && repository.startsWith(`${normalizedNamespace}/`))
-          .map((repository) => ({ namespace: normalizedNamespace, repository }));
-
-        return {
-          ok: true as const,
-          value: {
-            namespace: normalizedNamespace,
-            datasets,
-          },
-          ...requestContext,
-        };
-      } catch (error) {
+    try {
+      const normalizedNamespace = normalizeNamespace(namespace);
+      const payload = await fetchJsonFromHub<Array<{ id?: unknown }>>(
+        `/api/datasets?author=${encodeURIComponent(normalizedNamespace)}&limit=100`,
+        "listNamespaceDatasets",
+        requestContext,
+      );
+      if (!Array.isArray(payload)) {
         return {
           ok: false as const,
-          error: mapUnexpectedHubError("listNamespaceDatasets", error, getAccessToken()),
+          error: createContractError("internal", "Unexpected Hugging Face datasets response shape."),
           ...requestContext,
         };
       }
-    },
 
-    async listDatasetParquetFiles(
-      input: { repository: string; revision?: string },
-      context: ApplicationRequestContext = {},
-    ) {
-      const requestContext = resolveRequestContext(context);
-      try {
-        const repository = normalizeDatasetRepository(input.repository);
-        const revision = input.revision?.trim() || DEFAULT_REVISION;
-        const encodedRevision = encodeURIComponent(revision);
-        const payload = await fetchJsonFromHub<Array<{ path?: unknown; type?: unknown; size?: unknown }>>(
-          `/api/datasets/${encodeURIComponent(repository)}/tree/${encodedRevision}?recursive=1`,
-          "listDatasetParquetFiles",
-          requestContext,
-        );
-        if (!Array.isArray(payload)) {
-          return {
-            ok: false as const,
-            error: createContractError("internal", "Unexpected Hugging Face dataset tree response shape."),
-            ...requestContext,
-          };
-        }
+      const datasets = payload
+        .map((entry) => (typeof entry.id === "string" ? entry.id.trim() : ""))
+        .filter((repository) => repository.length > 0 && repository.startsWith(`${normalizedNamespace}/`))
+        .map((repository) => ({ namespace: normalizedNamespace, repository }));
 
-        const files = payload
-          .filter((entry) => (entry.type === "file" || typeof entry.type !== "string"))
-          .map((entry) => ({
-            path: typeof entry.path === "string" ? entry.path.trim() : "",
-            sizeBytes: typeof entry.size === "number" ? entry.size : undefined,
-          }))
-          .filter((entry) => entry.path.toLowerCase().endsWith(".parquet"))
-          .map((entry) => ({
-            repository,
-            path: entry.path,
-            revision,
-            sizeBytes: entry.sizeBytes,
-          }));
+      return {
+        ok: true as const,
+        value: {
+          namespace: normalizedNamespace,
+          datasets,
+        },
+        ...requestContext,
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: mapUnexpectedHubError("listNamespaceDatasets", error, getAccessToken()),
+        ...requestContext,
+      };
+    }
+  };
 
-        return {
-          ok: true as const,
-          value: {
-            repository,
-            revision,
-            files,
-          },
-          ...requestContext,
-        };
-      } catch (error) {
+  const listDatasetParquetFiles: HuggingFaceRepoBrowserPort["listDatasetParquetFiles"] = async (
+    input: { repository: string; revision?: string },
+    context: ApplicationRequestContext = {},
+  ) => {
+    const requestContext = resolveRequestContext(context);
+    try {
+      const repository = normalizeDatasetRepository(input.repository);
+      const revision = input.revision?.trim() || DEFAULT_REVISION;
+      const encodedRevision = encodeURIComponent(revision);
+      const payload = await fetchJsonFromHub<Array<{ path?: unknown; type?: unknown; size?: unknown }>>(
+        `/api/datasets/${encodeURIComponent(repository)}/tree/${encodedRevision}?recursive=1`,
+        "listDatasetParquetFiles",
+        requestContext,
+      );
+      if (!Array.isArray(payload)) {
         return {
           ok: false as const,
-          error: mapUnexpectedHubError("listDatasetParquetFiles", error, getAccessToken()),
+          error: createContractError("internal", "Unexpected Hugging Face dataset tree response shape."),
           ...requestContext,
         };
       }
-    },
+
+      const files = payload
+        .filter((entry) => (entry.type === "file" || typeof entry.type !== "string"))
+        .map((entry) => ({
+          path: typeof entry.path === "string" ? entry.path.trim() : "",
+          sizeBytes: typeof entry.size === "number" ? entry.size : undefined,
+        }))
+        .filter((entry) => entry.path.toLowerCase().endsWith(".parquet"))
+        .map((entry) => ({
+          repository,
+          path: entry.path,
+          revision,
+          sizeBytes: entry.sizeBytes,
+        }));
+
+      return {
+        ok: true as const,
+        value: {
+          repository,
+          revision,
+          files,
+        },
+        ...requestContext,
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: mapUnexpectedHubError("listDatasetParquetFiles", error, getAccessToken()),
+        ...requestContext,
+      };
+    }
+  };
+
+  return {
+    hasArtifactInRepo,
+    storeArtifactInRepo,
+    retrieveArtifactFromRepo,
+    listNamespaceDatasets,
+    listDatasetParquetFiles,
   };
 }
