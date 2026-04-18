@@ -140,7 +140,7 @@ export interface DesktopPreloadApi {
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
   browseArtifacts: (
-    input: { artifactKind?: "image" | "data" },
+    input?: { artifactKind?: "image" | "data" },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactBrowseResponse>;
   readArtifactDetail: (
@@ -188,7 +188,7 @@ export interface DesktopPreloadApi {
         path: string;
         revision?: string;
       };
-      artifactKind: "image";
+      artifactKind?: "image" | "data";
       mediaType?: string;
     },
     context?: DesktopArtifactUploadBridgeContext,
@@ -378,7 +378,7 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async browseArtifacts(input, context = {}) {
+    async browseArtifacts(input = {}, context = {}) {
       const request: DesktopArtifactBrowseRequest = createDesktopArtifactBrowseRequest(
         {
           artifactKind: input.artifactKind,

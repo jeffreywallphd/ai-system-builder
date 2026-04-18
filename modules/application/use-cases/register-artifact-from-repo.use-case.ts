@@ -14,6 +14,7 @@ import {
   SystemArtifactIdFactory,
   type ArtifactIdFactory,
 } from "../../domain/artifact";
+import type { ArtifactBrowseKind } from "../../contracts/artifact-browser";
 
 export interface RegisterArtifactFromRepoCommand {
   target: {
@@ -22,7 +23,7 @@ export interface RegisterArtifactFromRepoCommand {
     path: string;
     revision?: string;
   };
-  artifactKind?: "image";
+  artifactKind?: ArtifactBrowseKind;
   mediaType?: string;
 }
 
@@ -78,6 +79,8 @@ export class RegisterArtifactFromRepoUseCase {
     const repository = command.target.repository?.trim();
     const path = command.target.path?.trim();
     const revision = command.target.revision?.trim() || "main";
+    const resolvedArtifactKind: ArtifactBrowseKind = command.artifactKind
+      ?? (command.mediaType?.trim().toLowerCase().startsWith("image/") ? "image" : "data");
     await this.logging.log({
       timestamp: this.now(),
       level: "info",
@@ -217,7 +220,7 @@ export class RegisterArtifactFromRepoUseCase {
     const appendResult = await this.artifactCatalogAppend.appendArtifactCatalogRecord({
       record: {
         storageKey: artifactId.toString(),
-        artifactKind: command.artifactKind ?? "image",
+        artifactKind: resolvedArtifactKind,
         mediaType: command.mediaType?.trim() || undefined,
         originalName: path,
         createdAt: verifiedAt,
@@ -250,7 +253,7 @@ export class RegisterArtifactFromRepoUseCase {
 
     const artifact = Artifact.create({
       id: artifactId,
-      artifactKind: command.artifactKind ?? "image",
+      artifactKind: resolvedArtifactKind,
     });
     artifact.attachOrUpdateBacking(
       ArtifactBacking.from({

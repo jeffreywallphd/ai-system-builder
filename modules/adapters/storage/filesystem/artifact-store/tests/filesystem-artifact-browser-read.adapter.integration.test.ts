@@ -25,6 +25,53 @@ async function createTempRoot(): Promise<string> {
 }
 
 describe("filesystem artifact browser read adapter", () => {
+  it("includes uploaded non-image artifacts in default browse results", async () => {
+    const rootDirectory = await createTempRoot();
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      artifactCatalogAppend: artifactCatalog,
+    });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      artifactCatalogRead: artifactCatalog,
+      storage: objectStorage,
+    });
+
+    await objectStorage.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([1, 2, 3]), {
+        descriptor: {
+          key: "uploads/session/cat.png",
+          mediaType: "image/png",
+        },
+      }),
+    );
+    await objectStorage.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([4, 5, 6]), {
+        descriptor: {
+          key: "uploads/session/train.parquet",
+          mediaType: "application/x-parquet",
+        },
+      }),
+    );
+
+    const browseResult = await browserRead.browseArtifacts({});
+    expect(browseResult.ok).toBe(true);
+    if (!browseResult.ok) {
+      throw new Error("Expected browse success.");
+    }
+
+    const imageItem = browseResult.value.items.find((item) => item.storageKey === "uploads/session/cat.png");
+    const dataItem = browseResult.value.items.find((item) => item.storageKey === "uploads/session/train.parquet");
+    expect(imageItem).toMatchObject({
+      artifactKind: "image",
+      mediaType: "image/png",
+    });
+    expect(dataItem).toMatchObject({
+      artifactKind: "data",
+      mediaType: "application/x-parquet",
+    });
+  });
+
   it("uses artifact catalog records from explicit catalog seam instead of filesystem traversal", async () => {
     const rootDirectory = await createTempRoot();
     const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });

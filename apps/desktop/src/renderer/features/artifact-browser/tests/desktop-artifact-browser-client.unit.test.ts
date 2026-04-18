@@ -156,24 +156,6 @@ describe("desktop artifact browser client", () => {
     expect(createdBlob).toBeInstanceOf(Blob);
   });
 
-  it("supports explicit image-only browsing when requested", async () => {
-    window.desktopApi = {
-      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
-      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
-      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
-      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
-      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
-      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
-      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
-    };
-
-    const client = createDesktopArtifactBrowserClient();
-    await client.browseImageArtifacts?.();
-
-    expect(window.desktopApi.browseArtifacts).toHaveBeenCalledWith({ artifactKind: "image" });
-  });
-
   it("publishes artifact backing through preload publish bridge", async () => {
     window.desktopApi = {
       uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
@@ -271,6 +253,54 @@ describe("desktop artifact browser client", () => {
       artifactId: "uploads/cat.png",
     });
     expect(result.verification.exists).toBe(false);
+  });
+
+  it("registers repo artifacts without forcing image artifactKind in the generic path", async () => {
+    window.desktopApi = {
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
+      registerArtifactFromRepo: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-import001",
+          backing: {
+            role: "imported-source",
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "data/train.parquet",
+              revision: "main",
+              locator: "openai/demo/data/train.parquet",
+            },
+            verification: { exists: true, verifiedAt: "2026-04-18T00:00:00.000Z" },
+          },
+        },
+      }),
+      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+    };
+
+    const client = createDesktopArtifactBrowserClient();
+    await client.registerArtifactFromRepo({
+      repository: "openai/demo",
+      path: "data/train.parquet",
+      revision: "main",
+      mediaType: "application/x-parquet",
+    });
+
+    expect(window.desktopApi.registerArtifactFromRepo).toHaveBeenCalledWith({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "data/train.parquet",
+        revision: "main",
+      },
+      mediaType: "application/x-parquet",
+    });
   });
 
   it("localizes imported artifact bytes through preload localize bridge", async () => {

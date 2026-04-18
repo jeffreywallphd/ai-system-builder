@@ -4,13 +4,13 @@ import { ArtifactId } from "./ArtifactId";
 
 export interface ArtifactProps {
   id: ArtifactId;
-  artifactKind: "image";
+  artifactKind: "image" | "data";
   backings?: ArtifactBacking[];
 }
 
 export class Artifact {
   public readonly id: ArtifactId;
-  public readonly artifactKind: "image";
+  public readonly artifactKind: "image" | "data";
   private readonly backings: ArtifactBacking[];
 
   private constructor(props: ArtifactProps) {
@@ -35,12 +35,12 @@ export class Artifact {
 
   public static fromStorageBindings(input: {
     artifactId: string;
-    artifactKind?: "image";
+    artifactKind?: "image" | "data";
     bindings: ArtifactStorageBinding[];
   }): Artifact {
     return Artifact.create({
       id: ArtifactId.from(input.artifactId),
-      artifactKind: input.artifactKind ?? "image",
+      artifactKind: input.artifactKind ?? "data",
       backings: input.bindings.map((binding) => ArtifactBacking.fromStorageBinding(binding)),
     });
   }

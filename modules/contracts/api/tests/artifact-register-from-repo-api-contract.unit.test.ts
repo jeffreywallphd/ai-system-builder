@@ -25,7 +25,7 @@ describe("artifact register-from-repo api contract", () => {
         path: "images/cat.png",
         revision: "main",
       },
-      artifactKind: "image",
+      artifactKind: undefined,
       mediaType: undefined,
       source: "thin-client.artifact-browser",
     });

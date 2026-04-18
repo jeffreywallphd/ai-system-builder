@@ -322,11 +322,12 @@ export function createFilesystemArtifactObjectStorageAdapter(
           );
         }
 
-        if (isImageMediaType(request.descriptor.mediaType) && options.artifactCatalogAppend) {
+        if (options.artifactCatalogAppend) {
+          const artifactKind = isImageMediaType(request.descriptor.mediaType) ? "image" : "data";
           const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
             record: {
               storageKey: key,
-              artifactKind: "image",
+              artifactKind,
               mediaType: request.descriptor.mediaType,
               sizeBytes: bytes.byteLength,
               sourceKind: "upload",

@@ -232,6 +232,59 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     expect(container.textContent).not.toContain("Register from Hugging Face");
   });
 
+  it("lists non-image artifacts and only renders image preview for image media types", async () => {
+    const client = {
+      browseArtifacts: vi.fn().mockResolvedValue([
+        { storageKey: "uploads/cat.png", artifactKind: "image" as const, mediaType: "image/png" },
+        { storageKey: "uploads/train.parquet", artifactKind: "data" as const, mediaType: "application/x-parquet" },
+      ]),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/train.parquet" },
+        artifactKind: "data" as const,
+        mediaType: "application/x-parquet",
+        sourceKind: "upload",
+      }),
+      readArtifactContent: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/train.parquet" },
+        mediaType: "application/x-parquet",
+        availability: "available" as const,
+        retrieval: "deferred" as const,
+      }),
+      createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn(),
+      clearHuggingFaceToken: vi.fn(),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    expect(container.textContent).toContain("uploads/train.parquet");
+    const parquetButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("uploads/train.parquet")) as HTMLButtonElement;
+
+    await act(async () => {
+      parquetButton.click();
+    });
+
+    expect(client.createArtifactMediaViewUrl).not.toHaveBeenCalled();
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.textContent).toContain("application/x-parquet");
+    expect(container.textContent).toContain("data");
+    expect(container.textContent).toContain("upload");
+  });
+
 
   it("re-checks published backing existence from the artifact detail panel", async () => {
     const client = {

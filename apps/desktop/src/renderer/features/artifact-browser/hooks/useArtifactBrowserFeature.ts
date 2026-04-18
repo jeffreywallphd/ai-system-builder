@@ -145,18 +145,18 @@ export function useArtifactBrowserFeature(
   });
 
   const refreshArtifacts = useCallback(async () => {
-    setViewState({ status: "loading", message: "Loading data artifacts..." });
+    setViewState({ status: "loading", message: "Loading artifacts..." });
     try {
       const browseItems = await artifactClient.browseArtifacts();
       setItems(browseItems);
       setViewState({
         status: "success",
-        message: browseItems.length > 0 ? "Loaded data artifacts." : "No data artifacts found yet.",
+        message: browseItems.length > 0 ? "Loaded artifacts." : "No artifacts found yet.",
       });
     } catch (error) {
       setViewState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to load data artifacts.",
+        message: error instanceof Error ? error.message : "Failed to load artifacts.",
       });
     }
   }, [artifactClient]);
