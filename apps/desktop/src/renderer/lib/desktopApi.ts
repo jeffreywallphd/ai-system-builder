@@ -1,4 +1,4 @@
-export interface DesktopImageUploadInput {
+export interface DesktopArtifactUploadInput {
   fileName: string;
   mediaType: string;
   bytes: Uint8Array;
@@ -91,7 +91,7 @@ export interface DesktopLocalizedArtifactFromRepo {
   localizedAt: string;
 }
 
-export type DesktopImageUploadResult =
+export type DesktopArtifactUploadResult =
   | {
       ok: true;
       value: {
@@ -106,8 +106,14 @@ export type DesktopImageUploadResult =
       };
     };
 
-export interface DesktopImageUploadApi {
-  uploadImage: (input: DesktopImageUploadInput) => Promise<DesktopImageUploadResult>;
+export interface DesktopArtifactUploadAcceptedTypePolicy {
+  acceptedMediaTypes: readonly string[];
+  acceptedExtensions: readonly string[];
+}
+
+export interface DesktopArtifactUploadApi {
+  uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<DesktopArtifactUploadResult>;
+  getArtifactUploadPolicy: () => Promise<DesktopArtifactUploadAcceptedTypePolicy>;
 }
 
 interface DesktopApiBridge {
@@ -116,7 +122,8 @@ interface DesktopApiBridge {
   clearHuggingFaceToken: () => Promise<unknown>;
   browseHuggingFaceNamespaceDatasets: (input: { namespace: string }) => Promise<unknown>;
   browseHuggingFaceDatasetParquetFiles: (input: { repository: string; revision?: string }) => Promise<unknown>;
-  uploadImage: (input: DesktopImageUploadInput) => Promise<unknown>;
+  uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<unknown>;
+  getArtifactUploadPolicy: () => Promise<unknown>;
   browseArtifacts: () => Promise<unknown>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;

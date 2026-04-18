@@ -7,7 +7,7 @@
 
 ## Context
 
-The current implementation has a working image-upload vertical slice, but the platform direction is broader than image/file upload alone.
+The current implementation has a working artifact-upload vertical slice, but the platform direction is broader than image/file upload alone.
 
 Inbound content spans multiple intake shapes:
 
@@ -37,7 +37,7 @@ Adopt ingestion/staged-artifact as the canonical higher-level semantic model for
 - Storage remains a generic architecture category with specialized storage families (artifact-object and artifact-repo) over a shared storage foundation; ingestion contracts define higher-level staged artifact semantics above those families.
 - Inbound staged artifacts may originate from artifact-object storage (key/blob/object) or from artifact-repo storage (provider/repository/revision/path).
 - Import from repo-backed providers should normalize into canonical internal staged artifact semantics and descriptor vocabulary.
-- Existing image upload remains a specialized intake path and is aligned to the staged artifact model.
+- Existing artifact upload remains a specialized intake path and is aligned to the staged artifact model.
 - Canonical metadata vocabulary for intake outcomes is ingestion-centric (source kind + staged artifact descriptor), not image-only.
 - Early viewer direction is staged artifact inspection (an early data-lake-like surface), not a generic file browser.
 - The first end-to-end read-side vertical slice is image-backed artifact browsing and viewing:
@@ -80,5 +80,5 @@ The image-backed artifact browser/viewer direction should be read as early stage
 ### Follow-up
 
 - Keep ingestion contracts intentionally small and transport/storage neutral.
-- Align specialized intake contracts/results (starting with image upload) to staged artifact descriptor semantics.
+- Align specialized intake contracts/results (starting with artifact upload) to staged artifact descriptor semantics.
 - Update context packs and architecture docs only where stable semantic guidance changed.

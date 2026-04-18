@@ -6,8 +6,8 @@ responses.
 
 Current implemented flow:
 
-- `image.upload` request channel registration
-- request payload/context delegation into `StoreImageUploadUseCase`
+- `artifact.upload` request channel registration
+- request payload/context delegation into `StoreArtifactUploadUseCase`
 - structured IPC success/failure response mapping on the response channel
 
 Current test coverage for this slice:

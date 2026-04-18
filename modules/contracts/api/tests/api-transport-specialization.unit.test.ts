@@ -1,7 +1,7 @@
 import { describe, expect, it } from "../../../testing/node-test";
 
 import {
-  API_IMAGE_UPLOAD_OPERATION,
+  API_ARTIFACT_UPLOAD_OPERATION,
   createApiError,
   createApiFailureResponse,
   createApiRequest,
@@ -15,12 +15,12 @@ import {
   createTransportSuccessResponse,
   type TransportResponse,
 } from "../../transport";
-import { IMAGE_UPLOAD_OPERATION } from "../../image-upload";
+import { ARTIFACT_UPLOAD_OPERATION } from "../../artifact-upload";
 
 describe("api transport specialization contracts", () => {
 
-  it("reuses shared image-upload operation identity from canonical transport contract family", () => {
-    expect(API_IMAGE_UPLOAD_OPERATION).toBe(IMAGE_UPLOAD_OPERATION);
+  it("reuses shared artifact-upload operation identity from canonical transport contract family", () => {
+    expect(API_ARTIFACT_UPLOAD_OPERATION).toBe(ARTIFACT_UPLOAD_OPERATION);
   });
   it("creates an api request compatible with the transport request envelope", () => {
     const apiRequest = createApiRequest(

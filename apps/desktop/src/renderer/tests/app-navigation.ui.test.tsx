@@ -28,7 +28,7 @@ describe("desktop renderer page composition", () => {
     mountedContainer = container;
 
     window.desktopApi = {
-      uploadImage: vi.fn().mockRejectedValue(new Error("unused")),
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
       readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
@@ -54,7 +54,7 @@ describe("desktop renderer page composition", () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Image upload");
+    expect(container.textContent).toContain("Artifact upload");
     expect(container.textContent).toContain("Data Artifact Browser");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(

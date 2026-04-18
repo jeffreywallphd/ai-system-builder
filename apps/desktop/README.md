@@ -20,9 +20,9 @@ The preload layer exposes a narrow desktop API at `window.desktopApi` for UI-to-
 
 Current methods:
 
-- `uploadImage(input, context?)`
-  - maps UI-provided upload payload into the `image.upload` IPC request envelope
-  - invokes only `ipc.image.upload.request`
+- `uploadArtifact(input, context?)`
+  - maps UI-provided upload payload into the `artifact.upload` IPC request envelope
+  - invokes only `ipc.artifact.upload.request`
   - returns the structured IPC upload response envelope
 - `browseArtifacts(context?)`
 - `readArtifactDetail(locator, context?)`

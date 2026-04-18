@@ -1,5 +1,5 @@
-export * from "./store-image-upload.types";
-export * from "./store-image-upload.use-case";
+export * from "./store-artifact-upload.types";
+export * from "./store-artifact-upload.use-case";
 export * from "./artifact-browser-read.types";
 export * from "./artifact-browser-read.use-case-ports";
 export * from "./browse-artifacts.use-case";

@@ -1,7 +1,7 @@
 import {
-  registerImageUploadApiRoute,
-  type RegisterImageUploadApiRouteDependencies,
-} from "./image-upload/registerImageUploadApiRoute";
+  registerArtifactUploadApiRoute,
+  type RegisterArtifactUploadApiRouteDependencies,
+} from "./artifact-upload/registerArtifactUploadApiRoute";
 import {
   registerArtifactBrowserApiRoutes,
   type RegisterArtifactBrowserApiRoutesDependencies,
@@ -12,13 +12,13 @@ import {
 } from "./artifact-repo/registerArtifactRepoApiRoutes";
 
 export interface RegisterExpressApiDependencies {
-  app: RegisterImageUploadApiRouteDependencies["app"]
+  app: RegisterArtifactUploadApiRouteDependencies["app"]
     & RegisterArtifactBrowserApiRoutesDependencies["app"]
     & RegisterArtifactRepoApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
-  storeImageUploadUseCase: RegisterImageUploadApiRouteDependencies["storeImageUploadUseCase"];
+  storeArtifactUploadUseCase: RegisterArtifactUploadApiRouteDependencies["storeArtifactUploadUseCase"];
   browseArtifactsUseCase: RegisterArtifactBrowserApiRoutesDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactContentUseCase"];
@@ -37,9 +37,9 @@ export interface RegisterExpressApiDependencies {
 export function registerExpressApi(
   dependencies: RegisterExpressApiDependencies,
 ): void {
-  registerImageUploadApiRoute({
+  registerArtifactUploadApiRoute({
     app: dependencies.app,
-    storeImageUploadUseCase: dependencies.storeImageUploadUseCase,
+    storeArtifactUploadUseCase: dependencies.storeArtifactUploadUseCase,
   });
 
   registerArtifactBrowserApiRoutes({

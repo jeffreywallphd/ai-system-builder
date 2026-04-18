@@ -34,8 +34,8 @@ describe("composeServerHost", () => {
       verbosity: "normal",
       event: "upload.started",
       message: "Upload started",
-      component: "store-image-upload-use-case",
-      useCase: "store-image-upload",
+      component: "store-artifact-upload-use-case",
+      useCase: "store-artifact-upload",
     };
 
     await host.loggingPort.log(event);
@@ -45,8 +45,8 @@ describe("composeServerHost", () => {
     expect(emittedEvent).toMatchObject({
       event: "upload.started",
       host: "server",
-      component: "store-image-upload-use-case",
-      useCase: "store-image-upload",
+      component: "store-artifact-upload-use-case",
+      useCase: "store-artifact-upload",
     });
   });
 
@@ -107,7 +107,7 @@ describe("composeServerHost", () => {
     expect(uploadCall.accessToken).toBe("hf_token_updated");
   });
 
-  it("registers server image upload routes using a provided app port without creating express", () => {
+  it("registers server artifact upload routes using a provided app port without creating express", () => {
     const app = {
       post: testDouble.fn(),
       get: testDouble.fn(),
@@ -117,14 +117,14 @@ describe("composeServerHost", () => {
 
     host.registerApi({
       app,
-      storageRootDirectory: "/tmp/server-image-upload-test",
+      storageRootDirectory: "/tmp/server-artifact-upload-test",
     });
 
     expect(app.post).toHaveBeenCalledTimes(14);
-    expect(app.get).toHaveBeenCalledTimes(2);
+    expect(app.get).toHaveBeenCalledTimes(3);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
-      "/api/image/upload",
+      "/api/artifact/upload",
       "/api/artifact/browse",
       "/api/artifact/read",
       "/api/artifact/content/read",
@@ -140,7 +140,7 @@ describe("composeServerHost", () => {
       "/api/artifact/localize-from-repo",
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
-    expect(registeredGetPaths).toEqual(["/api/artifact/media/view", "/api/config/huggingface-token"]);
+    expect(registeredGetPaths).toEqual(["/api/artifact/upload/policy", "/api/artifact/media/view", "/api/config/huggingface-token"]);
   });
 
   it("wires Hugging Face browse use-cases to the dedicated Hugging Face adapter seam", () => {

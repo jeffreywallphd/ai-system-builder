@@ -13,5 +13,5 @@ How this differs from storage contracts:
 - ingestion is above storage mechanics and may be satisfied by storage adapters
 
 Image upload note:
-- image upload is one specialized intake path that registers staged artifact semantics
+- artifact upload is one specialized intake path that registers staged artifact semantics
 - it is not the canonical definition of the ingestion model

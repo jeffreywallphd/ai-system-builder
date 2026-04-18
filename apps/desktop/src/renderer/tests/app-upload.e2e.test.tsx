@@ -12,12 +12,12 @@ import {
   registerElectronIpc,
 } from "../../../../../modules/adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../../../modules/adapters/transport/ipc-electron/ipcMainHandlePort";
-import { StoreImageUploadUseCase } from "../../../../../modules/application/use-cases";
+import { StoreArtifactUploadUseCase } from "../../../../../modules/application/use-cases";
 import { createLoggingConfig } from "../../../../../modules/contracts/config";
 import {
-  DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
-  type DesktopImageUploadRequest,
-  type DesktopImageUploadResponse,
+  DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
+  type DesktopArtifactUploadRequest,
+  type DesktopArtifactUploadResponse,
 } from "../../../../../modules/contracts/ipc";
 
 import { createDesktopPreloadApi } from "../../preload/exposedApi";
@@ -50,7 +50,7 @@ function setInputFiles(input: HTMLInputElement, files: File[]): void {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-describe("desktop image upload end-to-end", () => {
+describe("desktop artifact upload end-to-end", () => {
   it("uploads from renderer UI through preload and IPC into real filesystem storage with structured success", async () => {
     const rootDirectory = await createTempRoot();
     const logEvents: string[] = [];
@@ -69,7 +69,7 @@ describe("desktop image upload end-to-end", () => {
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
-    const useCase = new StoreImageUploadUseCase({
+    const useCase = new StoreArtifactUploadUseCase({
       storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,
         logging: logger,
@@ -81,12 +81,12 @@ describe("desktop image upload end-to-end", () => {
     });
 
     let uploadHandler:
-      | ((event: unknown, request: DesktopImageUploadRequest) => Promise<DesktopImageUploadResponse>)
+      | ((event: unknown, request: DesktopArtifactUploadRequest) => Promise<DesktopArtifactUploadResponse>)
       | undefined;
 
     const ipcMain: IpcMainHandlePort = {
       handle(channel: string, listener) {
-        if (channel === DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value) {
+        if (channel === DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value) {
           uploadHandler = listener;
         }
       },
@@ -102,7 +102,7 @@ describe("desktop image upload end-to-end", () => {
 
     registerElectronIpc({
       ipcMain,
-      storeImageUploadUseCase: useCase,
+      storeArtifactUploadUseCase: useCase,
       browseArtifactsUseCase: {
         execute: async () => unavailableResult,
       },
@@ -135,11 +135,11 @@ describe("desktop image upload end-to-end", () => {
     const preloadApi = createDesktopPreloadApi({
       ipcRenderer: {
         invoke: async (channel, request) => {
-          if (channel !== DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value || !uploadHandler) {
+          if (channel !== DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value || !uploadHandler) {
             throw new Error("Desktop upload IPC handler was not registered.");
           }
 
-          return uploadHandler({}, request as DesktopImageUploadRequest);
+          return uploadHandler({}, request as DesktopArtifactUploadRequest);
         },
       },
     });
@@ -189,8 +189,8 @@ describe("desktop image upload end-to-end", () => {
       const writtenBytes = await readFile(path.join(rootDirectory, "uploads", "20260414120000000-e2e.png"));
       expect(new Uint8Array(writtenBytes)).toEqual(bytes);
 
-      expect(logEvents).toContain("application.image-upload.store.started");
-      expect(logEvents).toContain("application.image-upload.store.succeeded");
+      expect(logEvents).toContain("application.artifact-upload.store.started");
+      expect(logEvents).toContain("application.artifact-upload.store.succeeded");
       expect(logEvents).toContain("storage.filesystem.store.started");
       expect(logEvents).toContain("storage.filesystem.store.succeeded");
     } finally {
