@@ -477,7 +477,7 @@ describe("ArtifactBrowserFeature", () => {
     expect(container.textContent).toContain("Registered imports/huggingface/openai/demo/main/images/cat.png from Hugging Face.");
   });
 
-  it("registers from dataset parquet list without relying on async form state updates", async () => {
+  it("renders dataset cards with per-card file viewer and register actions", async () => {
     const client = {
       browseImageArtifacts: vi.fn()
         .mockResolvedValueOnce([])
@@ -546,10 +546,17 @@ describe("ArtifactBrowserFeature", () => {
     });
 
     const datasetButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "openai/demo") as HTMLButtonElement;
+      .find((button) => button.textContent === "View Files") as HTMLButtonElement;
     await act(async () => {
       datasetButton.click();
     });
+
+    expect(client.browseHuggingFaceDatasetParquetFiles).toHaveBeenCalledWith({
+      repository: "openai/demo",
+      revision: "main",
+    });
+    expect(container.textContent).toContain("Dataset files");
+    expect(container.textContent).toContain("data/train.parquet");
 
     const registerFileButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Register") as HTMLButtonElement;
@@ -563,6 +570,66 @@ describe("ArtifactBrowserFeature", () => {
       revision: "main",
       mediaType: undefined,
     });
+
+    const closeButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Close") as HTMLButtonElement;
+    await act(async () => {
+      closeButton.click();
+    });
+
+    expect(container.textContent).not.toContain("Dataset files");
+  });
+
+  it("renders per-card dataset file errors", async () => {
+    const client = {
+      browseImageArtifacts: vi.fn().mockResolvedValue([]),
+      readArtifactDetail: vi.fn(),
+      readArtifactContent: vi.fn(),
+      createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      browseHuggingFaceNamespaceDatasets: vi.fn().mockResolvedValue([
+        { namespace: "openai", repository: "openai/demo" },
+      ]),
+      browseHuggingFaceDatasetParquetFiles: vi.fn().mockRejectedValue(new Error("Failed to load dataset files.")),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const registerToggle = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Register from Hugging Face") as HTMLButtonElement;
+    await act(async () => {
+      registerToggle.click();
+    });
+
+    const namespaceInput = Array.from(container.querySelectorAll("input"))[1] as HTMLInputElement;
+    setInputValue(namespaceInput, "openai");
+    const registerNamespaceButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Register namespace") as HTMLButtonElement;
+    await act(async () => {
+      registerNamespaceButton.click();
+    });
+
+    const datasetButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "View Files") as HTMLButtonElement;
+    await act(async () => {
+      datasetButton.click();
+    });
+
+    expect(container.textContent).toContain("Failed to load dataset files.");
   });
 
   it("localizes imported artifact bytes from the artifact panel", async () => {
