@@ -40,7 +40,7 @@ export class Artifact {
   }): Artifact {
     return Artifact.create({
       id: ArtifactId.from(input.artifactId),
-      artifactKind: input.artifactKind ?? "data",
+      artifactKind: input.artifactKind ?? "artifact",
       backings: input.bindings.map((binding) => ArtifactBacking.fromStorageBinding(binding)),
     });
   }

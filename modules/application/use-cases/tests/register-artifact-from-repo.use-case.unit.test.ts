@@ -132,7 +132,54 @@ describe("RegisterArtifactFromRepoUseCase", () => {
     const appendCall = (artifactCatalogAppend.appendArtifactCatalogRecord as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
     expect(appendCall).toMatchObject({
       record: {
-        artifactKind: "data",
+        artifactKind: "artifact",
+      },
+    });
+  });
+
+  it("derives catalog artifactKind from media type family when artifactKind is omitted", async () => {
+    const logging: LoggingPort = { log: testDouble.fn() };
+    const artifactRepoStorage: ArtifactRepoStoragePort = {
+      hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
+      storeArtifactInRepo: testDouble.fn(),
+      retrieveArtifactFromRepo: testDouble.fn(),
+    } as unknown as ArtifactRepoStoragePort;
+    const artifactBindingStorage: ArtifactStorageBindingPort = {
+      readArtifactStorageBindings: testDouble.fn(),
+      upsertArtifactStorageBinding: testDouble.fn(async (request) => ({
+        ok: true,
+        value: { binding: request.binding },
+      })),
+    } as unknown as ArtifactStorageBindingPort;
+    const artifactCatalogAppend: ArtifactCatalogAppendPort = {
+      appendArtifactCatalogRecord: testDouble.fn(async (request) => ({
+        ok: true,
+        value: { storageKey: request.record.storageKey },
+      })),
+    };
+
+    const useCase = new RegisterArtifactFromRepoUseCase({
+      artifactRepoStorage,
+      artifactBindingStorage,
+      artifactCatalogAppend,
+      logging,
+      createArtifactId: () => ArtifactId.from("artifacts/20260418000000-factory002"),
+    });
+
+    const result = await useCase.execute({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "data/train.parquet",
+      },
+      mediaType: "application/x-parquet",
+    });
+
+    expect(result.ok).toBe(true);
+    const appendCall = (artifactCatalogAppend.appendArtifactCatalogRecord as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
+    expect(appendCall).toMatchObject({
+      record: {
+        artifactKind: "application",
       },
     });
   });

@@ -88,8 +88,14 @@ function inferMediaTypeFromStorageKey(storageKey: string): string | undefined {
   }
 }
 
-function deriveArtifactKind(mediaType: string | undefined): string {
-  return mediaType?.startsWith("image/") ? "image" : "data";
+function toCatalogArtifactKind(mediaType: string | undefined): string {
+  const normalizedMediaType = mediaType?.trim().toLowerCase();
+  if (!normalizedMediaType) {
+    return "artifact";
+  }
+
+  const [family] = normalizedMediaType.split("/", 1);
+  return family && family.length > 0 ? family : "artifact";
 }
 
 async function listRelativeFilesRecursively(rootDirectory: string): Promise<string[]> {
@@ -486,7 +492,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
       const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
         record: {
           storageKey,
-          artifactKind: deriveArtifactKind(mediaType),
+          artifactKind: toCatalogArtifactKind(mediaType),
           mediaType,
           sizeBytes: fileStats.size,
           sourceKind: "upload",

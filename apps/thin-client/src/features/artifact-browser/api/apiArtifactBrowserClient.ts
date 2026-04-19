@@ -4,7 +4,7 @@ export interface ArtifactBrowserLocator {
 
 export interface ThinClientArtifactBrowseItem {
   storageKey: string;
-  artifactKind: "image" | "data";
+  artifactKind: string;
   mediaType?: string;
   sizeBytes?: number;
   originalName?: string;
@@ -22,7 +22,7 @@ export interface ThinClientArtifactBrowseItem {
 
 export interface ThinClientArtifactDetail {
   locator: ArtifactBrowserLocator;
-  artifactKind: "image" | "data";
+  artifactKind: string;
   mediaType?: string;
   sizeBytes?: number;
   sourceKind?: string;
@@ -109,8 +109,7 @@ export interface ArtifactBrowserApiClient {
   clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
-  browseArtifacts: (input?: { artifactKind?: "image" | "data" }) => Promise<ThinClientArtifactBrowseItem[]>;
-  browseImageArtifacts?: () => Promise<ThinClientArtifactBrowseItem[]>;
+  browseArtifacts: (input?: { artifactKind?: string }) => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator) => string;
@@ -257,10 +256,6 @@ export function createApiArtifactBrowserClient(
         const items = (value as { items?: ThinClientArtifactBrowseItem[] } | undefined)?.items;
         return Array.isArray(items) ? items : [];
       });
-    },
-
-    async browseImageArtifacts(): Promise<ThinClientArtifactBrowseItem[]> {
-      return this.browseArtifacts({ artifactKind: "image" });
     },
 
     async readArtifactDetail(locator: ArtifactBrowserLocator): Promise<ThinClientArtifactDetail> {

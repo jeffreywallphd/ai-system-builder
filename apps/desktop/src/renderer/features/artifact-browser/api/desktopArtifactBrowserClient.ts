@@ -19,7 +19,7 @@ export interface DesktopArtifactBrowserClient {
   clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
-  browseArtifacts: (input?: { artifactKind?: DesktopArtifactBrowseItem["artifactKind"] }) => Promise<DesktopArtifactBrowseItem[]>;
+  browseArtifacts: (input?: { artifactKind?: string }) => Promise<DesktopArtifactBrowseItem[]>;
   browseUnregisteredArtifacts?: () => Promise<DesktopUnregisteredArtifactBrowseItem[]>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;
   deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;

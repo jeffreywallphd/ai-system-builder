@@ -205,6 +205,18 @@ describe("desktop artifact-browser ipc contract", () => {
     expect("path" in contentRequest.payload.locator).toBe(false);
   });
 
+  it("accepts generic artifactKind filters without narrowing to image/data", () => {
+    const browseRequest = createDesktopArtifactBrowseRequest({
+      artifactKind: "application",
+      boundary: {
+        host: "desktop",
+        source: "desktop.renderer.artifact-browse",
+      },
+    });
+
+    expect(browseRequest.payload.artifactKind).toBe("application");
+  });
+
   it("defines a publish contract that mirrors the shared publish operation semantics", () => {
     const request = createDesktopArtifactPublishRequest({
       artifactId: " uploads/cat.png ",
