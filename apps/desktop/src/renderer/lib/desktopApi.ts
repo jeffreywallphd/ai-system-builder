@@ -119,9 +119,61 @@ export interface DesktopArtifactUploadAcceptedTypePolicy {
   acceptedExtensions: readonly string[];
 }
 
+export interface DesktopWebsiteIngestionTarget {
+  url: string;
+  label?: string;
+}
+
+export interface DesktopWebsiteIngestionStagedArtifact {
+  sourceKind: string;
+  originalName?: string;
+  storage: {
+    key: string;
+    mediaType?: string;
+    sizeBytes?: number;
+  };
+  metadata?: {
+    requestedMode?: "automatic" | "rendered";
+    acquisitionMechanismUsed?: "simple-http" | "rendered-browser";
+  };
+}
+
+export interface DesktopWebsitePageIngestionResult {
+  target: DesktopWebsiteIngestionTarget;
+  resolvedUrl: string;
+  acquisitionMechanismUsed: "simple-http" | "rendered-browser";
+  stagedArtifact?: DesktopWebsiteIngestionStagedArtifact;
+  warnings?: string[];
+}
+
+export interface DesktopWebsitePagesBatchSummary {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+}
+
+export interface DesktopWebsitePagesBatchItem {
+  target: DesktopWebsiteIngestionTarget;
+  ok: boolean;
+  result?: DesktopWebsitePageIngestionResult;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
 export interface DesktopArtifactUploadApi {
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<DesktopArtifactUploadResult>;
   getArtifactUploadPolicy: () => Promise<DesktopArtifactUploadAcceptedTypePolicy>;
+  ingestWebsitePage: (input: {
+    url: string;
+    label?: string;
+    mode?: "automatic" | "rendered";
+  }) => Promise<unknown>;
+  ingestWebsitePagesBatch: (input: {
+    targets: DesktopWebsiteIngestionTarget[];
+    mode?: "automatic" | "rendered";
+  }) => Promise<unknown>;
 }
 
 interface DesktopApiBridge {
@@ -132,6 +184,15 @@ interface DesktopApiBridge {
   browseHuggingFaceDatasetParquetFiles: (input: { repository: string; revision?: string }) => Promise<unknown>;
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<unknown>;
   getArtifactUploadPolicy: () => Promise<unknown>;
+  ingestWebsitePage?: (input: {
+    url: string;
+    label?: string;
+    mode?: "automatic" | "rendered";
+  }) => Promise<unknown>;
+  ingestWebsitePagesBatch?: (input: {
+    targets: DesktopWebsiteIngestionTarget[];
+    mode?: "automatic" | "rendered";
+  }) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;

@@ -92,3 +92,72 @@ describe("desktop artifact upload client", () => {
     });
   });
 });
+
+it("maps website single-page ingestion via preload bridge", async () => {
+  const ingestWebsitePage = vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      result: {
+        target: { url: "https://example.com" },
+        resolvedUrl: "https://example.com",
+        acquisitionMechanismUsed: "simple-http",
+      },
+    },
+  });
+
+  window.desktopApi = {
+    uploadArtifact: async () => ({ ok: true, value: { descriptor: { storage: { key: "uploads/a", mediaType: "text/plain", sizeBytes: 1 } } } }),
+    getArtifactUploadPolicy: async () => ({ ok: true, value: { policy: { acceptedExtensions: [".txt"], acceptedMediaTypes: ["text/plain"] } } }),
+    browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+    readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a" }, artifactFamily: "document" } } }),
+    readArtifactContentDescriptor: async () => ({ ok: true, value: { content: { locator: { storageKey: "uploads/a" }, availability: "available", retrieval: "deferred" } } }),
+    readArtifactViewerMedia: async () => ({ ok: true, value: { storageKey: "uploads/a", bytes: new Uint8Array([1]) } }),
+    publishArtifactToRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+    verifyPublishedArtifactBacking: async () => ({ ok: false, error: { message: "n/a" } }),
+    registerArtifactFromRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+    localizeArtifactFromRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+    ingestWebsitePage,
+    ingestWebsitePagesBatch: async () => ({ ok: false, error: { message: "n/a" } }),
+  };
+
+  const client = createDesktopArtifactUploadClient();
+  const response = await client.ingestWebsitePage({ url: "https://example.com" });
+
+  expect(ingestWebsitePage).toHaveBeenCalledWith({ url: "https://example.com" });
+  expect(response.ok).toBe(true);
+});
+
+it("maps website batch ingestion via preload bridge", async () => {
+  const ingestWebsitePagesBatch = vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      result: {
+        items: [],
+        summary: { attempted: 2, succeeded: 2, failed: 0 },
+      },
+    },
+  });
+
+  window.desktopApi = {
+    uploadArtifact: async () => ({ ok: true, value: { descriptor: { storage: { key: "uploads/a", mediaType: "text/plain", sizeBytes: 1 } } } }),
+    getArtifactUploadPolicy: async () => ({ ok: true, value: { policy: { acceptedExtensions: [".txt"], acceptedMediaTypes: ["text/plain"] } } }),
+    browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+    readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a" }, artifactFamily: "document" } } }),
+    readArtifactContentDescriptor: async () => ({ ok: true, value: { content: { locator: { storageKey: "uploads/a" }, availability: "available", retrieval: "deferred" } } }),
+    readArtifactViewerMedia: async () => ({ ok: true, value: { storageKey: "uploads/a", bytes: new Uint8Array([1]) } }),
+    publishArtifactToRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+    verifyPublishedArtifactBacking: async () => ({ ok: false, error: { message: "n/a" } }),
+    registerArtifactFromRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+    localizeArtifactFromRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+    ingestWebsitePage: async () => ({ ok: false, error: { message: "n/a" } }),
+    ingestWebsitePagesBatch,
+  };
+
+  const client = createDesktopArtifactUploadClient();
+  const response = await client.ingestWebsitePagesBatch({
+    targets: [{ url: "https://example.com/a" }, { url: "https://example.com/b" }],
+  });
+
+  expect(ingestWebsitePagesBatch).toHaveBeenCalled();
+  expect(response.ok).toBe(true);
+});

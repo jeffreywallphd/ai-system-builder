@@ -130,6 +130,12 @@ describe("desktop artifact upload end-to-end", () => {
       localizeArtifactFromRepoUseCase: {
         execute: async () => unavailableResult,
       },
+      ingestWebsitePageUseCase: {
+        execute: async () => unavailableResult,
+      },
+      ingestWebsitePagesBatchUseCase: {
+        execute: async () => unavailableResult,
+      },
     });
 
     const preloadApi = createDesktopPreloadApi({
