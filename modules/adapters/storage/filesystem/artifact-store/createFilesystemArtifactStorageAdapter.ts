@@ -174,8 +174,14 @@ function extensionFromOriginalFileName(originalFileName: string | undefined): st
   return normalized.slice(dot + 1).toLowerCase();
 }
 
-function isImageMediaType(mediaType: string | undefined): boolean {
-  return typeof mediaType === "string" && mediaType.toLowerCase().startsWith("image/");
+function toCatalogArtifactKind(mediaType: string | undefined): string {
+  const normalizedMediaType = mediaType?.trim().toLowerCase();
+  if (!normalizedMediaType) {
+    return "artifact";
+  }
+
+  const [family] = normalizedMediaType.split("/", 1);
+  return family && family.length > 0 ? family : "artifact";
 }
 
 function createContentChecksum(bytes: Uint8Array): StorageObjectChecksum {
@@ -323,11 +329,10 @@ export function createFilesystemArtifactObjectStorageAdapter(
         }
 
         if (options.artifactCatalogAppend) {
-          const artifactKind = isImageMediaType(request.descriptor.mediaType) ? "image" : "data";
           const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
             record: {
               storageKey: key,
-              artifactKind,
+              artifactKind: toCatalogArtifactKind(request.descriptor.mediaType),
               mediaType: request.descriptor.mediaType,
               sizeBytes: bytes.byteLength,
               sourceKind: "upload",

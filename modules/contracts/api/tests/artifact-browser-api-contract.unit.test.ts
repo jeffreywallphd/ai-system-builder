@@ -147,4 +147,16 @@ describe("artifact-browser api contracts", () => {
     expect("path" in readRequest.payload.locator).toBe(false);
     expect("path" in contentRequest.payload.locator).toBe(false);
   });
+
+  it("accepts generic artifactKind filters without image/data coupling", () => {
+    const browseRequest = createApiArtifactBrowseRequest({
+      artifactKind: "application",
+      boundary: {
+        host: "server",
+        source: "api.artifact-browse",
+      },
+    });
+
+    expect(browseRequest.payload.artifactKind).toBe("application");
+  });
 });

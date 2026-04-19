@@ -69,7 +69,7 @@ describe("filesystem artifact browser read adapter", () => {
       mediaType: "image/png",
     });
     expect(dataItem).toMatchObject({
-      artifactKind: "data",
+      artifactKind: "application",
       mediaType: "application/x-parquet",
     });
   });
@@ -454,8 +454,47 @@ describe("filesystem artifact browser read adapter", () => {
     expect(browseRegistered.value.items[0]).toMatchObject({
       storageKey: "uploads/session/report.pdf",
       mediaType: "application/pdf",
-      artifactKind: "data",
+      artifactKind: "application",
     });
+  });
+
+  it("uses consistent catalog artifactKind derivation for normal uploads and unregistered registration", async () => {
+    const rootDirectory = await createTempRoot();
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      artifactCatalogAppend: artifactCatalog,
+    });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
+      artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
+      storage: objectStorage,
+    });
+
+    await objectStorage.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([5, 5, 5]), {
+        descriptor: {
+          key: "uploads/session/from-store.pdf",
+          mediaType: "application/pdf",
+        },
+      }),
+    );
+    await mkdir(path.join(rootDirectory, "uploads", "session"), { recursive: true });
+    await writeFile(path.join(rootDirectory, "uploads", "session", "from-unregistered.pdf"), new Uint8Array([6, 6, 6]));
+    await browserRead.registerUnregisteredArtifact({
+      storageKey: "uploads/session/from-unregistered.pdf",
+    });
+
+    const browseResult = await browserRead.browseArtifacts({ artifactKind: "application" });
+    expect(browseResult.ok).toBe(true);
+    if (!browseResult.ok) {
+      throw new Error("Expected browse success.");
+    }
+
+    const byKey = new Map(browseResult.value.items.map((item) => [item.storageKey, item]));
+    expect(byKey.get("uploads/session/from-store.pdf")?.artifactKind).toBe("application");
+    expect(byKey.get("uploads/session/from-unregistered.pdf")?.artifactKind).toBe("application");
   });
 
   it("deletes unregistered uploaded artifacts without touching registered catalog artifacts", async () => {

@@ -55,6 +55,16 @@ export interface RegisterArtifactFromRepoUseCaseDependencies {
   createArtifactId?: () => ArtifactId;
 }
 
+function toCatalogArtifactKind(mediaType: string | undefined): ArtifactBrowseKind {
+  const normalizedMediaType = mediaType?.trim().toLowerCase();
+  if (!normalizedMediaType) {
+    return "artifact";
+  }
+
+  const [family] = normalizedMediaType.split("/", 1);
+  return family && family.length > 0 ? family : "artifact";
+}
+
 export class RegisterArtifactFromRepoUseCase {
   private readonly artifactRepoStorage: ArtifactRepoStoragePort;
   private readonly artifactBindingStorage: ArtifactStorageBindingPort;
@@ -80,7 +90,7 @@ export class RegisterArtifactFromRepoUseCase {
     const path = command.target.path?.trim();
     const revision = command.target.revision?.trim() || "main";
     const resolvedArtifactKind: ArtifactBrowseKind = command.artifactKind
-      ?? (command.mediaType?.trim().toLowerCase().startsWith("image/") ? "image" : "data");
+      ?? toCatalogArtifactKind(command.mediaType);
     await this.logging.log({
       timestamp: this.now(),
       level: "info",
