@@ -163,6 +163,47 @@ describe("filesystem artifact browser read adapter", () => {
     expect("bytes" in content.value.content).toBe(false);
   });
 
+  it("returns detail read model without metadata when catalog record has no metadata", async () => {
+    const rootDirectory = await createTempRoot();
+    const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const objectStorage = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      artifactCatalogAppend: artifactCatalog,
+    });
+    const browserRead = createFilesystemArtifactBrowserReadAdapter({
+      rootDirectory,
+      artifactCatalogRead: artifactCatalog,
+      artifactCatalogAppend: artifactCatalog,
+      storage: objectStorage,
+    });
+
+    await objectStorage.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([4, 5, 6, 7]), {
+        descriptor: {
+          key: "uploads/session/without-metadata.png",
+          mediaType: "image/png",
+        },
+      }),
+    );
+
+    const detail = await browserRead.readArtifactDetail({
+      locator: { storageKey: "uploads/session/without-metadata.png" },
+    });
+
+    expect(detail.ok).toBe(true);
+    if (!detail.ok) {
+      throw new Error("Expected detail success.");
+    }
+
+    expect(detail.value.artifact).toMatchObject({
+      locator: { storageKey: "uploads/session/without-metadata.png" },
+      artifactFamily: "image",
+      mediaType: "image/png",
+      sizeBytes: 4,
+    });
+    expect(detail.value.artifact.metadata).toBeUndefined();
+  });
+
   it("adds published backing metadata from artifact storage bindings into detail read model", async () => {
     const rootDirectory = await createTempRoot();
     const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
