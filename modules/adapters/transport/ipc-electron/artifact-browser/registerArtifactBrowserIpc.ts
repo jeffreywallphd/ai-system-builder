@@ -124,6 +124,7 @@ import {
   type DesktopHuggingFaceDatasetParquetFilesBrowseRequest,
   type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
 } from "../../../../contracts/ipc";
+import { normalizeArtifactFamily } from "../../../../domain/artifact";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 export type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
@@ -212,7 +213,9 @@ export function mapDesktopArtifactRegisterFromRepoRequestToCommand(
 ): RegisterArtifactFromRepoCommand {
   return {
     target: request.payload.target,
-    artifactFamily: request.payload.artifactFamily,
+    artifactFamily: request.payload.artifactFamily
+      ? normalizeArtifactFamily(request.payload.artifactFamily)
+      : undefined,
     mediaType: request.payload.mediaType,
   };
 }
@@ -898,8 +901,20 @@ export function createDesktopArtifactRegisterFromRepoIpcHandler(
     _event: unknown,
     request: DesktopArtifactRegisterFromRepoRequest,
   ): Promise<DesktopArtifactRegisterFromRepoResponse> => {
+    let command: RegisterArtifactFromRepoCommand;
+    try {
+      command = mapDesktopArtifactRegisterFromRepoRequestToCommand(request);
+    } catch (error) {
+      return mapRegisterFromRepoFailure(request, {
+        code: "validation",
+        message: error instanceof Error
+          ? error.message
+          : "Invalid artifact register-from-repo request.",
+      });
+    }
+
     const result = await registerArtifactFromRepoUseCase.execute(
-      mapDesktopArtifactRegisterFromRepoRequestToCommand(request),
+      command,
       mapDesktopArtifactRequestContext(request),
     );
 
