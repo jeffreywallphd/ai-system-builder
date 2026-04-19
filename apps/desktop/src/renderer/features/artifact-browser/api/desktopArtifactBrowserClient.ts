@@ -4,6 +4,7 @@ import {
   type DesktopArtifactBrowserLocator,
   type DesktopArtifactContentDescriptor,
   type DesktopArtifactDetail,
+  type DesktopArtifactFamily,
   type DesktopLocalizedArtifactFromRepo,
   type DesktopPublishedBacking,
   type DesktopUnregisteredArtifactBrowseItem,
@@ -19,7 +20,7 @@ export interface DesktopArtifactBrowserClient {
   clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
-  browseArtifacts: (input?: { artifactFamily?: string }) => Promise<DesktopArtifactBrowseItem[]>;
+  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }) => Promise<DesktopArtifactBrowseItem[]>;
   browseUnregisteredArtifacts?: () => Promise<DesktopUnregisteredArtifactBrowseItem[]>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;
   deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;

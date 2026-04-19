@@ -219,8 +219,8 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
           <dd>{detail.locator.storageKey}</dd>
           <dt>Media type</dt>
           <dd>{detail.mediaType ?? "unknown"}</dd>
-          <dt>Artifact kind</dt>
-          <dd>{detail.artifactKind}</dd>
+          <dt>Artifact family</dt>
+          <dd>{detail.artifactFamily}</dd>
           <dt>Source</dt>
           <dd>{detail.sourceKind ?? "unknown"}</dd>
           <dt>Size bytes</dt>

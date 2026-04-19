@@ -1,3 +1,8 @@
+import type {
+  ArtifactBrowseItem as ArtifactBrowseContractItem,
+  ArtifactDetailReadModel as ArtifactDetailContractModel,
+} from "../../../../../modules/contracts/artifact-browser";
+
 export interface DesktopArtifactUploadInput {
   fileName: string;
   mediaType: string;
@@ -16,7 +21,7 @@ export interface DesktopUploadedImageDescriptor {
 
 export interface DesktopArtifactBrowseItem {
   storageKey: string;
-  artifactFamily: string;
+  artifactFamily: ArtifactBrowseContractItem["artifactFamily"];
   mediaType?: string;
   sizeBytes?: number;
   originalName?: string;
@@ -34,7 +39,7 @@ export interface DesktopArtifactBrowseItem {
 
 export interface DesktopArtifactDetail {
   locator: DesktopArtifactBrowserLocator;
-  artifactFamily: string;
+  artifactFamily: ArtifactDetailContractModel["artifactFamily"];
   mediaType?: string;
   sizeBytes?: number;
   sourceKind?: string;
@@ -45,6 +50,8 @@ export interface DesktopArtifactDetail {
     importedSourceBacking?: DesktopPublishedBacking;
   };
 }
+
+export type DesktopArtifactFamily = ArtifactBrowseContractItem["artifactFamily"];
 
 export interface DesktopArtifactContentDescriptor {
   locator: DesktopArtifactBrowserLocator;

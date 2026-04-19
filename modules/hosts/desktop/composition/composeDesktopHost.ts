@@ -169,8 +169,10 @@ export function composeDesktopHost(
         artifactBrowserUnregistered: artifactBrowserRead,
       });
       const deleteRegisteredArtifact = new DeleteRegisteredArtifactUseCase({
+        artifactCatalogRead: artifactCatalog,
         artifactCatalogDelete: artifactCatalog,
         storage,
+        artifactBindingStorage: artifactBindings,
       });
       const publishArtifactToRepo = new PublishArtifactToRepoUseCase({
         artifactStorage: storage,

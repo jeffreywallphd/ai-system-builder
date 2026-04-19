@@ -1,10 +1,14 @@
+import type { ArtifactBrowseItem as ArtifactBrowseContractItem } from "../../../../../../modules/contracts/artifact-browser";
+
 export interface ArtifactBrowserLocator {
   storageKey: string;
 }
 
+type ThinClientArtifactFamily = ArtifactBrowseContractItem["artifactFamily"];
+
 export interface ThinClientArtifactBrowseItem {
   storageKey: string;
-  artifactKind: string;
+  artifactFamily: ThinClientArtifactFamily;
   mediaType?: string;
   sizeBytes?: number;
   originalName?: string;
@@ -22,7 +26,7 @@ export interface ThinClientArtifactBrowseItem {
 
 export interface ThinClientArtifactDetail {
   locator: ArtifactBrowserLocator;
-  artifactKind: string;
+  artifactFamily: ThinClientArtifactFamily;
   mediaType?: string;
   sizeBytes?: number;
   sourceKind?: string;
@@ -109,7 +113,7 @@ export interface ArtifactBrowserApiClient {
   clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
-  browseArtifacts: (input?: { artifactKind?: string }) => Promise<ThinClientArtifactBrowseItem[]>;
+  browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily }) => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator) => string;
@@ -163,6 +167,46 @@ function ensureSuccess<T>(response: ApiResponseEnvelope, pick: (value: unknown) 
   }
 
   return pick(response.value);
+}
+
+function resolveArtifactFamily(input: { mediaType?: string; fileName?: string }): ThinClientArtifactFamily {
+  const mediaType = input.mediaType?.trim().toLowerCase();
+  const fileName = input.fileName?.trim().toLowerCase();
+  const extension = fileName?.includes(".") ? fileName.slice(fileName.lastIndexOf(".") + 1) : undefined;
+
+  if (mediaType?.startsWith("image/")) {
+    return "image";
+  }
+  if (mediaType === "application/pdf" || mediaType === "application/msword" || mediaType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || mediaType === "application/rtf" || mediaType === "text/rtf") {
+    return "document";
+  }
+  if (mediaType === "text/plain" || mediaType === "text/markdown") {
+    return "text";
+  }
+  if (mediaType === "application/json" || mediaType === "application/yaml" || mediaType === "application/x-yaml" || mediaType === "text/yaml" || mediaType === "text/x-yaml") {
+    return "structured-text";
+  }
+  if (mediaType === "text/csv" || mediaType === "text/tab-separated-values" || mediaType === "application/vnd.ms-excel" || mediaType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || mediaType === "application/x-parquet") {
+    return "tabular";
+  }
+  if (mediaType?.startsWith("text/")) {
+    return "text";
+  }
+
+  if (extension === "pdf" || extension === "doc" || extension === "docx" || extension === "rtf") {
+    return "document";
+  }
+  if (extension === "txt" || extension === "md") {
+    return "text";
+  }
+  if (extension === "json" || extension === "yaml" || extension === "yml") {
+    return "structured-text";
+  }
+  if (extension === "csv" || extension === "tsv" || extension === "xls" || extension === "xlsx" || extension === "parquet") {
+    return "tabular";
+  }
+
+  return "binary";
 }
 
 export interface CreateApiArtifactBrowserClientOptions {
@@ -248,7 +292,7 @@ export function createApiArtifactBrowserClient(
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ artifactKind: input.artifactKind, source }),
+        body: JSON.stringify({ artifactFamily: input.artifactFamily, source }),
       });
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
@@ -383,6 +427,10 @@ export function createApiArtifactBrowserClient(
     },
 
     async registerArtifactFromRepo(input): Promise<ThinClientRegisteredArtifactFromRepo> {
+      const artifactFamily = resolveArtifactFamily({
+        mediaType: input.mediaType,
+        fileName: input.path,
+      });
       const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/register-from-repo"), {
         method: "POST",
         headers: {
@@ -395,7 +443,7 @@ export function createApiArtifactBrowserClient(
             revision: input.revision,
             path: input.path,
           },
-          artifactKind: "image",
+          artifactFamily,
           mediaType: input.mediaType,
           source,
         }),

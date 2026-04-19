@@ -31,13 +31,13 @@ describe("ArtifactBrowserFeature", () => {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "uploads/cat.png",
-          artifactKind: "image" as const,
+          artifactFamily: "image" as const,
           mediaType: "image/png",
         },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
         locator: { storageKey: "uploads/cat.png" },
-        artifactKind: "image" as const,
+        artifactFamily: "image" as const,
         mediaType: "image/png",
         sizeBytes: 4,
         metadata: {
@@ -145,12 +145,12 @@ describe("ArtifactBrowserFeature", () => {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "uploads/cat.png",
-          artifactKind: "image" as const,
+          artifactFamily: "image" as const,
         },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
         locator: { storageKey: "uploads/cat.png" },
-        artifactKind: "image" as const,
+        artifactFamily: "image" as const,
       }),
       readArtifactContent: vi.fn().mockResolvedValue({
         locator: { storageKey: "uploads/cat.png" },
@@ -259,12 +259,12 @@ describe("ArtifactBrowserFeature", () => {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "uploads/cat.png",
-          artifactKind: "image" as const,
+          artifactFamily: "image" as const,
         },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
         locator: { storageKey: "uploads/cat.png" },
-        artifactKind: "image" as const,
+        artifactFamily: "image" as const,
       }),
       readArtifactContent: vi.fn().mockResolvedValue({
         locator: { storageKey: "uploads/cat.png" },
@@ -335,11 +335,11 @@ describe("ArtifactBrowserFeature", () => {
   it("re-checks published backing existence from the artifact detail panel", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
-        { storageKey: "uploads/cat.png", artifactKind: "image" as const },
+        { storageKey: "uploads/cat.png", artifactFamily: "image" as const },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
         locator: { storageKey: "uploads/cat.png" },
-        artifactKind: "image" as const,
+        artifactFamily: "image" as const,
         metadata: {
           publishedBacking: {
             target: {
@@ -409,11 +409,11 @@ describe("ArtifactBrowserFeature", () => {
       browseArtifacts: vi.fn()
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
-          { storageKey: "imports/huggingface/openai/demo/main/images/cat.png", artifactKind: "image" as const },
+          { storageKey: "imports/huggingface/openai/demo/main/images/cat.png", artifactFamily: "image" as const },
         ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
         locator: { storageKey: "imports/huggingface/openai/demo/main/images/cat.png" },
-        artifactKind: "image" as const,
+        artifactFamily: "image" as const,
       }),
       readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
@@ -482,11 +482,11 @@ describe("ArtifactBrowserFeature", () => {
       browseArtifacts: vi.fn()
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
-          { storageKey: "imports/huggingface/openai/demo/main/data/train.parquet", artifactKind: "image" as const },
+          { storageKey: "imports/huggingface/openai/demo/main/data/train.parquet", artifactFamily: "image" as const },
         ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
         locator: { storageKey: "imports/huggingface/openai/demo/main/data/train.parquet" },
-        artifactKind: "image" as const,
+        artifactFamily: "image" as const,
       }),
       readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
@@ -635,11 +635,11 @@ describe("ArtifactBrowserFeature", () => {
   it("localizes imported artifact bytes from the artifact panel", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
-        { storageKey: "artifacts/20260418000000-local01", artifactKind: "image" as const },
+        { storageKey: "artifacts/20260418000000-local01", artifactFamily: "image" as const },
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
         locator: { storageKey: "artifacts/20260418000000-local01" },
-        artifactKind: "image" as const,
+        artifactFamily: "image" as const,
         metadata: {
           importedSourceBacking: {
             target: {
@@ -720,7 +720,7 @@ describe("ArtifactBrowserFeature", () => {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
           storageKey: "artifacts/20260418000000-local01",
-          artifactKind: "image" as const,
+          artifactFamily: "image" as const,
           metadata: {
             backingState: {
               hasImportedSourceBacking: true,
@@ -734,7 +734,7 @@ describe("ArtifactBrowserFeature", () => {
       ]),
       readArtifactDetail: vi.fn().mockResolvedValue({
         locator: { storageKey: "artifacts/20260418000000-local01" },
-        artifactKind: "image" as const,
+        artifactFamily: "image" as const,
         metadata: {
           importedSourceBacking: {
             target: {
@@ -804,3 +804,4 @@ describe("ArtifactBrowserFeature", () => {
     expect(container.textContent).toContain("Localize artifact");
   });
 });
+
