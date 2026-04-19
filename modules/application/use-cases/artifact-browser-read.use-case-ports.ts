@@ -15,6 +15,7 @@ import type {
   RegisterUnregisteredArtifactCommand,
   RegisterUnregisteredArtifactUseCaseResult,
 } from "./artifact-browser-unregistered.types";
+import type { DeleteRegisteredArtifactCommand } from "./delete-registered-artifact.use-case";
 
 export interface BrowseArtifactsUseCasePort {
   execute: (
@@ -53,6 +54,13 @@ export interface RegisterUnregisteredArtifactUseCasePort {
 export interface DeleteUnregisteredArtifactUseCasePort {
   execute: (
     command: DeleteUnregisteredArtifactCommand,
+    context?: ArtifactBrowserUnregisteredCommandContext,
+  ) => Promise<DeleteUnregisteredArtifactUseCaseResult>;
+}
+
+export interface DeleteRegisteredArtifactUseCasePort {
+  execute: (
+    command: DeleteRegisteredArtifactCommand,
     context?: ArtifactBrowserUnregisteredCommandContext,
   ) => Promise<DeleteUnregisteredArtifactUseCaseResult>;
 }

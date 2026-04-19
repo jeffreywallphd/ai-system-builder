@@ -72,7 +72,7 @@ export class LocalizeArtifactFromRepoUseCase {
 
     const artifact = Artifact.fromStorageBindings({
       artifactId: artifactId.toString(),
-      artifactKind: "image",
+      artifactFamily: "image",
       bindings: readBindingsResult.value.bindings,
     });
 

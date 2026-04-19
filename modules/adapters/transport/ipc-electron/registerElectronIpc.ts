@@ -18,6 +18,7 @@ export interface RegisterElectronIpcDependencies {
   browseUnregisteredArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseUnregisteredArtifactsUseCase"];
   registerUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["registerUnregisteredArtifactUseCase"];
   deleteUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteUnregisteredArtifactUseCase"];
+  deleteRegisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteRegisteredArtifactUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactContentUseCase"];
   artifactMediaViewRetrieval: RegisterArtifactBrowserIpcDependencies["artifactMediaViewRetrieval"];
@@ -47,6 +48,7 @@ export function registerElectronIpc(
     browseUnregisteredArtifactsUseCase: dependencies.browseUnregisteredArtifactsUseCase,
     registerUnregisteredArtifactUseCase: dependencies.registerUnregisteredArtifactUseCase,
     deleteUnregisteredArtifactUseCase: dependencies.deleteUnregisteredArtifactUseCase,
+    deleteRegisteredArtifactUseCase: dependencies.deleteRegisteredArtifactUseCase,
     readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
     readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
     artifactMediaViewRetrieval: dependencies.artifactMediaViewRetrieval,

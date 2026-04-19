@@ -1,7 +1,7 @@
 import { createApiError } from "./api-error";
+import type { ArtifactFamily } from "../../domain/artifact";
 import { createApiRequest, type ApiRequest } from "./api-request";
 import { createApiFailureResponse, createApiSuccessResponse, type ApiResponse } from "./api-response";
-import type { ArtifactBrowseKind } from "../artifact-browser";
 
 export const API_ARTIFACT_REGISTER_FROM_REPO_OPERATION = "artifact.register.from-repo" as const;
 
@@ -12,7 +12,7 @@ export interface ApiArtifactRegisterFromRepoRequestPayload {
     revision?: string;
     path: string;
   };
-  artifactKind?: ArtifactBrowseKind;
+  artifactFamily?: ArtifactFamily;
   mediaType?: string;
   source: string;
 }
@@ -68,7 +68,7 @@ export function createApiArtifactRegisterFromRepoRequest(
       revision: payload.target.revision?.trim() || undefined,
       path: normalizeRequired(payload.target.path, "target.path"),
     },
-    artifactKind: payload.artifactKind,
+    artifactFamily: payload.artifactFamily,
     mediaType: payload.mediaType?.trim() || undefined,
     source: normalizeRequired(payload.source, "source"),
   }, options);

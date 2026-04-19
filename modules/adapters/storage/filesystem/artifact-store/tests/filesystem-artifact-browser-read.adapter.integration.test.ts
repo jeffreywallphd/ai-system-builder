@@ -65,11 +65,11 @@ describe("filesystem artifact browser read adapter", () => {
     const imageItem = browseResult.value.items.find((item) => item.storageKey === "uploads/session/cat.png");
     const dataItem = browseResult.value.items.find((item) => item.storageKey === "uploads/session/train.parquet");
     expect(imageItem).toMatchObject({
-      artifactKind: "image",
+      artifactFamily: "image",
       mediaType: "image/png",
     });
     expect(dataItem).toMatchObject({
-      artifactKind: "application",
+      artifactFamily: "application",
       mediaType: "application/x-parquet",
     });
   });
@@ -103,7 +103,7 @@ describe("filesystem artifact browser read adapter", () => {
     await mkdir(path.join(rootDirectory, "hidden"), { recursive: true });
     await writeFile(path.join(rootDirectory, "hidden", "not-cataloged.png"), new Uint8Array([9, 9]));
 
-    const browseResult = await browserRead.browseArtifacts({ artifactKind: "image" });
+    const browseResult = await browserRead.browseArtifacts({ artifactFamily: "image" });
 
     expect(browseResult.ok).toBe(true);
     if (!browseResult.ok) {
@@ -113,7 +113,7 @@ describe("filesystem artifact browser read adapter", () => {
     expect(browseResult.value.items.length).toBe(1);
     expect(browseResult.value.items[0]).toMatchObject({
       storageKey: "uploads/session/cat.png",
-      artifactKind: "image",
+      artifactFamily: "image",
       mediaType: "image/png",
       sizeBytes: 3,
       sourceKind: "upload",
@@ -354,7 +354,7 @@ describe("filesystem artifact browser read adapter", () => {
       },
     });
 
-    const browse = await browserRead.browseArtifacts({ artifactKind: "image" });
+    const browse = await browserRead.browseArtifacts({ artifactFamily: "image" });
     const detail = await browserRead.readArtifactDetail({
       locator: { storageKey: "artifacts/20260418000000-local01" },
     });
@@ -454,11 +454,11 @@ describe("filesystem artifact browser read adapter", () => {
     expect(browseRegistered.value.items[0]).toMatchObject({
       storageKey: "uploads/session/report.pdf",
       mediaType: "application/pdf",
-      artifactKind: "application",
+      artifactFamily: "application",
     });
   });
 
-  it("uses consistent catalog artifactKind derivation for normal uploads and unregistered registration", async () => {
+  it("uses consistent catalog artifactFamily derivation for normal uploads and unregistered registration", async () => {
     const rootDirectory = await createTempRoot();
     const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
     const objectStorage = createFilesystemArtifactObjectStorageAdapter({
@@ -486,15 +486,15 @@ describe("filesystem artifact browser read adapter", () => {
       storageKey: "uploads/session/from-unregistered.pdf",
     });
 
-    const browseResult = await browserRead.browseArtifacts({ artifactKind: "application" });
+    const browseResult = await browserRead.browseArtifacts({ artifactFamily: "application" });
     expect(browseResult.ok).toBe(true);
     if (!browseResult.ok) {
       throw new Error("Expected browse success.");
     }
 
     const byKey = new Map(browseResult.value.items.map((item) => [item.storageKey, item]));
-    expect(byKey.get("uploads/session/from-store.pdf")?.artifactKind).toBe("application");
-    expect(byKey.get("uploads/session/from-unregistered.pdf")?.artifactKind).toBe("application");
+    expect(byKey.get("uploads/session/from-store.pdf")?.artifactFamily).toBe("application");
+    expect(byKey.get("uploads/session/from-unregistered.pdf")?.artifactFamily).toBe("application");
   });
 
   it("deletes unregistered uploaded artifacts without touching registered catalog artifacts", async () => {

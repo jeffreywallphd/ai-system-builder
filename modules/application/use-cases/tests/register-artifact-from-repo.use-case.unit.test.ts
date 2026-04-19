@@ -51,7 +51,7 @@ describe("RegisterArtifactFromRepoUseCase", () => {
         repository: "openai/demo",
         path: "images/a.png",
       },
-      artifactKind: "image",
+      artifactFamily: "image",
       mediaType: "image/png",
     });
 
@@ -72,7 +72,7 @@ describe("RegisterArtifactFromRepoUseCase", () => {
     expect(appendCall).toMatchObject({
       record: {
         storageKey: "artifacts/20260417000000-import001",
-        artifactKind: "image",
+        artifactFamily: "image",
       },
     });
     const logCalls = (log as ReturnType<typeof testDouble.fn>).mock.calls.map((call) => call[0]);
@@ -132,12 +132,12 @@ describe("RegisterArtifactFromRepoUseCase", () => {
     const appendCall = (artifactCatalogAppend.appendArtifactCatalogRecord as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
     expect(appendCall).toMatchObject({
       record: {
-        artifactKind: "artifact",
+        artifactFamily: "binary",
       },
     });
   });
 
-  it("derives catalog artifactKind from media type family when artifactKind is omitted", async () => {
+  it("derives catalog artifactFamily from media type family when artifactFamily is omitted", async () => {
     const logging: LoggingPort = { log: testDouble.fn() };
     const artifactRepoStorage: ArtifactRepoStoragePort = {
       hasArtifactInRepo: testDouble.fn(async () => createHasArtifactInRepoSuccessResult(true)),
@@ -179,7 +179,7 @@ describe("RegisterArtifactFromRepoUseCase", () => {
     const appendCall = (artifactCatalogAppend.appendArtifactCatalogRecord as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
     expect(appendCall).toMatchObject({
       record: {
-        artifactKind: "application",
+        artifactFamily: "tabular",
       },
     });
   });

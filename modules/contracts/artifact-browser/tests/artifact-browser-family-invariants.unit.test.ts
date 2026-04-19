@@ -29,7 +29,7 @@ describe("artifact-browser family invariants", () => {
     const detail = artifactBrowserContracts.normalizeArtifactReadSuccessValue({
       artifact: {
         locator,
-        artifactKind: "image",
+        artifactFamily: "image",
       },
     });
     const content = artifactBrowserContracts.normalizeArtifactContentReadSuccessValue({

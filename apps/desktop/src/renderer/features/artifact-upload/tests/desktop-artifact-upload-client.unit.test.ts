@@ -22,7 +22,7 @@ describe("desktop artifact upload client", () => {
     window.desktopApi = {
       uploadArtifact,
       browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
-      readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a.png" }, artifactKind: "image" } } }),
+      readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a.png" }, artifactFamily: "image" } } }),
       readArtifactContentDescriptor: async () => ({ ok: true, value: { content: { locator: { storageKey: "uploads/a.png" }, availability: "available", retrieval: "deferred" } } }),
       readArtifactViewerMedia: async () => ({ ok: true, value: { storageKey: "uploads/a.png", bytes: new Uint8Array([1]) } }),
       publishArtifactToRepo: async () => ({ ok: true, value: { target: { provider: "huggingface", repository: "openai/demo", path: "images/a.png", locator: "openai/demo/images/a.png" }, verification: { exists: true } } }),
@@ -67,7 +67,7 @@ describe("desktop artifact upload client", () => {
     window.desktopApi = {
       uploadArtifact,
       browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
-      readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a.png" }, artifactKind: "image" } } }),
+      readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a.png" }, artifactFamily: "image" } } }),
       readArtifactContentDescriptor: async () => ({ ok: true, value: { content: { locator: { storageKey: "uploads/a.png" }, availability: "available", retrieval: "deferred" } } }),
       readArtifactViewerMedia: async () => ({ ok: true, value: { storageKey: "uploads/a.png", bytes: new Uint8Array([1]) } }),
       publishArtifactToRepo: async () => ({ ok: true, value: { target: { provider: "huggingface", repository: "openai/demo", path: "images/a.png", locator: "openai/demo/images/a.png" }, verification: { exists: true } } }),

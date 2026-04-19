@@ -62,7 +62,7 @@ describe("desktop renderer artifact workflow page", () => {
         channel: "ipc.artifact.browse.response",
         ok: true,
         value: {
-          items: [{ storageKey: "uploads/cat.png", artifactKind: "image", originalName: "cat.png" }],
+          items: [{ storageKey: "uploads/cat.png", artifactFamily: "image", originalName: "cat.png" }],
         },
       });
 
@@ -73,7 +73,7 @@ describe("desktop renderer artifact workflow page", () => {
         operation: "artifact.read",
         channel: "ipc.artifact.read.response",
         ok: true,
-        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactKind: "image" } },
+        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactFamily: "image" } },
       }),
       readArtifactContentDescriptor: vi.fn().mockResolvedValue({
         operation: "artifact.content.read",

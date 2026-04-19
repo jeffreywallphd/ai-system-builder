@@ -25,3 +25,14 @@
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+.ui-button--destructive {
+  border-color: color-mix(in srgb, var(--color-danger) 65%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--color-bg-elevated));
+  color: var(--color-danger);
+}
+
+.ui-button--destructive:hover:enabled {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 26%, var(--color-bg-elevated));
+}

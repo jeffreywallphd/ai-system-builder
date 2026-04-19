@@ -1,28 +1,29 @@
 import type { ArtifactStorageBinding, ArtifactStorageBindingRole } from "../../contracts/storage";
 import { ArtifactBacking } from "./ArtifactBacking";
 import { ArtifactId } from "./ArtifactId";
+import { type ArtifactFamily } from "./ArtifactFamily";
 
 export interface ArtifactProps {
   id: ArtifactId;
-  artifactKind: string;
+  artifactFamily: ArtifactFamily;
   backings?: ArtifactBacking[];
 }
 
 export class Artifact {
   public readonly id: ArtifactId;
-  public readonly artifactKind: string;
+  public readonly artifactFamily: ArtifactFamily;
   private readonly backings: ArtifactBacking[];
 
   private constructor(props: ArtifactProps) {
     this.id = props.id;
-    this.artifactKind = props.artifactKind;
+    this.artifactFamily = props.artifactFamily;
     this.backings = [...(props.backings ?? [])];
   }
 
   public static create(props: ArtifactProps): Artifact {
     const artifact = new Artifact({
       id: props.id,
-      artifactKind: props.artifactKind,
+      artifactFamily: props.artifactFamily,
       backings: [],
     });
 
@@ -35,12 +36,12 @@ export class Artifact {
 
   public static fromStorageBindings(input: {
     artifactId: string;
-    artifactKind?: string;
+    artifactFamily?: ArtifactFamily;
     bindings: ArtifactStorageBinding[];
   }): Artifact {
     return Artifact.create({
       id: ArtifactId.from(input.artifactId),
-      artifactKind: input.artifactKind ?? "artifact",
+      artifactFamily: input.artifactFamily ?? "binary",
       backings: input.bindings.map((binding) => ArtifactBacking.fromStorageBinding(binding)),
     });
   }

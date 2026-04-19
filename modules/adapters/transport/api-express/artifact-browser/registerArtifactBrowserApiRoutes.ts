@@ -26,7 +26,7 @@ import {
 } from "../../../../contracts/api";
 
 interface ArtifactBrowseApiRequestBody {
-  artifactKind?: string;
+  artifactFamily?: string;
   source?: string;
 }
 
@@ -132,7 +132,7 @@ export function mapArtifactBrowseApiRequestToCommand(
 ): BrowseArtifactsCommand {
   const apiRequest = createApiArtifactBrowseRequest(
     {
-      artifactKind: requestBody.artifactKind,
+      artifactFamily: requestBody.artifactFamily,
       boundary: {
         host: "server",
         source: normalizeSource(requestBody.source),
@@ -141,7 +141,7 @@ export function mapArtifactBrowseApiRequestToCommand(
     context,
   );
 
-  return { artifactKind: apiRequest.payload.artifactKind };
+  return { artifactFamily: apiRequest.payload.artifactFamily };
 }
 
 export function mapArtifactReadApiRequestToCommand(

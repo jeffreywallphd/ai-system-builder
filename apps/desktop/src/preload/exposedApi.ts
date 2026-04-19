@@ -41,6 +41,9 @@ import {
   DESKTOP_ARTIFACT_UNREGISTERED_DELETE_OPERATION,
   DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_UNREGISTERED_DELETE_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTERED_DELETE_OPERATION,
+  DESKTOP_ARTIFACT_REGISTERED_DELETE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTERED_DELETE_RESPONSE_CHANNEL,
   createDesktopArtifactBrowseRequest,
   createDesktopArtifactContentReadRequest,
   createDesktopArtifactMediaViewRequest,
@@ -55,6 +58,7 @@ import {
   createDesktopArtifactUnregisteredBrowseRequest,
   createDesktopArtifactUnregisteredRegisterRequest,
   createDesktopArtifactUnregisteredDeleteRequest,
+  createDesktopArtifactRegisteredDeleteRequest,
   type DesktopArtifactBrowseRequest,
   type DesktopArtifactBrowseResponse,
   type DesktopArtifactContentReadRequest,
@@ -79,6 +83,7 @@ import {
   type DesktopArtifactUnregisteredBrowseResponse,
   type DesktopArtifactUnregisteredRegisterResponse,
   type DesktopArtifactUnregisteredDeleteResponse,
+  type DesktopArtifactRegisteredDeleteResponse,
   DESKTOP_HUGGING_FACE_TOKEN_GET_OPERATION,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_GET_RESPONSE_CHANNEL,
@@ -155,7 +160,7 @@ export interface DesktopPreloadApi {
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
   browseArtifacts: (
-    input?: { artifactKind?: string },
+    input?: { artifactFamily?: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactBrowseResponse>;
   browseUnregisteredArtifacts: (
@@ -169,6 +174,10 @@ export interface DesktopPreloadApi {
     input: { storageKey: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUnregisteredDeleteResponse>;
+  deleteRegisteredArtifact: (
+    input: { storageKey: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopArtifactRegisteredDeleteResponse>;
   readArtifactDetail: (
     locator: DesktopArtifactBrowserLocator,
     context?: DesktopArtifactUploadBridgeContext,
@@ -214,7 +223,7 @@ export interface DesktopPreloadApi {
         path: string;
         revision?: string;
       };
-      artifactKind?: string;
+      artifactFamily?: string;
       mediaType?: string;
     },
     context?: DesktopArtifactUploadBridgeContext,
@@ -407,7 +416,7 @@ export function createDesktopPreloadApi(
     async browseArtifacts(input = {}, context = {}) {
       const request: DesktopArtifactBrowseRequest = createDesktopArtifactBrowseRequest(
         {
-          artifactKind: input.artifactKind,
+          artifactFamily: input.artifactFamily,
           boundary: {
             host: "desktop",
             source: artifactSource,
@@ -474,6 +483,24 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_UNREGISTERED_DELETE_OPERATION,
         channel: DESKTOP_ARTIFACT_UNREGISTERED_DELETE_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop unregistered artifact delete IPC response envelope.",
+      });
+    },
+
+
+    async deleteRegisteredArtifact(input, context = {}) {
+      const request = createDesktopArtifactRegisteredDeleteRequest({
+        storageKey: input.storageKey,
+        boundary: { host: "desktop", source: artifactSource },
+      }, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ARTIFACT_REGISTERED_DELETE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopArtifactRegisteredDeleteResponse>(response, {
+        operation: DESKTOP_ARTIFACT_REGISTERED_DELETE_OPERATION,
+        channel: DESKTOP_ARTIFACT_REGISTERED_DELETE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop registered artifact delete IPC response envelope.",
       });
     },
 
@@ -628,7 +655,7 @@ export function createDesktopPreloadApi(
       const request: DesktopArtifactRegisterFromRepoRequest = createDesktopArtifactRegisterFromRepoRequest(
         {
           target: input.target,
-          artifactKind: input.artifactKind,
+          artifactFamily: input.artifactFamily,
           mediaType: input.mediaType,
           boundary: {
             host: "desktop",

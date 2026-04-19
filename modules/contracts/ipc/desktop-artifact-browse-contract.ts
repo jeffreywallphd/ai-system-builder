@@ -1,9 +1,9 @@
 import {
   ARTIFACT_BROWSE_OPERATION,
   normalizeArtifactBrowseSuccessValue,
-  type ArtifactBrowseKind,
   type ArtifactBrowseSuccessValue,
 } from "../artifact-browser";
+import type { ArtifactFamily } from "../../domain/artifact";
 import {
   createIpcChannel,
   type IpcChannel,
@@ -36,7 +36,7 @@ export interface DesktopArtifactBrowseBoundaryContext {
 }
 
 export interface DesktopArtifactBrowseRequestPayload {
-  artifactKind?: ArtifactBrowseKind;
+  artifactFamily?: ArtifactFamily;
   boundary: DesktopArtifactBrowseBoundaryContext;
 }
 
@@ -70,7 +70,7 @@ function normalizeDesktopArtifactBrowsePayload(
   payload: DesktopArtifactBrowseRequestPayload,
 ): DesktopArtifactBrowseRequestPayload {
   return {
-    artifactKind: payload.artifactKind,
+    artifactFamily: payload.artifactFamily,
     boundary: {
       host: "desktop",
       source: normalizeRequiredTextField(payload.boundary.source, "boundary.source"),

@@ -29,7 +29,7 @@ describe("artifact-browser api contracts", () => {
       items: [
         {
           storageKey: " staged/images/artifact-21 ",
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: " image/png ",
         },
       ],
@@ -40,7 +40,7 @@ describe("artifact-browser api contracts", () => {
         locator: {
           storageKey: " staged/images/artifact-21 ",
         },
-        artifactKind: "image",
+        artifactFamily: "image",
         mediaType: " image/png ",
       },
     });
@@ -64,7 +64,7 @@ describe("artifact-browser api contracts", () => {
         items: [
           {
             storageKey: "staged/images/artifact-21",
-            artifactKind: "image",
+            artifactFamily: "image",
             mediaType: "image/png",
           },
         ],
@@ -83,7 +83,7 @@ describe("artifact-browser api contracts", () => {
           locator: {
             storageKey: "staged/images/artifact-21",
           },
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: "image/png",
         },
       },
@@ -134,7 +134,7 @@ describe("artifact-browser api contracts", () => {
       },
     });
     const browseRequest = createApiArtifactBrowseRequest({
-      artifactKind: "image",
+      artifactFamily: "image",
       boundary: {
         host: "server",
         source: " api.artifact-browse ",
@@ -143,20 +143,20 @@ describe("artifact-browser api contracts", () => {
 
     expect(readRequest.payload.locator.storageKey).toBe("staged/images/artifact-22");
     expect(contentRequest.payload.locator.storageKey).toBe("staged/images/artifact-22");
-    expect(browseRequest.payload.artifactKind).toBe("image");
+    expect(browseRequest.payload.artifactFamily).toBe("image");
     expect("path" in readRequest.payload.locator).toBe(false);
     expect("path" in contentRequest.payload.locator).toBe(false);
   });
 
-  it("accepts generic artifactKind filters without image/data coupling", () => {
+  it("accepts generic artifactFamily filters without image/data coupling", () => {
     const browseRequest = createApiArtifactBrowseRequest({
-      artifactKind: "application",
+      artifactFamily: "application",
       boundary: {
         host: "server",
         source: "api.artifact-browse",
       },
     });
 
-    expect(browseRequest.payload.artifactKind).toBe("application");
+    expect(browseRequest.payload.artifactFamily).toBe("application");
   });
 });

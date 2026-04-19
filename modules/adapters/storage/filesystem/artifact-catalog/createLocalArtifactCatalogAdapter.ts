@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type {
   ArtifactCatalogAppendPort,
+  ArtifactCatalogDeletePort,
   ArtifactCatalogReadPort,
   ArtifactCatalogRecord,
 } from "../../../../application/ports/artifact-catalog";
@@ -12,8 +13,11 @@ import {
   createSuccessResult,
 } from "../../../../contracts/shared";
 import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
+import { normalizeArtifactFamily } from "../../../../domain/artifact";
 
 const DEFAULT_CATALOG_FILE = ".catalog/artifact-catalog.ndjson";
+
+type ArtifactCatalogRecordLine = ArtifactCatalogRecord | { storageKey: string; deletedAt: string };
 
 export interface CreateLocalArtifactCatalogPersistenceAdapterOptions {
   rootDirectory: string;
@@ -21,29 +25,34 @@ export interface CreateLocalArtifactCatalogPersistenceAdapterOptions {
 }
 
 export interface LocalArtifactCatalogPersistenceAdapter
-  extends ArtifactCatalogAppendPort, ArtifactCatalogReadPort {}
+  extends ArtifactCatalogAppendPort, ArtifactCatalogReadPort, ArtifactCatalogDeletePort {}
 
 function normalizeRecord(record: ArtifactCatalogRecord): ArtifactCatalogRecord {
   return {
     ...record,
     storageKey: normalizeStorageArtifactKey(record.storageKey),
+    artifactFamily: normalizeArtifactFamily(record.artifactFamily),
   };
 }
 
-function parseRecordLine(line: string): ArtifactCatalogRecord | undefined {
+function parseRecordLine(line: string): ArtifactCatalogRecordLine | undefined {
   try {
-    const parsed = JSON.parse(line) as Partial<ArtifactCatalogRecord>;
-    if (
-      typeof parsed.artifactKind !== "string"
-      || parsed.artifactKind.trim().length === 0
-      || typeof parsed.storageKey !== "string"
-    ) {
+    const parsed = JSON.parse(line) as Partial<ArtifactCatalogRecord> & { deletedAt?: unknown };
+    if (typeof parsed.storageKey !== "string") {
+      return undefined;
+    }
+
+    if (typeof parsed.deletedAt === "string" && parsed.deletedAt.trim().length > 0) {
+      return { storageKey: normalizeStorageArtifactKey(parsed.storageKey), deletedAt: parsed.deletedAt };
+    }
+
+    if (typeof parsed.artifactFamily !== "string" || parsed.artifactFamily.trim().length === 0) {
       return undefined;
     }
 
     return normalizeRecord({
       storageKey: parsed.storageKey,
-      artifactKind: parsed.artifactKind,
+      artifactFamily: normalizeArtifactFamily(parsed.artifactFamily),
       mediaType: typeof parsed.mediaType === "string" ? parsed.mediaType : undefined,
       sizeBytes: typeof parsed.sizeBytes === "number" ? parsed.sizeBytes : undefined,
       sourceKind: parsed.sourceKind === "upload" ? "upload" : undefined,
@@ -90,6 +99,11 @@ export function createLocalArtifactCatalogPersistenceAdapter(
         continue;
       }
 
+      if ("deletedAt" in record) {
+        latestByStorageKey.delete(record.storageKey);
+        continue;
+      }
+
       latestByStorageKey.set(record.storageKey, record);
     }
 
@@ -118,8 +132,8 @@ export function createLocalArtifactCatalogPersistenceAdapter(
     async browseArtifactCatalogRecords(request, context = {}) {
       const records = await readCatalogRecords();
       return createSuccessResult({
-        records: typeof request.artifactKind === "string"
-          ? records.filter((record) => record.artifactKind === request.artifactKind)
+        records: request.artifactFamily
+          ? records.filter((record) => record.artifactFamily === request.artifactFamily)
           : records,
       }, context);
     },
@@ -135,6 +149,19 @@ export function createLocalArtifactCatalogPersistenceAdapter(
       }
 
       return createSuccessResult({ record }, context);
+    },
+
+    async deleteArtifactCatalogRecord(request, context = {}) {
+      const storageKey = normalizeStorageArtifactKey(request.storageKey);
+      const records = await readCatalogRecords();
+      const exists = records.some((entry) => entry.storageKey === storageKey);
+      if (!exists) {
+        return createSuccessResult({ deleted: false }, context);
+      }
+
+      await mkdir(path.dirname(catalogPath), { recursive: true });
+      await appendFile(catalogPath, `${JSON.stringify({ storageKey, deletedAt: new Date().toISOString() })}\n`, "utf8");
+      return createSuccessResult({ deleted: true }, context);
     },
   };
 }

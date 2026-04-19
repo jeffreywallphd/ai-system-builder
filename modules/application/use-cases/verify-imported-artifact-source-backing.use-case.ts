@@ -62,7 +62,7 @@ export class VerifyImportedArtifactSourceBackingUseCase {
 
     const artifact = Artifact.fromStorageBindings({
       artifactId: artifactId.toString(),
-      artifactKind: "image",
+      artifactFamily: "image",
       bindings: readBindingsResult.value.bindings,
     });
     const importedSourceBacking = artifact.latestBackingForRole("imported-source");

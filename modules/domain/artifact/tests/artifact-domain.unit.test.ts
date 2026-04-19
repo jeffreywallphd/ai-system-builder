@@ -108,7 +108,7 @@ describe("Artifact", () => {
       verifiedAt: "2026-04-18T11:00:00.000Z",
     }, "2026-04-18T11:00:00.000Z");
 
-    const artifact = Artifact.create({ id, artifactKind: "image", backings: [first] });
+    const artifact = Artifact.create({ id, artifactFamily: "image", backings: [first] });
     artifact.attachOrUpdateBacking(updated);
 
     const backings = artifact.getBackings();
@@ -132,7 +132,7 @@ describe("Artifact", () => {
 
     const artifact = Artifact.fromStorageBindings({
       artifactId: legacyBinding.artifactId,
-      artifactKind: "image",
+      artifactFamily: "image",
       bindings: [legacyBinding],
     });
 
@@ -147,7 +147,7 @@ describe("Artifact", () => {
         now: () => new Date("2026-04-18T12:00:00.000Z"),
         randomSuffix: () => "abc123",
       }),
-      artifactKind: "image",
+      artifactFamily: "image",
     });
     expect(newArtifact.id.toString()).toBe("artifacts/20260418120000-abc123");
   });

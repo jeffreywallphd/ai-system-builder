@@ -235,7 +235,7 @@ describe("contracts cross-family invariants", () => {
       items: [
         {
           storageKey: stagedDescriptor.storage.key,
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: stagedDescriptor.storage.mediaType,
           sizeBytes: stagedDescriptor.storage.sizeBytes,
           sourceKind: stagedDescriptor.sourceKind,
@@ -248,7 +248,7 @@ describe("contracts cross-family invariants", () => {
         locator: {
           storageKey: stagedDescriptor.storage.key,
         },
-        artifactKind: "image",
+        artifactFamily: "image",
         mediaType: stagedDescriptor.storage.mediaType,
         sizeBytes: stagedDescriptor.storage.sizeBytes,
         sourceKind: stagedDescriptor.sourceKind,

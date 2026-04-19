@@ -13,7 +13,7 @@ describe("desktop artifact browser client", () => {
       uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({
         ok: true,
-        value: { items: [{ storageKey: "uploads/cat.png", artifactKind: "image" }] },
+        value: { items: [{ storageKey: "uploads/cat.png", artifactFamily: "image" }] },
       }),
       browseUnregisteredArtifacts: vi.fn().mockResolvedValue({
         ok: true,
@@ -23,7 +23,7 @@ describe("desktop artifact browser client", () => {
       deleteUnregisteredArtifact: vi.fn().mockResolvedValue({ ok: true, value: { storageKey: "uploads/orphan.parquet" } }),
       readArtifactDetail: vi.fn().mockResolvedValue({
         ok: true,
-        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactKind: "image" } },
+        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactFamily: "image" } },
       }),
       readArtifactContentDescriptor: vi.fn().mockResolvedValue({
         ok: true,
@@ -89,7 +89,7 @@ describe("desktop artifact browser client", () => {
     const createdBlob = createObjectURL.mock.calls[0]?.[0];
     expect(createdBlob).toBeInstanceOf(Blob);
     expect(mediaUrl).toBe("blob:desktop-preview");
-    expect(window.desktopApi.browseArtifacts).toHaveBeenCalledWith({ artifactKind: undefined });
+    expect(window.desktopApi.browseArtifacts).toHaveBeenCalledWith({ artifactFamily: undefined });
   });
 
   it("supports browsing/registering/deleting unregistered artifacts", async () => {
@@ -131,7 +131,7 @@ describe("desktop artifact browser client", () => {
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockResolvedValue({
         ok: true,
-        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactKind: "image" } },
+        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactFamily: "image" } },
       }),
       readArtifactContentDescriptor: vi.fn().mockResolvedValue({
         ok: true,
@@ -291,7 +291,7 @@ describe("desktop artifact browser client", () => {
     expect(result.verification.exists).toBe(false);
   });
 
-  it("registers repo artifacts without forcing image artifactKind in the generic path", async () => {
+  it("registers repo artifacts without forcing image artifactFamily in the generic path", async () => {
     window.desktopApi = {
       uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
