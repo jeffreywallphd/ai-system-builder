@@ -1,0 +1,41 @@
+import type { StagedArtifactDescriptor } from "../../contracts/ingestion";
+import {
+  normalizeWebsiteIngestionMode,
+  type WebsiteIngestionMode,
+} from "./website-ingestion-mode";
+import {
+  normalizeWebsiteIngestionTarget,
+  type WebsiteIngestionTarget,
+} from "./website-ingestion-target";
+
+export interface WebsiteIngestionResult {
+  target: WebsiteIngestionTarget;
+  resolvedUrl: string;
+  retrievalModeUsed: WebsiteIngestionMode;
+  stagedArtifact?: StagedArtifactDescriptor;
+  warnings?: string[];
+}
+
+function normalizeRequiredText(fieldName: string, value: string): string {
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    throw new Error(`${fieldName} must be a non-empty trimmed string.`);
+  }
+
+  return normalized;
+}
+
+export function normalizeWebsiteIngestionResult(
+  result: WebsiteIngestionResult,
+): WebsiteIngestionResult {
+  return {
+    ...result,
+    target: normalizeWebsiteIngestionTarget(result.target),
+    resolvedUrl: normalizeRequiredText("resolvedUrl", result.resolvedUrl),
+    retrievalModeUsed: normalizeWebsiteIngestionMode(result.retrievalModeUsed),
+    warnings:
+      result.warnings
+        ?.map((warning) => warning.trim())
+        .filter((warning) => warning.length > 0),
+  };
+}
