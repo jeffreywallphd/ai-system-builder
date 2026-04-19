@@ -10,19 +10,24 @@
   --color-bg-panel: #121826;
   --color-bg-elevated: #1a2233;
   --color-bg-hover: #1f2940;
+  --color-bg-accent: #2485fc;
+  --color-bg-accent-hover: #0073ff;
+  --color-bg-inverse: #ddebff;
 
   --color-border: #2a3446;
   --color-border-soft: #1e2736;
   --color-border-strong: #3a4a63;
+  --color-border-inverse: #ffffff;
 
   --color-text-primary: #e6edf7;
   --color-text-secondary: #9fb0c8;
   --color-text-muted: #6e7f98;
   --color-text-inverse: #ffffff;
+   --color-text-dark: #111111;
 
   --color-success: #3fb950;
   --color-warning: #f2c94c;
-  --color-danger: #ff6b6b;
+  --color-danger: #ec2626;
   --color-info: #4f9cf9;
 
   /* Typography */

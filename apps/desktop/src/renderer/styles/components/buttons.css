@@ -3,7 +3,7 @@
   padding: 0 var(--space-md);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
+  background: var(--color-bg-accent);
   color: var(--color-text-primary);
   cursor: pointer;
   transition:
@@ -12,8 +12,8 @@
 }
 
 .ui-button:hover:enabled {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border-strong);
+  background: var(--color-bg-accent-hover);
+  border-color: var(--color-border-inverse);
 }
 
 .ui-button[aria-current="page"] {

@@ -5,6 +5,11 @@
   padding: var(--space-lg);
 }
 
+.ui-panel-divider {
+  margin: 15px 0px 15px 0px;
+  color: var(--color-bg-inverse);
+}
+
 .ui-panel--elevated {
   background: var(--color-bg-elevated);
 }
