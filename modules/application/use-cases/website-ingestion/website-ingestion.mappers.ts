@@ -31,7 +31,10 @@ export interface WebsitePageIngestionCommand {
   mode: WebsiteIngestionMode;
 }
 
-type WebsiteIngestionArtifactMetadata = WebsiteHtmlCaptureMetadata & { artifactFamily: ArtifactFamily };
+type WebsiteIngestionArtifactMetadata =
+  StorageObjectMetadata
+  & WebsiteHtmlCaptureMetadata
+  & { artifactFamily: ArtifactFamily };
 
 export interface WebsitePageIngestionCompleted {
   ingestion: WebsiteIngestionResult;
