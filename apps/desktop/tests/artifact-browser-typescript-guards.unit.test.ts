@@ -8,6 +8,16 @@ function readSourceFile(relativePath: string): string {
 }
 
 describe("artifact browser TypeScript regression guards", () => {
+  it("keeps useArtifactSelectionContent state hooks explicitly initialized for React 19 typings", () => {
+    const source = readSourceFile(
+      "apps/desktop/src/renderer/features/artifact-browser/hooks/useArtifactSelectionContent.ts",
+    );
+
+    expect(source).toContain("useState<string | undefined>(undefined)");
+    expect(source).toContain("useState<DesktopArtifactDetail | undefined>(undefined)");
+    expect(source).toContain("useState<DesktopArtifactContentDescriptor | undefined>(undefined)");
+  });
+
   it("keeps selectedStorageKey destructured in desktop ArtifactBrowserFeature", () => {
     const source = readSourceFile(
       "apps/desktop/src/renderer/features/artifact-browser/components/ArtifactBrowserFeature.tsx",
