@@ -53,6 +53,41 @@ export interface DesktopArtifactBrowserClient {
   }) => Promise<DesktopLocalizedArtifactFromRepo>;
 }
 
+function toBrowseItems(value: unknown): DesktopArtifactBrowseItem[] {
+  if (Array.isArray(value)) {
+    return value as DesktopArtifactBrowseItem[];
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+
+  const payload = value as {
+    items?: DesktopArtifactBrowseItem[];
+    registeredItems?: DesktopArtifactBrowseItem[];
+    registered?: { items?: DesktopArtifactBrowseItem[] };
+    registeredItemsMap?: Record<string, DesktopArtifactBrowseItem>;
+  };
+
+  if (Array.isArray(payload.items)) {
+    return payload.items;
+  }
+
+  if (Array.isArray(payload.registeredItems)) {
+    return payload.registeredItems;
+  }
+
+  if (Array.isArray(payload.registered?.items)) {
+    return payload.registered.items;
+  }
+
+  if (payload.registeredItemsMap && typeof payload.registeredItemsMap === "object") {
+    return Object.values(payload.registeredItemsMap);
+  }
+
+  return [];
+}
+
 function ensureSuccess<T>(
   response: unknown,
   pick: (value: unknown) => T,
@@ -126,10 +161,7 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
     async browseArtifacts(input = {}) {
       return ensureSuccess(
         await desktopApi.browseArtifacts({ artifactFamily: input.artifactFamily }),
-        (value) => {
-          const items = (value as { items?: DesktopArtifactBrowseItem[] } | undefined)?.items;
-          return Array.isArray(items) ? items : [];
-        },
+        (value) => toBrowseItems(value),
         "Failed to browse artifacts.",
       );
     },

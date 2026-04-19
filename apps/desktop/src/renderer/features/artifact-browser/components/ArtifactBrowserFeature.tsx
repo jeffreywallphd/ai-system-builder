@@ -98,12 +98,21 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
       <section className="ui-stack ui-stack--sm">
         <h3>Filter by family</h3>
-        <div className="ui-grid ui-grid--two">
-          <button className="ui-button" type="button" aria-current={selectedArtifactFamily === "all" ? "page" : undefined} onClick={() => setSelectedArtifactFamily("all")}>All</button>
-          {ARTIFACT_BROWSER_FAMILY_OPTIONS.map((family) => (
-            <button key={family} className="ui-button" type="button" aria-current={selectedArtifactFamily === family ? "page" : undefined} onClick={() => setSelectedArtifactFamily(family)}>{family}</button>
-          ))}
-        </div>
+        <label className="ui-stack ui-stack--sm">
+          <span>Family</span>
+          <select
+            className="ui-input"
+            value={selectedArtifactFamily}
+            onChange={(event) => setSelectedArtifactFamily(event.target.value as typeof selectedArtifactFamily)}
+          >
+            <option value="all">All</option>
+            {ARTIFACT_BROWSER_FAMILY_OPTIONS.map((family) => (
+              <option key={family} value={family}>
+                {family}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
       {pendingDeleteConfirmation ? (
         <section className="ui-panel ui-stack ui-stack--sm" role="dialog" aria-label="Delete confirmation">

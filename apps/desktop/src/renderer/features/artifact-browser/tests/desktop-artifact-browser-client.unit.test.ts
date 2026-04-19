@@ -125,6 +125,39 @@ describe("desktop artifact browser client", () => {
     expect(window.desktopApi.deleteUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan.json" });
   });
 
+  it("maps registered artifact browse results from registeredItemsMap payloads", async () => {
+    window.desktopApi = {
+      uploadArtifact: vi.fn(),
+      browseArtifacts: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          registeredItemsMap: {
+            "artifacts/20260418000000-import001": {
+              storageKey: "artifacts/20260418000000-import001",
+              artifactFamily: "tabular",
+            },
+          },
+        },
+      }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
+      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+    };
+
+    const client = createDesktopArtifactBrowserClient();
+    const items = await client.browseArtifacts();
+
+    expect(items).toEqual([
+      {
+        storageKey: "artifacts/20260418000000-import001",
+        artifactFamily: "tabular",
+      },
+    ]);
+  });
+
   it("creates media blob from the typed-array view, not the full backing buffer", async () => {
     const backingBytes = new Uint8Array([9, 1, 2, 3, 7]);
     const slicedView = backingBytes.subarray(1, 4);
