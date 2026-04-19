@@ -132,7 +132,7 @@ interface DesktopApiBridge {
   browseHuggingFaceDatasetParquetFiles: (input: { repository: string; revision?: string }) => Promise<unknown>;
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<unknown>;
   getArtifactUploadPolicy: () => Promise<unknown>;
-  browseArtifacts: (input?: { artifactFamily?: string }) => Promise<unknown>;
+  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
   deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
@@ -163,7 +163,7 @@ interface DesktopApiBridge {
       path: string;
       revision?: string;
     };
-    artifactFamily?: string;
+    artifactFamily?: DesktopArtifactFamily;
     mediaType?: string;
   }) => Promise<unknown>;
   localizeArtifactFromRepo: (input: {
