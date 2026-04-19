@@ -22,11 +22,11 @@ export function useArtifactSelectionContent(
   client: DesktopArtifactBrowserClient,
   setViewState: (value: ArtifactBrowserViewState) => void
 ): UseArtifactSelectionContentResult {
-  const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>();
-  const [detail, setDetail] = useState<DesktopArtifactDetail | undefined>();
-  const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
-  const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
-  const [htmlPreview, setHtmlPreview] = useState<string | undefined>();
+  const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>(undefined);
+  const [detail, setDetail] = useState<DesktopArtifactDetail | undefined>(undefined);
+  const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>(undefined);
+  const [imageViewUrl, setImageViewUrl] = useState<string | undefined>(undefined);
+  const [htmlPreview, setHtmlPreview] = useState<string | undefined>(undefined);
   const activeImageViewUrl = useRef<string | undefined>();
 
   const revokeObjectUrl = useCallback((url: string) => {
