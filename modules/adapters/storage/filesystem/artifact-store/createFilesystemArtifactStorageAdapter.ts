@@ -6,9 +6,9 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { ApplicationRequestContext } from "../../../../application/ports";
 import type { ArtifactCatalogAppendPort } from "../../../../application/ports/artifact-catalog";
 import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
+import { resolveArtifactFamily } from "../../../../application/shared/artifact-family-classifier";
 import type { ContractErrorCode } from "../../../../contracts/shared";
 import { createContractError } from "../../../../contracts/shared";
-import { resolveArtifactFamily } from "../../../../domain/artifact";
 import {
   createDeleteArtifactFailureResult,
   createDeleteArtifactSuccessResult,

@@ -1,5 +1,5 @@
 import type { ArtifactBrowseItem as ArtifactBrowseContractItem } from "../../../../../../modules/contracts/artifact-browser";
-import { resolveArtifactFamily as resolveCanonicalArtifactFamily } from "../../../../../../modules/domain/artifact";
+import { resolveArtifactFamily as resolveCanonicalArtifactFamily } from "../../../../../../modules/application/shared/artifact-family-classifier";
 
 export interface ArtifactBrowserLocator {
   storageKey: string;

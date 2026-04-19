@@ -34,7 +34,7 @@ import {
   type ArtifactStorageBindingRole,
   type StorageObjectMetadata,
 } from "../../../../contracts/storage";
-import { resolveArtifactFamily } from "../../../../domain/artifact";
+import { resolveArtifactFamily } from "../../../../application/shared/artifact-family-classifier";
 
 export interface FilesystemArtifactBrowserReadAdapter
   extends ArtifactBrowserMetadataReadPort,

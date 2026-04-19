@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiArtifactBrowserClient } from "../api/apiArtifactBrowserClient";
-import { resolveArtifactFamily } from "../../../../../../modules/domain/artifact";
+import { resolveArtifactFamily } from "../../../../../../modules/application/shared/artifact-family-classifier";
 
 describe("api artifact browser client", () => {
   afterEach(() => {
