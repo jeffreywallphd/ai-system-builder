@@ -109,6 +109,18 @@ import {
   createDesktopHuggingFaceDatasetParquetFilesBrowseRequest,
   type DesktopHuggingFaceNamespaceDatasetsBrowseResponse,
   type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
+  DESKTOP_INGEST_WEBSITE_PAGE_OPERATION,
+  DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGE_RESPONSE_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGES_BATCH_OPERATION,
+  DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGES_BATCH_RESPONSE_CHANNEL,
+  createDesktopIngestWebsitePageRequest,
+  createDesktopIngestWebsitePagesBatchRequest,
+  type DesktopIngestWebsitePageRequest,
+  type DesktopIngestWebsitePageResponse,
+  type DesktopIngestWebsitePagesBatchRequest,
+  type DesktopIngestWebsitePagesBatchResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 
@@ -160,6 +172,21 @@ export interface DesktopPreloadApi {
   getArtifactUploadPolicy: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
+  ingestWebsitePage: (
+    input: {
+      url: string;
+      label?: string;
+      mode?: "automatic" | "rendered";
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopIngestWebsitePageResponse>;
+  ingestWebsitePagesBatch: (
+    input: {
+      targets: Array<{ url: string; label?: string }>;
+      mode?: "automatic" | "rendered";
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopIngestWebsitePagesBatchResponse>;
   browseArtifacts: (
     input?: { artifactFamily?: ArtifactFamily },
     context?: DesktopArtifactUploadBridgeContext,
@@ -411,6 +438,59 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_OPERATION,
         channel: DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact upload policy IPC response envelope.",
+      });
+    },
+
+    async ingestWebsitePage(input, context = {}) {
+      const request: DesktopIngestWebsitePageRequest = createDesktopIngestWebsitePageRequest(
+        {
+          request: {
+            url: input.url,
+            label: input.label,
+            mode: input.mode,
+          },
+          boundary: {
+            host: "desktop",
+            source: uploadSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopIngestWebsitePageResponse>(response, {
+        operation: DESKTOP_INGEST_WEBSITE_PAGE_OPERATION,
+        channel: DESKTOP_INGEST_WEBSITE_PAGE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop website-page ingestion IPC response envelope.",
+      });
+    },
+
+    async ingestWebsitePagesBatch(input, context = {}) {
+      const request: DesktopIngestWebsitePagesBatchRequest = createDesktopIngestWebsitePagesBatchRequest(
+        {
+          request: {
+            targets: input.targets,
+            mode: input.mode,
+          },
+          boundary: {
+            host: "desktop",
+            source: uploadSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopIngestWebsitePagesBatchResponse>(response, {
+        operation: DESKTOP_INGEST_WEBSITE_PAGES_BATCH_OPERATION,
+        channel: DESKTOP_INGEST_WEBSITE_PAGES_BATCH_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop website-pages batch ingestion IPC response envelope.",
       });
     },
 

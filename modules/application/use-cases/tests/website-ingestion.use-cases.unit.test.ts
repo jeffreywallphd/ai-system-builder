@@ -76,6 +76,7 @@ describe("website ingestion use cases", () => {
     expect(result.value.acquisitionMechanismUsed).toBe("simple-http");
     expect(result.value.stagedArtifact?.storage.key).toBe("staged/real/object-1.html");
     expect(result.value.stagedArtifact?.storage.mediaType).toBe("text/html");
+    expect(result.value.stagedArtifact?.originalName).toBe("example.com-docs.html");
     expect(result.value.stagedArtifact?.metadata).toMatchObject({
       artifactFamily: "structured-text",
       sourceUrl: "https://example.com/docs",
@@ -221,6 +222,15 @@ describe("website ingestion use cases", () => {
         sizeBytes: 12,
         metadata: storageDescriptorInput.metadata,
       },
+      expectedMetadata: storageDescriptorInput.metadata ?? {
+        artifactFamily: "structured-text",
+        sourceUrl: "https://example.com/path",
+        resolvedUrl: "https://example.com/path",
+        retrievedAt: "2026-04-19T14:00:00.000Z",
+        requestedMode: "rendered",
+        acquisitionMechanismUsed: "rendered-browser",
+        rendered: true,
+      },
     });
 
     const contractResult = mapDomainResultToContractResult({
@@ -239,7 +249,8 @@ describe("website ingestion use cases", () => {
 
     expect(contractResult.value.stagedArtifact?.storage.key).toContain("staged/website/example.com/path-");
     expect(contractResult.value.stagedArtifact?.storage.mediaType).toBe("text/html");
-    expect(contractResult.value.stagedArtifact?.metadata).toMatchObject({ artifactFamily: "structured-text" });
+    expect(contractResult.value.stagedArtifact?.originalName).toBe("example.com-path.html");
+    expect(contractResult.value.stagedArtifact?.metadata).toMatchObject({ artifactFamily: "structured-text", requestedMode: "rendered", acquisitionMechanismUsed: "rendered-browser" });
     expect(contractResult.value.sourceKind).toBe("scrape");
     expect(contractResult.value.acquisitionMechanismUsed).toBe("rendered-browser");
   });

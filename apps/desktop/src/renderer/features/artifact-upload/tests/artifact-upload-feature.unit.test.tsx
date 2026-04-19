@@ -51,5 +51,8 @@ describe("ArtifactUploadFeature", () => {
     expect(container.textContent).toContain("Artifact upload");
     expect(container.textContent).toContain("Hugging Face token");
     expect(container.textContent).toContain("Register from Hugging Face");
+    expect(container.textContent).toContain("Website ingestion");
+    expect(container.textContent).toContain("Ingest page");
+    expect(container.textContent).toContain("Ingest batch");
   });
 });

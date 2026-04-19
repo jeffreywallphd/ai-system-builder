@@ -7,6 +7,10 @@ import {
   registerArtifactBrowserIpc,
   type RegisterArtifactBrowserIpcDependencies,
 } from "./artifact-browser/registerArtifactBrowserIpc";
+import {
+  registerWebsiteIngestionIpc,
+  type RegisterWebsiteIngestionIpcDependencies,
+} from "./website-ingestion/registerWebsiteIngestionIpc";
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
@@ -29,6 +33,8 @@ export interface RegisterElectronIpcDependencies {
   verifyImportedArtifactSourceBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyImportedArtifactSourceBackingUseCase"];
   registerArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["registerArtifactFromRepoUseCase"];
   localizeArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["localizeArtifactFromRepoUseCase"];
+  ingestWebsitePageUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePageUseCase"];
+  ingestWebsitePagesBatchUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePagesBatchUseCase"];
 }
 
 export function registerElectronIpc(
@@ -60,4 +66,12 @@ export function registerElectronIpc(
     registerArtifactFromRepoUseCase: dependencies.registerArtifactFromRepoUseCase,
     localizeArtifactFromRepoUseCase: dependencies.localizeArtifactFromRepoUseCase,
   });
+
+  registerWebsiteIngestionIpc({
+    ipcMain: dependencies.ipcMain,
+    ingestWebsitePageUseCase: dependencies.ingestWebsitePageUseCase,
+    ingestWebsitePagesBatchUseCase: dependencies.ingestWebsitePagesBatchUseCase,
+  });
 }
+
+

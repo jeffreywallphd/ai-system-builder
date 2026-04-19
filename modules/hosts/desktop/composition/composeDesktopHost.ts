@@ -16,8 +16,11 @@ import {
   DeleteRegisteredArtifactUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
+  IngestWebsitePageUseCase,
+  IngestWebsitePagesBatchUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
+import { createWebsiteHtmlAcquisitionPort } from "../../../adapters/ingestion";
 import {
   createArtifactRepoStorageAdapter,
 } from "../../../adapters/storage/artifact-repo";
@@ -215,6 +218,16 @@ export function composeDesktopHost(
         now: options.now,
       });
 
+      const websiteHtmlAcquisition = createWebsiteHtmlAcquisitionPort();
+      const ingestWebsitePage = new IngestWebsitePageUseCase({
+        acquisition: websiteHtmlAcquisition,
+        storage,
+        now: options.now,
+      });
+      const ingestWebsitePagesBatch = new IngestWebsitePagesBatchUseCase({
+        ingestWebsitePage,
+      });
+
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
@@ -236,6 +249,8 @@ export function composeDesktopHost(
         verifyImportedArtifactSourceBackingUseCase: verifyImportedArtifactSourceBacking,
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
+        ingestWebsitePageUseCase: ingestWebsitePage,
+        ingestWebsitePagesBatchUseCase: ingestWebsitePagesBatch,
       });
     },
   };

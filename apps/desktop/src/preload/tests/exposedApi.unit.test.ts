@@ -28,6 +28,10 @@ import {
   createIpcFailureResponse,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   createDesktopHuggingFaceTokenGetSuccessResponse,
+  DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL,
+  createDesktopIngestWebsitePageSuccessResponse,
+  createDesktopIngestWebsitePagesBatchSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
@@ -302,4 +306,40 @@ it("maps unregistered artifact browse/register/delete bridge calls to dedicated 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[2]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value);
+});
+
+
+it("maps website page ingestion bridge calls to dedicated IPC request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopIngestWebsitePageSuccessResponse({
+      target: { url: "https://example.com" },
+      resolvedUrl: "https://example.com",
+      acquisitionMechanismUsed: "simple-http",
+      sourceKind: "scrape",
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  const response = await api.ingestWebsitePage({ url: "https://example.com", mode: "automatic" });
+
+  expect(response.ok).toBe(true);
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value);
+});
+
+it("maps website pages batch ingestion bridge calls to dedicated IPC request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopIngestWebsitePagesBatchSuccessResponse({
+      items: [],
+      summary: { attempted: 0, succeeded: 0, failed: 0 },
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  const response = await api.ingestWebsitePagesBatch({
+    targets: [{ url: "https://example.com/a" }, { url: "https://example.com/b" }],
+    mode: "rendered",
+  });
+
+  expect(response.ok).toBe(true);
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value);
 });

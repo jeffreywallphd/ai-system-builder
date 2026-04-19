@@ -47,14 +47,21 @@ export class IngestWebsitePageUseCase {
       const acquisitionResult = await this.acquisition.acquireWebsiteHtml(acquisitionRequest, context);
       const domainResult = mapAcquisitionResultToDomain(acquisitionResult, domainCommand);
 
+      const retrievedAt = this.now();
       const htmlBytes = new TextEncoder().encode(acquisitionResult.html);
-      const storageRequest = createStoreArtifactRequest(htmlBytes, {
-        descriptor: mapAcquisitionResultToStorageDescriptorInput({
-          command: domainCommand,
-          acquisitionResult,
-          retrievedAt: this.now(),
-        }),
+      const storageDescriptorInput = mapAcquisitionResultToStorageDescriptorInput({
+        command: domainCommand,
+        acquisitionResult,
+        retrievedAt,
       });
+      const storageRequest = createStoreArtifactRequest(htmlBytes, {
+        descriptor: storageDescriptorInput,
+      });
+
+      const expectedMetadata = storageDescriptorInput.metadata;
+      if (!expectedMetadata) {
+        throw new Error("Website ingestion storage descriptor metadata was not generated.");
+      }
 
       const storeResult = await this.storage.storeArtifact(storageRequest, context);
       if (!storeResult.ok) {
@@ -65,6 +72,7 @@ export class IngestWebsitePageUseCase {
         command: domainCommand,
         acquisitionResult,
         storageDescriptor: storeResult.value,
+        expectedMetadata,
       });
 
       return mapDomainResultToContractResult({

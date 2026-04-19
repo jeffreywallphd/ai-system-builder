@@ -97,6 +97,24 @@ function toStorageKey(resolvedUrl: string, retrievedAt: string): string {
   return `staged/website/${host}/${pathToken}-${timestampToken}.html`;
 }
 
+function toOriginalName(resolvedUrl: string): string {
+  const url = new URL(resolvedUrl);
+  const host = url.hostname.toLowerCase();
+  const segments = url.pathname
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.replace(/\.[a-zA-Z0-9]+$/, ""))
+    .map((segment) => segment.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase())
+    .filter((segment) => segment.length > 0);
+
+  if (segments.length === 0) {
+    return `${host}.html`;
+  }
+
+  return `${host}-${segments.join("-")}.html`;
+}
+
 function buildWebsiteIngestionMetadata(input: {
   sourceUrl: string;
   acquisitionResult: WebsiteHtmlAcquisitionResult;
@@ -119,6 +137,20 @@ function buildWebsiteIngestionMetadata(input: {
     ...metadata,
     artifactFamily: "structured-text",
   };
+}
+
+function normalizeStoredWebsiteMetadata(
+  metadata: StorageObjectMetadata | undefined,
+  fallback: WebsiteIngestionArtifactMetadata,
+): WebsiteIngestionArtifactMetadata {
+  if (!metadata) {
+    return fallback;
+  }
+
+  return {
+    ...fallback,
+    ...metadata,
+  } as WebsiteIngestionArtifactMetadata;
 }
 
 export function mapAcquisitionResultToStorageDescriptorInput(input: {
@@ -145,16 +177,17 @@ export function mapStoredWebsiteToStagedArtifactDescriptor(input: {
   command: WebsitePageIngestionCommand;
   acquisitionResult: WebsiteHtmlAcquisitionResult;
   storageDescriptor: StorageObjectDescriptor<StorageObjectMetadata>;
+  expectedMetadata: WebsiteIngestionArtifactMetadata;
 }): StagedArtifactDescriptor<WebsiteIngestionArtifactMetadata> {
   const normalizedAcquisition = normalizeWebsiteHtmlAcquisitionResult(input.acquisitionResult);
   return createStagedArtifactDescriptorFromStorageObjectDescriptor(
     {
       ...input.storageDescriptor,
-      metadata: input.storageDescriptor.metadata as WebsiteIngestionArtifactMetadata,
+      metadata: normalizeStoredWebsiteMetadata(input.storageDescriptor.metadata, input.expectedMetadata),
     },
     {
       sourceKind: "scrape",
-      originalName: `${new URL(normalizedAcquisition.resolvedUrl).hostname}.html`,
+      originalName: toOriginalName(normalizedAcquisition.resolvedUrl),
     },
   );
 }
