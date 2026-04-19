@@ -18,12 +18,12 @@ import type {
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
-
-interface PendingDeleteConfirmation {
-  kind: "registered" | "unregistered";
-  storageKey: string;
-  label: string;
-}
+import {
+  type PendingDeleteConfirmation,
+  useArtifactDeleteConfirmation,
+} from "./useArtifactDeleteConfirmation";
+import { useArtifactSelectionContent } from "./useArtifactSelectionContent";
+import { useArtifactBrowserHuggingFace } from "./useArtifactBrowserHuggingFace";
 
 export interface UseArtifactBrowserFeatureResult {
   huggingFaceTokenStatus: { configured: boolean; maskedToken?: string };
@@ -100,72 +100,26 @@ export interface UseArtifactBrowserFeatureResult {
 export function useArtifactBrowserFeature(
   client?: DesktopArtifactBrowserClient,
 ): UseArtifactBrowserFeatureResult {
-  type DatasetFilesPanelState = {
-    files: DesktopHuggingFaceDatasetParquetFile[];
-    state: ArtifactBrowserViewState;
-  };
-
-  const withHuggingFaceAuthGuidance = (message: string): string => {
-    const normalized = message.toLowerCase();
-    const mentionsAuth = normalized.includes("hugging face")
-      && (
-        normalized.includes("token")
-        || normalized.includes("auth")
-        || normalized.includes("401")
-        || normalized.includes("403")
-        || normalized.includes("access denied")
-        || normalized.includes("private")
-        || normalized.includes("gated")
-      );
-    if (!mentionsAuth) {
-      return message;
-    }
-
-    return `${message} This Hugging Face repository may require an access token. Open Hugging Face token settings in this page to configure desktop-host access for private or gated repos.`;
-  };
-
   const artifactClient = useArtifactBrowserClient(client);
   const [items, setItems] = useState<DesktopArtifactBrowseItem[]>([]);
   const [unregisteredItems, setUnregisteredItems] = useState<DesktopUnregisteredArtifactBrowseItem[]>([]);
-  const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>();
-  const [detail, setDetail] = useState<DesktopArtifactDetail | undefined>();
-  const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
-  const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
-  const [htmlPreview, setHtmlPreview] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [selectedArtifactFamily, setSelectedArtifactFamily] = useState<DesktopArtifactFamily | "all">("all");
-  const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [localizeState, setLocalizeState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [sourceVerifyState, setSourceVerifyState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [localizedArtifact, setLocalizedArtifact] = useState<DesktopLocalizedArtifactFromRepo | undefined>();
-  const [registerRepository, setRegisterRepository] = useState("");
-  const [registerNamespace, setRegisterNamespace] = useState("");
-  const [registerPathInRepo, setRegisterPathInRepo] = useState("");
-  const [registerRevision, setRegisterRevision] = useState("main");
-  const [registerMediaType, setRegisterMediaType] = useState("");
-  const [showRegisterForm, setShowRegisterForm] = useState(false);
-  const [huggingFaceNamespaceDatasets, setHuggingFaceNamespaceDatasets] = useState<DesktopHuggingFaceNamespaceDataset[]>([]);
-  const [datasetFilesByRepository, setDatasetFilesByRepository] = useState<Record<string, DatasetFilesPanelState>>({});
-  const [expandedHuggingFaceDataset, setExpandedHuggingFaceDataset] = useState<string | undefined>();
-  const [tokenInput, setTokenInput] = useState("");
-  const [tokenState, setTokenState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [huggingFaceTokenStatus, setHuggingFaceTokenStatus] = useState<{ configured: boolean; maskedToken?: string }>({
-    configured: false,
-  });
-  const [pendingDeleteConfirmation, setPendingDeleteConfirmation] = useState<PendingDeleteConfirmation | undefined>();
-  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
+
+  const selection = useArtifactSelectionContent(
+    artifactClient,
+    setViewState,
+  );
 
   const publishLogic = useArtifactBrowserPublishLogic<DesktopArtifactDetail>({
-    selectedStorageKey,
+    selectedStorageKey: selection.selectedStorageKey,
     client: artifactClient,
     async readSelectedArtifactDetail() {
-      if (!selectedStorageKey) {
+      if (!selection.selectedStorageKey) {
         return undefined;
       }
 
-      const artifactDetail = await artifactClient.readArtifactDetail({ storageKey: selectedStorageKey });
-      setDetail(artifactDetail);
-      return artifactDetail;
+      return artifactClient.readArtifactDetail({ storageKey: selection.selectedStorageKey });
     },
   });
 
@@ -192,6 +146,8 @@ export function useArtifactBrowserFeature(
     }
   }, [artifactClient, selectedArtifactFamily]);
 
+  const deleteConfirmation = useArtifactDeleteConfirmation();
+
   async function registerUnregisteredArtifact(storageKey: string): Promise<void> {
     setViewState({ status: "loading", message: `Registering ${storageKey}...` });
     try {
@@ -207,29 +163,6 @@ export function useArtifactBrowserFeature(
         message: error instanceof Error ? error.message : "Failed to register unregistered artifact.",
       });
     }
-  }
-
-  function requestDeleteUnregisteredArtifact(storageKey: string): void {
-    setDeleteConfirmationInput("");
-    setPendingDeleteConfirmation({
-      kind: "unregistered",
-      storageKey,
-      label: `Delete unregistered artifact ${storageKey}`,
-    });
-  }
-
-  function requestDeleteRegisteredArtifact(storageKey: string): void {
-    setDeleteConfirmationInput("");
-    setPendingDeleteConfirmation({
-      kind: "registered",
-      storageKey,
-      label: `Delete registered artifact ${storageKey}`,
-    });
-  }
-
-  function cancelPendingDelete(): void {
-    setDeleteConfirmationInput("");
-    setPendingDeleteConfirmation(undefined);
   }
 
   async function runDeleteUnregisteredArtifact(storageKey: string): Promise<void> {
@@ -256,11 +189,7 @@ export function useArtifactBrowserFeature(
         throw new Error("Registered artifact delete flow is unavailable.");
       }
       await artifactClient.deleteRegisteredArtifact({ storageKey });
-      setDetail(undefined);
-      setContent(undefined);
-      setImageViewUrl(undefined);
-      setHtmlPreview(undefined);
-      setSelectedStorageKey(undefined);
+      selection.clearSelectedArtifact();
       await refreshArtifacts();
       setViewState({ status: "success", message: `Deleted ${storageKey}.` });
     } catch (error) {
@@ -272,17 +201,17 @@ export function useArtifactBrowserFeature(
   }
 
   async function confirmPendingDelete(): Promise<void> {
-    if (!pendingDeleteConfirmation) {
+    if (!deleteConfirmation.pendingDeleteConfirmation) {
       return;
     }
 
-    if (deleteConfirmationInput !== "Delete") {
+    if (deleteConfirmation.deleteConfirmationInput !== "Delete") {
       setViewState({ status: "error", message: "Delete cancelled: typed confirmation must be exactly Delete." });
       return;
     }
 
-    const pending = pendingDeleteConfirmation;
-    cancelPendingDelete();
+    const pending = deleteConfirmation.pendingDeleteConfirmation;
+    deleteConfirmation.cancelPendingDelete();
 
     if (pending.kind === "registered") {
       await runDeleteRegisteredArtifact(pending.storageKey);
@@ -292,262 +221,23 @@ export function useArtifactBrowserFeature(
     await runDeleteUnregisteredArtifact(pending.storageKey);
   }
 
+  const huggingFace = useArtifactBrowserHuggingFace({
+    client: artifactClient,
+    refreshArtifacts,
+    selectArtifact: selection.selectArtifact,
+    selectedStorageKey: selection.selectedStorageKey,
+  });
+
+  useEffect(() => {
+    publishLogic.setPublishedBackingFromDetail(selection.detail);
+  }, [selection.detail]);
+
   useEffect(() => {
     void refreshArtifacts();
-    void artifactClient.getHuggingFaceTokenStatus().then(setHuggingFaceTokenStatus).catch(() => {
-      setHuggingFaceTokenStatus({ configured: false });
+    void artifactClient.getHuggingFaceTokenStatus().then(huggingFace.setHuggingFaceTokenStatus).catch(() => {
+      huggingFace.setHuggingFaceTokenStatus({ configured: false });
     });
-  }, [refreshArtifacts]);
-
-  async function saveHuggingFaceToken(): Promise<void> {
-    setTokenState({ status: "loading", message: "Saving Hugging Face token..." });
-    try {
-      const status = await artifactClient.setHuggingFaceToken({ token: tokenInput });
-      setHuggingFaceTokenStatus(status);
-      setTokenInput("");
-      setTokenState({ status: "success", message: "Hugging Face token saved." });
-    } catch (error) {
-      setTokenState({ status: "error", message: error instanceof Error ? error.message : "Failed to save Hugging Face token." });
-    }
-  }
-
-  async function clearHuggingFaceToken(): Promise<void> {
-    setTokenState({ status: "loading", message: "Removing Hugging Face token..." });
-    try {
-      const status = await artifactClient.clearHuggingFaceToken();
-      setHuggingFaceTokenStatus(status);
-      setTokenInput("");
-      setTokenState({ status: "success", message: "Hugging Face token removed." });
-    } catch (error) {
-      setTokenState({ status: "error", message: error instanceof Error ? error.message : "Failed to remove Hugging Face token." });
-    }
-  }
-
-  async function selectArtifact(storageKey: string): Promise<void> {
-    setSelectedStorageKey(storageKey);
-    setViewState({ status: "loading", message: `Loading ${storageKey}...` });
-
-    try {
-      const locator = { storageKey };
-      const artifactDetail = await artifactClient.readArtifactDetail(locator);
-
-      setDetail(artifactDetail);
-      publishLogic.setPublishedBackingFromDetail(artifactDetail);
-
-      try {
-        const contentDescriptor = await artifactClient.readArtifactContent(locator);
-        setContent(contentDescriptor);
-        setHtmlPreview(undefined);
-        if (contentDescriptor.mediaType?.startsWith("image/")) {
-          try {
-            const nextImageViewUrl = await artifactClient.createArtifactMediaViewUrl(locator);
-            setImageViewUrl(nextImageViewUrl);
-          } catch {
-            setImageViewUrl(undefined);
-          }
-        } else {
-          setImageViewUrl(undefined);
-          if (contentDescriptor.availability === "available" && contentDescriptor.mediaType === "text/html") {
-            try {
-              const media = await artifactClient.readArtifactMedia(locator);
-              const preview = new TextDecoder().decode(media.bytes).slice(0, 50000);
-              setHtmlPreview(preview);
-            } catch {
-              setHtmlPreview(undefined);
-            }
-          }
-        }
-      } catch {
-        setContent({ locator, availability: "unavailable", retrieval: "deferred" });
-        setImageViewUrl(undefined);
-        setHtmlPreview(undefined);
-      }
-
-      setViewState({ status: "success", message: `Loaded ${storageKey}.` });
-    } catch (error) {
-      setDetail(undefined);
-      setContent(undefined);
-      setImageViewUrl(undefined);
-      setHtmlPreview(undefined);
-      publishLogic.setPublishedBackingFromDetail(undefined);
-      setViewState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Failed to load artifact detail.",
-      });
-    }
-  }
-
-  async function registerArtifactFromHuggingFace(
-    input: {
-      repository?: string;
-      pathInRepo?: string;
-      revision?: string;
-      mediaType?: string;
-    } = {},
-  ): Promise<void> {
-    setRegisterState({ status: "loading", message: "Registering remote artifact..." });
-    const repository = input.repository ?? registerRepository;
-    const pathInRepo = input.pathInRepo ?? registerPathInRepo;
-    const revision = input.revision ?? registerRevision;
-    const mediaType = input.mediaType ?? registerMediaType;
-
-    try {
-      const registered = await artifactClient.registerArtifactFromRepo({
-        repository,
-        path: pathInRepo,
-        revision,
-        mediaType: mediaType || undefined,
-      });
-      setRegisterRepository(repository);
-      setRegisterPathInRepo(pathInRepo);
-      setRegisterRevision(revision);
-      setRegisterMediaType(mediaType);
-      await refreshArtifacts();
-      await selectArtifact(registered.artifactId);
-      setRegisterState({
-        status: "success",
-        message: `Registered ${registered.artifactId} from Hugging Face.`,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to register artifact from repo.";
-      setRegisterState({
-        status: "error",
-        message: withHuggingFaceAuthGuidance(message),
-      });
-    }
-  }
-
-  async function registerHuggingFaceNamespace(): Promise<void> {
-    setRegisterState({ status: "loading", message: "Loading namespace datasets..." });
-    try {
-      if (!artifactClient.browseHuggingFaceNamespaceDatasets) {
-        throw new Error("Namespace browsing is unavailable for this client.");
-      }
-      const datasets = await artifactClient.browseHuggingFaceNamespaceDatasets({
-        namespace: registerNamespace,
-      });
-      setHuggingFaceNamespaceDatasets(datasets);
-      setDatasetFilesByRepository({});
-      setExpandedHuggingFaceDataset(undefined);
-      setRegisterState({
-        status: "success",
-        message: datasets.length > 0
-          ? `Registered namespace ${registerNamespace} and loaded datasets.`
-          : `Registered namespace ${registerNamespace}. No datasets found.`,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load namespace datasets.";
-      setRegisterState({ status: "error", message: withHuggingFaceAuthGuidance(message) });
-    }
-  }
-
-  async function browseHuggingFaceDatasetParquetFiles(repository: string): Promise<void> {
-    setExpandedHuggingFaceDataset(repository);
-    setDatasetFilesByRepository((current) => ({
-      ...current,
-      [repository]: {
-        files: current[repository]?.files ?? [],
-        state: { status: "loading", message: `Loading files for ${repository}...` },
-      },
-    }));
-    try {
-      if (!artifactClient.browseHuggingFaceDatasetParquetFiles) {
-        throw new Error("Dataset file browsing is unavailable for this client.");
-      }
-      const files = await artifactClient.browseHuggingFaceDatasetParquetFiles({
-        repository,
-        revision: registerRevision,
-      });
-      setRegisterRepository(repository);
-      setDatasetFilesByRepository((current) => ({
-        ...current,
-        [repository]: {
-          files,
-          state: {
-            status: "success",
-            message: files.length > 0 ? `Loaded ${files.length} file(s).` : "No files found for this dataset.",
-          },
-        },
-      }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load dataset files.";
-      setDatasetFilesByRepository((current) => ({
-        ...current,
-        [repository]: {
-          files: current[repository]?.files ?? [],
-          state: { status: "error", message: withHuggingFaceAuthGuidance(message) },
-        },
-      }));
-    }
-  }
-
-  function closeHuggingFaceDatasetParquetFiles(): void {
-    setExpandedHuggingFaceDataset(undefined);
-  }
-
-  function getHuggingFaceDatasetParquetFiles(repository: string): DesktopHuggingFaceDatasetParquetFile[] {
-    return datasetFilesByRepository[repository]?.files ?? [];
-  }
-
-  function getHuggingFaceDatasetFilesState(repository: string): ArtifactBrowserViewState {
-    return datasetFilesByRepository[repository]?.state ?? { status: "idle", message: "Select View Files to load files." };
-  }
-
-  async function localizeArtifactFromRepo(): Promise<void> {
-    if (!selectedStorageKey) {
-      setLocalizeState({ status: "error", message: "Select an artifact before localizing." });
-      return;
-    }
-
-    setLocalizeState({ status: "loading", message: "Localizing imported artifact bytes..." });
-    try {
-      const localized = await artifactClient.localizeArtifactFromRepo({
-        artifactId: selectedStorageKey,
-      });
-      setLocalizedArtifact(localized);
-      await refreshArtifacts();
-      await selectArtifact(selectedStorageKey);
-      setLocalizeState({
-        status: "success",
-        message: `Localized ${localized.artifactId} to local object storage.`,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to localize imported artifact.";
-      setLocalizeState({
-        status: "error",
-        message: withHuggingFaceAuthGuidance(message),
-      });
-    }
-  }
-
-  async function recheckSourceBacking(): Promise<void> {
-    if (!selectedStorageKey) {
-      setSourceVerifyState({ status: "error", message: "Select an artifact before verification." });
-      return;
-    }
-
-    setSourceVerifyState({ status: "loading", message: "Verifying imported source backing..." });
-    try {
-      if (!artifactClient.verifyImportedSourceBacking) {
-        throw new Error("Source verification is unavailable for this client.");
-      }
-      await artifactClient.verifyImportedSourceBacking({
-        artifactId: selectedStorageKey,
-      });
-      await refreshArtifacts();
-      await selectArtifact(selectedStorageKey);
-      setSourceVerifyState({
-        status: "success",
-        message: "Imported source backing verification refreshed.",
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to verify imported source backing.";
-      setSourceVerifyState({
-        status: "error",
-        message: withHuggingFaceAuthGuidance(message),
-      });
-    }
-  }
+  }, [artifactClient, refreshArtifacts]);
 
   async function publishArtifactToHuggingFace(): Promise<void> {
     await publishLogic.publishArtifactToHuggingFace();
@@ -560,69 +250,62 @@ export function useArtifactBrowserFeature(
   }
 
   return {
-    huggingFaceTokenStatus,
-    tokenInput,
-    tokenState,
+    huggingFaceTokenStatus: huggingFace.huggingFaceTokenStatus,
+    tokenInput: huggingFace.tokenInput,
+    tokenState: huggingFace.tokenState,
     items,
     unregisteredItems,
-    selectedStorageKey,
-    detail,
-    content,
-    imageViewUrl,
-    htmlPreview,
+    selectedStorageKey: selection.selectedStorageKey,
+    detail: selection.detail,
+    content: selection.content,
+    imageViewUrl: selection.imageViewUrl,
+    htmlPreview: selection.htmlPreview,
     publishState: publishLogic.publishState,
-    registerState,
-    localizeState,
-    sourceVerifyState,
+    registerState: huggingFace.registerState,
+    localizeState: huggingFace.localizeState,
+    sourceVerifyState: huggingFace.sourceVerifyState,
     publishedBacking: publishLogic.publishedBacking,
-    localizedArtifact,
+    localizedArtifact: huggingFace.localizedArtifact,
     publishForm: publishLogic.publishForm,
-    registerForm: {
-      namespace: registerNamespace,
-      repository: registerRepository,
-      pathInRepo: registerPathInRepo,
-      revision: registerRevision,
-      mediaType: registerMediaType,
-      showRegisterForm,
-    },
+    registerForm: huggingFace.registerForm,
     viewState,
-    pendingDeleteConfirmation,
-    deleteConfirmationInput,
-    selectArtifact,
+    pendingDeleteConfirmation: deleteConfirmation.pendingDeleteConfirmation,
+    deleteConfirmationInput: deleteConfirmation.deleteConfirmationInput,
+    selectArtifact: selection.selectArtifact,
     refreshArtifacts,
     registerUnregisteredArtifact,
-    requestDeleteUnregisteredArtifact,
-    requestDeleteRegisteredArtifact,
-    setDeleteConfirmationInput,
+    requestDeleteUnregisteredArtifact: deleteConfirmation.requestDeleteUnregisteredArtifact,
+    requestDeleteRegisteredArtifact: deleteConfirmation.requestDeleteRegisteredArtifact,
+    setDeleteConfirmationInput: deleteConfirmation.setDeleteConfirmationInput,
     confirmPendingDelete,
-    cancelPendingDelete,
+    cancelPendingDelete: deleteConfirmation.cancelPendingDelete,
     selectedArtifactFamily,
     setSelectedArtifactFamily,
     publishArtifactToHuggingFace,
-    registerArtifactFromHuggingFace,
-    registerHuggingFaceNamespace,
-    browseHuggingFaceDatasetParquetFiles,
-    closeHuggingFaceDatasetParquetFiles,
-    huggingFaceNamespaceDatasets,
-    getHuggingFaceDatasetParquetFiles,
-    getHuggingFaceDatasetFilesState,
-    expandedHuggingFaceDataset,
-    localizeArtifactFromRepo,
+    registerArtifactFromHuggingFace: huggingFace.registerArtifactFromHuggingFace,
+    registerHuggingFaceNamespace: huggingFace.registerHuggingFaceNamespace,
+    browseHuggingFaceDatasetParquetFiles: huggingFace.browseHuggingFaceDatasetParquetFiles,
+    closeHuggingFaceDatasetParquetFiles: huggingFace.closeHuggingFaceDatasetParquetFiles,
+    huggingFaceNamespaceDatasets: huggingFace.huggingFaceNamespaceDatasets,
+    getHuggingFaceDatasetParquetFiles: huggingFace.getHuggingFaceDatasetParquetFiles,
+    getHuggingFaceDatasetFilesState: huggingFace.getHuggingFaceDatasetFilesState,
+    expandedHuggingFaceDataset: huggingFace.expandedHuggingFaceDataset,
+    localizeArtifactFromRepo: huggingFace.localizeArtifactFromRepo,
     recheckPublishedBacking,
-    recheckSourceBacking,
+    recheckSourceBacking: huggingFace.recheckSourceBacking,
     setRepository: publishLogic.setRepository,
     setPathInRepo: publishLogic.setPathInRepo,
     setRevision: publishLogic.setRevision,
     setMediaType: publishLogic.setMediaType,
     togglePublishForm: publishLogic.togglePublishForm,
-    setRegisterRepository,
-    setRegisterNamespace,
-    setRegisterPathInRepo,
-    setRegisterRevision,
-    setRegisterMediaType,
-    toggleRegisterForm: () => setShowRegisterForm((current) => !current),
-    setTokenInput,
-    saveHuggingFaceToken,
-    clearHuggingFaceToken,
+    setRegisterRepository: huggingFace.setRegisterRepository,
+    setRegisterNamespace: huggingFace.setRegisterNamespace,
+    setRegisterPathInRepo: huggingFace.setRegisterPathInRepo,
+    setRegisterRevision: huggingFace.setRegisterRevision,
+    setRegisterMediaType: huggingFace.setRegisterMediaType,
+    toggleRegisterForm: huggingFace.toggleRegisterForm,
+    setTokenInput: huggingFace.setTokenInput,
+    saveHuggingFaceToken: huggingFace.saveHuggingFaceToken,
+    clearHuggingFaceToken: huggingFace.clearHuggingFaceToken,
   };
 }
