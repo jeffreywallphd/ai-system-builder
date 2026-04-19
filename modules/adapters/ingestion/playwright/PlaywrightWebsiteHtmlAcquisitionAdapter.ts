@@ -7,16 +7,7 @@ import {
 import type { WebsiteHtmlAcquisitionStrategy } from "../../../application/ports/ingestion";
 import type { ApplicationRequestContext } from "../../../application/ports";
 import { loadPlaywrightChromiumLauncher } from "./loadPlaywrightChromiumLauncher";
-
-interface PlaywrightPage {
-  goto(url: string, options: { waitUntil: "domcontentloaded"; timeout: number }): Promise<{ status(): number | null } | null>;
-  content(): Promise<string>;
-}
-
-interface PlaywrightBrowser {
-  newPage(): Promise<PlaywrightPage>;
-  close(): Promise<void>;
-}
+import type { PlaywrightBrowser } from "./playwrightChromiumTypes";
 
 type BrowserFactory = () => Promise<PlaywrightBrowser>;
 
