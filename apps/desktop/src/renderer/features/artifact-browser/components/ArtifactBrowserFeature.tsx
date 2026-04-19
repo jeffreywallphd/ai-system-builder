@@ -55,6 +55,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     detail,
     content,
     imageViewUrl,
+    htmlPreview,
     publishState,
     localizeState,
     sourceVerifyState,
@@ -193,6 +194,28 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
             </dl>
           ) : (<p className="ui-text-muted">Select an artifact to inspect metadata and preview availability.</p>)}
 
+          {detail?.metadata?.websiteCapture ? (
+            <section className="ui-stack ui-stack--sm">
+              <h3>Website capture metadata</h3>
+              <dl className="ui-grid ui-grid--two">
+                <dt>Source URL</dt>
+                <dd>{detail.metadata.websiteCapture.sourceUrl}</dd>
+                <dt>Resolved URL</dt>
+                <dd>{detail.metadata.websiteCapture.resolvedUrl}</dd>
+                <dt>Requested mode</dt>
+                <dd>{detail.metadata.websiteCapture.requestedMode}</dd>
+                <dt>Acquisition mechanism</dt>
+                <dd>{detail.metadata.websiteCapture.acquisitionMechanismUsed}</dd>
+                <dt>Retrieved at</dt>
+                <dd>{detail.metadata.websiteCapture.retrievedAt}</dd>
+                <dt>HTTP status</dt>
+                <dd>{detail.metadata.websiteCapture.httpStatus ?? "unknown"}</dd>
+                <dt>Content-Type</dt>
+                <dd>{detail.metadata.websiteCapture.contentTypeHeader ?? "unknown"}</dd>
+              </dl>
+            </section>
+          ) : null}
+
           {content ? (
             <dl className="ui-grid ui-grid--two">
               <dt>Availability</dt>
@@ -272,6 +295,13 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <img src={imageViewUrl} alt={detail?.locator.storageKey ?? "Selected artifact"} />
               <figcaption>Image preview for {detail?.locator.storageKey}</figcaption>
             </figure>
+          ) : null}
+
+          {htmlPreview && content?.availability === "available" ? (
+            <section className="ui-stack ui-stack--sm">
+              <h3>HTML source preview</h3>
+              <pre className="ui-panel" style={{ maxHeight: "16rem", overflow: "auto" }}>{htmlPreview}</pre>
+            </section>
           ) : null}
 
           {detail ? (

@@ -219,7 +219,7 @@ describe("useArtifactUploadFeature", () => {
 
 interface WebsiteHookProbeProps {
   client: ArtifactUploadClient;
-  onUploadComplete?: (storageKey: string) => void;
+  onUploadComplete?: () => void;
   initialBatchInput?: string;
 }
 
@@ -290,7 +290,7 @@ it("submits single website ingestion and refreshes upload browser on success", a
   });
 
   expect(ingestWebsitePage).toHaveBeenCalledWith({ url: "https://example.com", mode: "automatic" });
-  expect(onUploadComplete).toHaveBeenCalledWith("staged/website/example.com/index.html");
+  expect(onUploadComplete).toHaveBeenCalledTimes(1);
 
   await act(async () => {
     root.unmount();
@@ -298,12 +298,16 @@ it("submits single website ingestion and refreshes upload browser on success", a
   container.remove();
 });
 
-it("submits website batch ingestion and renders summary message", async () => {
+it("submits website batch ingestion, renders summary message, and triggers one refresh callback", async () => {
+  const onUploadComplete = vi.fn();
   const ingestWebsitePagesBatch = vi.fn().mockResolvedValue({
     ok: true,
     value: {
-      items: [],
-      summary: { attempted: 2, succeeded: 1, failed: 1 },
+      items: [
+        { target: { url: "https://example.com/a" }, ok: true, result: { target: { url: "https://example.com/a" }, resolvedUrl: "https://example.com/a", acquisitionMechanismUsed: "simple-http", stagedArtifact: { sourceKind: "scrape", storage: { key: "staged/website/example.com/a.html" } } } },
+        { target: { url: "https://example.com/b" }, ok: true, result: { target: { url: "https://example.com/b" }, resolvedUrl: "https://example.com/b", acquisitionMechanismUsed: "simple-http", stagedArtifact: { sourceKind: "scrape", storage: { key: "staged/website/example.com/b.html" } } } },
+      ],
+      summary: { attempted: 2, succeeded: 2, failed: 0 },
     },
   });
   const client: ArtifactUploadClient = {
@@ -318,7 +322,7 @@ it("submits website batch ingestion and renders summary message", async () => {
   const root = createRoot(container);
 
   await act(async () => {
-    root.render(<WebsiteHookProbe client={client} initialBatchInput={"https://example.com/a\n\nhttps://example.com/b"} />);
+    root.render(<WebsiteHookProbe client={client} onUploadComplete={onUploadComplete} initialBatchInput={"https://example.com/a\n\nhttps://example.com/b"} />);
   });
 
   await act(async () => {
@@ -334,7 +338,8 @@ it("submits website batch ingestion and renders summary message", async () => {
     targets: [{ url: "https://example.com/a" }, { url: "https://example.com/b" }],
     mode: "automatic",
   });
-  expect(container.querySelector("[data-testid='batch-message']")?.textContent).toContain("1/2 succeeded");
+  expect(container.querySelector("[data-testid='batch-message']")?.textContent).toContain("2/2 succeeded");
+  expect(onUploadComplete).toHaveBeenCalledTimes(1);
 
   await act(async () => {
     root.unmount();

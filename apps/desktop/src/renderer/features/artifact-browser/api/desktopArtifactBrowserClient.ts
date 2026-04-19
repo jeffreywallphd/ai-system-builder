@@ -28,6 +28,7 @@ export interface DesktopArtifactBrowserClient {
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: DesktopArtifactBrowserLocator) => Promise<string>;
+  readArtifactMedia: (locator: DesktopArtifactBrowserLocator) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
   publishArtifactToHuggingFace: (input: {
     artifactId: string;
     repository: string;
@@ -209,6 +210,16 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         },
         "Failed to read artifact content descriptor.",
       );
+    },
+
+    async readArtifactMedia(locator) {
+      const media = ensureSuccess(
+        await desktopApi.readArtifactViewerMedia(locator),
+        (value) => value as { mediaType?: string; bytes: Uint8Array },
+        "Failed to read artifact media.",
+      );
+
+      return { mediaType: media.mediaType, bytes: Uint8Array.from(media.bytes) };
     },
 
     async createArtifactMediaViewUrl(locator) {

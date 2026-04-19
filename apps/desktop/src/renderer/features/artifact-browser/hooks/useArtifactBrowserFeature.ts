@@ -35,6 +35,7 @@ export interface UseArtifactBrowserFeatureResult {
   detail?: DesktopArtifactDetail;
   content?: DesktopArtifactContentDescriptor;
   imageViewUrl?: string;
+  htmlPreview?: string;
   publishState: ArtifactBrowserViewState;
   registerState: ArtifactBrowserViewState;
   localizeState: ArtifactBrowserViewState;
@@ -130,6 +131,7 @@ export function useArtifactBrowserFeature(
   const [detail, setDetail] = useState<DesktopArtifactDetail | undefined>();
   const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
+  const [htmlPreview, setHtmlPreview] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [selectedArtifactFamily, setSelectedArtifactFamily] = useState<DesktopArtifactFamily | "all">("all");
   const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({ status: "idle" });
@@ -257,6 +259,7 @@ export function useArtifactBrowserFeature(
       setDetail(undefined);
       setContent(undefined);
       setImageViewUrl(undefined);
+      setHtmlPreview(undefined);
       setSelectedStorageKey(undefined);
       await refreshArtifacts();
       setViewState({ status: "success", message: `Deleted ${storageKey}.` });
@@ -334,6 +337,7 @@ export function useArtifactBrowserFeature(
       try {
         const contentDescriptor = await artifactClient.readArtifactContent(locator);
         setContent(contentDescriptor);
+        setHtmlPreview(undefined);
         if (contentDescriptor.mediaType?.startsWith("image/")) {
           try {
             const nextImageViewUrl = await artifactClient.createArtifactMediaViewUrl(locator);
@@ -343,10 +347,20 @@ export function useArtifactBrowserFeature(
           }
         } else {
           setImageViewUrl(undefined);
+          if (contentDescriptor.availability === "available" && contentDescriptor.mediaType === "text/html") {
+            try {
+              const media = await artifactClient.readArtifactMedia(locator);
+              const preview = new TextDecoder().decode(media.bytes).slice(0, 50000);
+              setHtmlPreview(preview);
+            } catch {
+              setHtmlPreview(undefined);
+            }
+          }
         }
       } catch {
         setContent({ locator, availability: "unavailable", retrieval: "deferred" });
         setImageViewUrl(undefined);
+        setHtmlPreview(undefined);
       }
 
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
@@ -354,6 +368,7 @@ export function useArtifactBrowserFeature(
       setDetail(undefined);
       setContent(undefined);
       setImageViewUrl(undefined);
+      setHtmlPreview(undefined);
       publishLogic.setPublishedBackingFromDetail(undefined);
       setViewState({
         status: "error",
@@ -554,6 +569,7 @@ export function useArtifactBrowserFeature(
     detail,
     content,
     imageViewUrl,
+    htmlPreview,
     publishState: publishLogic.publishState,
     registerState,
     localizeState,

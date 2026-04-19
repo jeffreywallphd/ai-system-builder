@@ -37,6 +37,16 @@ export interface DesktopArtifactBrowseItem {
   };
 }
 
+export interface DesktopWebsiteCaptureMetadata {
+  sourceUrl: string;
+  resolvedUrl: string;
+  requestedMode: "automatic" | "rendered";
+  acquisitionMechanismUsed: "simple-http" | "rendered-browser";
+  retrievedAt: string;
+  httpStatus?: number;
+  contentTypeHeader?: string;
+}
+
 export interface DesktopArtifactDetail {
   locator: DesktopArtifactBrowserLocator;
   artifactFamily: ArtifactDetailContractModel["artifactFamily"];
@@ -48,6 +58,7 @@ export interface DesktopArtifactDetail {
   metadata?: {
     publishedBacking?: DesktopPublishedBacking;
     importedSourceBacking?: DesktopPublishedBacking;
+    websiteCapture?: DesktopWebsiteCaptureMetadata;
   };
 }
 
