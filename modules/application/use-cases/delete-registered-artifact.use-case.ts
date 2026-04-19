@@ -18,6 +18,8 @@ export interface DeleteRegisteredArtifactUseCaseDependencies {
   artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings">;
 }
 
+type RegisteredDeleteStepStatus = "not-attempted" | "succeeded" | "failed";
+
 export class DeleteRegisteredArtifactUseCase {
   private readonly artifactCatalogRead: Pick<ArtifactCatalogReadPort, "readArtifactCatalogRecord">;
   private readonly artifactCatalogDelete: ArtifactCatalogDeletePort;
@@ -41,11 +43,62 @@ export class DeleteRegisteredArtifactUseCase {
 
     const storageKey = command.storageKey.trim();
 
-    // Semantics for registered deletion:
-    // 1. Confirm registration exists.
-    // 2. Remove local object-state and local backing bindings.
-    // 3. Remove registration record only after local cleanup succeeds.
+    // Registered-delete semantics:
+    // 1) Confirm registration exists in catalog.
+    // 2) Delete local imported-source bindings.
+    // 3) Delete local object bytes.
+    // 4) Delete catalog registration last.
+    //
     // Remote provider assets are never deleted by this flow.
+    // Rollback across steps is not available; failures return explicit partial-cleanup details.
+    // Missing local object/bindings are treated as acceptable local state and do not block catalog cleanup.
+    const progress = {
+      bindings: { status: "not-attempted" as RegisteredDeleteStepStatus, deleted: false },
+      localObject: { status: "not-attempted" as RegisteredDeleteStepStatus, deleted: false },
+      catalog: { status: "not-attempted" as RegisteredDeleteStepStatus, deleted: false },
+    };
+
+    const createPartialFailure = (
+      message: string,
+      failedStep: "delete-bindings" | "delete-local-object" | "delete-catalog",
+      cause?: unknown,
+      code: "unavailable" | "not-found" = "unavailable",
+    ) =>
+      createFailureResult(
+        createContractError(code, message, {
+          details: {
+            storageKey,
+            semantics: "registered-local-state-delete",
+            rollbackAvailable: false,
+            failedStep,
+            progress: {
+              bindings: {
+                status: progress.bindings.status,
+                deleted: progress.bindings.deleted,
+              },
+              localObject: {
+                status: progress.localObject.status,
+                deleted: progress.localObject.deleted,
+                missingAccepted: progress.localObject.status === "succeeded" && !progress.localObject.deleted,
+              },
+              catalog: {
+                status: progress.catalog.status,
+                deleted: progress.catalog.deleted,
+              },
+            },
+            partialCleanup: {
+              bindingsDeleted: progress.bindings.deleted,
+              bindingsAlreadyMissing: progress.bindings.status === "succeeded" && !progress.bindings.deleted,
+              localObjectDeleted: progress.localObject.deleted,
+              localObjectAlreadyMissing: progress.localObject.status === "succeeded" && !progress.localObject.deleted,
+              catalogRecordDeleted: progress.catalog.deleted,
+            },
+            cause,
+          },
+        }),
+        context,
+      );
+
     const readCatalog = await this.artifactCatalogRead.readArtifactCatalogRecord({
       storageKey,
     }, context);
@@ -60,58 +113,55 @@ export class DeleteRegisteredArtifactUseCase {
       return readCatalog;
     }
 
-    const deleteLocalObject = await this.storage.deleteArtifact({ key: storageKey }, context);
-    if (!deleteLocalObject.ok) {
-      return createFailureResult(
-        createContractError("unavailable", "Failed to delete local artifact object for registered artifact.", {
-          details: {
-            storageKey,
-            cause: deleteLocalObject.error,
-          },
-        }),
-        context,
-      );
-    }
-
+    progress.bindings.status = "failed";
     const deleteBindings = await this.artifactBindingStorage.deleteArtifactStorageBindings({
       artifactId: storageKey,
     }, context);
     if (!deleteBindings.ok) {
-      return createFailureResult(
-        createContractError("unavailable", "Failed to delete artifact backing bindings for registered artifact.", {
-          details: {
-            storageKey,
-            cause: deleteBindings.error,
-          },
-        }),
-        context,
+      return createPartialFailure(
+        "Failed to delete artifact backing bindings for registered artifact.",
+        "delete-bindings",
+        deleteBindings.error,
       );
     }
+    progress.bindings.status = "succeeded";
+    progress.bindings.deleted = deleteBindings.value.deleted;
 
+    progress.localObject.status = "failed";
+    const deleteLocalObject = await this.storage.deleteArtifact({ key: storageKey }, context);
+    if (!deleteLocalObject.ok) {
+      return createPartialFailure(
+        "Failed to delete local artifact object for registered artifact.",
+        "delete-local-object",
+        deleteLocalObject.error,
+      );
+    }
+    progress.localObject.status = "succeeded";
+    progress.localObject.deleted = deleteLocalObject.value.deleted;
+
+    progress.catalog.status = "failed";
     const deleteCatalog = await this.artifactCatalogDelete.deleteArtifactCatalogRecord({
       storageKey,
     }, context);
 
     if (!deleteCatalog.ok) {
-      return createFailureResult(
-        createContractError("unavailable", "Local artifact state was cleaned up but catalog deletion failed.", {
-          details: {
-            storageKey,
-            localObjectDeleted: deleteLocalObject.value.deleted,
-            bindingsDeleted: deleteBindings.value.deleted,
-            cause: deleteCatalog.error,
-          },
-        }),
-        context,
+      return createPartialFailure(
+        "Local artifact state was cleaned up but catalog deletion failed.",
+        "delete-catalog",
+        deleteCatalog.error,
       );
     }
 
     if (!deleteCatalog.value.deleted) {
-      return createFailureResult(
-        createContractError("not-found", `Artifact \"${storageKey}\" is not registered.`),
-        context,
+      return createPartialFailure(
+        `Catalog record for artifact \"${storageKey}\" was not deleted after local cleanup.`,
+        "delete-catalog",
+        undefined,
+        "not-found",
       );
     }
+    progress.catalog.status = "succeeded";
+    progress.catalog.deleted = true;
 
     return createSuccessResult({ storageKey }, context);
   }

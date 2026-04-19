@@ -1,4 +1,5 @@
 import type { ArtifactBrowseItem as ArtifactBrowseContractItem } from "../../../../../../modules/contracts/artifact-browser";
+import { resolveArtifactFamily as resolveCanonicalArtifactFamily } from "../../../../../../modules/domain/artifact";
 
 export interface ArtifactBrowserLocator {
   storageKey: string;
@@ -167,46 +168,6 @@ function ensureSuccess<T>(response: ApiResponseEnvelope, pick: (value: unknown) 
   }
 
   return pick(response.value);
-}
-
-function resolveArtifactFamily(input: { mediaType?: string; fileName?: string }): ThinClientArtifactFamily {
-  const mediaType = input.mediaType?.trim().toLowerCase();
-  const fileName = input.fileName?.trim().toLowerCase();
-  const extension = fileName?.includes(".") ? fileName.slice(fileName.lastIndexOf(".") + 1) : undefined;
-
-  if (mediaType?.startsWith("image/")) {
-    return "image";
-  }
-  if (mediaType === "application/pdf" || mediaType === "application/msword" || mediaType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || mediaType === "application/rtf" || mediaType === "text/rtf") {
-    return "document";
-  }
-  if (mediaType === "text/plain" || mediaType === "text/markdown") {
-    return "text";
-  }
-  if (mediaType === "application/json" || mediaType === "application/yaml" || mediaType === "application/x-yaml" || mediaType === "text/yaml" || mediaType === "text/x-yaml") {
-    return "structured-text";
-  }
-  if (mediaType === "text/csv" || mediaType === "text/tab-separated-values" || mediaType === "application/vnd.ms-excel" || mediaType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || mediaType === "application/x-parquet") {
-    return "tabular";
-  }
-  if (mediaType?.startsWith("text/")) {
-    return "text";
-  }
-
-  if (extension === "pdf" || extension === "doc" || extension === "docx" || extension === "rtf") {
-    return "document";
-  }
-  if (extension === "txt" || extension === "md") {
-    return "text";
-  }
-  if (extension === "json" || extension === "yaml" || extension === "yml") {
-    return "structured-text";
-  }
-  if (extension === "csv" || extension === "tsv" || extension === "xls" || extension === "xlsx" || extension === "parquet") {
-    return "tabular";
-  }
-
-  return "binary";
 }
 
 export interface CreateApiArtifactBrowserClientOptions {
@@ -427,7 +388,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async registerArtifactFromRepo(input): Promise<ThinClientRegisteredArtifactFromRepo> {
-      const artifactFamily = resolveArtifactFamily({
+      const artifactFamily = resolveCanonicalArtifactFamily({
         mediaType: input.mediaType,
         fileName: input.path,
       });

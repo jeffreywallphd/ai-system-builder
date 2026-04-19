@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiArtifactBrowserClient } from "../api/apiArtifactBrowserClient";
+import { resolveArtifactFamily } from "../../../../../../modules/domain/artifact";
 
 describe("api artifact browser client", () => {
   afterEach(() => {
@@ -236,7 +237,7 @@ describe("api artifact browser client", () => {
     expect(localized.localObject.key).toBe("artifacts/20260418000000-local01");
   });
 
-  it("registers repo artifacts with artifactFamily payload and no image hardcoding", async () => {
+  it("registers repo artifacts with canonical artifactFamily resolver output", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       json: vi.fn().mockResolvedValue({
         ok: true,
@@ -262,30 +263,50 @@ describe("api artifact browser client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const client = createApiArtifactBrowserClient({ apiBaseUrl: "/api" });
-    await client.registerArtifactFromRepo({
-      repository: "openai/demo",
-      path: "data/train.parquet",
-      revision: "main",
-      mediaType: "application/x-parquet",
-    });
+    const scenarios = [
+      {
+        path: "data/train.parquet",
+        mediaType: "application/x-parquet",
+      },
+      {
+        path: "images/cat.png",
+        mediaType: "image/png",
+      },
+      {
+        path: "unknown/file.bin",
+        mediaType: undefined,
+      },
+    ] as const;
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/artifact/register-from-repo",
-      expect.objectContaining({
+    for (const scenario of scenarios) {
+      await client.registerArtifactFromRepo({
+        repository: "openai/demo",
+        path: scenario.path,
+        revision: "main",
+        mediaType: scenario.mediaType,
+      });
+    }
+
+    for (const [index, scenario] of scenarios.entries()) {
+      const call = fetchMock.mock.calls[index];
+      expect(call?.[0]).toBe("/api/artifact/register-from-repo");
+      expect(call?.[1]).toMatchObject({
         method: "POST",
-        body: JSON.stringify({
-          target: {
-            provider: "huggingface",
-            repository: "openai/demo",
-            revision: "main",
-            path: "data/train.parquet",
-          },
-          artifactFamily: "tabular",
-          mediaType: "application/x-parquet",
-          source: "thin-client.artifact-browser",
+      });
+      const body = JSON.parse((call?.[1] as { body?: string })?.body ?? "{}") as {
+        artifactFamily?: string;
+        target?: { path?: string };
+        mediaType?: string;
+      };
+      expect(body.target?.path).toBe(scenario.path);
+      expect(body.mediaType).toBe(scenario.mediaType);
+      expect(body.artifactFamily).toBe(
+        resolveArtifactFamily({
+          mediaType: scenario.mediaType,
+          fileName: scenario.path,
         }),
-      }),
-    );
+      );
+    }
   });
 });
 

@@ -6,16 +6,164 @@ import type { ArtifactObjectStoragePort, ArtifactStorageBindingPort } from "../.
 import { DeleteRegisteredArtifactUseCase } from "../delete-registered-artifact.use-case";
 
 describe("DeleteRegisteredArtifactUseCase", () => {
-  it("deletes local object + bindings before deleting catalog record", async () => {
-    const artifactCatalogRead: Pick<ArtifactCatalogReadPort, "readArtifactCatalogRecord"> = {
-      readArtifactCatalogRecord: testDouble.fn(async () => ({
-        ok: true,
-        value: {
-          record: {
-            storageKey: "artifacts/a-1",
-            artifactFamily: "image",
+  function createCatalogRead(callOrder?: string[]): Pick<ArtifactCatalogReadPort, "readArtifactCatalogRecord"> {
+    return {
+      readArtifactCatalogRecord: testDouble.fn(async () => {
+        callOrder?.push("read-catalog");
+        return {
+          ok: true,
+          value: {
+            record: {
+              storageKey: "artifacts/a-1",
+              artifactFamily: "image",
+            },
           },
-        },
+        };
+      }),
+    };
+  }
+
+  it("deletes bindings, then local object, then catalog record", async () => {
+    const callOrder: string[] = [];
+    const artifactCatalogRead = createCatalogRead(callOrder);
+    const artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings"> = {
+      deleteArtifactStorageBindings: testDouble.fn(async () => {
+        callOrder.push("delete-bindings");
+        return {
+          ok: true,
+          value: { deleted: true },
+        };
+      }),
+    };
+    const storage: Pick<ArtifactObjectStoragePort, "deleteArtifact"> = {
+      deleteArtifact: testDouble.fn(async () => {
+        callOrder.push("delete-local-object");
+        return {
+          ok: true,
+          value: { deleted: true },
+        };
+      }),
+    };
+    const artifactCatalogDelete: ArtifactCatalogDeletePort = {
+      deleteArtifactCatalogRecord: testDouble.fn(async () => {
+        callOrder.push("delete-catalog");
+        return {
+          ok: true,
+          value: { deleted: true },
+        };
+      }),
+    };
+
+    const useCase = new DeleteRegisteredArtifactUseCase({
+      artifactCatalogRead,
+      artifactCatalogDelete,
+      storage,
+      artifactBindingStorage,
+    });
+
+    const result = await useCase.execute({ storageKey: "artifacts/a-1" });
+
+    expect(result.ok).toBe(true);
+    expect(callOrder).toEqual([
+      "read-catalog",
+      "delete-bindings",
+      "delete-local-object",
+      "delete-catalog",
+    ]);
+  });
+
+  it("returns binding-step partial failure and does not continue when binding deletion fails", async () => {
+    const artifactCatalogRead = createCatalogRead();
+    const artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings"> = {
+      deleteArtifactStorageBindings: testDouble.fn(async () => ({
+        ok: false,
+        error: createContractError("unavailable", "binding file locked"),
+      })),
+    };
+    const storage: Pick<ArtifactObjectStoragePort, "deleteArtifact"> = {
+      deleteArtifact: testDouble.fn(),
+    };
+    const artifactCatalogDelete: ArtifactCatalogDeletePort = {
+      deleteArtifactCatalogRecord: testDouble.fn(),
+    };
+
+    const useCase = new DeleteRegisteredArtifactUseCase({
+      artifactCatalogRead,
+      artifactCatalogDelete,
+      storage,
+      artifactBindingStorage,
+    });
+
+    const result = await useCase.execute({ storageKey: "artifacts/a-1" });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected failure.");
+    }
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.details).toMatchObject({
+      storageKey: "artifacts/a-1",
+      failedStep: "delete-bindings",
+      partialCleanup: {
+        bindingsDeleted: false,
+        localObjectDeleted: false,
+        catalogRecordDeleted: false,
+      },
+    });
+    expect(storage.deleteArtifact).not.toHaveBeenCalled();
+    expect(artifactCatalogDelete.deleteArtifactCatalogRecord).not.toHaveBeenCalled();
+  });
+
+  it("returns storage-step partial failure and does not delete catalog when local object deletion fails", async () => {
+    const artifactCatalogRead = createCatalogRead();
+    const artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings"> = {
+      deleteArtifactStorageBindings: testDouble.fn(async () => ({
+        ok: true,
+        value: { deleted: true },
+      })),
+    };
+    const storage: Pick<ArtifactObjectStoragePort, "deleteArtifact"> = {
+      deleteArtifact: testDouble.fn(async () => ({
+        ok: false,
+        error: createContractError("unavailable", "local object delete failed"),
+      })),
+    };
+    const artifactCatalogDelete: ArtifactCatalogDeletePort = {
+      deleteArtifactCatalogRecord: testDouble.fn(),
+    };
+
+    const useCase = new DeleteRegisteredArtifactUseCase({
+      artifactCatalogRead,
+      artifactCatalogDelete,
+      storage,
+      artifactBindingStorage,
+    });
+
+    const result = await useCase.execute({ storageKey: "artifacts/a-1" });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected failure.");
+    }
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.details).toMatchObject({
+      storageKey: "artifacts/a-1",
+      failedStep: "delete-local-object",
+      partialCleanup: {
+        bindingsDeleted: true,
+        localObjectDeleted: false,
+        catalogRecordDeleted: false,
+      },
+    });
+    expect(artifactCatalogDelete.deleteArtifactCatalogRecord).not.toHaveBeenCalled();
+  });
+
+  it("returns catalog-step partial failure after local cleanup when catalog deletion fails", async () => {
+    const artifactCatalogRead = createCatalogRead();
+    const artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings"> = {
+      deleteArtifactStorageBindings: testDouble.fn(async () => ({
+        ok: true,
+        value: { deleted: true },
       })),
     };
     const storage: Pick<ArtifactObjectStoragePort, "deleteArtifact"> = {
@@ -24,10 +172,50 @@ describe("DeleteRegisteredArtifactUseCase", () => {
         value: { deleted: true },
       })),
     };
+    const artifactCatalogDelete: ArtifactCatalogDeletePort = {
+      deleteArtifactCatalogRecord: testDouble.fn(async () => ({
+        ok: false,
+        error: createContractError("unavailable", "catalog unavailable"),
+      })),
+    };
+
+    const useCase = new DeleteRegisteredArtifactUseCase({
+      artifactCatalogRead,
+      artifactCatalogDelete,
+      storage,
+      artifactBindingStorage,
+    });
+
+    const result = await useCase.execute({ storageKey: "artifacts/a-1" });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected failure.");
+    }
+    expect(result.error.code).toBe("unavailable");
+    expect(result.error.details).toMatchObject({
+      storageKey: "artifacts/a-1",
+      failedStep: "delete-catalog",
+      partialCleanup: {
+        bindingsDeleted: true,
+        localObjectDeleted: true,
+        catalogRecordDeleted: false,
+      },
+    });
+  });
+
+  it("treats missing local object as acceptable and still deletes the catalog record", async () => {
+    const artifactCatalogRead = createCatalogRead();
     const artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings"> = {
       deleteArtifactStorageBindings: testDouble.fn(async () => ({
         ok: true,
         value: { deleted: true },
+      })),
+    };
+    const storage: Pick<ArtifactObjectStoragePort, "deleteArtifact"> = {
+      deleteArtifact: testDouble.fn(async () => ({
+        ok: true,
+        value: { deleted: false },
       })),
     };
     const artifactCatalogDelete: ArtifactCatalogDeletePort = {
@@ -47,160 +235,6 @@ describe("DeleteRegisteredArtifactUseCase", () => {
     const result = await useCase.execute({ storageKey: "artifacts/a-1" });
 
     expect(result.ok).toBe(true);
-    if (!result.ok) {
-      throw new Error("Expected success.");
-    }
-    expect(result.value.storageKey).toBe("artifacts/a-1");
-
-    const readOrder = (artifactCatalogRead.readArtifactCatalogRecord as ReturnType<typeof testDouble.fn>).mock.invocationCallOrder[0];
-    const storageOrder = (storage.deleteArtifact as ReturnType<typeof testDouble.fn>).mock.invocationCallOrder[0];
-    const bindingOrder = (artifactBindingStorage.deleteArtifactStorageBindings as ReturnType<typeof testDouble.fn>).mock.invocationCallOrder[0];
-    const catalogDeleteOrder = (artifactCatalogDelete.deleteArtifactCatalogRecord as ReturnType<typeof testDouble.fn>).mock.invocationCallOrder[0];
-
-    expect(readOrder).toBeLessThan(storageOrder);
-    expect(storageOrder).toBeLessThan(bindingOrder);
-    expect(bindingOrder).toBeLessThan(catalogDeleteOrder);
-  });
-
-  it("fails without deleting catalog when local object deletion fails", async () => {
-    const artifactCatalogRead: Pick<ArtifactCatalogReadPort, "readArtifactCatalogRecord"> = {
-      readArtifactCatalogRecord: testDouble.fn(async () => ({
-        ok: true,
-        value: {
-          record: {
-            storageKey: "artifacts/a-2",
-            artifactFamily: "image",
-          },
-        },
-      })),
-    };
-    const storage: Pick<ArtifactObjectStoragePort, "deleteArtifact"> = {
-      deleteArtifact: testDouble.fn(async () => ({
-        ok: false,
-        error: createContractError("unavailable", "disk write failed"),
-      })),
-    };
-    const artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings"> = {
-      deleteArtifactStorageBindings: testDouble.fn(),
-    };
-    const artifactCatalogDelete: ArtifactCatalogDeletePort = {
-      deleteArtifactCatalogRecord: testDouble.fn(),
-    };
-
-    const useCase = new DeleteRegisteredArtifactUseCase({
-      artifactCatalogRead,
-      artifactCatalogDelete,
-      storage,
-      artifactBindingStorage,
-    });
-
-    const result = await useCase.execute({ storageKey: "artifacts/a-2" });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected failure.");
-    }
-    expect(result.error.code).toBe("unavailable");
-    expect(artifactBindingStorage.deleteArtifactStorageBindings).not.toHaveBeenCalled();
-    expect(artifactCatalogDelete.deleteArtifactCatalogRecord).not.toHaveBeenCalled();
-  });
-
-  it("returns explicit partial-failure when catalog deletion fails after cleanup", async () => {
-    const artifactCatalogRead: Pick<ArtifactCatalogReadPort, "readArtifactCatalogRecord"> = {
-      readArtifactCatalogRecord: testDouble.fn(async () => ({
-        ok: true,
-        value: {
-          record: {
-            storageKey: "artifacts/a-3",
-            artifactFamily: "image",
-          },
-        },
-      })),
-    };
-    const storage: Pick<ArtifactObjectStoragePort, "deleteArtifact"> = {
-      deleteArtifact: testDouble.fn(async () => ({
-        ok: true,
-        value: { deleted: true },
-      })),
-    };
-    const artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings"> = {
-      deleteArtifactStorageBindings: testDouble.fn(async () => ({
-        ok: true,
-        value: { deleted: true },
-      })),
-    };
-    const artifactCatalogDelete: ArtifactCatalogDeletePort = {
-      deleteArtifactCatalogRecord: testDouble.fn(async () => ({
-        ok: false,
-        error: createContractError("unavailable", "catalog unavailable"),
-      })),
-    };
-
-    const useCase = new DeleteRegisteredArtifactUseCase({
-      artifactCatalogRead,
-      artifactCatalogDelete,
-      storage,
-      artifactBindingStorage,
-    });
-
-    const result = await useCase.execute({ storageKey: "artifacts/a-3" });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected failure.");
-    }
-    expect(result.error.code).toBe("unavailable");
-    expect(result.error.message).toContain("catalog deletion failed");
-    expect(result.error.details).toMatchObject({
-      storageKey: "artifacts/a-3",
-      localObjectDeleted: true,
-      bindingsDeleted: true,
-    });
-  });
-
-  it("fails without deleting catalog when binding cleanup fails", async () => {
-    const artifactCatalogRead: Pick<ArtifactCatalogReadPort, "readArtifactCatalogRecord"> = {
-      readArtifactCatalogRecord: testDouble.fn(async () => ({
-        ok: true,
-        value: {
-          record: {
-            storageKey: "artifacts/a-4",
-            artifactFamily: "image",
-          },
-        },
-      })),
-    };
-    const storage: Pick<ArtifactObjectStoragePort, "deleteArtifact"> = {
-      deleteArtifact: testDouble.fn(async () => ({
-        ok: true,
-        value: { deleted: true },
-      })),
-    };
-    const artifactBindingStorage: Pick<ArtifactStorageBindingPort, "deleteArtifactStorageBindings"> = {
-      deleteArtifactStorageBindings: testDouble.fn(async () => ({
-        ok: false,
-        error: createContractError("unavailable", "binding file locked"),
-      })),
-    };
-    const artifactCatalogDelete: ArtifactCatalogDeletePort = {
-      deleteArtifactCatalogRecord: testDouble.fn(),
-    };
-
-    const useCase = new DeleteRegisteredArtifactUseCase({
-      artifactCatalogRead,
-      artifactCatalogDelete,
-      storage,
-      artifactBindingStorage,
-    });
-
-    const result = await useCase.execute({ storageKey: "artifacts/a-4" });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected failure.");
-    }
-    expect(result.error.code).toBe("unavailable");
-    expect(result.error.message).toContain("backing bindings");
-    expect(artifactCatalogDelete.deleteArtifactCatalogRecord).not.toHaveBeenCalled();
+    expect(artifactCatalogDelete.deleteArtifactCatalogRecord).toHaveBeenCalledTimes(1);
   });
 });
