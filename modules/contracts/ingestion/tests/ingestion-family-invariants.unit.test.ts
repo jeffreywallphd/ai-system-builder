@@ -6,15 +6,30 @@ describe("ingestion family invariants", () => {
   it("exports only ingestion-family surfaces from the family barrel", () => {
     expect(Object.keys(ingestionContracts).sort()).toEqual([
       "INGESTION_SOURCE_KINDS",
+      "WEBSITE_INGESTION_MODES",
+      "createIngestWebsitePageFailureResult",
+      "createIngestWebsitePageRequest",
+      "createIngestWebsitePageSuccessResult",
+      "createIngestWebsitePagesBatchFailureResult",
+      "createIngestWebsitePagesBatchRequest",
+      "createIngestWebsitePagesBatchSuccessResult",
       "createRegisterStagedArtifactFailureResult",
       "createRegisterStagedArtifactRequest",
       "createRegisterStagedArtifactSuccessResult",
       "createStagedArtifactDescriptorFromStorageObjectDescriptor",
       "isIngestionSourceKind",
+      "isWebsiteIngestionMode",
+      "normalizeIngestWebsitePageSuccessValue",
+      "normalizeIngestWebsitePagesBatchSuccessValue",
       "normalizeIngestionSourceKind",
+      "normalizeOptionalWebsiteIngestionMode",
       "normalizeStagedArtifactDescriptor",
       "normalizeStagedArtifactDescriptorInput",
       "normalizeStagedArtifactStorageReference",
+      "normalizeWebsiteHtmlAcquisitionRequest",
+      "normalizeWebsiteHtmlAcquisitionResult",
+      "normalizeWebsiteIngestionMode",
+      "normalizeWebsiteIngestionTarget",
     ]);
   });
 
