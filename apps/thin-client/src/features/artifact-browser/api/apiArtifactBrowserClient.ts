@@ -25,6 +25,16 @@ export interface ThinClientArtifactBrowseItem {
   };
 }
 
+export interface ThinClientWebsiteCaptureMetadata {
+  sourceUrl: string;
+  resolvedUrl: string;
+  requestedMode: "automatic" | "rendered";
+  acquisitionMechanismUsed: "simple-http" | "rendered-browser";
+  retrievedAt: string;
+  httpStatus?: number;
+  contentTypeHeader?: string;
+}
+
 export interface ThinClientArtifactDetail {
   locator: ArtifactBrowserLocator;
   artifactFamily: ThinClientArtifactFamily;
@@ -36,6 +46,7 @@ export interface ThinClientArtifactDetail {
   metadata?: {
     publishedBacking?: ThinClientPublishedBacking;
     importedSourceBacking?: ThinClientPublishedBacking;
+    websiteCapture?: ThinClientWebsiteCaptureMetadata;
   };
 }
 

@@ -23,7 +23,7 @@ describe("desktop artifact browser client", () => {
       deleteUnregisteredArtifact: vi.fn().mockResolvedValue({ ok: true, value: { storageKey: "uploads/orphan.parquet" } }),
       readArtifactDetail: vi.fn().mockResolvedValue({
         ok: true,
-        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactFamily: "image" } },
+        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactFamily: "image", metadata: { websiteCapture: { sourceUrl: "https://example.com", resolvedUrl: "https://example.com/", requestedMode: "automatic", acquisitionMechanismUsed: "simple-http", retrievedAt: "2026-04-18T00:00:00.000Z" } } } },
       }),
       readArtifactContentDescriptor: vi.fn().mockResolvedValue({
         ok: true,
@@ -79,11 +79,14 @@ describe("desktop artifact browser client", () => {
     const items = await client.browseArtifacts();
     const detail = await client.readArtifactDetail({ storageKey: "uploads/cat.png" });
     const content = await client.readArtifactContent({ storageKey: "uploads/cat.png" });
+    const mediaBytes = await client.readArtifactMedia({ storageKey: "uploads/cat.png" });
     const mediaUrl = await client.createArtifactMediaViewUrl({ storageKey: "uploads/cat.png" });
 
     expect(items[0].storageKey).toBe("uploads/cat.png");
     expect(detail.locator.storageKey).toBe("uploads/cat.png");
     expect(content.retrieval).toBe("deferred");
+    expect(detail.metadata?.websiteCapture?.acquisitionMechanismUsed).toBe("simple-http");
+    expect(Array.from(mediaBytes.bytes)).toEqual([1, 2, 3]);
     expect(window.desktopApi.readArtifactViewerMedia).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     const createdBlob = createObjectURL.mock.calls[0]?.[0];
@@ -131,7 +134,7 @@ describe("desktop artifact browser client", () => {
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockResolvedValue({
         ok: true,
-        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactFamily: "image" } },
+        value: { artifact: { locator: { storageKey: "uploads/cat.png" }, artifactFamily: "image", metadata: { websiteCapture: { sourceUrl: "https://example.com", resolvedUrl: "https://example.com/", requestedMode: "automatic", acquisitionMechanismUsed: "simple-http", retrievedAt: "2026-04-18T00:00:00.000Z" } } } },
       }),
       readArtifactContentDescriptor: vi.fn().mockResolvedValue({
         ok: true,

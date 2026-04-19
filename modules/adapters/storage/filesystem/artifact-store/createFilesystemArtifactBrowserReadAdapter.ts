@@ -260,6 +260,7 @@ function toDetailValue(record: ArtifactCatalogRecord): ArtifactReadSuccessValue 
       sourceKind: record.sourceKind,
       originalName: record.originalName,
       createdAt: record.createdAt,
+      metadata: record.metadata,
     },
   };
 }

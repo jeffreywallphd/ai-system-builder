@@ -8,7 +8,7 @@ import { ArtifactIngestionControls } from "./ArtifactIngestionControls";
 export interface ArtifactUploadFeatureProps {
   client?: ArtifactUploadClient;
   ingestionClient?: DesktopArtifactBrowserClient;
-  onUploadComplete?: (storageKey: string) => void;
+  onUploadComplete?: () => void;
 }
 
 export function ArtifactUploadFeature({ client, ingestionClient, onUploadComplete }: ArtifactUploadFeatureProps) {
@@ -124,7 +124,7 @@ export function ArtifactUploadFeature({ client, ingestionClient, onUploadComplet
         ) : null}
       </section>
 
-      <ArtifactIngestionControls client={ingestionClient} onRegistered={onUploadComplete} />
+      <ArtifactIngestionControls client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
     </section>
   );
 }

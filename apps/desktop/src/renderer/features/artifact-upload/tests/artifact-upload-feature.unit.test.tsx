@@ -32,6 +32,7 @@ describe("ArtifactUploadFeature", () => {
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn(),
+      readArtifactMedia: vi.fn(),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn(),
