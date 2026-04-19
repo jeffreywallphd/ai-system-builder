@@ -10,6 +10,12 @@ function setInputValue(input: HTMLInputElement, value: string): void {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+function setSelectValue(select: HTMLSelectElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value");
+  descriptor?.set?.call(select, value);
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 describe("Desktop ArtifactBrowserFeature publish flow", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
@@ -537,7 +543,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
   });
 
 
-  it("renders family filter options and requests filtered browse", async () => {
+  it("renders family filter select and requests filtered browse", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([]),
       readArtifactDetail: vi.fn(),
@@ -564,12 +570,13 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     expect(container.textContent).toContain("Filter by family");
-    expect(container.textContent).toContain("All");
-    expect(container.textContent).toContain("structured-text");
+    const familySelect = container.querySelector("select") as HTMLSelectElement;
+    expect(familySelect).toBeTruthy();
+    expect(Array.from(familySelect.options).map((option) => option.value)).toContain("all");
+    expect(Array.from(familySelect.options).map((option) => option.value)).toContain("structured-text");
 
-    const tabularFilter = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "tabular") as HTMLButtonElement;
     await act(async () => {
-      tabularFilter.click();
+      setSelectValue(familySelect, "tabular");
     });
 
     expect(client.browseArtifacts).toHaveBeenCalledWith({ artifactFamily: "tabular" });
