@@ -1,18 +1,28 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { AppShell } from "./components/layout/AppShell";
 import { useDesktopPage } from "./hooks/useDesktopPage";
+import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { HomePage } from "./pages/HomePage";
 import { SystemPage } from "./pages/SystemPage";
 import { desktopPageDefinitions, type DesktopPageKey } from "./routes/desktopPages";
 
-const desktopPageContentMap: Record<DesktopPageKey, ReactNode> = {
-  home: <HomePage />,
-  system: <SystemPage />,
-};
-
 export function App() {
   const { activePage, setActivePage } = useDesktopPage();
+  const [artifactRefreshToken, setArtifactRefreshToken] = useState(0);
+
+  const desktopPageContentMap: Record<DesktopPageKey, ReactNode> = {
+    home: <HomePage onGoToArtifacts={() => setActivePage("artifacts")} />,
+    artifacts: (
+      <ArtifactsPage
+        refreshToken={artifactRefreshToken}
+        onUploaded={() => {
+          setArtifactRefreshToken((current) => current + 1);
+        }}
+      />
+    ),
+    system: <SystemPage />,
+  };
 
   return (
     <AppShell

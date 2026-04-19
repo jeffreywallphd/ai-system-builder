@@ -1,7 +1,6 @@
 import { describe, expect, it } from "../../testing/node-test";
 
 import {
-  ARTIFACT_BROWSE_KINDS,
   ARTIFACT_BROWSE_OPERATION,
   ARTIFACT_CONTENT_READ_OPERATION,
   ARTIFACT_READ_OPERATION,
@@ -23,7 +22,7 @@ describe("artifact-browser contracts", () => {
       items: [
         {
           storageKey: " staged/images/kitten-1 ",
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: " image/png ",
           sourceKind: " Upload ",
           originalName: " kitten.png ",
@@ -31,12 +30,11 @@ describe("artifact-browser contracts", () => {
       ],
     });
 
-    expect(ARTIFACT_BROWSE_KINDS).toEqual(["image"]);
     expect(browse).toMatchObject({
       items: [
         {
           storageKey: "staged/images/kitten-1",
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: "image/png",
           sourceKind: "upload",
           originalName: "kitten.png",
@@ -52,7 +50,7 @@ describe("artifact-browser contracts", () => {
     const detail = normalizeArtifactReadSuccessValue({
       artifact: {
         locator,
-        artifactKind: "image",
+        artifactFamily: "image",
         mediaType: " image/jpeg ",
         sourceKind: " upload ",
       },

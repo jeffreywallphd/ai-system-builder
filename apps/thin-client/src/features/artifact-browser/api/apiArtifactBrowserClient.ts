@@ -1,21 +1,42 @@
+import type { ArtifactBrowseItem as ArtifactBrowseContractItem } from "../../../../../../modules/contracts/artifact-browser";
+import { resolveArtifactFamily as resolveCanonicalArtifactFamily } from "../../../../../../modules/application/shared/artifact-family-classifier";
+
 export interface ArtifactBrowserLocator {
   storageKey: string;
 }
 
+type ThinClientArtifactFamily = ArtifactBrowseContractItem["artifactFamily"];
+
 export interface ThinClientArtifactBrowseItem {
   storageKey: string;
-  artifactKind: "image";
+  artifactFamily: ThinClientArtifactFamily;
   mediaType?: string;
   sizeBytes?: number;
+  originalName?: string;
   createdAt?: string;
+  metadata?: {
+    backingState?: {
+      hasImportedSourceBacking: boolean;
+      hasPublishedBacking: boolean;
+      hasLocalObjectAvailable: boolean;
+      isLocalized: boolean;
+      isRemoteOnly: boolean;
+    };
+  };
 }
 
 export interface ThinClientArtifactDetail {
   locator: ArtifactBrowserLocator;
-  artifactKind: "image";
+  artifactFamily: ThinClientArtifactFamily;
   mediaType?: string;
   sizeBytes?: number;
+  sourceKind?: string;
+  originalName?: string;
   createdAt?: string;
+  metadata?: {
+    publishedBacking?: ThinClientPublishedBacking;
+    importedSourceBacking?: ThinClientPublishedBacking;
+  };
 }
 
 export interface ThinClientArtifactContentDescriptor {
@@ -26,10 +47,99 @@ export interface ThinClientArtifactContentDescriptor {
   retrieval: "inline" | "deferred";
 }
 
+export interface ThinClientPublishedBacking {
+  target: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator?: string;
+  };
+  verification: {
+    exists: boolean;
+    verifiedAt?: string;
+  };
+}
+
+export interface ThinClientRegisteredArtifactFromRepo {
+  artifactId: string;
+  backing: {
+    role: "imported-source";
+    target: {
+      provider: string;
+      repository: string;
+      path: string;
+      revision: string;
+      locator?: string;
+    };
+    verification: {
+      exists: true;
+      verifiedAt: string;
+    };
+  };
+}
+
+export interface ThinClientLocalizedArtifactFromRepo {
+  artifactId: string;
+  localObject: {
+    key: string;
+    mediaType?: string;
+    sizeBytes: number;
+  };
+  source: {
+    provider: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    locator: string;
+  };
+  localizedAt: string;
+}
+
+export interface ThinClientHuggingFaceNamespaceDataset {
+  namespace: string;
+  repository: string;
+}
+
+export interface ThinClientHuggingFaceDatasetParquetFile {
+  repository: string;
+  path: string;
+  revision: string;
+  sizeBytes?: number;
+}
+
 export interface ArtifactBrowserApiClient {
-  browseImageArtifacts: () => Promise<ThinClientArtifactBrowseItem[]>;
+  getHuggingFaceTokenStatus: () => Promise<{ configured: boolean; maskedToken?: string }>;
+  setHuggingFaceToken: (input: { token: string }) => Promise<{ configured: boolean; maskedToken?: string }>;
+  clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
+  browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
+  browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
+  browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily }) => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
+  createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator) => string;
+  publishArtifactToHuggingFace: (input: {
+    artifactId: string;
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<ThinClientPublishedBacking>;
+  verifyPublishedArtifactBacking: (input: {
+    artifactId: string;
+  }) => Promise<ThinClientPublishedBacking>;
+  verifyImportedSourceBacking?: (input: {
+    artifactId: string;
+  }) => Promise<ThinClientPublishedBacking>;
+  registerArtifactFromRepo: (input: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<ThinClientRegisteredArtifactFromRepo>;
+  localizeArtifactFromRepo: (input: {
+    artifactId: string;
+  }) => Promise<ThinClientLocalizedArtifactFromRepo>;
 }
 
 interface ApiResponseEnvelope {
@@ -72,13 +182,78 @@ export function createApiArtifactBrowserClient(
   const source = options.source ?? "thin-client.artifact-browser";
 
   return {
-    async browseImageArtifacts(): Promise<ThinClientArtifactBrowseItem[]> {
+    async getHuggingFaceTokenStatus() {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+        method: "GET",
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => value as { configured: boolean; maskedToken?: string });
+    },
+
+    async setHuggingFaceToken(input) {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ token: input.token }),
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => value as { configured: boolean; maskedToken?: string });
+    },
+
+    async clearHuggingFaceToken() {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+        method: "DELETE",
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => value as { configured: boolean; maskedToken?: string });
+    },
+
+    async browseHuggingFaceNamespaceDatasets(input) {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/huggingface/namespace/datasets"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          namespace: input.namespace,
+          source,
+        }),
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const datasets = (value as { datasets?: ThinClientHuggingFaceNamespaceDataset[] } | undefined)?.datasets;
+        return Array.isArray(datasets) ? datasets : [];
+      });
+    },
+
+    async browseHuggingFaceDatasetParquetFiles(input) {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          repository: input.repository,
+          revision: input.revision,
+          source,
+        }),
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const files = (value as { files?: ThinClientHuggingFaceDatasetParquetFile[] } | undefined)?.files;
+        return Array.isArray(files) ? files : [];
+      });
+    },
+
+    async browseArtifacts(input = {}): Promise<ThinClientArtifactBrowseItem[]> {
       const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/browse"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ artifactKind: "image", source }),
+        body: JSON.stringify({ artifactFamily: input.artifactFamily, source }),
       });
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
@@ -127,6 +302,145 @@ export function createApiArtifactBrowserClient(
         }
 
         return content;
+      });
+    },
+
+    createArtifactMediaViewUrl(locator: ArtifactBrowserLocator): string {
+      const query = new URLSearchParams({ storageKey: locator.storageKey });
+      return createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`);
+    },
+
+    async publishArtifactToHuggingFace(input): Promise<ThinClientPublishedBacking> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/publish"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          artifactId: input.artifactId,
+          target: {
+            provider: "huggingface",
+            repository: input.repository,
+            revision: input.revision,
+            path: input.path,
+          },
+          mediaType: input.mediaType,
+          verify: true,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const backing = value as ThinClientPublishedBacking;
+        if (!backing || typeof backing !== "object") {
+          throw new Error("Artifact publish response is missing backing information.");
+        }
+
+        return backing;
+      });
+    },
+
+    async verifyPublishedArtifactBacking(input): Promise<ThinClientPublishedBacking> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/publish/verify"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          artifactId: input.artifactId,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const backing = value as ThinClientPublishedBacking;
+        if (!backing || typeof backing !== "object") {
+          throw new Error("Artifact publish verify response is missing backing information.");
+        }
+
+        return backing;
+      });
+    },
+
+    async verifyImportedSourceBacking(input): Promise<ThinClientPublishedBacking> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/source/verify"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          artifactId: input.artifactId,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const backing = value as ThinClientPublishedBacking;
+        if (!backing || typeof backing !== "object") {
+          throw new Error("Artifact source verify response is missing backing information.");
+        }
+
+        return backing;
+      });
+    },
+
+    async registerArtifactFromRepo(input): Promise<ThinClientRegisteredArtifactFromRepo> {
+      const artifactFamily = resolveCanonicalArtifactFamily({
+        mediaType: input.mediaType,
+        fileName: input.path,
+      });
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/register-from-repo"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          target: {
+            provider: "huggingface",
+            repository: input.repository,
+            revision: input.revision,
+            path: input.path,
+          },
+          artifactFamily,
+          mediaType: input.mediaType,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const registered = value as ThinClientRegisteredArtifactFromRepo;
+        if (!registered || typeof registered !== "object") {
+          throw new Error("Artifact register-from-repo response is missing registration information.");
+        }
+
+        return registered;
+      });
+    },
+
+    async localizeArtifactFromRepo(input): Promise<ThinClientLocalizedArtifactFromRepo> {
+      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/localize-from-repo"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          artifactId: input.artifactId,
+          source,
+        }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, (value) => {
+        const localized = value as ThinClientLocalizedArtifactFromRepo;
+        if (!localized || typeof localized !== "object") {
+          throw new Error("Artifact localize-from-repo response is missing localization information.");
+        }
+
+        return localized;
       });
     },
   };

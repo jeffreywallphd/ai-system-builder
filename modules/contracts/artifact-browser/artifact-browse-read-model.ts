@@ -6,19 +6,21 @@ import {
   normalizeStorageArtifactKey,
   type StorageArtifactKey,
 } from "../storage";
-
-export const ARTIFACT_BROWSE_KINDS = ["image"] as const;
-
-export type ArtifactBrowseKind = (typeof ARTIFACT_BROWSE_KINDS)[number];
+import type { StorageObjectMetadata } from "../storage";
+import {
+  normalizeArtifactFamily,
+  type ArtifactFamily,
+} from "../../domain/artifact";
 
 export interface ArtifactBrowseItem {
   storageKey: StorageArtifactKey;
-  artifactKind: ArtifactBrowseKind;
+  artifactFamily: ArtifactFamily;
   mediaType?: string;
   sizeBytes?: number;
   sourceKind?: IngestionSourceKind;
   originalName?: string;
   createdAt?: string;
+  metadata?: StorageObjectMetadata;
 }
 
 export interface ArtifactBrowseSuccessValue {
@@ -34,15 +36,11 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function normalizeArtifactBrowseKind(kind: ArtifactBrowseKind): ArtifactBrowseKind {
-  return kind;
-}
-
 export function normalizeArtifactBrowseItem(item: ArtifactBrowseItem): ArtifactBrowseItem {
   return {
     ...item,
     storageKey: normalizeStorageArtifactKey(item.storageKey),
-    artifactKind: normalizeArtifactBrowseKind(item.artifactKind),
+    artifactFamily: normalizeArtifactFamily(item.artifactFamily),
     mediaType: normalizeOptionalText(item.mediaType),
     sourceKind:
       typeof item.sourceKind === "string"

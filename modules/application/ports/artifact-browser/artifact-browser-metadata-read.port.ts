@@ -1,15 +1,15 @@
 import type {
-  ArtifactBrowseKind,
   ArtifactBrowserLocator,
   ArtifactBrowseSuccessValue,
   ArtifactReadSuccessValue,
 } from "../../../contracts/artifact-browser";
 import type { ContractResult } from "../../../contracts/shared";
 import type { StorageObjectMetadata } from "../../../contracts/storage";
-import type { ArtifactBrowserBoundaryContext } from "./artifact-browser-request-context";
+import type { ArtifactFamily } from "../../../domain/artifact";
+import type { ApplicationRequestContext } from "../application-request-context";
 
 export interface BrowseArtifactsRequest {
-  artifactKind: ArtifactBrowseKind;
+  artifactFamily?: ArtifactFamily;
 }
 
 export interface ReadArtifactDetailRequest {
@@ -19,11 +19,11 @@ export interface ReadArtifactDetailRequest {
 export interface ArtifactBrowserMetadataReadPort {
   browseArtifacts(
     request: BrowseArtifactsRequest,
-    context?: ArtifactBrowserBoundaryContext,
+    context?: ApplicationRequestContext,
   ): Promise<ContractResult<ArtifactBrowseSuccessValue>>;
 
   readArtifactDetail<TMetadata extends StorageObjectMetadata = StorageObjectMetadata>(
     request: ReadArtifactDetailRequest,
-    context?: ArtifactBrowserBoundaryContext,
+    context?: ApplicationRequestContext,
   ): Promise<ContractResult<ArtifactReadSuccessValue<TMetadata>>>;
 }

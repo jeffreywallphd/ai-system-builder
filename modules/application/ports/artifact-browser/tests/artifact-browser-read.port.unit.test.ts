@@ -15,7 +15,7 @@ import {
 import type { StorageObjectMetadata } from "../../../../contracts/storage";
 
 import type {
-  ArtifactBrowserBoundaryContext,
+  ApplicationRequestContext,
   ArtifactBrowserContentReadPort,
   ArtifactBrowserMetadataReadPort,
   BrowseArtifactsRequest,
@@ -45,7 +45,7 @@ describe("artifact browser application ports", () => {
       correlationId: string;
     }>();
     expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["browseArtifacts"]>[1]>().toExtend<
-      ArtifactBrowserBoundaryContext | undefined
+      ApplicationRequestContext | undefined
     >();
 
     expectTypeOf<
@@ -68,7 +68,7 @@ describe("artifact browser application ports", () => {
           items: [
             {
               storageKey: locator.storageKey,
-              artifactKind: request.artifactKind,
+              artifactFamily: request.artifactFamily,
               mediaType: "image/png",
             },
           ],
@@ -77,7 +77,7 @@ describe("artifact browser application ports", () => {
         createSuccessResult({
           artifact: {
             locator,
-            artifactKind: "image",
+            artifactFamily: "image",
             mediaType: "image/png",
           },
         }),

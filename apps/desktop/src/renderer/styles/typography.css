@@ -30,3 +30,7 @@ p {
 code {
   font-family: var(--font-family-mono);
 }
+
+.ui-text-muted {
+  color: var(--color-text-muted);
+}

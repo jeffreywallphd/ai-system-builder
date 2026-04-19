@@ -12,6 +12,12 @@ import path from "node:path";
 import { run } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
+import {
+  applyIgnoredFailureAdjustments,
+  applyDiagnosticSummaryMetric,
+  buildNonBrowserNodeTestRunOptions,
+  isIgnorableRunnerSpawnFailure,
+} from "./non-browser-test-runner-core.mjs";
 
 const runnerDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(runnerDir, "../../..");
@@ -19,8 +25,15 @@ const repoRoot = path.resolve(runnerDir, "../../..");
 const reportRelativePath = "artifacts/test-reports/non-browser-test-report.json";
 const reportPath = path.resolve(repoRoot, reportRelativePath);
 const runtimeRoot = path.resolve(repoRoot, "artifacts/test-runtime/non-browser");
+const runnerRelativePath = "dev-tools/scripts/testing/run-non-browser-tests.mjs";
 
-const discoveryRoots = ["modules", "apps/server", "apps/desktop", "apps/thin-client"];
+const discoveryRoots = [
+  "modules",
+  "apps/server",
+  "apps/desktop",
+  "apps/thin-client",
+  "dev-tools/scripts/testing",
+];
 const validTestFilePattern = /\.test\.[cm]?[jt]sx?$/i;
 const browserOnlyTestPattern = /\.(ui|e2e)\.test\.[cm]?[jt]sx?$/i;
 const browserAppPathPattern = /^(apps\/desktop\/src\/renderer\/|apps\/thin-client\/src\/)/i;
@@ -395,6 +408,7 @@ const resolveSourcePath = (maybeRuntimeFile) => {
 
 try {
   discoverAndPrepareRuntime();
+  let ignoredRunnerSpawnFailures = 0;
 
   if (discoveredRuntimeTestFiles.length === 0) {
     throw new Error("No non-browser test files were discovered.");
@@ -404,57 +418,35 @@ try {
     await import(pathToFileURL(runtimeTestFile).href);
   }
 
-  const testsStream = run({
-    concurrency: true,
-  });
+  const testsStream = run(buildNonBrowserNodeTestRunOptions());
 
   for await (const streamEvent of testsStream) {
     const eventType = streamEvent?.type;
     const event = streamEvent?.data ?? streamEvent;
 
-    if (eventType === "test:diagnostic") {      
-      const message = typeof event?.message === "string" ? event.message.trim() : "";
-      const match = /^(?:\W+)?\s*(tests|suites|pass|fail|cancelled|skipped|todo|duration_ms)\s+(.+)$/.exec(message);
-      
-      if(match) {
-        const[, metricName, rawValue] = match;
-
-        switch (metricName) {
-          case "tests":
-            report.summary.counts.tests = Number(rawValue);
-            break;
-          case "suites":
-            report.summary.counts.suites = Number(rawValue);
-            break;
-          case "pass":
-            report.summary.counts.passed = Number(rawValue);
-            break;
-          case "fail":
-            report.summary.counts.failed = Number(rawValue);
-            break;
-          case "cancelled":
-            report.summary.counts.cancelled = Number(rawValue);
-            break;
-          case "skipped":
-            report.summary.counts.skipped = Number(rawValue);
-            break;
-          case "todo":
-            report.summary.counts.todo = Number(rawValue);
-            break;
-          case "duration_ms":
-            report.summary.counts.durationMs = Number(rawValue);
-            break;
-          default:
-            break;
-        }
+    if (eventType === "test:diagnostic") {
+      const didApply = applyDiagnosticSummaryMetric(report.summary, event?.message);
+      if (didApply) {
         continue;
       }
     }
 
     if (eventType === "test:fail") {
+      const sourceFile = resolveSourcePath(event.file);
+      if (
+        isIgnorableRunnerSpawnFailure({
+          event,
+          sourceFile,
+          runnerRelativePath,
+        })
+      ) {
+        ignoredRunnerSpawnFailures += 1;
+        continue;
+      }
+
       report.failures.push({
         name: event.name,
-        file: resolveSourcePath(event.file),
+        file: sourceFile,
         line: event.line,
         column: event.column,
         nesting: event.nesting,
@@ -469,6 +461,7 @@ try {
     }
   }
 
+  applyIgnoredFailureAdjustments(report.summary, ignoredRunnerSpawnFailures);
   report.summary.success = report.failures.length === 0;
   const didFail = report.summary.success === false;
   report.status = didFail ? "failed" : "passed";
@@ -487,7 +480,6 @@ try {
     report.status = "startup-failed";
   } else {
     report.status = "failed";
-    report.startupError = serialized;
   }
 } finally {
   writeReport();

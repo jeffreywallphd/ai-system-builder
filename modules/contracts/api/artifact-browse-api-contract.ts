@@ -1,10 +1,10 @@
 import {
   ARTIFACT_BROWSE_OPERATION,
   normalizeArtifactBrowseSuccessValue,
-  type ArtifactBrowseKind,
   type ArtifactBrowseSuccessValue,
 } from "../artifact-browser";
 import { createApiError } from "./api-error";
+import type { ArtifactFamily } from "../../domain/artifact";
 import { createApiRequest, type ApiRequest } from "./api-request";
 import {
   createApiFailureResponse,
@@ -20,7 +20,7 @@ export interface ApiArtifactBrowseBoundaryContext {
 }
 
 export interface ApiArtifactBrowseRequestPayload {
-  artifactKind: ArtifactBrowseKind;
+  artifactFamily?: ArtifactFamily;
   boundary: ApiArtifactBrowseBoundaryContext;
 }
 
@@ -51,12 +51,8 @@ function normalizeRequiredTextField(value: string, fieldName: string): string {
 function normalizeApiArtifactBrowsePayload(
   payload: ApiArtifactBrowseRequestPayload,
 ): ApiArtifactBrowseRequestPayload {
-  if (payload.artifactKind !== "image") {
-    throw new Error(`artifactKind must be "image". Received "${payload.artifactKind}".`);
-  }
-
   return {
-    artifactKind: "image",
+    artifactFamily: payload.artifactFamily,
     boundary: {
       host: "server",
       source: normalizeRequiredTextField(payload.boundary.source, "boundary.source"),

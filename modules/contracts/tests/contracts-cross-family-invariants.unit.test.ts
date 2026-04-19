@@ -1,6 +1,7 @@
-import { describe, expect, it } from "../../testing/node-test";
+import { describe, expect, expectTypeOf, it } from "../../testing/node-test";
 
 import { createApiRequest } from "../api";
+import type { ContractBoundaryContext } from "../shared";
 import {
   normalizeArtifactBrowseSuccessValue,
   normalizeArtifactContentReadSuccessValue,
@@ -30,7 +31,10 @@ import {
 import {
   createStoreArtifactRequest,
   createStoreArtifactSuccessResult,
+  createStoreArtifactInRepoRequest,
   normalizeStorageArtifactKey,
+  normalizeStorageKind,
+  normalizeStorageBackingReference,
 } from "../storage";
 import { createStagedArtifactDescriptorFromStorageObjectDescriptor } from "../ingestion";
 import { normalizeTransformRecord } from "../transform";
@@ -114,6 +118,21 @@ describe("contracts cross-family invariants", () => {
       correlationId: "corr-802",
       host: "server",
     });
+  });
+
+  it("keeps repo-storage request contracts payload-only while context flows at application boundaries", () => {
+    expectTypeOf<ReturnType<typeof createStoreArtifactInRepoRequest>>().not.toExtend<ContractBoundaryContext>();
+
+    const repoRequest = createStoreArtifactInRepoRequest(new Uint8Array([1]), {
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/a.png",
+      },
+    });
+
+    expect("requestId" in repoRequest).toBe(false);
+    expect("correlationId" in repoRequest).toBe(false);
   });
 
   it("keeps persistence record semantics distinct from storage key semantics", () => {
@@ -216,7 +235,7 @@ describe("contracts cross-family invariants", () => {
       items: [
         {
           storageKey: stagedDescriptor.storage.key,
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: stagedDescriptor.storage.mediaType,
           sizeBytes: stagedDescriptor.storage.sizeBytes,
           sourceKind: stagedDescriptor.sourceKind,
@@ -229,7 +248,7 @@ describe("contracts cross-family invariants", () => {
         locator: {
           storageKey: stagedDescriptor.storage.key,
         },
-        artifactKind: "image",
+        artifactFamily: "image",
         mediaType: stagedDescriptor.storage.mediaType,
         sizeBytes: stagedDescriptor.storage.sizeBytes,
         sourceKind: stagedDescriptor.sourceKind,
@@ -316,4 +335,28 @@ describe("contracts cross-family invariants", () => {
       to: { id: "orders.v1", kind: "dataset" },
     });
   });
+
+  it("keeps shared storage foundation thin across object and repo families", () => {
+    const objectKind = normalizeStorageKind("artifact-object");
+    const repoKind = normalizeStorageKind("artifact-repo");
+
+    const objectBacking = normalizeStorageBackingReference({
+      kind: objectKind,
+      provider: "local-filesystem",
+      locator: "workspace/ws-42/snapshots/state.json",
+    });
+    const repoRequest = createStoreArtifactInRepoRequest(new Uint8Array([1]), {
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "state.json",
+      },
+    });
+
+    expect(objectBacking.kind).toBe("artifact-object");
+    expect(repoKind).toBe("artifact-repo");
+    expect("repository" in objectBacking).toBe(false);
+    expect("key" in repoRequest.target).toBe(false);
+  });
+
 });

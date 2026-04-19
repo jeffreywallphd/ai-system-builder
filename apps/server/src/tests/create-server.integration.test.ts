@@ -19,7 +19,7 @@ async function createTempRoot(): Promise<string> {
   return root;
 }
 
-describe("server app image upload route", () => {
+describe("server app artifact upload route", () => {
   it("mounts the upload route and stores image bytes through the server host use case", async () => {
     const storageRootDirectory = await createTempRoot();
     const { app } = createServer({
@@ -47,7 +47,7 @@ describe("server app image upload route", () => {
       );
       uploadFormData.append("source", "server.integration.test");
 
-      const response = await fetch(`http://127.0.0.1:${address.port}/api/image/upload`, {
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/artifact/upload`, {
         method: "POST",
         headers: {
           "x-request-id": "req-server-1",
@@ -60,7 +60,7 @@ describe("server app image upload route", () => {
       const payload = await response.json();
       expect(payload).toMatchObject({
         ok: true,
-        operation: "image.upload",
+        operation: "artifact.upload",
         requestId: "req-server-1",
         correlationId: "corr-server-1",
         value: {
@@ -113,11 +113,11 @@ describe("server app image upload route", () => {
       const uploadFormData = new FormData();
       uploadFormData.append(
         "file",
-        new File([new Uint8Array([37, 80, 68, 70])], "cat.pdf", { type: "application/pdf" }),
+        new File([new Uint8Array([80, 75, 3, 4])], "cat.zip", { type: "application/zip" }),
       );
       uploadFormData.append("source", "server.integration.test.invalid-media-type");
 
-      const response = await fetch(`http://127.0.0.1:${address.port}/api/image/upload`, {
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/artifact/upload`, {
         method: "POST",
         body: uploadFormData,
       });
@@ -126,10 +126,10 @@ describe("server app image upload route", () => {
       const payload = await response.json();
       expect(payload).toMatchObject({
         ok: false,
-        operation: "image.upload",
+        operation: "artifact.upload",
         error: {
           code: "validation",
-          message: "mediaType must be an image media type.",
+          message: "Artifact type is not accepted: application/zip.",
           kind: "client",
         },
       });

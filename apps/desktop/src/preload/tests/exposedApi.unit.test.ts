@@ -1,18 +1,51 @@
 import { describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
 
 import {
-  DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
+  createDesktopArtifactBrowseSuccessResponse,
+  createDesktopArtifactPublishSuccessResponse,
+  createDesktopArtifactPublishVerifySuccessResponse,
+  createDesktopArtifactSourceVerifySuccessResponse,
+  createDesktopArtifactRegisterFromRepoSuccessResponse,
+  createDesktopArtifactLocalizeFromRepoSuccessResponse,
+  createDesktopArtifactMediaViewSuccessResponse,
+  createDesktopArtifactUnregisteredBrowseSuccessResponse,
+  createDesktopArtifactUnregisteredRegisterSuccessResponse,
+  createDesktopArtifactUnregisteredDeleteSuccessResponse,
+  createDesktopArtifactUploadSuccessResponse,
   createIpcChannel,
-  createDesktopImageUploadSuccessResponse,
   createIpcError,
   createIpcFailureResponse,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
+  createDesktopHuggingFaceTokenGetSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
-describe("desktop preload exposedApi uploadImage bridge", () => {
-  it("maps bridge input into the desktop upload request envelope and invokes the request channel", async () => {
+describe("desktop preload exposedApi bridge", () => {
+  it("maps hugging face token status bridge calls to dedicated request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
-      createDesktopImageUploadSuccessResponse(
+      createDesktopHuggingFaceTokenGetSuccessResponse({ configured: true, maskedToken: "••••1234" }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.getHuggingFaceTokenStatus();
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value);
+  });
+
+  it("maps bridge input into desktop upload request envelope and invokes request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopArtifactUploadSuccessResponse(
         {
           sourceKind: "upload",
           storage: {
@@ -27,13 +60,9 @@ describe("desktop preload exposedApi uploadImage bridge", () => {
         },
       ),
     );
-    const api = createDesktopPreloadApi({
-      ipcRenderer: {
-        invoke,
-      },
-    });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-    const response = await api.uploadImage(
+    const response = await api.uploadArtifact(
       {
         fileName: " kitten.png ",
         mediaType: " image/png ",
@@ -47,56 +76,80 @@ describe("desktop preload exposedApi uploadImage bridge", () => {
 
     expect(response.ok).toBe(true);
     expect(invoke).toHaveBeenCalledTimes(1);
-    expect(invoke).toHaveBeenCalledWith(
-      DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value,
-      {
-        channel: "ipc.image.upload.request",
-        operation: "image.upload",
-        payload: {
-          fileName: "kitten.png",
-          mediaType: "image/png",
-          bytes: new Uint8Array([137, 80, 78, 71]),
-          boundary: {
-            host: "desktop",
-            source: "desktop.renderer.upload-form",
-          },
-        },
-        requestId: "req-upload-1",
-        correlationId: "corr-upload-1",
-        metadata: undefined,
-      },
-    );
+    const [channel, request] = invoke.mock.calls[0] as [string, { operation: string; payload: { boundary: { host: string; source: string } } }];
+    expect(channel).toBe(DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value);
+    expect(request.operation).toBe("artifact.upload");
+    expect(request.payload.boundary).toEqual({ host: "desktop", source: "desktop.renderer.artifact-upload.form" });
   });
 
-  it("supports preload-owned boundary source overrides without exposing IPC internals to ui callers", async () => {
+  it("maps artifact browse and media-view operations to separate request channels", async () => {
+    const responses = [
+      createDesktopArtifactBrowseSuccessResponse({ items: [] }),
+      createDesktopArtifactMediaViewSuccessResponse({
+        storageKey: "uploads/cat.png",
+        mediaType: "image/png",
+        bytes: new Uint8Array([1, 2]),
+      }),
+    ];
+    let index = 0;
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
+      const response = responses[index];
+      index += 1;
+      return response;
+    });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    await api.browseArtifacts();
+    const mediaResponse = await api.readArtifactViewerMedia({ storageKey: "uploads/cat.png" });
+
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
+    expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactFamily?: string } } | undefined)?.payload?.artifactFamily).toBeUndefined();
+    expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value);
+    expect(mediaResponse.ok).toBe(true);
+  });
+
+  it("maps artifact browse family filter using the contract artifact-family union", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
-      createDesktopImageUploadSuccessResponse({
-        sourceKind: "upload",
-        storage: {
-          key: "uploads/cat.png",
-          mediaType: "image/png",
-          sizeBytes: 8,
+      createDesktopArtifactBrowseSuccessResponse({ items: [] }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    await api.browseArtifacts({ artifactFamily: "structured-text" });
+
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
+    expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactFamily?: string } } | undefined)?.payload?.artifactFamily).toBe("structured-text");
+  });
+
+  it("maps publish bridge calls to artifact publish request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopArtifactPublishSuccessResponse({
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          locator: "openai/demo/images/cat.png",
+        },
+        verification: {
+          exists: true,
+          verifiedAt: "2026-04-17T00:00:00.000Z",
         },
       }),
     );
-    const api = createDesktopPreloadApi({
-      ipcRenderer: {
-        invoke,
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    const response = await api.publishArtifactToRepo({
+      artifactId: "uploads/cat.png",
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
       },
-      uploadSource: "desktop.renderer.drag-drop",
     });
 
-    await api.uploadImage({
-      fileName: "cat.png",
-      mediaType: "image/png",
-      bytes: new Uint8Array([1, 2, 3, 4]),
-    });
-
-    const request = invoke.mock.calls[0]?.[1];
-    expect(request?.payload.boundary).toEqual({
-      host: "desktop",
-      source: "desktop.renderer.drag-drop",
-    });
+    expect(response.ok).toBe(true);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value);
   });
 
   it("throws when IPC returns a response envelope for the wrong operation or channel", async () => {
@@ -109,18 +162,144 @@ describe("desktop preload exposedApi uploadImage bridge", () => {
         ),
       ),
     );
-    const api = createDesktopPreloadApi({
-      ipcRenderer: {
-        invoke,
-      },
-    });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
     await expect(
-      api.uploadImage({
+      api.uploadArtifact({
         fileName: "cat.png",
         mediaType: "image/png",
         bytes: new Uint8Array([1]),
       }),
-    ).rejects.toThrow("Received invalid desktop image upload IPC response envelope.");
+    ).rejects.toThrow("Received invalid desktop artifact upload IPC response envelope.");
   });
+});
+
+
+it("maps publish verify bridge calls to artifact publish verify request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopArtifactPublishVerifySuccessResponse({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        locator: "openai/demo/images/cat.png",
+      },
+      verification: {
+        exists: true,
+        verifiedAt: "2026-04-17T00:00:00.000Z",
+      },
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.verifyPublishedArtifactBacking({ artifactId: "uploads/cat.png" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value);
+});
+
+it("maps register-from-repo bridge calls to artifact register-from-repo request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopArtifactRegisterFromRepoSuccessResponse({
+      artifactId: "imports/huggingface/openai/demo/main/images/cat.png",
+      backing: {
+        role: "imported-source",
+        target: {
+          provider: "huggingface",
+          repository: "openai/demo",
+          path: "images/cat.png",
+          revision: "main",
+          locator: "openai/demo/images/cat.png",
+        },
+        verification: {
+          exists: true,
+          verifiedAt: "2026-04-18T00:00:00.000Z",
+        },
+      },
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.registerArtifactFromRepo({
+    target: {
+      provider: "huggingface",
+      repository: "openai/demo",
+      path: "images/cat.png",
+    },
+  });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value);
+  expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactFamily?: string } } | undefined)?.payload?.artifactFamily).toBeUndefined();
+});
+
+it("maps localize-from-repo bridge calls to artifact localize-from-repo request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopArtifactLocalizeFromRepoSuccessResponse({
+      artifactId: "artifacts/20260418000000-local01",
+      localObject: {
+        key: "artifacts/20260418000000-local01",
+        mediaType: "image/png",
+        sizeBytes: 3,
+      },
+      source: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        locator: "openai/demo/images/cat.png",
+      },
+      localizedAt: "2026-04-18T00:00:00.000Z",
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.localizeArtifactFromRepo({ artifactId: "artifacts/20260418000000-local01" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value);
+});
+
+it("maps source-verify bridge calls to artifact source-verify request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopArtifactSourceVerifySuccessResponse({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/cat.png",
+        revision: "main",
+        locator: "openai/demo/images/cat.png",
+      },
+      verification: {
+        exists: true,
+        verifiedAt: "2026-04-18T00:00:00.000Z",
+      },
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.verifyImportedArtifactSourceBacking({ artifactId: "artifacts/20260418000000-local01" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL.value);
+});
+
+it("maps unregistered artifact browse/register/delete bridge calls to dedicated request channels", async () => {
+  const responses = [
+    createDesktopArtifactUnregisteredBrowseSuccessResponse({ items: [] }),
+    createDesktopArtifactUnregisteredRegisterSuccessResponse({ storageKey: "uploads/orphan.txt" }),
+    createDesktopArtifactUnregisteredDeleteSuccessResponse({ storageKey: "uploads/orphan.txt" }),
+  ];
+  let index = 0;
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
+    const response = responses[index];
+    index += 1;
+    return response;
+  });
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.browseUnregisteredArtifacts();
+  await api.registerUnregisteredArtifact({ storageKey: "uploads/orphan.txt" });
+  await api.deleteUnregisteredArtifact({ storageKey: "uploads/orphan.txt" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[2]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value);
 });

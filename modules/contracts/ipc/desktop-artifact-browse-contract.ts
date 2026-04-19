@@ -1,9 +1,9 @@
 import {
   ARTIFACT_BROWSE_OPERATION,
   normalizeArtifactBrowseSuccessValue,
-  type ArtifactBrowseKind,
   type ArtifactBrowseSuccessValue,
 } from "../artifact-browser";
+import type { ArtifactFamily } from "../../domain/artifact";
 import {
   createIpcChannel,
   type IpcChannel,
@@ -36,7 +36,7 @@ export interface DesktopArtifactBrowseBoundaryContext {
 }
 
 export interface DesktopArtifactBrowseRequestPayload {
-  artifactKind: ArtifactBrowseKind;
+  artifactFamily?: ArtifactFamily;
   boundary: DesktopArtifactBrowseBoundaryContext;
 }
 
@@ -69,12 +69,8 @@ function normalizeRequiredTextField(value: string, fieldName: string): string {
 function normalizeDesktopArtifactBrowsePayload(
   payload: DesktopArtifactBrowseRequestPayload,
 ): DesktopArtifactBrowseRequestPayload {
-  if (payload.artifactKind !== "image") {
-    throw new Error(`artifactKind must be "image". Received "${payload.artifactKind}".`);
-  }
-
   return {
-    artifactKind: "image",
+    artifactFamily: payload.artifactFamily,
     boundary: {
       host: "desktop",
       source: normalizeRequiredTextField(payload.boundary.source, "boundary.source"),

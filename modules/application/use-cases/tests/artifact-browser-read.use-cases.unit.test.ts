@@ -44,7 +44,7 @@ describe("artifact browser read use cases", () => {
           items: [
             {
               storageKey: " staged/images/cat-1 ",
-              artifactKind: "image",
+              artifactFamily: "image",
               mediaType: " image/png ",
             } satisfies ArtifactBrowseItem,
           ],
@@ -57,7 +57,7 @@ describe("artifact browser read use cases", () => {
 
     const result = await useCase.execute(
       {
-        artifactKind: "image",
+        artifactFamily: "image",
       },
       {
         requestId: "req-browse-1",
@@ -74,7 +74,7 @@ describe("artifact browser read use cases", () => {
       items: [
         {
           storageKey: "staged/images/cat-1",
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: "image/png",
         },
       ],
@@ -82,7 +82,7 @@ describe("artifact browser read use cases", () => {
     expect("content" in result.value.items[0]).toBe(false);
     expect(browseArtifacts).toHaveBeenCalledWith(
       {
-        artifactKind: "image",
+        artifactFamily: "image",
       },
       {
         requestId: "req-browse-1",
@@ -91,24 +91,19 @@ describe("artifact browser read use cases", () => {
     );
   });
 
-  it("browse validates first-slice artifact kind and avoids calling the port on invalid input", async () => {
+  it("browse passes through generic artifact kind filters without image/data restriction", async () => {
     const browseArtifacts = testDouble.fn<ArtifactBrowserMetadataReadPort["browseArtifacts"]>();
+    browseArtifacts.mockResolvedValue({ ok: true, value: { items: [] } });
     const useCase = new BrowseArtifactsUseCase({
       artifactBrowserMetadataRead: createMetadataReadPort({ browseArtifacts }),
     });
 
     const result = await useCase.execute({
-      artifactKind: "document" as "image",
+      artifactFamily: "document",
     });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected validation failure.");
-    }
-
-    expect(result.error.code).toBe("validation");
-    expect(result.error.message).toContain('artifactKind must be "image"');
-    expect(browseArtifacts).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(browseArtifacts).toHaveBeenCalledWith({ artifactFamily: "document" }, {});
   });
 
   it("detail returns one artifact metadata/read-model result by locator", async () => {
@@ -119,7 +114,7 @@ describe("artifact browser read use cases", () => {
         value: {
           artifact: {
             locator: createArtifactBrowserLocator("staged/images/cat-2"),
-            artifactKind: "image",
+            artifactFamily: "image",
             mediaType: "image/jpeg",
             metadata: {
               width: 640,
@@ -143,7 +138,7 @@ describe("artifact browser read use cases", () => {
 
     expect(result.value.artifact).toMatchObject({
       locator: { storageKey: "staged/images/cat-2" },
-      artifactKind: "image",
+      artifactFamily: "image",
       mediaType: "image/jpeg",
       metadata: { width: 640 },
     });

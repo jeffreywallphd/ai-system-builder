@@ -24,6 +24,7 @@ Hosts are implemented under `modules/hosts/` and surfaced through `apps/*` entry
   - preload: narrow secure renderer bridge,
   - renderer: React UI composition only (no filesystem or IPC internals),
   - host composition (`modules/hosts/desktop`): adapter/use-case wiring.
+- Desktop artifact publish/verification uses the same shared application use case path as server/thin-client (`PublishArtifactToRepoUseCase`, `VerifyPublishedArtifactBackingUseCase`) and is exposed through preload+IPC transport wiring rather than renderer-side orchestration.
 
 ## Server host
 
@@ -103,20 +104,36 @@ Contributors should:
 - It composes pages/features/components in a renderer-oriented structure and calls server APIs over HTTP through feature-local clients.
 - It should remain structurally distinct from the desktop preload-backed path and avoid duplicating host logic.
 - The initial server-backed image vertical slice includes both upload and read-side artifact browse/view behavior:
-  - thin-client UI calls server HTTP contracts for image upload plus image-backed artifact browse/detail/content-read,
+  - thin-client UI calls server HTTP contracts for artifact upload plus image-backed artifact browse/detail/content-read,
   - the Express adapter stays thin and delegates to shared application use cases,
   - shared server host composition continues to own storage/persistence capability wiring for both write and read flows.
-- Multipart parsing for that server-backed image-upload path stays in the Express transport adapter and should parse
+- Multipart parsing for that server-backed artifact-upload path stays in the Express transport adapter and should parse
   the live request stream with Busboy rather than buffering the full request body before parsing.
 
 ## Practical boundaries
 
 - Apps own framework bootstrap surfaces (for example `express()` instantiation and app-level middleware).
 - Host modules compose dependencies and register transport adapters against app-provided ports.
-- Transport adapter registration should be feature-sliced (for example `image-upload/...`) with only tiny top-level aggregators.
+- Transport adapter registration should be feature-sliced (for example `artifact-upload/...`) with only tiny top-level aggregators.
 - Host modules may depend on application/contracts/adapters.
 - Transport adapters may be selected by hosts.
+- Hosts may compose multiple specialized storage adapter families (artifact-object plus artifact-repo providers) when task scope requires it.
+- Server/desktop host composition should keep those storage-family choices explicit in composition wiring (for example future Hugging Face artifact-repo provider composition) rather than hiding provider semantics behind ad hoc transport/UI shortcuts.
 - Business rules remain in domain/application.
 - UI remains separate from host lifecycle internals.
 
 If host code starts accumulating business logic, move that logic inward before it becomes entrenched.
+
+
+### Current host parity for repo-backed artifact workflows
+
+- Server API and desktop IPC/preload both expose shared publish, published-verify, source-verify, register-from-repo, and localize-from-repo use cases.
+- Thin-client and desktop renderer surfaces remain host-specific UI layers but call into the same shared application workflow path.
+
+
+## Hugging Face token host configuration
+
+- Server host now exposes a persisted Hugging Face token config seam for thin-client users (`GET/POST/DELETE /api/config/huggingface-token`).
+- Desktop host exposes equivalent token config through preload/IPC so renderer flows can save/update/clear token without environment restarts.
+- Artifact register/localize/publish/verify flows read token from host config at execution time; users no longer need to re-enter token per action.
+- Public repositories may work without token; private/gated repositories can require one.

@@ -26,6 +26,8 @@
 - Keep operation identity transport-neutral (`workspace.create` style), with HTTP route details staying adapter-side.
 - Route/controller code must stay thin and delegate use-case behavior inward.
 - Server host composition is separate from transport adaptation.
+- Server host composition may include multiple specialized storage adapter families (artifact-object plus artifact-repo storage) and should keep that composition explicit.
+- Current composition includes artifact-object filesystem storage and the first artifact-repo provider adapter registration (Hugging Face).
 - Pass host metadata inward via `modules/contracts/host` host-context contracts,
   not HTTP framework objects.
 - Keep host-context metadata small and serialization-friendly (JSON-serializable values only).
@@ -38,6 +40,7 @@
 - Do not accumulate business logic in routes/controllers/middleware.
 - Do not encode HTTP semantics into domain/application models.
 - Keep host wiring, transport translation, and application orchestration as separate responsibilities.
+- Do not hide provider-backed storage semantics behind ad hoc route/UI shortcuts; compose provider-backed adapters explicitly in host wiring.
 
 ## Canonical Source Docs
 
@@ -58,3 +61,22 @@
 - Typical set: `index` + `server-host`.
 - Add `architecture` for boundary-sensitive refactors.
 - Add `logging` for startup/request diagnostics and `testing` for route/host integration behavior.
+
+
+
+## Current implementation checkpoint (server host)
+
+- `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has`, `POST /api/artifact-repo/store`, `POST /api/artifact/publish`, and `POST /api/artifact/publish/verify`.
+- `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has`, `POST /api/artifact-repo/store`, `POST /api/artifact/publish`, `POST /api/artifact/publish/verify`, and `POST /api/artifact/source/verify`.
+- These routes delegate through application use cases; they do not bypass to storage adapters directly.
+- Thin-client artifact-browser publish flow should target `POST /api/artifact/publish` as the primary user workflow route.
+- Thin-client artifact-browser re-check flow should target `POST /api/artifact/publish/verify` to update durable verification state/time without republishing bytes.
+- Thin-client artifact-browser source re-check flow should target `POST /api/artifact/source/verify` for imported-source backing verification refresh.
+- Desktop host uses the same shared `PublishArtifactToRepoUseCase` path via IPC/preload transport (separate host/transport wiring, shared application orchestration).
+
+
+- Server route surface now includes `POST /api/artifact/register-from-repo` delegating to shared application use-case orchestration.
+- Server route surface now also includes `POST /api/artifact/localize-from-repo` for explicit localization/download of imported artifacts through shared application orchestration.
+
+
+- Server host route surface now includes Hugging Face token config endpoints (`GET/POST/DELETE /api/config/huggingface-token`) so thin-client users can recover from auth-required artifact errors without leaving the product.

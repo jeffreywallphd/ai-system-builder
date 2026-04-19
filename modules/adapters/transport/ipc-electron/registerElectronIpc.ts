@@ -1,30 +1,63 @@
 import {
-  registerImageUploadIpc,
-  type RegisterImageUploadIpcDependencies,
-} from "./image-upload/registerImageUploadIpc";
+  registerArtifactUploadIpc,
+  type RegisterArtifactUploadIpcDependencies,
+} from "./artifact-upload/registerArtifactUploadIpc";
+import type { IpcMainHandlePort } from "./ipcMainHandlePort";
 import {
   registerArtifactBrowserIpc,
   type RegisterArtifactBrowserIpcDependencies,
 } from "./artifact-browser/registerArtifactBrowserIpc";
 
-export type { IpcMainHandlePort } from "./image-upload/registerImageUploadIpc";
-
 export interface RegisterElectronIpcDependencies {
-  ipcMain: RegisterImageUploadIpcDependencies["ipcMain"];
-  storeImageUploadUseCase: RegisterImageUploadIpcDependencies["storeImageUploadUseCase"];
-  artifactBrowserUseCases: RegisterArtifactBrowserIpcDependencies["useCases"];
+  ipcMain: IpcMainHandlePort;
+  getHuggingFaceTokenStatus: RegisterArtifactBrowserIpcDependencies["getHuggingFaceTokenStatus"];
+  setHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["setHuggingFaceToken"];
+  clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
+  storeArtifactUploadUseCase: RegisterArtifactUploadIpcDependencies["storeArtifactUploadUseCase"];
+  browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
+  browseUnregisteredArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseUnregisteredArtifactsUseCase"];
+  registerUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["registerUnregisteredArtifactUseCase"];
+  deleteUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteUnregisteredArtifactUseCase"];
+  deleteRegisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteRegisteredArtifactUseCase"];
+  readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
+  readArtifactContentUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactContentUseCase"];
+  artifactMediaViewRetrieval: RegisterArtifactBrowserIpcDependencies["artifactMediaViewRetrieval"];
+  publishArtifactToRepoUseCase: RegisterArtifactBrowserIpcDependencies["publishArtifactToRepoUseCase"];
+  browseHuggingFaceNamespaceDatasetsUseCase: RegisterArtifactBrowserIpcDependencies["browseHuggingFaceNamespaceDatasetsUseCase"];
+  browseHuggingFaceDatasetParquetFilesUseCase: RegisterArtifactBrowserIpcDependencies["browseHuggingFaceDatasetParquetFilesUseCase"];
+  verifyPublishedArtifactBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyPublishedArtifactBackingUseCase"];
+  verifyImportedArtifactSourceBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyImportedArtifactSourceBackingUseCase"];
+  registerArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["registerArtifactFromRepoUseCase"];
+  localizeArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["localizeArtifactFromRepoUseCase"];
 }
 
 export function registerElectronIpc(
   dependencies: RegisterElectronIpcDependencies,
 ): void {
-  registerImageUploadIpc({
+  registerArtifactUploadIpc({
     ipcMain: dependencies.ipcMain,
-    storeImageUploadUseCase: dependencies.storeImageUploadUseCase,
+    storeArtifactUploadUseCase: dependencies.storeArtifactUploadUseCase,
   });
 
   registerArtifactBrowserIpc({
     ipcMain: dependencies.ipcMain,
-    useCases: dependencies.artifactBrowserUseCases,
+    getHuggingFaceTokenStatus: dependencies.getHuggingFaceTokenStatus,
+    setHuggingFaceToken: dependencies.setHuggingFaceToken,
+    clearHuggingFaceToken: dependencies.clearHuggingFaceToken,
+    browseArtifactsUseCase: dependencies.browseArtifactsUseCase,
+    browseUnregisteredArtifactsUseCase: dependencies.browseUnregisteredArtifactsUseCase,
+    registerUnregisteredArtifactUseCase: dependencies.registerUnregisteredArtifactUseCase,
+    deleteUnregisteredArtifactUseCase: dependencies.deleteUnregisteredArtifactUseCase,
+    deleteRegisteredArtifactUseCase: dependencies.deleteRegisteredArtifactUseCase,
+    readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
+    readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
+    artifactMediaViewRetrieval: dependencies.artifactMediaViewRetrieval,
+    publishArtifactToRepoUseCase: dependencies.publishArtifactToRepoUseCase,
+    browseHuggingFaceNamespaceDatasetsUseCase: dependencies.browseHuggingFaceNamespaceDatasetsUseCase,
+    browseHuggingFaceDatasetParquetFilesUseCase: dependencies.browseHuggingFaceDatasetParquetFilesUseCase,
+    verifyPublishedArtifactBackingUseCase: dependencies.verifyPublishedArtifactBackingUseCase,
+    verifyImportedArtifactSourceBackingUseCase: dependencies.verifyImportedArtifactSourceBackingUseCase,
+    registerArtifactFromRepoUseCase: dependencies.registerArtifactFromRepoUseCase,
+    localizeArtifactFromRepoUseCase: dependencies.localizeArtifactFromRepoUseCase,
   });
 }

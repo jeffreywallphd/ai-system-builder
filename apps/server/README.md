@@ -22,3 +22,11 @@ From this workspace directly:
 - `npm run dev`
 - `npm run build`
 - `npm run start`
+
+## Hugging Face token configuration
+
+- Server-host artifact-repo composition reads Hugging Face token from:
+  1. `artifactRepo.huggingFaceAccessToken` composition option, then
+  2. `HF_TOKEN`, then
+  3. `HUGGING_FACE_TOKEN`.
+- Thin-client Hugging Face register/localize/publish/verify flows depend on this server-side configuration for private/gated repositories.

@@ -4,32 +4,38 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
 import {
-  DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
-  createDesktopImageUploadRequest,
+  DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
+  createDesktopArtifactUploadRequest,
 } from "../../../../contracts/ipc";
 import { createContractError } from "../../../../contracts/shared";
 import {
-  createDesktopImageUploadIpcHandler,
-  registerImageUploadIpc,
+  createDesktopArtifactUploadIpcHandler,
+  registerArtifactUploadIpc,
   type IpcMainHandlePort,
-  type StoreImageUploadUseCasePort,
-} from "../image-upload/registerImageUploadIpc";
+  type StoreArtifactUploadUseCasePort,
+} from "../artifact-upload/registerArtifactUploadIpc";
 
 function createUseCaseStub(
-  executeImpl?: ReturnType<typeof testDouble.fn<StoreImageUploadUseCasePort["execute"]>>,
-): StoreImageUploadUseCasePort {
+  executeImpl?: ReturnType<typeof testDouble.fn<StoreArtifactUploadUseCasePort["execute"]>>,
+): StoreArtifactUploadUseCasePort {
   return {
     execute:
       executeImpl ??
       testDouble
-        .fn<StoreImageUploadUseCasePort["execute"]>()
+        .fn<StoreArtifactUploadUseCasePort["execute"]>()
         .mockRejectedValue(new Error("Missing execute mock implementation.")),
+    getAcceptedUploadPolicy: testDouble
+      .fn<StoreArtifactUploadUseCasePort["getAcceptedUploadPolicy"]>()
+      .mockImplementation(() => ({
+        acceptedMediaTypes: ["image/png"],
+        acceptedExtensions: [".png"],
+      })),
   };
 }
 
-describe("registerImageUploadIpc desktop image upload handler", () => {
+describe("registerArtifactUploadIpc desktop artifact upload handler", () => {
   it("maps request payload and context into the upload use case and returns a success response", async () => {
-    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreArtifactUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
         storage: {
@@ -43,15 +49,15 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       correlationId: "corr-upload-1",
     });
 
-    const handler = createDesktopImageUploadIpcHandler(createUseCaseStub(execute));
-    const request = createDesktopImageUploadRequest(
+    const handler = createDesktopArtifactUploadIpcHandler(createUseCaseStub(execute));
+    const request = createDesktopArtifactUploadRequest(
       {
         fileName: "kitten.png",
         mediaType: "image/png",
         bytes: new Uint8Array([137, 80, 78, 71]),
         boundary: {
           host: "desktop",
-          source: "desktop.renderer.upload-form",
+          source: "desktop.renderer.artifact-upload.form",
         },
       },
       {
@@ -69,7 +75,7 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
         bytes: new Uint8Array([137, 80, 78, 71]),
       },
       {
-        source: "desktop.renderer.upload-form",
+        source: "desktop.renderer.artifact-upload.form",
       },
       {
         requestId: "req-upload-1",
@@ -90,15 +96,15 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       },
       requestId: "req-upload-1",
       correlationId: "corr-upload-1",
-      operation: "image.upload",
-      channel: "ipc.image.upload.response",
+      operation: "artifact.upload",
+      channel: "ipc.artifact.upload.response",
     });
   });
 
   it("maps use-case failures to a structured ipc failure response envelope", async () => {
-    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreArtifactUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: false,
-      error: createContractError("validation", "mediaType must be an image media type.", {
+      error: createContractError("validation", "Artifact type is not accepted: application/pdf.", {
         details: {
           field: "mediaType",
         },
@@ -107,15 +113,15 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       correlationId: "corr-upload-2",
     });
 
-    const handler = createDesktopImageUploadIpcHandler(createUseCaseStub(execute));
-    const request = createDesktopImageUploadRequest(
+    const handler = createDesktopArtifactUploadIpcHandler(createUseCaseStub(execute));
+    const request = createDesktopArtifactUploadRequest(
       {
         fileName: "brochure.pdf",
         mediaType: "application/pdf",
         bytes: new Uint8Array([1, 2, 3]),
         boundary: {
           host: "desktop",
-          source: "desktop.renderer.upload-form",
+          source: "desktop.renderer.artifact-upload.form",
         },
       },
       {
@@ -128,19 +134,19 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
 
     expect(response).toEqual({
       ok: false,
-      operation: "image.upload",
-      channel: "ipc.image.upload.response",
+      operation: "artifact.upload",
+      channel: "ipc.artifact.upload.response",
       error: {
         code: "validation",
-        message: "mediaType must be an image media type.",
+        message: "Artifact type is not accepted: application/pdf.",
         details: {
           field: "mediaType",
         },
         requestId: "req-upload-2",
         correlationId: "corr-upload-2",
         metadata: undefined,
-        operation: "image.upload",
-        channel: "ipc.image.upload.response",
+        operation: "artifact.upload",
+        channel: "ipc.artifact.upload.response",
       },
       requestId: "req-upload-2",
       correlationId: "corr-upload-2",
@@ -148,17 +154,20 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
     });
   });
 
-  it("registers only the upload request channel and delegates handler execution", async () => {
+  it("registers upload channels and delegates upload handler execution", async () => {
     let registeredHandler:
-      | ((event: unknown, request: ReturnType<typeof createDesktopImageUploadRequest>) => Promise<unknown>)
+      | ((event: unknown, request: ReturnType<typeof createDesktopArtifactUploadRequest>) => Promise<unknown>)
       | undefined;
+    const registeredChannels: string[] = [];
     const ipcMain: IpcMainHandlePort = {
       handle: testDouble.fn((channel: string, listener: Parameters<IpcMainHandlePort["handle"]>[1]) => {
-        expect(channel).toBe(DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value);
-        registeredHandler = listener;
+        registeredChannels.push(channel);
+        if (channel === DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value) {
+          registeredHandler = listener;
+        }
       }),
     };
-    const execute = testDouble.fn<StoreImageUploadUseCasePort["execute"]>().mockResolvedValue({
+    const execute = testDouble.fn<StoreArtifactUploadUseCasePort["execute"]>().mockResolvedValue({
       ok: true,
       value: {
         storage: {
@@ -171,21 +180,22 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
       requestId: "req-upload-3",
     });
 
-    registerImageUploadIpc({
+    registerArtifactUploadIpc({
       ipcMain,
-      storeImageUploadUseCase: createUseCaseStub(execute),
+      storeArtifactUploadUseCase: createUseCaseStub(execute),
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(1);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(2);
+    expect(registeredChannels).toContain(DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value);
     expect(registeredHandler).toBeDefined();
-    const request = createDesktopImageUploadRequest(
+    const request = createDesktopArtifactUploadRequest(
       {
         fileName: "cat.png",
         mediaType: "image/png",
         bytes: new Uint8Array([1, 2, 3, 4]),
         boundary: {
           host: "desktop",
-          source: "desktop.renderer.upload-form",
+          source: "desktop.renderer.artifact-upload.form",
         },
       },
       {
@@ -197,8 +207,8 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
 
     expect(response).toMatchObject({
       ok: true,
-      channel: "ipc.image.upload.response",
-      operation: "image.upload",
+      channel: "ipc.artifact.upload.response",
+      operation: "artifact.upload",
     });
     expect(execute).toHaveBeenCalledWith(
       {
@@ -207,7 +217,7 @@ describe("registerImageUploadIpc desktop image upload handler", () => {
         bytes: new Uint8Array([1, 2, 3, 4]),
       },
       {
-        source: "desktop.renderer.upload-form",
+        source: "desktop.renderer.artifact-upload.form",
       },
       {
         requestId: "req-upload-3",
@@ -228,7 +238,7 @@ describe("registerElectronIpc top-level aggregator surface", () => {
 
     expect(source).not.toContain("export type");
     expect(source).not.toContain("mapIpcRequestPayload");
-    expect(source).not.toContain("mapStoreImageUploadResultToIpcResponse");
-    expect(source).not.toContain("createDesktopImageUploadIpcHandler");
+    expect(source).not.toContain("mapStoreArtifactUploadResultToIpcResponse");
+    expect(source).not.toContain("createDesktopArtifactUploadIpcHandler");
   });
 });

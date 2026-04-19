@@ -1,18 +1,52 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
+import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
 import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
-  DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
+import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
-import { composeDesktopHost } from "../composeDesktopHost";
+import {
+  composeDesktopHost,
+  type ComposeDesktopHostOptions,
+  type RegisterDesktopArtifactUploadIpcOptions,
+} from "../composeDesktopHost";
 
 describe("composeDesktopHost", () => {
+  it("uses the canonical ipc-main handle port type for registration options", () => {
+    expectTypeOf<RegisterDesktopArtifactUploadIpcOptions["ipcMain"]>().toEqualTypeOf<IpcMainHandlePort>();
+  });
+
+  it("uses the shared huggingface fetch implementation seam type instead of DOM-global fetch typing", () => {
+    expectTypeOf<NonNullable<ComposeDesktopHostOptions["artifactRepo"]>["huggingFaceFetchImplementation"]>()
+      .toEqualTypeOf<HuggingFaceFetchImplementation | undefined>();
+  });
+
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
     const sink = testDouble.fn();
     const host = composeDesktopHost({
@@ -36,8 +70,8 @@ describe("composeDesktopHost", () => {
       verbosity: "normal",
       event: "upload.started",
       message: "Upload started",
-      component: "store-image-upload-use-case",
-      useCase: "store-image-upload",
+      component: "store-artifact-upload-use-case",
+      useCase: "store-artifact-upload",
     };
 
     await host.loggingPort.log(event);
@@ -47,30 +81,45 @@ describe("composeDesktopHost", () => {
     expect(emittedEvent).toMatchObject({
       event: "upload.started",
       host: "desktop",
-      component: "store-image-upload-use-case",
-      useCase: "store-image-upload",
+      component: "store-artifact-upload-use-case",
+      useCase: "store-artifact-upload",
     });
   });
 
 
-  it("registers the desktop image upload IPC handler on the request channel", () => {
+  it("registers the desktop artifact upload IPC handler on the request channel", () => {
     const ipcMain = {
       handle: testDouble.fn(),
     };
     const host = composeDesktopHost();
 
-    host.registerImageUploadIpc({
+    host.registerArtifactUploadIpc({
       ipcMain,
-      storageRootDirectory: "/tmp/desktop-image-upload-test",
+      storageRootDirectory: "/tmp/desktop-artifact-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(4);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(19);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
-      DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value,
+      DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_PUBLISH_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_PUBLISH_VERIFY_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL.value,
+      DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value,
     ]);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
@@ -92,8 +141,8 @@ describe("composeDesktopHost", () => {
       verbosity: "normal",
       event: "upload.stored_successfully",
       message: "Upload stored successfully",
-      component: "store-image-upload-use-case",
-      useCase: "store-image-upload",
+      component: "store-artifact-upload-use-case",
+      useCase: "store-artifact-upload",
       outcome: "success",
     });
     await host.loggingPort.log({
@@ -102,11 +151,58 @@ describe("composeDesktopHost", () => {
       verbosity: "normal",
       event: "upload.failed",
       message: "Upload failed",
-      component: "store-image-upload-use-case",
-      useCase: "store-image-upload",
+      component: "store-artifact-upload-use-case",
+      useCase: "store-artifact-upload",
       outcome: "failure",
     });
 
     expect(sink).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses the shared PublishArtifactToRepoUseCase in desktop host composition", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("PublishArtifactToRepoUseCase");
+    expect(source).not.toContain("class DesktopPublish");
+  });
+
+  it("keeps desktop composition source free of DOM-global fetch typing to stay webpack main emit-safe", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).not.toContain("typeof fetch");
+  });
+
+  it("wires Hugging Face browse use-cases to the dedicated Hugging Face adapter seam", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter");
+    expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
+    expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
+    expect(source).not.toContain("repoBrowser: artifactRepoStorage");
+  });
+
+  it("stores and exposes desktop Hugging Face token status", () => {
+    const host = composeDesktopHost();
+    expect(host.getHuggingFaceTokenStatus().configured).toBe(false);
+    const saved = host.setHuggingFaceToken("hf_desktop_token");
+    expect(saved.configured).toBe(true);
+    expect(saved.maskedToken).toBe("••••oken");
+    const cleared = host.clearHuggingFaceToken();
+    expect(cleared.configured).toBe(false);
   });
 });

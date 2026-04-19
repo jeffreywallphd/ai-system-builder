@@ -64,6 +64,8 @@ This keeps desktop workflow stable while making thin-client/server dependency in
 - `modules/domain/`
   - Business/domain rules and invariants.
   - No dependency on transport, hosts, storage engines, framework details, or UI.
+  - Current artifact domain slice is intentionally small and practical under
+    `modules/domain/artifact/` (`ArtifactId`, `ArtifactBacking`, `Artifact`).
 
 - `modules/application/`
   - Use-case orchestration, policies, ports, and DTO-level behavior.
@@ -155,15 +157,27 @@ Transport technologies are adapters, not application definitions.
 ## Persistence and storage posture
 
 - Persistence: structured durable records (default adapter target: Postgres).
-- Storage: files/blobs/artifacts/workspaces and other non-relational content.
+- Storage adapters: a broad architectural category for non-relational durable/semi-durable content concerns with a thin shared foundation.
+- Storage is family-oriented (not one flat abstraction): artifact-object storage and artifact-repo storage are peer first-class specialized families.
+- Artifact-object storage centers on artifact keys, bytes, checksums, and artifact metadata.
+- Repo-backed storage centers on provider/repo identity, revision/version semantics, remote visibility/access semantics, and provider-specific import/publication behavior.
+- Shared storage foundation contracts keep family boundaries explicit: `StorageKind` (`artifact-object` | `artifact-repo`), `StorageProviderId`, thin `StorageBackingReference`, and `ArtifactStorageBinding` for internal-artifact linkage.
+- Provider integrations should be composed as specialized artifact-repo adapters/providers, not flattened into a generic blob-only framing.
+- Hugging Face is the first implemented artifact-repo provider adapter in this repository; treat it as one provider implementation, not as the family definition.
 - Ingestion/staged artifact: canonical semantic model for inbound content (uploads, scrape outputs, selected generated outputs, and similar intake paths) above raw storage mechanics.
 
 They are separate architectural concerns even if they share physical disk territory in some host deployments.
 
 Image upload remains an implemented specialized intake path and should align to staged artifact descriptor semantics rather than defining a parallel semantic world.
 The initial image vertical slice now includes both write and read direction:
-- write/intake through image upload as specialized ingestion,
+- write/intake through artifact upload as specialized ingestion,
 - read-side artifact browser behavior through image-backed `artifact.browse` (list metadata), `artifact.read` (detail metadata), and `artifact.content.read` (separate content retrieval).
+
+Artifact browser posture:
+
+- the artifact browser is the normalized system browser over internal artifacts across backing-store differences,
+- it is not a filesystem browser,
+- it is not equivalent to provider-native repository browsing surfaces.
 
 ## Packaging restraint
 
@@ -188,3 +202,43 @@ The following are intentionally open and should not be over-specified yet:
 - concrete enforcement tooling (for example, lint rules) for every dependency rule.
 
 Until formalized, contributors should follow the boundaries in this architecture set and document significant decisions in ADRs.
+
+
+
+### Server-host artifact-repo slice (current)
+
+Server composition now wires both storage families as peers:
+
+- local filesystem artifact-object storage for upload/catalog/browser flows, and
+- artifact-repo aggregate storage with Hugging Face as first provider adapter.
+
+A minimal artifact-repo API slice is exposed (`artifact-repo.has`, `artifact-repo.store`, `artifact.publish`, `artifact.publish.verify`) through dedicated application use cases.
+
+Thin-client artifact-browser publish flow should call `artifact.publish` as the primary orchestration route (artifact bytes -> provider store -> verify -> published binding write), while follow-up verification should call `artifact.publish.verify` (remote existence re-check without republish).
+
+### Desktop-host artifact-repo slice (current)
+
+Desktop composition now mirrors the same publish orchestration path used by server/thin-client:
+
+- local filesystem artifact-object storage for upload/catalog/browser flows,
+- artifact-repo aggregate storage with Hugging Face as first provider adapter,
+- shared publish/verify use cases wired through Electron IPC and preload bridge (`artifact.publish`, `artifact.publish.verify`).
+
+Desktop renderer artifact-browser publish/re-check UX should call the preload-backed bridge and shared hook logic, not raw IPC and not desktop-only business logic.
+
+
+### Artifact repo registration slice (current)
+
+- In addition to publish/re-check, the system now supports first-slice remote registration (`artifact.register.from-repo`) through shared application use-case wiring.
+- Registration verifies remote existence and creates an internal catalog + `imported-source` binding so the artifact browser can treat the remote artifact as an internal artifact record.
+- New registration writes now use system-owned internal artifact ids; provider/repository/path/revision remain backing metadata (not canonical artifact identity).
+- Artifact id generation policy is now behind a small system-owned seam (`SystemArtifactIdFactory`) used by composition/use cases; `ArtifactId` remains the value object.
+- This is a narrow registration/import slice; it is not a full provider repo browser or sync engine.
+
+### Artifact import usefulness step (current)
+
+- Imported artifacts without local bytes now support explicit localization (`artifact.localize.from-repo`) through shared application logic.
+- Localization keeps artifact browser central: select artifact -> inspect imported-source backing + local availability -> localize/download when needed.
+- Imported-source backing verification can be re-checked explicitly (`artifact.source.verify`) without changing artifact identity or collapsing source/published concepts.
+- Artifact browser list/detail now surfaces minimal backing-state cues (`Remote only`, `Localized`, `Published`) while keeping artifacts as the core entity.
+- This is an incremental usefulness step for the current image-focused slice, not full remote sync or provider-native browsing parity.

@@ -4,14 +4,14 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, testDouble } from "../../../../testing/node-test";
 
-import { StoreImageUploadUseCase } from "../../../../application/use-cases";
+import { StoreArtifactUploadUseCase } from "../../../../application/use-cases";
 import { createFilesystemArtifactStorageAdapter } from "../../../storage/filesystem/artifact-store";
 import {
-  createDesktopImageUploadRequest,
-  DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL,
+  createDesktopArtifactUploadRequest,
+  DESKTOP_ARTIFACT_UPLOAD_RESPONSE_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { LoggingPort } from "../../../../application/ports/logging";
-import { createDesktopImageUploadIpcHandler } from "../image-upload/registerImageUploadIpc";
+import { createDesktopArtifactUploadIpcHandler } from "../artifact-upload/registerArtifactUploadIpc";
 
 let tempRoots: string[] = [];
 
@@ -36,11 +36,11 @@ function createLoggingPort(log = testDouble.fn<LoggingPort["log"]>().mockResolve
   } satisfies LoggingPort;
 }
 
-describe("desktop image upload IPC integration", () => {
+describe("desktop artifact upload IPC integration", () => {
   it("handles a real upload request through IPC -> use case -> filesystem adapter and returns success", async () => {
     const rootDirectory = await createTempRoot();
     const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
-    const useCase = new StoreImageUploadUseCase({
+    const useCase = new StoreArtifactUploadUseCase({
       storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,
         logging: createLoggingPort(log),
@@ -48,15 +48,15 @@ describe("desktop image upload IPC integration", () => {
       logging: createLoggingPort(log),
       now: () => "2026-04-14T12:00:00.000Z",
     });
-    const handler = createDesktopImageUploadIpcHandler(useCase);
-    const request = createDesktopImageUploadRequest(
+    const handler = createDesktopArtifactUploadIpcHandler(useCase);
+    const request = createDesktopArtifactUploadRequest(
       {
         fileName: "cat.png",
         mediaType: "image/png",
         bytes: new Uint8Array([137, 80, 78, 71]),
         boundary: {
           host: "desktop",
-          source: "desktop.renderer.upload-form",
+          source: "desktop.renderer.artifact-upload.form",
         },
       },
       {
@@ -71,8 +71,8 @@ describe("desktop image upload IPC integration", () => {
     if (!response.ok) {
       throw new Error("Expected upload success response.");
     }
-    expect(response.channel).toBe(DESKTOP_IMAGE_UPLOAD_RESPONSE_CHANNEL.value);
-    expect(response.operation).toBe("image.upload");
+    expect(response.channel).toBe(DESKTOP_ARTIFACT_UPLOAD_RESPONSE_CHANNEL.value);
+    expect(response.operation).toBe("artifact.upload");
     expect(response.requestId).toBe("req-ipc-integration-1");
     expect(response.correlationId).toBe("corr-ipc-integration-1");
     expect(path.isAbsolute(response.value.descriptor.storage.key)).toBe(false);
@@ -85,30 +85,30 @@ describe("desktop image upload IPC integration", () => {
     const events = log.mock.calls.map(
       ([event]: Parameters<LoggingPort["log"]>) => event.event,
     );
-    expect(events).toContain("application.image-upload.store.started");
-    expect(events).toContain("application.image-upload.store.succeeded");
+    expect(events).toContain("application.artifact-upload.store.started");
+    expect(events).toContain("application.artifact-upload.store.succeeded");
     expect(events).toContain("storage.filesystem.store.started");
     expect(events).toContain("storage.filesystem.store.succeeded");
   });
 
   it("maps real use-case validation failures to structured IPC failures", async () => {
     const rootDirectory = await createTempRoot();
-    const useCase = new StoreImageUploadUseCase({
+    const useCase = new StoreArtifactUploadUseCase({
       storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,
       }),
       logging: createLoggingPort(),
       now: () => "2026-04-14T12:00:00.000Z",
     });
-    const handler = createDesktopImageUploadIpcHandler(useCase);
-    const request = createDesktopImageUploadRequest(
+    const handler = createDesktopArtifactUploadIpcHandler(useCase);
+    const request = createDesktopArtifactUploadRequest(
       {
-        fileName: "brochure.pdf",
-        mediaType: "application/pdf",
+        fileName: "brochure.zip",
+        mediaType: "application/zip",
         bytes: new Uint8Array([1, 2, 3]),
         boundary: {
           host: "desktop",
-          source: "desktop.renderer.upload-form",
+          source: "desktop.renderer.artifact-upload.form",
         },
       },
       {
@@ -121,17 +121,17 @@ describe("desktop image upload IPC integration", () => {
 
     expect(response).toEqual({
       ok: false,
-      operation: "image.upload",
-      channel: "ipc.image.upload.response",
+      operation: "artifact.upload",
+      channel: "ipc.artifact.upload.response",
       error: {
         code: "validation",
-        message: "mediaType must be an image media type.",
+        message: "Artifact type is not accepted: application/zip.",
         details: undefined,
         requestId: "req-ipc-integration-2",
         correlationId: "corr-ipc-integration-2",
         metadata: undefined,
-        operation: "image.upload",
-        channel: "ipc.image.upload.response",
+        operation: "artifact.upload",
+        channel: "ipc.artifact.upload.response",
       },
       requestId: "req-ipc-integration-2",
       correlationId: "corr-ipc-integration-2",

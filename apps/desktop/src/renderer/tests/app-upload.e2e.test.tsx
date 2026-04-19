@@ -10,14 +10,14 @@ import { createLogger, type StructuredLogSink } from "../../../../../modules/ada
 import { createFilesystemArtifactStorageAdapter } from "../../../../../modules/adapters/storage/filesystem/artifact-store";
 import {
   registerElectronIpc,
-  type IpcMainHandlePort,
 } from "../../../../../modules/adapters/transport/ipc-electron/registerElectronIpc";
-import { StoreImageUploadUseCase } from "../../../../../modules/application/use-cases";
+import type { IpcMainHandlePort } from "../../../../../modules/adapters/transport/ipc-electron/ipcMainHandlePort";
+import { StoreArtifactUploadUseCase } from "../../../../../modules/application/use-cases";
 import { createLoggingConfig } from "../../../../../modules/contracts/config";
 import {
-  DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL,
-  type DesktopImageUploadRequest,
-  type DesktopImageUploadResponse,
+  DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL,
+  type DesktopArtifactUploadRequest,
+  type DesktopArtifactUploadResponse,
 } from "../../../../../modules/contracts/ipc";
 
 import { createDesktopPreloadApi } from "../../preload/exposedApi";
@@ -50,7 +50,7 @@ function setInputFiles(input: HTMLInputElement, files: File[]): void {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-describe("desktop image upload end-to-end", () => {
+describe("desktop artifact upload end-to-end", () => {
   it("uploads from renderer UI through preload and IPC into real filesystem storage with structured success", async () => {
     const rootDirectory = await createTempRoot();
     const logEvents: string[] = [];
@@ -69,7 +69,7 @@ describe("desktop image upload end-to-end", () => {
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
-    const useCase = new StoreImageUploadUseCase({
+    const useCase = new StoreArtifactUploadUseCase({
       storage: createFilesystemArtifactStorageAdapter({
         rootDirectory,
         logging: logger,
@@ -77,35 +77,69 @@ describe("desktop image upload end-to-end", () => {
         randomSuffix: () => "e2e",
       }),
       logging: logger,
-      host: "desktop",
       now: () => "2026-04-14T12:00:00.000Z",
     });
 
     let uploadHandler:
-      | ((event: unknown, request: DesktopImageUploadRequest) => Promise<DesktopImageUploadResponse>)
+      | ((event: unknown, request: DesktopArtifactUploadRequest) => Promise<DesktopArtifactUploadResponse>)
       | undefined;
 
     const ipcMain: IpcMainHandlePort = {
-      handle(channel, listener) {
-        if (channel === DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value) {
+      handle(channel: string, listener) {
+        if (channel === DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value) {
           uploadHandler = listener;
         }
       },
     };
 
+    const unavailableResult = {
+      ok: false as const,
+      error: {
+        code: "unavailable" as const,
+        message: "artifact browser disabled in upload-only e2e",
+      },
+    };
+
     registerElectronIpc({
       ipcMain,
-      storeImageUploadUseCase: useCase,
+      storeArtifactUploadUseCase: useCase,
+      browseArtifactsUseCase: {
+        execute: async () => unavailableResult,
+      },
+      readArtifactDetailUseCase: {
+        execute: async () => unavailableResult,
+      },
+      readArtifactContentUseCase: {
+        execute: async () => unavailableResult,
+      },
+      artifactMediaViewRetrieval: {
+        retrieveArtifactViewerMediaByStorageKey: async () => unavailableResult,
+      },
+      publishArtifactToRepoUseCase: {
+        execute: async () => unavailableResult,
+      },
+      verifyPublishedArtifactBackingUseCase: {
+        execute: async () => unavailableResult,
+      },
+      verifyImportedArtifactSourceBackingUseCase: {
+        execute: async () => unavailableResult,
+      },
+      registerArtifactFromRepoUseCase: {
+        execute: async () => unavailableResult,
+      },
+      localizeArtifactFromRepoUseCase: {
+        execute: async () => unavailableResult,
+      },
     });
 
     const preloadApi = createDesktopPreloadApi({
       ipcRenderer: {
         invoke: async (channel, request) => {
-          if (channel !== DESKTOP_IMAGE_UPLOAD_REQUEST_CHANNEL.value || !uploadHandler) {
+          if (channel !== DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value || !uploadHandler) {
             throw new Error("Desktop upload IPC handler was not registered.");
           }
 
-          return uploadHandler({}, request);
+          return uploadHandler({}, request as DesktopArtifactUploadRequest);
         },
       },
     });
@@ -119,6 +153,11 @@ describe("desktop image upload end-to-end", () => {
     try {
       await act(async () => {
         root.render(<App />);
+      });
+
+      const artifactsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Artifacts");
+      await act(async () => {
+        artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
       });
 
       const input = container.querySelector("input[type='file']") as HTMLInputElement | null;
@@ -150,8 +189,8 @@ describe("desktop image upload end-to-end", () => {
       const writtenBytes = await readFile(path.join(rootDirectory, "uploads", "20260414120000000-e2e.png"));
       expect(new Uint8Array(writtenBytes)).toEqual(bytes);
 
-      expect(logEvents).toContain("application.image-upload.store.started");
-      expect(logEvents).toContain("application.image-upload.store.succeeded");
+      expect(logEvents).toContain("application.artifact-upload.store.started");
+      expect(logEvents).toContain("application.artifact-upload.store.succeeded");
       expect(logEvents).toContain("storage.filesystem.store.started");
       expect(logEvents).toContain("storage.filesystem.store.succeeded");
     } finally {

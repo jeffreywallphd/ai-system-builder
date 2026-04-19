@@ -12,7 +12,7 @@ import {
   createStoreArtifactRequest,
 } from "../../../../../contracts/storage";
 import type { LoggingPort } from "../../../../../application/ports/logging";
-import { createFilesystemArtifactStorageAdapter } from "../createFilesystemArtifactStorageAdapter";
+import { createFilesystemArtifactObjectStorageAdapter } from "..";
 
 let tempRoots: string[] = [];
 
@@ -37,7 +37,7 @@ function createLoggingPortMock(log = testDouble.fn<LoggingPort["log"]>().mockRes
   } satisfies LoggingPort;
 }
 
-describe("desktop filesystem artifact storage adapter integration", () => {
+describe("desktop filesystem artifact-object storage adapter integration", () => {
   function sha256Hex(bytes: Uint8Array): string {
     return createHash("sha256").update(bytes).digest("hex");
   }
@@ -45,7 +45,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
   it("writes artifact bytes to disk under the configured root and returns a contract descriptor", async () => {
     const rootDirectory = await createTempRoot();
     const log = testDouble.fn<LoggingPort["log"]>().mockResolvedValue(undefined);
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
       logging: createLoggingPortMock(log),
       now: () => "2026-04-14T12:00:00.000Z",
@@ -111,7 +111,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("computes checksum from stored content for generic artifact media types", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
     });
     const artifactBytes = new Uint8Array([10, 20, 30, 40, 50]);
@@ -143,7 +143,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
         code: "ENOENT",
       }),
     );
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
       logging: createLoggingPortMock(log),
       statPath: statPath as typeof import("node:fs/promises").stat,
@@ -190,7 +190,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("returns a structured failure when post-write verification size mismatches the write payload", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
       statPath: testDouble.fn().mockResolvedValue({
         isFile: () => true,
@@ -221,7 +221,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("generates a logical upload key when none is supplied and stores bytes on disk", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
       now: () => "2026-04-14T12:00:00.000Z",
       randomSuffix: () => "abc123",
@@ -250,9 +250,64 @@ describe("desktop filesystem artifact storage adapter integration", () => {
     expect(new Uint8Array(writtenBytes)).toEqual(new Uint8Array([255, 216, 255]));
   });
 
+  it("preserves markdown extension when generating a key from original upload metadata", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      now: () => "2026-04-14T12:00:00.000Z",
+      randomSuffix: () => "abc123",
+    });
+
+    const result = await adapter.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([35, 32, 72, 101]), {
+        descriptor: {
+          mediaType: "text/markdown",
+          metadata: {
+            originalFileName: "architecture-document-scope-boundaries.md",
+          },
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected generated markdown-key store success.");
+    }
+
+    expect(result.value.key).toBe("uploads/20260414120000000-abc123.md");
+  });
+
+  it("preserves json extension when generating a key from original upload metadata", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      now: () => "2026-04-14T12:00:00.000Z",
+      randomSuffix: () => "json123",
+    });
+
+    const result = await adapter.storeArtifact(
+      createStoreArtifactRequest(new Uint8Array([123, 125]), {
+        descriptor: {
+          mediaType: "application/json",
+          metadata: {
+            originalFileName: "schema.json",
+          },
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected generated json-key store success.");
+    }
+
+    expect(result.value.key).toBe("uploads/20260414120000000-json123.json");
+    expect(result.value.key.endsWith(".bin")).toBe(false);
+  });
+
   it("returns a structured conflict failure when overwrite is disabled and key already exists", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
     });
     const request = createStoreArtifactRequest(new Uint8Array([1, 2, 3]), {
@@ -285,7 +340,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("returns a structured validation failure when storage key contains traversal segments", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
     });
 
@@ -310,7 +365,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("retrieves stored bytes, keeps descriptor key logical, and does not leak host paths", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
     });
     const storedBytes = new Uint8Array([11, 22, 33, 44]);
@@ -347,7 +402,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("returns has/delete success envelopes that track real filesystem state", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
     });
     const key = "uploads/lifecycle/stateful.bin";
@@ -423,7 +478,7 @@ describe("desktop filesystem artifact storage adapter integration", () => {
 
   it("returns not-found retrieve failure for missing keys", async () => {
     const rootDirectory = await createTempRoot();
-    const adapter = createFilesystemArtifactStorageAdapter({
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
       rootDirectory,
     });
 

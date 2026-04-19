@@ -23,14 +23,21 @@ import {
   type StoreArtifactResult,
 } from "../../../contracts/storage";
 import type { StructuredLogEvent } from "../../../contracts/logging";
+import type { ContractBoundaryContext } from "../../../contracts/shared";
+import type {
+  HasArtifactInRepoRequest,
+  RetrieveArtifactFromRepoRequest,
+  StoreArtifactInRepoRequest,
+} from "../../../contracts/storage";
 
 import type { LoggingPort } from "../logging";
+import type { ApplicationRequestContext } from "../application-request-context";
 import type {
   PersistenceRecordOperationRequest,
   PersistenceRecordPort,
 } from "../persistence";
 import type { RuntimeExecutionPort } from "../runtime";
-import type { ArtifactStoragePort } from "../storage";
+import type { ArtifactRepoStoragePort, ArtifactStoragePort } from "../storage";
 import type {
   ArtifactBrowserContentReadPort,
   ArtifactBrowserMetadataReadPort,
@@ -138,6 +145,9 @@ describe("application ports cross-family invariants", () => {
     expectTypeOf<keyof ArtifactStoragePort>().toEqualTypeOf<
       "storeArtifact" | "retrieveArtifact" | "hasArtifact" | "deleteArtifact"
     >();
+    expectTypeOf<keyof ArtifactRepoStoragePort>().toEqualTypeOf<
+      "storeArtifactInRepo" | "retrieveArtifactFromRepo" | "hasArtifactInRepo"
+    >();
 
     expectTypeOf<PersistenceRecordOperationRequest>().toExtend<{
       operation: PersistenceOperation;
@@ -154,6 +164,13 @@ describe("application ports cross-family invariants", () => {
       StoreArtifactResult
     >();
 
+    expectTypeOf<Parameters<ArtifactStoragePort["storeArtifact"]>[1]>().toExtend<
+      ApplicationRequestContext | undefined
+    >();
+    expectTypeOf<Parameters<ArtifactStoragePort["storeArtifact"]>[0]>().not.toExtend<
+      ApplicationRequestContext
+    >();
+
     const persistenceRequest: PersistenceRecordOperationRequest = {
       operation: createPersistenceOperationForRecord("workspace", "save"),
       record: createPersistenceRecordReference("workspace", "ws-42"),
@@ -166,6 +183,16 @@ describe("application ports cross-family invariants", () => {
         key: normalizeStorageArtifactKey("workspace/ws-42/snapshots/state.json"),
       },
     });
+
+    expectTypeOf<Parameters<ArtifactRepoStoragePort["storeArtifactInRepo"]>[1]>().toExtend<
+      ApplicationRequestContext | undefined
+    >();
+    expectTypeOf<Parameters<ArtifactRepoStoragePort["storeArtifactInRepo"]>[0]>().not.toExtend<{
+      descriptor: { key: string };
+    }>();
+    expectTypeOf<StoreArtifactInRepoRequest>().not.toExtend<ContractBoundaryContext>();
+    expectTypeOf<RetrieveArtifactFromRepoRequest>().not.toExtend<ContractBoundaryContext>();
+    expectTypeOf<HasArtifactInRepoRequest>().not.toExtend<ContractBoundaryContext>();
 
     expect("descriptor" in persistenceRequest).toBe(false);
     expect("operation" in storageRequest).toBe(false);
@@ -235,7 +262,7 @@ describe("application ports cross-family invariants", () => {
     expectTypeOf<keyof ArtifactBrowserContentReadPort>().toEqualTypeOf<"readArtifactContent">();
 
     expectTypeOf<BrowseArtifactsRequest>().toExtend<{
-      artifactKind: "image";
+      artifactFamily: "image";
     }>();
     expectTypeOf<ReadArtifactDetailRequest>().toExtend<{
       locator: { storageKey: string };
@@ -255,15 +282,31 @@ describe("application ports cross-family invariants", () => {
     }>();
 
     expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["browseArtifacts"]>[1]>().toExtend<
-      { requestId?: string; correlationId?: string } | undefined
+      ApplicationRequestContext | undefined
     >();
 
     expectTypeOf<Parameters<ArtifactBrowserMetadataReadPort["readArtifactDetail"]>[0]>().not.toExtend<{
       content: unknown;
     }>();
     expectTypeOf<Parameters<ArtifactBrowserContentReadPort["readArtifactContent"]>[0]>().not.toExtend<{
-      artifactKind: string;
+      artifactFamily: string;
     }>();
+  });
+
+  it("uses generic application request context for artifact catalog/content seams", () => {
+    const artifactCatalogPortSource = readFileSync(
+      resolve("modules/application/ports/artifact-catalog/artifact-catalog.port.ts"),
+      "utf8",
+    );
+    const artifactContentPortSource = readFileSync(
+      resolve("modules/application/ports/artifact-content/artifact-content-retrieval.port.ts"),
+      "utf8",
+    );
+
+    expect(artifactCatalogPortSource).toContain("ApplicationRequestContext");
+    expect(artifactContentPortSource).toContain("ApplicationRequestContext");
+    expect(artifactCatalogPortSource).not.toContain("ArtifactBrowserBoundaryContext");
+    expect(artifactContentPortSource).not.toContain("ArtifactBrowserBoundaryContext");
   });
 
 });
