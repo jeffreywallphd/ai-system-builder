@@ -62,7 +62,7 @@ describe("website ingestion contracts", () => {
         url: " https://example.com/a ",
       },
       resolvedUrl: " https://example.com/a?ref=canonical ",
-      retrievalModeUsed: " automatic ",
+      acquisitionMechanismUsed: " simple-http ",
       stagedArtifact: {
         sourceKind: " scrape ",
         storage: {
@@ -80,7 +80,7 @@ describe("website ingestion contracts", () => {
           url: "https://example.com/a",
         },
         resolvedUrl: "https://example.com/a?ref=canonical",
-        retrievalModeUsed: "automatic",
+        acquisitionMechanismUsed: "simple-http",
         stagedArtifact: {
           id: undefined,
           sourceKind: "scrape",
@@ -144,7 +144,7 @@ describe("website ingestion contracts", () => {
       resolvedUrl: " https://example.com/page ",
       html: " <html><body>ok</body></html> ",
       mediaType: " text/html ",
-      retrievalModeUsed: " rendered ",
+      acquisitionMechanismUsed: " rendered-browser ",
       httpStatus: 200,
       contentTypeHeader: " text/html; charset=utf-8 ",
     });
@@ -154,7 +154,7 @@ describe("website ingestion contracts", () => {
       resolvedUrl: "https://example.com/page",
       html: "<html><body>ok</body></html>",
       mediaType: "text/html",
-      retrievalModeUsed: "rendered",
+      acquisitionMechanismUsed: "rendered-browser",
       httpStatus: 200,
       contentTypeHeader: "text/html; charset=utf-8",
     });

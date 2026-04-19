@@ -44,7 +44,7 @@ export class SimpleHttpWebsiteHtmlAcquisitionAdapter implements WebsiteHtmlAcqui
       resolvedUrl: response.url || normalizedRequest.target.url,
       html,
       mediaType: "text/html",
-      retrievalModeUsed: "automatic",
+      acquisitionMechanismUsed: "simple-http",
       httpStatus: response.status,
       contentTypeHeader: response.headers.get("content-type") ?? undefined,
     });

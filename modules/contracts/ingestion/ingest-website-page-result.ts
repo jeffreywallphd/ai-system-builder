@@ -10,9 +10,9 @@ import {
   type StagedArtifactDescriptor,
 } from "./staged-artifact-descriptor";
 import {
-  normalizeWebsiteIngestionMode,
-  type WebsiteIngestionMode,
-} from "./website-ingestion-mode";
+  normalizeWebsiteHtmlAcquisitionMechanism,
+  type WebsiteHtmlAcquisitionMechanism,
+} from "./website-html-acquisition-mechanism";
 import {
   normalizeWebsiteIngestionTarget,
   type WebsiteIngestionTarget,
@@ -22,7 +22,7 @@ export interface IngestWebsitePageSuccessValue {
   sourceKind?: "scrape";
   target: WebsiteIngestionTarget;
   resolvedUrl: string;
-  retrievalModeUsed: WebsiteIngestionMode;
+  acquisitionMechanismUsed: WebsiteHtmlAcquisitionMechanism;
   stagedArtifact?: StagedArtifactDescriptor;
   warnings?: string[];
 }
@@ -47,7 +47,7 @@ export function normalizeIngestWebsitePageSuccessValue(
     sourceKind: value.sourceKind ?? "scrape",
     target: normalizeWebsiteIngestionTarget(value.target),
     resolvedUrl: normalizeRequiredText("resolvedUrl", value.resolvedUrl),
-    retrievalModeUsed: normalizeWebsiteIngestionMode(value.retrievalModeUsed),
+    acquisitionMechanismUsed: normalizeWebsiteHtmlAcquisitionMechanism(value.acquisitionMechanismUsed),
     stagedArtifact:
       value.stagedArtifact
         ? normalizeStagedArtifactDescriptor(value.stagedArtifact)

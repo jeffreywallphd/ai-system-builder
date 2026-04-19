@@ -1,9 +1,9 @@
 import {
   createIngestWebsitePageSuccessResult,
   createIngestWebsitePagesBatchSuccessResult,
+  createStagedArtifactDescriptorFromStorageObjectDescriptor,
   normalizeWebsiteHtmlAcquisitionRequest,
   normalizeWebsiteHtmlAcquisitionResult,
-  normalizeStagedArtifactDescriptor,
   normalizeWebsiteIngestionTarget,
   type IngestWebsitePageRequest,
   type IngestWebsitePageResult,
@@ -13,6 +13,7 @@ import {
   type WebsiteHtmlAcquisitionRequest,
   type WebsiteHtmlAcquisitionResult,
 } from "../../../contracts/ingestion";
+import type { StorageObjectDescriptorInput, StorageObjectMetadata, StorageObjectDescriptor } from "../../../contracts/storage";
 import { type ArtifactFamily } from "../../../domain/artifact";
 import {
   normalizeWebsiteHtmlCaptureMetadata,
@@ -30,9 +31,11 @@ export interface WebsitePageIngestionCommand {
   mode: WebsiteIngestionMode;
 }
 
+type WebsiteIngestionArtifactMetadata = WebsiteHtmlCaptureMetadata & { artifactFamily: ArtifactFamily };
+
 export interface WebsitePageIngestionCompleted {
   ingestion: WebsiteIngestionResult;
-  stagedArtifact: StagedArtifactDescriptor<WebsiteHtmlCaptureMetadata & { artifactFamily: ArtifactFamily }>;
+  stagedArtifact: StagedArtifactDescriptor<WebsiteIngestionArtifactMetadata>;
 }
 
 export function mapIngestWebsitePageRequestToDomain(
@@ -81,7 +84,7 @@ export function mapAcquisitionResultToDomain(
   return normalizeWebsiteIngestionResult({
     target: command.target,
     resolvedUrl: normalized.resolvedUrl,
-    retrievalModeUsed: normalized.retrievalModeUsed,
+    acquisitionMechanismUsed: normalized.acquisitionMechanismUsed,
   });
 }
 
@@ -94,49 +97,66 @@ function toStorageKey(resolvedUrl: string, retrievedAt: string): string {
   return `staged/website/${host}/${pathToken}-${timestampToken}.html`;
 }
 
-export function toStagedArtifactDescriptor(input: {
+function buildWebsiteIngestionMetadata(input: {
   sourceUrl: string;
   acquisitionResult: WebsiteHtmlAcquisitionResult;
+  requestedMode: WebsiteIngestionMode;
   retrievedAt: string;
-}): StagedArtifactDescriptor<WebsiteHtmlCaptureMetadata & { artifactFamily: ArtifactFamily }> {
+}): WebsiteIngestionArtifactMetadata {
   const normalizedAcquisition = normalizeWebsiteHtmlAcquisitionResult(input.acquisitionResult);
   const metadata = normalizeWebsiteHtmlCaptureMetadata({
     sourceUrl: input.sourceUrl,
     resolvedUrl: normalizedAcquisition.resolvedUrl,
     retrievedAt: input.retrievedAt,
-    retrievalModeUsed: normalizedAcquisition.retrievalModeUsed,
-    rendered: normalizedAcquisition.retrievalModeUsed === "rendered",
+    requestedMode: input.requestedMode,
+    acquisitionMechanismUsed: normalizedAcquisition.acquisitionMechanismUsed,
+    rendered: normalizedAcquisition.acquisitionMechanismUsed === "rendered-browser",
     httpStatus: normalizedAcquisition.httpStatus,
     contentTypeHeader: normalizedAcquisition.contentTypeHeader,
   });
 
-  const artifactFamily: ArtifactFamily = "structured-text";
-
-  return normalizeStagedArtifactDescriptor({
-    sourceKind: "scrape",
-    originalName: `${new URL(normalizedAcquisition.resolvedUrl).hostname}.html`,
-    metadata: {
-      ...metadata,
-      artifactFamily,
-    },
-    storage: {
-      key: toStorageKey(normalizedAcquisition.resolvedUrl, input.retrievedAt),
-      mediaType: "text/html",
-      sizeBytes: Buffer.byteLength(normalizedAcquisition.html, "utf8"),
-    },
-  });
+  return {
+    ...metadata,
+    artifactFamily: "structured-text",
+  };
 }
 
-export function mapAcquisitionResultToStagedArtifactDescriptor(input: {
+export function mapAcquisitionResultToStorageDescriptorInput(input: {
   command: WebsitePageIngestionCommand;
   acquisitionResult: WebsiteHtmlAcquisitionResult;
   retrievedAt: string;
-}): StagedArtifactDescriptor<WebsiteHtmlCaptureMetadata & { artifactFamily: ArtifactFamily }> {
-  return toStagedArtifactDescriptor({
+}): StorageObjectDescriptorInput<WebsiteIngestionArtifactMetadata> {
+  const normalizedAcquisition = normalizeWebsiteHtmlAcquisitionResult(input.acquisitionResult);
+  const metadata = buildWebsiteIngestionMetadata({
     sourceUrl: input.command.target.url,
-    acquisitionResult: input.acquisitionResult,
+    requestedMode: input.command.mode,
+    acquisitionResult: normalizedAcquisition,
     retrievedAt: input.retrievedAt,
   });
+
+  return {
+    key: toStorageKey(normalizedAcquisition.resolvedUrl, input.retrievedAt),
+    mediaType: "text/html",
+    metadata,
+  };
+}
+
+export function mapStoredWebsiteToStagedArtifactDescriptor(input: {
+  command: WebsitePageIngestionCommand;
+  acquisitionResult: WebsiteHtmlAcquisitionResult;
+  storageDescriptor: StorageObjectDescriptor<StorageObjectMetadata>;
+}): StagedArtifactDescriptor<WebsiteIngestionArtifactMetadata> {
+  const normalizedAcquisition = normalizeWebsiteHtmlAcquisitionResult(input.acquisitionResult);
+  return createStagedArtifactDescriptorFromStorageObjectDescriptor(
+    {
+      ...input.storageDescriptor,
+      metadata: input.storageDescriptor.metadata as WebsiteIngestionArtifactMetadata,
+    },
+    {
+      sourceKind: "scrape",
+      originalName: `${new URL(normalizedAcquisition.resolvedUrl).hostname}.html`,
+    },
+  );
 }
 
 export function mapDomainResultToContractResult(
@@ -149,7 +169,7 @@ export function mapDomainResultToContractResult(
       label: completed.ingestion.target.label,
     },
     resolvedUrl: completed.ingestion.resolvedUrl,
-    retrievalModeUsed: completed.ingestion.retrievalModeUsed,
+    acquisitionMechanismUsed: completed.ingestion.acquisitionMechanismUsed,
     stagedArtifact: completed.stagedArtifact,
     warnings: completed.ingestion.warnings,
   });

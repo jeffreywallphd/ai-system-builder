@@ -5,6 +5,7 @@ export * from "./register-staged-artifact-request";
 export * from "./register-staged-artifact-result";
 export * from "./website-ingestion-mode";
 export * from "./website-ingestion-target";
+export * from "./website-html-acquisition-mechanism";
 export * from "./website-html-acquisition";
 export * from "./ingest-website-page-request";
 export * from "./ingest-website-page-result";

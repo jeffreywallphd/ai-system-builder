@@ -1,11 +1,12 @@
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
 import { DefaultWebsiteHtmlAcquisitionPipeline } from "../../../application/services/ingestion/default-website-html-acquisition.pipeline";
+import { createWebsiteHtmlAcquisitionPort } from "../createWebsiteHtmlAcquisitionPort";
 import { PlaywrightWebsiteHtmlAcquisitionAdapter } from "../playwright/PlaywrightWebsiteHtmlAcquisitionAdapter";
 import { SimpleHttpWebsiteHtmlAcquisitionAdapter } from "../simple-http/SimpleHttpWebsiteHtmlAcquisitionAdapter";
 
 describe("website html acquisition adapters and pipeline", () => {
-  it("simple adapter returns fetched html", async () => {
+  it("simple adapter reports simple-http mechanism", async () => {
     const adapter = new SimpleHttpWebsiteHtmlAcquisitionAdapter({
       fetchImpl: async () => ({
         url: "https://example.com/simple",
@@ -22,11 +23,11 @@ describe("website html acquisition adapters and pipeline", () => {
       mode: "automatic",
     });
 
-    expect(result.retrievalModeUsed).toBe("automatic");
+    expect(result.acquisitionMechanismUsed).toBe("simple-http");
     expect(result.html).toContain("Simple");
   });
 
-  it("playwright adapter returns rendered html", async () => {
+  it("playwright adapter reports rendered-browser mechanism", async () => {
     const close = testDouble.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
     const adapter = new PlaywrightWebsiteHtmlAcquisitionAdapter({
@@ -44,7 +45,7 @@ describe("website html acquisition adapters and pipeline", () => {
       mode: "rendered",
     });
 
-    expect(result.retrievalModeUsed).toBe("rendered");
+    expect(result.acquisitionMechanismUsed).toBe("rendered-browser");
     expect(result.html).toContain("Rendered");
     expect(close).toHaveBeenCalledOnce();
   });
@@ -55,7 +56,7 @@ describe("website html acquisition adapters and pipeline", () => {
         resolvedUrl: "https://example.com/fallback",
         html: "<html><body></body></html>",
         mediaType: "text/html",
-        retrievalModeUsed: "automatic",
+        acquisitionMechanismUsed: "simple-http",
       }),
     };
 
@@ -64,7 +65,7 @@ describe("website html acquisition adapters and pipeline", () => {
         resolvedUrl: "https://example.com/fallback",
         html: "<html><body><main><p>Rendered fallback</p></main></body></html>",
         mediaType: "text/html",
-        retrievalModeUsed: "rendered",
+        acquisitionMechanismUsed: "rendered-browser",
       }),
     };
 
@@ -77,7 +78,7 @@ describe("website html acquisition adapters and pipeline", () => {
 
     expect(simple.acquireWebsiteHtml).toHaveBeenCalledOnce();
     expect(advanced.acquireWebsiteHtml).toHaveBeenCalledOnce();
-    expect(result.retrievalModeUsed).toBe("rendered");
+    expect(result.acquisitionMechanismUsed).toBe("rendered-browser");
   });
 
   it("pipeline does not fall back when simple content is sufficient", async () => {
@@ -86,7 +87,7 @@ describe("website html acquisition adapters and pipeline", () => {
         resolvedUrl: "https://example.com/sufficient",
         html: "<html><body><main><p>Enough content</p></main></body></html>",
         mediaType: "text/html",
-        retrievalModeUsed: "automatic",
+        acquisitionMechanismUsed: "simple-http",
       }),
     };
 
@@ -95,7 +96,7 @@ describe("website html acquisition adapters and pipeline", () => {
         resolvedUrl: "https://example.com/sufficient",
         html: "<html><body><main><p>Rendered</p></main></body></html>",
         mediaType: "text/html",
-        retrievalModeUsed: "rendered",
+        acquisitionMechanismUsed: "rendered-browser",
       }),
     };
 
@@ -107,6 +108,41 @@ describe("website html acquisition adapters and pipeline", () => {
 
     expect(simple.acquireWebsiteHtml).toHaveBeenCalledOnce();
     expect(advanced.acquireWebsiteHtml).not.toHaveBeenCalled();
-    expect(result.retrievalModeUsed).toBe("automatic");
+    expect(result.acquisitionMechanismUsed).toBe("simple-http");
+  });
+
+  it("factory supports explicit strategy injection", async () => {
+    const simple = {
+      acquireWebsiteHtml: testDouble.fn().mockResolvedValue({
+        sourceKind: "scrape",
+        resolvedUrl: "https://example.com/a",
+        html: "<html><body><main><p>a</p></main></body></html>",
+        mediaType: "text/html",
+        acquisitionMechanismUsed: "simple-http",
+      }),
+    };
+
+    const advanced = {
+      acquireWebsiteHtml: testDouble.fn().mockResolvedValue({
+        sourceKind: "scrape",
+        resolvedUrl: "https://example.com/a",
+        html: "<html><body><main>advanced</main></body></html>",
+        mediaType: "text/html",
+        acquisitionMechanismUsed: "rendered-browser",
+      }),
+    };
+
+    const port = createWebsiteHtmlAcquisitionPort({
+      simpleStrategy: simple,
+      advancedStrategy: advanced,
+    });
+
+    const result = await port.acquireWebsiteHtml({
+      target: { url: "https://example.com/a" },
+      mode: "automatic",
+    });
+
+    expect(simple.acquireWebsiteHtml).toHaveBeenCalledOnce();
+    expect(result.acquisitionMechanismUsed).toBe("simple-http");
   });
 });

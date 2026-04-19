@@ -5,28 +5,34 @@ import {
   type IngestWebsitePageResult,
 } from "../../contracts/ingestion";
 import { createContractError } from "../../contracts/shared";
+import { createStoreArtifactRequest } from "../../contracts/storage";
 
 import type { ApplicationRequestContext } from "../ports";
 import type { WebsiteHtmlAcquisitionPort } from "../ports/ingestion";
+import type { ArtifactObjectStoragePort } from "../ports/storage";
 import {
   mapAcquisitionResultToDomain,
-  mapAcquisitionResultToStagedArtifactDescriptor,
+  mapAcquisitionResultToStorageDescriptorInput,
   mapDomainCommandToAcquisitionRequest,
   mapDomainResultToContractResult,
   mapIngestWebsitePageRequestToDomain,
+  mapStoredWebsiteToStagedArtifactDescriptor,
 } from "./website-ingestion/website-ingestion.mappers";
 
 export interface IngestWebsitePageUseCaseDependencies {
   acquisition: WebsiteHtmlAcquisitionPort;
+  storage: ArtifactObjectStoragePort;
   now?: () => string;
 }
 
 export class IngestWebsitePageUseCase {
   private readonly acquisition: WebsiteHtmlAcquisitionPort;
+  private readonly storage: ArtifactObjectStoragePort;
   private readonly now: () => string;
 
   public constructor(dependencies: IngestWebsitePageUseCaseDependencies) {
     this.acquisition = dependencies.acquisition;
+    this.storage = dependencies.storage;
     this.now = dependencies.now ?? (() => new Date().toISOString());
   }
 
@@ -40,10 +46,25 @@ export class IngestWebsitePageUseCase {
       const acquisitionRequest = mapDomainCommandToAcquisitionRequest(domainCommand);
       const acquisitionResult = await this.acquisition.acquireWebsiteHtml(acquisitionRequest, context);
       const domainResult = mapAcquisitionResultToDomain(acquisitionResult, domainCommand);
-      const stagedArtifact = mapAcquisitionResultToStagedArtifactDescriptor({
+
+      const htmlBytes = new TextEncoder().encode(acquisitionResult.html);
+      const storageRequest = createStoreArtifactRequest(htmlBytes, {
+        descriptor: mapAcquisitionResultToStorageDescriptorInput({
+          command: domainCommand,
+          acquisitionResult,
+          retrievedAt: this.now(),
+        }),
+      });
+
+      const storeResult = await this.storage.storeArtifact(storageRequest, context);
+      if (!storeResult.ok) {
+        return createIngestWebsitePageFailureResult(storeResult.error);
+      }
+
+      const stagedArtifact = mapStoredWebsiteToStagedArtifactDescriptor({
         command: domainCommand,
         acquisitionResult,
-        retrievedAt: this.now(),
+        storageDescriptor: storeResult.value,
       });
 
       return mapDomainResultToContractResult({

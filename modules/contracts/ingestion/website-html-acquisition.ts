@@ -3,6 +3,10 @@ import {
   type IngestionSourceKind,
 } from "./ingestion-source-kind";
 import {
+  normalizeWebsiteHtmlAcquisitionMechanism,
+  type WebsiteHtmlAcquisitionMechanism,
+} from "./website-html-acquisition-mechanism";
+import {
   normalizeWebsiteIngestionMode,
   type WebsiteIngestionMode,
 } from "./website-ingestion-mode";
@@ -22,7 +26,7 @@ export interface WebsiteHtmlAcquisitionResult {
   resolvedUrl: string;
   html: string;
   mediaType: string;
-  retrievalModeUsed: WebsiteIngestionMode;
+  acquisitionMechanismUsed: WebsiteHtmlAcquisitionMechanism;
   httpStatus?: number;
   contentTypeHeader?: string;
 }
@@ -69,7 +73,7 @@ export function normalizeWebsiteHtmlAcquisitionResult(
     resolvedUrl: normalizeRequiredText("resolvedUrl", result.resolvedUrl),
     html: normalizeRequiredText("html", result.html),
     mediaType: normalizeRequiredText("mediaType", result.mediaType),
-    retrievalModeUsed: normalizeWebsiteIngestionMode(result.retrievalModeUsed),
+    acquisitionMechanismUsed: normalizeWebsiteHtmlAcquisitionMechanism(result.acquisitionMechanismUsed),
     httpStatus: typeof result.httpStatus === "number" ? result.httpStatus : undefined,
     contentTypeHeader: normalizeOptionalText(result.contentTypeHeader),
   };

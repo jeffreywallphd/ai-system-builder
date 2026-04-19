@@ -4,19 +4,22 @@ import { resolve } from "node:path";
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
 import type { IngestWebsitePageRequest, WebsiteHtmlAcquisitionRequest } from "../../../contracts/ingestion";
+import { createStoreArtifactSuccessResult, createStoreArtifactFailureResult } from "../../../contracts/storage";
+import { createContractError } from "../../../contracts/shared";
 import type { WebsiteHtmlAcquisitionPort } from "../../ports/ingestion";
+import type { ArtifactObjectStoragePort } from "../../ports/storage";
 import { IngestWebsitePageUseCase } from "../ingest-website-page.use-case";
 import { IngestWebsitePagesBatchUseCase } from "../ingest-website-pages-batch.use-case";
 import {
-  mapAcquisitionResultToStagedArtifactDescriptor,
+  mapAcquisitionResultToStorageDescriptorInput,
   mapDomainCommandToAcquisitionRequest,
   mapDomainResultToContractResult,
   mapIngestWebsitePageRequestToDomain,
-  toStagedArtifactDescriptor,
+  mapStoredWebsiteToStagedArtifactDescriptor,
 } from "../website-ingestion/website-ingestion.mappers";
 
 describe("website ingestion use cases", () => {
-  it("orchestrates single-page ingestion through request mapping, acquisition, and staged artifact mapping", async () => {
+  it("orchestrates single-page ingestion with storage write and staged artifact derived from storage result", async () => {
     const acquireWebsiteHtml = testDouble
       .fn<WebsiteHtmlAcquisitionPort["acquireWebsiteHtml"]>()
       .mockResolvedValue({
@@ -24,13 +27,36 @@ describe("website ingestion use cases", () => {
         resolvedUrl: "https://example.com/docs",
         html: "<html><body>hello</body></html>",
         mediaType: "text/html",
-        retrievalModeUsed: "automatic",
+        acquisitionMechanismUsed: "simple-http",
         httpStatus: 200,
         contentTypeHeader: "text/html; charset=utf-8",
       });
 
+    const storeArtifact = testDouble
+      .fn<ArtifactObjectStoragePort["storeArtifact"]>()
+      .mockResolvedValue(
+        createStoreArtifactSuccessResult({
+          key: "staged/real/object-1.html",
+          mediaType: "text/html",
+          sizeBytes: 123,
+          checksum: { algorithm: "sha256", value: "abc" },
+          metadata: {
+            artifactFamily: "structured-text",
+            sourceUrl: "https://example.com/docs",
+            requestedMode: "automatic",
+            acquisitionMechanismUsed: "simple-http",
+          },
+        }),
+      );
+
     const useCase = new IngestWebsitePageUseCase({
       acquisition: { acquireWebsiteHtml },
+      storage: {
+        storeArtifact,
+        retrieveArtifact: testDouble.fn(),
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
       now: () => "2026-04-19T12:00:00.000Z",
     });
 
@@ -40,22 +66,50 @@ describe("website ingestion use cases", () => {
     });
 
     expect(acquireWebsiteHtml).toHaveBeenCalledOnce();
+    expect(storeArtifact).toHaveBeenCalledOnce();
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
 
     expect(result.value.sourceKind).toBe("scrape");
-    expect(result.value.stagedArtifact?.sourceKind).toBe("scrape");
+    expect(result.value.acquisitionMechanismUsed).toBe("simple-http");
+    expect(result.value.stagedArtifact?.storage.key).toBe("staged/real/object-1.html");
     expect(result.value.stagedArtifact?.storage.mediaType).toBe("text/html");
     expect(result.value.stagedArtifact?.metadata).toMatchObject({
       artifactFamily: "structured-text",
       sourceUrl: "https://example.com/docs",
-      resolvedUrl: "https://example.com/docs",
-      retrievedAt: "2026-04-19T12:00:00.000Z",
-      retrievalModeUsed: "automatic",
-      rendered: false,
+      requestedMode: "automatic",
+      acquisitionMechanismUsed: "simple-http",
     });
+  });
+
+  it("returns failure when storage write fails", async () => {
+    const useCase = new IngestWebsitePageUseCase({
+      acquisition: {
+        acquireWebsiteHtml: async () => ({
+          sourceKind: "scrape",
+          resolvedUrl: "https://example.com/docs",
+          html: "<html><body>hello</body></html>",
+          mediaType: "text/html",
+          acquisitionMechanismUsed: "simple-http",
+        }),
+      },
+      storage: {
+        storeArtifact: async () =>
+          createStoreArtifactFailureResult(createContractError("unavailable", "storage down")),
+        retrieveArtifact: testDouble.fn(),
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
+    });
+
+    const result = await useCase.execute({ url: "https://example.com/docs" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatchObject({ code: "unavailable", message: "storage down" });
+    }
   });
 
   it("returns per-item batch results and continues on partial failures", async () => {
@@ -71,9 +125,21 @@ describe("website ingestion use cases", () => {
             resolvedUrl: request.target.url,
             html: `<html><body><main>${request.target.url}</main></body></html>`,
             mediaType: "text/html",
-            retrievalModeUsed: request.mode,
+            acquisitionMechanismUsed: request.mode === "rendered" ? "rendered-browser" : "simple-http",
           };
         },
+      },
+      storage: {
+        storeArtifact: async (request) =>
+          createStoreArtifactSuccessResult({
+            key: request.descriptor.key ?? "staged/website/default.html",
+            mediaType: "text/html",
+            sizeBytes: (request.content as Uint8Array).byteLength,
+            metadata: request.descriptor.metadata,
+          }),
+        retrieveArtifact: testDouble.fn(),
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
       },
       now: () => "2026-04-19T13:00:00.000Z",
     });
@@ -126,25 +192,42 @@ describe("website ingestion use cases", () => {
       mode: "rendered",
     });
 
-    const stagedArtifact = mapAcquisitionResultToStagedArtifactDescriptor({
+    const storageDescriptorInput = mapAcquisitionResultToStorageDescriptorInput({
       command: domainCommand,
       acquisitionResult: {
         sourceKind: "scrape",
         resolvedUrl: "https://example.com/path",
         html: "<html>ok</html>",
         mediaType: "text/html",
-        retrievalModeUsed: "rendered",
+        acquisitionMechanismUsed: "rendered-browser",
         httpStatus: 200,
         contentTypeHeader: "text/html",
       },
       retrievedAt: "2026-04-19T14:00:00.000Z",
     });
 
+    const stagedArtifact = mapStoredWebsiteToStagedArtifactDescriptor({
+      command: domainCommand,
+      acquisitionResult: {
+        sourceKind: "scrape",
+        resolvedUrl: "https://example.com/path",
+        html: "<html>ok</html>",
+        mediaType: "text/html",
+        acquisitionMechanismUsed: "rendered-browser",
+      },
+      storageDescriptor: {
+        key: storageDescriptorInput.key ?? "staged/website/example.com/path.html",
+        mediaType: "text/html",
+        sizeBytes: 12,
+        metadata: storageDescriptorInput.metadata,
+      },
+    });
+
     const contractResult = mapDomainResultToContractResult({
       ingestion: {
         target: domainCommand.target,
         resolvedUrl: "https://example.com/path",
-        retrievalModeUsed: "rendered",
+        acquisitionMechanismUsed: "rendered-browser",
       },
       stagedArtifact,
     });
@@ -158,32 +241,17 @@ describe("website ingestion use cases", () => {
     expect(contractResult.value.stagedArtifact?.storage.mediaType).toBe("text/html");
     expect(contractResult.value.stagedArtifact?.metadata).toMatchObject({ artifactFamily: "structured-text" });
     expect(contractResult.value.sourceKind).toBe("scrape");
+    expect(contractResult.value.acquisitionMechanismUsed).toBe("rendered-browser");
   });
 
-  it("provides a single staged artifact helper with structured-text family", () => {
-    const descriptor = toStagedArtifactDescriptor({
-      sourceUrl: "https://example.com/source",
-      acquisitionResult: {
-        sourceKind: "scrape",
-        resolvedUrl: "https://example.com/source",
-        html: "<html><body><p>x</p></body></html>",
-        mediaType: "text/html",
-        retrievalModeUsed: "automatic",
-      },
-      retrievedAt: "2026-04-19T15:00:00.000Z",
-    });
-
-    expect(descriptor.metadata?.artifactFamily).toBe("structured-text");
-    expect(descriptor.storage.mediaType).toBe("text/html");
-  });
-
-  it("keeps ingestion use case dependent on ingestion port only", () => {
+  it("keeps ingestion use case dependent on ingestion+storage ports only", () => {
     const source = readFileSync(
       resolve("modules/application/use-cases/ingest-website-page.use-case.ts"),
       "utf8",
     );
 
     expect(source).toContain('import type { WebsiteHtmlAcquisitionPort } from "../ports/ingestion";');
+    expect(source).toContain('import type { ArtifactObjectStoragePort } from "../ports/storage";');
     expect(source.includes("adapters/ingestion")).toBe(false);
     expect(source.includes("playwright")).toBe(false);
   });

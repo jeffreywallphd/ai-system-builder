@@ -64,15 +64,9 @@ export class DefaultWebsiteHtmlAcquisitionPipeline implements WebsiteHtmlAcquisi
         await this.advanced.acquireWebsiteHtml(normalizedRequest, context),
       );
 
-      return {
-        ...advancedResult,
-        retrievalModeUsed: "rendered",
-      };
+      return advancedResult;
     }
 
-    return {
-      ...simpleResult,
-      retrievalModeUsed: "automatic",
-    };
+    return simpleResult;
   }
 }
