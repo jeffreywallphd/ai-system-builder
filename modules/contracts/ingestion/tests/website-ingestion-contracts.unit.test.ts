@@ -101,7 +101,12 @@ describe("website ingestion contracts", () => {
     });
 
     const batchResult = createIngestWebsitePagesBatchSuccessResult({
-      items: [pageResult.value],
+      items: [
+        {
+          target: pageResult.value.target,
+          result: pageResult,
+        },
+      ],
       summary: {
         attempted: 1,
         succeeded: 1,

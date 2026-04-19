@@ -1,10 +1,14 @@
 import {
   createIngestWebsitePageSuccessResult,
+  createIngestWebsitePagesBatchSuccessResult,
   normalizeWebsiteHtmlAcquisitionRequest,
   normalizeWebsiteHtmlAcquisitionResult,
   normalizeStagedArtifactDescriptor,
+  normalizeWebsiteIngestionTarget,
   type IngestWebsitePageRequest,
   type IngestWebsitePageResult,
+  type IngestWebsitePagesBatchResult,
+  type IngestWebsitePageBatchItemResult,
   type StagedArtifactDescriptor,
   type WebsiteHtmlAcquisitionRequest,
   type WebsiteHtmlAcquisitionResult,
@@ -13,7 +17,8 @@ import { type ArtifactFamily } from "../../../domain/artifact";
 import {
   normalizeWebsiteHtmlCaptureMetadata,
   normalizeWebsiteIngestionMode,
-  normalizeWebsiteIngestionTarget,
+  normalizeWebsiteIngestionResult,
+  normalizeWebsiteIngestionTarget as normalizeDomainWebsiteIngestionTarget,
   type WebsiteHtmlCaptureMetadata,
   type WebsiteIngestionMode,
   type WebsiteIngestionResult,
@@ -34,11 +39,23 @@ export function mapIngestWebsitePageRequestToDomain(
   request: IngestWebsitePageRequest,
 ): WebsitePageIngestionCommand {
   return {
-    target: normalizeWebsiteIngestionTarget({
+    target: normalizeDomainWebsiteIngestionTarget({
       url: request.url,
       label: request.label,
     }),
     mode: normalizeWebsiteIngestionMode(request.mode ?? "automatic"),
+  };
+}
+
+export function mapBatchTargetToPageRequest(input: {
+  target: { url: string; label?: string };
+  mode?: WebsiteIngestionMode;
+}): IngestWebsitePageRequest {
+  const normalizedTarget = normalizeWebsiteIngestionTarget(input.target);
+  return {
+    url: normalizedTarget.url,
+    label: normalizedTarget.label,
+    mode: input.mode,
   };
 }
 
@@ -61,11 +78,11 @@ export function mapAcquisitionResultToDomain(
 ): WebsiteIngestionResult {
   const normalized = normalizeWebsiteHtmlAcquisitionResult(acquisitionResult);
 
-  return {
+  return normalizeWebsiteIngestionResult({
     target: command.target,
     resolvedUrl: normalized.resolvedUrl,
     retrievalModeUsed: normalized.retrievalModeUsed,
-  };
+  });
 }
 
 function toStorageKey(resolvedUrl: string, retrievedAt: string): string {
@@ -77,14 +94,14 @@ function toStorageKey(resolvedUrl: string, retrievedAt: string): string {
   return `staged/website/${host}/${pathToken}-${timestampToken}.html`;
 }
 
-export function mapAcquisitionResultToStagedArtifactDescriptor(input: {
-  command: WebsitePageIngestionCommand;
+export function toStagedArtifactDescriptor(input: {
+  sourceUrl: string;
   acquisitionResult: WebsiteHtmlAcquisitionResult;
   retrievedAt: string;
 }): StagedArtifactDescriptor<WebsiteHtmlCaptureMetadata & { artifactFamily: ArtifactFamily }> {
   const normalizedAcquisition = normalizeWebsiteHtmlAcquisitionResult(input.acquisitionResult);
   const metadata = normalizeWebsiteHtmlCaptureMetadata({
-    sourceUrl: input.command.target.url,
+    sourceUrl: input.sourceUrl,
     resolvedUrl: normalizedAcquisition.resolvedUrl,
     retrievedAt: input.retrievedAt,
     retrievalModeUsed: normalizedAcquisition.retrievalModeUsed,
@@ -110,6 +127,18 @@ export function mapAcquisitionResultToStagedArtifactDescriptor(input: {
   });
 }
 
+export function mapAcquisitionResultToStagedArtifactDescriptor(input: {
+  command: WebsitePageIngestionCommand;
+  acquisitionResult: WebsiteHtmlAcquisitionResult;
+  retrievedAt: string;
+}): StagedArtifactDescriptor<WebsiteHtmlCaptureMetadata & { artifactFamily: ArtifactFamily }> {
+  return toStagedArtifactDescriptor({
+    sourceUrl: input.command.target.url,
+    acquisitionResult: input.acquisitionResult,
+    retrievedAt: input.retrievedAt,
+  });
+}
+
 export function mapDomainResultToContractResult(
   completed: WebsitePageIngestionCompleted,
 ): IngestWebsitePageResult {
@@ -123,5 +152,16 @@ export function mapDomainResultToContractResult(
     retrievalModeUsed: completed.ingestion.retrievalModeUsed,
     stagedArtifact: completed.stagedArtifact,
     warnings: completed.ingestion.warnings,
+  });
+}
+
+export function mapBatchItemResultsToContractResult(items: IngestWebsitePageBatchItemResult[]): IngestWebsitePagesBatchResult {
+  return createIngestWebsitePagesBatchSuccessResult({
+    items,
+    summary: {
+      attempted: items.length,
+      succeeded: items.filter((item) => item.result.ok).length,
+      failed: items.filter((item) => !item.result.ok).length,
+    },
   });
 }

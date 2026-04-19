@@ -1,9 +1,9 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
-import type {
-  IngestWebsitePageRequest,
-  WebsiteHtmlAcquisitionRequest,
-} from "../../../contracts/ingestion";
+import type { IngestWebsitePageRequest, WebsiteHtmlAcquisitionRequest } from "../../../contracts/ingestion";
 import type { WebsiteHtmlAcquisitionPort } from "../../ports/ingestion";
 import { IngestWebsitePageUseCase } from "../ingest-website-page.use-case";
 import { IngestWebsitePagesBatchUseCase } from "../ingest-website-pages-batch.use-case";
@@ -12,6 +12,7 @@ import {
   mapDomainCommandToAcquisitionRequest,
   mapDomainResultToContractResult,
   mapIngestWebsitePageRequestToDomain,
+  toStagedArtifactDescriptor,
 } from "../website-ingestion/website-ingestion.mappers";
 
 describe("website ingestion use cases", () => {
@@ -57,16 +58,22 @@ describe("website ingestion use cases", () => {
     });
   });
 
-  it("aggregates batch ingestion summary using the single-page use case", async () => {
+  it("returns per-item batch results and continues on partial failures", async () => {
     const singlePage = new IngestWebsitePageUseCase({
       acquisition: {
-        acquireWebsiteHtml: async (request) => ({
-          sourceKind: "scrape",
-          resolvedUrl: request.target.url,
-          html: `<html>${request.target.url}</html>`,
-          mediaType: "text/html",
-          retrievalModeUsed: request.mode,
-        }),
+        acquireWebsiteHtml: async (request) => {
+          if (request.target.url.includes("fail")) {
+            throw new Error("forced failure");
+          }
+
+          return {
+            sourceKind: "scrape",
+            resolvedUrl: request.target.url,
+            html: `<html><body><main>${request.target.url}</main></body></html>`,
+            mediaType: "text/html",
+            retrievalModeUsed: request.mode,
+          };
+        },
       },
       now: () => "2026-04-19T13:00:00.000Z",
     });
@@ -76,7 +83,7 @@ describe("website ingestion use cases", () => {
     const result = await batchUseCase.execute({
       targets: [
         { url: " https://example.com/a " },
-        { url: " https://example.com/b " },
+        { url: " https://example.com/fail " },
       ],
       mode: " automatic ",
     });
@@ -88,9 +95,12 @@ describe("website ingestion use cases", () => {
 
     expect(result.value.summary).toEqual({
       attempted: 2,
-      succeeded: 2,
-      failed: 0,
+      succeeded: 1,
+      failed: 1,
     });
+    expect(result.value.items.length).toBe(2);
+    expect(result.value.items[0].result.ok).toBe(true);
+    expect(result.value.items[1].result.ok).toBe(false);
   });
 
   it("maps contract requests into domain commands and domain results back to contracts", () => {
@@ -146,9 +156,35 @@ describe("website ingestion use cases", () => {
 
     expect(contractResult.value.stagedArtifact?.storage.key).toContain("staged/website/example.com/path-");
     expect(contractResult.value.stagedArtifact?.storage.mediaType).toBe("text/html");
-    expect(contractResult.value.stagedArtifact?.metadata).toMatchObject({
-      artifactFamily: "structured-text",
-    });
+    expect(contractResult.value.stagedArtifact?.metadata).toMatchObject({ artifactFamily: "structured-text" });
     expect(contractResult.value.sourceKind).toBe("scrape");
+  });
+
+  it("provides a single staged artifact helper with structured-text family", () => {
+    const descriptor = toStagedArtifactDescriptor({
+      sourceUrl: "https://example.com/source",
+      acquisitionResult: {
+        sourceKind: "scrape",
+        resolvedUrl: "https://example.com/source",
+        html: "<html><body><p>x</p></body></html>",
+        mediaType: "text/html",
+        retrievalModeUsed: "automatic",
+      },
+      retrievedAt: "2026-04-19T15:00:00.000Z",
+    });
+
+    expect(descriptor.metadata?.artifactFamily).toBe("structured-text");
+    expect(descriptor.storage.mediaType).toBe("text/html");
+  });
+
+  it("keeps ingestion use case dependent on ingestion port only", () => {
+    const source = readFileSync(
+      resolve("modules/application/use-cases/ingest-website-page.use-case.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain('import type { WebsiteHtmlAcquisitionPort } from "../ports/ingestion";');
+    expect(source.includes("adapters/ingestion")).toBe(false);
+    expect(source.includes("playwright")).toBe(false);
   });
 });
