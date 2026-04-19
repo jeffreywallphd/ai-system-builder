@@ -1,0 +1,20 @@
+.ui-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  padding: var(--space-lg);
+}
+
+.ui-panel--elevated {
+  background: var(--color-bg-elevated);
+}
+
+.ui-panel__title {
+  margin-bottom: var(--space-sm);
+}
+
+.ui-panel img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-soft);
+}
