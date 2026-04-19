@@ -15,6 +15,7 @@ import {
   DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_SOURCE_VERIFY_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_REGISTER_FROM_REPO_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL,
   createDesktopArtifactBrowseRequest,
@@ -33,6 +34,7 @@ import {
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import {
+  createDesktopArtifactRegisterFromRepoIpcHandler,
   createDesktopArtifactPublishIpcHandler,
   createDesktopArtifactPublishVerifyIpcHandler,
   mapDesktopArtifactRequestContext,
@@ -362,6 +364,37 @@ describe("registerArtifactBrowserIpc", () => {
       requestId: "req-ipc-1",
       correlationId: "corr-ipc-1",
     });
+  });
+
+  it("fails register-from-repo requests with invalid artifact family at the IPC boundary", async () => {
+    const registerFromRepoUseCase = { execute: testDouble.fn() };
+    const handler = createDesktopArtifactRegisterFromRepoIpcHandler(registerFromRepoUseCase);
+    const request = createDesktopArtifactRegisterFromRepoRequest({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo",
+        path: "images/a.png",
+      },
+      artifactFamily: "application",
+      boundary: { host: "desktop", source: "desktop.renderer" },
+    }, {
+      requestId: "req-register-invalid-family",
+      correlationId: "corr-register-invalid-family",
+    });
+
+    const response = await handler({}, request);
+
+    expect(response).toMatchObject({
+      ok: false,
+      channel: DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL.value,
+      operation: DESKTOP_ARTIFACT_REGISTER_FROM_REPO_RESPONSE_CHANNEL.operation,
+      error: {
+        code: "validation",
+      },
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+    });
+    expect(registerFromRepoUseCase.execute).not.toHaveBeenCalled();
   });
 
   it("maps publish and publish-verify failures to operation-specific IPC response channels", async () => {

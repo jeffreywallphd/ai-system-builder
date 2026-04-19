@@ -45,4 +45,13 @@ describe("artifact browser TypeScript regression guards", () => {
     expect(source).toContain("DESKTOP_ARTIFACT_PUBLISH_RESPONSE_CHANNEL");
     expect(source).toContain("DESKTOP_ARTIFACT_PUBLISH_VERIFY_RESPONSE_CHANNEL");
   });
+
+  it("keeps register-from-repo IPC mapper normalizing artifact family before use-case command mapping", () => {
+    const source = readSourceFile(
+      "modules/adapters/transport/ipc-electron/artifact-browser/registerArtifactBrowserIpc.ts",
+    );
+
+    expect(source).toContain("mapDesktopArtifactRegisterFromRepoRequestToCommand");
+    expect(source).toContain("normalizeArtifactFamily(request.payload.artifactFamily)");
+  });
 });
