@@ -16,6 +16,7 @@ describe("artifact browser TypeScript regression guards", () => {
     expect(source).toContain("useState<string | undefined>(undefined)");
     expect(source).toContain("useState<DesktopArtifactDetail | undefined>(undefined)");
     expect(source).toContain("useState<DesktopArtifactContentDescriptor | undefined>(undefined)");
+    expect(source).toContain("useRef<string | undefined>(undefined)");
   });
 
   it("keeps selectedStorageKey destructured in desktop ArtifactBrowserFeature", () => {

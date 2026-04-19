@@ -27,7 +27,7 @@ export function useArtifactSelectionContent(
   const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>(undefined);
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>(undefined);
   const [htmlPreview, setHtmlPreview] = useState<string | undefined>(undefined);
-  const activeImageViewUrl = useRef<string | undefined>();
+  const activeImageViewUrl = useRef<string | undefined>(undefined);
 
   const revokeObjectUrl = useCallback((url: string) => {
     if (typeof URL.revokeObjectURL === "function") {
