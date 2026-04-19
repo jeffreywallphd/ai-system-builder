@@ -108,6 +108,18 @@ describe("desktop preload exposedApi bridge", () => {
     expect(mediaResponse.ok).toBe(true);
   });
 
+  it("maps artifact browse family filter using the contract artifact-family union", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopArtifactBrowseSuccessResponse({ items: [] }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    await api.browseArtifacts({ artifactFamily: "structured-text" });
+
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
+    expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactFamily?: string } } | undefined)?.payload?.artifactFamily).toBe("structured-text");
+  });
+
   it("maps publish bridge calls to artifact publish request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopArtifactPublishSuccessResponse({

@@ -110,6 +110,7 @@ import {
   type DesktopHuggingFaceNamespaceDatasetsBrowseResponse,
   type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
 } from "../../../../modules/contracts/ipc";
+import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 
 const DEFAULT_UPLOAD_SOURCE = "desktop.renderer.artifact-upload.form";
 const DEFAULT_ARTIFACT_SOURCE = "desktop.renderer.artifact-browser";
@@ -160,7 +161,7 @@ export interface DesktopPreloadApi {
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
   browseArtifacts: (
-    input?: { artifactFamily?: string },
+    input?: { artifactFamily?: ArtifactFamily },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactBrowseResponse>;
   browseUnregisteredArtifacts: (
@@ -223,7 +224,7 @@ export interface DesktopPreloadApi {
         path: string;
         revision?: string;
       };
-      artifactFamily?: string;
+      artifactFamily?: ArtifactFamily;
       mediaType?: string;
     },
     context?: DesktopArtifactUploadBridgeContext,
