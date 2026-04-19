@@ -1,4 +1,3 @@
-import type { StagedArtifactDescriptor } from "../../contracts/ingestion";
 import {
   normalizeWebsiteIngestionMode,
   type WebsiteIngestionMode,
@@ -12,7 +11,6 @@ export interface WebsiteIngestionResult {
   target: WebsiteIngestionTarget;
   resolvedUrl: string;
   retrievalModeUsed: WebsiteIngestionMode;
-  stagedArtifact?: StagedArtifactDescriptor;
   warnings?: string[];
 }
 
@@ -29,7 +27,6 @@ export function normalizeWebsiteIngestionResult(
   result: WebsiteIngestionResult,
 ): WebsiteIngestionResult {
   return {
-    ...result,
     target: normalizeWebsiteIngestionTarget(result.target),
     resolvedUrl: normalizeRequiredText("resolvedUrl", result.resolvedUrl),
     retrievalModeUsed: normalizeWebsiteIngestionMode(result.retrievalModeUsed),

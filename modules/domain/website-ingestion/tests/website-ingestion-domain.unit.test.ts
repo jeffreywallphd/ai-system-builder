@@ -1,7 +1,6 @@
 import { describe, expect, it } from "../../../testing/node-test";
 
 import {
-  WEBSITE_HTML_ARTIFACT_FAMILY,
   normalizeWebsiteBatchIngestionResult,
   normalizeWebsiteHtmlCaptureMetadata,
   normalizeWebsiteIngestionMode,
@@ -10,9 +9,6 @@ import {
 } from "..";
 
 describe("website-ingestion domain", () => {
-  it("uses structured-text as the default artifact family for website html captures", () => {
-    expect(WEBSITE_HTML_ARTIFACT_FAMILY).toBe("structured-text");
-  });
   it("normalizes and validates website ingestion modes", () => {
     expect(normalizeWebsiteIngestionMode(" Automatic ")).toBe("automatic");
     expect(normalizeWebsiteIngestionMode("rendered")).toBe("rendered");

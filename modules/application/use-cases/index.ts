@@ -24,3 +24,6 @@ export * from "./localize-artifact-from-repo.use-case";
 export * from "./browse-huggingface-namespace-datasets.use-case";
 export * from "./browse-huggingface-dataset-parquet-files.use-case";
 export * from "./delete-registered-artifact.use-case";
+export * from "./ingest-website-page.use-case";
+export * from "./ingest-website-pages-batch.use-case";
+
