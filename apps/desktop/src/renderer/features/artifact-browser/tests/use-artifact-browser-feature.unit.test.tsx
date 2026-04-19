@@ -893,3 +893,69 @@ it("renders website capture metadata and HTML source preview for website-ingeste
   });
   container.remove();
 });
+
+it("revokes prior object URLs when image preview selection changes and on unmount", async () => {
+  const revokeObjectURL = vi.fn();
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: revokeObjectURL,
+  });
+
+  const client = {
+    browseArtifacts: vi.fn().mockResolvedValue([
+      { storageKey: "uploads/cat-1.png", artifactFamily: "image" as const, mediaType: "image/png" },
+      { storageKey: "uploads/cat-2.png", artifactFamily: "image" as const, mediaType: "image/png" },
+    ]),
+    readArtifactDetail: vi.fn().mockImplementation(async ({ storageKey }: { storageKey: string }) => ({
+      locator: { storageKey },
+      artifactFamily: "image" as const,
+      mediaType: "image/png",
+    })),
+    readArtifactContent: vi.fn().mockResolvedValue({
+      locator: { storageKey: "uploads/cat-1.png" },
+      mediaType: "image/png",
+      availability: "available" as const,
+      retrieval: "deferred" as const,
+    }),
+    createArtifactMediaViewUrl: vi.fn()
+      .mockResolvedValueOnce("blob:desktop-preview-1")
+      .mockResolvedValueOnce("blob:desktop-preview-2"),
+    readArtifactMedia: vi.fn(),
+    getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+    setHuggingFaceToken: vi.fn(),
+    clearHuggingFaceToken: vi.fn(),
+    publishArtifactToHuggingFace: vi.fn(),
+    verifyPublishedArtifactBacking: vi.fn(),
+    registerArtifactFromRepo: vi.fn(),
+    localizeArtifactFromRepo: vi.fn(),
+  };
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  await act(async () => {
+    root.render(<ArtifactBrowserFeature client={client} />);
+  });
+
+  const first = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("cat-1")) as HTMLButtonElement;
+  const second = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("cat-2")) as HTMLButtonElement;
+
+  await act(async () => {
+    first.click();
+  });
+
+  await act(async () => {
+    second.click();
+  });
+
+  expect(revokeObjectURL).toHaveBeenCalledWith("blob:desktop-preview-1");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  expect(revokeObjectURL).toHaveBeenCalledWith("blob:desktop-preview-2");
+  container.remove();
+});
