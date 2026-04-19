@@ -6,6 +6,7 @@ import {
 } from "../../../contracts/ingestion";
 import type { WebsiteHtmlAcquisitionStrategy } from "../../../application/ports/ingestion";
 import type { ApplicationRequestContext } from "../../../application/ports";
+import { loadPlaywrightChromiumLauncher } from "./loadPlaywrightChromiumLauncher";
 
 interface PlaywrightPage {
   goto(url: string, options: { waitUntil: "domcontentloaded"; timeout: number }): Promise<{ status(): number | null } | null>;
@@ -25,8 +26,8 @@ export interface PlaywrightWebsiteHtmlAcquisitionAdapterDependencies {
 }
 
 async function defaultBrowserFactory(): Promise<PlaywrightBrowser> {
-  const playwrightModule = await import("playwright");
-  return playwrightModule.chromium.launch({ headless: true });
+  const launchChromium = loadPlaywrightChromiumLauncher();
+  return launchChromium({ headless: true });
 }
 
 export class PlaywrightWebsiteHtmlAcquisitionAdapter implements WebsiteHtmlAcquisitionStrategy {
