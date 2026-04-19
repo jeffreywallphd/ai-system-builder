@@ -69,7 +69,7 @@ describe("filesystem artifact browser read adapter", () => {
       mediaType: "image/png",
     });
     expect(dataItem).toMatchObject({
-      artifactFamily: "application",
+      artifactFamily: "tabular",
       mediaType: "application/x-parquet",
     });
   });
@@ -454,7 +454,7 @@ describe("filesystem artifact browser read adapter", () => {
     expect(browseRegistered.value.items[0]).toMatchObject({
       storageKey: "uploads/session/report.pdf",
       mediaType: "application/pdf",
-      artifactFamily: "application",
+      artifactFamily: "document",
     });
   });
 
@@ -486,15 +486,15 @@ describe("filesystem artifact browser read adapter", () => {
       storageKey: "uploads/session/from-unregistered.pdf",
     });
 
-    const browseResult = await browserRead.browseArtifacts({ artifactFamily: "application" });
+    const browseResult = await browserRead.browseArtifacts({ artifactFamily: "document" });
     expect(browseResult.ok).toBe(true);
     if (!browseResult.ok) {
       throw new Error("Expected browse success.");
     }
 
     const byKey = new Map(browseResult.value.items.map((item) => [item.storageKey, item]));
-    expect(byKey.get("uploads/session/from-store.pdf")?.artifactFamily).toBe("application");
-    expect(byKey.get("uploads/session/from-unregistered.pdf")?.artifactFamily).toBe("application");
+    expect(byKey.get("uploads/session/from-store.pdf")?.artifactFamily).toBe("document");
+    expect(byKey.get("uploads/session/from-unregistered.pdf")?.artifactFamily).toBe("document");
   });
 
   it("deletes unregistered uploaded artifacts without touching registered catalog artifacts", async () => {

@@ -1,5 +1,3 @@
-import path from "node:path";
-
 export const ARTIFACT_FAMILIES = [
   "image",
   "document",
@@ -52,12 +50,18 @@ function normalizeExtension(extensionOrName: string | undefined): string | undef
     return undefined;
   }
 
-  const ext = trimmed.includes(".") ? path.extname(trimmed) : `.${trimmed}`;
-  if (!ext || ext === ".") {
+  if (!trimmed.includes(".")) {
+    return trimmed.toLowerCase();
+  }
+
+  const slashNormalized = trimmed.replace(/\\/g, "/");
+  const fileName = slashNormalized.slice(slashNormalized.lastIndexOf("/") + 1);
+  const lastDotIndex = fileName.lastIndexOf(".");
+  if (lastDotIndex <= 0 || lastDotIndex >= fileName.length - 1) {
     return undefined;
   }
 
-  return ext.slice(1).toLowerCase();
+  return fileName.slice(lastDotIndex + 1).toLowerCase();
 }
 
 export function normalizeArtifactFamily(value: string): ArtifactFamily {
