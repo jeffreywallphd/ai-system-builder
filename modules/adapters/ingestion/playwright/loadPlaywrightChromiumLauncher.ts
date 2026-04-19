@@ -1,11 +1,4 @@
-interface PlaywrightBrowser {
-  newPage(): Promise<unknown>;
-  close(): Promise<void>;
-}
-
-interface PlaywrightChromiumLike {
-  launch(options: { headless: boolean }): Promise<PlaywrightBrowser>;
-}
+import type { PlaywrightChromiumLike } from "./playwrightChromiumTypes";
 
 interface PlaywrightModuleLike {
   chromium?: PlaywrightChromiumLike;
