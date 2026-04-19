@@ -29,7 +29,7 @@ export class BrowseArtifactsUseCase {
     try {
       const result = await this.artifactBrowserMetadataRead.browseArtifacts(
         {
-          artifactKind: command.artifactKind,
+          artifactFamily: command.artifactFamily,
         },
         context,
       );

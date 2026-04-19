@@ -101,7 +101,7 @@ interface ArtifactRegisterFromRepoApiRequestBody {
     revision?: string;
     path?: string;
   };
-  artifactKind?: "image";
+  artifactFamily?: "image";
   mediaType?: string;
   source?: string;
 }
@@ -654,7 +654,7 @@ export function registerArtifactRepoApiRoutes(
           revision: (request.body as ArtifactRegisterFromRepoApiRequestBody).target?.revision,
           path: (request.body as ArtifactRegisterFromRepoApiRequestBody).target?.path ?? "",
         },
-        artifactKind: (request.body as ArtifactRegisterFromRepoApiRequestBody).artifactKind ?? "image",
+        artifactFamily: (request.body as ArtifactRegisterFromRepoApiRequestBody).artifactFamily ?? "image",
         mediaType: (request.body as ArtifactRegisterFromRepoApiRequestBody).mediaType,
         source: normalizeSource((request.body as ArtifactRegisterFromRepoApiRequestBody).source),
       }, context);
@@ -671,7 +671,7 @@ export function registerArtifactRepoApiRoutes(
     const result = await dependencies.registerArtifactFromRepoUseCase.execute(
       {
         target: apiRequest.payload.target,
-        artifactKind: apiRequest.payload.artifactKind,
+        artifactFamily: apiRequest.payload.artifactFamily,
         mediaType: apiRequest.payload.mediaType,
       },
       context,

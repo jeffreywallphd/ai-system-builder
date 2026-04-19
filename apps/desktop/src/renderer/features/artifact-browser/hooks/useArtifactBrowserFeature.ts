@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { ArtifactFamily } from "../../../../../../../modules/domain/artifact";
 
 import {
   useArtifactBrowserPublishLogic,
@@ -48,6 +49,9 @@ export interface UseArtifactBrowserFeatureResult {
   refreshArtifacts: () => Promise<void>;
   registerUnregisteredArtifact: (storageKey: string) => Promise<void>;
   deleteUnregisteredArtifact: (storageKey: string) => Promise<void>;
+  deleteRegisteredArtifact: (storageKey: string) => Promise<void>;
+  selectedArtifactFamily: ArtifactFamily | "all";
+  setSelectedArtifactFamily: (value: ArtifactFamily | "all") => void;
   publishArtifactToHuggingFace: () => Promise<void>;
   registerArtifactFromHuggingFace: (input?: {
     repository?: string;
@@ -116,6 +120,7 @@ export function useArtifactBrowserFeature(
   const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [selectedArtifactFamily, setSelectedArtifactFamily] = useState<ArtifactFamily | "all">("all");
   const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [localizeState, setLocalizeState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [sourceVerifyState, setSourceVerifyState] = useState<ArtifactBrowserViewState>({ status: "idle" });
@@ -153,7 +158,7 @@ export function useArtifactBrowserFeature(
     setViewState({ status: "loading", message: "Loading artifacts..." });
     try {
       const [browseItems, unregistered] = await Promise.all([
-        artifactClient.browseArtifacts(),
+        artifactClient.browseArtifacts(selectedArtifactFamily === "all" ? {} : { artifactFamily: selectedArtifactFamily }),
         artifactClient.browseUnregisteredArtifacts?.() ?? Promise.resolve([]),
       ]);
       setItems(browseItems);
@@ -170,7 +175,7 @@ export function useArtifactBrowserFeature(
         message: error instanceof Error ? error.message : "Failed to load artifacts.",
       });
     }
-  }, [artifactClient]);
+  }, [artifactClient, selectedArtifactFamily]);
 
   async function registerUnregisteredArtifact(storageKey: string): Promise<void> {
     setViewState({ status: "loading", message: `Registering ${storageKey}...` });
@@ -190,6 +195,11 @@ export function useArtifactBrowserFeature(
   }
 
   async function deleteUnregisteredArtifact(storageKey: string): Promise<void> {
+    const confirmation = globalThis.prompt?.(`Type Delete to remove unregistered artifact ${storageKey}.`, "");
+    if (confirmation !== "Delete") {
+      setViewState({ status: "error", message: "Delete cancelled: typed confirmation must be exactly Delete." });
+      return;
+    }
     setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
     try {
       if (!artifactClient.deleteUnregisteredArtifact) {
@@ -202,6 +212,34 @@ export function useArtifactBrowserFeature(
       setViewState({
         status: "error",
         message: error instanceof Error ? error.message : "Failed to delete unregistered artifact.",
+      });
+    }
+  }
+
+
+  async function deleteRegisteredArtifact(storageKey: string): Promise<void> {
+    const confirmation = globalThis.prompt?.(`Type Delete to remove registered artifact ${storageKey}.`, "");
+    if (confirmation !== "Delete") {
+      setViewState({ status: "error", message: "Delete cancelled: typed confirmation must be exactly Delete." });
+      return;
+    }
+
+    setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
+    try {
+      if (!artifactClient.deleteRegisteredArtifact) {
+        throw new Error("Registered artifact delete flow is unavailable.");
+      }
+      await artifactClient.deleteRegisteredArtifact({ storageKey });
+      setDetail(undefined);
+      setContent(undefined);
+      setImageViewUrl(undefined);
+      setSelectedStorageKey(undefined);
+      await refreshArtifacts();
+      setViewState({ status: "success", message: `Deleted ${storageKey}.` });
+    } catch (error) {
+      setViewState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to delete registered artifact.",
       });
     }
   }
@@ -491,6 +529,9 @@ export function useArtifactBrowserFeature(
     refreshArtifacts,
     registerUnregisteredArtifact,
     deleteUnregisteredArtifact,
+    deleteRegisteredArtifact,
+    selectedArtifactFamily,
+    setSelectedArtifactFamily,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace,

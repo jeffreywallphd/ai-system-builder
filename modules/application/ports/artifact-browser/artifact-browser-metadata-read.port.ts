@@ -1,15 +1,15 @@
 import type {
-  ArtifactBrowseKind,
   ArtifactBrowserLocator,
   ArtifactBrowseSuccessValue,
   ArtifactReadSuccessValue,
 } from "../../../contracts/artifact-browser";
 import type { ContractResult } from "../../../contracts/shared";
 import type { StorageObjectMetadata } from "../../../contracts/storage";
+import type { ArtifactFamily } from "../../../domain/artifact";
 import type { ApplicationRequestContext } from "../application-request-context";
 
 export interface BrowseArtifactsRequest {
-  artifactKind?: ArtifactBrowseKind;
+  artifactFamily?: ArtifactFamily;
 }
 
 export interface ReadArtifactDetailRequest {

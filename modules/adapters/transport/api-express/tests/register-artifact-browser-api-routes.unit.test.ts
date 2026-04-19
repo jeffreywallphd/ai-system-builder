@@ -40,7 +40,7 @@ describe("registerArtifactBrowserApiRoutes", () => {
       value: {
         artifact: {
           locator: { storageKey: "uploads/a.png" },
-          artifactKind: "image",
+          artifactFamily: "image",
         },
       },
     });
@@ -74,7 +74,7 @@ describe("registerArtifactBrowserApiRoutes", () => {
     };
 
     await postHandlers.get("/api/artifact/browse")?.(
-      { body: { artifactKind: "image", source: "thin-client" }, headers: {} },
+      { body: { artifactFamily: "image", source: "thin-client" }, headers: {} },
       response,
     );
     await postHandlers.get("/api/artifact/read")?.(
@@ -91,7 +91,7 @@ describe("registerArtifactBrowserApiRoutes", () => {
     );
 
     expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
-      { artifactKind: "image" },
+      { artifactFamily: "image" },
       { requestId: undefined, correlationId: undefined },
     );
     expect(dependencies.readArtifactDetailUseCase.execute).toHaveBeenCalledWith(
@@ -112,10 +112,10 @@ describe("registerArtifactBrowserApiRoutes", () => {
   it("maps api request payload and use case failure responses through explicit helpers", () => {
     expect(
       mapArtifactBrowseApiRequestToCommand(
-        { artifactKind: "image", source: " thin-client.browser " },
+        { artifactFamily: "image", source: " thin-client.browser " },
         { requestId: "req-1", correlationId: "corr-1" },
       ),
-    ).toEqual({ artifactKind: "image" });
+    ).toEqual({ artifactFamily: "image" });
 
     const mapped = mapReadArtifactContentResultToApiResponse(
       {

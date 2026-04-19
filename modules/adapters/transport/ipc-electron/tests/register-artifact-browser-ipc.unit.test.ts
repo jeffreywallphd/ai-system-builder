@@ -82,7 +82,7 @@ describe("registerArtifactBrowserIpc", () => {
       value: {
         artifact: {
           locator: { storageKey: "uploads/a.png" },
-          artifactKind: "image",
+          artifactFamily: "image",
         },
       },
     });
@@ -201,7 +201,7 @@ describe("registerArtifactBrowserIpc", () => {
     await handlers.get(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)?.(
       {},
       createDesktopArtifactBrowseRequest({
-        artifactKind: "image",
+        artifactFamily: "image",
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
@@ -272,7 +272,7 @@ describe("registerArtifactBrowserIpc", () => {
     );
 
     expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
-      { artifactKind: "image" },
+      { artifactFamily: "image" },
       { requestId: undefined, correlationId: undefined },
     );
     expect(dependencies.readArtifactDetailUseCase.execute).toHaveBeenCalledWith(
@@ -311,7 +311,7 @@ describe("registerArtifactBrowserIpc", () => {
           path: "images/a.png",
           revision: undefined,
         },
-        artifactKind: undefined,
+        artifactFamily: undefined,
         mediaType: undefined,
       },
       { requestId: undefined, correlationId: undefined },
@@ -351,7 +351,7 @@ describe("registerArtifactBrowserIpc", () => {
 
   it("maps request correlation metadata with an explicit helper", () => {
     const request = createDesktopArtifactBrowseRequest({
-      artifactKind: "image",
+      artifactFamily: "image",
       boundary: { host: "desktop", source: "desktop.renderer" },
     }, {
       requestId: "req-ipc-1",

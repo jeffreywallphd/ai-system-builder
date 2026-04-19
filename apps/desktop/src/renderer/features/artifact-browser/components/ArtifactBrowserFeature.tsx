@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { ARTIFACT_FAMILIES } from "../../../../../../../modules/domain/artifact";
 
 import {
   deriveArtifactBackingState,
@@ -65,6 +66,9 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     refreshArtifacts,
     registerUnregisteredArtifact,
     deleteUnregisteredArtifact,
+    deleteRegisteredArtifact,
+    selectedArtifactFamily,
+    setSelectedArtifactFamily,
     publishArtifactToHuggingFace,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
@@ -86,6 +90,15 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
         </button>
       </header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
+      <section className="ui-stack ui-stack--sm">
+        <h3>Filter by family</h3>
+        <div className="ui-grid ui-grid--two">
+          <button className="ui-button" type="button" aria-current={selectedArtifactFamily === "all" ? "page" : undefined} onClick={() => setSelectedArtifactFamily("all")}>All</button>
+          {ARTIFACT_FAMILIES.map((family) => (
+            <button key={family} className="ui-button" type="button" aria-current={selectedArtifactFamily === family ? "page" : undefined} onClick={() => setSelectedArtifactFamily(family)}>{family}</button>
+          ))}
+        </div>
+      </section>
       <div className="ui-grid ui-grid--two">
         <div className="ui-stack ui-stack--sm">
           <h3>Artifacts</h3>
@@ -107,7 +120,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               {unregisteredItems.map((item) => (
                 <li key={item.storageKey}>
                   <p>{item.relativePath}</p>
-                  <small>{item.mediaType ?? "unknown media type"}</small>
+                  <small>{item.mediaType ?? "unknown media type"} · {item.storageKey.split(".").pop() ?? "unknown"}</small>
                   <div className="ui-grid ui-grid--two">
                     <button
                       className="ui-button"
@@ -117,7 +130,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
                       Register
                     </button>
                     <button
-                      className="ui-button"
+                      className="ui-button ui-button--destructive"
                       type="button"
                       onClick={() => void deleteUnregisteredArtifact(item.storageKey)}
                     >
@@ -138,8 +151,8 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <dd>{detail.locator.storageKey}</dd>
               <dt>Media type</dt>
               <dd>{detail.mediaType ?? "unknown"}</dd>
-              <dt>Artifact kind</dt>
-              <dd>{detail.artifactKind}</dd>
+              <dt>Artifact family</dt>
+              <dd>{detail.artifactFamily}</dd>
               <dt>Source</dt>
               <dd>{detail.sourceKind ?? "unknown"}</dd>
               <dt>Size bytes</dt>
@@ -162,6 +175,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
 
           {detail ? (
             <section className="ui-stack ui-stack--sm">
+              <button className="ui-button ui-button--destructive" type="button" onClick={() => void deleteRegisteredArtifact(detail.locator.storageKey)}>Delete registered artifact</button>
               <h3>Local Object State</h3>
               <dl className="ui-grid ui-grid--two">
                 <dt>Local object availability</dt>

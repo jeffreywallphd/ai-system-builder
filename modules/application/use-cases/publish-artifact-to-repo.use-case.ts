@@ -122,7 +122,7 @@ export class PublishArtifactToRepoUseCase {
 
     const artifact = Artifact.fromStorageBindings({
       artifactId: artifactId.toString(),
-      artifactKind: "image",
+      artifactFamily: "image",
       bindings: existingBindingsResult.value.bindings,
     });
     artifact.attachOrUpdateBacking(

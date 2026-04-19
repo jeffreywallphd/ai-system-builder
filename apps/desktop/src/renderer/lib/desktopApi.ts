@@ -16,7 +16,7 @@ export interface DesktopUploadedImageDescriptor {
 
 export interface DesktopArtifactBrowseItem {
   storageKey: string;
-  artifactKind: string;
+  artifactFamily: string;
   mediaType?: string;
   sizeBytes?: number;
   originalName?: string;
@@ -34,7 +34,7 @@ export interface DesktopArtifactBrowseItem {
 
 export interface DesktopArtifactDetail {
   locator: DesktopArtifactBrowserLocator;
-  artifactKind: string;
+  artifactFamily: string;
   mediaType?: string;
   sizeBytes?: number;
   sourceKind?: string;
@@ -125,10 +125,11 @@ interface DesktopApiBridge {
   browseHuggingFaceDatasetParquetFiles: (input: { repository: string; revision?: string }) => Promise<unknown>;
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<unknown>;
   getArtifactUploadPolicy: () => Promise<unknown>;
-  browseArtifacts: (input?: { artifactKind?: string }) => Promise<unknown>;
+  browseArtifacts: (input?: { artifactFamily?: string }) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
   deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
+  deleteRegisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
   readArtifactViewerMedia: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
@@ -155,7 +156,7 @@ interface DesktopApiBridge {
       path: string;
       revision?: string;
     };
-    artifactKind?: string;
+    artifactFamily?: string;
     mediaType?: string;
   }) => Promise<unknown>;
   localizeArtifactFromRepo: (input: {

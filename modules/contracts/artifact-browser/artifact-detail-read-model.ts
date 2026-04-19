@@ -11,14 +11,15 @@ import {
   type ArtifactBrowserLocator,
 } from "./artifact-browser-locator";
 import {
-  type ArtifactBrowseKind,
-} from "./artifact-browse-read-model";
+  type ArtifactFamily,
+  normalizeArtifactFamily,
+} from "../../domain/artifact";
 
 export interface ArtifactDetailReadModel<
   TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
 > {
   locator: ArtifactBrowserLocator;
-  artifactKind: ArtifactBrowseKind;
+  artifactFamily: ArtifactFamily;
   mediaType?: string;
   sizeBytes?: number;
   checksum?: StorageObjectChecksum;
@@ -43,17 +44,6 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function normalizeArtifactKind(kind: ArtifactBrowseKind): ArtifactBrowseKind {
-  const normalized = kind.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new Error(
-    `Artifact browse kind must be a non-empty string. Received "${kind}".`,
-  );
-}
-
 export function normalizeArtifactDetailReadModel<
   TMetadata extends StorageObjectMetadata = StorageObjectMetadata,
 >(
@@ -62,7 +52,7 @@ export function normalizeArtifactDetailReadModel<
   return {
     ...model,
     locator: normalizeArtifactBrowserLocator(model.locator),
-    artifactKind: normalizeArtifactKind(model.artifactKind),
+    artifactFamily: normalizeArtifactFamily(model.artifactFamily),
     mediaType: normalizeOptionalText(model.mediaType),
     sourceKind:
       typeof model.sourceKind === "string"

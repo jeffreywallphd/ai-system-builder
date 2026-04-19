@@ -43,22 +43,22 @@ describe("artifact catalog application ports", () => {
         createSuccessResult({
           record: {
             storageKey: request.storageKey,
-            artifactKind: "image",
+            artifactFamily: "image",
             mediaType: "image/png",
           },
         }),
     };
 
     const append = await appendPort.appendArtifactCatalogRecord({
-      record: { storageKey: "uploads/a.png", artifactKind: "image" },
+      record: { storageKey: "uploads/a.png", artifactFamily: "image" },
     });
-    const browse = await readPort.browseArtifactCatalogRecords({ artifactKind: "image" });
+    const browse = await readPort.browseArtifactCatalogRecords({ artifactFamily: "image" });
     const read = await readPort.readArtifactCatalogRecord({ storageKey: "uploads/a.png" });
 
     expectTypeOf<typeof append>().toEqualTypeOf<ContractResult<{ storageKey: string }>>();
     expect(append.ok).toBe(true);
     expect(browse.ok).toBe(true);
     expect(read.ok).toBe(true);
-    expect("requestId" in { artifactKind: "image" }).toBe(false);
+    expect("requestId" in { artifactFamily: "image" }).toBe(false);
   });
 });

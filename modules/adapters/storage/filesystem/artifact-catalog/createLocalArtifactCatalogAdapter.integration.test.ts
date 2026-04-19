@@ -26,13 +26,13 @@ describe("createLocalArtifactCatalogPersistenceAdapter", () => {
     const append = await adapter.appendArtifactCatalogRecord({
       record: {
         storageKey: " uploads/cat.png ",
-        artifactKind: "image",
+        artifactFamily: "image",
         mediaType: "image/png",
       },
     });
     expect(append.ok).toBe(true);
 
-    const browse = await adapter.browseArtifactCatalogRecords({ artifactKind: "image" });
+    const browse = await adapter.browseArtifactCatalogRecords({ artifactFamily: "image" });
     const read = await adapter.readArtifactCatalogRecord({ storageKey: "uploads/cat.png" });
 
     expect(browse.ok).toBe(true);

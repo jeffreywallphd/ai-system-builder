@@ -22,7 +22,7 @@ describe("artifact-browser contracts", () => {
       items: [
         {
           storageKey: " staged/images/kitten-1 ",
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: " image/png ",
           sourceKind: " Upload ",
           originalName: " kitten.png ",
@@ -34,7 +34,7 @@ describe("artifact-browser contracts", () => {
       items: [
         {
           storageKey: "staged/images/kitten-1",
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: "image/png",
           sourceKind: "upload",
           originalName: "kitten.png",
@@ -50,7 +50,7 @@ describe("artifact-browser contracts", () => {
     const detail = normalizeArtifactReadSuccessValue({
       artifact: {
         locator,
-        artifactKind: "image",
+        artifactFamily: "image",
         mediaType: " image/jpeg ",
         sourceKind: " upload ",
       },

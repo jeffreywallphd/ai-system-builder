@@ -34,6 +34,7 @@ import {
   type ArtifactStorageBindingRole,
   type StorageObjectMetadata,
 } from "../../../../contracts/storage";
+import { resolveArtifactFamily } from "../../../../domain/artifact";
 
 export interface FilesystemArtifactBrowserReadAdapter
   extends ArtifactBrowserMetadataReadPort,
@@ -86,16 +87,6 @@ function inferMediaTypeFromStorageKey(storageKey: string): string | undefined {
     default:
       return undefined;
   }
-}
-
-function toCatalogArtifactKind(mediaType: string | undefined): string {
-  const normalizedMediaType = mediaType?.trim().toLowerCase();
-  if (!normalizedMediaType) {
-    return "artifact";
-  }
-
-  const [family] = normalizedMediaType.split("/", 1);
-  return family && family.length > 0 ? family : "artifact";
 }
 
 async function listRelativeFilesRecursively(rootDirectory: string): Promise<string[]> {
@@ -210,7 +201,7 @@ async function readLatestRepoBackingByRole(
 function toBrowseItem(record: ArtifactCatalogRecord): ArtifactBrowseItem {
   return {
     storageKey: record.storageKey,
-    artifactKind: record.artifactKind,
+    artifactFamily: record.artifactFamily,
     mediaType: record.mediaType,
     sizeBytes: record.sizeBytes,
     sourceKind: record.sourceKind,
@@ -262,7 +253,7 @@ function toDetailValue(record: ArtifactCatalogRecord): ArtifactReadSuccessValue 
   return {
     artifact: {
       locator: createArtifactBrowserLocator(record.storageKey),
-      artifactKind: record.artifactKind,
+      artifactFamily: record.artifactFamily,
       mediaType: record.mediaType,
       sizeBytes: record.sizeBytes,
       checksum: record.checksum,
@@ -297,7 +288,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
     ) {
       const browseResult = await options.artifactCatalogRead.browseArtifactCatalogRecords(
         {
-          artifactKind: request.artifactKind,
+          artifactFamily: request.artifactFamily,
         },
         context,
       );
@@ -492,7 +483,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
       const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
         record: {
           storageKey,
-          artifactKind: toCatalogArtifactKind(mediaType),
+          artifactFamily: resolveArtifactFamily({ mediaType, fileName: storageKey }),
           mediaType,
           sizeBytes: fileStats.size,
           sourceKind: "upload",

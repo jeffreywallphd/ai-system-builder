@@ -67,7 +67,7 @@ export class VerifyPublishedArtifactBackingUseCase {
 
     const artifact = Artifact.fromStorageBindings({
       artifactId: artifactId.toString(),
-      artifactKind: "image",
+      artifactFamily: "image",
       bindings: readBindingsResult.value.bindings,
     });
     const latestPublishedBacking = artifact.latestBackingForRole("published");

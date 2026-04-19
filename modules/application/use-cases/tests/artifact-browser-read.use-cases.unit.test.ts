@@ -44,7 +44,7 @@ describe("artifact browser read use cases", () => {
           items: [
             {
               storageKey: " staged/images/cat-1 ",
-              artifactKind: "image",
+              artifactFamily: "image",
               mediaType: " image/png ",
             } satisfies ArtifactBrowseItem,
           ],
@@ -57,7 +57,7 @@ describe("artifact browser read use cases", () => {
 
     const result = await useCase.execute(
       {
-        artifactKind: "image",
+        artifactFamily: "image",
       },
       {
         requestId: "req-browse-1",
@@ -74,7 +74,7 @@ describe("artifact browser read use cases", () => {
       items: [
         {
           storageKey: "staged/images/cat-1",
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: "image/png",
         },
       ],
@@ -82,7 +82,7 @@ describe("artifact browser read use cases", () => {
     expect("content" in result.value.items[0]).toBe(false);
     expect(browseArtifacts).toHaveBeenCalledWith(
       {
-        artifactKind: "image",
+        artifactFamily: "image",
       },
       {
         requestId: "req-browse-1",
@@ -99,11 +99,11 @@ describe("artifact browser read use cases", () => {
     });
 
     const result = await useCase.execute({
-      artifactKind: "document",
+      artifactFamily: "document",
     });
 
     expect(result.ok).toBe(true);
-    expect(browseArtifacts).toHaveBeenCalledWith({ artifactKind: "document" }, {});
+    expect(browseArtifacts).toHaveBeenCalledWith({ artifactFamily: "document" }, {});
   });
 
   it("detail returns one artifact metadata/read-model result by locator", async () => {
@@ -114,7 +114,7 @@ describe("artifact browser read use cases", () => {
         value: {
           artifact: {
             locator: createArtifactBrowserLocator("staged/images/cat-2"),
-            artifactKind: "image",
+            artifactFamily: "image",
             mediaType: "image/jpeg",
             metadata: {
               width: 640,
@@ -138,7 +138,7 @@ describe("artifact browser read use cases", () => {
 
     expect(result.value.artifact).toMatchObject({
       locator: { storageKey: "staged/images/cat-2" },
-      artifactKind: "image",
+      artifactFamily: "image",
       mediaType: "image/jpeg",
       metadata: { width: 640 },
     });

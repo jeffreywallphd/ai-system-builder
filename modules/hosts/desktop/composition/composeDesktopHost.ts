@@ -13,6 +13,7 @@ import {
   RegisterArtifactFromRepoUseCase,
   StoreArtifactUploadUseCase,
   DeleteUnregisteredArtifactUseCase,
+  DeleteRegisteredArtifactUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
 } from "../../../application/use-cases";
@@ -167,6 +168,10 @@ export function composeDesktopHost(
       const deleteUnregisteredArtifact = new DeleteUnregisteredArtifactUseCase({
         artifactBrowserUnregistered: artifactBrowserRead,
       });
+      const deleteRegisteredArtifact = new DeleteRegisteredArtifactUseCase({
+        artifactCatalogDelete: artifactCatalog,
+        storage,
+      });
       const publishArtifactToRepo = new PublishArtifactToRepoUseCase({
         artifactStorage: storage,
         artifactRepoStorage,
@@ -218,6 +223,7 @@ export function composeDesktopHost(
         browseUnregisteredArtifactsUseCase: browseUnregisteredArtifacts,
         registerUnregisteredArtifactUseCase: registerUnregisteredArtifact,
         deleteUnregisteredArtifactUseCase: deleteUnregisteredArtifact,
+        deleteRegisteredArtifactUseCase: deleteRegisteredArtifact,
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,

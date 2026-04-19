@@ -8,6 +8,7 @@ import type { ArtifactCatalogAppendPort } from "../../../../application/ports/ar
 import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
 import type { ContractErrorCode } from "../../../../contracts/shared";
 import { createContractError } from "../../../../contracts/shared";
+import { resolveArtifactFamily } from "../../../../domain/artifact";
 import {
   createDeleteArtifactFailureResult,
   createDeleteArtifactSuccessResult,
@@ -174,16 +175,6 @@ function extensionFromOriginalFileName(originalFileName: string | undefined): st
   return normalized.slice(dot + 1).toLowerCase();
 }
 
-function toCatalogArtifactKind(mediaType: string | undefined): string {
-  const normalizedMediaType = mediaType?.trim().toLowerCase();
-  if (!normalizedMediaType) {
-    return "artifact";
-  }
-
-  const [family] = normalizedMediaType.split("/", 1);
-  return family && family.length > 0 ? family : "artifact";
-}
-
 function createContentChecksum(bytes: Uint8Array): StorageObjectChecksum {
   const digest = createHash(STORAGE_CHECKSUM_ALGORITHM).update(bytes).digest("hex");
 
@@ -305,6 +296,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
             mediaType: request.descriptor.mediaType,
             originalFileName,
           });
+        const extension = extensionFromOriginalFileName(originalFileName) ?? path.extname(key).replace(/^\./, "");
         attemptedKey = key;
         const bytes = toBytes(request.content);
         const checksum = createContentChecksum(bytes);
@@ -332,7 +324,11 @@ export function createFilesystemArtifactObjectStorageAdapter(
           const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
             record: {
               storageKey: key,
-              artifactKind: toCatalogArtifactKind(request.descriptor.mediaType),
+              artifactFamily: resolveArtifactFamily({
+                mediaType: request.descriptor.mediaType,
+                extension,
+                fileName: originalFileName,
+              }),
               mediaType: request.descriptor.mediaType,
               sizeBytes: bytes.byteLength,
               sourceKind: "upload",

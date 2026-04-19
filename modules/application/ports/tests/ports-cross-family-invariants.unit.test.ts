@@ -262,7 +262,7 @@ describe("application ports cross-family invariants", () => {
     expectTypeOf<keyof ArtifactBrowserContentReadPort>().toEqualTypeOf<"readArtifactContent">();
 
     expectTypeOf<BrowseArtifactsRequest>().toExtend<{
-      artifactKind: "image";
+      artifactFamily: "image";
     }>();
     expectTypeOf<ReadArtifactDetailRequest>().toExtend<{
       locator: { storageKey: string };
@@ -289,7 +289,7 @@ describe("application ports cross-family invariants", () => {
       content: unknown;
     }>();
     expectTypeOf<Parameters<ArtifactBrowserContentReadPort["readArtifactContent"]>[0]>().not.toExtend<{
-      artifactKind: string;
+      artifactFamily: string;
     }>();
   });
 

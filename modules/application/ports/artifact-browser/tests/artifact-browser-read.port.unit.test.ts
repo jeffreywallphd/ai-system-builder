@@ -68,7 +68,7 @@ describe("artifact browser application ports", () => {
           items: [
             {
               storageKey: locator.storageKey,
-              artifactKind: request.artifactKind,
+              artifactFamily: request.artifactFamily,
               mediaType: "image/png",
             },
           ],
@@ -77,7 +77,7 @@ describe("artifact browser application ports", () => {
         createSuccessResult({
           artifact: {
             locator,
-            artifactKind: "image",
+            artifactFamily: "image",
             mediaType: "image/png",
           },
         }),

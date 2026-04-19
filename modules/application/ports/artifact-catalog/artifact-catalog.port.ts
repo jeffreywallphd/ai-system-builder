@@ -7,10 +7,14 @@ export interface AppendArtifactCatalogRecordRequest {
 }
 
 export interface BrowseArtifactCatalogRecordsRequest {
-  artifactKind?: ArtifactCatalogRecord["artifactKind"];
+  artifactFamily?: ArtifactCatalogRecord["artifactFamily"];
 }
 
 export interface ReadArtifactCatalogRecordRequest {
+  storageKey: string;
+}
+
+export interface DeleteArtifactCatalogRecordRequest {
   storageKey: string;
 }
 
@@ -31,4 +35,11 @@ export interface ArtifactCatalogReadPort {
     request: ReadArtifactCatalogRecordRequest,
     context?: ApplicationRequestContext,
   ): Promise<ContractResult<{ record: ArtifactCatalogRecord }>>;
+}
+
+export interface ArtifactCatalogDeletePort {
+  deleteArtifactCatalogRecord(
+    request: DeleteArtifactCatalogRecordRequest,
+    context?: ApplicationRequestContext,
+  ): Promise<ContractResult<{ deleted: boolean }>>;
 }

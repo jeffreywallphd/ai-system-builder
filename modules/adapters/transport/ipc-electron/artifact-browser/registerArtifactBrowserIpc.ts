@@ -9,6 +9,7 @@ import type {
   BrowseUnregisteredArtifactsUseCasePort,
   DeleteUnregisteredArtifactCommand,
   DeleteUnregisteredArtifactUseCasePort,
+  DeleteRegisteredArtifactUseCasePort,
   LocalizeArtifactFromRepoCommand,
   LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoCommand,
@@ -46,6 +47,11 @@ import {
   DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_UNREGISTERED_DELETE_RESPONSE_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTERED_DELETE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTERED_DELETE_RESPONSE_CHANNEL,
+  createDesktopArtifactRegisteredDeleteSuccessResponse,
+  type DesktopArtifactRegisteredDeleteRequest,
+  type DesktopArtifactRegisteredDeleteResponse,
   DESKTOP_ARTIFACT_CONTENT_READ_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_READ_RESPONSE_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
@@ -130,6 +136,7 @@ export interface RegisterArtifactBrowserIpcDependencies {
   browseUnregisteredArtifactsUseCase: BrowseUnregisteredArtifactsUseCasePort;
   registerUnregisteredArtifactUseCase: RegisterUnregisteredArtifactUseCasePort;
   deleteUnregisteredArtifactUseCase: DeleteUnregisteredArtifactUseCasePort;
+  deleteRegisteredArtifactUseCase: DeleteRegisteredArtifactUseCasePort;
   readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
   readArtifactContentUseCase: ReadArtifactContentUseCasePort;
   artifactMediaViewRetrieval: ArtifactContentRetrievalPort;
@@ -146,7 +153,7 @@ export function mapDesktopArtifactBrowseRequestToCommand(
   request: DesktopArtifactBrowseRequest,
 ): BrowseArtifactsCommand {
   return {
-    artifactKind: request.payload.artifactKind,
+    artifactFamily: request.payload.artifactFamily,
   };
 }
 
@@ -205,7 +212,7 @@ export function mapDesktopArtifactRegisterFromRepoRequestToCommand(
 ): RegisterArtifactFromRepoCommand {
   return {
     target: request.payload.target,
-    artifactKind: request.payload.artifactKind,
+    artifactFamily: request.payload.artifactFamily,
     mediaType: request.payload.mediaType,
   };
 }
@@ -234,6 +241,12 @@ export function mapDesktopUnregisteredDeleteRequestToCommand(
   };
 }
 
+
+export function mapDesktopRegisteredDeleteRequestToCommand(
+  request: DesktopArtifactRegisteredDeleteRequest,
+): { storageKey: string } {
+  return { storageKey: request.payload.storageKey };
+}
 export function mapDesktopArtifactRequestContext(
   request:
     | DesktopArtifactBrowseRequest
@@ -247,7 +260,8 @@ export function mapDesktopArtifactRequestContext(
     | DesktopArtifactLocalizeFromRepoRequest
     | DesktopArtifactUnregisteredBrowseRequest
     | DesktopArtifactUnregisteredRegisterRequest
-    | DesktopArtifactUnregisteredDeleteRequest,
+    | DesktopArtifactUnregisteredDeleteRequest
+    | DesktopArtifactRegisteredDeleteRequest,
 ): { requestId?: string; correlationId?: string } {
   return {
     requestId: request.requestId,
@@ -643,6 +657,41 @@ export function createDesktopUnregisteredArtifactDeleteIpcHandler(
   };
 }
 
+
+export function createDesktopRegisteredArtifactDeleteIpcHandler(
+  deleteRegisteredArtifactUseCase: DeleteRegisteredArtifactUseCasePort,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopArtifactRegisteredDeleteRequest,
+  ): Promise<DesktopArtifactRegisteredDeleteResponse> => {
+    const result = await deleteRegisteredArtifactUseCase.execute(
+      mapDesktopRegisteredDeleteRequestToCommand(request),
+      mapDesktopArtifactRequestContext(request),
+    );
+
+    if (!result.ok) {
+      return createIpcFailureResponse(
+        createIpcError(
+          DESKTOP_ARTIFACT_REGISTERED_DELETE_RESPONSE_CHANNEL,
+          result.error.code,
+          result.error.message,
+          {
+            details: result.error.details as Record<string, unknown> | undefined,
+            requestId: result.requestId ?? request.requestId,
+            correlationId: result.correlationId ?? request.correlationId,
+          },
+        ),
+      );
+    }
+
+    return createDesktopArtifactRegisteredDeleteSuccessResponse(result.value, {
+      requestId: result.requestId ?? request.requestId,
+      correlationId: result.correlationId ?? request.correlationId,
+    });
+  };
+}
+
 export function createDesktopArtifactReadIpcHandler(
   readArtifactDetailUseCase: ReadArtifactDetailUseCasePort,
 ) {
@@ -948,6 +997,10 @@ export function registerArtifactBrowserIpc(
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value,
     createDesktopUnregisteredArtifactDeleteIpcHandler(dependencies.deleteUnregisteredArtifactUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_ARTIFACT_REGISTERED_DELETE_REQUEST_CHANNEL.value,
+    createDesktopRegisteredArtifactDeleteIpcHandler(dependencies.deleteRegisteredArtifactUseCase),
   );
   dependencies.ipcMain.handle(
     DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value,

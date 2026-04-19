@@ -108,7 +108,7 @@ describe("desktop artifact-browser ipc contract", () => {
       items: [
         {
           storageKey: " staged/images/artifact-31 ",
-          artifactKind: "image",
+          artifactFamily: "image",
           mediaType: " image/png ",
         },
       ],
@@ -118,7 +118,7 @@ describe("desktop artifact-browser ipc contract", () => {
         locator: {
           storageKey: " staged/images/artifact-31 ",
         },
-        artifactKind: "image",
+        artifactFamily: "image",
       },
     });
     const contentResponse = createDesktopArtifactContentReadSuccessResponse({
@@ -182,7 +182,7 @@ describe("desktop artifact-browser ipc contract", () => {
       },
     });
     const browseRequest = createDesktopArtifactBrowseRequest({
-      artifactKind: "image",
+      artifactFamily: "image",
       boundary: {
         host: "desktop",
         source: " desktop.renderer.artifact-browse ",
@@ -199,22 +199,22 @@ describe("desktop artifact-browser ipc contract", () => {
 
     expect(readRequest.payload.locator.storageKey).toBe("staged/images/artifact-32");
     expect(contentRequest.payload.locator.storageKey).toBe("staged/images/artifact-32");
-    expect(browseRequest.payload.artifactKind).toBe("image");
+    expect(browseRequest.payload.artifactFamily).toBe("image");
     expect(mediaViewRequest.payload.storageKey).toBe("staged/images/artifact-32");
     expect("path" in readRequest.payload.locator).toBe(false);
     expect("path" in contentRequest.payload.locator).toBe(false);
   });
 
-  it("accepts generic artifactKind filters without narrowing to image/data", () => {
+  it("accepts generic artifactFamily filters without narrowing to image/data", () => {
     const browseRequest = createDesktopArtifactBrowseRequest({
-      artifactKind: "application",
+      artifactFamily: "application",
       boundary: {
         host: "desktop",
         source: "desktop.renderer.artifact-browse",
       },
     });
 
-    expect(browseRequest.payload.artifactKind).toBe("application");
+    expect(browseRequest.payload.artifactFamily).toBe("application");
   });
 
   it("defines a publish contract that mirrors the shared publish operation semantics", () => {

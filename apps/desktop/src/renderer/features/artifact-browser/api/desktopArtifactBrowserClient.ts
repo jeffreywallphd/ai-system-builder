@@ -19,10 +19,11 @@ export interface DesktopArtifactBrowserClient {
   clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
-  browseArtifacts: (input?: { artifactKind?: string }) => Promise<DesktopArtifactBrowseItem[]>;
+  browseArtifacts: (input?: { artifactFamily?: string }) => Promise<DesktopArtifactBrowseItem[]>;
   browseUnregisteredArtifacts?: () => Promise<DesktopUnregisteredArtifactBrowseItem[]>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;
   deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;
+  deleteRegisteredArtifact?: (input: { storageKey: string }) => Promise<{ storageKey: string }>;
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: DesktopArtifactBrowserLocator) => Promise<string>;
@@ -122,7 +123,7 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async browseArtifacts(input = {}) {
       return ensureSuccess(
-        await desktopApi.browseArtifacts({ artifactKind: input.artifactKind }),
+        await desktopApi.browseArtifacts({ artifactFamily: input.artifactFamily }),
         (value) => {
           const items = (value as { items?: DesktopArtifactBrowseItem[] } | undefined)?.items;
           return Array.isArray(items) ? items : [];
@@ -164,6 +165,18 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         await desktopApi.deleteUnregisteredArtifact({ storageKey: input.storageKey }),
         (value) => value as { storageKey: string },
         "Failed to delete unregistered artifact.",
+      );
+    },
+
+
+    async deleteRegisteredArtifact(input) {
+      if (!desktopApi.deleteRegisteredArtifact) {
+        throw new Error("Desktop preload registered artifact delete bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.deleteRegisteredArtifact({ storageKey: input.storageKey }),
+        (value) => value as { storageKey: string },
+        "Failed to delete registered artifact.",
       );
     },
 
