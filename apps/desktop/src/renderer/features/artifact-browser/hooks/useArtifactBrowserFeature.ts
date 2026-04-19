@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ArtifactFamily } from "../../../../../../../modules/domain/artifact";
 
 import {
   useArtifactBrowserPublishLogic,
@@ -10,6 +9,7 @@ import type {
   DesktopArtifactBrowseItem,
   DesktopArtifactContentDescriptor,
   DesktopArtifactDetail,
+  DesktopArtifactFamily,
   DesktopLocalizedArtifactFromRepo,
   DesktopHuggingFaceDatasetParquetFile,
   DesktopHuggingFaceNamespaceDataset,
@@ -18,6 +18,12 @@ import type {
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
+
+interface PendingDeleteConfirmation {
+  kind: "registered" | "unregistered";
+  storageKey: string;
+  label: string;
+}
 
 export interface UseArtifactBrowserFeatureResult {
   huggingFaceTokenStatus: { configured: boolean; maskedToken?: string };
@@ -45,13 +51,18 @@ export interface UseArtifactBrowserFeatureResult {
     showRegisterForm: boolean;
   };
   viewState: ArtifactBrowserViewState;
+  pendingDeleteConfirmation?: PendingDeleteConfirmation;
+  deleteConfirmationInput: string;
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
   registerUnregisteredArtifact: (storageKey: string) => Promise<void>;
-  deleteUnregisteredArtifact: (storageKey: string) => Promise<void>;
-  deleteRegisteredArtifact: (storageKey: string) => Promise<void>;
-  selectedArtifactFamily: ArtifactFamily | "all";
-  setSelectedArtifactFamily: (value: ArtifactFamily | "all") => void;
+  requestDeleteUnregisteredArtifact: (storageKey: string) => void;
+  requestDeleteRegisteredArtifact: (storageKey: string) => void;
+  setDeleteConfirmationInput: (value: string) => void;
+  confirmPendingDelete: () => Promise<void>;
+  cancelPendingDelete: () => void;
+  selectedArtifactFamily: DesktopArtifactFamily | "all";
+  setSelectedArtifactFamily: (value: DesktopArtifactFamily | "all") => void;
   publishArtifactToHuggingFace: () => Promise<void>;
   registerArtifactFromHuggingFace: (input?: {
     repository?: string;
@@ -120,7 +131,7 @@ export function useArtifactBrowserFeature(
   const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>();
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [selectedArtifactFamily, setSelectedArtifactFamily] = useState<ArtifactFamily | "all">("all");
+  const [selectedArtifactFamily, setSelectedArtifactFamily] = useState<DesktopArtifactFamily | "all">("all");
   const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [localizeState, setLocalizeState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const [sourceVerifyState, setSourceVerifyState] = useState<ArtifactBrowserViewState>({ status: "idle" });
@@ -139,6 +150,8 @@ export function useArtifactBrowserFeature(
   const [huggingFaceTokenStatus, setHuggingFaceTokenStatus] = useState<{ configured: boolean; maskedToken?: string }>({
     configured: false,
   });
+  const [pendingDeleteConfirmation, setPendingDeleteConfirmation] = useState<PendingDeleteConfirmation | undefined>();
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
 
   const publishLogic = useArtifactBrowserPublishLogic<DesktopArtifactDetail>({
     selectedStorageKey,
@@ -194,12 +207,30 @@ export function useArtifactBrowserFeature(
     }
   }
 
-  async function deleteUnregisteredArtifact(storageKey: string): Promise<void> {
-    const confirmation = globalThis.prompt?.(`Type Delete to remove unregistered artifact ${storageKey}.`, "");
-    if (confirmation !== "Delete") {
-      setViewState({ status: "error", message: "Delete cancelled: typed confirmation must be exactly Delete." });
-      return;
-    }
+  function requestDeleteUnregisteredArtifact(storageKey: string): void {
+    setDeleteConfirmationInput("");
+    setPendingDeleteConfirmation({
+      kind: "unregistered",
+      storageKey,
+      label: `Delete unregistered artifact ${storageKey}`,
+    });
+  }
+
+  function requestDeleteRegisteredArtifact(storageKey: string): void {
+    setDeleteConfirmationInput("");
+    setPendingDeleteConfirmation({
+      kind: "registered",
+      storageKey,
+      label: `Delete registered artifact ${storageKey}`,
+    });
+  }
+
+  function cancelPendingDelete(): void {
+    setDeleteConfirmationInput("");
+    setPendingDeleteConfirmation(undefined);
+  }
+
+  async function runDeleteUnregisteredArtifact(storageKey: string): Promise<void> {
     setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
     try {
       if (!artifactClient.deleteUnregisteredArtifact) {
@@ -216,14 +247,7 @@ export function useArtifactBrowserFeature(
     }
   }
 
-
-  async function deleteRegisteredArtifact(storageKey: string): Promise<void> {
-    const confirmation = globalThis.prompt?.(`Type Delete to remove registered artifact ${storageKey}.`, "");
-    if (confirmation !== "Delete") {
-      setViewState({ status: "error", message: "Delete cancelled: typed confirmation must be exactly Delete." });
-      return;
-    }
-
+  async function runDeleteRegisteredArtifact(storageKey: string): Promise<void> {
     setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
     try {
       if (!artifactClient.deleteRegisteredArtifact) {
@@ -242,6 +266,27 @@ export function useArtifactBrowserFeature(
         message: error instanceof Error ? error.message : "Failed to delete registered artifact.",
       });
     }
+  }
+
+  async function confirmPendingDelete(): Promise<void> {
+    if (!pendingDeleteConfirmation) {
+      return;
+    }
+
+    if (deleteConfirmationInput !== "Delete") {
+      setViewState({ status: "error", message: "Delete cancelled: typed confirmation must be exactly Delete." });
+      return;
+    }
+
+    const pending = pendingDeleteConfirmation;
+    cancelPendingDelete();
+
+    if (pending.kind === "registered") {
+      await runDeleteRegisteredArtifact(pending.storageKey);
+      return;
+    }
+
+    await runDeleteUnregisteredArtifact(pending.storageKey);
   }
 
   useEffect(() => {
@@ -525,11 +570,16 @@ export function useArtifactBrowserFeature(
       showRegisterForm,
     },
     viewState,
+    pendingDeleteConfirmation,
+    deleteConfirmationInput,
     selectArtifact,
     refreshArtifacts,
     registerUnregisteredArtifact,
-    deleteUnregisteredArtifact,
-    deleteRegisteredArtifact,
+    requestDeleteUnregisteredArtifact,
+    requestDeleteRegisteredArtifact,
+    setDeleteConfirmationInput,
+    confirmPendingDelete,
+    cancelPendingDelete,
     selectedArtifactFamily,
     setSelectedArtifactFamily,
     publishArtifactToHuggingFace,

@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ArtifactBrowserFeature } from "../components/ArtifactBrowserFeature";
 
@@ -13,10 +13,6 @@ function setInputValue(input: HTMLInputElement, value: string): void {
 describe("Desktop ArtifactBrowserFeature publish flow", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
-
-  beforeEach(() => {
-    vi.stubGlobal("prompt", vi.fn(() => "Delete"));
-  });
 
   afterEach(async () => {
     if (mountedRoot) {
@@ -290,7 +286,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     expect(container.textContent).toContain("upload");
   });
 
-  it("renders Unregistered Artifacts section and wires Register/Delete actions", async () => {
+  it("renders Unregistered Artifacts section and deletes only after exact typed confirmation", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([]),
       browseUnregisteredArtifacts: vi.fn().mockResolvedValue([
@@ -339,15 +335,23 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     await act(async () => {
       deleteButton.click();
     });
+    expect(container.textContent).toContain("Type Delete to confirm this destructive action.");
+
+    const confirmationInput = Array.from(container.querySelectorAll("input"))
+      .find((input) => input.getAttribute("placeholder") === "Delete") as HTMLInputElement;
+    setInputValue(confirmationInput, "Delete");
+
+    const confirmDeleteButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Confirm delete") as HTMLButtonElement;
+    await act(async () => {
+      confirmDeleteButton.click();
+    });
 
     expect(client.registerUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan/report.pdf" });
     expect(client.deleteUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan/report.pdf" });
   });
 
-
-
-  it("blocks unregistered delete when typed confirmation is not exact", async () => {
-    vi.stubGlobal("prompt", vi.fn(() => "delete"));
+  it("blocks unregistered delete when typed confirmation is not exact and supports cancel", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([]),
       browseUnregisteredArtifacts: vi.fn().mockResolvedValue([
@@ -389,13 +393,31 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       deleteButton.click();
     });
 
+    const confirmationInput = Array.from(container.querySelectorAll("input"))
+      .find((input) => input.getAttribute("placeholder") === "Delete") as HTMLInputElement;
+    setInputValue(confirmationInput, "delete");
+
+    const confirmDeleteButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Confirm delete") as HTMLButtonElement;
+    await act(async () => {
+      confirmDeleteButton.click();
+    });
+
     expect(client.deleteUnregisteredArtifact).not.toHaveBeenCalled();
     expect(container.textContent).toContain("typed confirmation must be exactly Delete");
+
+    const cancelButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Cancel") as HTMLButtonElement;
+    await act(async () => {
+      cancelButton.click();
+    });
+
+    expect(container.textContent).not.toContain("Confirm delete");
   });
 
-
-  it("blocks registered delete when typed confirmation is not exact", async () => {
-    vi.stubGlobal("prompt", vi.fn(() => "DELETE"));
+  it("blocks registered delete when typed confirmation is not exact and does not use browser prompt", async () => {
+    const promptSpy = vi.fn(() => "Delete");
+    vi.stubGlobal("prompt", promptSpy);
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([{ storageKey: "uploads/cat.png", artifactFamily: "image" as const }]),
       deleteRegisteredArtifact: vi.fn().mockResolvedValue({ storageKey: "uploads/cat.png" }),
@@ -437,8 +459,73 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       deleteButton.click();
     });
 
+    const confirmationInput = Array.from(container.querySelectorAll("input"))
+      .find((input) => input.getAttribute("placeholder") === "Delete") as HTMLInputElement;
+    setInputValue(confirmationInput, "DELETE");
+
+    const confirmDeleteButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Confirm delete") as HTMLButtonElement;
+    await act(async () => {
+      confirmDeleteButton.click();
+    });
+
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(client.deleteRegisteredArtifact).not.toHaveBeenCalled();
     expect(container.textContent).toContain("typed confirmation must be exactly Delete");
+  });
+
+  it("deletes registered artifact only after exact typed confirmation", async () => {
+    const client = {
+      browseArtifacts: vi.fn().mockResolvedValue([{ storageKey: "uploads/cat.png", artifactFamily: "image" as const }]),
+      deleteRegisteredArtifact: vi.fn().mockResolvedValue({ storageKey: "uploads/cat.png" }),
+      readArtifactDetail: vi.fn().mockResolvedValue({
+        locator: { storageKey: "uploads/cat.png" },
+        artifactFamily: "image" as const,
+      }),
+      readArtifactContent: vi.fn().mockResolvedValue({ locator: { storageKey: "uploads/cat.png" }, availability: "available" as const, retrieval: "deferred" as const }),
+      createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn(),
+      clearHuggingFaceToken: vi.fn(),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const artifactButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    await act(async () => {
+      artifactButton.click();
+    });
+
+    const deleteButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Delete registered artifact") as HTMLButtonElement;
+    await act(async () => {
+      deleteButton.click();
+    });
+
+    const confirmationInput = Array.from(container.querySelectorAll("input"))
+      .find((input) => input.getAttribute("placeholder") === "Delete") as HTMLInputElement;
+    setInputValue(confirmationInput, "Delete");
+
+    const confirmDeleteButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Confirm delete") as HTMLButtonElement;
+    await act(async () => {
+      confirmDeleteButton.click();
+    });
+
+    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
   });
 
 

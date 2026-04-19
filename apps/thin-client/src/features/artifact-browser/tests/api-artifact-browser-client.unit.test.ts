@@ -39,7 +39,7 @@ describe("api artifact browser client", () => {
         json: vi.fn().mockResolvedValue({
           ok: true,
           value: {
-            items: [{ storageKey: "uploads/a.png", artifactKind: "image", mediaType: "image/png" }],
+            items: [{ storageKey: "uploads/a.png", artifactFamily: "image", mediaType: "image/png" }],
           },
         }),
       })
@@ -49,7 +49,7 @@ describe("api artifact browser client", () => {
           value: {
             artifact: {
               locator: { storageKey: "uploads/a.png" },
-              artifactKind: "image",
+              artifactFamily: "image",
               mediaType: "image/png",
             },
           },
@@ -188,7 +188,7 @@ describe("api artifact browser client", () => {
       "/api/artifact/browse",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ artifactKind: undefined, source: "thin-client.artifact-browser" }),
+        body: JSON.stringify({ artifactFamily: undefined, source: "thin-client.artifact-browser" }),
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -235,4 +235,57 @@ describe("api artifact browser client", () => {
     expect(sourceVerified.verification.exists).toBe(false);
     expect(localized.localObject.key).toBe("artifacts/20260418000000-local01");
   });
+
+  it("registers repo artifacts with artifactFamily payload and no image hardcoding", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          artifactId: "artifacts/20260418000000-import001",
+          backing: {
+            role: "imported-source",
+            target: {
+              provider: "huggingface",
+              repository: "openai/demo",
+              path: "data/train.parquet",
+              revision: "main",
+              locator: "openai/demo/data/train.parquet",
+            },
+            verification: {
+              exists: true,
+              verifiedAt: "2026-04-18T00:00:00.000Z",
+            },
+          },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiArtifactBrowserClient({ apiBaseUrl: "/api" });
+    await client.registerArtifactFromRepo({
+      repository: "openai/demo",
+      path: "data/train.parquet",
+      revision: "main",
+      mediaType: "application/x-parquet",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/artifact/register-from-repo",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          target: {
+            provider: "huggingface",
+            repository: "openai/demo",
+            revision: "main",
+            path: "data/train.parquet",
+          },
+          artifactFamily: "tabular",
+          mediaType: "application/x-parquet",
+          source: "thin-client.artifact-browser",
+        }),
+      }),
+    );
+  });
 });
+

@@ -1,5 +1,4 @@
 import { Fragment } from "react";
-import { ARTIFACT_FAMILIES } from "../../../../../../../modules/domain/artifact";
 
 import {
   deriveArtifactBackingState,
@@ -9,6 +8,7 @@ import {
   type PublishedBackingView,
 } from "../../../../../../../modules/ui/shared";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
+import { ARTIFACT_BROWSER_FAMILY_OPTIONS } from "../artifactFamilyOptions";
 import { useArtifactBrowserFeature } from "../hooks/useArtifactBrowserFeature";
 
 export interface ArtifactBrowserFeatureProps {
@@ -65,8 +65,13 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     selectArtifact,
     refreshArtifacts,
     registerUnregisteredArtifact,
-    deleteUnregisteredArtifact,
-    deleteRegisteredArtifact,
+    requestDeleteUnregisteredArtifact,
+    requestDeleteRegisteredArtifact,
+    pendingDeleteConfirmation,
+    deleteConfirmationInput,
+    setDeleteConfirmationInput,
+    confirmPendingDelete,
+    cancelPendingDelete,
     selectedArtifactFamily,
     setSelectedArtifactFamily,
     publishArtifactToHuggingFace,
@@ -94,11 +99,37 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
         <h3>Filter by family</h3>
         <div className="ui-grid ui-grid--two">
           <button className="ui-button" type="button" aria-current={selectedArtifactFamily === "all" ? "page" : undefined} onClick={() => setSelectedArtifactFamily("all")}>All</button>
-          {ARTIFACT_FAMILIES.map((family) => (
+          {ARTIFACT_BROWSER_FAMILY_OPTIONS.map((family) => (
             <button key={family} className="ui-button" type="button" aria-current={selectedArtifactFamily === family ? "page" : undefined} onClick={() => setSelectedArtifactFamily(family)}>{family}</button>
           ))}
         </div>
       </section>
+      {pendingDeleteConfirmation ? (
+        <section className="ui-panel ui-stack ui-stack--sm" role="dialog" aria-label="Delete confirmation">
+          <h3>{pendingDeleteConfirmation.label}</h3>
+          <p>Type <strong>Delete</strong> to confirm this destructive action.</p>
+          <label className="ui-stack ui-stack--sm">
+            <span>Confirmation</span>
+            <input
+              className="ui-input"
+              value={deleteConfirmationInput}
+              onChange={(event) => setDeleteConfirmationInput(event.target.value)}
+              placeholder="Delete"
+            />
+          </label>
+          <div className="ui-grid ui-grid--two">
+            <button
+              className="ui-button ui-button--destructive"
+              type="button"
+              onClick={() => void confirmPendingDelete()}
+              disabled={deleteConfirmationInput !== "Delete"}
+            >
+              Confirm delete
+            </button>
+            <button className="ui-button" type="button" onClick={cancelPendingDelete}>Cancel</button>
+          </div>
+        </section>
+      ) : null}
       <div className="ui-grid ui-grid--two">
         <div className="ui-stack ui-stack--sm">
           <h3>Artifacts</h3>
@@ -132,7 +163,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
                     <button
                       className="ui-button ui-button--destructive"
                       type="button"
-                      onClick={() => void deleteUnregisteredArtifact(item.storageKey)}
+                      onClick={() => requestDeleteUnregisteredArtifact(item.storageKey)}
                     >
                       Delete
                     </button>
@@ -175,7 +206,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
 
           {detail ? (
             <section className="ui-stack ui-stack--sm">
-              <button className="ui-button ui-button--destructive" type="button" onClick={() => void deleteRegisteredArtifact(detail.locator.storageKey)}>Delete registered artifact</button>
+              <button className="ui-button ui-button--destructive" type="button" onClick={() => requestDeleteRegisteredArtifact(detail.locator.storageKey)}>Delete registered artifact</button>
               <h3>Local Object State</h3>
               <dl className="ui-grid ui-grid--two">
                 <dt>Local object availability</dt>

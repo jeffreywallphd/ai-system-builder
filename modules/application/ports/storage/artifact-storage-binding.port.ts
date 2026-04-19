@@ -10,6 +10,10 @@ export interface ReadArtifactStorageBindingsRequest {
   artifactId: string;
 }
 
+export interface DeleteArtifactStorageBindingsRequest {
+  artifactId: string;
+}
+
 export interface ArtifactStorageBindingPort {
   upsertArtifactStorageBinding(
     request: UpsertArtifactStorageBindingRequest,
@@ -20,4 +24,9 @@ export interface ArtifactStorageBindingPort {
     request: ReadArtifactStorageBindingsRequest,
     context?: ApplicationRequestContext,
   ): Promise<ContractResult<{ bindings: ArtifactStorageBinding[] }>>;
+
+  deleteArtifactStorageBindings(
+    request: DeleteArtifactStorageBindingsRequest,
+    context?: ApplicationRequestContext,
+  ): Promise<ContractResult<{ deleted: boolean }>>;
 }
