@@ -7,8 +7,13 @@ import {
 } from "../shared";
 import {
   normalizeIngestWebsitePageSuccessValue,
+  type IngestWebsitePageResult,
   type IngestWebsitePageSuccessValue,
 } from "./ingest-website-page-result";
+import {
+  normalizeWebsiteIngestionTarget,
+  type WebsiteIngestionTarget,
+} from "./website-ingestion-target";
 
 export interface IngestWebsitePagesBatchSummary {
   attempted: number;
@@ -16,8 +21,13 @@ export interface IngestWebsitePagesBatchSummary {
   failed: number;
 }
 
+export interface IngestWebsitePageBatchItemResult {
+  target: WebsiteIngestionTarget;
+  result: IngestWebsitePageResult;
+}
+
 export interface IngestWebsitePagesBatchSuccessValue {
-  items: IngestWebsitePageSuccessValue[];
+  items: IngestWebsitePageBatchItemResult[];
   summary: IngestWebsitePagesBatchSummary;
 }
 
@@ -25,10 +35,27 @@ export type IngestWebsitePagesBatchResult<
   TDetails extends ContractErrorDetails = ContractErrorDetails,
 > = ContractResult<IngestWebsitePagesBatchSuccessValue, TDetails>;
 
+function normalizeItemResult(item: IngestWebsitePageBatchItemResult): IngestWebsitePageBatchItemResult {
+  if (item.result.ok) {
+    return {
+      target: normalizeWebsiteIngestionTarget(item.target),
+      result: {
+        ...item.result,
+        value: normalizeIngestWebsitePageSuccessValue(item.result.value as IngestWebsitePageSuccessValue),
+      },
+    };
+  }
+
+  return {
+    target: normalizeWebsiteIngestionTarget(item.target),
+    result: item.result,
+  };
+}
+
 export function normalizeIngestWebsitePagesBatchSuccessValue(
   value: IngestWebsitePagesBatchSuccessValue,
 ): IngestWebsitePagesBatchSuccessValue {
-  const items = value.items.map((item) => normalizeIngestWebsitePageSuccessValue(item));
+  const items = value.items.map((item) => normalizeItemResult(item));
   const attempted = items.length;
 
   if (value.summary.attempted !== attempted) {

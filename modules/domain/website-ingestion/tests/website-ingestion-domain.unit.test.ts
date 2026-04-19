@@ -1,7 +1,6 @@
 import { describe, expect, it } from "../../../testing/node-test";
 
 import {
-  normalizeWebsiteBatchIngestionResult,
   normalizeWebsiteHtmlCaptureMetadata,
   normalizeWebsiteIngestionMode,
   normalizeWebsiteIngestionResult,
@@ -55,7 +54,7 @@ describe("website-ingestion domain", () => {
     });
   });
 
-  it("normalizes single-item and batch website ingestion summaries", () => {
+  it("normalizes single-item website ingestion summaries", () => {
     const item = normalizeWebsiteIngestionResult({
       target: {
         url: " https://example.com/page ",
@@ -73,31 +72,6 @@ describe("website-ingestion domain", () => {
       retrievalModeUsed: "automatic",
       warnings: ["used rendered fallback"],
     });
-
-    const batch = normalizeWebsiteBatchIngestionResult({
-      items: [item],
-      summary: {
-        attempted: 1,
-        succeeded: 1,
-        failed: 0,
-      },
-    });
-
-    expect(batch.summary).toEqual({
-      attempted: 1,
-      succeeded: 1,
-      failed: 0,
-    });
-
-    expect(() =>
-      normalizeWebsiteBatchIngestionResult({
-        items: [item],
-        summary: {
-          attempted: 2,
-          succeeded: 1,
-          failed: 0,
-        },
-      }),
-    ).toThrow("Batch summary attempted count must equal item count (1).");
+  });
   });
 });
