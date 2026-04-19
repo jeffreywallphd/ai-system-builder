@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "../../../modules/testing/node-test";
 
 import { createApiArtifactBrowserClient } from "../src/features/artifact-browser/api/apiArtifactBrowserClient";
-import { resolveArtifactFamily } from "../../../modules/domain/artifact";
+import { resolveArtifactFamily } from "../../../modules/application/shared/artifact-family-classifier";
 
 const originalFetch = globalThis.fetch;
 

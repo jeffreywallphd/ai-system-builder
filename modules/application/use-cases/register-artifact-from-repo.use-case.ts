@@ -2,6 +2,7 @@ import type { ArtifactCatalogAppendPort } from "../ports/artifact-catalog";
 import type { ApplicationRequestContext } from "../ports";
 import type { LoggingPort } from "../ports/logging";
 import type { ArtifactRepoStoragePort, ArtifactStorageBindingPort } from "../ports/storage";
+import { resolveArtifactFamily } from "../shared/artifact-family-classifier";
 import { createContractError } from "../../contracts/shared";
 import {
   createHasArtifactInRepoRequest,
@@ -14,7 +15,7 @@ import {
   SystemArtifactIdFactory,
   type ArtifactIdFactory,
 } from "../../domain/artifact";
-import { resolveArtifactFamily, type ArtifactFamily } from "../../domain/artifact";
+import type { ArtifactFamily } from "../../domain/artifact";
 
 export interface RegisterArtifactFromRepoCommand {
   target: {
