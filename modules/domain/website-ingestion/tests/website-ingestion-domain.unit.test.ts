@@ -1,6 +1,7 @@
 import { describe, expect, it } from "../../../testing/node-test";
 
 import {
+  normalizeWebsiteHtmlAcquisitionMechanism,
   normalizeWebsiteHtmlCaptureMetadata,
   normalizeWebsiteIngestionMode,
   normalizeWebsiteIngestionResult,
@@ -13,6 +14,14 @@ describe("website-ingestion domain", () => {
     expect(normalizeWebsiteIngestionMode("rendered")).toBe("rendered");
     expect(() => normalizeWebsiteIngestionMode("basic")).toThrow(
       'Website ingestion mode must be one of automatic, rendered. Received "basic".',
+    );
+  });
+
+  it("normalizes and validates acquisition mechanisms", () => {
+    expect(normalizeWebsiteHtmlAcquisitionMechanism(" Simple-HTTP ")).toBe("simple-http");
+    expect(normalizeWebsiteHtmlAcquisitionMechanism("rendered-browser")).toBe("rendered-browser");
+    expect(() => normalizeWebsiteHtmlAcquisitionMechanism("automatic")).toThrow(
+      'Website HTML acquisition mechanism must be one of simple-http, rendered-browser. Received "automatic".',
     );
   });
 
@@ -37,7 +46,8 @@ describe("website-ingestion domain", () => {
       sourceUrl: " https://example.com/start ",
       resolvedUrl: " https://example.com/final ",
       retrievedAt: " 2026-04-19T00:00:00.000Z ",
-      retrievalModeUsed: " rendered ",
+      requestedMode: " rendered ",
+      acquisitionMechanismUsed: " rendered-browser ",
       rendered: true,
       httpStatus: 200,
       contentTypeHeader: " text/html; charset=utf-8 ",
@@ -47,7 +57,8 @@ describe("website-ingestion domain", () => {
       sourceUrl: "https://example.com/start",
       resolvedUrl: "https://example.com/final",
       retrievedAt: "2026-04-19T00:00:00.000Z",
-      retrievalModeUsed: "rendered",
+      requestedMode: "rendered",
+      acquisitionMechanismUsed: "rendered-browser",
       rendered: true,
       httpStatus: 200,
       contentTypeHeader: "text/html; charset=utf-8",
@@ -60,7 +71,7 @@ describe("website-ingestion domain", () => {
         url: " https://example.com/page ",
       },
       resolvedUrl: " https://example.com/page ",
-      retrievalModeUsed: " automatic ",
+      acquisitionMechanismUsed: " simple-http ",
       warnings: [" used rendered fallback ", "   "],
     });
 
@@ -69,9 +80,8 @@ describe("website-ingestion domain", () => {
         url: "https://example.com/page",
       },
       resolvedUrl: "https://example.com/page",
-      retrievalModeUsed: "automatic",
+      acquisitionMechanismUsed: "simple-http",
       warnings: ["used rendered fallback"],
     });
-  });
   });
 });

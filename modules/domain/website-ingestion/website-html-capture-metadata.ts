@@ -1,4 +1,8 @@
 import {
+  normalizeWebsiteHtmlAcquisitionMechanism,
+  type WebsiteHtmlAcquisitionMechanism,
+} from "./website-html-acquisition-mechanism";
+import {
   normalizeWebsiteIngestionMode,
   type WebsiteIngestionMode,
 } from "./website-ingestion-mode";
@@ -7,7 +11,8 @@ export interface WebsiteHtmlCaptureMetadata {
   sourceUrl: string;
   resolvedUrl: string;
   retrievedAt: string;
-  retrievalModeUsed: WebsiteIngestionMode;
+  requestedMode: WebsiteIngestionMode;
+  acquisitionMechanismUsed: WebsiteHtmlAcquisitionMechanism;
   rendered: boolean;
   httpStatus?: number;
   contentTypeHeader?: string;
@@ -38,7 +43,8 @@ export function normalizeWebsiteHtmlCaptureMetadata(
     sourceUrl: normalizeRequiredText("sourceUrl", metadata.sourceUrl),
     resolvedUrl: normalizeRequiredText("resolvedUrl", metadata.resolvedUrl),
     retrievedAt: normalizeRequiredText("retrievedAt", metadata.retrievedAt),
-    retrievalModeUsed: normalizeWebsiteIngestionMode(metadata.retrievalModeUsed),
+    requestedMode: normalizeWebsiteIngestionMode(metadata.requestedMode),
+    acquisitionMechanismUsed: normalizeWebsiteHtmlAcquisitionMechanism(metadata.acquisitionMechanismUsed),
     rendered: metadata.rendered,
     httpStatus: typeof metadata.httpStatus === "number" ? metadata.httpStatus : undefined,
     contentTypeHeader: normalizeOptionalText(metadata.contentTypeHeader),

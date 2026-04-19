@@ -1,7 +1,7 @@
 import {
-  normalizeWebsiteIngestionMode,
-  type WebsiteIngestionMode,
-} from "./website-ingestion-mode";
+  normalizeWebsiteHtmlAcquisitionMechanism,
+  type WebsiteHtmlAcquisitionMechanism,
+} from "./website-html-acquisition-mechanism";
 import {
   normalizeWebsiteIngestionTarget,
   type WebsiteIngestionTarget,
@@ -10,7 +10,7 @@ import {
 export interface WebsiteIngestionResult {
   target: WebsiteIngestionTarget;
   resolvedUrl: string;
-  retrievalModeUsed: WebsiteIngestionMode;
+  acquisitionMechanismUsed: WebsiteHtmlAcquisitionMechanism;
   warnings?: string[];
 }
 
@@ -29,7 +29,7 @@ export function normalizeWebsiteIngestionResult(
   return {
     target: normalizeWebsiteIngestionTarget(result.target),
     resolvedUrl: normalizeRequiredText("resolvedUrl", result.resolvedUrl),
-    retrievalModeUsed: normalizeWebsiteIngestionMode(result.retrievalModeUsed),
+    acquisitionMechanismUsed: normalizeWebsiteHtmlAcquisitionMechanism(result.acquisitionMechanismUsed),
     warnings:
       result.warnings
         ?.map((warning) => warning.trim())

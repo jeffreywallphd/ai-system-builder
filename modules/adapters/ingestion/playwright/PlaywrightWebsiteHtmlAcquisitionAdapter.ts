@@ -59,7 +59,7 @@ export class PlaywrightWebsiteHtmlAcquisitionAdapter implements WebsiteHtmlAcqui
         resolvedUrl: normalizedRequest.target.url,
         html,
         mediaType: "text/html",
-        retrievalModeUsed: "rendered",
+        acquisitionMechanismUsed: "rendered-browser",
         httpStatus: navigation?.status() ?? undefined,
         contentTypeHeader: "text/html",
       });
