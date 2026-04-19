@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   useArtifactBrowserPublishLogic,
@@ -18,12 +18,12 @@ import type {
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
-import {
-  type PendingDeleteConfirmation,
-  useArtifactDeleteConfirmation,
-} from "./useArtifactDeleteConfirmation";
+import { type PendingDeleteConfirmation } from "./useArtifactDeleteConfirmation";
 import { useArtifactSelectionContent } from "./useArtifactSelectionContent";
 import { useArtifactBrowserHuggingFace } from "./useArtifactBrowserHuggingFace";
+import { useArtifactBrowserArtifacts } from "./useArtifactBrowserArtifacts";
+import { useArtifactDeleteFlow } from "./useArtifactDeleteFlow";
+import { useArtifactBrowserMutations } from "./useArtifactBrowserMutations";
 
 export interface UseArtifactBrowserFeatureResult {
   huggingFaceTokenStatus: { configured: boolean; maskedToken?: string };
@@ -101,10 +101,11 @@ export function useArtifactBrowserFeature(
   client?: DesktopArtifactBrowserClient,
 ): UseArtifactBrowserFeatureResult {
   const artifactClient = useArtifactBrowserClient(client);
-  const [items, setItems] = useState<DesktopArtifactBrowseItem[]>([]);
-  const [unregisteredItems, setUnregisteredItems] = useState<DesktopUnregisteredArtifactBrowseItem[]>([]);
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [selectedArtifactFamily, setSelectedArtifactFamily] = useState<DesktopArtifactFamily | "all">("all");
+  const artifacts = useArtifactBrowserArtifacts({
+    client: artifactClient,
+    setViewState,
+  });
 
   const selection = useArtifactSelectionContent(
     artifactClient,
@@ -123,107 +124,21 @@ export function useArtifactBrowserFeature(
     },
   });
 
-  const refreshArtifacts = useCallback(async () => {
-    setViewState({ status: "loading", message: "Loading artifacts..." });
-    try {
-      const [browseItems, unregistered] = await Promise.all([
-        artifactClient.browseArtifacts(selectedArtifactFamily === "all" ? {} : { artifactFamily: selectedArtifactFamily }),
-        artifactClient.browseUnregisteredArtifacts?.() ?? Promise.resolve([]),
-      ]);
-      setItems(browseItems);
-      setUnregisteredItems(unregistered);
-      setViewState({
-        status: "success",
-        message: (browseItems.length + unregistered.length) > 0
-          ? "Loaded artifacts."
-          : "No artifacts found yet.",
-      });
-    } catch (error) {
-      setViewState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Failed to load artifacts.",
-      });
-    }
-  }, [artifactClient, selectedArtifactFamily]);
-
-  const deleteConfirmation = useArtifactDeleteConfirmation();
-
-  async function registerUnregisteredArtifact(storageKey: string): Promise<void> {
-    setViewState({ status: "loading", message: `Registering ${storageKey}...` });
-    try {
-      if (!artifactClient.registerUnregisteredArtifact) {
-        throw new Error("Unregistered artifact register flow is unavailable.");
-      }
-      await artifactClient.registerUnregisteredArtifact({ storageKey });
-      await refreshArtifacts();
-      setViewState({ status: "success", message: `Registered ${storageKey}.` });
-    } catch (error) {
-      setViewState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Failed to register unregistered artifact.",
-      });
-    }
-  }
-
-  async function runDeleteUnregisteredArtifact(storageKey: string): Promise<void> {
-    setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
-    try {
-      if (!artifactClient.deleteUnregisteredArtifact) {
-        throw new Error("Unregistered artifact delete flow is unavailable.");
-      }
-      await artifactClient.deleteUnregisteredArtifact({ storageKey });
-      await refreshArtifacts();
-      setViewState({ status: "success", message: `Deleted ${storageKey}.` });
-    } catch (error) {
-      setViewState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Failed to delete unregistered artifact.",
-      });
-    }
-  }
-
-  async function runDeleteRegisteredArtifact(storageKey: string): Promise<void> {
-    setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
-    try {
-      if (!artifactClient.deleteRegisteredArtifact) {
-        throw new Error("Registered artifact delete flow is unavailable.");
-      }
-      await artifactClient.deleteRegisteredArtifact({ storageKey });
-      selection.clearSelectedArtifact();
-      await refreshArtifacts();
-      setViewState({ status: "success", message: `Deleted ${storageKey}.` });
-    } catch (error) {
-      setViewState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Failed to delete registered artifact.",
-      });
-    }
-  }
-
-  async function confirmPendingDelete(): Promise<void> {
-    if (!deleteConfirmation.pendingDeleteConfirmation) {
-      return;
-    }
-
-    if (deleteConfirmation.deleteConfirmationInput !== "Delete") {
-      setViewState({ status: "error", message: "Delete cancelled: typed confirmation must be exactly Delete." });
-      return;
-    }
-
-    const pending = deleteConfirmation.pendingDeleteConfirmation;
-    deleteConfirmation.cancelPendingDelete();
-
-    if (pending.kind === "registered") {
-      await runDeleteRegisteredArtifact(pending.storageKey);
-      return;
-    }
-
-    await runDeleteUnregisteredArtifact(pending.storageKey);
-  }
+  const mutations = useArtifactBrowserMutations({
+    client: artifactClient,
+    refreshArtifacts: artifacts.refreshArtifacts,
+    setViewState,
+  });
+  const deleteFlow = useArtifactDeleteFlow({
+    client: artifactClient,
+    refreshArtifacts: artifacts.refreshArtifacts,
+    clearSelectedArtifact: selection.clearSelectedArtifact,
+    setViewState,
+  });
 
   const huggingFace = useArtifactBrowserHuggingFace({
     client: artifactClient,
-    refreshArtifacts,
+    refreshArtifacts: artifacts.refreshArtifacts,
     selectArtifact: selection.selectArtifact,
     selectedStorageKey: selection.selectedStorageKey,
   });
@@ -233,28 +148,28 @@ export function useArtifactBrowserFeature(
   }, [selection.detail]);
 
   useEffect(() => {
-    void refreshArtifacts();
+    void artifacts.refreshArtifacts();
     void artifactClient.getHuggingFaceTokenStatus().then(huggingFace.setHuggingFaceTokenStatus).catch(() => {
       huggingFace.setHuggingFaceTokenStatus({ configured: false });
     });
-  }, [artifactClient, refreshArtifacts]);
+  }, [artifactClient, artifacts.refreshArtifacts]);
 
   async function publishArtifactToHuggingFace(): Promise<void> {
     await publishLogic.publishArtifactToHuggingFace();
-    await refreshArtifacts();
+    await artifacts.refreshArtifacts();
   }
 
   async function recheckPublishedBacking(): Promise<void> {
     await publishLogic.recheckPublishedBacking();
-    await refreshArtifacts();
+    await artifacts.refreshArtifacts();
   }
 
   return {
     huggingFaceTokenStatus: huggingFace.huggingFaceTokenStatus,
     tokenInput: huggingFace.tokenInput,
     tokenState: huggingFace.tokenState,
-    items,
-    unregisteredItems,
+    items: artifacts.items,
+    unregisteredItems: artifacts.unregisteredItems,
     selectedStorageKey: selection.selectedStorageKey,
     detail: selection.detail,
     content: selection.content,
@@ -269,18 +184,18 @@ export function useArtifactBrowserFeature(
     publishForm: publishLogic.publishForm,
     registerForm: huggingFace.registerForm,
     viewState,
-    pendingDeleteConfirmation: deleteConfirmation.pendingDeleteConfirmation,
-    deleteConfirmationInput: deleteConfirmation.deleteConfirmationInput,
+    pendingDeleteConfirmation: deleteFlow.pendingDeleteConfirmation,
+    deleteConfirmationInput: deleteFlow.deleteConfirmationInput,
     selectArtifact: selection.selectArtifact,
-    refreshArtifacts,
-    registerUnregisteredArtifact,
-    requestDeleteUnregisteredArtifact: deleteConfirmation.requestDeleteUnregisteredArtifact,
-    requestDeleteRegisteredArtifact: deleteConfirmation.requestDeleteRegisteredArtifact,
-    setDeleteConfirmationInput: deleteConfirmation.setDeleteConfirmationInput,
-    confirmPendingDelete,
-    cancelPendingDelete: deleteConfirmation.cancelPendingDelete,
-    selectedArtifactFamily,
-    setSelectedArtifactFamily,
+    refreshArtifacts: artifacts.refreshArtifacts,
+    registerUnregisteredArtifact: mutations.registerUnregisteredArtifact,
+    requestDeleteUnregisteredArtifact: deleteFlow.requestDeleteUnregisteredArtifact,
+    requestDeleteRegisteredArtifact: deleteFlow.requestDeleteRegisteredArtifact,
+    setDeleteConfirmationInput: deleteFlow.setDeleteConfirmationInput,
+    confirmPendingDelete: deleteFlow.confirmPendingDelete,
+    cancelPendingDelete: deleteFlow.cancelPendingDelete,
+    selectedArtifactFamily: artifacts.selectedArtifactFamily,
+    setSelectedArtifactFamily: artifacts.setSelectedArtifactFamily,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace: huggingFace.registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace: huggingFace.registerHuggingFaceNamespace,
