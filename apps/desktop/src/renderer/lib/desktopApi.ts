@@ -20,7 +20,7 @@ export interface DesktopUploadedImageDescriptor {
 }
 
 export interface DesktopArtifactBrowseItem {
-  artifactId?: string;
+  artifactId: string;
   storageKey: string;
   artifactFamily: ArtifactBrowseContractItem["artifactFamily"];
   mediaType?: string;

@@ -13,7 +13,9 @@ describe("desktop artifact browser client", () => {
       uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({
         ok: true,
-        value: { items: [{ storageKey: "uploads/cat.png", artifactFamily: "image" }] },
+        value: {
+          items: [{ artifactId: "uploads/cat.png", storageKey: "uploads/cat.png", artifactFamily: "image" }],
+        },
       }),
       browseUnregisteredArtifacts: vi.fn().mockResolvedValue({
         ok: true,
@@ -83,6 +85,7 @@ describe("desktop artifact browser client", () => {
     const mediaUrl = await client.createArtifactMediaViewUrl({ storageKey: "uploads/cat.png" });
 
     expect(items[0].storageKey).toBe("uploads/cat.png");
+    expect(items[0].artifactId).toBe("uploads/cat.png");
     expect(detail.locator.storageKey).toBe("uploads/cat.png");
     expect(content.retrieval).toBe("deferred");
     expect(detail.metadata?.websiteCapture?.acquisitionMechanismUsed).toBe("simple-http");
@@ -133,6 +136,7 @@ describe("desktop artifact browser client", () => {
         value: {
           registeredItemsMap: {
             "artifacts/20260418000000-import001": {
+              artifactId: "artifacts/20260418000000-import001",
               storageKey: "artifacts/20260418000000-import001",
               artifactFamily: "tabular",
             },
@@ -152,6 +156,7 @@ describe("desktop artifact browser client", () => {
 
     expect(items).toEqual([
       {
+        artifactId: "artifacts/20260418000000-import001",
         storageKey: "artifacts/20260418000000-import001",
         artifactFamily: "tabular",
       },
