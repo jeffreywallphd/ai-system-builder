@@ -138,9 +138,12 @@ def normalize_sources_to_markdown(
         except Exception as error:
             if policy == "skip":
                 skipped += 1
+                warning_code = "document_normalization_skipped"
+                if ".doc (legacy Microsoft Word)" in str(error):
+                    warning_code = "document_normalization_unsupported_doc"
                 warnings.append(
                     DatasetPreparationWarning(
-                        code="document_normalization_skipped",
+                        code=warning_code,
                         message=(
                             f"Skipped source '{source.artifactId}' during normalization: {error}"
                         ),

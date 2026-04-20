@@ -85,6 +85,17 @@ class DocumentNormalizationTests(unittest.TestCase):
                     DocumentNormalizationConfig(targetFormat="markdown", unsupportedDocumentPolicy="fail"),
                 )
 
+    def test_doc_extension_skip_policy_uses_explicit_doc_warning_code(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "legacy.doc"
+            source.write_bytes(b"abc")
+            result = normalize_sources_to_markdown(
+                [DatasetPreparationSourceInput(artifactId="doc", localPath=str(source))],
+                DocumentNormalizationConfig(targetFormat="markdown", unsupportedDocumentPolicy="skip"),
+            )
+            self.assertEqual(result.skipped_document_count, 1)
+            self.assertEqual(result.warnings[0].code, "document_normalization_unsupported_doc")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,15 @@ from .example_generation import GeneratedQaExample, generate_qa_examples_for_chu
 from .markdown_chunking import chunk_markdown_documents
 
 
+def _validate_split_config(train_ratio: float, test_ratio: float) -> None:
+    if train_ratio <= 0:
+        raise ValueError("split.trainRatio must be greater than 0")
+    if test_ratio <= 0:
+        raise ValueError("split.testRatio must be greater than 0")
+    if abs((train_ratio + test_ratio) - 1.0) > 1e-6:
+        raise ValueError("split.trainRatio + split.testRatio must equal 1.0")
+
+
 def _emit_rows(
     rows: list[dict[str, object]],
     output_format: str,
@@ -72,18 +81,38 @@ def _build_generated_rows(
     normalization = normalize_sources_to_markdown(payload.sourceInputs, payload.recipe.normalization)
     chunks = chunk_markdown_documents(normalization.documents, payload.recipe.chunking)
 
-    generated_examples = generator(chunks, payload.recipe.generation)
+    failure_policy = payload.recipe.generation.failurePolicy
+    if not failure_policy:
+        normalization_mode = payload.recipe.normalization.normalizationMode or "strict"
+        failure_policy = "skip" if normalization_mode == "best-effort" else "fail"
 
-    rows = [
-        {
-            "artifactId": example.artifact_id,
-            "chunkIndex": example.chunk_index,
-            "question": example.question,
-            "answer": example.answer,
-            "generationMode": example.generation_mode,
-        }
-        for example in generated_examples
-    ]
+    rows: list[dict[str, object]] = []
+    for chunk in chunks:
+        try:
+            generated_examples = generator([chunk], payload.recipe.generation)
+            for example in generated_examples:
+                rows.append(
+                    {
+                        "artifactId": example.artifact_id,
+                        "chunkIndex": example.chunk_index,
+                        "question": example.question,
+                        "answer": example.answer,
+                        "generationMode": example.generation_mode,
+                    }
+                )
+        except Exception as error:
+            if failure_policy == "skip":
+                warnings.append(
+                    DatasetPreparationWarning(
+                        code="generation_example_skipped",
+                        message=(
+                            f"Skipped chunk {chunk.chunk_index} from source '{chunk.artifact_id}' during generation: {error}"
+                        ),
+                        sourceArtifactId=chunk.artifact_id,
+                    )
+                )
+                continue
+            raise
 
     return (
         rows,
@@ -98,6 +127,8 @@ def prepare_training_dataset(
     payload: PrepareTrainingDatasetRequest,
     example_generator: Callable[[list, object], list[GeneratedQaExample]] = generate_qa_examples_for_chunks,
 ) -> PrepareTrainingDatasetResult:
+    _validate_split_config(float(payload.split.trainRatio), float(payload.split.testRatio))
+
     rows, warnings, normalized_count, skipped_count, chunk_count = _build_generated_rows(payload, example_generator)
 
     if payload.split.shuffle:
@@ -105,8 +136,6 @@ def prepare_training_dataset(
         random.Random(seed).shuffle(rows)
 
     train_ratio = float(payload.split.trainRatio)
-    if not 0 < train_ratio < 1:
-        raise ValueError("split.trainRatio must be between 0 and 1")
 
     split_index = int(len(rows) * train_ratio)
     train_rows = rows[:split_index]
@@ -125,6 +154,8 @@ def prepare_training_dataset(
             "chunkCount": chunk_count,
             "generatedExampleCount": len(rows),
         },
+        "split": payload.split.model_dump(mode="json"),
+        "outputConfig": payload.output.model_dump(mode="json"),
     }
 
     train_output = _emit_rows(

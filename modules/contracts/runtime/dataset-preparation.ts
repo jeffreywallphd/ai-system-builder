@@ -58,6 +58,18 @@ export interface DatasetOutputConfig {
   naming?: {
     baseName?: string;
   };
+  destinations?: {
+    local?: {
+      enabled?: boolean;
+    };
+    huggingFace?: {
+      enabled?: boolean;
+      provider?: "huggingface";
+      repository: string;
+      revision?: string;
+      pathPrefix?: string;
+    };
+  };
 }
 
 export interface DatasetPreparationSummary {

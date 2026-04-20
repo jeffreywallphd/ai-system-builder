@@ -410,6 +410,7 @@ describe("python sidecar runtime contracts", () => {
           topP: 0.9,
           maxNewTokens: 256,
         },
+        failurePolicy: "skip",
       },
     };
     const split: DatasetSplitConfig = {
@@ -422,6 +423,16 @@ describe("python sidecar runtime contracts", () => {
       format: "jsonl",
       naming: {
         baseName: "support-ticket-dataset",
+      },
+      destinations: {
+        local: { enabled: true },
+        huggingFace: {
+          enabled: true,
+          provider: "huggingface",
+          repository: "acme/support-dataset",
+          revision: "main",
+          pathPrefix: "prepared",
+        },
       },
     };
 
@@ -471,6 +482,7 @@ describe("python sidecar runtime contracts", () => {
     expect(request.recipe.chunking.strategy).toBe("character");
     expect(request.split.shuffle).toBe(true);
     expect(request.output.naming?.baseName).toBe("support-ticket-dataset");
+    expect(request.output.destinations?.huggingFace?.repository).toBe("acme/support-dataset");
     expect(result.outputs.length).toBe(2);
     expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
     expect(result.summary.trainRowCount + result.summary.testRowCount).toBe(56);

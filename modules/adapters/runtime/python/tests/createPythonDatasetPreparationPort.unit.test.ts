@@ -42,13 +42,26 @@ describe("createPythonDatasetPreparationPort", () => {
         },
       },
       split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
-      output: { format: "jsonl" },
+      output: {
+        format: "jsonl",
+        destinations: {
+          local: { enabled: true },
+          huggingFace: { enabled: true, repository: "org/repo", pathPrefix: "datasets" },
+        },
+      },
     });
 
     expect(executeTask).toHaveBeenCalledOnce();
     expect(executeTask.mock.calls[0]?.[0]).toMatchObject({
       taskType: "prepare-training-dataset",
       requestId: expect.stringMatching(/^prepare-training-dataset-\d{14}-\d{6}$/),
+      payload: {
+        output: {
+          destinations: {
+            huggingFace: { repository: "org/repo", pathPrefix: "datasets" },
+          },
+        },
+      },
     });
     expect(result.summary.trainRowCount).toBe(8);
     expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
