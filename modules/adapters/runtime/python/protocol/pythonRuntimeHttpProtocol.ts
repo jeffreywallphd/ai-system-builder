@@ -3,9 +3,18 @@ import type {
   PythonRuntimeError,
   PythonRuntimeHealthCheckResult,
   PythonRuntimeHealthStatus,
+  PythonRuntimeStatus,
   PythonRuntimeTaskRequest,
   PythonRuntimeTaskResult,
 } from "../../../../contracts/runtime";
+
+const PYTHON_RUNTIME_STATUS_VALUES: ReadonlySet<PythonRuntimeStatus> = new Set([
+  "starting",
+  "ready",
+  "degraded",
+  "stopped",
+  "failed",
+]);
 
 function asObject(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -37,6 +46,17 @@ function asBoolean(value: unknown, field: string): boolean {
   }
 
   return value;
+}
+
+function asPythonRuntimeStatus(value: unknown, field: string): PythonRuntimeStatus {
+  const normalized = asString(value, field);
+  if (!PYTHON_RUNTIME_STATUS_VALUES.has(normalized as PythonRuntimeStatus)) {
+    throw new Error(
+      `Invalid python runtime payload: ${field} must be one of ${Array.from(PYTHON_RUNTIME_STATUS_VALUES).join(", ")}.`,
+    );
+  }
+
+  return normalized as PythonRuntimeStatus;
 }
 
 function asOptionalBoolean(value: unknown, field: string): boolean | undefined {
@@ -73,7 +93,7 @@ function parseHealthStatus(value: unknown): PythonRuntimeHealthStatus {
   const payload = asObject(value, "health status");
   return {
     runtimeId: asString(payload.runtimeId, "status.runtimeId"),
-    status: asString(payload.status, "status.status"),
+    status: asPythonRuntimeStatus(payload.status, "status.status"),
     version: asOptionalString(payload.version, "status.version"),
     pythonVersion: asOptionalString(payload.pythonVersion, "status.pythonVersion"),
     workerStartedAt: asOptionalString(payload.workerStartedAt, "status.workerStartedAt"),

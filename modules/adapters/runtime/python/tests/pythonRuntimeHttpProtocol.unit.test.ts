@@ -51,6 +51,18 @@ describe("pythonRuntimeHttpProtocol", () => {
     );
   });
 
+  it("rejects unsupported runtime status values in health payloads", () => {
+    expect(() =>
+      mapHealthResponseFromHttpPayload({
+        healthy: true,
+        status: {
+          runtimeId: "python-sidecar",
+          status: "warming",
+        },
+      }),
+    ).toThrow("status.status must be one of starting, ready, degraded, stopped, failed");
+  });
+
   it("rejects malformed capabilities payloads", () => {
     expect(() => mapCapabilitiesResponseFromHttpPayload({ runtimeId: "python", capabilities: [1] })).toThrow(
       "capabilities[0] must be a non-empty string",
