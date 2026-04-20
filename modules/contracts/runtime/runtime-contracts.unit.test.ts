@@ -345,7 +345,7 @@ describe("python sidecar runtime contracts", () => {
       requestId: "req-python-1",
       taskType: "prepare-templated-dataset",
       payload: {
-        sourceArtifactIds: ["artifact-1"],
+        sourceInputs: [{ artifactId: "artifact-1", localPath: "/tmp/a.jsonl", mediaType: "application/x-ndjson" }],
       },
       timeoutMs: 10000,
       metadata: {
@@ -374,7 +374,10 @@ describe("python sidecar runtime contracts", () => {
 
   it("keeps dataset preparation contracts task-specific while using shared output descriptors", () => {
     const request: PrepareTemplatedDatasetRequest = {
-      sourceArtifactIds: ["artifact-1", "artifact-2"],
+      sourceInputs: [
+        { artifactId: "artifact-1", localPath: "/tmp/a.jsonl", mediaType: "application/x-ndjson" },
+        { artifactId: "artifact-2", localPath: "/tmp/b.csv", mediaType: "text/csv" },
+      ],
       template: "Summarize: {{text}}",
       split: {
         trainRatio: 0.8,
