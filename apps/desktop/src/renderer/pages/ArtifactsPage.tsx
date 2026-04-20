@@ -1,5 +1,5 @@
 import { ArtifactBrowserFeature } from "../features/artifact-browser";
-import { ArtifactUploadFeature } from "../features/artifact-upload/components/ArtifactUploadFeature";
+import { ArtifactIngestionFeature } from "../features/artifact-upload/components/ArtifactIngestionFeature";
 
 export interface ArtifactsPageProps {
   refreshToken: number;
@@ -9,8 +9,9 @@ export interface ArtifactsPageProps {
 export function ArtifactsPage({ refreshToken, onUploaded }: ArtifactsPageProps) {
   return (
     <section className="ui-stack ui-stack--sm" data-refresh-token={refreshToken}>
-      <ArtifactUploadFeature onUploadComplete={onUploaded} />
+      <ArtifactIngestionFeature onUploadComplete={onUploaded} />
       <ArtifactBrowserFeature key={refreshToken} />
     </section>
   );
 }
+

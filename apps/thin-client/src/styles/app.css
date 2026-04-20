@@ -125,3 +125,14 @@ img {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
 }
+
+.artifact-ingestion-mobile-button {
+  width: 100%;
+}
+
+@media (min-width: 48rem) {
+  .artifact-ingestion-mobile-button {
+    width: auto;
+  }
+}
+
