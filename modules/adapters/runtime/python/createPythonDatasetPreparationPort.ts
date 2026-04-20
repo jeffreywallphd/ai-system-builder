@@ -1,4 +1,4 @@
-import type { PythonDatasetPreparationPort, PythonRuntimePort } from "../../../application/ports/runtime";
+import { PythonDatasetPreparationError, type PythonDatasetPreparationPort, type PythonRuntimePort } from "../../../application/ports/runtime";
 import type {
   PrepareTrainingDatasetRequest,
   PrepareTrainingDatasetResult,
@@ -7,16 +7,6 @@ import type {
   PythonRuntimeError,
 } from "../../../contracts/runtime";
 import { createContractError, type ContractError } from "../../../contracts/shared";
-
-export class PythonDatasetPreparationContractError extends Error {
-  public readonly contractError: ContractError;
-
-  public constructor(contractError: ContractError) {
-    super(contractError.message);
-    this.name = "PythonDatasetPreparationContractError";
-    this.contractError = contractError;
-  }
-}
 
 function asObject(value: unknown, field: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -144,16 +134,20 @@ function mapRuntimeErrorToContractError(runtimeError: PythonRuntimeError | undef
   const message = `${stagePrefix}${runtimeError?.message ?? "Python runtime dataset preparation failed."}`;
   return createContractError("internal", message, {
     details: {
-      runtimeErrorCode: runtimeError?.errorCode ?? runtimeError?.code ?? "task_failed",
+      runtimeErrorCode: runtimeError?.code ?? "task_failed",
       stage: runtimeError?.stage,
+      retryable: runtimeError?.retryable,
+      runtimeDetails: runtimeError?.details,
     },
   });
 }
 
 export function createPythonDatasetPreparationPort(
   runtimePort: PythonRuntimePort,
+  options?: { taskTimeoutMs?: number },
 ): PythonDatasetPreparationPort {
   let sequence = 0;
+  const taskTimeoutMs = options?.taskTimeoutMs;
 
   const nextRequestId = () => {
     sequence += 1;
@@ -167,11 +161,11 @@ export function createPythonDatasetPreparationPort(
         requestId: nextRequestId(),
         taskType: "prepare-training-dataset",
         payload: request,
-        timeoutMs: request.runtime?.timeoutMs,
+        timeoutMs: taskTimeoutMs,
       });
 
       if (!taskResult.success) {
-        throw new PythonDatasetPreparationContractError(mapRuntimeErrorToContractError(taskResult.error));
+        throw new PythonDatasetPreparationError(mapRuntimeErrorToContractError(taskResult.error));
       }
 
       return mapRuntimeDataToResult(taskResult.data);

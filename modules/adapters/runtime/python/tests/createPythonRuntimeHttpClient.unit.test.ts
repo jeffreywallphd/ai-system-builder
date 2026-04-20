@@ -70,6 +70,40 @@ describe("createPythonRuntimeHttpClient", () => {
     await expect(client.getHealthStatus()).rejects.toThrow("status 503");
   });
 
+  it("maps structured runtime task errors from non-2xx responses", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({
+        requestId: "req-python-err",
+        taskType: "prepare-training-dataset",
+        success: false,
+        error: {
+          code: "chunk_limit_exceeded",
+          stage: "chunking",
+          message: "Chunk limit exceeded.",
+          retryable: false,
+          details: { maxChunkCount: 10_000, actualChunkCount: 20_001 },
+        },
+      }), { status: 422 }));
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+    });
+
+    const task = await client.executeTask({
+      requestId: "req-python-err",
+      taskType: "prepare-training-dataset",
+      payload: {},
+    });
+
+    expect(task.success).toBe(false);
+    expect(task.error).toMatchObject({
+      code: "chunk_limit_exceeded",
+      stage: "chunking",
+      retryable: false,
+    });
+  });
+
   it("enforces task timeout and forwards timeoutMs to runtime", async () => {
     const fetchImplementation = testDouble.fn<typeof fetch>(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? "{}"));

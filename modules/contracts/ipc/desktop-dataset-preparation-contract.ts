@@ -41,28 +41,28 @@ export interface DesktopPrepareTemplatedDatasetRequestPayload {
 
 export interface DesktopPrepareTemplatedDatasetSuccessValue {
   result: {
-    train?: StagedArtifactDescriptor;
-    test?: StagedArtifactDescriptor;
-    localOutputs?: {
-      train: StagedArtifactDescriptor;
-      test: StagedArtifactDescriptor;
-    };
-    huggingFaceOutputs?: {
-      train: {
-        provider: "huggingface";
-        repository: string;
-        path: string;
-        revision?: string;
-        exists: boolean;
-        verifiedAt: string;
+    outputs: {
+      local?: {
+        train: StagedArtifactDescriptor;
+        test: StagedArtifactDescriptor;
       };
-      test: {
-        provider: "huggingface";
-        repository: string;
-        path: string;
-        revision?: string;
-        exists: boolean;
-        verifiedAt: string;
+      huggingFace?: {
+        train: {
+          provider: "huggingface";
+          repository: string;
+          path: string;
+          revision?: string;
+          exists: boolean;
+          verifiedAt: string;
+        };
+        test: {
+          provider: "huggingface";
+          repository: string;
+          path: string;
+          revision?: string;
+          exists: boolean;
+          verifiedAt: string;
+        };
       };
     };
     provenance?: Record<string, unknown>;

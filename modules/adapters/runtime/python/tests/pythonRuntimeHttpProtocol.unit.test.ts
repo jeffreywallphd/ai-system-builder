@@ -39,13 +39,28 @@ describe("pythonRuntimeHttpProtocol", () => {
       success: false,
       error: {
         code: "not_implemented",
-        errorCode: "not_implemented",
         stage: "generation",
         message: "Not implemented.",
       },
     });
     expect(taskResult.success).toBe(false);
     expect(taskResult.error?.stage).toBe("generation");
+    expect(taskResult.error?.code).toBe("not_implemented");
+  });
+
+  it("maps legacy errorCode payloads to canonical code", () => {
+    const taskResult = mapTaskResponseFromHttpPayload({
+      requestId: "req-python-1",
+      taskType: "prepare-training-dataset",
+      success: false,
+      error: {
+        errorCode: "runtime_timeout",
+        stage: "generation",
+        message: "Timed out.",
+      },
+    });
+
+    expect(taskResult.error?.code).toBe("runtime_timeout");
   });
 
   it("rejects malformed health payloads", () => {

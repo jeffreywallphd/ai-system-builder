@@ -20,7 +20,7 @@ import type {
 } from "../../contracts/runtime";
 
 import type { ApplicationRequestContext } from "../ports";
-import type { PythonDatasetPreparationPort } from "../ports/runtime";
+import { PythonDatasetPreparationError, type PythonDatasetPreparationPort } from "../ports/runtime";
 import type { ArtifactCatalogReadPort } from "../ports/artifact-catalog";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRepoStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
@@ -33,28 +33,28 @@ export interface PrepareTrainingDatasetFromArtifactsCommand {
 }
 
 export interface PrepareTrainingDatasetFromArtifactsValue {
-  train?: StagedArtifactDescriptor;
-  test?: StagedArtifactDescriptor;
-  localOutputs?: {
-    train: StagedArtifactDescriptor;
-    test: StagedArtifactDescriptor;
-  };
-  huggingFaceOutputs?: {
-    train: {
-      provider: "huggingface";
-      repository: string;
-      path: string;
-      revision?: string;
-      exists: boolean;
-      verifiedAt: string;
+  outputs: {
+    local?: {
+      train: StagedArtifactDescriptor;
+      test: StagedArtifactDescriptor;
     };
-    test: {
-      provider: "huggingface";
-      repository: string;
-      path: string;
-      revision?: string;
-      exists: boolean;
-      verifiedAt: string;
+    huggingFace?: {
+      train: {
+        provider: "huggingface";
+        repository: string;
+        path: string;
+        revision?: string;
+        exists: boolean;
+        verifiedAt: string;
+      };
+      test: {
+        provider: "huggingface";
+        repository: string;
+        path: string;
+        revision?: string;
+        exists: boolean;
+        verifiedAt: string;
+      };
     };
   };
   provenance: {
@@ -153,7 +153,14 @@ function joinRepoPath(pathPrefix: string | undefined, fileName: string): string 
 function buildDatasetMetadata(
   command: PrepareTrainingDatasetFromArtifactsCommand,
   summary: DatasetPreparationSummary,
-  destination: "local" | "huggingface",
+  destination: {
+    provider: "local" | "huggingface";
+    publication?: {
+      repository: string;
+      path: string;
+      revision?: string;
+    };
+  },
   runtimeMetadata: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
   return {
@@ -165,10 +172,7 @@ function buildDatasetMetadata(
       modelId: command.recipe.generation.model.modelId,
     },
     summary,
-    destination: {
-      provider: destination,
-      output: command.output,
-    },
+    destination,
     runtime: runtimeMetadata,
   };
 }
@@ -285,7 +289,6 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         });
       }
 
-      runtimeRequest.runtime = { timeoutMs: 120_000 };
       const prepared = await this.datasetPreparation.prepareTrainingDataset(runtimeRequest);
       const trainOutput = prepared.outputs.find((output) => output.role === "train");
       const testOutput = prepared.outputs.find((output) => output.role === "test");
@@ -315,7 +318,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         ]);
       }
 
-      let localOutputs: PrepareTrainingDatasetFromArtifactsValue["localOutputs"];
+      let localOutputs: PrepareTrainingDatasetFromArtifactsValue["outputs"]["local"];
       if (destinations.local) {
         const [storedTrain, storedTest] = await Promise.all([
           this.storage.storeArtifact(createStoreArtifactRequest(trainBytes, {
@@ -323,7 +326,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
               mediaType: trainOutput.mediaType,
               metadata: {
                 runtimeRole: "train",
-                ...buildDatasetMetadata(command, prepared.summary, "local", trainOutput.metadata),
+                ...buildDatasetMetadata(command, prepared.summary, { provider: "local" }, trainOutput.metadata),
               },
             },
           }), context),
@@ -332,7 +335,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
               mediaType: testOutput.mediaType,
               metadata: {
                 runtimeRole: "test",
-                ...buildDatasetMetadata(command, prepared.summary, "local", testOutput.metadata),
+                ...buildDatasetMetadata(command, prepared.summary, { provider: "local" }, testOutput.metadata),
               },
             },
           }), context),
@@ -358,7 +361,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         };
       }
 
-      let huggingFaceOutputs: PrepareTrainingDatasetFromArtifactsValue["huggingFaceOutputs"];
+      let huggingFaceOutputs: PrepareTrainingDatasetFromArtifactsValue["outputs"]["huggingFace"];
       if (destinations.huggingFace) {
         if (!this.artifactRepoStorage) {
           return createFailureResult(
@@ -388,7 +391,14 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
               mediaType: trainOutput.mediaType,
               metadata: {
                 runtimeRole: "train",
-                ...buildDatasetMetadata(command, prepared.summary, "huggingface", trainOutput.metadata),
+                ...buildDatasetMetadata(command, prepared.summary, {
+                  provider: "huggingface",
+                  publication: {
+                    repository: target.repository,
+                    path: trainPath,
+                    revision: target.revision,
+                  },
+                }, trainOutput.metadata),
               },
             }),
             context,
@@ -399,7 +409,14 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
               mediaType: testOutput.mediaType,
               metadata: {
                 runtimeRole: "test",
-                ...buildDatasetMetadata(command, prepared.summary, "huggingface", testOutput.metadata),
+                ...buildDatasetMetadata(command, prepared.summary, {
+                  provider: "huggingface",
+                  publication: {
+                    repository: target.repository,
+                    path: testPath,
+                    revision: target.revision,
+                  },
+                }, testOutput.metadata),
               },
             }),
             context,
@@ -449,10 +466,10 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       }
 
       return createSuccessResult({
-        train: localOutputs?.train,
-        test: localOutputs?.test,
-        localOutputs,
-        huggingFaceOutputs,
+        outputs: {
+          local: localOutputs,
+          huggingFace: huggingFaceOutputs,
+        },
         provenance: {
           sourceArtifactIds: command.sourceArtifactIds,
           recipe: command.recipe,
@@ -465,13 +482,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         warnings: prepared.warnings,
       }, context);
     } catch (error) {
-      if (
-        error
-        && typeof error === "object"
-        && "contractError" in error
-        && (error as { contractError?: unknown }).contractError
-      ) {
-        return createFailureResult((error as { contractError: ReturnType<typeof createContractError> }).contractError, context);
+      if (error instanceof PythonDatasetPreparationError) {
+        return createFailureResult(error.contractError, context);
       }
       return createFailureResult(
         createContractError(

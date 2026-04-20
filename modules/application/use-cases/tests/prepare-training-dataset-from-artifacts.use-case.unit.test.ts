@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 import { createContractError } from "../../../contracts/shared";
+import { PythonDatasetPreparationError } from "../../ports/runtime";
 import {
   PrepareTrainingDatasetFromArtifactsUseCase,
 } from "../prepare-training-dataset-from-artifacts.use-case";
@@ -68,10 +69,10 @@ function createDeps(runtimeTrain: string, runtimeTest: string) {
       : { ok: true as const, value: { key: "stored-test", mediaType: "application/x-ndjson" } };
   });
 
-  const storeArtifactInRepo = testDouble.fn(async () => ({
+  const storeArtifactInRepo = testDouble.fn(async ({ target }: { target: { repository: string; path: string; revision?: string } }) => ({
     ok: true as const,
     value: {
-      target: { provider: "huggingface", repository: "org/repo", path: "datasets/train.jsonl" },
+      target: { provider: "huggingface", repository: target.repository, path: target.path, revision: target.revision },
       descriptor: { mediaType: "application/x-ndjson", sizeBytes: 20 },
     },
   }));
@@ -153,9 +154,12 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
 
     const runtimeRequest = deps.prepareTrainingDataset.mock.calls[0]?.[0];
     expect(runtimeRequest.sourceInputs[0]?.originalName).toBe("key-artifact-1.md");
+    expect(runtimeRequest.runtime).toBeUndefined();
     expect(deps.storeArtifact).toHaveBeenCalledTimes(2);
-    expect(result.value.localOutputs?.train.storage.key).toBe("stored-train");
-    expect(result.value.huggingFaceOutputs).toBeUndefined();
+    expect(result.value.outputs.local?.train.storage.key).toBe("stored-train");
+    expect(result.value.outputs.huggingFace).toBeUndefined();
+    expect((result.value as Record<string, unknown>).train).toBeUndefined();
+    expect((result.value as Record<string, unknown>).localOutputs).toBeUndefined();
     expect(result.value.provenance.generationModelId).toBe("test-model");
     await expectFileMissing(runtimeTrain);
     await expectFileMissing(runtimeTest);
@@ -206,9 +210,9 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
 
     expect(deps.storeArtifact).not.toHaveBeenCalled();
     expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(2);
-    expect(result.value.localOutputs).toBeUndefined();
-    expect(result.value.huggingFaceOutputs?.train.path).toBe("datasets/dataset-train.jsonl");
-    expect(result.value.huggingFaceOutputs?.train.repository).toBe("org/repo");
+    expect(result.value.outputs.local).toBeUndefined();
+    expect(result.value.outputs.huggingFace?.train.path).toBe("datasets/dataset-train.jsonl");
+    expect(result.value.outputs.huggingFace?.train.repository).toBe("org/repo");
     await expectFileMissing(runtimeTrain);
     await expectFileMissing(runtimeTest);
   });
@@ -258,8 +262,8 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
 
     expect(deps.storeArtifact).toHaveBeenCalledTimes(2);
     expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(2);
-    expect(result.value.localOutputs?.train.storage.key).toBe("stored-train");
-    expect(result.value.huggingFaceOutputs?.test.path).toBe("dataset-test.jsonl");
+    expect(result.value.outputs.local?.train.storage.key).toBe("stored-train");
+    expect(result.value.outputs.huggingFace?.test.path).toBe("dataset-test.jsonl");
     expect(result.value.summary.trainRowCount).toBe(1);
     expect(result.value.provenance.output.destinations?.huggingFace?.repository).toBe("org/repo");
     const firstStoreMetadata = deps.storeArtifact.mock.calls[0]?.[0]?.descriptor?.metadata;
@@ -343,11 +347,11 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
     const deps = createDeps(runtimeTrain, runtimeTest);
     deps.prepareTrainingDataset.mockImplementationOnce(async () => {
-      throw {
-        contractError: createContractError("internal", "[generation] runtime timeout", {
+      throw new PythonDatasetPreparationError(
+        createContractError("internal", "[generation] runtime timeout", {
           details: { stage: "generation", runtimeErrorCode: "runtime_timeout" },
         }),
-      };
+      );
     });
 
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
