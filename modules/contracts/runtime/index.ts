@@ -6,3 +6,7 @@ export * from "./runtime-execution-request";
 export * from "./runtime-execution-error";
 export * from "./runtime-execution-result";
 export * from "./runtime-execution-event";
+export * from "./python-runtime-task-request";
+export * from "./python-runtime-task-result";
+export * from "./prepare-templated-dataset-request";
+export * from "./prepare-templated-dataset-result";
