@@ -34,22 +34,6 @@ describe("DatasetPreparationFeature", () => {
       };
     });
 
-    window.desktopApi = {
-      browseArtifacts: vi.fn().mockResolvedValue({
-        ok: true,
-        value: { items: [{ storageKey: "artifact-1", artifactFamily: "structured-text", originalName: "artifact-1.jsonl" }] },
-      }),
-      uploadArtifact: async () => ({ ok: false }),
-      getArtifactUploadPolicy: async () => ({ ok: false }),
-      readArtifactDetail: async () => ({ ok: false }),
-      readArtifactContentDescriptor: async () => ({ ok: false }),
-      readArtifactViewerMedia: async () => ({ ok: false }),
-      publishArtifactToRepo: async () => ({ ok: false }),
-      verifyPublishedArtifactBacking: async () => ({ ok: false }),
-      registerArtifactFromRepo: async () => ({ ok: false }),
-      localizeArtifactFromRepo: async () => ({ ok: false }),
-    };
-
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -57,7 +41,10 @@ describe("DatasetPreparationFeature", () => {
     await act(async () => {
       root?.render(
         <DatasetPreparationFeature
-          client={{ prepareTemplatedDatasetFromArtifacts }}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", storageKey: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTemplatedDatasetFromArtifacts,
+          }}
         />,
       );
     });
@@ -74,28 +61,14 @@ describe("DatasetPreparationFeature", () => {
     expect(prepareTemplatedDatasetFromArtifacts).toHaveBeenCalledWith(expect.objectContaining({
       sourceArtifactIds: ["artifact-1"],
       outputFormat: "jsonl",
+    }), expect.objectContaining({
+      requestId: expect.stringMatching(/^dataset-preparation-/),
     }));
     expect(container.textContent).toContain("stored-train");
     expect(container.textContent).toContain("stored-test");
   });
 
   it("shows error state when preparation fails", async () => {
-    window.desktopApi = {
-      browseArtifacts: vi.fn().mockResolvedValue({
-        ok: true,
-        value: { items: [{ storageKey: "artifact-1", artifactFamily: "structured-text", originalName: "artifact-1.jsonl" }] },
-      }),
-      uploadArtifact: async () => ({ ok: false }),
-      getArtifactUploadPolicy: async () => ({ ok: false }),
-      readArtifactDetail: async () => ({ ok: false }),
-      readArtifactContentDescriptor: async () => ({ ok: false }),
-      readArtifactViewerMedia: async () => ({ ok: false }),
-      publishArtifactToRepo: async () => ({ ok: false }),
-      verifyPublishedArtifactBacking: async () => ({ ok: false }),
-      registerArtifactFromRepo: async () => ({ ok: false }),
-      localizeArtifactFromRepo: async () => ({ ok: false }),
-    };
-
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -103,7 +76,10 @@ describe("DatasetPreparationFeature", () => {
     await act(async () => {
       root?.render(
         <DatasetPreparationFeature
-          client={{ prepareTemplatedDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }) }}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", storageKey: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTemplatedDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+          }}
         />,
       );
     });
@@ -119,4 +95,6 @@ describe("DatasetPreparationFeature", () => {
 
     expect(container.textContent).toContain("failed");
   });
+
+
 });

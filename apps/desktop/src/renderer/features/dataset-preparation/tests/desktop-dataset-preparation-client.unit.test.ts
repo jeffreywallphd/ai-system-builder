@@ -21,7 +21,7 @@ describe("desktop dataset preparation client", () => {
     hostWindow.window.desktopApi = {
       uploadArtifact: async () => ({ ok: false }),
       getArtifactUploadPolicy: async () => ({ ok: false }),
-      browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+      browseArtifacts: async () => ({ ok: true, value: { items: [{ artifactId: "artifact-1", storageKey: "stored/a1.jsonl", artifactFamily: "structured-text" }] } }),
       readArtifactDetail: async () => ({ ok: false }),
       readArtifactContentDescriptor: async () => ({ ok: false }),
       readArtifactViewerMedia: async () => ({ ok: false }),
@@ -33,15 +33,19 @@ describe("desktop dataset preparation client", () => {
     };
 
     const client = createDesktopDatasetPreparationClient();
+    const browseResult = await client.browseSourceArtifacts();
     const response = await client.prepareTemplatedDatasetFromArtifacts({
       sourceArtifactIds: ["artifact-1"],
       template: "Prompt: {{text}}",
       split: { trainRatio: 0.8, testRatio: 0.2 },
       outputFormat: "jsonl",
+    }, {
+      requestId: "req-123",
     });
 
+    expect(browseResult).toEqual([{ artifactId: "artifact-1", storageKey: "stored/a1.jsonl", label: "stored/a1.jsonl" }]);
     expect(response.ok).toBe(true);
-    expect(prepareTemplatedDatasetFromArtifacts).toHaveBeenCalledOnce();
+    expect(prepareTemplatedDatasetFromArtifacts).toHaveBeenCalledWith(expect.any(Object), { requestId: "req-123" });
   });
 
   it("maps failure response from preload bridge", async () => {
