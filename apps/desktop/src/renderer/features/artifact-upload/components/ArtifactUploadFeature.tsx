@@ -35,20 +35,24 @@ export function ArtifactUploadFeature({ client, ingestionClient, onUploadComplet
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <h1>Data Artifact Ingester</h1>
-      <h2 className="ui-panel__title">Upload data</h2>
-      <ArtifactUploadForm
-        selectedFile={selectedFile}
-        uploadStatus={viewState.status}
-        acceptedFileTypes={acceptedFileTypes}
-        onFileChange={onFileChange}
-        onSubmit={(event) => void onUploadSubmit(event)}
-      />
-      <ArtifactUploadStatus viewState={viewState} />
+      <p>Please select a method below to add data to the system.</p>
+      
+      <section className="ui-panel">
+        <h2 className="ui-panel__title">Upload data</h2>
+        <ArtifactUploadForm
+          selectedFile={selectedFile}
+          uploadStatus={viewState.status}
+          acceptedFileTypes={acceptedFileTypes}
+          onFileChange={onFileChange}
+          onSubmit={(event) => void onUploadSubmit(event)}
+        />
+        <ArtifactUploadStatus viewState={viewState} />
+      </section>
 
       <hr className="ui-panel-divider"/>
 
-      <section className="ui-stack ui-stack--sm">
-        <h3>Scrape web data</h3>
+      <section className="ui-panel">
+        <h2>Scrape web data</h2>
         <label className="ui-stack ui-stack--sm">
           <span>Single page URL</span>
           <input
@@ -129,7 +133,9 @@ export function ArtifactUploadFeature({ client, ingestionClient, onUploadComplet
 
       <hr className="ui-panel-divider"/>
 
-      <ArtifactIngestionControls client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
+      <section className="ui-panel">
+        <ArtifactIngestionControls client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
+      </section>
     </section>
   );
 }

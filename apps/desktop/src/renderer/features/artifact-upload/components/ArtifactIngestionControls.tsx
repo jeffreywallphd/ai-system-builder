@@ -151,8 +151,8 @@ export function ArtifactIngestionControls({ client, onRegistered }: ArtifactInge
 
   return (
     <section className="ui-stack ui-stack--sm">
-      <h2>Connect to HuggingFace</h2>
-      <h3>Hugging Face token</h3>
+      <h2>Import from HuggingFace</h2>
+      <p>Hugging Face token</p>
       <p role="status">
         Status: {huggingFaceTokenStatus.configured ? `configured (${huggingFaceTokenStatus.maskedToken ?? "••••"})` : "not configured"}
       </p>

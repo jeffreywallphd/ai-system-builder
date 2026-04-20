@@ -97,9 +97,8 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       </header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
       <section className="ui-stack ui-stack--sm">
-        <h3>Filter by family</h3>
         <label className="ui-stack ui-stack--sm">
-          <span>Family</span>
+          <span>Filter artifacts</span>
           <select
             className="ui-input"
             value={selectedArtifactFamily}
@@ -143,18 +142,20 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       <div className="ui-grid ui-grid--two">
         <div className="ui-stack ui-stack--sm">
           <h3>Artifacts</h3>
-          <ul className="ui-stack ui-stack--sm">
+          <section className="ui-stack ui-stack--sm">
             {items.map((item) => (
-              <li key={item.storageKey}>
-                <button className="ui-button" type="button" onClick={() => void selectArtifact(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
-                  {item.originalName ?? item.storageKey}
-                </button>
-                {item.metadata?.backingState ? (
+              <section key={item.storageKey}>
+                <p>{item.originalName ?? item.storageKey}</p>
+                <p>Status: {item.metadata?.backingState ? (
                   <small>{deriveArtifactListStatusLabels(item.metadata.backingState).join(" · ")}</small>
                 ) : null}
-              </li>
+                </p>
+                <button className="ui-button" type="button" onClick={() => void selectArtifact(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
+                  View Details
+                </button>                
+              </section>              
             ))}
-          </ul>
+          </section>
           <section className="ui-stack ui-stack--sm">
             <h3>Unregistered Artifacts</h3>
             <ul className="ui-stack ui-stack--sm">
