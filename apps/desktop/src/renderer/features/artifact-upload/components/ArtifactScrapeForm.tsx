@@ -46,8 +46,7 @@ export function ArtifactScrapeForm({
   ingestWebsiteBatch,
 }: ArtifactScrapeFormProps) {
   return (
-    <section className="ui-panel ui-stack ui-stack--sm">
-      <h2>Scrape web data</h2>
+    <section className="ui-stack ui-stack--sm">
       <label className="ui-stack ui-stack--sm">
         <span>Single page URL</span>
         <input

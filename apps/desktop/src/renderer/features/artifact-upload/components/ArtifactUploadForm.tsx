@@ -26,8 +26,7 @@ export function ArtifactUploadForm({
   onSubmit,
 }: ArtifactUploadFormProps) {
   return (
-    <section className="ui-panel ui-stack ui-stack--sm">
-      <h2 className="ui-panel__title">Upload data</h2>
+    <section className="ui-stack ui-stack--sm">
       <form className="ui-stack ui-stack--sm" onSubmit={onSubmit}>
         <label className="ui-label" htmlFor="desktop-artifact-file-input">
           Choose artifact

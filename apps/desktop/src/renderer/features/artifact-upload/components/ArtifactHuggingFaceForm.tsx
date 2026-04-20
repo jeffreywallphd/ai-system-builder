@@ -150,8 +150,7 @@ export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggin
   }
 
   return (
-    <section className="ui-panel ui-stack ui-stack--sm">
-      <h2>Import from HuggingFace</h2>
+    <section className="ui-stack ui-stack--sm">
       <p>Hugging Face token</p>
       <p role="status">
         Status: {huggingFaceTokenStatus.configured ? `configured (${huggingFaceTokenStatus.maskedToken ?? "...."})` : "not configured"}
