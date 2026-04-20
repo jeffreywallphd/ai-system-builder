@@ -4,10 +4,10 @@ import { join } from "node:path";
 
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 import {
-  PrepareTemplatedDatasetFromArtifactsUseCase,
+  PrepareTrainingDatasetFromArtifactsUseCase,
 } from "../prepare-templated-dataset-from-artifacts.use-case";
 
-describe("PrepareTemplatedDatasetFromArtifactsUseCase", () => {
+describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
   it("resolves source artifacts, invokes runtime dataset preparation, and stores runtime outputs", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "dataset-use-case-test-"));
     const runtimeTrain = join(tempDir, "train.jsonl");
@@ -47,20 +47,27 @@ describe("PrepareTemplatedDatasetFromArtifactsUseCase", () => {
         : { ok: true as const, value: { key: "stored-test", mediaType: "application/x-ndjson" } };
     });
 
-    const prepareTemplatedDataset = testDouble.fn(async (request) => {
+    const prepareTrainingDataset = testDouble.fn(async (request) => {
       expect(request.sourceInputs[0]?.artifactId).toBe("artifact-1");
       return {
         outputs: [
           { name: "dataset-train", role: "train", tempPath: runtimeTrain, mediaType: "application/x-ndjson" },
           { name: "dataset-test", role: "test", tempPath: runtimeTest, mediaType: "application/x-ndjson" },
         ],
-        trainRowCount: 1,
-        testRowCount: 1,
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 1,
+          generatedExampleCount: 2,
+          trainRowCount: 1,
+          testRowCount: 1,
+        },
       };
     });
 
-    const useCase = new PrepareTemplatedDatasetFromArtifactsUseCase({
-      datasetPreparation: { prepareTemplatedDataset },
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { prepareTrainingDataset },
       storageBindings: {
         readArtifactStorageBindings,
         upsertArtifactStorageBinding: testDouble.fn(),
@@ -76,9 +83,16 @@ describe("PrepareTemplatedDatasetFromArtifactsUseCase", () => {
 
     const result = await useCase.execute({
       sourceArtifactIds: ["artifact-1"],
-      template: "Prompt: {{text}}",
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+        generation: {
+          mode: "qa",
+          model: { provider: "transformers", modelId: "test-model", device: "cpu", torchDtype: "float32" },
+        },
+      },
       split: { trainRatio: 0.5, testRatio: 0.5 },
-      outputFormat: "jsonl",
+      output: { format: "jsonl" },
     });
 
     expect(result.ok).toBe(true);
@@ -86,17 +100,26 @@ describe("PrepareTemplatedDatasetFromArtifactsUseCase", () => {
       return;
     }
 
-    expect(prepareTemplatedDataset).toHaveBeenCalledOnce();
+    expect(prepareTrainingDataset).toHaveBeenCalledOnce();
     expect(storeArtifact).toHaveBeenCalledTimes(2);
     const firstStoreRequest = storeArtifact.mock.calls[0]?.[0];
     expect(firstStoreRequest.descriptor.metadata).toMatchObject({
       runtimeRole: "train",
       sourceArtifactIds: ["artifact-1"],
-      template: "Prompt: {{text}}",
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+        generation: {
+          mode: "qa",
+          model: { provider: "transformers", modelId: "test-model", device: "cpu", torchDtype: "float32" },
+        },
+      },
       split: { trainRatio: 0.5, testRatio: 0.5 },
       rowCount: 1,
     });
     expect(result.value.train.storage.key).toBe("stored-train");
     expect(result.value.test.storage.key).toBe("stored-test");
+    expect(result.value.summary.trainRowCount).toBe(1);
+    expect(result.value.summary.testRowCount).toBe(1);
   });
 });

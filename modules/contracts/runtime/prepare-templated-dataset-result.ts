@@ -1,8 +1,6 @@
-import type { PythonRuntimeOutputDescriptor } from "./python-runtime-output-descriptor";
+import type { PrepareTrainingDatasetResult } from "./prepare-training-dataset-result";
 
-export interface PrepareTemplatedDatasetResult {
-  outputs: PythonRuntimeOutputDescriptor[];
-  trainRowCount: number;
-  testRowCount: number;
-  warnings?: string[];
-}
+/**
+ * @deprecated Use PrepareTrainingDatasetResult.
+ */
+export type PrepareTemplatedDatasetResult = PrepareTrainingDatasetResult;

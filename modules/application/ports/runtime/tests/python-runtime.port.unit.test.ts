@@ -1,8 +1,8 @@
 import { describe, expectTypeOf, it } from "../../../../testing/node-test";
 
 import type {
-  PrepareTemplatedDatasetRequest,
-  PrepareTemplatedDatasetResult,
+  PrepareTrainingDatasetRequest,
+  PrepareTrainingDatasetResult,
   PythonRuntimeCapabilitiesResult,
   PythonRuntimeHealthCheckResult,
   PythonRuntimeTaskRequest,
@@ -35,13 +35,13 @@ describe("Python runtime ports", () => {
   });
 
   it("keeps dataset preparation as a task-specific application-facing seam", () => {
-    expectTypeOf<keyof PythonDatasetPreparationPort>().toEqualTypeOf<"prepareTemplatedDataset">();
+    expectTypeOf<keyof PythonDatasetPreparationPort>().toEqualTypeOf<"prepareTrainingDataset">();
 
-    expectTypeOf<Parameters<PythonDatasetPreparationPort["prepareTemplatedDataset"]>[0]>().toExtend<
-      PrepareTemplatedDatasetRequest
+    expectTypeOf<Parameters<PythonDatasetPreparationPort["prepareTrainingDataset"]>[0]>().toExtend<
+      PrepareTrainingDatasetRequest
     >();
-    expectTypeOf<Awaited<ReturnType<PythonDatasetPreparationPort["prepareTemplatedDataset"]>>>().toEqualTypeOf<
-      PrepareTemplatedDatasetResult
+    expectTypeOf<Awaited<ReturnType<PythonDatasetPreparationPort["prepareTrainingDataset"]>>>().toEqualTypeOf<
+      PrepareTrainingDatasetResult
     >();
   });
 });

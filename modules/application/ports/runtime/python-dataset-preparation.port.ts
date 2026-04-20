@@ -1,10 +1,10 @@
 import {
-  PrepareTemplatedDatasetRequest,
-  PrepareTemplatedDatasetResult
+  PrepareTrainingDatasetRequest,
+  PrepareTrainingDatasetResult,
 } from "../../../contracts/runtime";
 
 export interface PythonDatasetPreparationPort {
-  prepareTemplatedDataset(
-    request: PrepareTemplatedDatasetRequest
-  ): Promise<PrepareTemplatedDatasetResult>;
+  prepareTrainingDataset(
+    request: PrepareTrainingDatasetRequest
+  ): Promise<PrepareTrainingDatasetResult>;
 }
