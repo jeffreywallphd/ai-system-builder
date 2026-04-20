@@ -1,27 +1,35 @@
 import { describe, expect, it } from "../../../testing/node-test";
 
 import {
-  DESKTOP_DATASET_PREPARE_TEMPLATED_OPERATION,
-  DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL,
-  DESKTOP_DATASET_PREPARE_TEMPLATED_RESPONSE_CHANNEL,
-  createDesktopPrepareTemplatedDatasetRequest,
-  createDesktopPrepareTemplatedDatasetSuccessResponse,
+  DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
+  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
+  createDesktopPrepareTrainingDatasetRequest,
+  createDesktopPrepareTrainingDatasetSuccessResponse,
 } from "..";
 
 describe("desktop dataset preparation ipc contract", () => {
   it("defines operation/channel identities", () => {
-    expect(DESKTOP_DATASET_PREPARE_TEMPLATED_OPERATION).toBe("artifact.prepare-templated-dataset");
-    expect(DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL.value).toBe("ipc.artifact.prepare-templated-dataset.request");
-    expect(DESKTOP_DATASET_PREPARE_TEMPLATED_RESPONSE_CHANNEL.value).toBe("ipc.artifact.prepare-templated-dataset.response");
+    expect(DESKTOP_DATASET_PREPARE_TRAINING_OPERATION).toBe("artifact.prepare-training-dataset");
+    expect(DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value).toBe("ipc.artifact.prepare-training-dataset.request");
+    expect(DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL.value).toBe("ipc.artifact.prepare-training-dataset.response");
   });
 
   it("creates normalized request and success envelopes", () => {
-    const request = createDesktopPrepareTemplatedDatasetRequest({
+    const request = createDesktopPrepareTrainingDatasetRequest({
       command: {
         sourceArtifactIds: ["artifact-1"],
-        template: "Prompt: {{text}}",
+        recipe: {
+          normalization: { targetFormat: "markdown" },
+          chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+          generation: {
+            mode: "qa",
+            model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" },
+            promptTemplate: "Prompt: {{text}}",
+          },
+        },
         split: { trainRatio: 0.8, testRatio: 0.2, seed: 7 },
-        outputFormat: "jsonl",
+        output: { format: "jsonl" },
       },
       boundary: {
         host: "desktop",
@@ -31,7 +39,7 @@ describe("desktop dataset preparation ipc contract", () => {
 
     expect(request.payload.boundary.source).toBe("desktop.renderer.dataset-preparation");
 
-    const response = createDesktopPrepareTemplatedDatasetSuccessResponse({
+    const response = createDesktopPrepareTrainingDatasetSuccessResponse({
       outputs: {
         local: {
           train: {
@@ -44,12 +52,36 @@ describe("desktop dataset preparation ipc contract", () => {
           },
         },
       },
-      trainRowCount: 8,
-      testRowCount: 2,
-      warnings: [],
+      provenance: {
+        sourceArtifactIds: ["artifact-1"],
+        recipe: request.payload.command.recipe,
+        split: request.payload.command.split,
+        output: request.payload.command.output,
+        generationModelId: "Qwen/Qwen2.5-1.5B-Instruct",
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 2,
+          generatedExampleCount: 10,
+          trainRowCount: 8,
+          testRowCount: 2,
+        },
+      },
+      summary: {
+        sourceDocumentCount: 1,
+        normalizedDocumentCount: 1,
+        skippedDocumentCount: 0,
+        chunkCount: 2,
+        generatedExampleCount: 10,
+        trainRowCount: 8,
+        testRowCount: 2,
+      },
+      warnings: [{ code: "skipped_document", message: "Skipped one unsupported artifact." }],
     });
 
     expect(response.ok).toBe(true);
     expect(response.value.result.outputs.local?.train.storage.key).toBe("stored-train");
+    expect(response.value.result.summary.trainRowCount).toBe(8);
   });
 });

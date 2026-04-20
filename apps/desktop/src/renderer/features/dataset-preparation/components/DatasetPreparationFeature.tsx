@@ -36,7 +36,7 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <h2 className="ui-panel__title">Dataset Preparation</h2>
-      <p>Prepare templated train/test datasets from selected artifacts.</p>
+      <p>Prepare training datasets from selected artifacts.</p>
       <form className="ui-stack ui-stack--sm" onSubmit={(event) => void onSubmit(event)}>
         <section className="ui-stack ui-stack--sm">
           <h3>Source artifacts</h3>
@@ -86,7 +86,7 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
         </label>
 
         <button className="ui-button" type="submit" disabled={selectedArtifactIds.length === 0 || status.kind === "loading"}>
-          {status.kind === "loading" ? "Preparing..." : "Prepare train/test datasets"}
+          {status.kind === "loading" ? "Preparing..." : "Prepare training dataset"}
         </button>
       </form>
 

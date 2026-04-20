@@ -58,16 +58,45 @@ describe("createPythonRuntimeHttpClient", () => {
     expect(fetchImplementation).toHaveBeenCalledTimes(3);
   });
 
-  it("throws on non-OK HTTP status", async () => {
+  it("maps structured health payloads from non-2xx responses", async () => {
     const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
-      new Response("{}", { status: 503 }));
+      new Response(JSON.stringify({
+        healthy: false,
+        status: {
+          runtimeId: "python-sidecar",
+          status: "failed",
+        },
+        error: {
+          code: "runtime_unavailable",
+          message: "Runtime unavailable.",
+        },
+      }), { status: 503 }));
 
     const client = createPythonRuntimeHttpClient({
       baseUrl: "http://127.0.0.1:43111",
       fetchImplementation,
     });
 
-    await expect(client.getHealthStatus()).rejects.toThrow("status 503");
+    const health = await client.getHealthStatus();
+    expect(health.healthy).toBe(false);
+    expect(health.error?.code).toBe("runtime_unavailable");
+  });
+
+  it("maps structured capabilities payloads from non-2xx responses", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({
+        runtimeId: "python-sidecar",
+        capabilities: ["prepare-training-dataset"],
+      }), { status: 503 }));
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+    });
+
+    const capabilities = await client.getCapabilities();
+    expect(capabilities.runtimeId).toBe("python-sidecar");
+    expect(capabilities.capabilities).toEqual(["prepare-training-dataset"]);
   });
 
   it("maps structured runtime task errors from non-2xx responses", async () => {

@@ -3,17 +3,17 @@ import type {
   PrepareTrainingDatasetFromArtifactsResult,
 } from "../../../../application/use-cases";
 import {
-  DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL,
-  DESKTOP_DATASET_PREPARE_TEMPLATED_RESPONSE_CHANNEL,
-  createDesktopPrepareTemplatedDatasetSuccessResponse,
+  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
+  createDesktopPrepareTrainingDatasetSuccessResponse,
   createIpcError,
   createIpcFailureResponse,
-  type DesktopPrepareTemplatedDatasetRequest,
-  type DesktopPrepareTemplatedDatasetResponse,
+  type DesktopPrepareTrainingDatasetRequest,
+  type DesktopPrepareTrainingDatasetResponse,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
-export interface PrepareTemplatedDatasetFromArtifactsUseCasePort {
+export interface PrepareTrainingDatasetFromArtifactsUseCasePort {
   execute: (
     command: PrepareTrainingDatasetFromArtifactsCommand,
     context?: {
@@ -25,15 +25,15 @@ export interface PrepareTemplatedDatasetFromArtifactsUseCasePort {
 
 export interface RegisterDatasetPreparationIpcDependencies {
   ipcMain: IpcMainHandlePort;
-  prepareTemplatedDatasetFromArtifactsUseCase: PrepareTemplatedDatasetFromArtifactsUseCasePort;
+  prepareTrainingDatasetFromArtifactsUseCase: PrepareTrainingDatasetFromArtifactsUseCasePort;
 }
 
-function mapPrepareTemplatedDatasetResultToIpcResponse(
+function mapPrepareTrainingDatasetResultToIpcResponse(
   result: PrepareTrainingDatasetFromArtifactsResult,
-  request: DesktopPrepareTemplatedDatasetRequest,
-): DesktopPrepareTemplatedDatasetResponse {
+  request: DesktopPrepareTrainingDatasetRequest,
+): DesktopPrepareTrainingDatasetResponse {
   if (result.ok) {
-    return createDesktopPrepareTemplatedDatasetSuccessResponse(result.value, {
+    return createDesktopPrepareTrainingDatasetSuccessResponse(result.value, {
       requestId: result.requestId ?? request.requestId,
       correlationId: result.correlationId ?? request.correlationId,
     });
@@ -41,7 +41,7 @@ function mapPrepareTemplatedDatasetResultToIpcResponse(
 
   return createIpcFailureResponse(
     createIpcError(
-      DESKTOP_DATASET_PREPARE_TEMPLATED_RESPONSE_CHANNEL,
+      DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
       result.error.code,
       result.error.message,
       {
@@ -53,13 +53,13 @@ function mapPrepareTemplatedDatasetResultToIpcResponse(
   );
 }
 
-export function createDesktopPrepareTemplatedDatasetIpcHandler(
-  useCase: PrepareTemplatedDatasetFromArtifactsUseCasePort,
+export function createDesktopPrepareTrainingDatasetIpcHandler(
+  useCase: PrepareTrainingDatasetFromArtifactsUseCasePort,
 ) {
   return async (
     _event: unknown,
-    request: DesktopPrepareTemplatedDatasetRequest,
-  ): Promise<DesktopPrepareTemplatedDatasetResponse> => {
+    request: DesktopPrepareTrainingDatasetRequest,
+  ): Promise<DesktopPrepareTrainingDatasetResponse> => {
     const result = await useCase.execute(
       request.payload.command,
       {
@@ -68,7 +68,7 @@ export function createDesktopPrepareTemplatedDatasetIpcHandler(
       },
     );
 
-    return mapPrepareTemplatedDatasetResultToIpcResponse(result, request);
+    return mapPrepareTrainingDatasetResultToIpcResponse(result, request);
   };
 }
 
@@ -76,7 +76,7 @@ export function registerDatasetPreparationIpc(
   dependencies: RegisterDatasetPreparationIpcDependencies,
 ): void {
   dependencies.ipcMain.handle(
-    DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL.value,
-    createDesktopPrepareTemplatedDatasetIpcHandler(dependencies.prepareTemplatedDatasetFromArtifactsUseCase),
+    DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
+    createDesktopPrepareTrainingDatasetIpcHandler(dependencies.prepareTrainingDatasetFromArtifactsUseCase),
   );
 }

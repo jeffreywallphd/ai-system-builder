@@ -121,12 +121,12 @@ import {
   type DesktopIngestWebsitePageResponse,
   type DesktopIngestWebsitePagesBatchRequest,
   type DesktopIngestWebsitePagesBatchResponse,
-  DESKTOP_DATASET_PREPARE_TEMPLATED_OPERATION,
-  DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL,
-  DESKTOP_DATASET_PREPARE_TEMPLATED_RESPONSE_CHANNEL,
-  createDesktopPrepareTemplatedDatasetRequest,
-  type DesktopPrepareTemplatedDatasetRequest,
-  type DesktopPrepareTemplatedDatasetResponse,
+  DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
+  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
+  createDesktopPrepareTrainingDatasetRequest,
+  type DesktopPrepareTrainingDatasetRequest,
+  type DesktopPrepareTrainingDatasetResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 
@@ -193,20 +193,15 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopIngestWebsitePagesBatchResponse>;
-  prepareTemplatedDatasetFromArtifacts: (
+  prepareTrainingDatasetFromArtifacts: (
     input: {
       sourceArtifactIds: string[];
-      template: string;
-      split: {
-        trainRatio: number;
-        testRatio: number;
-        seed?: number;
-      };
-      outputFormat: "jsonl" | "json" | "csv";
-      shuffle?: boolean;
+      recipe: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["recipe"];
+      split: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["split"];
+      output: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["output"];
     },
     context?: DesktopArtifactUploadBridgeContext,
-  ) => Promise<DesktopPrepareTemplatedDatasetResponse>;
+  ) => Promise<DesktopPrepareTrainingDatasetResponse>;
   browseArtifacts: (
     input?: { artifactFamily?: ArtifactFamily },
     context?: DesktopArtifactUploadBridgeContext,
@@ -514,15 +509,14 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async prepareTemplatedDatasetFromArtifacts(input, context = {}) {
-      const request: DesktopPrepareTemplatedDatasetRequest = createDesktopPrepareTemplatedDatasetRequest(
+    async prepareTrainingDatasetFromArtifacts(input, context = {}) {
+      const request: DesktopPrepareTrainingDatasetRequest = createDesktopPrepareTrainingDatasetRequest(
         {
           command: {
             sourceArtifactIds: input.sourceArtifactIds,
-            template: input.template,
+            recipe: input.recipe,
             split: input.split,
-            outputFormat: input.outputFormat,
-            shuffle: input.shuffle,
+            output: input.output,
           },
           boundary: {
             host: "desktop",
@@ -532,13 +526,13 @@ export function createDesktopPreloadApi(
         context,
       );
       const response = await dependencies.ipcRenderer.invoke(
-        DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL.value,
+        DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
         request,
       );
 
-      return assertDesktopEnvelopeResponse<DesktopPrepareTemplatedDatasetResponse>(response, {
-        operation: DESKTOP_DATASET_PREPARE_TEMPLATED_OPERATION,
-        channel: DESKTOP_DATASET_PREPARE_TEMPLATED_RESPONSE_CHANNEL.value,
+      return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetResponse>(response, {
+        operation: DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
+        channel: DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop dataset preparation IPC response envelope.",
       });
     },

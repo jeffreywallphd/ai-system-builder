@@ -21,15 +21,46 @@ describe("DatasetPreparationFeature", () => {
   });
 
   it("constructs request, shows loading, and renders success output summary", async () => {
-    const prepareTemplatedDatasetFromArtifacts = vi.fn().mockImplementation(async () => {
+    const prepareTrainingDatasetFromArtifacts = vi.fn().mockImplementation(async () => {
       await Promise.resolve();
       return {
         ok: true,
         value: {
-          train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
-          test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
-          trainRowCount: 8,
-          testRowCount: 2,
+          outputs: {
+            local: {
+              train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
+              test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+            },
+          },
+          provenance: {
+            sourceArtifactIds: ["artifact-1"],
+            recipe: {
+              normalization: { targetFormat: "markdown" },
+              chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+              generation: { mode: "qa", model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" } },
+            },
+            split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
+            output: { format: "jsonl" },
+            generationModelId: "Qwen/Qwen2.5-1.5B-Instruct",
+            summary: {
+              sourceDocumentCount: 1,
+              normalizedDocumentCount: 1,
+              skippedDocumentCount: 0,
+              chunkCount: 2,
+              generatedExampleCount: 10,
+              trainRowCount: 8,
+              testRowCount: 2,
+            },
+          },
+          summary: {
+            sourceDocumentCount: 1,
+            normalizedDocumentCount: 1,
+            skippedDocumentCount: 0,
+            chunkCount: 2,
+            generatedExampleCount: 10,
+            trainRowCount: 8,
+            testRowCount: 2,
+          },
         },
       };
     });
@@ -43,7 +74,7 @@ describe("DatasetPreparationFeature", () => {
         <DatasetPreparationFeature
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", storageKey: "artifact-1", label: "artifact-1.jsonl" }],
-            prepareTemplatedDatasetFromArtifacts,
+            prepareTrainingDatasetFromArtifacts,
           }}
         />,
       );
@@ -58,9 +89,9 @@ describe("DatasetPreparationFeature", () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(prepareTemplatedDatasetFromArtifacts).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.objectContaining({
       sourceArtifactIds: ["artifact-1"],
-      outputFormat: "jsonl",
+      output: { format: "jsonl" },
     }), expect.objectContaining({
       requestId: expect.stringMatching(/^dataset-preparation-/),
     }));
@@ -78,7 +109,7 @@ describe("DatasetPreparationFeature", () => {
         <DatasetPreparationFeature
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", storageKey: "artifact-1", label: "artifact-1.jsonl" }],
-            prepareTemplatedDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+            prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
       );

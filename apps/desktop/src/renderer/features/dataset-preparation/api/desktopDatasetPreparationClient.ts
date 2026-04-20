@@ -1,7 +1,7 @@
 import {
   getDesktopApi,
-  type DesktopPrepareTemplatedDatasetInput,
-  type DesktopPreparedTemplatedDatasetResult,
+  type DesktopPrepareTrainingDatasetInput,
+  type DesktopPreparedTrainingDatasetResult,
   type DesktopArtifactBrowseItem,
 } from "../../../lib/desktopApi";
 
@@ -19,7 +19,7 @@ function isPreloadResponseEnvelope(value: unknown): value is PreloadResponseEnve
 }
 
 export type DesktopDatasetPreparationResult =
-  | { ok: true; value: DesktopPreparedTemplatedDatasetResult }
+  | { ok: true; value: DesktopPreparedTrainingDatasetResult }
   | { ok: false; error: { code: string; message: string } };
 
 export interface DesktopDatasetPreparationRequestContext {
@@ -29,8 +29,8 @@ export interface DesktopDatasetPreparationRequestContext {
 
 export interface DesktopDatasetPreparationClient {
   browseSourceArtifacts: () => Promise<Array<{ artifactId: string; storageKey: string; label: string }>>;
-  prepareTemplatedDatasetFromArtifacts: (
-    input: DesktopPrepareTemplatedDatasetInput,
+  prepareTrainingDatasetFromArtifacts: (
+    input: DesktopPrepareTrainingDatasetInput,
     context?: DesktopDatasetPreparationRequestContext,
   ) => Promise<DesktopDatasetPreparationResult>;
 }
@@ -79,11 +79,11 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
       });
     },
 
-    async prepareTemplatedDatasetFromArtifacts(
-      input: DesktopPrepareTemplatedDatasetInput,
+    async prepareTrainingDatasetFromArtifacts(
+      input: DesktopPrepareTrainingDatasetInput,
       context?: DesktopDatasetPreparationRequestContext,
     ): Promise<DesktopDatasetPreparationResult> {
-      if (!desktopApi.prepareTemplatedDatasetFromArtifacts) {
+      if (!desktopApi.prepareTrainingDatasetFromArtifacts) {
         return {
           ok: false,
           error: {
@@ -93,7 +93,7 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         };
       }
 
-      const response = await desktopApi.prepareTemplatedDatasetFromArtifacts(input, context);
+      const response = await desktopApi.prepareTrainingDatasetFromArtifacts(input, context);
       if (!isPreloadResponseEnvelope(response)) {
         return {
           ok: false,
@@ -114,7 +114,7 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         };
       }
 
-      const result = (response.value as { result?: DesktopPreparedTemplatedDatasetResult } | undefined)?.result;
+      const result = (response.value as { result?: DesktopPreparedTrainingDatasetResult } | undefined)?.result;
       if (!result) {
         return {
           ok: false,
