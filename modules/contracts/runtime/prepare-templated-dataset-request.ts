@@ -1,23 +1,6 @@
-export interface PrepareTemplatedDatasetInputDescriptor {
-  artifactId: string;
-  localPath: string;
-  mediaType: string;
-  role?: string;
-  name?: string;
-}
+import type { PrepareTrainingDatasetRequest } from "./prepare-training-dataset-request";
 
-export interface PrepareTemplatedDatasetRequest {
-  sourceInputs: PrepareTemplatedDatasetInputDescriptor[];
-  template: string;
-  split: {
-    trainRatio: number;
-    testRatio: number;
-    seed?: number;
-  };
-  outputFormat: "jsonl" | "json" | "csv";
-  shuffle?: boolean;
-  validationPolicy?: "strict" | "best-effort";
-  outputNaming?: {
-    baseName?: string;
-  };
-}
+/**
+ * @deprecated Use PrepareTrainingDatasetRequest.
+ */
+export type PrepareTemplatedDatasetRequest = PrepareTrainingDatasetRequest;

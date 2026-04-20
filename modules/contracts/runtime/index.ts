@@ -13,5 +13,8 @@ export * from "./python-runtime-capabilities-result";
 export * from "./python-runtime-output-descriptor";
 export * from "./python-runtime-task-request";
 export * from "./python-runtime-task-result";
+export * from "./dataset-preparation";
+export * from "./prepare-training-dataset-request";
+export * from "./prepare-training-dataset-result";
 export * from "./prepare-templated-dataset-request";
 export * from "./prepare-templated-dataset-result";

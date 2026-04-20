@@ -8,40 +8,34 @@ import {
 } from "../../contracts/ingestion";
 import { createContractError, createFailureResult, createSuccessResult, type ContractResult } from "../../contracts/shared";
 import { createRetrieveArtifactRequest, createStoreArtifactRequest } from "../../contracts/storage";
-import type { PrepareTemplatedDatasetRequest } from "../../contracts/runtime";
+import type {
+  DatasetPreparationSummary,
+  DatasetPreparationWarning,
+  PrepareTrainingDatasetRequest,
+} from "../../contracts/runtime";
 
 import type { ApplicationRequestContext } from "../ports";
 import type { PythonDatasetPreparationPort } from "../ports/runtime";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
 
-export interface PrepareTemplatedDatasetFromArtifactsCommand {
+export interface PrepareTrainingDatasetFromArtifactsCommand {
   sourceArtifactIds: string[];
-  template: string;
-  split: {
-    trainRatio: number;
-    testRatio: number;
-    seed?: number;
-  };
-  outputFormat: "jsonl" | "json" | "csv";
-  shuffle?: boolean;
-  validationPolicy?: "strict" | "best-effort";
-  outputNaming?: {
-    baseName?: string;
-  };
+  recipe: PrepareTrainingDatasetRequest["recipe"];
+  split: PrepareTrainingDatasetRequest["split"];
+  output: PrepareTrainingDatasetRequest["output"];
 }
 
-export interface PrepareTemplatedDatasetFromArtifactsValue {
+export interface PrepareTrainingDatasetFromArtifactsValue {
   train: StagedArtifactDescriptor;
   test: StagedArtifactDescriptor;
-  trainRowCount: number;
-  testRowCount: number;
-  warnings?: string[];
+  summary: DatasetPreparationSummary;
+  warnings?: DatasetPreparationWarning[];
 }
 
-export type PrepareTemplatedDatasetFromArtifactsResult = ContractResult<PrepareTemplatedDatasetFromArtifactsValue>;
+export type PrepareTrainingDatasetFromArtifactsResult = ContractResult<PrepareTrainingDatasetFromArtifactsValue>;
 
-export interface PrepareTemplatedDatasetFromArtifactsUseCaseDependencies {
+export interface PrepareTrainingDatasetFromArtifactsUseCaseDependencies {
   datasetPreparation: PythonDatasetPreparationPort;
   storageBindings: ArtifactStorageBindingPort;
   storage: ArtifactObjectStoragePort;
@@ -77,32 +71,29 @@ function extensionForMediaType(mediaType: string): string {
   return ".txt";
 }
 
-export class PrepareTemplatedDatasetFromArtifactsUseCase {
+export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly datasetPreparation: PythonDatasetPreparationPort;
   private readonly storageBindings: ArtifactStorageBindingPort;
   private readonly storage: ArtifactObjectStoragePort;
 
-  public constructor(dependencies: PrepareTemplatedDatasetFromArtifactsUseCaseDependencies) {
+  public constructor(dependencies: PrepareTrainingDatasetFromArtifactsUseCaseDependencies) {
     this.datasetPreparation = dependencies.datasetPreparation;
     this.storageBindings = dependencies.storageBindings;
     this.storage = dependencies.storage;
   }
 
   public async execute(
-    command: PrepareTemplatedDatasetFromArtifactsCommand,
+    command: PrepareTrainingDatasetFromArtifactsCommand,
     context?: ApplicationRequestContext,
-  ): Promise<PrepareTemplatedDatasetFromArtifactsResult> {
+  ): Promise<PrepareTrainingDatasetFromArtifactsResult> {
     const runtimeWorkingDir = await mkdtemp(join(tmpdir(), "ai-system-builder-runtime-"));
 
     try {
-      const runtimeRequest: PrepareTemplatedDatasetRequest = {
+      const runtimeRequest: PrepareTrainingDatasetRequest = {
         sourceInputs: [],
-        template: command.template,
+        recipe: command.recipe,
         split: command.split,
-        outputFormat: command.outputFormat,
-        shuffle: command.shuffle,
-        validationPolicy: command.validationPolicy,
-        outputNaming: command.outputNaming,
+        output: command.output,
       };
 
       for (const artifactId of command.sourceArtifactIds) {
@@ -139,7 +130,7 @@ export class PrepareTemplatedDatasetFromArtifactsUseCase {
         });
       }
 
-      const prepared = await this.datasetPreparation.prepareTemplatedDataset(runtimeRequest);
+      const prepared = await this.datasetPreparation.prepareTrainingDataset(runtimeRequest);
       const trainOutput = prepared.outputs.find((output) => output.role === "train");
       const testOutput = prepared.outputs.find((output) => output.role === "test");
 
@@ -163,11 +154,10 @@ export class PrepareTemplatedDatasetFromArtifactsUseCase {
               runtimeOutputName: trainOutput.name,
               runtimeRole: "train",
               sourceArtifactIds: command.sourceArtifactIds,
-              template: command.template,
+              recipe: command.recipe,
               split: command.split,
-              outputFormat: command.outputFormat,
-              shuffle: command.shuffle ?? false,
-              rowCount: prepared.trainRowCount,
+              output: command.output,
+              rowCount: prepared.summary.trainRowCount,
             },
           },
         }), context),
@@ -178,11 +168,10 @@ export class PrepareTemplatedDatasetFromArtifactsUseCase {
               runtimeOutputName: testOutput.name,
               runtimeRole: "test",
               sourceArtifactIds: command.sourceArtifactIds,
-              template: command.template,
+              recipe: command.recipe,
               split: command.split,
-              outputFormat: command.outputFormat,
-              shuffle: command.shuffle ?? false,
-              rowCount: prepared.testRowCount,
+              output: command.output,
+              rowCount: prepared.summary.testRowCount,
             },
           },
         }), context),
@@ -199,14 +188,13 @@ export class PrepareTemplatedDatasetFromArtifactsUseCase {
       return createSuccessResult({
         train: createStagedArtifactDescriptorFromStorageObjectDescriptor(storedTrain.value, {
           sourceKind: "runtime",
-          originalName: `${trainOutput.name}.${command.outputFormat}`,
+          originalName: `${trainOutput.name}.${command.output.format}`,
         }),
         test: createStagedArtifactDescriptorFromStorageObjectDescriptor(storedTest.value, {
           sourceKind: "runtime",
-          originalName: `${testOutput.name}.${command.outputFormat}`,
+          originalName: `${testOutput.name}.${command.output.format}`,
         }),
-        trainRowCount: prepared.trainRowCount,
-        testRowCount: prepared.testRowCount,
+        summary: prepared.summary,
         warnings: prepared.warnings,
       }, context);
     } catch (error) {
@@ -222,3 +210,29 @@ export class PrepareTemplatedDatasetFromArtifactsUseCase {
     }
   }
 }
+
+/**
+ * @deprecated Use PrepareTrainingDatasetFromArtifactsCommand.
+ */
+export type PrepareTemplatedDatasetFromArtifactsCommand = PrepareTrainingDatasetFromArtifactsCommand;
+
+/**
+ * @deprecated Use PrepareTrainingDatasetFromArtifactsValue.
+ */
+export type PrepareTemplatedDatasetFromArtifactsValue = PrepareTrainingDatasetFromArtifactsValue;
+
+/**
+ * @deprecated Use PrepareTrainingDatasetFromArtifactsResult.
+ */
+export type PrepareTemplatedDatasetFromArtifactsResult = PrepareTrainingDatasetFromArtifactsResult;
+
+/**
+ * @deprecated Use PrepareTrainingDatasetFromArtifactsUseCaseDependencies.
+ */
+export type PrepareTemplatedDatasetFromArtifactsUseCaseDependencies =
+  PrepareTrainingDatasetFromArtifactsUseCaseDependencies;
+
+/**
+ * @deprecated Use PrepareTrainingDatasetFromArtifactsUseCase.
+ */
+export const PrepareTemplatedDatasetFromArtifactsUseCase = PrepareTrainingDatasetFromArtifactsUseCase;

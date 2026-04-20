@@ -1,7 +1,8 @@
 import type { PythonDatasetPreparationPort, PythonRuntimePort } from "../../../application/ports/runtime";
 import type {
-  PrepareTemplatedDatasetRequest,
-  PrepareTemplatedDatasetResult,
+  PrepareTrainingDatasetRequest,
+  PrepareTrainingDatasetResult,
+  DatasetPreparationWarning,
   PythonRuntimeOutputDescriptor,
 } from "../../../contracts/runtime";
 
@@ -84,16 +85,41 @@ function parseOutputRole(
   return normalized as PythonRuntimeOutputDescriptor["role"];
 }
 
-function mapRuntimeDataToResult(data: unknown): PrepareTemplatedDatasetResult {
+function parseWarnings(value: unknown): DatasetPreparationWarning[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.flatMap((warning, index) => {
+    const normalized = asObject(warning, `warnings[${index}]`);
+    if (typeof normalized.code !== "string" || typeof normalized.message !== "string") {
+      return [];
+    }
+
+    return [{
+      code: normalized.code,
+      message: normalized.message,
+      sourceArtifactId: typeof normalized.sourceArtifactId === "string" ? normalized.sourceArtifactId : undefined,
+    }];
+  });
+}
+
+function mapRuntimeDataToResult(data: unknown): PrepareTrainingDatasetResult {
   const payload = asObject(data, "data");
+  const summary = asObject(payload.summary, "summary");
 
   return {
     outputs: parseOutputDescriptors(payload.outputs),
-    trainRowCount: asNumber(payload.trainRowCount, "trainRowCount"),
-    testRowCount: asNumber(payload.testRowCount, "testRowCount"),
-    warnings: Array.isArray(payload.warnings)
-      ? payload.warnings.filter((warning): warning is string => typeof warning === "string")
-      : undefined,
+    summary: {
+      sourceDocumentCount: asNumber(summary.sourceDocumentCount, "summary.sourceDocumentCount"),
+      normalizedDocumentCount: asNumber(summary.normalizedDocumentCount, "summary.normalizedDocumentCount"),
+      skippedDocumentCount: asNumber(summary.skippedDocumentCount, "summary.skippedDocumentCount"),
+      chunkCount: asNumber(summary.chunkCount, "summary.chunkCount"),
+      generatedExampleCount: asNumber(summary.generatedExampleCount, "summary.generatedExampleCount"),
+      trainRowCount: asNumber(summary.trainRowCount, "summary.trainRowCount"),
+      testRowCount: asNumber(summary.testRowCount, "summary.testRowCount"),
+    },
+    warnings: parseWarnings(payload.warnings),
   };
 }
 
@@ -105,14 +131,14 @@ export function createPythonDatasetPreparationPort(
   const nextRequestId = () => {
     sequence += 1;
     const timestamp = new Date().toISOString().replace(/[^\d]/g, "").slice(0, 14);
-    return `prepare-templated-dataset-${timestamp}-${String(sequence).padStart(6, "0")}`;
+    return `prepare-training-dataset-${timestamp}-${String(sequence).padStart(6, "0")}`;
   };
 
   return {
-    async prepareTemplatedDataset(request: PrepareTemplatedDatasetRequest): Promise<PrepareTemplatedDatasetResult> {
+    async prepareTrainingDataset(request: PrepareTrainingDatasetRequest): Promise<PrepareTrainingDatasetResult> {
       const taskResult = await runtimePort.executeTask({
         requestId: nextRequestId(),
-        taskType: "prepare-templated-dataset",
+        taskType: "prepare-training-dataset",
         payload: request,
       });
 

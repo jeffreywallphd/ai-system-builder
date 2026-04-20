@@ -1,9 +1,15 @@
 import { describe, expect, it } from "../../testing/node-test";
 
 import {
+  type DatasetOutputConfig,
+  type DatasetPreparationRecipe,
+  type DatasetPreparationSourceInput,
+  type DatasetPreparationSummary,
+  type DatasetPreparationWarning,
+  type DatasetSplitConfig,
   KNOWN_RUNTIME_KINDS,
-  type PrepareTemplatedDatasetRequest,
-  type PrepareTemplatedDatasetResult,
+  type PrepareTrainingDatasetRequest,
+  type PrepareTrainingDatasetResult,
   type PythonRuntimeCapabilitiesResult,
   type PythonRuntimeHealthCheckResult,
   type PythonRuntimeHealthStatus,
@@ -311,13 +317,13 @@ describe("python sidecar runtime contracts", () => {
     const capabilities: PythonRuntimeCapabilitiesResult = {
       runtimeId: "python-sidecar-1",
       capabilities: [
-        "prepare-templated-dataset",
+        "prepare-training-dataset",
         "future-task-type",
       ],
     };
 
     expect(capabilities.runtimeId).toBe("python-sidecar-1");
-    expect(capabilities.capabilities).toContain("prepare-templated-dataset");
+    expect(capabilities.capabilities).toContain("prepare-training-dataset");
   });
 
   it("uses runtime output descriptors as canonical output handoff contracts", () => {
@@ -343,7 +349,7 @@ describe("python sidecar runtime contracts", () => {
   it("keeps generic python runtime task request/result envelopes stable and metadata-friendly", () => {
     const request: PythonRuntimeTaskRequest = {
       requestId: "req-python-1",
-      taskType: "prepare-templated-dataset",
+      taskType: "prepare-training-dataset",
       payload: {
         sourceInputs: [{ artifactId: "artifact-1", localPath: "/tmp/a.jsonl", mediaType: "application/x-ndjson" }],
       },
@@ -372,27 +378,76 @@ describe("python sidecar runtime contracts", () => {
     expect(result.error?.code).toBe("validation_failed");
   });
 
-  it("keeps dataset preparation contracts task-specific while using shared output descriptors", () => {
-    const request: PrepareTemplatedDatasetRequest = {
-      sourceInputs: [
-        { artifactId: "artifact-1", localPath: "/tmp/a.jsonl", mediaType: "application/x-ndjson" },
-        { artifactId: "artifact-2", localPath: "/tmp/b.csv", mediaType: "text/csv" },
-      ],
-      template: "Summarize: {{text}}",
-      split: {
-        trainRatio: 0.8,
-        testRatio: 0.2,
-        seed: 42,
+  it("keeps dataset preparation contracts task-specific with recipe, split, output, summary, and warnings", () => {
+    const sourceInputs: DatasetPreparationSourceInput[] = [
+      { artifactId: "artifact-1", localPath: "/tmp/a.md", mediaType: "text/markdown", originalName: "a.md" },
+      { artifactId: "artifact-2", localPath: "/tmp/b.pdf", mediaType: "application/pdf", originalName: "b.pdf" },
+    ];
+    const recipe: DatasetPreparationRecipe = {
+      normalization: {
+        targetFormat: "markdown",
+        unsupportedDocumentPolicy: "skip",
+        normalizationMode: "best-effort",
       },
-      outputFormat: "jsonl",
+      chunking: {
+        strategy: "character",
+        chunkSize: 800,
+        chunkOverlap: 120,
+        preserveDocumentBoundaries: true,
+      },
+      generation: {
+        mode: "qa",
+        model: {
+          provider: "transformers",
+          modelId: "Qwen/Qwen2.5-3B-Instruct",
+          device: "auto",
+          torchDtype: "bfloat16",
+        },
+        promptTemplate: "Generate QA examples from this chunk.",
+        maxExamplesPerChunk: 4,
+        generationParams: {
+          temperature: 0.2,
+          topP: 0.9,
+          maxNewTokens: 256,
+        },
+      },
+    };
+    const split: DatasetSplitConfig = {
+      trainRatio: 0.8,
+      testRatio: 0.2,
+      seed: 42,
       shuffle: true,
-      validationPolicy: "strict",
-      outputNaming: {
+    };
+    const output: DatasetOutputConfig = {
+      format: "jsonl",
+      naming: {
         baseName: "support-ticket-dataset",
       },
     };
 
-    const result: PrepareTemplatedDatasetResult = {
+    const request: PrepareTrainingDatasetRequest = {
+      sourceInputs,
+      recipe,
+      split,
+      output,
+    };
+
+    const summary: DatasetPreparationSummary = {
+      sourceDocumentCount: 2,
+      normalizedDocumentCount: 2,
+      skippedDocumentCount: 0,
+      chunkCount: 14,
+      generatedExampleCount: 56,
+      trainRowCount: 45,
+      testRowCount: 11,
+    };
+    const warnings: DatasetPreparationWarning[] = [{
+      code: "source_media_type_inferred",
+      message: "Inferred media type from extension.",
+      sourceArtifactId: "artifact-2",
+    }];
+
+    const result: PrepareTrainingDatasetResult = {
       outputs: [
         {
           name: "support-ticket-dataset-train",
@@ -407,14 +462,18 @@ describe("python sidecar runtime contracts", () => {
           mediaType: "application/x-ndjson",
         },
       ],
-      trainRowCount: 800,
-      testRowCount: 200,
-      warnings: ["Some rows were skipped because required fields were missing."],
+      summary,
+      warnings,
     };
 
-    expect(request.validationPolicy).toBe("strict");
+    expect(request.recipe.generation.mode).toBe("qa");
+    expect(request.recipe.normalization.targetFormat).toBe("markdown");
+    expect(request.recipe.chunking.strategy).toBe("character");
+    expect(request.split.shuffle).toBe(true);
+    expect(request.output.naming?.baseName).toBe("support-ticket-dataset");
     expect(result.outputs.length).toBe(2);
     expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
-    expect(result.trainRowCount + result.testRowCount).toBe(1000);
+    expect(result.summary.trainRowCount + result.summary.testRowCount).toBe(56);
+    expect(result.warnings?.[0]?.code).toBe("source_media_type_inferred");
   });
 });
