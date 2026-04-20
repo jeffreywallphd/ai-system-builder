@@ -21,11 +21,12 @@ describe("PrepareTemplatedDatasetFromArtifactsUseCase", () => {
       value: {
         bindings: [{
           artifactId,
-          storage: {
-            key: `key-${artifactId}`,
-            storageKind: "filesystem",
-            providerId: "local",
+          backing: {
+            kind: "artifact-object",
+            provider: "local",
+            locator: `key-${artifactId}`,
           },
+          role: "primary",
         }],
       },
     }));
@@ -87,6 +88,14 @@ describe("PrepareTemplatedDatasetFromArtifactsUseCase", () => {
 
     expect(prepareTemplatedDataset).toHaveBeenCalledOnce();
     expect(storeArtifact).toHaveBeenCalledTimes(2);
+    const firstStoreRequest = storeArtifact.mock.calls[0]?.[0];
+    expect(firstStoreRequest.descriptor.metadata).toMatchObject({
+      runtimeRole: "train",
+      sourceArtifactIds: ["artifact-1"],
+      template: "Prompt: {{text}}",
+      split: { trainRatio: 0.5, testRatio: 0.5 },
+      rowCount: 1,
+    });
     expect(result.value.train.storage.key).toBe("stored-train");
     expect(result.value.test.storage.key).toBe("stored-test");
   });

@@ -36,9 +36,10 @@ function parseOutputDescriptors(value: unknown): PythonRuntimeOutputDescriptor[]
 
   return value.map((entry, index) => {
     const descriptor = asObject(entry, `outputs[${index}]`);
+    const role = parseOutputRole(descriptor.role, `outputs[${index}].role`);
     return {
       name: asString(descriptor.name, `outputs[${index}].name`),
-      role: descriptor.role as PythonRuntimeOutputDescriptor["role"],
+      role,
       tempPath: asString(descriptor.tempPath, `outputs[${index}].tempPath`),
       mediaType: asString(descriptor.mediaType, `outputs[${index}].mediaType`),
       sizeBytes: typeof descriptor.sizeBytes === "number" ? descriptor.sizeBytes : undefined,
@@ -48,6 +49,39 @@ function parseOutputDescriptors(value: unknown): PythonRuntimeOutputDescriptor[]
           : undefined,
     };
   });
+}
+
+const ALLOWED_OUTPUT_ROLES = new Set<PythonRuntimeOutputDescriptor["role"]>([
+  "train",
+  "test",
+  "metrics",
+  "report",
+  "artifact",
+  undefined,
+]);
+
+function parseOutputRole(
+  value: unknown,
+  field: string,
+): PythonRuntimeOutputDescriptor["role"] {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error(`Invalid dataset preparation result: ${field} must be a string when provided.`);
+  }
+
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  if (!ALLOWED_OUTPUT_ROLES.has(normalized as PythonRuntimeOutputDescriptor["role"])) {
+    throw new Error(`Invalid dataset preparation result: ${field} must be a known runtime output role.`);
+  }
+
+  return normalized as PythonRuntimeOutputDescriptor["role"];
 }
 
 function mapRuntimeDataToResult(data: unknown): PrepareTemplatedDatasetResult {
@@ -66,10 +100,18 @@ function mapRuntimeDataToResult(data: unknown): PrepareTemplatedDatasetResult {
 export function createPythonDatasetPreparationPort(
   runtimePort: PythonRuntimePort,
 ): PythonDatasetPreparationPort {
+  let sequence = 0;
+
+  const nextRequestId = () => {
+    sequence += 1;
+    const timestamp = new Date().toISOString().replace(/[^\d]/g, "").slice(0, 14);
+    return `prepare-templated-dataset-${timestamp}-${String(sequence).padStart(6, "0")}`;
+  };
+
   return {
     async prepareTemplatedDataset(request: PrepareTemplatedDatasetRequest): Promise<PrepareTemplatedDatasetResult> {
       const taskResult = await runtimePort.executeTask({
-        requestId: `prepare-templated-dataset-${Date.now()}`,
+        requestId: nextRequestId(),
         taskType: "prepare-templated-dataset",
         payload: request,
       });

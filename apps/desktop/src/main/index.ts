@@ -51,6 +51,10 @@ app.whenReady().then(async () => {
       await createMainWindow();
     }
   });
+
+  app.on("before-quit", () => {
+    void desktopHost.stopPythonRuntime();
+  });
 });
 
 app.on("window-all-closed", () => {

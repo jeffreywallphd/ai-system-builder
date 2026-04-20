@@ -13,6 +13,7 @@ import type { PrepareTemplatedDatasetRequest } from "../../contracts/runtime";
 import type { ApplicationRequestContext } from "../ports";
 import type { PythonDatasetPreparationPort } from "../ports/runtime";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort } from "../ports/storage";
+import type { ArtifactStorageBinding } from "../../contracts/storage";
 
 export interface PrepareTemplatedDatasetFromArtifactsCommand {
   sourceArtifactIds: string[];
@@ -44,6 +45,20 @@ export interface PrepareTemplatedDatasetFromArtifactsUseCaseDependencies {
   datasetPreparation: PythonDatasetPreparationPort;
   storageBindings: ArtifactStorageBindingPort;
   storage: ArtifactObjectStoragePort;
+}
+
+function resolvePreferredObjectStorageBinding(
+  bindings: ArtifactStorageBinding[],
+): ArtifactStorageBinding | undefined {
+  // Dataset preparation requires locally retrievable object bytes.
+  // Prefer an artifact-object + local + primary binding when available, then
+  // fallback to any artifact-object binding, then the first entry as a last resort.
+  return bindings.find((binding) =>
+    binding.backing.kind === "artifact-object"
+    && binding.backing.provider === "local"
+    && binding.role === "primary")
+    ?? bindings.find((binding) => binding.backing.kind === "artifact-object")
+    ?? bindings[0];
 }
 
 function extensionForMediaType(mediaType: string): string {
@@ -94,15 +109,16 @@ export class PrepareTemplatedDatasetFromArtifactsUseCase {
         const bindingsResult = await this.storageBindings.readArtifactStorageBindings({ artifactId }, context);
         if (!bindingsResult.ok || bindingsResult.value.bindings.length === 0) {
           return createFailureResult(
-            createContractError("not_found", `No storage binding found for artifact '${artifactId}'.`),
+            createContractError("not-found", `No storage binding found for artifact '${artifactId}'.`),
             context,
           );
         }
 
-        const storageKey = bindingsResult.value.bindings[0]?.storage.key;
+        const preferredBinding = resolvePreferredObjectStorageBinding(bindingsResult.value.bindings);
+        const storageKey = preferredBinding?.backing.locator;
         if (!storageKey) {
           return createFailureResult(
-            createContractError("not_found", `Storage key missing for artifact '${artifactId}'.`),
+            createContractError("not-found", `Storage locator missing for artifact '${artifactId}'.`),
             context,
           );
         }
@@ -143,13 +159,31 @@ export class PrepareTemplatedDatasetFromArtifactsUseCase {
         this.storage.storeArtifact(createStoreArtifactRequest(trainBytes, {
           descriptor: {
             mediaType: trainOutput.mediaType,
-            metadata: { runtimeOutputName: trainOutput.name, runtimeRole: "train" },
+            metadata: {
+              runtimeOutputName: trainOutput.name,
+              runtimeRole: "train",
+              sourceArtifactIds: command.sourceArtifactIds,
+              template: command.template,
+              split: command.split,
+              outputFormat: command.outputFormat,
+              shuffle: command.shuffle ?? false,
+              rowCount: prepared.trainRowCount,
+            },
           },
         }), context),
         this.storage.storeArtifact(createStoreArtifactRequest(testBytes, {
           descriptor: {
             mediaType: testOutput.mediaType,
-            metadata: { runtimeOutputName: testOutput.name, runtimeRole: "test" },
+            metadata: {
+              runtimeOutputName: testOutput.name,
+              runtimeRole: "test",
+              sourceArtifactIds: command.sourceArtifactIds,
+              template: command.template,
+              split: command.split,
+              outputFormat: command.outputFormat,
+              shuffle: command.shuffle ?? false,
+              rowCount: prepared.testRowCount,
+            },
           },
         }), context),
       ]);
