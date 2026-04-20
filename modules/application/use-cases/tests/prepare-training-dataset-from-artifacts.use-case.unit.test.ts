@@ -56,14 +56,14 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
             role: "train",
             tempPath: runtimeTrain,
             mediaType: "application/x-ndjson",
-            metadata: { stage: "chunk-level-interim" },
+            metadata: { stage: "generated-examples", generationMode: "qa" },
           },
           {
             name: "dataset-test",
             role: "test",
             tempPath: runtimeTest,
             mediaType: "application/x-ndjson",
-            metadata: { stage: "chunk-level-interim" },
+            metadata: { stage: "generated-examples", generationMode: "qa" },
           },
         ],
         summary: {
@@ -128,7 +128,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       },
       split: { trainRatio: 0.5, testRatio: 0.5 },
       rowCount: 1,
-      datasetPreparationStage: "chunk-level-interim",
+      datasetPreparationStage: "generated-examples",
     });
     expect(result.value.train.storage.key).toBe("stored-train");
     expect(result.value.test.storage.key).toBe("stored-test");

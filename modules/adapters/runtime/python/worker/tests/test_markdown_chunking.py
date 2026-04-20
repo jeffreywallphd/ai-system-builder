@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import unittest
 
-from models import MarkdownChunkingConfig
-from tasks.document_normalization import NormalizedDocument
-from tasks.markdown_chunking import chunk_markdown_documents
+from modules.adapters.runtime.python.worker.models import MarkdownChunkingConfig
+from modules.adapters.runtime.python.worker.tasks.document_normalization import NormalizedDocument
+from modules.adapters.runtime.python.worker.tasks.markdown_chunking import chunk_markdown_documents
 
 
 class MarkdownChunkingTests(unittest.TestCase):

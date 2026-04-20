@@ -4,7 +4,7 @@ import html
 from dataclasses import dataclass
 from pathlib import Path
 
-from models import (
+from ..models import (
     DatasetPreparationSourceInput,
     DatasetPreparationWarning,
     DocumentNormalizationConfig,
@@ -27,6 +27,8 @@ class DocumentNormalizationResult:
 
 
 _SUPPORTED_SUFFIXES = {".txt", ".md", ".html", ".htm", ".pdf", ".docx"}
+
+_UNSUPPORTED_BUT_COMMON_SUFFIXES = {".doc"}
 
 
 def _extension_for_source(source: DatasetPreparationSourceInput) -> str:
@@ -84,6 +86,11 @@ def _normalize_source_to_markdown(source: DatasetPreparationSourceInput) -> str:
         raise ValueError(f"Input path does not exist: {source.localPath}")
 
     extension = _extension_for_source(source)
+    if extension in _UNSUPPORTED_BUT_COMMON_SUFFIXES:
+        raise ValueError(
+            "Unsupported document type: .doc (legacy Microsoft Word). Convert to .docx before dataset preparation."
+        )
+
     if extension not in _SUPPORTED_SUFFIXES:
         raise ValueError(f"Unsupported document type: {extension or 'unknown'}")
 

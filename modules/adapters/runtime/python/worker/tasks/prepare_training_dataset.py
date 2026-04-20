@@ -6,16 +6,18 @@ import os
 import random
 import tempfile
 from pathlib import Path
+from typing import Callable
 
-from models import (
+from ..models import (
     DatasetPreparationSummary,
     DatasetPreparationWarning,
     PrepareTrainingDatasetRequest,
     PrepareTrainingDatasetResult,
     PythonRuntimeOutputDescriptor,
 )
-from tasks.document_normalization import normalize_sources_to_markdown
-from tasks.markdown_chunking import chunk_markdown_documents
+from .document_normalization import normalize_sources_to_markdown
+from .example_generation import GeneratedQaExample, generate_qa_examples_for_chunks
+from .markdown_chunking import chunk_markdown_documents
 
 
 def _emit_rows(
@@ -39,7 +41,7 @@ def _emit_rows(
             path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
         else:
             with path.open("w", encoding="utf-8", newline="") as handle:
-                fieldnames = ["artifactId", "chunkIndex", "text"]
+                fieldnames = ["artifactId", "chunkIndex", "question", "answer", "generationMode"]
                 writer = csv.DictWriter(handle, fieldnames=fieldnames)
                 writer.writeheader()
                 for row in rows:
@@ -63,24 +65,40 @@ def _emit_rows(
     )
 
 
-def _build_chunk_rows(payload: PrepareTrainingDatasetRequest) -> tuple[list[dict[str, object]], list[DatasetPreparationWarning], int, int]:
+def _build_generated_rows(
+    payload: PrepareTrainingDatasetRequest,
+    generator: Callable[[list, object], list[GeneratedQaExample]],
+) -> tuple[list[dict[str, object]], list[DatasetPreparationWarning], int, int, int]:
     normalization = normalize_sources_to_markdown(payload.sourceInputs, payload.recipe.normalization)
     chunks = chunk_markdown_documents(normalization.documents, payload.recipe.chunking)
 
+    generated_examples = generator(chunks, payload.recipe.generation)
+
     rows = [
         {
-            "artifactId": chunk.artifact_id,
-            "chunkIndex": chunk.chunk_index,
-            "text": chunk.text,
+            "artifactId": example.artifact_id,
+            "chunkIndex": example.chunk_index,
+            "question": example.question,
+            "answer": example.answer,
+            "generationMode": example.generation_mode,
         }
-        for chunk in chunks
+        for example in generated_examples
     ]
 
-    return rows, normalization.warnings, len(normalization.documents), normalization.skipped_document_count
+    return (
+        rows,
+        normalization.warnings,
+        len(normalization.documents),
+        normalization.skipped_document_count,
+        len(chunks),
+    )
 
 
-def prepare_training_dataset(payload: PrepareTrainingDatasetRequest) -> PrepareTrainingDatasetResult:
-    rows, warnings, normalized_count, skipped_count = _build_chunk_rows(payload)
+def prepare_training_dataset(
+    payload: PrepareTrainingDatasetRequest,
+    example_generator: Callable[[list, object], list[GeneratedQaExample]] = generate_qa_examples_for_chunks,
+) -> PrepareTrainingDatasetResult:
+    rows, warnings, normalized_count, skipped_count, chunk_count = _build_generated_rows(payload, example_generator)
 
     if payload.split.shuffle:
         seed = int(payload.split.seed or 0)
@@ -95,10 +113,18 @@ def prepare_training_dataset(payload: PrepareTrainingDatasetRequest) -> PrepareT
     test_rows = rows[split_index:]
 
     base_name = payload.output.naming.baseName if payload.output.naming and payload.output.naming.baseName else "training-dataset"
-    interim_metadata = {
-        "stage": "chunk-level-interim",
-        "generationStatus": "not-started",
-        "format": "markdown-chunk",
+    output_metadata = {
+        "stage": "generated-examples",
+        "generationMode": payload.recipe.generation.mode,
+        "generationModel": {
+            "provider": payload.recipe.generation.model.provider,
+            "modelId": payload.recipe.generation.model.modelId,
+        },
+        "sourceArtifactIds": [source.artifactId for source in payload.sourceInputs],
+        "summary": {
+            "chunkCount": chunk_count,
+            "generatedExampleCount": len(rows),
+        },
     }
 
     train_output = _emit_rows(
@@ -106,39 +132,28 @@ def prepare_training_dataset(payload: PrepareTrainingDatasetRequest) -> PrepareT
         payload.output.format,
         "train",
         base_name,
-        {**interim_metadata, "partition": "train"},
+        {**output_metadata, "partition": "train"},
     )
     test_output = _emit_rows(
         test_rows,
         payload.output.format,
         "test",
         base_name,
-        {**interim_metadata, "partition": "test"},
+        {**output_metadata, "partition": "test"},
     )
 
     summary = DatasetPreparationSummary(
         sourceDocumentCount=len(payload.sourceInputs),
         normalizedDocumentCount=normalized_count,
         skippedDocumentCount=skipped_count,
-        chunkCount=len(rows),
-        generatedExampleCount=0,
+        chunkCount=chunk_count,
+        generatedExampleCount=len(rows),
         trainRowCount=len(train_rows),
         testRowCount=len(test_rows),
     )
 
-    all_warnings = [
-        DatasetPreparationWarning(
-            code="generation_not_implemented",
-            message=(
-                "Local-model example generation is not implemented yet; "
-                "outputs currently contain chunk-level interim rows."
-            ),
-        ),
-        *warnings,
-    ]
-
     return PrepareTrainingDatasetResult(
         outputs=[train_output, test_output],
         summary=summary,
-        warnings=all_warnings,
+        warnings=warnings or None,
     )

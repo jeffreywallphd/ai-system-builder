@@ -18,16 +18,10 @@ describe("createPythonDatasetPreparationPort", () => {
           normalizedDocumentCount: 1,
           skippedDocumentCount: 0,
           chunkCount: 2,
-          generatedExampleCount: 0,
+          generatedExampleCount: 10,
           trainRowCount: 8,
           testRowCount: 2,
         },
-        warnings: [
-          {
-            code: "generation_not_implemented",
-            message: "interim rows",
-          },
-        ],
       },
     }));
 
@@ -58,7 +52,7 @@ describe("createPythonDatasetPreparationPort", () => {
     });
     expect(result.summary.trainRowCount).toBe(8);
     expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
-    expect(result.warnings?.[0]?.code).toBe("generation_not_implemented");
+    expect(result.warnings).toBeUndefined();
   });
 
   it("fails clearly for invalid runtime output role values", async () => {
