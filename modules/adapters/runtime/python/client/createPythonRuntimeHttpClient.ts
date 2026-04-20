@@ -34,6 +34,35 @@ async function parseJsonResponseSafe(
   }
 }
 
+function throwNonJsonResponseError(endpoint: string, status: number): never {
+  throw new Error(
+    `Python runtime request failed for ${endpoint} with status ${status} and invalid JSON response body.`,
+  );
+}
+
+function mapRuntimeResponsePayload<T>(
+  endpoint: string,
+  response: Response,
+  payload: unknown | undefined,
+  mapper: (value: unknown) => T,
+): T {
+  if (payload === undefined) {
+    return throwNonJsonResponseError(endpoint, response.status);
+  }
+
+  try {
+    return mapper(payload);
+  } catch {
+    if (!response.ok) {
+      throw new Error(
+        `Python runtime request failed for ${endpoint} with status ${response.status} and invalid structured payload.`,
+      );
+    }
+
+    throw new Error(`Python runtime request failed for ${endpoint} with invalid JSON response body.`);
+  }
+}
+
 function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
@@ -49,31 +78,13 @@ export function createPythonRuntimeHttpClient(
     async getHealthStatus() {
       const response = await fetcher(`${baseUrl}/health`, { method: "GET" });
       const payload = await parseJsonResponseSafe(response);
-      if (!response.ok) {
-        if (payload !== undefined) {
-          return mapHealthResponseFromHttpPayload(payload);
-        }
-        throw new Error(`Python runtime request failed for /health with status ${response.status}.`);
-      }
-      if (payload === undefined) {
-        throw new Error("Python runtime request failed for /health with invalid JSON response body.");
-      }
-      return mapHealthResponseFromHttpPayload(payload);
+      return mapRuntimeResponsePayload("/health", response, payload, mapHealthResponseFromHttpPayload);
     },
 
     async getCapabilities() {
       const response = await fetcher(`${baseUrl}/capabilities`, { method: "GET" });
       const payload = await parseJsonResponseSafe(response);
-      if (!response.ok) {
-        if (payload !== undefined) {
-          return mapCapabilitiesResponseFromHttpPayload(payload);
-        }
-        throw new Error(`Python runtime request failed for /capabilities with status ${response.status}.`);
-      }
-      if (payload === undefined) {
-        throw new Error("Python runtime request failed for /capabilities with invalid JSON response body.");
-      }
-      return mapCapabilitiesResponseFromHttpPayload(payload);
+      return mapRuntimeResponsePayload("/capabilities", response, payload, mapCapabilitiesResponseFromHttpPayload);
     },
 
     async executeTask(request: PythonRuntimeTaskRequest) {
@@ -100,20 +111,7 @@ export function createPythonRuntimeHttpClient(
       }
 
       const payload = await parseJsonResponseSafe(response);
-
-      if (!response.ok) {
-        if (payload !== undefined) {
-          return mapTaskResponseFromHttpPayload(payload);
-        }
-
-        throw new Error(`Python runtime request failed for /tasks/execute with status ${response.status}.`);
-      }
-
-      if (payload === undefined) {
-        throw new Error("Python runtime request failed for /tasks/execute with invalid JSON response body.");
-      }
-
-      return mapTaskResponseFromHttpPayload(payload);
+      return mapRuntimeResponsePayload("/tasks/execute", response, payload, mapTaskResponseFromHttpPayload);
     },
   };
 }

@@ -99,6 +99,55 @@ describe("createPythonRuntimeHttpClient", () => {
     expect(capabilities.capabilities).toEqual(["prepare-training-dataset"]);
   });
 
+  it("throws clear fallback error when /health returns non-JSON payload", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
+      new Response("service unavailable", { status: 503 }));
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+    });
+
+    await expect(client.getHealthStatus()).rejects.toThrow(
+      "Python runtime request failed for /health with status 503 and invalid JSON response body.",
+    );
+  });
+
+  it("throws clear fallback error when /capabilities returns malformed structured payload", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({
+        runtimeId: "python-sidecar",
+        capabilities: [123],
+      }), { status: 503 }));
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+    });
+
+    await expect(client.getCapabilities()).rejects.toThrow(
+      "Python runtime request failed for /capabilities with status 503 and invalid structured payload.",
+    );
+  });
+
+  it("throws clear fallback error when /tasks/execute returns non-JSON payload", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
+      new Response("<html>gateway timeout</html>", { status: 504 }));
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+    });
+
+    await expect(client.executeTask({
+      requestId: "req-python-3",
+      taskType: "prepare-training-dataset",
+      payload: {},
+    })).rejects.toThrow(
+      "Python runtime request failed for /tasks/execute with status 504 and invalid JSON response body.",
+    );
+  });
+
   it("maps structured runtime task errors from non-2xx responses", async () => {
     const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
       new Response(JSON.stringify({

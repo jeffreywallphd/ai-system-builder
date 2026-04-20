@@ -28,7 +28,7 @@ export interface DesktopDatasetPreparationRequestContext {
 }
 
 export interface DesktopDatasetPreparationClient {
-  browseSourceArtifacts: () => Promise<Array<{ artifactId: string; storageKey: string; label: string }>>;
+  browseSourceArtifacts: () => Promise<Array<{ artifactId: string; label: string }>>;
   prepareTrainingDatasetFromArtifacts: (
     input: DesktopPrepareTrainingDatasetInput,
     context?: DesktopDatasetPreparationRequestContext,
@@ -73,7 +73,6 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
 
         return {
           artifactId: artifact.artifactId,
-          storageKey: artifact.storageKey,
           label: artifact.originalName ?? artifact.storageKey,
         };
       });

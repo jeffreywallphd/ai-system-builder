@@ -28,7 +28,7 @@ const DEFAULT_DATASET_PREPARATION_RECIPE_BASE = {
 };
 
 export interface UseDatasetPreparationFeatureResult {
-  artifacts: Array<{ artifactId: string; storageKey: string; label: string }>;
+  artifacts: Array<{ artifactId: string; label: string }>;
   selectedArtifactIds: string[];
   template: string;
   trainRatio: string;
@@ -118,7 +118,7 @@ export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
 ): UseDatasetPreparationFeatureResult {
   const datasetClient = useDatasetPreparationClient(options.client);
-  const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; storageKey: string; label: string }>>([]);
+  const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string }>>([]);
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
   const [template, setTemplate] = useState("Prompt: {{text}}");
   const [trainRatio, setTrainRatio] = useState("0.8");

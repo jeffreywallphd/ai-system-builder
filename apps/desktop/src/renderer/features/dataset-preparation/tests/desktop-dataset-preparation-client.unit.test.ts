@@ -85,7 +85,7 @@ describe("desktop dataset preparation client", () => {
       requestId: "req-123",
     });
 
-    expect(browseResult).toEqual([{ artifactId: "artifact-1", storageKey: "stored/a1.jsonl", label: "stored/a1.jsonl" }]);
+    expect(browseResult).toEqual([{ artifactId: "artifact-1", label: "stored/a1.jsonl" }]);
     expect(response.ok).toBe(true);
     expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.any(Object), { requestId: "req-123" });
   });

@@ -73,7 +73,7 @@ describe("DatasetPreparationFeature", () => {
       root?.render(
         <DatasetPreparationFeature
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", storageKey: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts,
           }}
         />,
@@ -108,7 +108,7 @@ describe("DatasetPreparationFeature", () => {
       root?.render(
         <DatasetPreparationFeature
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", storageKey: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
