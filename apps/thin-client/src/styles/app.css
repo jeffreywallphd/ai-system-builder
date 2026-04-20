@@ -8,12 +8,48 @@
 
 .ui-shell {
   min-height: 100vh;
-  padding: var(--space-lg) var(--space-md);
+  padding-bottom: var(--space-lg);
 }
 
 .ui-container {
   width: min(100%, var(--container-width));
   margin: 0 auto;
+}
+
+.ui-shell__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg-primary) 90%, transparent);
+  backdrop-filter: blur(0.5rem);
+}
+
+.ui-shell__header-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.ui-shell__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.ui-shell__logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-panel);
+  padding: 0.125rem;
+}
+
+.ui-shell__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
 }
 
 .ui-panel {
@@ -202,12 +238,25 @@
 
 .ui-shell__nav {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
+  overflow-x: auto;
+  padding-bottom: var(--space-2xs);
+  scrollbar-width: thin;
+}
+
+.ui-shell__nav .ui-button {
+  flex: 1 0 auto;
+  min-height: 2.25rem;
+  padding: 0 var(--space-sm);
 }
 
 .ui-button[aria-current="page"] {
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 20%, var(--color-bg-primary));
+}
+
+.ui-shell__main {
+  padding: var(--space-md);
 }
 
 img {
@@ -221,6 +270,26 @@ img {
 }
 
 @media (min-width: 48rem) {
+  .ui-shell__header-inner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-lg);
+  }
+
+  .ui-shell__nav {
+    padding-bottom: 0;
+  }
+
+  .ui-shell__nav .ui-button {
+    flex: 0 0 auto;
+    min-height: 2rem;
+  }
+
+  .ui-shell__main {
+    padding: var(--space-lg) var(--space-md);
+  }
+
   .ui-tabbed-panel__tablist {
     grid-auto-columns: max-content;
     padding: 0 var(--space-sm);
