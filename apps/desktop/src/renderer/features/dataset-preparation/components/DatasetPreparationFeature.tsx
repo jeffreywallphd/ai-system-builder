@@ -1,10 +1,7 @@
-import { useEffect, useState } from "react";
-
-import { getDesktopApi, type DesktopArtifactBrowseItem } from "../../../lib/desktopApi";
 import {
-  createDesktopDatasetPreparationClient,
   type DesktopDatasetPreparationClient,
 } from "../api/desktopDatasetPreparationClient";
+import { useDatasetPreparationFeature } from "../hooks/useDatasetPreparationFeature";
 
 export interface DatasetPreparationFeatureProps {
   onPrepared?: () => void;
@@ -12,69 +9,29 @@ export interface DatasetPreparationFeatureProps {
 }
 
 export function DatasetPreparationFeature({ onPrepared, client }: DatasetPreparationFeatureProps) {
-  const datasetClient = client ?? createDesktopDatasetPreparationClient();
-  const [artifacts, setArtifacts] = useState<DesktopArtifactBrowseItem[]>([]);
-  const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
-  const [template, setTemplate] = useState("Prompt: {{text}}");
-  const [trainRatio, setTrainRatio] = useState("0.8");
-  const [testRatio, setTestRatio] = useState("0.2");
-  const [seed, setSeed] = useState("");
-  const [shuffle, setShuffle] = useState(true);
-  const [outputFormat, setOutputFormat] = useState<"jsonl" | "json" | "csv">("jsonl");
-  const [status, setStatus] = useState<{ kind: "idle" | "loading" | "success" | "error"; message?: string }>({ kind: "idle" });
-  const [resultSummary, setResultSummary] = useState<{ trainKey: string; testKey: string; trainRows: number; testRows: number }>();
-
-  useEffect(() => {
-    void getDesktopApi().browseArtifacts().then((response) => {
-      if (response && typeof response === "object" && "ok" in response && response.ok) {
-        const items = ((response as { value?: { items?: DesktopArtifactBrowseItem[] } }).value?.items) ?? [];
-        setArtifacts(items);
-      }
-    });
-  }, []);
-
-  const onToggleArtifact = (artifactId: string) => {
-    setSelectedArtifactIds((current) =>
-      current.includes(artifactId)
-        ? current.filter((id) => id !== artifactId)
-        : [...current, artifactId]);
-  };
-
-  const onSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setStatus({ kind: "loading", message: "Preparing templated train/test datasets..." });
-    setResultSummary(undefined);
-
-    const response = await datasetClient.prepareTemplatedDatasetFromArtifacts({
-      sourceArtifactIds: selectedArtifactIds,
-      template,
-      split: {
-        trainRatio: Number(trainRatio),
-        testRatio: Number(testRatio),
-        seed: seed ? Number(seed) : undefined,
-      },
-      shuffle,
-      outputFormat,
-    });
-
-    if (!response.ok) {
-      setStatus({ kind: "error", message: response.error.message });
-      return;
-    }
-
-    setStatus({ kind: "success", message: "Templated train/test datasets are ready." });
-    setResultSummary({
-      trainKey: response.value.train.storage.key,
-      testKey: response.value.test.storage.key,
-      trainRows: response.value.trainRowCount,
-      testRows: response.value.testRowCount,
-    });
-    const artifactsResponse = await getDesktopApi().browseArtifacts();
-    if (artifactsResponse && typeof artifactsResponse === "object" && "ok" in artifactsResponse && artifactsResponse.ok) {
-      setArtifacts(((artifactsResponse as { value?: { items?: DesktopArtifactBrowseItem[] } }).value?.items) ?? []);
-    }
-    onPrepared?.();
-  };
+  const {
+    artifacts,
+    selectedArtifactIds,
+    template,
+    trainRatio,
+    testRatio,
+    seed,
+    shuffle,
+    outputFormat,
+    status,
+    resultSummary,
+    onToggleArtifact,
+    setTemplate,
+    setTrainRatio,
+    setTestRatio,
+    setSeed,
+    setShuffle,
+    setOutputFormat,
+    onSubmit,
+  } = useDatasetPreparationFeature({
+    client,
+    onPrepared,
+  });
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -84,13 +41,13 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
         <section className="ui-stack ui-stack--sm">
           <h3>Source artifacts</h3>
           {artifacts.length === 0 ? <p>No artifacts available yet.</p> : artifacts.map((artifact) => (
-            <label key={artifact.storageKey}>
+            <label key={artifact.artifactId}>
               <input
                 type="checkbox"
-                checked={selectedArtifactIds.includes(artifact.storageKey)}
-                onChange={() => onToggleArtifact(artifact.storageKey)}
+                checked={selectedArtifactIds.includes(artifact.artifactId)}
+                onChange={() => onToggleArtifact(artifact.artifactId)}
               />
-              {artifact.originalName ?? artifact.storageKey}
+              {artifact.label}
             </label>
           ))}
         </section>

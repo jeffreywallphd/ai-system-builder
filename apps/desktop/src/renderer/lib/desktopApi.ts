@@ -20,6 +20,7 @@ export interface DesktopUploadedImageDescriptor {
 }
 
 export interface DesktopArtifactBrowseItem {
+  artifactId?: string;
   storageKey: string;
   artifactFamily: ArtifactBrowseContractItem["artifactFamily"];
   mediaType?: string;
@@ -215,9 +216,15 @@ export interface DesktopArtifactUploadApi {
   }) => Promise<unknown>;
 }
 
+export interface DesktopBridgeRequestContext {
+  requestId?: string;
+  correlationId?: string;
+}
+
 export interface DesktopDatasetPreparationApi {
   prepareTemplatedDatasetFromArtifacts: (
     input: DesktopPrepareTemplatedDatasetInput,
+    context?: DesktopBridgeRequestContext,
   ) => Promise<unknown>;
 }
 
@@ -238,8 +245,8 @@ interface DesktopApiBridge {
     targets: DesktopWebsiteIngestionTarget[];
     mode?: "automatic" | "rendered";
   }) => Promise<unknown>;
-  prepareTemplatedDatasetFromArtifacts?: (input: DesktopPrepareTemplatedDatasetInput) => Promise<unknown>;
-  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }) => Promise<unknown>;
+  prepareTemplatedDatasetFromArtifacts?: (input: DesktopPrepareTemplatedDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
   deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
