@@ -75,6 +75,19 @@ function asOptionalRecord(value: unknown, field: string): Record<string, unknown
   return asObject(value, field);
 }
 
+function asOptionalStage(value: unknown, field: string): PythonRuntimeError["stage"] | undefined {
+  const stage = asOptionalString(value, field);
+  if (!stage) {
+    return undefined;
+  }
+
+  if (!["normalization", "chunking", "generation", "split"].includes(stage)) {
+    throw new Error(`Invalid python runtime payload: ${field} must be a known stage.`);
+  }
+
+  return stage as PythonRuntimeError["stage"];
+}
+
 function parseRuntimeError(value: unknown, field: string): PythonRuntimeError | undefined {
   if (value === undefined || value === null) {
     return undefined;
@@ -83,6 +96,8 @@ function parseRuntimeError(value: unknown, field: string): PythonRuntimeError | 
   const payload = asObject(value, field);
   return {
     code: asString(payload.code, `${field}.code`),
+    errorCode: asOptionalString(payload.errorCode, `${field}.errorCode`),
+    stage: asOptionalStage(payload.stage, `${field}.stage`),
     message: asString(payload.message, `${field}.message`),
     details: asOptionalRecord(payload.details, `${field}.details`),
     retryable: asOptionalBoolean(payload.retryable, `${field}.retryable`),

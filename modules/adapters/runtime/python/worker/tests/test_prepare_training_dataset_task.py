@@ -161,6 +161,34 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "cannot generate"):
             prepare_training_dataset(payload, example_generator=failing_generator)
 
+    def test_enforces_max_chunk_count_guardrail(self) -> None:
+        payload = self._build_payload("jsonl")
+        payload.recipe.chunking.maxChunkCount = 1
+
+        with self.assertRaisesRegex(ValueError, "maxChunkCount"):
+            prepare_training_dataset(payload, example_generator=lambda chunks, _config: [])
+
+    def test_supports_generation_batching(self) -> None:
+        payload = self._build_payload("jsonl")
+        payload.recipe.generation.batchSize = 2
+        batch_sizes: list[int] = []
+
+        def generator(chunks, _config):
+            batch_sizes.append(len(chunks))
+            return [
+                GeneratedQaExample(
+                    artifact_id=chunk.artifact_id,
+                    chunk_index=chunk.chunk_index,
+                    question="Q",
+                    answer=chunk.text,
+                )
+                for chunk in chunks
+            ]
+
+        result = prepare_training_dataset(payload, example_generator=generator)
+        self.assertEqual(result.summary.generatedExampleCount, 3)
+        self.assertEqual(batch_sizes, [2, 1])
+
 
 if __name__ == "__main__":
     unittest.main()

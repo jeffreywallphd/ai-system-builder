@@ -17,6 +17,7 @@ export interface MarkdownChunkingConfig {
   chunkSize: number;
   chunkOverlap: number;
   preserveDocumentBoundaries?: boolean;
+  maxChunkCount?: number;
 }
 
 export interface GenerationParams {
@@ -37,7 +38,9 @@ export interface ExampleGenerationConfig {
   model: LocalModelConfig;
   promptTemplate?: string;
   maxExamplesPerChunk?: number;
+  batchSize?: number;
   generationParams?: GenerationParams;
+  failurePolicy?: "fail" | "skip";
 }
 
 export interface DatasetPreparationRecipe {

@@ -4,7 +4,19 @@ import type {
   PrepareTrainingDatasetResult,
   DatasetPreparationWarning,
   PythonRuntimeOutputDescriptor,
+  PythonRuntimeError,
 } from "../../../contracts/runtime";
+import { createContractError, type ContractError } from "../../../contracts/shared";
+
+export class PythonDatasetPreparationContractError extends Error {
+  public readonly contractError: ContractError;
+
+  public constructor(contractError: ContractError) {
+    super(contractError.message);
+    this.name = "PythonDatasetPreparationContractError";
+    this.contractError = contractError;
+  }
+}
 
 function asObject(value: unknown, field: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -107,9 +119,13 @@ function parseWarnings(value: unknown): DatasetPreparationWarning[] | undefined 
 function mapRuntimeDataToResult(data: unknown): PrepareTrainingDatasetResult {
   const payload = asObject(data, "data");
   const summary = asObject(payload.summary, "summary");
+  const outputs = parseOutputDescriptors(payload.outputs);
+  if (!outputs.some((output) => output.role === "train") || !outputs.some((output) => output.role === "test")) {
+    throw new Error("Invalid dataset preparation result: outputs must include both train and test roles.");
+  }
 
   return {
-    outputs: parseOutputDescriptors(payload.outputs),
+    outputs,
     summary: {
       sourceDocumentCount: asNumber(summary.sourceDocumentCount, "summary.sourceDocumentCount"),
       normalizedDocumentCount: asNumber(summary.normalizedDocumentCount, "summary.normalizedDocumentCount"),
@@ -121,6 +137,17 @@ function mapRuntimeDataToResult(data: unknown): PrepareTrainingDatasetResult {
     },
     warnings: parseWarnings(payload.warnings),
   };
+}
+
+function mapRuntimeErrorToContractError(runtimeError: PythonRuntimeError | undefined): ContractError {
+  const stagePrefix = runtimeError?.stage ? `[${runtimeError.stage}] ` : "";
+  const message = `${stagePrefix}${runtimeError?.message ?? "Python runtime dataset preparation failed."}`;
+  return createContractError("internal", message, {
+    details: {
+      runtimeErrorCode: runtimeError?.errorCode ?? runtimeError?.code ?? "task_failed",
+      stage: runtimeError?.stage,
+    },
+  });
 }
 
 export function createPythonDatasetPreparationPort(
@@ -140,10 +167,11 @@ export function createPythonDatasetPreparationPort(
         requestId: nextRequestId(),
         taskType: "prepare-training-dataset",
         payload: request,
+        timeoutMs: request.runtime?.timeoutMs,
       });
 
       if (!taskResult.success) {
-        throw new Error(taskResult.error?.message ?? "Python runtime dataset preparation failed.");
+        throw new PythonDatasetPreparationContractError(mapRuntimeErrorToContractError(taskResult.error));
       }
 
       return mapRuntimeDataToResult(taskResult.data);

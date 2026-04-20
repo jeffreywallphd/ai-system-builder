@@ -19,6 +19,15 @@ from .document_normalization import normalize_sources_to_markdown
 from .example_generation import GeneratedQaExample, generate_qa_examples_for_chunks
 from .markdown_chunking import chunk_markdown_documents
 
+DEFAULT_MAX_CHUNK_COUNT = 10000
+
+
+class DatasetPreparationStageError(ValueError):
+    def __init__(self, stage: str, message: str, error_code: str) -> None:
+        super().__init__(message)
+        self.stage = stage
+        self.error_code = error_code
+
 
 def _validate_split_config(train_ratio: float, test_ratio: float) -> None:
     if train_ratio <= 0:
@@ -78,18 +87,35 @@ def _build_generated_rows(
     payload: PrepareTrainingDatasetRequest,
     generator: Callable[[list, object], list[GeneratedQaExample]],
 ) -> tuple[list[dict[str, object]], list[DatasetPreparationWarning], int, int, int]:
-    normalization = normalize_sources_to_markdown(payload.sourceInputs, payload.recipe.normalization)
-    chunks = chunk_markdown_documents(normalization.documents, payload.recipe.chunking)
+    try:
+        normalization = normalize_sources_to_markdown(payload.sourceInputs, payload.recipe.normalization)
+    except Exception as error:
+        raise DatasetPreparationStageError("normalization", str(error), "normalization_failed") from error
+
+    try:
+        chunks = chunk_markdown_documents(normalization.documents, payload.recipe.chunking)
+    except Exception as error:
+        raise DatasetPreparationStageError("chunking", str(error), "chunking_failed") from error
+
+    max_chunk_count = int(payload.recipe.chunking.maxChunkCount or DEFAULT_MAX_CHUNK_COUNT)
+    if len(chunks) > max_chunk_count:
+        raise DatasetPreparationStageError(
+            "chunking",
+            f"Chunk count {len(chunks)} exceeds configured maxChunkCount {max_chunk_count}.",
+            "chunk_limit_exceeded",
+        )
 
     failure_policy = payload.recipe.generation.failurePolicy
     if not failure_policy:
         normalization_mode = payload.recipe.normalization.normalizationMode or "strict"
         failure_policy = "skip" if normalization_mode == "best-effort" else "fail"
 
+    batch_size = int(payload.recipe.generation.batchSize or 1)
     rows: list[dict[str, object]] = []
-    for chunk in chunks:
+    for start in range(0, len(chunks), batch_size):
+        chunk_batch = chunks[start : start + batch_size]
         try:
-            generated_examples = generator([chunk], payload.recipe.generation)
+            generated_examples = generator(chunk_batch, payload.recipe.generation)
             for example in generated_examples:
                 rows.append(
                     {
@@ -102,17 +128,18 @@ def _build_generated_rows(
                 )
         except Exception as error:
             if failure_policy == "skip":
-                warnings.append(
-                    DatasetPreparationWarning(
-                        code="generation_example_skipped",
-                        message=(
-                            f"Skipped chunk {chunk.chunk_index} from source '{chunk.artifact_id}' during generation: {error}"
-                        ),
-                        sourceArtifactId=chunk.artifact_id,
+                for chunk in chunk_batch:
+                    warnings.append(
+                        DatasetPreparationWarning(
+                            code="generation_example_skipped",
+                            message=(
+                                f"Skipped chunk {chunk.chunk_index} from source '{chunk.artifact_id}' during generation: {error}"
+                            ),
+                            sourceArtifactId=chunk.artifact_id,
+                        )
                     )
-                )
                 continue
-            raise
+            raise DatasetPreparationStageError("generation", str(error), "generation_failed") from error
 
     return (
         rows,
@@ -127,7 +154,10 @@ def prepare_training_dataset(
     payload: PrepareTrainingDatasetRequest,
     example_generator: Callable[[list, object], list[GeneratedQaExample]] = generate_qa_examples_for_chunks,
 ) -> PrepareTrainingDatasetResult:
-    _validate_split_config(float(payload.split.trainRatio), float(payload.split.testRatio))
+    try:
+        _validate_split_config(float(payload.split.trainRatio), float(payload.split.testRatio))
+    except Exception as error:
+        raise DatasetPreparationStageError("split", str(error), "split_validation_failed") from error
 
     rows, warnings, normalized_count, skipped_count, chunk_count = _build_generated_rows(payload, example_generator)
 

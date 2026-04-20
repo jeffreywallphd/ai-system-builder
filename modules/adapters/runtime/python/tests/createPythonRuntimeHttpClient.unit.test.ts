@@ -69,4 +69,36 @@ describe("createPythonRuntimeHttpClient", () => {
 
     await expect(client.getHealthStatus()).rejects.toThrow("status 503");
   });
+
+  it("enforces task timeout and forwards timeoutMs to runtime", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      expect(body.timeoutMs).toBe(20);
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, 100);
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(new DOMException("aborted", "AbortError"));
+        });
+      });
+      return new Response(JSON.stringify({
+        requestId: "req-python-2",
+        taskType: "prepare-training-dataset",
+        success: true,
+        data: {},
+      }), { status: 200 });
+    });
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+      defaultTaskTimeoutMs: 20,
+    });
+
+    await expect(client.executeTask({
+      requestId: "req-python-2",
+      taskType: "prepare-training-dataset",
+      payload: {},
+    })).rejects.toThrow("timed out");
+  });
 });

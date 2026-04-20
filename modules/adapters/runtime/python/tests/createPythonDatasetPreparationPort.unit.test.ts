@@ -55,6 +55,7 @@ describe("createPythonDatasetPreparationPort", () => {
     expect(executeTask.mock.calls[0]?.[0]).toMatchObject({
       taskType: "prepare-training-dataset",
       requestId: expect.stringMatching(/^prepare-training-dataset-\d{14}-\d{6}$/),
+      timeoutMs: undefined,
       payload: {
         output: {
           destinations: {
@@ -66,6 +67,46 @@ describe("createPythonDatasetPreparationPort", () => {
     expect(result.summary.trainRowCount).toBe(8);
     expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
     expect(result.warnings).toBeUndefined();
+  });
+
+  it("propagates structured runtime errors without stack traces", async () => {
+    const adapter = createPythonDatasetPreparationPort({
+      executeTask: async () => ({
+        requestId: "req-1",
+        taskType: "prepare-training-dataset",
+        success: false,
+        error: {
+          code: "task_failed",
+          errorCode: "chunk_limit_exceeded",
+          stage: "chunking",
+          message: "Chunk count 20001 exceeds configured maxChunkCount 10000.",
+        },
+      }),
+      getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
+      getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+    });
+
+    try {
+      await adapter.prepareTrainingDataset({
+        sourceInputs: [{ artifactId: "a1", localPath: "/tmp/a1.jsonl", mediaType: "application/x-ndjson" }],
+        recipe: {
+          normalization: { targetFormat: "markdown" },
+          chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+          generation: { mode: "qa", model: { provider: "transformers", modelId: "test-model" } },
+        },
+        split: { trainRatio: 0.8, testRatio: 0.2 },
+        output: { format: "jsonl" },
+      });
+      throw new Error("Expected runtime failure");
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: "PythonDatasetPreparationContractError",
+        contractError: {
+          message: "[chunking] Chunk count 20001 exceeds configured maxChunkCount 10000.",
+          details: { runtimeErrorCode: "chunk_limit_exceeded", stage: "chunking" },
+        },
+      });
+    }
   });
 
   it("fails clearly for invalid runtime output role values", async () => {
@@ -104,5 +145,72 @@ describe("createPythonDatasetPreparationPort", () => {
       split: { trainRatio: 0.8, testRatio: 0.2 },
       output: { format: "jsonl" },
     })).rejects.toThrow("must be a known runtime output role");
+  });
+
+  it("fails fast when required summary fields are missing", async () => {
+    const adapter = createPythonDatasetPreparationPort({
+      executeTask: async () => ({
+        requestId: "req-1",
+        taskType: "prepare-training-dataset",
+        success: true,
+        data: {
+          outputs: [
+            { name: "train", role: "train", tempPath: "/tmp/out", mediaType: "application/json" },
+            { name: "test", role: "test", tempPath: "/tmp/out-test", mediaType: "application/json" },
+          ],
+          summary: {
+            sourceDocumentCount: 1,
+          },
+        },
+      }),
+      getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
+      getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+    });
+
+    await expect(adapter.prepareTrainingDataset({
+      sourceInputs: [{ artifactId: "a1", localPath: "/tmp/a1.jsonl", mediaType: "application/x-ndjson" }],
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+        generation: { mode: "qa", model: { provider: "transformers", modelId: "test-model" } },
+      },
+      split: { trainRatio: 0.8, testRatio: 0.2 },
+      output: { format: "jsonl" },
+    })).rejects.toThrow("summary.normalizedDocumentCount must be a number");
+  });
+
+  it("fails fast when outputs do not contain train/test roles", async () => {
+    const adapter = createPythonDatasetPreparationPort({
+      executeTask: async () => ({
+        requestId: "req-1",
+        taskType: "prepare-training-dataset",
+        success: true,
+        data: {
+          outputs: [{ name: "dataset", role: "artifact", tempPath: "/tmp/out", mediaType: "application/json" }],
+          summary: {
+            sourceDocumentCount: 1,
+            normalizedDocumentCount: 1,
+            skippedDocumentCount: 0,
+            chunkCount: 1,
+            generatedExampleCount: 1,
+            trainRowCount: 1,
+            testRowCount: 0,
+          },
+        },
+      }),
+      getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
+      getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+    });
+
+    await expect(adapter.prepareTrainingDataset({
+      sourceInputs: [{ artifactId: "a1", localPath: "/tmp/a1.jsonl", mediaType: "application/x-ndjson" }],
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+        generation: { mode: "qa", model: { provider: "transformers", modelId: "test-model" } },
+      },
+      split: { trainRatio: 0.8, testRatio: 0.2 },
+      output: { format: "jsonl" },
+    })).rejects.toThrow("outputs must include both train and test roles");
   });
 });
