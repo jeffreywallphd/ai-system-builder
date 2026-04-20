@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -150,6 +150,62 @@ function joinRepoPath(pathPrefix: string | undefined, fileName: string): string 
   return normalizedPrefix ? `${normalizedPrefix}/${fileName}` : fileName;
 }
 
+function buildDatasetMetadata(
+  command: PrepareTrainingDatasetFromArtifactsCommand,
+  summary: DatasetPreparationSummary,
+  destination: "local" | "huggingface",
+  runtimeMetadata: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  return {
+    sourceArtifactIds: command.sourceArtifactIds,
+    recipe: command.recipe,
+    split: command.split,
+    generationModel: {
+      provider: command.recipe.generation.model.provider,
+      modelId: command.recipe.generation.model.modelId,
+    },
+    summary,
+    destination: {
+      provider: destination,
+      output: command.output,
+    },
+    runtime: runtimeMetadata,
+  };
+}
+
+async function validateDatasetOutput(tempPath: string, format: PrepareTrainingDatasetRequest["output"]["format"]): Promise<void> {
+  const outputStat = await stat(tempPath);
+  if (outputStat.size <= 0) {
+    throw new Error(`Runtime output file '${tempPath}' is empty.`);
+  }
+
+  const contents = await readFile(tempPath, "utf-8");
+  if (!contents.trim()) {
+    throw new Error(`Runtime output file '${tempPath}' contains no data.`);
+  }
+
+  if (format === "json") {
+    JSON.parse(contents);
+    return;
+  }
+
+  if (format === "jsonl") {
+    const lines = contents.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
+    if (lines.length === 0) {
+      throw new Error(`Runtime output file '${tempPath}' does not contain any JSONL rows.`);
+    }
+    for (const line of lines) {
+      JSON.parse(line);
+    }
+    return;
+  }
+
+  const [header] = contents.split(/\r?\n/);
+  if (!header || header.trim().length === 0) {
+    throw new Error(`Runtime output file '${tempPath}' does not include a CSV header.`);
+  }
+}
+
 export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly datasetPreparation: PythonDatasetPreparationPort;
   private readonly storageBindings: ArtifactStorageBindingPort;
@@ -229,6 +285,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         });
       }
 
+      runtimeRequest.runtime = { timeoutMs: 120_000 };
       const prepared = await this.datasetPreparation.prepareTrainingDataset(runtimeRequest);
       const trainOutput = prepared.outputs.find((output) => output.role === "train");
       const testOutput = prepared.outputs.find((output) => output.role === "test");
@@ -240,10 +297,23 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         );
       }
 
-      const [trainBytes, testBytes] = await Promise.all([
-        readFile(trainOutput.tempPath),
-        readFile(testOutput.tempPath),
-      ]);
+      let trainBytes: Buffer;
+      let testBytes: Buffer;
+      try {
+        await Promise.all([
+          validateDatasetOutput(trainOutput.tempPath, command.output.format),
+          validateDatasetOutput(testOutput.tempPath, command.output.format),
+        ]);
+        [trainBytes, testBytes] = await Promise.all([
+          readFile(trainOutput.tempPath),
+          readFile(testOutput.tempPath),
+        ]);
+      } finally {
+        await Promise.allSettled([
+          rm(trainOutput.tempPath, { force: true }),
+          rm(testOutput.tempPath, { force: true }),
+        ]);
+      }
 
       let localOutputs: PrepareTrainingDatasetFromArtifactsValue["localOutputs"];
       if (destinations.local) {
@@ -252,17 +322,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
             descriptor: {
               mediaType: trainOutput.mediaType,
               metadata: {
-                runtimeOutputName: trainOutput.name,
                 runtimeRole: "train",
-                sourceArtifactIds: command.sourceArtifactIds,
-                recipe: command.recipe,
-                split: command.split,
-                output: command.output,
-                generationModelId: command.recipe.generation.model.modelId,
-                rowCount: prepared.summary.trainRowCount,
-                runtimeOutputMetadata: trainOutput.metadata,
-                datasetPreparationStage: "generated-examples",
-                destination: "local",
+                ...buildDatasetMetadata(command, prepared.summary, "local", trainOutput.metadata),
               },
             },
           }), context),
@@ -270,17 +331,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
             descriptor: {
               mediaType: testOutput.mediaType,
               metadata: {
-                runtimeOutputName: testOutput.name,
                 runtimeRole: "test",
-                sourceArtifactIds: command.sourceArtifactIds,
-                recipe: command.recipe,
-                split: command.split,
-                output: command.output,
-                generationModelId: command.recipe.generation.model.modelId,
-                rowCount: prepared.summary.testRowCount,
-                runtimeOutputMetadata: testOutput.metadata,
-                datasetPreparationStage: "generated-examples",
-                destination: "local",
+                ...buildDatasetMetadata(command, prepared.summary, "local", testOutput.metadata),
               },
             },
           }), context),
@@ -336,12 +388,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
               mediaType: trainOutput.mediaType,
               metadata: {
                 runtimeRole: "train",
-                sourceArtifactIds: command.sourceArtifactIds,
-                recipe: command.recipe,
-                split: command.split,
-                output: command.output,
-                generationModelId: command.recipe.generation.model.modelId,
-                summary: prepared.summary,
+                ...buildDatasetMetadata(command, prepared.summary, "huggingface", trainOutput.metadata),
               },
             }),
             context,
@@ -352,12 +399,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
               mediaType: testOutput.mediaType,
               metadata: {
                 runtimeRole: "test",
-                sourceArtifactIds: command.sourceArtifactIds,
-                recipe: command.recipe,
-                split: command.split,
-                output: command.output,
-                generationModelId: command.recipe.generation.model.modelId,
-                summary: prepared.summary,
+                ...buildDatasetMetadata(command, prepared.summary, "huggingface", testOutput.metadata),
               },
             }),
             context,
@@ -384,20 +426,22 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         }
 
         const verifiedAt = this.now();
+        const publishTrainTarget = publishTrain.value.target;
+        const publishTestTarget = publishTest.value.target;
         huggingFaceOutputs = {
           train: {
             provider: "huggingface",
-            repository: target.repository,
-            path: trainPath,
-            revision: target.revision,
+            repository: publishTrainTarget.repository,
+            path: publishTrainTarget.path,
+            revision: publishTrainTarget.revision,
             exists: verifyTrain.value.exists,
             verifiedAt,
           },
           test: {
             provider: "huggingface",
-            repository: target.repository,
-            path: testPath,
-            revision: target.revision,
+            repository: publishTestTarget.repository,
+            path: publishTestTarget.path,
+            revision: publishTestTarget.revision,
             exists: verifyTest.value.exists,
             verifiedAt,
           },
@@ -421,6 +465,14 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         warnings: prepared.warnings,
       }, context);
     } catch (error) {
+      if (
+        error
+        && typeof error === "object"
+        && "contractError" in error
+        && (error as { contractError?: unknown }).contractError
+      ) {
+        return createFailureResult((error as { contractError: ReturnType<typeof createContractError> }).contractError, context);
+      }
       return createFailureResult(
         createContractError(
           "internal",

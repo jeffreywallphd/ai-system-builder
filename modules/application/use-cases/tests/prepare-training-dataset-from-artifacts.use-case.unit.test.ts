@@ -1,8 +1,9 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
+import { createContractError } from "../../../contracts/shared";
 import {
   PrepareTrainingDatasetFromArtifactsUseCase,
 } from "../prepare-training-dataset-from-artifacts.use-case";
@@ -25,6 +26,10 @@ async function setupRuntimeOutputs() {
   await writeFile(runtimeTrain, '{"text":"train"}\n', "utf-8");
   await writeFile(runtimeTest, '{"text":"test"}\n', "utf-8");
   return { runtimeTrain, runtimeTest };
+}
+
+async function expectFileMissing(path: string) {
+  await expect(access(path)).rejects.toBeDefined();
 }
 
 function createDeps(runtimeTrain: string, runtimeTest: string) {
@@ -152,6 +157,8 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     expect(result.value.localOutputs?.train.storage.key).toBe("stored-train");
     expect(result.value.huggingFaceOutputs).toBeUndefined();
     expect(result.value.provenance.generationModelId).toBe("test-model");
+    await expectFileMissing(runtimeTrain);
+    await expectFileMissing(runtimeTest);
   });
 
   it("supports huggingface-only output destination", async () => {
@@ -201,6 +208,9 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(2);
     expect(result.value.localOutputs).toBeUndefined();
     expect(result.value.huggingFaceOutputs?.train.path).toBe("datasets/dataset-train.jsonl");
+    expect(result.value.huggingFaceOutputs?.train.repository).toBe("org/repo");
+    await expectFileMissing(runtimeTrain);
+    await expectFileMissing(runtimeTest);
   });
 
   it("supports local + huggingface output destinations", async () => {
@@ -252,5 +262,123 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     expect(result.value.huggingFaceOutputs?.test.path).toBe("dataset-test.jsonl");
     expect(result.value.summary.trainRowCount).toBe(1);
     expect(result.value.provenance.output.destinations?.huggingFace?.repository).toBe("org/repo");
+    const firstStoreMetadata = deps.storeArtifact.mock.calls[0]?.[0]?.descriptor?.metadata;
+    expect(firstStoreMetadata).toMatchObject({
+      sourceArtifactIds: ["artifact-1"],
+      summary: { generatedExampleCount: 2 },
+      destination: { provider: "local" },
+      generationModel: { modelId: "test-model" },
+    });
+    await expectFileMissing(runtimeTrain);
+    await expectFileMissing(runtimeTest);
+  });
+
+  it("fails without storing when runtime output is invalid JSONL", async () => {
+    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
+    await writeFile(runtimeTrain, "not-json\n", "utf-8");
+    const deps = createDeps(runtimeTrain, runtimeTest);
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
+      storageBindings: {
+        readArtifactStorageBindings: deps.readArtifactStorageBindings,
+        upsertArtifactStorageBinding: testDouble.fn(),
+        deleteArtifactStorageBindings: testDouble.fn(),
+      },
+      storage: {
+        retrieveArtifact: deps.retrieveArtifact,
+        storeArtifact: deps.storeArtifact,
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
+    });
+
+    const result = await useCase.execute({
+      sourceArtifactIds: ["artifact-1"],
+      recipe,
+      split,
+      output: { format: "jsonl" },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(deps.storeArtifact).not.toHaveBeenCalled();
+    await expectFileMissing(runtimeTrain);
+    await expectFileMissing(runtimeTest);
+  });
+
+  it("cleans runtime files on partial destination failure", async () => {
+    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeTrain, runtimeTest);
+    deps.storeArtifact.mockImplementationOnce(async () => ({
+      ok: false as const,
+      error: { code: "unavailable", message: "store failed" },
+    }));
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
+      storageBindings: {
+        readArtifactStorageBindings: deps.readArtifactStorageBindings,
+        upsertArtifactStorageBinding: testDouble.fn(),
+        deleteArtifactStorageBindings: testDouble.fn(),
+      },
+      storage: {
+        retrieveArtifact: deps.retrieveArtifact,
+        storeArtifact: deps.storeArtifact,
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
+    });
+
+    const result = await useCase.execute({
+      sourceArtifactIds: ["artifact-1"],
+      recipe,
+      split,
+      output: { format: "jsonl" },
+    });
+
+    expect(result.ok).toBe(false);
+    await expectFileMissing(runtimeTrain);
+    await expectFileMissing(runtimeTest);
+  });
+
+  it("returns mapped structured runtime contract errors", async () => {
+    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeTrain, runtimeTest);
+    deps.prepareTrainingDataset.mockImplementationOnce(async () => {
+      throw {
+        contractError: createContractError("internal", "[generation] runtime timeout", {
+          details: { stage: "generation", runtimeErrorCode: "runtime_timeout" },
+        }),
+      };
+    });
+
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
+      storageBindings: {
+        readArtifactStorageBindings: deps.readArtifactStorageBindings,
+        upsertArtifactStorageBinding: testDouble.fn(),
+        deleteArtifactStorageBindings: testDouble.fn(),
+      },
+      storage: {
+        retrieveArtifact: deps.retrieveArtifact,
+        storeArtifact: deps.storeArtifact,
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
+    });
+
+    const result = await useCase.execute({
+      sourceArtifactIds: ["artifact-1"],
+      recipe,
+      split,
+      output: { format: "jsonl" },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.error.message).toBe("[generation] runtime timeout");
+    expect(result.error.details).toMatchObject({ stage: "generation", runtimeErrorCode: "runtime_timeout" });
+    await expectFileMissing(runtimeTrain);
+    await expectFileMissing(runtimeTest);
   });
 });

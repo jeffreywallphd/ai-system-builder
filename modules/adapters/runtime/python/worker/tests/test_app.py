@@ -85,6 +85,35 @@ class WorkerAppTests(unittest.TestCase):
         result = capabilities()
         self.assertIn("prepare-training-dataset", result.capabilities)
 
+    def test_timeout_returns_structured_error(self) -> None:
+        request = PythonRuntimeTaskRequest(
+            requestId="req-timeout",
+            taskType="prepare-training-dataset",
+            timeoutMs=5,
+            payload={
+                "sourceInputs": [],
+                "recipe": {
+                    "normalization": {"targetFormat": "markdown"},
+                    "chunking": {"strategy": "character", "chunkSize": 128, "chunkOverlap": 8},
+                    "generation": {"mode": "qa", "model": {"provider": "transformers", "modelId": "test-model"}},
+                },
+                "split": {"trainRatio": 0.5, "testRatio": 0.5},
+                "output": {"format": "jsonl"},
+            },
+        )
+
+        with patch("modules.adapters.runtime.python.worker.app.prepare_training_dataset") as prepare_mock:
+            def _slow(*_args, **_kwargs):
+                import time
+                time.sleep(0.05)
+                return None
+            prepare_mock.side_effect = _slow
+            response = execute_task(request)
+
+        self.assertFalse(response.success)
+        self.assertEqual(response.error.errorCode, "runtime_timeout")
+        self.assertEqual(response.error.stage, "generation")
+
 
 if __name__ == "__main__":
     unittest.main()

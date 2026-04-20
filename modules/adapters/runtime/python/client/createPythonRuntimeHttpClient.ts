@@ -21,6 +21,7 @@ export interface PythonRuntimeHttpClient {
 export interface CreatePythonRuntimeHttpClientOptions {
   baseUrl: string;
   fetchImplementation?: typeof fetch;
+  defaultTaskTimeoutMs?: number;
 }
 
 async function parseJsonResponse<T>(response: Response, path: string): Promise<T> {
@@ -40,6 +41,7 @@ export function createPythonRuntimeHttpClient(
 ): PythonRuntimeHttpClient {
   const fetcher = options.fetchImplementation ?? fetch;
   const baseUrl = trimTrailingSlash(options.baseUrl);
+  const defaultTaskTimeoutMs = options.defaultTaskTimeoutMs ?? 120_000;
 
   return {
     async getHealthStatus() {
@@ -55,13 +57,27 @@ export function createPythonRuntimeHttpClient(
     },
 
     async executeTask(request: PythonRuntimeTaskRequest) {
-      const response = await fetcher(`${baseUrl}/tasks/execute`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(mapTaskRequestToHttpPayload(request)),
-      });
+      const timeoutMs = request.timeoutMs ?? defaultTaskTimeoutMs;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(new Error(`Python runtime task timed out after ${timeoutMs}ms.`)), timeoutMs);
+      let response: Response;
+      try {
+        response = await fetcher(`${baseUrl}/tasks/execute`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(mapTaskRequestToHttpPayload({ ...request, timeoutMs })),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (error instanceof Error && (error.name === "AbortError" || error.message.includes("timed out"))) {
+          throw new Error(`Python runtime task request timed out after ${timeoutMs}ms.`);
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
 
       const payload = await parseJsonResponse<unknown>(response, "/tasks/execute");
       return mapTaskResponseFromHttpPayload(payload);

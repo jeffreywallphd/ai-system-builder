@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 
 class PythonRuntimeError(BaseModel):
     code: str
+    errorCode: str | None = None
+    stage: Literal["normalization", "chunking", "generation", "split"] | None = None
     message: str
     details: dict[str, Any] | None = None
     retryable: bool | None = None
@@ -69,6 +71,7 @@ class MarkdownChunkingConfig(BaseModel):
     chunkSize: int = Field(gt=0)
     chunkOverlap: int = Field(ge=0)
     preserveDocumentBoundaries: bool | None = None
+    maxChunkCount: int | None = Field(default=None, gt=0)
 
 
 class GenerationParams(BaseModel):
@@ -89,6 +92,7 @@ class ExampleGenerationConfig(BaseModel):
     model: LocalModelConfig
     promptTemplate: str | None = None
     maxExamplesPerChunk: int | None = None
+    batchSize: int | None = Field(default=None, gt=0)
     generationParams: GenerationParams | None = None
     failurePolicy: Literal["fail", "skip"] | None = None
 
@@ -121,6 +125,7 @@ class PrepareTrainingDatasetRequest(BaseModel):
     recipe: DatasetPreparationRecipe
     split: DatasetSplitConfig
     output: DatasetOutputConfig
+    runtime: dict[str, Any] | None = None
 
 
 class PythonRuntimeOutputDescriptor(BaseModel):

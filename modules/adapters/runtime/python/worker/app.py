@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import platform
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
 from os import getenv
 
@@ -23,6 +24,7 @@ WORKER_STARTED_AT = datetime.now(timezone.utc).isoformat()
 PYTHON_VERSION = platform.python_version()
 
 app = FastAPI(title="ai-system-builder python runtime worker", version=WORKER_VERSION)
+TASK_EXECUTOR = ThreadPoolExecutor(max_workers=1)
 
 
 @app.get("/health", response_model=PythonRuntimeHealthCheckResult)
@@ -54,7 +56,25 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
     try:
         if request.taskType == "prepare-training-dataset":
             payload = PrepareTrainingDatasetRequest.model_validate(request.payload)
-            result = prepare_training_dataset(payload)
+            task_future = TASK_EXECUTOR.submit(prepare_training_dataset, payload)
+            timeout_seconds = (request.timeoutMs / 1000) if request.timeoutMs else None
+            try:
+                result = task_future.result(timeout=timeout_seconds)
+            except FutureTimeoutError:
+                task_future.cancel()
+                return PythonRuntimeTaskResult(
+                    requestId=request.requestId,
+                    taskType=request.taskType,
+                    success=False,
+                    error=PythonRuntimeError(
+                        code="task_timeout",
+                        errorCode="runtime_timeout",
+                        stage="generation",
+                        message=f"Dataset preparation timed out after {request.timeoutMs}ms.",
+                        retryable=False,
+                    ),
+                    metadata={"runtimeId": RUNTIME_ID},
+                )
             return PythonRuntimeTaskResult(
                 requestId=request.requestId,
                 taskType=request.taskType,
@@ -78,13 +98,22 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
             },
         )
     except Exception as error:
+        error_code = "task_failed"
+        stage = None
+        message = str(error)
+        if hasattr(error, "error_code"):
+            error_code = str(getattr(error, "error_code"))
+        if hasattr(error, "stage"):
+            stage = str(getattr(error, "stage"))
         return PythonRuntimeTaskResult(
             requestId=request.requestId,
             taskType=request.taskType,
             success=False,
             error=PythonRuntimeError(
                 code="task_failed",
-                message=str(error),
+                errorCode=error_code,
+                stage=stage,  # type: ignore[arg-type]
+                message=message,
                 retryable=False,
             ),
             metadata={"runtimeId": RUNTIME_ID},

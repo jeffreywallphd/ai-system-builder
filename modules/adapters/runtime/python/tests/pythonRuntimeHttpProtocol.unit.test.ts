@@ -39,10 +39,13 @@ describe("pythonRuntimeHttpProtocol", () => {
       success: false,
       error: {
         code: "not_implemented",
+        errorCode: "not_implemented",
+        stage: "generation",
         message: "Not implemented.",
       },
     });
     expect(taskResult.success).toBe(false);
+    expect(taskResult.error?.stage).toBe("generation");
   });
 
   it("rejects malformed health payloads", () => {
