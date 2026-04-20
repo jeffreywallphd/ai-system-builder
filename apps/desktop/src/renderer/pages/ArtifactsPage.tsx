@@ -1,5 +1,6 @@
 import { ArtifactBrowserFeature } from "../features/artifact-browser";
 import { ArtifactIngestionFeature } from "../features/artifact-upload/components/ArtifactIngestionFeature";
+import { TabbedPanel } from "../components/ui/TabbedPanel";
 
 export interface ArtifactsPageProps {
   refreshToken: number;
@@ -9,8 +10,22 @@ export interface ArtifactsPageProps {
 export function ArtifactsPage({ refreshToken, onUploaded }: ArtifactsPageProps) {
   return (
     <section className="ui-stack ui-stack--sm" data-refresh-token={refreshToken}>
-      <ArtifactIngestionFeature onUploadComplete={onUploaded} />
-      <ArtifactBrowserFeature key={refreshToken} />
+      <TabbedPanel
+        tabListAriaLabel="Artifact workspace panels"
+        defaultTabId="ingestion"
+        tabs={[
+          {
+            id: "ingestion",
+            label: "Artifact Ingestion",
+            content: <ArtifactIngestionFeature onUploadComplete={onUploaded} />,
+          },
+          {
+            id: "browser",
+            label: "Artifact Browser",
+            content: <ArtifactBrowserFeature key={refreshToken} />,
+          },
+        ]}
+      />
     </section>
   );
 }
