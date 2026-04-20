@@ -173,6 +173,34 @@ export interface DesktopWebsitePagesBatchItem {
   };
 }
 
+export interface DesktopPrepareTemplatedDatasetInput {
+  sourceArtifactIds: string[];
+  template: string;
+  split: {
+    trainRatio: number;
+    testRatio: number;
+    seed?: number;
+  };
+  outputFormat: "jsonl" | "json" | "csv";
+  shuffle?: boolean;
+}
+
+export interface DesktopPreparedTemplatedDatasetResult {
+  train: {
+    storage: { key: string; mediaType?: string; sizeBytes?: number };
+    sourceKind: string;
+    originalName?: string;
+  };
+  test: {
+    storage: { key: string; mediaType?: string; sizeBytes?: number };
+    sourceKind: string;
+    originalName?: string;
+  };
+  trainRowCount: number;
+  testRowCount: number;
+  warnings?: string[];
+}
+
 export interface DesktopArtifactUploadApi {
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<DesktopArtifactUploadResult>;
   getArtifactUploadPolicy: () => Promise<DesktopArtifactUploadAcceptedTypePolicy>;
@@ -185,6 +213,12 @@ export interface DesktopArtifactUploadApi {
     targets: DesktopWebsiteIngestionTarget[];
     mode?: "automatic" | "rendered";
   }) => Promise<unknown>;
+}
+
+export interface DesktopDatasetPreparationApi {
+  prepareTemplatedDatasetFromArtifacts: (
+    input: DesktopPrepareTemplatedDatasetInput,
+  ) => Promise<unknown>;
 }
 
 interface DesktopApiBridge {
@@ -204,6 +238,7 @@ interface DesktopApiBridge {
     targets: DesktopWebsiteIngestionTarget[];
     mode?: "automatic" | "rendered";
   }) => Promise<unknown>;
+  prepareTemplatedDatasetFromArtifacts?: (input: DesktopPrepareTemplatedDatasetInput) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;

@@ -1,5 +1,6 @@
 import { ArtifactBrowserFeature } from "../features/artifact-browser";
 import { ArtifactIngestionFeature } from "../features/artifact-upload/components/ArtifactIngestionFeature";
+import { DatasetPreparationFeature } from "../features/dataset-preparation/components/DatasetPreparationFeature";
 import { TabbedPanel } from "../components/ui/TabbedPanel";
 
 export interface ArtifactsPageProps {
@@ -26,9 +27,13 @@ export function ArtifactsPage({ refreshToken, onUploaded }: ArtifactsPageProps) 
             label: "Artifact Browser",
             content: <ArtifactBrowserFeature key={refreshToken} />,
           },
+          {
+            id: "dataset-preparation",
+            label: "Dataset Preparation",
+            content: <DatasetPreparationFeature onPrepared={onUploaded} />,
+          },
         ]}
       />
     </section>
   );
 }
-

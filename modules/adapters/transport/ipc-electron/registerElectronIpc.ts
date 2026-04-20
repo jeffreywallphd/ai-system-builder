@@ -11,6 +11,10 @@ import {
   registerWebsiteIngestionIpc,
   type RegisterWebsiteIngestionIpcDependencies,
 } from "./website-ingestion/registerWebsiteIngestionIpc";
+import {
+  registerDatasetPreparationIpc,
+  type RegisterDatasetPreparationIpcDependencies,
+} from "./dataset-preparation/registerDatasetPreparationIpc";
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
@@ -35,6 +39,7 @@ export interface RegisterElectronIpcDependencies {
   localizeArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["localizeArtifactFromRepoUseCase"];
   ingestWebsitePageUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePageUseCase"];
   ingestWebsitePagesBatchUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePagesBatchUseCase"];
+  prepareTemplatedDatasetFromArtifactsUseCase: RegisterDatasetPreparationIpcDependencies["prepareTemplatedDatasetFromArtifactsUseCase"];
 }
 
 export function registerElectronIpc(
@@ -72,6 +77,10 @@ export function registerElectronIpc(
     ingestWebsitePageUseCase: dependencies.ingestWebsitePageUseCase,
     ingestWebsitePagesBatchUseCase: dependencies.ingestWebsitePagesBatchUseCase,
   });
-}
 
+  registerDatasetPreparationIpc({
+    ipcMain: dependencies.ipcMain,
+    prepareTemplatedDatasetFromArtifactsUseCase: dependencies.prepareTemplatedDatasetFromArtifactsUseCase,
+  });
+}
 

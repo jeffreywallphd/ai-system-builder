@@ -26,6 +26,7 @@ import {
   DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL,
   DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
   DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
@@ -101,7 +102,7 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: "/tmp/desktop-artifact-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(22);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(23);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -126,6 +127,7 @@ describe("composeDesktopHost", () => {
       DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value,
       DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value,
       DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value,
+      DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL.value,
     ]);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
@@ -200,6 +202,20 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
     expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
     expect(source).not.toContain("repoBrowser: artifactRepoStorage");
+  });
+
+  it("wires Python runtime foundation and dataset preparation use case into desktop composition", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("createPythonRuntimeAdapterFoundation");
+    expect(source).toContain("createPythonDatasetPreparationPort");
+    expect(source).toContain("PrepareTemplatedDatasetFromArtifactsUseCase");
+    expect(source).toContain("prepareTemplatedDatasetFromArtifactsUseCase");
   });
 
   it("stores and exposes desktop Hugging Face token status", () => {

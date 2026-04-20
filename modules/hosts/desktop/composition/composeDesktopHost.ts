@@ -18,12 +18,17 @@ import {
   VerifyPublishedArtifactBackingUseCase,
   IngestWebsitePageUseCase,
   IngestWebsitePagesBatchUseCase,
+  PrepareTemplatedDatasetFromArtifactsUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createWebsiteHtmlAcquisitionPort } from "../../../adapters/ingestion";
 import {
   createArtifactRepoStorageAdapter,
 } from "../../../adapters/storage/artifact-repo";
+import {
+  createPythonDatasetPreparationPort,
+  createPythonRuntimeAdapterFoundation,
+} from "../../../adapters/runtime/python";
 import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
@@ -73,6 +78,9 @@ export interface DesktopHostComposition {
   getHuggingFaceTokenStatus: () => HuggingFaceTokenStatus;
   setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
   clearHuggingFaceToken: () => HuggingFaceTokenStatus;
+  startPythonRuntime: () => Promise<void>;
+  stopPythonRuntime: () => Promise<void>;
+  getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
 }
 
@@ -97,6 +105,25 @@ export function composeDesktopHost(
     filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/desktop/hugging-face-token.json",
     fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
   });
+  const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
+    client: {
+      baseUrl: process.env.PYTHON_RUNTIME_BASE_URL ?? "http://127.0.0.1:43111",
+    },
+    supervisor: {
+      command: process.env.PYTHON_RUNTIME_COMMAND ?? "python3",
+      args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
+      cwd: process.env.PYTHON_RUNTIME_WORKER_DIR ?? "modules/adapters/runtime/python/worker",
+      env: process.env,
+    },
+  });
+  const datasetPreparationPort = createPythonDatasetPreparationPort({
+    executeTask: async (request) => {
+      await pythonRuntimeFoundation.supervisor.start();
+      return pythonRuntimeFoundation.runtimePort.executeTask(request);
+    },
+    getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
+    getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
+  });
 
   return {
     loggingPort,
@@ -109,6 +136,23 @@ export function composeDesktopHost(
     },
     clearHuggingFaceToken() {
       return tokenConfigStore.clearToken();
+    },
+    async startPythonRuntime() {
+      await pythonRuntimeFoundation.supervisor.start();
+    },
+    async stopPythonRuntime() {
+      await pythonRuntimeFoundation.supervisor.stop();
+    },
+    async getPythonRuntimeDiagnostics() {
+      const [health, capabilities] = await Promise.all([
+        pythonRuntimeFoundation.runtimePort.getHealthStatus(),
+        pythonRuntimeFoundation.runtimePort.getCapabilities(),
+      ]);
+      return {
+        status: health.status.status,
+        healthy: health.healthy,
+        capabilities: capabilities.capabilities,
+      };
     },
     registerArtifactUploadIpc(registerOptions) {
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
@@ -227,6 +271,11 @@ export function composeDesktopHost(
       const ingestWebsitePagesBatch = new IngestWebsitePagesBatchUseCase({
         ingestWebsitePage,
       });
+      const prepareTemplatedDatasetFromArtifacts = new PrepareTemplatedDatasetFromArtifactsUseCase({
+        datasetPreparation: datasetPreparationPort,
+        storageBindings: artifactBindings,
+        storage,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -251,6 +300,7 @@ export function composeDesktopHost(
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
         ingestWebsitePageUseCase: ingestWebsitePage,
         ingestWebsitePagesBatchUseCase: ingestWebsitePagesBatch,
+        prepareTemplatedDatasetFromArtifactsUseCase: prepareTemplatedDatasetFromArtifacts,
       });
     },
   };

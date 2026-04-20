@@ -22,3 +22,4 @@ export * from "./desktop-huggingface-dataset-parquet-files-contract";
 export * from "./desktop-artifact-registered-contract";
 
 export * from "./desktop-website-ingestion-contract";
+export * from "./desktop-dataset-preparation-contract";

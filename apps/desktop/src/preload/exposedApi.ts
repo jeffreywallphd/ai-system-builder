@@ -121,6 +121,12 @@ import {
   type DesktopIngestWebsitePageResponse,
   type DesktopIngestWebsitePagesBatchRequest,
   type DesktopIngestWebsitePagesBatchResponse,
+  DESKTOP_DATASET_PREPARE_TEMPLATED_OPERATION,
+  DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TEMPLATED_RESPONSE_CHANNEL,
+  createDesktopPrepareTemplatedDatasetRequest,
+  type DesktopPrepareTemplatedDatasetRequest,
+  type DesktopPrepareTemplatedDatasetResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 
@@ -187,6 +193,20 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopIngestWebsitePagesBatchResponse>;
+  prepareTemplatedDatasetFromArtifacts: (
+    input: {
+      sourceArtifactIds: string[];
+      template: string;
+      split: {
+        trainRatio: number;
+        testRatio: number;
+        seed?: number;
+      };
+      outputFormat: "jsonl" | "json" | "csv";
+      shuffle?: boolean;
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopPrepareTemplatedDatasetResponse>;
   browseArtifacts: (
     input?: { artifactFamily?: ArtifactFamily },
     context?: DesktopArtifactUploadBridgeContext,
@@ -491,6 +511,35 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_INGEST_WEBSITE_PAGES_BATCH_OPERATION,
         channel: DESKTOP_INGEST_WEBSITE_PAGES_BATCH_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop website-pages batch ingestion IPC response envelope.",
+      });
+    },
+
+    async prepareTemplatedDatasetFromArtifacts(input, context = {}) {
+      const request: DesktopPrepareTemplatedDatasetRequest = createDesktopPrepareTemplatedDatasetRequest(
+        {
+          command: {
+            sourceArtifactIds: input.sourceArtifactIds,
+            template: input.template,
+            split: input.split,
+            outputFormat: input.outputFormat,
+            shuffle: input.shuffle,
+          },
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.dataset-preparation",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopPrepareTemplatedDatasetResponse>(response, {
+        operation: DESKTOP_DATASET_PREPARE_TEMPLATED_OPERATION,
+        channel: DESKTOP_DATASET_PREPARE_TEMPLATED_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop dataset preparation IPC response envelope.",
       });
     },
 
