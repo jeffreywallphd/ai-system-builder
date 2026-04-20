@@ -54,8 +54,19 @@ describe("desktop renderer page composition", () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Artifact upload");
-    expect(container.textContent).toContain("Data Artifact Browser");
+    expect(container.textContent).toContain("Data Artifact Ingester");
+    expect(container.textContent).not.toContain("Data Artifact Browser");
+
+    const artifactBrowserTab = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Artifact Browser",
+    );
+    expect(artifactBrowserTab).toBeDefined();
+
+    await act(async () => {
+      artifactBrowserTab?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Artifact Browser");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "System",
