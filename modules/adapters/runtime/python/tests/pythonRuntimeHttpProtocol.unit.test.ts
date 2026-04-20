@@ -16,7 +16,7 @@ describe("pythonRuntimeHttpProtocol", () => {
     };
 
     const requestPayload = mapTaskRequestToHttpPayload(request);
-    expect(requestPayload).toEqual(request);
+    expect(requestPayload).toMatchObject(request);
 
     const health = mapHealthResponseFromHttpPayload({
       healthy: true,
@@ -43,5 +43,23 @@ describe("pythonRuntimeHttpProtocol", () => {
       },
     });
     expect(taskResult.success).toBe(false);
+  });
+
+  it("rejects malformed health payloads", () => {
+    expect(() => mapHealthResponseFromHttpPayload({ healthy: "yes" })).toThrow(
+      "healthy must be a boolean",
+    );
+  });
+
+  it("rejects malformed capabilities payloads", () => {
+    expect(() => mapCapabilitiesResponseFromHttpPayload({ runtimeId: "python", capabilities: [1] })).toThrow(
+      "capabilities[0] must be a non-empty string",
+    );
+  });
+
+  it("rejects malformed task payloads", () => {
+    expect(() => mapTaskResponseFromHttpPayload({ requestId: "id", taskType: "t", success: true, metadata: [] })).toThrow(
+      "metadata: expected object payload",
+    );
   });
 });

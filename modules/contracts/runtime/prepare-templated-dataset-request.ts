@@ -1,5 +1,13 @@
+export interface PrepareTemplatedDatasetInputDescriptor {
+  artifactId: string;
+  localPath: string;
+  mediaType: string;
+  role?: string;
+  name?: string;
+}
+
 export interface PrepareTemplatedDatasetRequest {
-  sourceArtifactIds: string[];
+  sourceInputs: PrepareTemplatedDatasetInputDescriptor[];
   template: string;
   split: {
     trainRatio: number;
