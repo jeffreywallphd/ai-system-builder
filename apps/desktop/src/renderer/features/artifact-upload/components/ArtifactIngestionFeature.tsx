@@ -1,5 +1,7 @@
 import type { ArtifactUploadClient } from "../api/desktopArtifactUploadClient";
 import type { DesktopArtifactBrowserClient } from "../../artifact-browser/api/desktopArtifactBrowserClient";
+import { useState } from "react";
+import { CollapsiblePanel } from "../../../components/ui/CollapsiblePanel";
 import { useArtifactUploadFeature } from "../hooks/useArtifactUploadFeature";
 import { ArtifactUploadForm } from "./ArtifactUploadForm";
 import { ArtifactScrapeForm } from "./ArtifactScrapeForm";
@@ -12,6 +14,19 @@ export interface ArtifactIngestionFeatureProps {
 }
 
 export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete }: ArtifactIngestionFeatureProps) {
+  const [expandedPanels, setExpandedPanels] = useState({
+    uploadData: false,
+    scrapeWebData: false,
+    importFromHuggingFace: false,
+  });
+
+  function togglePanel(panel: keyof typeof expandedPanels): void {
+    setExpandedPanels((current) => ({
+      ...current,
+      [panel]: !current[panel],
+    }));
+  }
+
   const {
     selectedFile,
     viewState,
@@ -37,34 +52,52 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
       <h1>Data Artifact Ingester</h1>
       <p>Please select a method below to add data to the system.</p>
 
-      <ArtifactUploadForm
-        selectedFile={selectedFile}
-        viewState={viewState}
-        acceptedFileTypes={acceptedFileTypes}
-        onFileChange={onFileChange}
-        onSubmit={(event) => void onUploadSubmit(event)}
-      />
+      <CollapsiblePanel
+        title="Upload data"
+        contentId="artifact-upload-panel-content"
+        isExpanded={expandedPanels.uploadData}
+        onToggle={() => togglePanel("uploadData")}
+      >
+        <ArtifactUploadForm
+          selectedFile={selectedFile}
+          viewState={viewState}
+          acceptedFileTypes={acceptedFileTypes}
+          onFileChange={onFileChange}
+          onSubmit={(event) => void onUploadSubmit(event)}
+        />
+      </CollapsiblePanel>
 
-      <hr className="ui-panel-divider" />
+      <CollapsiblePanel
+        title="Scrape web data"
+        contentId="artifact-scrape-panel-content"
+        isExpanded={expandedPanels.scrapeWebData}
+        onToggle={() => togglePanel("scrapeWebData")}
+      >
+        <ArtifactScrapeForm
+          websiteSingleUrl={websiteSingleUrl}
+          websiteSingleMode={websiteSingleMode}
+          websiteBatchInput={websiteBatchInput}
+          websiteBatchMode={websiteBatchMode}
+          websiteSingleViewState={websiteSingleViewState}
+          websiteBatchViewState={websiteBatchViewState}
+          setWebsiteSingleUrl={setWebsiteSingleUrl}
+          setWebsiteSingleMode={setWebsiteSingleMode}
+          setWebsiteBatchInput={setWebsiteBatchInput}
+          setWebsiteBatchMode={setWebsiteBatchMode}
+          ingestWebsiteSingle={ingestWebsiteSingle}
+          ingestWebsiteBatch={ingestWebsiteBatch}
+        />
+      </CollapsiblePanel>
 
-      <ArtifactScrapeForm
-        websiteSingleUrl={websiteSingleUrl}
-        websiteSingleMode={websiteSingleMode}
-        websiteBatchInput={websiteBatchInput}
-        websiteBatchMode={websiteBatchMode}
-        websiteSingleViewState={websiteSingleViewState}
-        websiteBatchViewState={websiteBatchViewState}
-        setWebsiteSingleUrl={setWebsiteSingleUrl}
-        setWebsiteSingleMode={setWebsiteSingleMode}
-        setWebsiteBatchInput={setWebsiteBatchInput}
-        setWebsiteBatchMode={setWebsiteBatchMode}
-        ingestWebsiteSingle={ingestWebsiteSingle}
-        ingestWebsiteBatch={ingestWebsiteBatch}
-      />
-
-      <hr className="ui-panel-divider" />
-
-      <ArtifactHuggingFaceForm client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
+      <CollapsiblePanel
+        title="Import from HuggingFace"
+        contentId="artifact-huggingface-panel-content"
+        isExpanded={expandedPanels.importFromHuggingFace}
+        onToggle={() => togglePanel("importFromHuggingFace")}
+      >
+        <ArtifactHuggingFaceForm client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
+      </CollapsiblePanel>
     </section>
   );
 }
+
