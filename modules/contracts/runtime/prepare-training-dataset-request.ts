@@ -10,7 +10,4 @@ export interface PrepareTrainingDatasetRequest {
   recipe: DatasetPreparationRecipe;
   split: DatasetSplitConfig;
   output: DatasetOutputConfig;
-  runtime?: {
-    timeoutMs?: number;
-  };
 }

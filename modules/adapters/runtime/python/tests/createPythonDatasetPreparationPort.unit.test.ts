@@ -55,7 +55,6 @@ describe("createPythonDatasetPreparationPort", () => {
     expect(executeTask.mock.calls[0]?.[0]).toMatchObject({
       taskType: "prepare-training-dataset",
       requestId: expect.stringMatching(/^prepare-training-dataset-\d{14}-\d{6}$/),
-      timeoutMs: undefined,
       payload: {
         output: {
           destinations: {
@@ -64,6 +63,7 @@ describe("createPythonDatasetPreparationPort", () => {
         },
       },
     });
+    expect(executeTask.mock.calls[0]?.[0]?.timeoutMs).toBeUndefined();
     expect(result.summary.trainRowCount).toBe(8);
     expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
     expect(result.warnings).toBeUndefined();
@@ -77,7 +77,6 @@ describe("createPythonDatasetPreparationPort", () => {
         success: false,
         error: {
           code: "task_failed",
-          errorCode: "chunk_limit_exceeded",
           stage: "chunking",
           message: "Chunk count 20001 exceeds configured maxChunkCount 10000.",
         },
@@ -100,13 +99,54 @@ describe("createPythonDatasetPreparationPort", () => {
       throw new Error("Expected runtime failure");
     } catch (error) {
       expect(error).toMatchObject({
-        name: "PythonDatasetPreparationContractError",
+        name: "PythonDatasetPreparationError",
         contractError: {
           message: "[chunking] Chunk count 20001 exceeds configured maxChunkCount 10000.",
-          details: { runtimeErrorCode: "chunk_limit_exceeded", stage: "chunking" },
+          details: { runtimeErrorCode: "task_failed", stage: "chunking" },
         },
       });
     }
+  });
+
+  it("applies adapter-level task timeout controls", async () => {
+    const executeTask = testDouble.fn(async (request) => ({
+      requestId: request.requestId,
+      taskType: request.taskType,
+      success: true,
+      data: {
+        outputs: [
+          { name: "dataset-train", role: "train", tempPath: "/tmp/train.jsonl", mediaType: "application/x-ndjson" },
+          { name: "dataset-test", role: "test", tempPath: "/tmp/test.jsonl", mediaType: "application/x-ndjson" },
+        ],
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 1,
+          generatedExampleCount: 2,
+          trainRowCount: 1,
+          testRowCount: 1,
+        },
+      },
+    }));
+    const adapter = createPythonDatasetPreparationPort({
+      executeTask,
+      getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
+      getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+    }, { taskTimeoutMs: 25_000 });
+
+    await adapter.prepareTrainingDataset({
+      sourceInputs: [{ artifactId: "a1", localPath: "/tmp/a1.jsonl", mediaType: "application/x-ndjson" }],
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+        generation: { mode: "qa", model: { provider: "transformers", modelId: "test-model" } },
+      },
+      split: { trainRatio: 0.8, testRatio: 0.2 },
+      output: { format: "jsonl" },
+    });
+
+    expect(executeTask.mock.calls[0]?.[0]?.timeoutMs).toBe(25_000);
   });
 
   it("fails clearly for invalid runtime output role values", async () => {

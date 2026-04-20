@@ -32,6 +32,16 @@ async function parseJsonResponse<T>(response: Response, path: string): Promise<T
   return response.json() as Promise<T>;
 }
 
+async function parseJsonResponseSafe(
+  response: Response,
+): Promise<unknown | undefined> {
+  try {
+    return await response.json();
+  } catch {
+    return undefined;
+  }
+}
+
 function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
@@ -79,7 +89,20 @@ export function createPythonRuntimeHttpClient(
         clearTimeout(timeout);
       }
 
-      const payload = await parseJsonResponse<unknown>(response, "/tasks/execute");
+      const payload = await parseJsonResponseSafe(response);
+
+      if (!response.ok) {
+        if (payload !== undefined) {
+          return mapTaskResponseFromHttpPayload(payload);
+        }
+
+        throw new Error(`Python runtime request failed for /tasks/execute with status ${response.status}.`);
+      }
+
+      if (payload === undefined) {
+        throw new Error("Python runtime request failed for /tasks/execute with invalid JSON response body.");
+      }
+
       return mapTaskResponseFromHttpPayload(payload);
     },
   };

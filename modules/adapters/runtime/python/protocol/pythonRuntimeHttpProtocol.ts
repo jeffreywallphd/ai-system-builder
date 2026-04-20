@@ -94,9 +94,14 @@ function parseRuntimeError(value: unknown, field: string): PythonRuntimeError | 
   }
 
   const payload = asObject(value, field);
+  const mappedCode = asOptionalString(payload.code, `${field}.code`)
+    ?? asOptionalString(payload.errorCode, `${field}.errorCode`);
+  if (!mappedCode) {
+    throw new Error(`Invalid python runtime payload: ${field}.code must be a non-empty string.`);
+  }
+
   return {
-    code: asString(payload.code, `${field}.code`),
-    errorCode: asOptionalString(payload.errorCode, `${field}.errorCode`),
+    code: mappedCode,
     stage: asOptionalStage(payload.stage, `${field}.stage`),
     message: asString(payload.message, `${field}.message`),
     details: asOptionalRecord(payload.details, `${field}.details`),

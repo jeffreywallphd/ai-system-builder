@@ -32,13 +32,17 @@ describe("desktop dataset preparation ipc contract", () => {
     expect(request.payload.boundary.source).toBe("desktop.renderer.dataset-preparation");
 
     const response = createDesktopPrepareTemplatedDatasetSuccessResponse({
-      train: {
-        sourceKind: "runtime",
-        storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 10 },
-      },
-      test: {
-        sourceKind: "runtime",
-        storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 10 },
+      outputs: {
+        local: {
+          train: {
+            sourceKind: "runtime",
+            storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 10 },
+          },
+          test: {
+            sourceKind: "runtime",
+            storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 10 },
+          },
+        },
       },
       trainRowCount: 8,
       testRowCount: 2,
@@ -46,6 +50,6 @@ describe("desktop dataset preparation ipc contract", () => {
     });
 
     expect(response.ok).toBe(true);
-    expect(response.value.result.train.storage.key).toBe("stored-train");
+    expect(response.value.result.outputs.local?.train.storage.key).toBe("stored-train");
   });
 });
