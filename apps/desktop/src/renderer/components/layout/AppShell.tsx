@@ -16,7 +16,9 @@ export function AppShell({ activePage, onNavigate, pages, children }: AppShellPr
       <header className="ui-shell__header">
         <div className="ui-container ui-shell__header-inner">
           <div className="ui-shell__brand">
-            <img className="ui-shell__logo" src={appLogoSrc} alt="AI System Builder logo" />
+            <span className="ui-shell__logo-frame">
+              <img className="ui-shell__logo-image" src={appLogoSrc} alt="AI System Builder logo" />
+            </span>
             <h1 className="ui-shell__title">AI System Builder</h1>
           </div>
           <nav className="ui-shell__nav" aria-label="Primary">

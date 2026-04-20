@@ -17,13 +17,30 @@
   font-size: var(--font-size-lg);
 }
 
-.ui-shell__logo {
+.ui-shell__logo-frame {
+  --ui-shell-logo-scale: 1.22;
+  --ui-shell-logo-y-offset: -6%;
+  position: relative;
   width: 2rem;
   height: 2rem;
+  overflow: hidden;
+  flex: 0 0 auto;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-bg-elevated);
   padding: var(--space-2xs);
+}
+
+.ui-shell__logo-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(100% * var(--ui-shell-logo-scale));
+  height: calc(100% * var(--ui-shell-logo-scale));
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  transform: translate(-50%, calc(-50% + var(--ui-shell-logo-y-offset)));
 }
 
 .ui-shell__header-inner {
