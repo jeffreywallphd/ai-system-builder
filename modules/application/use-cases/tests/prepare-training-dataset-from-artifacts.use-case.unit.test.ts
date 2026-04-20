@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 import {
   PrepareTrainingDatasetFromArtifactsUseCase,
-} from "../prepare-templated-dataset-from-artifacts.use-case";
+} from "../prepare-training-dataset-from-artifacts.use-case";
 
 describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
   it("resolves source artifacts, invokes runtime dataset preparation, and stores runtime outputs", async () => {
@@ -51,8 +51,20 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       expect(request.sourceInputs[0]?.artifactId).toBe("artifact-1");
       return {
         outputs: [
-          { name: "dataset-train", role: "train", tempPath: runtimeTrain, mediaType: "application/x-ndjson" },
-          { name: "dataset-test", role: "test", tempPath: runtimeTest, mediaType: "application/x-ndjson" },
+          {
+            name: "dataset-train",
+            role: "train",
+            tempPath: runtimeTrain,
+            mediaType: "application/x-ndjson",
+            metadata: { stage: "chunk-level-interim" },
+          },
+          {
+            name: "dataset-test",
+            role: "test",
+            tempPath: runtimeTest,
+            mediaType: "application/x-ndjson",
+            metadata: { stage: "chunk-level-interim" },
+          },
         ],
         summary: {
           sourceDocumentCount: 1,
@@ -116,6 +128,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       },
       split: { trainRatio: 0.5, testRatio: 0.5 },
       rowCount: 1,
+      datasetPreparationStage: "chunk-level-interim",
     });
     expect(result.value.train.storage.key).toBe("stored-train");
     expect(result.value.test.storage.key).toBe("stored-test");

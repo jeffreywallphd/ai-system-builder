@@ -18,7 +18,7 @@ import {
   VerifyPublishedArtifactBackingUseCase,
   IngestWebsitePageUseCase,
   IngestWebsitePagesBatchUseCase,
-  PrepareTemplatedDatasetFromArtifactsUseCase,
+  PrepareTrainingDatasetFromArtifactsUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createWebsiteHtmlAcquisitionPort } from "../../../adapters/ingestion";
@@ -271,7 +271,7 @@ export function composeDesktopHost(
       const ingestWebsitePagesBatch = new IngestWebsitePagesBatchUseCase({
         ingestWebsitePage,
       });
-      const prepareTemplatedDatasetFromArtifacts = new PrepareTemplatedDatasetFromArtifactsUseCase({
+      const prepareTemplatedDatasetFromArtifacts = new PrepareTrainingDatasetFromArtifactsUseCase({
         datasetPreparation: datasetPreparationPort,
         storageBindings: artifactBindings,
         storage,

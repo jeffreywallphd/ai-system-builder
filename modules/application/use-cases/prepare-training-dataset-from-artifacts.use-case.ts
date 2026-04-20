@@ -158,6 +158,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
               split: command.split,
               output: command.output,
               rowCount: prepared.summary.trainRowCount,
+              runtimeOutputMetadata: trainOutput.metadata,
+              datasetPreparationStage: "chunk-level-interim",
             },
           },
         }), context),
@@ -172,6 +174,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
               split: command.split,
               output: command.output,
               rowCount: prepared.summary.testRowCount,
+              runtimeOutputMetadata: testOutput.metadata,
+              datasetPreparationStage: "chunk-level-interim",
             },
           },
         }), context),
@@ -210,29 +214,3 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     }
   }
 }
-
-/**
- * @deprecated Use PrepareTrainingDatasetFromArtifactsCommand.
- */
-export type PrepareTemplatedDatasetFromArtifactsCommand = PrepareTrainingDatasetFromArtifactsCommand;
-
-/**
- * @deprecated Use PrepareTrainingDatasetFromArtifactsValue.
- */
-export type PrepareTemplatedDatasetFromArtifactsValue = PrepareTrainingDatasetFromArtifactsValue;
-
-/**
- * @deprecated Use PrepareTrainingDatasetFromArtifactsResult.
- */
-export type PrepareTemplatedDatasetFromArtifactsResult = PrepareTrainingDatasetFromArtifactsResult;
-
-/**
- * @deprecated Use PrepareTrainingDatasetFromArtifactsUseCaseDependencies.
- */
-export type PrepareTemplatedDatasetFromArtifactsUseCaseDependencies =
-  PrepareTrainingDatasetFromArtifactsUseCaseDependencies;
-
-/**
- * @deprecated Use PrepareTrainingDatasetFromArtifactsUseCase.
- */
-export const PrepareTemplatedDatasetFromArtifactsUseCase = PrepareTrainingDatasetFromArtifactsUseCase;

@@ -1,6 +1,6 @@
 import type {
-  PrepareTemplatedDatasetFromArtifactsCommand,
-  PrepareTemplatedDatasetFromArtifactsResult,
+  PrepareTrainingDatasetFromArtifactsCommand,
+  PrepareTrainingDatasetFromArtifactsResult,
 } from "../../../../application/use-cases";
 import {
   DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL,
@@ -15,12 +15,12 @@ import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 export interface PrepareTemplatedDatasetFromArtifactsUseCasePort {
   execute: (
-    command: PrepareTemplatedDatasetFromArtifactsCommand,
+    command: PrepareTrainingDatasetFromArtifactsCommand,
     context?: {
       requestId?: string;
       correlationId?: string;
     },
-  ) => Promise<PrepareTemplatedDatasetFromArtifactsResult>;
+  ) => Promise<PrepareTrainingDatasetFromArtifactsResult>;
 }
 
 export interface RegisterDatasetPreparationIpcDependencies {
@@ -29,7 +29,7 @@ export interface RegisterDatasetPreparationIpcDependencies {
 }
 
 function mapPrepareTemplatedDatasetResultToIpcResponse(
-  result: PrepareTemplatedDatasetFromArtifactsResult,
+  result: PrepareTrainingDatasetFromArtifactsResult,
   request: DesktopPrepareTemplatedDatasetRequest,
 ): DesktopPrepareTemplatedDatasetResponse {
   if (result.ok) {
