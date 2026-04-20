@@ -67,10 +67,12 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
       );
 
       return toBrowseItems(payload.value).map((artifact) => {
-        const artifactId = artifact.artifactId ?? artifact.storageKey;
+        if (typeof artifact.artifactId !== "string" || artifact.artifactId.trim().length === 0) {
+          throw new Error("Artifact browse item is missing artifactId.");
+        }
 
         return {
-          artifactId,
+          artifactId: artifact.artifactId,
           storageKey: artifact.storageKey,
           label: artifact.originalName ?? artifact.storageKey,
         };

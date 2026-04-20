@@ -78,4 +78,31 @@ describe("desktop dataset preparation client", () => {
       error: { code: "validation", message: "bad input" },
     });
   });
+
+  it("does not fall back to storageKey when artifactId is missing from browse items", async () => {
+    const hostWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
+    hostWindow.window ??= {} as Window & typeof globalThis;
+    hostWindow.window.desktopApi = {
+      uploadArtifact: async () => ({ ok: false }),
+      getArtifactUploadPolicy: async () => ({ ok: false }),
+      browseArtifacts: async () => ({
+        ok: true,
+        value: { items: [{ storageKey: "stored/a1.jsonl", artifactFamily: "structured-text" }] },
+      }),
+      readArtifactDetail: async () => ({ ok: false }),
+      readArtifactContentDescriptor: async () => ({ ok: false }),
+      readArtifactViewerMedia: async () => ({ ok: false }),
+      publishArtifactToRepo: async () => ({ ok: false }),
+      verifyPublishedArtifactBacking: async () => ({ ok: false }),
+      registerArtifactFromRepo: async () => ({ ok: false }),
+      localizeArtifactFromRepo: async () => ({ ok: false }),
+      prepareTemplatedDatasetFromArtifacts: async () => ({ ok: false }),
+    };
+
+    const client = createDesktopDatasetPreparationClient();
+
+    await expect(client.browseSourceArtifacts()).rejects.toThrow(
+      "Artifact browse item is missing artifactId.",
+    );
+  });
 });
