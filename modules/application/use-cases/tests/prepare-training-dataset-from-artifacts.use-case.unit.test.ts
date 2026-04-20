@@ -7,87 +7,128 @@ import {
   PrepareTrainingDatasetFromArtifactsUseCase,
 } from "../prepare-training-dataset-from-artifacts.use-case";
 
-describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
-  it("resolves source artifacts, invokes runtime dataset preparation, and stores runtime outputs", async () => {
-    const tempDir = await mkdtemp(join(tmpdir(), "dataset-use-case-test-"));
-    const runtimeTrain = join(tempDir, "train.jsonl");
-    const runtimeTest = join(tempDir, "test.jsonl");
+const recipe = {
+  normalization: { targetFormat: "markdown" as const },
+  chunking: { strategy: "character" as const, chunkSize: 1000, chunkOverlap: 100 },
+  generation: {
+    mode: "qa" as const,
+    model: { provider: "transformers" as const, modelId: "test-model", device: "cpu" as const, torchDtype: "float32" as const },
+  },
+};
 
-    await writeFile(runtimeTrain, '{"text":"train"}\n', "utf-8");
-    await writeFile(runtimeTest, '{"text":"test"}\n', "utf-8");
+const split = { trainRatio: 0.5, testRatio: 0.5 };
 
-    const readArtifactStorageBindings = testDouble.fn(async ({ artifactId }: { artifactId: string }) => ({
-      ok: true as const,
-      value: {
-        bindings: [{
-          artifactId,
-          backing: {
-            kind: "artifact-object",
-            provider: "local",
-            locator: `key-${artifactId}`,
-          },
-          role: "primary",
-        }],
-      },
-    }));
+async function setupRuntimeOutputs() {
+  const tempDir = await mkdtemp(join(tmpdir(), "dataset-use-case-test-"));
+  const runtimeTrain = join(tempDir, "train.jsonl");
+  const runtimeTest = join(tempDir, "test.jsonl");
+  await writeFile(runtimeTrain, '{"text":"train"}\n', "utf-8");
+  await writeFile(runtimeTest, '{"text":"test"}\n', "utf-8");
+  return { runtimeTrain, runtimeTest };
+}
 
-    const retrieveArtifact = testDouble.fn(async () => ({
-      ok: true as const,
-      value: {
-        descriptor: { key: "key-artifact-1", mediaType: "application/x-ndjson" },
-        content: new TextEncoder().encode('{"text":"a"}\n{"text":"b"}\n'),
-      },
-    }));
-
-    let storeCall = 0;
-    const storeArtifact = testDouble.fn(async () => {
-      storeCall += 1;
-      return storeCall === 1
-        ? { ok: true as const, value: { key: "stored-train", mediaType: "application/x-ndjson" } }
-        : { ok: true as const, value: { key: "stored-test", mediaType: "application/x-ndjson" } };
-    });
-
-    const prepareTrainingDataset = testDouble.fn(async (request) => {
-      expect(request.sourceInputs[0]?.artifactId).toBe("artifact-1");
-      return {
-        outputs: [
-          {
-            name: "dataset-train",
-            role: "train",
-            tempPath: runtimeTrain,
-            mediaType: "application/x-ndjson",
-            metadata: { stage: "generated-examples", generationMode: "qa" },
-          },
-          {
-            name: "dataset-test",
-            role: "test",
-            tempPath: runtimeTest,
-            mediaType: "application/x-ndjson",
-            metadata: { stage: "generated-examples", generationMode: "qa" },
-          },
-        ],
-        summary: {
-          sourceDocumentCount: 1,
-          normalizedDocumentCount: 1,
-          skippedDocumentCount: 0,
-          chunkCount: 1,
-          generatedExampleCount: 2,
-          trainRowCount: 1,
-          testRowCount: 1,
+function createDeps(runtimeTrain: string, runtimeTest: string) {
+  const readArtifactStorageBindings = testDouble.fn(async ({ artifactId }: { artifactId: string }) => ({
+    ok: true as const,
+    value: {
+      bindings: [{
+        artifactId,
+        backing: {
+          kind: "artifact-object",
+          provider: "local",
+          locator: `key-${artifactId}`,
         },
-      };
-    });
+        role: "primary",
+      }],
+    },
+  }));
+
+  const retrieveArtifact = testDouble.fn(async ({ key }: { key: string }) => ({
+    ok: true as const,
+    value: {
+      descriptor: {
+        key,
+        mediaType: "application/x-ndjson",
+        metadata: { originalName: `${key}.md` },
+      },
+      content: new TextEncoder().encode('{"text":"a"}\n{"text":"b"}\n'),
+    },
+  }));
+
+  let storeCall = 0;
+  const storeArtifact = testDouble.fn(async () => {
+    storeCall += 1;
+    return storeCall === 1
+      ? { ok: true as const, value: { key: "stored-train", mediaType: "application/x-ndjson" } }
+      : { ok: true as const, value: { key: "stored-test", mediaType: "application/x-ndjson" } };
+  });
+
+  const storeArtifactInRepo = testDouble.fn(async () => ({
+    ok: true as const,
+    value: {
+      target: { provider: "huggingface", repository: "org/repo", path: "datasets/train.jsonl" },
+      descriptor: { mediaType: "application/x-ndjson", sizeBytes: 20 },
+    },
+  }));
+
+  const hasArtifactInRepo = testDouble.fn(async () => ({ ok: true as const, value: { exists: true } }));
+
+  const prepareTrainingDataset = testDouble.fn(async (request) => {
+    return {
+      outputs: [
+        {
+          name: "dataset-train",
+          role: "train",
+          tempPath: runtimeTrain,
+          mediaType: "application/x-ndjson",
+          metadata: { stage: "generated-examples", generationMode: "qa" },
+        },
+        {
+          name: "dataset-test",
+          role: "test",
+          tempPath: runtimeTest,
+          mediaType: "application/x-ndjson",
+          metadata: { stage: "generated-examples", generationMode: "qa" },
+        },
+      ],
+      summary: {
+        sourceDocumentCount: 1,
+        normalizedDocumentCount: 1,
+        skippedDocumentCount: 0,
+        chunkCount: 1,
+        generatedExampleCount: 2,
+        trainRowCount: 1,
+        testRowCount: 1,
+      },
+      request,
+    };
+  });
+
+  return {
+    readArtifactStorageBindings,
+    retrieveArtifact,
+    storeArtifact,
+    storeArtifactInRepo,
+    hasArtifactInRepo,
+    prepareTrainingDataset,
+  };
+}
+
+describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
+  it("passes originalName to runtime source inputs and stores local outputs by default", async () => {
+    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeTrain, runtimeTest);
 
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
-      datasetPreparation: { prepareTrainingDataset },
+      datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
       storageBindings: {
-        readArtifactStorageBindings,
+        readArtifactStorageBindings: deps.readArtifactStorageBindings,
         upsertArtifactStorageBinding: testDouble.fn(),
         deleteArtifactStorageBindings: testDouble.fn(),
       },
       storage: {
-        retrieveArtifact,
-        storeArtifact,
+        retrieveArtifact: deps.retrieveArtifact,
+        storeArtifact: deps.storeArtifact,
         hasArtifact: testDouble.fn(),
         deleteArtifact: testDouble.fn(),
       },
@@ -95,15 +136,8 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
 
     const result = await useCase.execute({
       sourceArtifactIds: ["artifact-1"],
-      recipe: {
-        normalization: { targetFormat: "markdown" },
-        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
-        generation: {
-          mode: "qa",
-          model: { provider: "transformers", modelId: "test-model", device: "cpu", torchDtype: "float32" },
-        },
-      },
-      split: { trainRatio: 0.5, testRatio: 0.5 },
+      recipe,
+      split,
       output: { format: "jsonl" },
     });
 
@@ -112,27 +146,111 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       return;
     }
 
-    expect(prepareTrainingDataset).toHaveBeenCalledOnce();
-    expect(storeArtifact).toHaveBeenCalledTimes(2);
-    const firstStoreRequest = storeArtifact.mock.calls[0]?.[0];
-    expect(firstStoreRequest.descriptor.metadata).toMatchObject({
-      runtimeRole: "train",
+    const runtimeRequest = deps.prepareTrainingDataset.mock.calls[0]?.[0];
+    expect(runtimeRequest.sourceInputs[0]?.originalName).toBe("key-artifact-1.md");
+    expect(deps.storeArtifact).toHaveBeenCalledTimes(2);
+    expect(result.value.localOutputs?.train.storage.key).toBe("stored-train");
+    expect(result.value.huggingFaceOutputs).toBeUndefined();
+    expect(result.value.provenance.generationModelId).toBe("test-model");
+  });
+
+  it("supports huggingface-only output destination", async () => {
+    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeTrain, runtimeTest);
+
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
+      storageBindings: {
+        readArtifactStorageBindings: deps.readArtifactStorageBindings,
+        upsertArtifactStorageBinding: testDouble.fn(),
+        deleteArtifactStorageBindings: testDouble.fn(),
+      },
+      storage: {
+        retrieveArtifact: deps.retrieveArtifact,
+        storeArtifact: deps.storeArtifact,
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
+      artifactRepoStorage: {
+        storeArtifactInRepo: deps.storeArtifactInRepo,
+        hasArtifactInRepo: deps.hasArtifactInRepo,
+        retrieveArtifactFromRepo: testDouble.fn(),
+      },
+      now: () => "2026-04-20T00:00:00.000Z",
+    });
+
+    const result = await useCase.execute({
       sourceArtifactIds: ["artifact-1"],
-      recipe: {
-        normalization: { targetFormat: "markdown" },
-        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
-        generation: {
-          mode: "qa",
-          model: { provider: "transformers", modelId: "test-model", device: "cpu", torchDtype: "float32" },
+      recipe,
+      split,
+      output: {
+        format: "jsonl",
+        destinations: {
+          local: { enabled: false },
+          huggingFace: { enabled: true, repository: "org/repo", pathPrefix: "datasets" },
         },
       },
-      split: { trainRatio: 0.5, testRatio: 0.5 },
-      rowCount: 1,
-      datasetPreparationStage: "generated-examples",
     });
-    expect(result.value.train.storage.key).toBe("stored-train");
-    expect(result.value.test.storage.key).toBe("stored-test");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(deps.storeArtifact).not.toHaveBeenCalled();
+    expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(2);
+    expect(result.value.localOutputs).toBeUndefined();
+    expect(result.value.huggingFaceOutputs?.train.path).toBe("datasets/dataset-train.jsonl");
+  });
+
+  it("supports local + huggingface output destinations", async () => {
+    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeTrain, runtimeTest);
+
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
+      storageBindings: {
+        readArtifactStorageBindings: deps.readArtifactStorageBindings,
+        upsertArtifactStorageBinding: testDouble.fn(),
+        deleteArtifactStorageBindings: testDouble.fn(),
+      },
+      storage: {
+        retrieveArtifact: deps.retrieveArtifact,
+        storeArtifact: deps.storeArtifact,
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
+      artifactRepoStorage: {
+        storeArtifactInRepo: deps.storeArtifactInRepo,
+        hasArtifactInRepo: deps.hasArtifactInRepo,
+        retrieveArtifactFromRepo: testDouble.fn(),
+      },
+      now: () => "2026-04-20T00:00:00.000Z",
+    });
+
+    const result = await useCase.execute({
+      sourceArtifactIds: ["artifact-1"],
+      recipe,
+      split,
+      output: {
+        format: "jsonl",
+        destinations: {
+          local: { enabled: true },
+          huggingFace: { enabled: true, repository: "org/repo" },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(deps.storeArtifact).toHaveBeenCalledTimes(2);
+    expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(2);
+    expect(result.value.localOutputs?.train.storage.key).toBe("stored-train");
+    expect(result.value.huggingFaceOutputs?.test.path).toBe("dataset-test.jsonl");
     expect(result.value.summary.trainRowCount).toBe(1);
-    expect(result.value.summary.testRowCount).toBe(1);
+    expect(result.value.provenance.output.destinations?.huggingFace?.repository).toBe("org/repo");
   });
 });

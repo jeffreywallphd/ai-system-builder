@@ -11,8 +11,10 @@ Endpoints:
 Implemented task:
 
 - `prepare-training-dataset`
+  - validates split consistency (`trainRatio > 0`, `testRatio > 0`, and ratios sum to `1.0`)
   - normalizes supported source docs to markdown (`.txt`, `.md`, `.html`, `.pdf`, `.docx`)
   - explicitly rejects legacy `.doc` files (convert to `.docx` or configure skip policy)
   - chunks markdown using recipe chunking config (`character` strategy)
   - generates QA training examples from chunks via local `transformers` model configuration
+  - supports generation failure handling policy (`generation.failurePolicy`), defaulting to strict fail-fast unless normalization mode is best-effort
   - emits train/test dataset artifacts in JSONL/JSON/CSV using generated-example rows

@@ -16,7 +16,12 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         return PrepareTrainingDatasetRequest.model_validate(
             {
                 "sourceInputs": [
-                    {"artifactId": "doc-1", "localPath": self.first_path, "mediaType": "text/plain"},
+                    {
+                        "artifactId": "doc-1",
+                        "localPath": self.first_path,
+                        "mediaType": "text/plain",
+                        "originalName": "original-doc-1.txt",
+                    },
                     {"artifactId": "doc-2", "localPath": self.second_path, "mediaType": "application/octet-stream"},
                 ],
                 "recipe": {
@@ -36,7 +41,7 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
                     },
                 },
                 "split": {"trainRatio": 0.5, "testRatio": 0.5, "shuffle": False},
-                "output": {"format": output_format},
+                "output": {"format": output_format, "destinations": {"local": {"enabled": True}}},
             }
         )
 
@@ -105,6 +110,56 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
             else:
                 reader = csv.DictReader(contents.splitlines())
                 self.assertEqual(reader.fieldnames, ["artifactId", "chunkIndex", "question", "answer", "generationMode"])
+
+    def test_split_validation_requires_positive_ratios_and_total_of_one(self) -> None:
+        payload = self._build_payload("jsonl")
+        payload.split.trainRatio = 0
+        with self.assertRaisesRegex(ValueError, "trainRatio"):
+            prepare_training_dataset(payload, example_generator=lambda chunks, _config: [])
+
+        payload = self._build_payload("jsonl")
+        payload.split.testRatio = 0
+        with self.assertRaisesRegex(ValueError, "testRatio"):
+            prepare_training_dataset(payload, example_generator=lambda chunks, _config: [])
+
+        payload = self._build_payload("jsonl")
+        payload.split.trainRatio = 0.7
+        payload.split.testRatio = 0.2
+        with self.assertRaisesRegex(ValueError, "must equal 1.0"):
+            prepare_training_dataset(payload, example_generator=lambda chunks, _config: [])
+
+    def test_generation_failure_policy_skip_adds_warning_and_continues(self) -> None:
+        payload = self._build_payload("jsonl")
+        payload.recipe.generation.failurePolicy = "skip"
+
+        def flaky_generator(chunks, _config):
+            chunk = chunks[0]
+            if chunk.chunk_index == 1:
+                raise RuntimeError("generation blew up")
+            return [
+                GeneratedQaExample(
+                    artifact_id=chunk.artifact_id,
+                    chunk_index=chunk.chunk_index,
+                    question="Q",
+                    answer=chunk.text,
+                )
+            ]
+
+        result = prepare_training_dataset(payload, example_generator=flaky_generator)
+
+        warning_codes = [warning.code for warning in result.warnings or []]
+        self.assertIn("generation_example_skipped", warning_codes)
+        self.assertEqual(result.summary.generatedExampleCount, 2)
+
+    def test_generation_failure_default_is_fail_fast_in_strict_mode(self) -> None:
+        payload = self._build_payload("jsonl")
+        payload.recipe.normalization.normalizationMode = "strict"
+
+        def failing_generator(_chunks, _config):
+            raise RuntimeError("cannot generate")
+
+        with self.assertRaisesRegex(RuntimeError, "cannot generate"):
+            prepare_training_dataset(payload, example_generator=failing_generator)
 
 
 if __name__ == "__main__":

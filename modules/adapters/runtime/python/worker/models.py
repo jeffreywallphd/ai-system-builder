@@ -90,6 +90,7 @@ class ExampleGenerationConfig(BaseModel):
     promptTemplate: str | None = None
     maxExamplesPerChunk: int | None = None
     generationParams: GenerationParams | None = None
+    failurePolicy: Literal["fail", "skip"] | None = None
 
 
 class DatasetPreparationRecipe(BaseModel):
@@ -112,6 +113,7 @@ class DatasetOutputConfigNaming(BaseModel):
 class DatasetOutputConfig(BaseModel):
     format: Literal["jsonl", "json", "csv"]
     naming: DatasetOutputConfigNaming | None = None
+    destinations: dict[str, Any] | None = None
 
 
 class PrepareTrainingDatasetRequest(BaseModel):

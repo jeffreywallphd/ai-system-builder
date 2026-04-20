@@ -275,6 +275,9 @@ export function composeDesktopHost(
         datasetPreparation: datasetPreparationPort,
         storageBindings: artifactBindings,
         storage,
+        artifactRepoStorage,
+        artifactCatalog,
+        now: options.now,
       });
 
       registerElectronIpc({
