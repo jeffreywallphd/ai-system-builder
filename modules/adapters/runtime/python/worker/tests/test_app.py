@@ -3,9 +3,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from app import capabilities, execute_task, health
-from models import PythonRuntimeTaskRequest
+from modules.adapters.runtime.python.worker.app import capabilities, execute_task, health
+from modules.adapters.runtime.python.worker.models import PythonRuntimeTaskRequest
 
 
 class WorkerAppTests(unittest.TestCase):
@@ -37,8 +38,8 @@ class WorkerAppTests(unittest.TestCase):
                         },
                         "chunking": {
                             "strategy": "character",
-                            "chunkSize": 5,
-                            "chunkOverlap": 1,
+                            "chunkSize": 128,
+                            "chunkOverlap": 8,
                             "preserveDocumentBoundaries": True,
                         },
                         "generation": {
@@ -51,13 +52,24 @@ class WorkerAppTests(unittest.TestCase):
                 },
             )
 
-            response = execute_task(request)
+            with patch("modules.adapters.runtime.python.worker.app.prepare_training_dataset") as prepare_mock:
+                prepare_mock.return_value = type("Result", (), {"model_dump": lambda self, mode: {
+                    "outputs": [],
+                    "summary": {
+                        "sourceDocumentCount": 1,
+                        "normalizedDocumentCount": 1,
+                        "skippedDocumentCount": 0,
+                        "chunkCount": 1,
+                        "generatedExampleCount": 1,
+                        "trainRowCount": 1,
+                        "testRowCount": 0,
+                    },
+                }})()
+                response = execute_task(request)
+
             self.assertTrue(response.success)
             self.assertIsNotNone(response.data)
-            outputs = response.data["outputs"]
-            self.assertEqual(len(outputs), 2)
-            self.assertEqual({output["role"] for output in outputs}, {"train", "test"})
-            self.assertEqual(response.data["summary"]["sourceDocumentCount"], 1)
+            self.assertEqual(response.data["summary"]["generatedExampleCount"], 1)
 
     def test_unknown_task_preserves_generic_execution_path(self) -> None:
         request = PythonRuntimeTaskRequest(

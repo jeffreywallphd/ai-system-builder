@@ -6,7 +6,7 @@ from os import getenv
 
 from fastapi import FastAPI
 
-from models import (
+from .models import (
     PrepareTrainingDatasetRequest,
     PythonRuntimeCapabilitiesResult,
     PythonRuntimeError,
@@ -15,7 +15,7 @@ from models import (
     PythonRuntimeTaskRequest,
     PythonRuntimeTaskResult,
 )
-from tasks.prepare_training_dataset import prepare_training_dataset
+from .tasks.prepare_training_dataset import prepare_training_dataset
 
 RUNTIME_ID = getenv("PYTHON_RUNTIME_ID", "python-sidecar")
 WORKER_VERSION = getenv("PYTHON_RUNTIME_WORKER_VERSION", "0.1.0")

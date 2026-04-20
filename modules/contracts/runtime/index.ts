@@ -16,5 +16,3 @@ export * from "./python-runtime-task-result";
 export * from "./dataset-preparation";
 export * from "./prepare-training-dataset-request";
 export * from "./prepare-training-dataset-result";
-export * from "./prepare-templated-dataset-request";
-export * from "./prepare-templated-dataset-result";

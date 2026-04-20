@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from models import MarkdownChunkingConfig
-from tasks.document_normalization import NormalizedDocument
+from ..models import MarkdownChunkingConfig
+from .document_normalization import NormalizedDocument
 
 
 @dataclass

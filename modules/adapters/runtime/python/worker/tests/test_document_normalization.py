@@ -7,8 +7,8 @@ from pathlib import Path
 from docx import Document
 from pypdf import PdfWriter
 
-from models import DatasetPreparationSourceInput, DocumentNormalizationConfig
-from tasks.document_normalization import normalize_sources_to_markdown
+from modules.adapters.runtime.python.worker.models import DatasetPreparationSourceInput, DocumentNormalizationConfig
+from modules.adapters.runtime.python.worker.tasks.document_normalization import normalize_sources_to_markdown
 
 
 class DocumentNormalizationTests(unittest.TestCase):
@@ -74,6 +74,16 @@ class DocumentNormalizationTests(unittest.TestCase):
             self.assertEqual(len(result.documents), 0)
             self.assertEqual(result.skipped_document_count, 1)
             self.assertEqual(result.warnings[0].code, "document_normalization_skipped")
+
+    def test_doc_extension_reports_explicit_unsupported_message(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "legacy.doc"
+            source.write_bytes(b"abc")
+            with self.assertRaisesRegex(ValueError, "legacy Microsoft Word"):
+                normalize_sources_to_markdown(
+                    [DatasetPreparationSourceInput(artifactId="doc", localPath=str(source))],
+                    DocumentNormalizationConfig(targetFormat="markdown", unsupportedDocumentPolicy="fail"),
+                )
 
 
 if __name__ == "__main__":
