@@ -20,4 +20,15 @@ describe("prepare training dataset TypeScript regression guards", () => {
     expect(source).not.toContain("this.artifactRepoStorage.storeArtifactInRepo(");
     expect(source).not.toContain("this.artifactRepoStorage.hasArtifactInRepo(");
   });
+
+  it("reads repo publish targets from store descriptor contract shape", () => {
+    const source = readSourceFile(
+      "modules/application/use-cases/prepare-training-dataset-from-artifacts.use-case.ts",
+    );
+
+    expect(source).toContain("publishTrain.value.descriptor.target");
+    expect(source).toContain("publishTest.value.descriptor.target");
+    expect(source).not.toContain("publishTrain.value.target");
+    expect(source).not.toContain("publishTest.value.target");
+  });
 });
