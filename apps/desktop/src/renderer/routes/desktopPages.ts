@@ -7,12 +7,8 @@ export interface DesktopPageDefinition {
 
 export const desktopPageDefinitions: readonly DesktopPageDefinition[] = [
   {
-    key: "home",
-    label: "Home",
-  },
-  {
     key: "artifacts",
-    label: "Artifacts",
+    label: "Data",
   },
   {
     key: "system",
