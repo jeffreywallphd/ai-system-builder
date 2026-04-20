@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { useArtifactUploadClient } from "./useArtifactUploadClient";
 import type { ArtifactUploadClient, WebsiteIngestionMode } from "../api/desktopArtifactUploadClient";
-import type { UploadViewState } from "../components/ArtifactUploadStatus";
+import type { UploadViewState } from "../components/ArtifactUploadForm";
 import { toHtmlFileAcceptAttribute } from "./toHtmlFileAcceptAttribute";
 import { useFileArtifactUpload } from "./useFileArtifactUpload";
 import { useWebsiteArtifactIngestion } from "./useWebsiteArtifactIngestion";
@@ -77,3 +77,4 @@ export function useArtifactUploadFeature(
     ingestWebsiteBatch: websiteIngestion.ingestWebsiteBatch,
   };
 }
+

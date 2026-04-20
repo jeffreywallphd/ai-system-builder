@@ -1,25 +1,57 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { type ApiArtifactUploadClient } from "../api/apiArtifactUploadClient";
-import type { UploadViewState } from "../components/ArtifactUploadStatus";
+import type { UploadViewState } from "../components/ArtifactUploadForm";
 import { useArtifactUploadClient } from "./useArtifactUploadClient";
 import { toHtmlFileAcceptAttribute } from "./toHtmlFileAcceptAttribute";
+import { useWebsiteArtifactIngestion } from "./useWebsiteArtifactIngestion";
 
 export interface UseArtifactUploadFeatureResult {
   selectedFile: File | null;
   viewState: UploadViewState;
   acceptedFileTypes: string;
+  websiteSingleUrl: string;
+  websiteSingleMode: "automatic" | "rendered";
+  websiteBatchInput: string;
+  websiteBatchMode: "automatic" | "rendered";
+  websiteSingleViewState: {
+    status: "idle" | "loading" | "success" | "error";
+    message?: string;
+    result?: {
+      acquisitionMechanismUsed: "simple-http" | "rendered-browser";
+      stagedArtifact?: {
+        storage: { key: string };
+        originalName?: string;
+      };
+    };
+  };
+  websiteBatchViewState: {
+    status: "idle" | "loading" | "success" | "error";
+    message?: string;
+    summary?: {
+      attempted: number;
+      succeeded: number;
+      failed: number;
+    };
+  };
   onFileChange: (event: FormEvent<HTMLInputElement>) => void;
   onUploadSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  setWebsiteSingleUrl: (value: string) => void;
+  setWebsiteSingleMode: (mode: "automatic" | "rendered") => void;
+  setWebsiteBatchInput: (value: string) => void;
+  setWebsiteBatchMode: (mode: "automatic" | "rendered") => void;
+  ingestWebsiteSingle: () => Promise<void>;
+  ingestWebsiteBatch: () => Promise<void>;
 }
 
-export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUploadComplete?: (storageKey: string) => void): UseArtifactUploadFeatureResult {
+export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUploadComplete?: () => void): UseArtifactUploadFeatureResult {
   const uploadClient = useArtifactUploadClient(client);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [acceptedFileTypes, setAcceptedFileTypes] = useState<string>("*");
   const [viewState, setViewState] = useState<UploadViewState>({
     status: "idle",
   });
+  const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete);
 
   useEffect(() => {
     void uploadClient.getAcceptedTypes().then((policy) => {
@@ -69,7 +101,7 @@ export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUpl
           mediaType: response.value.descriptor.mediaType,
           sizeBytes: response.value.descriptor.sizeBytes,
         });
-        onUploadComplete?.(response.value.descriptor.key);
+        onUploadComplete?.();
         return;
       }
 
@@ -86,7 +118,19 @@ export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUpl
     selectedFile,
     viewState,
     acceptedFileTypes,
+    websiteSingleUrl: websiteIngestion.websiteSingleUrl,
+    websiteSingleMode: websiteIngestion.websiteSingleMode,
+    websiteBatchInput: websiteIngestion.websiteBatchInput,
+    websiteBatchMode: websiteIngestion.websiteBatchMode,
+    websiteSingleViewState: websiteIngestion.websiteSingleViewState,
+    websiteBatchViewState: websiteIngestion.websiteBatchViewState,
     onFileChange,
     onUploadSubmit,
+    setWebsiteSingleUrl: websiteIngestion.setWebsiteSingleUrl,
+    setWebsiteSingleMode: websiteIngestion.setWebsiteSingleMode,
+    setWebsiteBatchInput: websiteIngestion.setWebsiteBatchInput,
+    setWebsiteBatchMode: websiteIngestion.setWebsiteBatchMode,
+    ingestWebsiteSingle: websiteIngestion.ingestWebsiteSingle,
+    ingestWebsiteBatch: websiteIngestion.ingestWebsiteBatch,
   };
 }

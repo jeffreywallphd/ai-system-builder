@@ -7,7 +7,7 @@ import type {
   DesktopHuggingFaceNamespaceDataset,
 } from "../../../lib/desktopApi";
 
-interface ArtifactIngestionControlsProps {
+interface ArtifactHuggingFaceFormProps {
   client?: DesktopArtifactBrowserClient;
   onRegistered?: (storageKey: string) => void;
 }
@@ -17,7 +17,7 @@ interface ViewState {
   message?: string;
 }
 
-export function ArtifactIngestionControls({ client, onRegistered }: ArtifactIngestionControlsProps) {
+export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggingFaceFormProps) {
   const artifactClient = useArtifactBrowserClient(client);
   const [tokenInput, setTokenInput] = useState("");
   const [tokenState, setTokenState] = useState<ViewState>({ status: "idle" });
@@ -150,11 +150,11 @@ export function ArtifactIngestionControls({ client, onRegistered }: ArtifactInge
   }
 
   return (
-    <section className="ui-stack ui-stack--sm">
+    <section className="ui-panel ui-stack ui-stack--sm">
       <h2>Import from HuggingFace</h2>
       <p>Hugging Face token</p>
       <p role="status">
-        Status: {huggingFaceTokenStatus.configured ? `configured (${huggingFaceTokenStatus.maskedToken ?? "••••"})` : "not configured"}
+        Status: {huggingFaceTokenStatus.configured ? `configured (${huggingFaceTokenStatus.maskedToken ?? "...."})` : "not configured"}
       </p>
       <label className="ui-stack ui-stack--sm">
         <span>Access token</span>
@@ -197,7 +197,7 @@ export function ArtifactIngestionControls({ client, onRegistered }: ArtifactInge
                           Close
                         </button>
                       </div>
-                      {filesByRepository[dataset.repository]?.state.status === "loading" ? <p role="status">Loading dataset files…</p> : null}
+                      {filesByRepository[dataset.repository]?.state.status === "loading" ? <p role="status">Loading dataset files...</p> : null}
                       {filesByRepository[dataset.repository]?.state.status === "error" ? (
                         <p role="alert">{filesByRepository[dataset.repository]?.state.message ?? "Failed to load dataset files."}</p>
                       ) : null}

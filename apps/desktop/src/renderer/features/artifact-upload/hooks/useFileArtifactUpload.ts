@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import type { ArtifactUploadClient } from "../api/desktopArtifactUploadClient";
-import type { UploadViewState } from "../components/ArtifactUploadStatus";
+import type { UploadViewState } from "../components/ArtifactUploadForm";
 import { resolveArtifactUploadMediaType } from "./resolveArtifactUploadMediaType";
 
 export interface UseFileArtifactUploadResult {
@@ -70,3 +70,4 @@ export function useFileArtifactUpload(
 
   return { selectedFile, viewState, onFileChange, onUploadSubmit };
 }
+
