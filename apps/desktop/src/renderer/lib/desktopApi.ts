@@ -2,6 +2,12 @@ import type {
   ArtifactBrowseItem as ArtifactBrowseContractItem,
   ArtifactDetailReadModel as ArtifactDetailContractModel,
 } from "../../../../../modules/contracts/artifact-browser";
+import type { StagedArtifactDescriptor } from "../../../../../modules/contracts/ingestion";
+import type {
+  DatasetPreparationSummary,
+  DatasetPreparationWarning,
+  PrepareTrainingDatasetRequest,
+} from "../../../../../modules/contracts/runtime";
 
 export interface DesktopArtifactUploadInput {
   fileName: string;
@@ -174,32 +180,48 @@ export interface DesktopWebsitePagesBatchItem {
   };
 }
 
-export interface DesktopPrepareTemplatedDatasetInput {
+export interface DesktopPrepareTrainingDatasetInput {
   sourceArtifactIds: string[];
-  template: string;
-  split: {
-    trainRatio: number;
-    testRatio: number;
-    seed?: number;
-  };
-  outputFormat: "jsonl" | "json" | "csv";
-  shuffle?: boolean;
+  recipe: PrepareTrainingDatasetRequest["recipe"];
+  split: PrepareTrainingDatasetRequest["split"];
+  output: PrepareTrainingDatasetRequest["output"];
 }
 
-export interface DesktopPreparedTemplatedDatasetResult {
-  train: {
-    storage: { key: string; mediaType?: string; sizeBytes?: number };
-    sourceKind: string;
-    originalName?: string;
+export interface DesktopPreparedTrainingDatasetResult {
+  outputs: {
+    local?: {
+      train: StagedArtifactDescriptor;
+      test: StagedArtifactDescriptor;
+    };
+    huggingFace?: {
+      train: {
+        provider: "huggingface";
+        repository: string;
+        path: string;
+        revision?: string;
+        exists: boolean;
+        verifiedAt: string;
+      };
+      test: {
+        provider: "huggingface";
+        repository: string;
+        path: string;
+        revision?: string;
+        exists: boolean;
+        verifiedAt: string;
+      };
+    };
   };
-  test: {
-    storage: { key: string; mediaType?: string; sizeBytes?: number };
-    sourceKind: string;
-    originalName?: string;
+  provenance: {
+    sourceArtifactIds: string[];
+    recipe: PrepareTrainingDatasetRequest["recipe"];
+    split: PrepareTrainingDatasetRequest["split"];
+    output: PrepareTrainingDatasetRequest["output"];
+    generationModelId: string;
+    summary: DatasetPreparationSummary;
   };
-  trainRowCount: number;
-  testRowCount: number;
-  warnings?: string[];
+  summary: DatasetPreparationSummary;
+  warnings?: DatasetPreparationWarning[];
 }
 
 export interface DesktopArtifactUploadApi {
@@ -222,8 +244,8 @@ export interface DesktopBridgeRequestContext {
 }
 
 export interface DesktopDatasetPreparationApi {
-  prepareTemplatedDatasetFromArtifacts: (
-    input: DesktopPrepareTemplatedDatasetInput,
+  prepareTrainingDatasetFromArtifacts: (
+    input: DesktopPrepareTrainingDatasetInput,
     context?: DesktopBridgeRequestContext,
   ) => Promise<unknown>;
 }
@@ -245,7 +267,7 @@ interface DesktopApiBridge {
     targets: DesktopWebsiteIngestionTarget[];
     mode?: "automatic" | "rendered";
   }) => Promise<unknown>;
-  prepareTemplatedDatasetFromArtifacts?: (input: DesktopPrepareTemplatedDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  prepareTrainingDatasetFromArtifacts?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;

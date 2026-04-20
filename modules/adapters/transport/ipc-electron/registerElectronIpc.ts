@@ -39,7 +39,7 @@ export interface RegisterElectronIpcDependencies {
   localizeArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["localizeArtifactFromRepoUseCase"];
   ingestWebsitePageUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePageUseCase"];
   ingestWebsitePagesBatchUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePagesBatchUseCase"];
-  prepareTemplatedDatasetFromArtifactsUseCase: RegisterDatasetPreparationIpcDependencies["prepareTemplatedDatasetFromArtifactsUseCase"];
+  prepareTrainingDatasetFromArtifactsUseCase: RegisterDatasetPreparationIpcDependencies["prepareTrainingDatasetFromArtifactsUseCase"];
 }
 
 export function registerElectronIpc(
@@ -80,7 +80,7 @@ export function registerElectronIpc(
 
   registerDatasetPreparationIpc({
     ipcMain: dependencies.ipcMain,
-    prepareTemplatedDatasetFromArtifactsUseCase: dependencies.prepareTemplatedDatasetFromArtifactsUseCase,
+    prepareTrainingDatasetFromArtifactsUseCase: dependencies.prepareTrainingDatasetFromArtifactsUseCase,
   });
 }
 

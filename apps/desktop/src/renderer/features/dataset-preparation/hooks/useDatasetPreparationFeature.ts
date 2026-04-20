@@ -15,6 +15,18 @@ interface DatasetPreparationResultSummary {
   testRows: number;
 }
 
+const DEFAULT_DATASET_PREPARATION_RECIPE_BASE = {
+  normalization: { targetFormat: "markdown" as const },
+  chunking: { strategy: "character" as const, chunkSize: 1_000, chunkOverlap: 200 },
+  generation: {
+    mode: "qa" as const,
+    model: { provider: "transformers" as const, modelId: "Qwen/Qwen2.5-1.5B-Instruct", device: "auto" as const },
+    maxExamplesPerChunk: 4,
+    batchSize: 4,
+    failurePolicy: "skip" as const,
+  },
+};
+
 export interface UseDatasetPreparationFeatureResult {
   artifacts: Array<{ artifactId: string; storageKey: string; label: string }>;
   selectedArtifactIds: string[];
@@ -158,21 +170,29 @@ export function useDatasetPreparationFeature(
 
     const parsedSeed = parseOptionalNumber(seed);
 
-    setStatus({ kind: "loading", message: "Preparing templated train/test datasets..." });
+    setStatus({ kind: "loading", message: "Preparing training dataset..." });
     setResultSummary(undefined);
 
     const requestId = createDatasetPreparationRequestId();
-    const response = await datasetClient.prepareTemplatedDatasetFromArtifacts(
+    const response = await datasetClient.prepareTrainingDatasetFromArtifacts(
       {
         sourceArtifactIds: selectedArtifactIds,
-        template: template.trim(),
+        recipe: {
+          ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE,
+          generation: {
+            ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE.generation,
+            promptTemplate: template.trim(),
+          },
+        },
         split: {
           trainRatio: Number(trainRatio),
           testRatio: Number(testRatio),
           seed: typeof parsedSeed === "number" && !Number.isNaN(parsedSeed) ? parsedSeed : undefined,
+          shuffle,
         },
-        shuffle,
-        outputFormat,
+        output: {
+          format: outputFormat,
+        },
       },
       { requestId },
     );
@@ -182,12 +202,12 @@ export function useDatasetPreparationFeature(
       return;
     }
 
-    setStatus({ kind: "success", message: "Templated train/test datasets are ready." });
+    setStatus({ kind: "success", message: "Training dataset is ready." });
     setResultSummary({
-      trainKey: response.value.train.storage.key,
-      testKey: response.value.test.storage.key,
-      trainRows: response.value.trainRowCount,
-      testRows: response.value.testRowCount,
+      trainKey: response.value.outputs.local?.train.storage.key ?? "(not produced locally)",
+      testKey: response.value.outputs.local?.test.storage.key ?? "(not produced locally)",
+      trainRows: response.value.summary.trainRowCount,
+      testRows: response.value.summary.testRowCount,
     });
 
     await refreshArtifacts();

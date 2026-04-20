@@ -271,7 +271,7 @@ export function composeDesktopHost(
       const ingestWebsitePagesBatch = new IngestWebsitePagesBatchUseCase({
         ingestWebsitePage,
       });
-      const prepareTemplatedDatasetFromArtifacts = new PrepareTrainingDatasetFromArtifactsUseCase({
+      const prepareTrainingDatasetFromArtifacts = new PrepareTrainingDatasetFromArtifactsUseCase({
         datasetPreparation: datasetPreparationPort,
         storageBindings: artifactBindings,
         storage,
@@ -303,7 +303,7 @@ export function composeDesktopHost(
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
         ingestWebsitePageUseCase: ingestWebsitePage,
         ingestWebsitePagesBatchUseCase: ingestWebsitePagesBatch,
-        prepareTemplatedDatasetFromArtifactsUseCase: prepareTemplatedDatasetFromArtifacts,
+        prepareTrainingDatasetFromArtifactsUseCase: prepareTrainingDatasetFromArtifacts,
       });
     },
   };

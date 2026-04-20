@@ -24,14 +24,6 @@ export interface CreatePythonRuntimeHttpClientOptions {
   defaultTaskTimeoutMs?: number;
 }
 
-async function parseJsonResponse<T>(response: Response, path: string): Promise<T> {
-  if (!response.ok) {
-    throw new Error(`Python runtime request failed for ${path} with status ${response.status}.`);
-  }
-
-  return response.json() as Promise<T>;
-}
-
 async function parseJsonResponseSafe(
   response: Response,
 ): Promise<unknown | undefined> {
@@ -56,13 +48,31 @@ export function createPythonRuntimeHttpClient(
   return {
     async getHealthStatus() {
       const response = await fetcher(`${baseUrl}/health`, { method: "GET" });
-      const payload = await parseJsonResponse<unknown>(response, "/health");
+      const payload = await parseJsonResponseSafe(response);
+      if (!response.ok) {
+        if (payload !== undefined) {
+          return mapHealthResponseFromHttpPayload(payload);
+        }
+        throw new Error(`Python runtime request failed for /health with status ${response.status}.`);
+      }
+      if (payload === undefined) {
+        throw new Error("Python runtime request failed for /health with invalid JSON response body.");
+      }
       return mapHealthResponseFromHttpPayload(payload);
     },
 
     async getCapabilities() {
       const response = await fetcher(`${baseUrl}/capabilities`, { method: "GET" });
-      const payload = await parseJsonResponse<unknown>(response, "/capabilities");
+      const payload = await parseJsonResponseSafe(response);
+      if (!response.ok) {
+        if (payload !== undefined) {
+          return mapCapabilitiesResponseFromHttpPayload(payload);
+        }
+        throw new Error(`Python runtime request failed for /capabilities with status ${response.status}.`);
+      }
+      if (payload === undefined) {
+        throw new Error("Python runtime request failed for /capabilities with invalid JSON response body.");
+      }
       return mapCapabilitiesResponseFromHttpPayload(payload);
     },
 

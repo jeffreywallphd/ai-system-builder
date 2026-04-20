@@ -26,7 +26,7 @@ import {
   DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL,
   DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
   DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL,
-  DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
@@ -127,7 +127,7 @@ describe("composeDesktopHost", () => {
       DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value,
       DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value,
       DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value,
-      DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL.value,
+      DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
     ]);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
@@ -215,7 +215,7 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("createPythonRuntimeAdapterFoundation");
     expect(source).toContain("createPythonDatasetPreparationPort");
     expect(source).toContain("PrepareTrainingDatasetFromArtifactsUseCase");
-    expect(source).toContain("prepareTemplatedDatasetFromArtifactsUseCase");
+    expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
   });
 
   it("stores and exposes desktop Hugging Face token status", () => {

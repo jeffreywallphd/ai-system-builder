@@ -32,8 +32,8 @@ import {
   DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL,
   createDesktopIngestWebsitePageSuccessResponse,
   createDesktopIngestWebsitePagesBatchSuccessResponse,
-  DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL,
-  createDesktopPrepareTemplatedDatasetSuccessResponse,
+  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
+  createDesktopPrepareTrainingDatasetSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
@@ -328,27 +328,65 @@ it("maps website page ingestion bridge calls to dedicated IPC request channel", 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value);
 });
 
-it("maps templated dataset preparation bridge calls to dedicated IPC request channel", async () => {
+it("maps training dataset preparation bridge calls to dedicated IPC request channel", async () => {
   const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
-    createDesktopPrepareTemplatedDatasetSuccessResponse({
-      train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
-      test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
-      trainRowCount: 8,
-      testRowCount: 2,
+    createDesktopPrepareTrainingDatasetSuccessResponse({
+      outputs: {
+        local: {
+          train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
+          test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+        },
+      },
+      provenance: {
+        sourceArtifactIds: ["artifact-1"],
+        recipe: {
+          normalization: { targetFormat: "markdown" },
+          chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+          generation: { mode: "qa", model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" } },
+        },
+        split: { trainRatio: 0.8, testRatio: 0.2, seed: 7, shuffle: true },
+        output: { format: "jsonl" },
+        generationModelId: "Qwen/Qwen2.5-1.5B-Instruct",
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 2,
+          generatedExampleCount: 10,
+          trainRowCount: 8,
+          testRowCount: 2,
+        },
+      },
+      summary: {
+        sourceDocumentCount: 1,
+        normalizedDocumentCount: 1,
+        skippedDocumentCount: 0,
+        chunkCount: 2,
+        generatedExampleCount: 10,
+        trainRowCount: 8,
+        testRowCount: 2,
+      },
     }),
   );
   const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-  const response = await api.prepareTemplatedDatasetFromArtifacts({
+  const response = await api.prepareTrainingDatasetFromArtifacts({
     sourceArtifactIds: ["artifact-1"],
-    template: "Prompt: {{text}}",
-    split: { trainRatio: 0.8, testRatio: 0.2, seed: 7 },
-    outputFormat: "jsonl",
-    shuffle: true,
+    recipe: {
+      normalization: { targetFormat: "markdown" },
+      chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+      generation: {
+        mode: "qa",
+        model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" },
+        promptTemplate: "Prompt: {{text}}",
+      },
+    },
+    split: { trainRatio: 0.8, testRatio: 0.2, seed: 7, shuffle: true },
+    output: { format: "jsonl" },
   });
 
   expect(response.ok).toBe(true);
-  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_DATASET_PREPARE_TEMPLATED_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value);
 });
 
 it("maps website pages batch ingestion bridge calls to dedicated IPC request channel", async () => {

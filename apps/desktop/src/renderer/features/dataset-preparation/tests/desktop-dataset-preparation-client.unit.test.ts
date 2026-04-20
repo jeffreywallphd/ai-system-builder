@@ -6,14 +6,48 @@ describe("desktop dataset preparation client", () => {
   it("maps success response from preload bridge", async () => {
     const hostWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
     hostWindow.window ??= {} as Window & typeof globalThis;
-    const prepareTemplatedDatasetFromArtifacts = vi.fn().mockResolvedValue({
+    const prepareTrainingDatasetFromArtifacts = vi.fn().mockResolvedValue({
       ok: true,
       value: {
         result: {
-          train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
-          test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
-          trainRowCount: 8,
-          testRowCount: 2,
+          outputs: {
+            local: {
+              train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
+              test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+            },
+          },
+          provenance: {
+            sourceArtifactIds: ["artifact-1"],
+            recipe: {
+              normalization: { targetFormat: "markdown" },
+              chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+              generation: {
+                mode: "qa",
+                model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" },
+              },
+            },
+            split: { trainRatio: 0.8, testRatio: 0.2 },
+            output: { format: "jsonl" },
+            generationModelId: "Qwen/Qwen2.5-1.5B-Instruct",
+            summary: {
+              sourceDocumentCount: 1,
+              normalizedDocumentCount: 1,
+              skippedDocumentCount: 0,
+              chunkCount: 2,
+              generatedExampleCount: 10,
+              trainRowCount: 8,
+              testRowCount: 2,
+            },
+          },
+          summary: {
+            sourceDocumentCount: 1,
+            normalizedDocumentCount: 1,
+            skippedDocumentCount: 0,
+            chunkCount: 2,
+            generatedExampleCount: 10,
+            trainRowCount: 8,
+            testRowCount: 2,
+          },
         },
       },
     });
@@ -29,23 +63,31 @@ describe("desktop dataset preparation client", () => {
       verifyPublishedArtifactBacking: async () => ({ ok: false }),
       registerArtifactFromRepo: async () => ({ ok: false }),
       localizeArtifactFromRepo: async () => ({ ok: false }),
-      prepareTemplatedDatasetFromArtifacts,
+      prepareTrainingDatasetFromArtifacts,
     };
 
     const client = createDesktopDatasetPreparationClient();
     const browseResult = await client.browseSourceArtifacts();
-    const response = await client.prepareTemplatedDatasetFromArtifacts({
+    const response = await client.prepareTrainingDatasetFromArtifacts({
       sourceArtifactIds: ["artifact-1"],
-      template: "Prompt: {{text}}",
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+        generation: {
+          mode: "qa",
+          model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" },
+          promptTemplate: "Prompt: {{text}}",
+        },
+      },
       split: { trainRatio: 0.8, testRatio: 0.2 },
-      outputFormat: "jsonl",
+      output: { format: "jsonl" },
     }, {
       requestId: "req-123",
     });
 
     expect(browseResult).toEqual([{ artifactId: "artifact-1", storageKey: "stored/a1.jsonl", label: "stored/a1.jsonl" }]);
     expect(response.ok).toBe(true);
-    expect(prepareTemplatedDatasetFromArtifacts).toHaveBeenCalledWith(expect.any(Object), { requestId: "req-123" });
+    expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.any(Object), { requestId: "req-123" });
   });
 
   it("maps failure response from preload bridge", async () => {
@@ -62,15 +104,23 @@ describe("desktop dataset preparation client", () => {
       verifyPublishedArtifactBacking: async () => ({ ok: false }),
       registerArtifactFromRepo: async () => ({ ok: false }),
       localizeArtifactFromRepo: async () => ({ ok: false }),
-      prepareTemplatedDatasetFromArtifacts: async () => ({ ok: false, error: { code: "validation", message: "bad input" } }),
+      prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "validation", message: "bad input" } }),
     };
 
     const client = createDesktopDatasetPreparationClient();
-    const response = await client.prepareTemplatedDatasetFromArtifacts({
+    const response = await client.prepareTrainingDatasetFromArtifacts({
       sourceArtifactIds: [],
-      template: "",
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+        generation: {
+          mode: "qa",
+          model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" },
+          promptTemplate: "",
+        },
+      },
       split: { trainRatio: 0.8, testRatio: 0.2 },
-      outputFormat: "jsonl",
+      output: { format: "jsonl" },
     });
 
     expect(response).toEqual({
@@ -96,7 +146,7 @@ describe("desktop dataset preparation client", () => {
       verifyPublishedArtifactBacking: async () => ({ ok: false }),
       registerArtifactFromRepo: async () => ({ ok: false }),
       localizeArtifactFromRepo: async () => ({ ok: false }),
-      prepareTemplatedDatasetFromArtifacts: async () => ({ ok: false }),
+      prepareTrainingDatasetFromArtifacts: async () => ({ ok: false }),
     };
 
     const client = createDesktopDatasetPreparationClient();
