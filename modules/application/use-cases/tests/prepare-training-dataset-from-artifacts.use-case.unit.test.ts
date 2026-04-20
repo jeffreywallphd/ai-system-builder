@@ -72,8 +72,11 @@ function createDeps(runtimeTrain: string, runtimeTest: string) {
   const storeArtifactInRepo = testDouble.fn(async ({ target }: { target: { repository: string; path: string; revision?: string } }) => ({
     ok: true as const,
     value: {
-      target: { provider: "huggingface", repository: target.repository, path: target.path, revision: target.revision },
-      descriptor: { mediaType: "application/x-ndjson", sizeBytes: 20 },
+      descriptor: {
+        target: { provider: "huggingface", repository: target.repository, path: target.path, revision: target.revision },
+        mediaType: "application/x-ndjson",
+        sizeBytes: 20,
+      },
     },
   }));
 

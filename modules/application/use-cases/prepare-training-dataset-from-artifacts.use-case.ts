@@ -444,8 +444,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         }
 
         const verifiedAt = this.now();
-        const publishTrainTarget = publishTrain.value.target;
-        const publishTestTarget = publishTest.value.target;
+        const publishTrainTarget = publishTrain.value.descriptor.target;
+        const publishTestTarget = publishTest.value.descriptor.target;
         huggingFaceOutputs = {
           train: {
             provider: "huggingface",
