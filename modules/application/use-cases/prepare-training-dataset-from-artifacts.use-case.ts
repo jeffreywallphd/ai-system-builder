@@ -363,7 +363,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
 
       let huggingFaceOutputs: PrepareTrainingDatasetFromArtifactsValue["outputs"]["huggingFace"];
       if (destinations.huggingFace) {
-        if (!this.artifactRepoStorage) {
+        const artifactRepoStorage = this.artifactRepoStorage;
+        if (!artifactRepoStorage) {
           return createFailureResult(
             createContractError("internal", "Artifact repo storage is required for Hugging Face output."),
             context,
@@ -385,7 +386,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         };
 
         const [publishTrain, publishTest] = await Promise.all([
-          this.artifactRepoStorage.storeArtifactInRepo(
+          artifactRepoStorage.storeArtifactInRepo(
             createStoreArtifactInRepoRequest(new Uint8Array(trainBytes), {
               target: { ...target, path: trainPath },
               mediaType: trainOutput.mediaType,
@@ -403,7 +404,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
             }),
             context,
           ),
-          this.artifactRepoStorage.storeArtifactInRepo(
+          artifactRepoStorage.storeArtifactInRepo(
             createStoreArtifactInRepoRequest(new Uint8Array(testBytes), {
               target: { ...target, path: testPath },
               mediaType: testOutput.mediaType,
@@ -431,8 +432,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         }
 
         const [verifyTrain, verifyTest] = await Promise.all([
-          this.artifactRepoStorage.hasArtifactInRepo(createHasArtifactInRepoRequest({ ...target, path: trainPath }), context),
-          this.artifactRepoStorage.hasArtifactInRepo(createHasArtifactInRepoRequest({ ...target, path: testPath }), context),
+          artifactRepoStorage.hasArtifactInRepo(createHasArtifactInRepoRequest({ ...target, path: trainPath }), context),
+          artifactRepoStorage.hasArtifactInRepo(createHasArtifactInRepoRequest({ ...target, path: testPath }), context),
         ]);
 
         if (!verifyTrain.ok) {
