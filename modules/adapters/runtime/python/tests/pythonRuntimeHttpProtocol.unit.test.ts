@@ -11,7 +11,7 @@ describe("pythonRuntimeHttpProtocol", () => {
   it("keeps contract payloads canonical when mapping to/from HTTP payloads", () => {
     const request = {
       requestId: "req-python-1",
-      taskType: "prepare-templated-dataset",
+      taskType: "prepare-training-dataset",
       payload: { template: "{{text}}" },
     };
 
@@ -29,13 +29,13 @@ describe("pythonRuntimeHttpProtocol", () => {
 
     const capabilities = mapCapabilitiesResponseFromHttpPayload({
       runtimeId: "python-sidecar",
-      capabilities: ["prepare-templated-dataset"],
+      capabilities: ["prepare-training-dataset"],
     });
-    expect(capabilities.capabilities).toContain("prepare-templated-dataset");
+    expect(capabilities.capabilities).toContain("prepare-training-dataset");
 
     const taskResult = mapTaskResponseFromHttpPayload({
       requestId: "req-python-1",
-      taskType: "prepare-templated-dataset",
+      taskType: "prepare-training-dataset",
       success: false,
       error: {
         code: "not_implemented",

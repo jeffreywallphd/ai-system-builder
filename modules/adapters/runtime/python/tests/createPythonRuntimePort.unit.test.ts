@@ -20,13 +20,13 @@ describe("createPythonRuntimeAdapterFoundation", () => {
       if (url.endsWith("/capabilities")) {
         return new Response(JSON.stringify({
           runtimeId: "python-sidecar",
-          capabilities: ["prepare-templated-dataset"],
+          capabilities: ["prepare-training-dataset"],
         }), { status: 200 });
       }
 
       return new Response(JSON.stringify({
         requestId: "req-1",
-        taskType: "prepare-templated-dataset",
+        taskType: "prepare-training-dataset",
         success: false,
         error: {
           code: "not_implemented",
@@ -58,12 +58,12 @@ describe("createPythonRuntimeAdapterFoundation", () => {
     const capabilities = await foundation.runtimePort.getCapabilities();
     const taskResult = await foundation.runtimePort.executeTask({
       requestId: "req-1",
-      taskType: "prepare-templated-dataset",
+      taskType: "prepare-training-dataset",
       payload: {},
     });
 
     expect(health.healthy).toBe(true);
-    expect(capabilities.capabilities).toContain("prepare-templated-dataset");
+    expect(capabilities.capabilities).toContain("prepare-training-dataset");
     expect(taskResult.success).toBe(false);
     expect(foundation.supervisor.getStatus()).toBe("stopped");
   });

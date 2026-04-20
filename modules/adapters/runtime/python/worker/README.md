@@ -1,6 +1,6 @@
-# Python Runtime Worker Skeleton
+# Python Runtime Worker
 
-This directory contains the managed Python sidecar worker skeleton.
+This directory contains the managed Python sidecar worker.
 
 Endpoints:
 
@@ -8,4 +8,9 @@ Endpoints:
 - `GET /capabilities`
 - `POST /tasks/execute`
 
-`/tasks/execute` currently returns a structured `not_implemented` task result.
+Implemented task:
+
+- `prepare-training-dataset`
+  - normalizes supported source docs to markdown (`.txt`, `.md`, `.html`, `.pdf`, `.docx`)
+  - chunks markdown using recipe chunking config (`character` strategy)
+  - emits interim chunk-level train/test dataset artifacts

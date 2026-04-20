@@ -21,7 +21,7 @@ describe("createPythonRuntimeHttpClient", () => {
         expect(init?.method).toBe("GET");
         return new Response(JSON.stringify({
           runtimeId: "python-sidecar",
-          capabilities: ["prepare-templated-dataset"],
+          capabilities: ["prepare-training-dataset"],
         }), { status: 200 });
       }
 
@@ -30,7 +30,7 @@ describe("createPythonRuntimeHttpClient", () => {
       expect(init?.headers).toMatchObject({ "content-type": "application/json" });
       return new Response(JSON.stringify({
         requestId: "req-python-1",
-        taskType: "prepare-templated-dataset",
+        taskType: "prepare-training-dataset",
         success: false,
         error: {
           code: "not_implemented",
@@ -48,12 +48,12 @@ describe("createPythonRuntimeHttpClient", () => {
     const capabilities = await client.getCapabilities();
     const task = await client.executeTask({
       requestId: "req-python-1",
-      taskType: "prepare-templated-dataset",
+      taskType: "prepare-training-dataset",
       payload: {},
     });
 
     expect(health.healthy).toBe(true);
-    expect(capabilities.capabilities).toContain("prepare-templated-dataset");
+    expect(capabilities.capabilities).toContain("prepare-training-dataset");
     expect(task.success).toBe(false);
     expect(fetchImplementation).toHaveBeenCalledTimes(3);
   });

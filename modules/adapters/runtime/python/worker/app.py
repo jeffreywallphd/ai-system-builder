@@ -7,7 +7,7 @@ from os import getenv
 from fastapi import FastAPI
 
 from models import (
-    PrepareTemplatedDatasetRequest,
+    PrepareTrainingDatasetRequest,
     PythonRuntimeCapabilitiesResult,
     PythonRuntimeError,
     PythonRuntimeHealthCheckResult,
@@ -15,7 +15,7 @@ from models import (
     PythonRuntimeTaskRequest,
     PythonRuntimeTaskResult,
 )
-from tasks.prepare_templated_dataset import prepare_templated_dataset
+from tasks.prepare_training_dataset import prepare_training_dataset
 
 RUNTIME_ID = getenv("PYTHON_RUNTIME_ID", "python-sidecar")
 WORKER_VERSION = getenv("PYTHON_RUNTIME_WORKER_VERSION", "0.1.0")
@@ -45,16 +45,16 @@ def health() -> PythonRuntimeHealthCheckResult:
 def capabilities() -> PythonRuntimeCapabilitiesResult:
     return PythonRuntimeCapabilitiesResult(
         runtimeId=RUNTIME_ID,
-        capabilities=["prepare-templated-dataset"],
+        capabilities=["prepare-training-dataset"],
     )
 
 
 @app.post("/tasks/execute", response_model=PythonRuntimeTaskResult)
 def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
     try:
-        if request.taskType == "prepare-templated-dataset":
-            payload = PrepareTemplatedDatasetRequest.model_validate(request.payload)
-            result = prepare_templated_dataset(payload)
+        if request.taskType == "prepare-training-dataset":
+            payload = PrepareTrainingDatasetRequest.model_validate(request.payload)
+            result = prepare_training_dataset(payload)
             return PythonRuntimeTaskResult(
                 requestId=request.requestId,
                 taskType=request.taskType,

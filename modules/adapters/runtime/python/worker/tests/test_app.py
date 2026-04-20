@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,31 +14,40 @@ class WorkerAppTests(unittest.TestCase):
         self.assertTrue(result.healthy)
         self.assertRegex(result.status.pythonVersion or "", r"^\d+\.\d+\.\d+")
 
-    def test_prepare_templated_dataset_dispatch(self) -> None:
+    def test_prepare_training_dataset_dispatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "source.jsonl"
-            input_path.write_text(
-                "\n".join([
-                    json.dumps({"text": "alpha"}),
-                    json.dumps({"text": "beta"}),
-                    json.dumps({"text": "gamma"}),
-                ]),
-                encoding="utf-8",
-            )
+            input_path = Path(temp_dir) / "source.txt"
+            input_path.write_text("alpha beta gamma", encoding="utf-8")
 
             request = PythonRuntimeTaskRequest(
                 requestId="req-1",
-                taskType="prepare-templated-dataset",
+                taskType="prepare-training-dataset",
                 payload={
-                    "sourceInputs": [{
-                        "artifactId": "artifact-1",
-                        "localPath": str(input_path),
-                        "mediaType": "application/x-ndjson",
-                    }],
-                    "template": "Prompt: {{text}}",
-                    "split": {"trainRatio": 0.67, "testRatio": 0.33, "seed": 7},
-                    "outputFormat": "jsonl",
-                    "shuffle": True,
+                    "sourceInputs": [
+                        {
+                            "artifactId": "artifact-1",
+                            "localPath": str(input_path),
+                            "mediaType": "text/plain",
+                        }
+                    ],
+                    "recipe": {
+                        "normalization": {
+                            "targetFormat": "markdown",
+                            "unsupportedDocumentPolicy": "fail",
+                        },
+                        "chunking": {
+                            "strategy": "character",
+                            "chunkSize": 5,
+                            "chunkOverlap": 1,
+                            "preserveDocumentBoundaries": True,
+                        },
+                        "generation": {
+                            "mode": "qa",
+                            "model": {"provider": "transformers", "modelId": "test-model"},
+                        },
+                    },
+                    "split": {"trainRatio": 0.67, "testRatio": 0.33, "seed": 7, "shuffle": True},
+                    "output": {"format": "jsonl", "naming": {"baseName": "test-dataset"}},
                 },
             )
 
@@ -49,6 +57,7 @@ class WorkerAppTests(unittest.TestCase):
             outputs = response.data["outputs"]
             self.assertEqual(len(outputs), 2)
             self.assertEqual({output["role"] for output in outputs}, {"train", "test"})
+            self.assertEqual(response.data["summary"]["sourceDocumentCount"], 1)
 
     def test_unknown_task_preserves_generic_execution_path(self) -> None:
         request = PythonRuntimeTaskRequest(
@@ -62,7 +71,7 @@ class WorkerAppTests(unittest.TestCase):
 
     def test_capabilities_endpoint_contains_dataset_task(self) -> None:
         result = capabilities()
-        self.assertIn("prepare-templated-dataset", result.capabilities)
+        self.assertIn("prepare-training-dataset", result.capabilities)
 
 
 if __name__ == "__main__":

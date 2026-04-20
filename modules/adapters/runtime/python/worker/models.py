@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PythonRuntimeError(BaseModel):
@@ -50,22 +50,75 @@ class PythonRuntimeTaskResult(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class PrepareTemplatedDatasetInputDescriptor(BaseModel):
+class DatasetPreparationSourceInput(BaseModel):
     artifactId: str
     localPath: str
-    mediaType: str
-    role: str | None = None
-    name: str | None = None
+    mediaType: str | None = None
+    originalName: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
-class PrepareTemplatedDatasetRequest(BaseModel):
-    sourceInputs: list[PrepareTemplatedDatasetInputDescriptor]
-    template: str
-    split: dict[str, float | int]
-    outputFormat: Literal["jsonl", "json", "csv"]
+class DocumentNormalizationConfig(BaseModel):
+    targetFormat: Literal["markdown"]
+    unsupportedDocumentPolicy: Literal["fail", "skip"] | None = None
+    normalizationMode: Literal["best-effort", "strict"] | None = None
+
+
+class MarkdownChunkingConfig(BaseModel):
+    strategy: Literal["character"]
+    chunkSize: int = Field(gt=0)
+    chunkOverlap: int = Field(ge=0)
+    preserveDocumentBoundaries: bool | None = None
+
+
+class GenerationParams(BaseModel):
+    temperature: float | None = None
+    topP: float | None = None
+    maxNewTokens: int | None = None
+
+
+class LocalModelConfig(BaseModel):
+    provider: Literal["transformers"]
+    modelId: str
+    device: Literal["cpu", "cuda", "auto"] | None = None
+    torchDtype: Literal["auto", "float16", "bfloat16", "float32"] | None = None
+
+
+class ExampleGenerationConfig(BaseModel):
+    mode: Literal["qa"]
+    model: LocalModelConfig
+    promptTemplate: str | None = None
+    maxExamplesPerChunk: int | None = None
+    generationParams: GenerationParams | None = None
+
+
+class DatasetPreparationRecipe(BaseModel):
+    normalization: DocumentNormalizationConfig
+    chunking: MarkdownChunkingConfig
+    generation: ExampleGenerationConfig
+
+
+class DatasetSplitConfig(BaseModel):
+    trainRatio: float
+    testRatio: float
+    seed: int | None = None
     shuffle: bool | None = None
-    validationPolicy: Literal["strict", "best-effort"] | None = None
-    outputNaming: dict[str, str] | None = None
+
+
+class DatasetOutputConfigNaming(BaseModel):
+    baseName: str | None = None
+
+
+class DatasetOutputConfig(BaseModel):
+    format: Literal["jsonl", "json", "csv"]
+    naming: DatasetOutputConfigNaming | None = None
+
+
+class PrepareTrainingDatasetRequest(BaseModel):
+    sourceInputs: list[DatasetPreparationSourceInput]
+    recipe: DatasetPreparationRecipe
+    split: DatasetSplitConfig
+    output: DatasetOutputConfig
 
 
 class PythonRuntimeOutputDescriptor(BaseModel):
@@ -77,8 +130,23 @@ class PythonRuntimeOutputDescriptor(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class PrepareTemplatedDatasetResult(BaseModel):
-    outputs: list[PythonRuntimeOutputDescriptor]
+class DatasetPreparationSummary(BaseModel):
+    sourceDocumentCount: int
+    normalizedDocumentCount: int
+    skippedDocumentCount: int
+    chunkCount: int
+    generatedExampleCount: int
     trainRowCount: int
     testRowCount: int
-    warnings: list[str] | None = None
+
+
+class DatasetPreparationWarning(BaseModel):
+    code: str
+    message: str
+    sourceArtifactId: str | None = None
+
+
+class PrepareTrainingDatasetResult(BaseModel):
+    outputs: list[PythonRuntimeOutputDescriptor]
+    summary: DatasetPreparationSummary
+    warnings: list[DatasetPreparationWarning] | None = None
