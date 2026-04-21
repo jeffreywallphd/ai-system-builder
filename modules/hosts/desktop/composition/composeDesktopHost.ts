@@ -28,6 +28,7 @@ import {
 import {
   createPythonDatasetPreparationPort,
   createPythonRuntimeAdapterFoundation,
+  ensurePythonRuntimeWorkerDependencies,
 } from "../../../adapters/runtime/python";
 import {
   createFilesystemArtifactBrowserReadAdapter,
@@ -145,6 +146,13 @@ export function composeDesktopHost(
       args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
       cwd: process.env.PYTHON_RUNTIME_WORKER_DIR ?? "modules/adapters/runtime/python/worker",
       env: process.env,
+      prepareRuntimeEnvironment(context) {
+        ensurePythonRuntimeWorkerDependencies({
+          command: context.command,
+          cwd: context.cwd,
+          env: context.env,
+        });
+      },
       onEvent(event) {
         if (event.type === "stdio") {
           const message = event.detail?.trim();
