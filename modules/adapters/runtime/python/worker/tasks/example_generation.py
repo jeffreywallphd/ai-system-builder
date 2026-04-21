@@ -70,6 +70,31 @@ class TransformersQaTextGenerator(QaTextGenerator):
         return text
 
 
+def ensure_generation_model_is_available(config: ExampleGenerationConfig) -> None:
+    if config.model.provider != "transformers":
+        raise ValueError(f"Unsupported generation model provider: {config.model.provider}")
+
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError as error:
+        raise RuntimeError(
+            "The 'huggingface_hub' package is required to validate local generation model availability."
+        ) from error
+
+    try:
+        snapshot_download(
+            repo_id=config.model.modelId,
+            local_files_only=True,
+        )
+    except Exception as error:
+        raise RuntimeError(
+            (
+                f"Generation model '{config.model.modelId}' is not available in the local Hugging Face cache. "
+                "Download the model before running dataset preparation."
+            )
+        ) from error
+
+
 _GENERATOR_CACHE: dict[tuple[str, str, str, str], QaTextGenerator] = {}
 _GENERATOR_CACHE_LOCK = Lock()
 

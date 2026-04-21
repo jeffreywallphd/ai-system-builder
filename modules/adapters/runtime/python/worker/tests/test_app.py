@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from modules.adapters.runtime.python.worker.app import capabilities, execute_task, health
 from modules.adapters.runtime.python.worker.models import PythonRuntimeTaskRequest
+from modules.adapters.runtime.python.worker.tasks.prepare_training_dataset import DatasetPreparationStageError
 
 
 class WorkerAppTests(unittest.TestCase):
@@ -113,6 +114,36 @@ class WorkerAppTests(unittest.TestCase):
         self.assertFalse(response.success)
         self.assertEqual(response.error.errorCode, "runtime_timeout")
         self.assertEqual(response.error.stage, "generation")
+
+    def test_stage_error_details_are_returned_in_runtime_error(self) -> None:
+        request = PythonRuntimeTaskRequest(
+            requestId="req-stage-details",
+            taskType="prepare-training-dataset",
+            payload={
+                "sourceInputs": [],
+                "recipe": {
+                    "normalization": {"targetFormat": "markdown"},
+                    "chunking": {"strategy": "character", "chunkSize": 128, "chunkOverlap": 8},
+                    "generation": {"mode": "qa", "model": {"provider": "transformers", "modelId": "test-model"}},
+                },
+                "split": {"trainRatio": 0.5, "testRatio": 0.5},
+                "output": {"format": "jsonl"},
+            },
+        )
+
+        with patch("modules.adapters.runtime.python.worker.app.prepare_training_dataset") as prepare_mock:
+            prepare_mock.side_effect = DatasetPreparationStageError(
+                "generation",
+                "Generation model is not downloaded.",
+                "generation_model_not_available",
+                details={"modelId": "test-model"},
+            )
+            response = execute_task(request)
+
+        self.assertFalse(response.success)
+        self.assertEqual(response.error.errorCode, "generation_model_not_available")
+        self.assertEqual(response.error.stage, "generation")
+        self.assertEqual((response.error.details or {}).get("modelId"), "test-model")
 
 
 if __name__ == "__main__":

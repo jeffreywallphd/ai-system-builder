@@ -16,17 +16,28 @@ from ..models import (
     PythonRuntimeOutputDescriptor,
 )
 from .document_normalization import normalize_sources_to_markdown
-from .example_generation import GeneratedQaExample, generate_qa_examples_for_chunks
+from .example_generation import (
+    GeneratedQaExample,
+    ensure_generation_model_is_available,
+    generate_qa_examples_for_chunks,
+)
 from .markdown_chunking import chunk_markdown_documents
 
 DEFAULT_MAX_CHUNK_COUNT = 10000
 
 
 class DatasetPreparationStageError(ValueError):
-    def __init__(self, stage: str, message: str, error_code: str) -> None:
+    def __init__(
+        self,
+        stage: str,
+        message: str,
+        error_code: str,
+        details: dict[str, object] | None = None,
+    ) -> None:
         super().__init__(message)
         self.stage = stage
         self.error_code = error_code
+        self.details = details
 
 
 def _validate_split_config(train_ratio: float, test_ratio: float) -> None:
@@ -63,6 +74,10 @@ def _validate_generated_rows(total_rows: int, chunk_count: int) -> None:
             "Check source content, chunking settings, and generation model configuration."
         ),
         "generation_no_examples",
+        details={
+            "chunkCount": chunk_count,
+            "generatedRowCount": total_rows,
+        },
     )
 
 
@@ -116,14 +131,46 @@ def _build_generated_rows(
     generator: Callable[[list, object], list[GeneratedQaExample]],
 ) -> tuple[list[dict[str, object]], list[DatasetPreparationWarning], int, int, int]:
     try:
+        ensure_generation_model_is_available(payload.recipe.generation)
+    except Exception as error:
+        raise DatasetPreparationStageError(
+            "generation",
+            str(error),
+            "generation_model_not_available",
+            details={
+                "provider": payload.recipe.generation.model.provider,
+                "modelId": payload.recipe.generation.model.modelId,
+            },
+        ) from error
+
+    try:
         normalization = normalize_sources_to_markdown(payload.sourceInputs, payload.recipe.normalization)
     except Exception as error:
-        raise DatasetPreparationStageError("normalization", str(error), "normalization_failed") from error
+        raise DatasetPreparationStageError(
+            "normalization",
+            str(error),
+            "normalization_failed",
+            details={
+                "sourceInputCount": len(payload.sourceInputs),
+                "unsupportedDocumentPolicy": payload.recipe.normalization.unsupportedDocumentPolicy,
+                "normalizationMode": payload.recipe.normalization.normalizationMode or "strict",
+            },
+        ) from error
 
     try:
         chunks = chunk_markdown_documents(normalization.documents, payload.recipe.chunking)
     except Exception as error:
-        raise DatasetPreparationStageError("chunking", str(error), "chunking_failed") from error
+        raise DatasetPreparationStageError(
+            "chunking",
+            str(error),
+            "chunking_failed",
+            details={
+                "normalizedDocumentCount": len(normalization.documents),
+                "chunkSize": payload.recipe.chunking.chunkSize,
+                "chunkOverlap": payload.recipe.chunking.chunkOverlap,
+                "preserveDocumentBoundaries": bool(payload.recipe.chunking.preserveDocumentBoundaries),
+            },
+        ) from error
 
     max_chunk_count = int(payload.recipe.chunking.maxChunkCount or DEFAULT_MAX_CHUNK_COUNT)
     if len(chunks) > max_chunk_count:
@@ -131,6 +178,10 @@ def _build_generated_rows(
             "chunking",
             f"Chunk count {len(chunks)} exceeds configured maxChunkCount {max_chunk_count}.",
             "chunk_limit_exceeded",
+            details={
+                "maxChunkCount": max_chunk_count,
+                "actualChunkCount": len(chunks),
+            },
         )
 
     failure_policy = payload.recipe.generation.failurePolicy
@@ -141,6 +192,8 @@ def _build_generated_rows(
     batch_size = int(payload.recipe.generation.batchSize or 1)
     rows: list[dict[str, object]] = []
     warnings: list[DatasetPreparationWarning] = list(normalization.warnings)
+    generation_error_samples: list[str] = []
+    skipped_generation_chunk_count = 0
     for start in range(0, len(chunks), batch_size):
         chunk_batch = chunks[start : start + batch_size]
         try:
@@ -156,7 +209,10 @@ def _build_generated_rows(
                     }
                 )
         except Exception as error:
+            if len(generation_error_samples) < 3:
+                generation_error_samples.append(str(error))
             if failure_policy == "skip":
+                skipped_generation_chunk_count += len(chunk_batch)
                 for chunk in chunk_batch:
                     warnings.append(
                         DatasetPreparationWarning(
@@ -168,7 +224,46 @@ def _build_generated_rows(
                         )
                     )
                 continue
-            raise DatasetPreparationStageError("generation", str(error), "generation_failed") from error
+            raise DatasetPreparationStageError(
+                "generation",
+                str(error),
+                "generation_failed",
+                details={
+                    "failurePolicy": failure_policy,
+                    "failedChunkCount": len(chunk_batch),
+                    "chunkIndices": [chunk.chunk_index for chunk in chunk_batch],
+                    "sourceArtifactIds": sorted({chunk.artifact_id for chunk in chunk_batch}),
+                    "batchSize": batch_size,
+                },
+            ) from error
+
+    if not rows:
+        model = payload.recipe.generation.model
+        details = {
+            "chunkCount": len(chunks),
+            "generatedRowCount": 0,
+            "failurePolicy": failure_policy,
+            "generationBatchSize": batch_size,
+            "skippedGenerationChunkCount": skipped_generation_chunk_count,
+            "generationErrorSamples": generation_error_samples,
+            "modelProvider": model.provider,
+            "modelId": model.modelId,
+        }
+        error_message = (
+            "No training examples were generated from the normalized chunks. "
+            f"Processed {len(chunks)} chunk(s), but generation produced 0 row(s). "
+            f"Failure policy was '{failure_policy}'. "
+            f"Skipped generation chunk(s): {skipped_generation_chunk_count}. "
+            "Check source content, chunking settings, and generation model configuration."
+        )
+        if generation_error_samples:
+            error_message = f"{error_message} Example generation error(s): {' | '.join(generation_error_samples)}"
+        raise DatasetPreparationStageError(
+            "generation",
+            error_message,
+            "generation_no_examples",
+            details=details,
+        )
 
     return (
         rows,
@@ -186,7 +281,15 @@ def prepare_training_dataset(
     try:
         _validate_split_config(float(payload.split.trainRatio), float(payload.split.testRatio))
     except Exception as error:
-        raise DatasetPreparationStageError("split", str(error), "split_validation_failed") from error
+        raise DatasetPreparationStageError(
+            "split",
+            str(error),
+            "split_validation_failed",
+            details={
+                "trainRatio": payload.split.trainRatio,
+                "testRatio": payload.split.testRatio,
+            },
+        ) from error
 
     rows, warnings, normalized_count, skipped_count, chunk_count = _build_generated_rows(payload, example_generator)
     _validate_generated_rows(len(rows), chunk_count)
