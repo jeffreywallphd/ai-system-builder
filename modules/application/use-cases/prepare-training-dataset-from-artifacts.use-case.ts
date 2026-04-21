@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join, parse } from "node:path";
 
 import {
   createStagedArtifactDescriptorFromStorageObjectDescriptor,
@@ -122,6 +122,10 @@ function resolveLocalStorageKeyForArtifact(
 }
 
 function extensionForMediaType(mediaType: string): string {
+  if (mediaType === "text/markdown" || mediaType === "text/x-markdown") {
+    return ".md";
+  }
+
   if (mediaType === "application/x-ndjson" || mediaType === "application/jsonl") {
     return ".jsonl";
   }
@@ -135,6 +139,29 @@ function extensionForMediaType(mediaType: string): string {
   }
 
   return ".txt";
+}
+
+function sanitizeRuntimeSourceFileSegment(value: string): string {
+  const normalized = value
+    .trim()
+    .replace(/[\\/]+/g, "-")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized.length > 0 ? normalized : "source";
+}
+
+function buildRuntimeSourceInputPath(
+  runtimeWorkingDir: string,
+  artifactId: string,
+  mediaType: string,
+  originalName: string | undefined,
+  sourceIndex: number,
+): string {
+  const sourceName = originalName?.trim() || basename(artifactId);
+  const stem = sanitizeRuntimeSourceFileSegment(parse(sourceName).name || sourceName);
+  const prefix = `${String(sourceIndex + 1).padStart(4, "0")}-${stem}`;
+  return join(runtimeWorkingDir, `${prefix}${extensionForMediaType(mediaType)}`);
 }
 
 interface ResolvedOutputDestinations {
@@ -269,7 +296,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         output: command.output,
       };
 
-      for (const artifactId of command.sourceArtifactIds) {
+      for (const [sourceIndex, artifactId] of command.sourceArtifactIds.entries()) {
         const bindingsResult = resolveArtifactBindingsReadFailureAsEmpty(
           await this.storageBindings.readArtifactStorageBindings({ artifactId }, context),
         );
@@ -291,9 +318,6 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         }
 
         const mediaType = retrieveResult.value.descriptor.mediaType ?? "application/json";
-        const localPath = join(runtimeWorkingDir, `${artifactId}${extensionForMediaType(mediaType)}`);
-        await writeFile(localPath, Buffer.from(retrieveResult.value.content as Uint8Array));
-
         const descriptorMetadata = retrieveResult.value.descriptor.metadata;
         const metadataOriginalName = descriptorMetadata
           && typeof descriptorMetadata === "object"
@@ -306,12 +330,21 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           ? await artifactCatalog.readArtifactCatalogRecord({ storageKey }, context)
             .then((result) => (result.ok ? result.value.record.originalName : undefined))
           : undefined;
+        const resolvedOriginalName = metadataOriginalName ?? catalogOriginalName;
+        const localPath = buildRuntimeSourceInputPath(
+          runtimeWorkingDir,
+          artifactId,
+          mediaType,
+          resolvedOriginalName,
+          sourceIndex,
+        );
+        await writeFile(localPath, Buffer.from(retrieveResult.value.content as Uint8Array));
 
         runtimeRequest.sourceInputs.push({
           artifactId,
           localPath,
           mediaType,
-          originalName: metadataOriginalName ?? catalogOriginalName,
+          originalName: resolvedOriginalName,
         });
       }
 
