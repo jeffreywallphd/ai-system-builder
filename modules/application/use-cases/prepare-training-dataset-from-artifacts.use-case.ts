@@ -94,6 +94,20 @@ function resolvePreferredObjectStorageBinding(
     ?? bindings[0];
 }
 
+function resolveLocalStorageKeyForArtifact(
+  artifactId: string,
+  bindings: ArtifactStorageBinding[],
+): string {
+  const preferredBinding = resolvePreferredObjectStorageBinding(bindings);
+  if (preferredBinding?.backing.kind === "artifact-object" && preferredBinding.backing.locator) {
+    return preferredBinding.backing.locator;
+  }
+
+  // Catalog-backed local artifacts use storageKey as artifact identity in desktop flows.
+  // When no explicit storage binding exists yet, use the artifact id as local key.
+  return artifactId;
+}
+
 function extensionForMediaType(mediaType: string): string {
   if (mediaType === "application/x-ndjson" || mediaType === "application/jsonl") {
     return ".jsonl";
@@ -244,16 +258,12 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
 
       for (const artifactId of command.sourceArtifactIds) {
         const bindingsResult = await this.storageBindings.readArtifactStorageBindings({ artifactId }, context);
-        if (!bindingsResult.ok || bindingsResult.value.bindings.length === 0) {
-          return createFailureResult(
-            createContractError("not-found", `No storage binding found for artifact '${artifactId}'.`),
-            context,
-          );
+        if (!bindingsResult.ok) {
+          return createFailureResult(bindingsResult.error, context);
         }
 
-        const preferredBinding = resolvePreferredObjectStorageBinding(bindingsResult.value.bindings);
-        const storageKey = preferredBinding?.backing.locator;
-        if (!storageKey) {
+        const storageKey = resolveLocalStorageKeyForArtifact(artifactId, bindingsResult.value.bindings);
+        if (!storageKey.trim()) {
           return createFailureResult(
             createContractError("not-found", `Storage locator missing for artifact '${artifactId}'.`),
             context,
