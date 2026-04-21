@@ -37,6 +37,26 @@ describe("desktop renderer page composition", () => {
       verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
       registerArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
       localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      readPythonRuntimeStatus: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          supervisorStatus: "stopped",
+          healthy: false,
+          runtimeStatus: "stopped",
+          capabilities: [],
+          logs: [],
+        },
+      }),
+      controlPythonRuntime: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          supervisorStatus: "starting",
+          healthy: false,
+          runtimeStatus: "starting",
+          capabilities: [],
+          logs: [],
+        },
+      }),
     };
 
     await act(async () => {
@@ -67,6 +87,17 @@ describe("desktop renderer page composition", () => {
     });
 
     expect(container.textContent).toContain("Artifact Browser");
+
+    const datasetPreparationTab = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Dataset Preparation",
+    );
+    expect(datasetPreparationTab).toBeDefined();
+
+    await act(async () => {
+      datasetPreparationTab?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Python Runtime");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "System",

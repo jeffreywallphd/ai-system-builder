@@ -32,6 +32,8 @@ import {
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
@@ -102,7 +104,7 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: "/tmp/desktop-artifact-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(23);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(25);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -128,6 +130,8 @@ describe("composeDesktopHost", () => {
       DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value,
       DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value,
       DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
+      DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
+      DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");

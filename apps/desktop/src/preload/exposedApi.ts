@@ -124,9 +124,19 @@ import {
   DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
   DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
   DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_OPERATION,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
   createDesktopPrepareTrainingDatasetRequest,
+  createDesktopPythonRuntimeControlRequest,
+  createDesktopPythonRuntimeStatusReadRequest,
   type DesktopPrepareTrainingDatasetRequest,
   type DesktopPrepareTrainingDatasetResponse,
+  type DesktopPythonRuntimeControlResponse,
+  type DesktopPythonRuntimeStatusReadResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 
@@ -202,6 +212,13 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPrepareTrainingDatasetResponse>;
+  readPythonRuntimeStatus: (
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
+  controlPythonRuntime: (
+    input: { action: "start" | "stop" | "restart" },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopPythonRuntimeControlResponse>;
   browseArtifacts: (
     input?: { artifactFamily?: ArtifactFamily },
     context?: DesktopArtifactUploadBridgeContext,
@@ -534,6 +551,51 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
         channel: DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop dataset preparation IPC response envelope.",
+      });
+    },
+
+    async readPythonRuntimeStatus(context = {}) {
+      const request = createDesktopPythonRuntimeStatusReadRequest(
+        {
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.python-runtime-footer",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopPythonRuntimeStatusReadResponse>(response, {
+        operation: DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
+        channel: DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop python runtime status IPC response envelope.",
+      });
+    },
+
+    async controlPythonRuntime(input, context = {}) {
+      const request = createDesktopPythonRuntimeControlRequest(
+        {
+          action: input.action,
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.python-runtime-footer",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopPythonRuntimeControlResponse>(response, {
+        operation: DESKTOP_PYTHON_RUNTIME_CONTROL_OPERATION,
+        channel: DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop python runtime control IPC response envelope.",
       });
     },
 

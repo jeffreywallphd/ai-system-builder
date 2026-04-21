@@ -2,7 +2,11 @@ from os import getenv
 
 import uvicorn
 
-from .app import app
+try:
+    from .app import app
+except ImportError:
+    # Support direct script execution (`python main.py`) used by the desktop supervisor.
+    from app import app
 
 
 if __name__ == "__main__":

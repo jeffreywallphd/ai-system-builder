@@ -224,6 +224,20 @@ export interface DesktopPreparedTrainingDatasetResult {
   warnings?: DatasetPreparationWarning[];
 }
 
+export interface DesktopPythonRuntimeLogEntry {
+  timestamp: string;
+  level: "info" | "warn" | "error";
+  message: string;
+}
+
+export interface DesktopPythonRuntimeStatusSnapshot {
+  supervisorStatus: "stopped" | "starting" | "ready" | "failed";
+  healthy: boolean;
+  runtimeStatus: string;
+  capabilities: string[];
+  logs: DesktopPythonRuntimeLogEntry[];
+}
+
 export interface DesktopArtifactUploadApi {
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<DesktopArtifactUploadResult>;
   getArtifactUploadPolicy: () => Promise<DesktopArtifactUploadAcceptedTypePolicy>;
@@ -250,6 +264,11 @@ export interface DesktopDatasetPreparationApi {
   ) => Promise<unknown>;
 }
 
+export interface DesktopPythonRuntimeApi {
+  readPythonRuntimeStatus: () => Promise<unknown>;
+  controlPythonRuntime: (input: { action: "start" | "stop" | "restart" }) => Promise<unknown>;
+}
+
 interface DesktopApiBridge {
   getHuggingFaceTokenStatus: () => Promise<unknown>;
   setHuggingFaceToken: (input: { token: string }) => Promise<unknown>;
@@ -268,6 +287,8 @@ interface DesktopApiBridge {
     mode?: "automatic" | "rendered";
   }) => Promise<unknown>;
   prepareTrainingDatasetFromArtifacts?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readPythonRuntimeStatus?: () => Promise<unknown>;
+  controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" }) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
