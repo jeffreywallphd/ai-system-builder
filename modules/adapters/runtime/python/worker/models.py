@@ -35,6 +35,19 @@ class PythonRuntimeCapabilitiesResult(BaseModel):
     capabilities: list[str]
 
 
+class EnsureModelDownloadRequest(BaseModel):
+    provider: Literal["transformers"]
+    modelId: str
+
+
+class EnsureModelDownloadResult(BaseModel):
+    provider: Literal["transformers"]
+    modelId: str
+    downloaded: bool
+    fromCache: bool
+    localPath: str | None = None
+
+
 class PythonRuntimeTaskRequest(BaseModel):
     requestId: str
     taskType: str

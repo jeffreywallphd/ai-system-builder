@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from modules.adapters.runtime.python.worker.app import capabilities, execute_task, health
+from modules.adapters.runtime.python.worker.app import capabilities, ensure_model_download, execute_task, health
+from modules.adapters.runtime.python.worker.models import EnsureModelDownloadRequest
 from modules.adapters.runtime.python.worker.models import PythonRuntimeTaskRequest
 from modules.adapters.runtime.python.worker.tasks.prepare_training_dataset import DatasetPreparationStageError
 
@@ -85,6 +86,23 @@ class WorkerAppTests(unittest.TestCase):
     def test_capabilities_endpoint_contains_dataset_task(self) -> None:
         result = capabilities()
         self.assertIn("prepare-training-dataset", result.capabilities)
+        self.assertIn("ensure-model-download", result.capabilities)
+
+    def test_ensure_model_download_endpoint_returns_download_status(self) -> None:
+        request = EnsureModelDownloadRequest(provider="transformers", modelId="Qwen/Qwen2.5-1.5B-Instruct")
+        with patch("modules.adapters.runtime.python.worker.app.ensure_generation_model_downloaded") as ensure_mock:
+            ensure_mock.return_value = type("Availability", (), {
+                "downloaded": True,
+                "from_cache": False,
+                "local_path": "/tmp/models/qwen",
+            })()
+            result = ensure_model_download(request)
+
+        self.assertEqual(result.provider, "transformers")
+        self.assertEqual(result.modelId, "Qwen/Qwen2.5-1.5B-Instruct")
+        self.assertTrue(result.downloaded)
+        self.assertFalse(result.fromCache)
+        self.assertEqual(result.localPath, "/tmp/models/qwen")
 
     def test_timeout_returns_structured_error(self) -> None:
         request = PythonRuntimeTaskRequest(

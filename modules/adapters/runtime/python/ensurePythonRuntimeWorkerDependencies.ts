@@ -38,7 +38,7 @@ export function ensurePythonRuntimeWorkerDependencies(
   const probeResult = runCommand(
     spawnSyncImplementation,
     options.command,
-    ["-c", "import fastapi, uvicorn"],
+    ["-c", "import fastapi, uvicorn, huggingface_hub"],
     options,
   );
 
@@ -51,7 +51,7 @@ export function ensurePythonRuntimeWorkerDependencies(
     throw new Error(`Failed to probe Python runtime worker dependencies: ${probeOutput}`);
   }
 
-  const missingDependencyPattern = /No module named ['"](fastapi|uvicorn)['"]/i;
+  const missingDependencyPattern = /No module named ['"](fastapi|uvicorn|huggingface_hub)['"]/i;
   if (!missingDependencyPattern.test(probeOutput)) {
     throw new Error(
       `Python dependency probe failed for an unexpected reason; aborting startup. ${probeOutput}`,

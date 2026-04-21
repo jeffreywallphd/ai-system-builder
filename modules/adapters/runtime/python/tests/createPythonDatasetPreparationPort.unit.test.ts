@@ -4,6 +4,12 @@ import { createPythonDatasetPreparationPort } from "../createPythonDatasetPrepar
 
 describe("createPythonDatasetPreparationPort", () => {
   it("maps task-specific request/result through PythonRuntimePort", async () => {
+    const ensureModelDownloaded = testDouble.fn(async () => ({
+      provider: "transformers" as const,
+      modelId: "test-model",
+      downloaded: false,
+      fromCache: true,
+    }));
     const executeTask = testDouble.fn(async (request) => ({
       requestId: request.requestId,
       taskType: request.taskType,
@@ -29,6 +35,7 @@ describe("createPythonDatasetPreparationPort", () => {
       executeTask,
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+      ensureModelDownloaded,
     });
 
     const result = await adapter.prepareTrainingDataset({
@@ -64,6 +71,10 @@ describe("createPythonDatasetPreparationPort", () => {
       },
     });
     expect(executeTask.mock.calls[0]?.[0]?.timeoutMs).toBeUndefined();
+    expect(ensureModelDownloaded).toHaveBeenCalledWith({
+      provider: "transformers",
+      modelId: "test-model",
+    });
     expect(result.summary.trainRowCount).toBe(8);
     expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
     expect(result.warnings).toBeUndefined();
@@ -83,6 +94,7 @@ describe("createPythonDatasetPreparationPort", () => {
       }),
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+      ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
     });
 
     try {
@@ -133,6 +145,7 @@ describe("createPythonDatasetPreparationPort", () => {
       executeTask,
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+      ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
     }, { taskTimeoutMs: 25_000 });
 
     await adapter.prepareTrainingDataset({
@@ -170,6 +183,7 @@ describe("createPythonDatasetPreparationPort", () => {
       }),
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+      ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
     });
 
     await expect(adapter.prepareTrainingDataset({
@@ -205,6 +219,7 @@ describe("createPythonDatasetPreparationPort", () => {
       }),
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+      ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
     });
 
     await expect(adapter.prepareTrainingDataset({
@@ -240,6 +255,7 @@ describe("createPythonDatasetPreparationPort", () => {
       }),
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+      ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
     });
 
     await expect(adapter.prepareTrainingDataset({

@@ -264,5 +264,22 @@ describe("composeDesktopHost", () => {
       }
     }
   });
+
+  it("emits runtime health-change logs only when status transitions", async () => {
+    const host = composeDesktopHost();
+
+    const firstRead = await host.readPythonRuntimeStatus();
+    const secondRead = await host.readPythonRuntimeStatus();
+
+    const healthTransitionLogsFirstRead = firstRead.logs.filter((entry) =>
+      entry.message.includes("Python runtime health changed:"),
+    );
+    const healthTransitionLogsSecondRead = secondRead.logs.filter((entry) =>
+      entry.message.includes("Python runtime health changed:"),
+    );
+
+    expect(healthTransitionLogsFirstRead.length).toBe(1);
+    expect(healthTransitionLogsSecondRead.length).toBe(1);
+  });
 });
 
