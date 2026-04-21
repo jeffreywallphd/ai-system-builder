@@ -208,6 +208,49 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     await expectFileMissing(runtimeTest);
   });
 
+  it("uses artifact id as storage key when binding read returns not-found", async () => {
+    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeTrain, runtimeTest);
+    deps.readArtifactStorageBindings.mockImplementationOnce(async () => ({
+      ok: false as const,
+      error: {
+        code: "not-found",
+        message: "No storage binding found for artifact 'uploads/session/source-a.md'.",
+      },
+    }));
+
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
+      storageBindings: {
+        readArtifactStorageBindings: deps.readArtifactStorageBindings,
+        upsertArtifactStorageBinding: testDouble.fn(),
+        deleteArtifactStorageBindings: testDouble.fn(),
+      },
+      storage: {
+        retrieveArtifact: deps.retrieveArtifact,
+        storeArtifact: deps.storeArtifact,
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
+    });
+
+    const artifactId = "uploads/session/source-a.md";
+    const result = await useCase.execute({
+      sourceArtifactIds: [artifactId],
+      recipe,
+      split,
+      output: { format: "jsonl" },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(deps.retrieveArtifact).toHaveBeenCalledWith(
+      expect.objectContaining({ key: artifactId }),
+      undefined,
+    );
+    await expectFileMissing(runtimeTrain);
+    await expectFileMissing(runtimeTest);
+  });
+
   it("supports huggingface-only output destination", async () => {
     const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
     const deps = createDeps(runtimeTrain, runtimeTest);
