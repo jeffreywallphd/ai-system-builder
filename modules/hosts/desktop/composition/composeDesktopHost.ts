@@ -173,21 +173,21 @@ export function composeDesktopHost(
   });
   const readPythonRuntimeStatus = async (): Promise<DesktopPythonRuntimeStatusPayload> => {
     const supervisorStatus = pythonRuntimeFoundation.supervisor.getStatus();
-
     let healthy = false;
     let runtimeStatus = supervisorStatus === "ready" ? "ready" : supervisorStatus;
     let capabilities: string[] = [];
-    try {
-      const [health, runtimeCapabilities] = await Promise.all([
-        pythonRuntimeFoundation.runtimePort.getHealthStatus(),
-        pythonRuntimeFoundation.runtimePort.getCapabilities(),
-      ]);
-      healthy = health.healthy;
-      runtimeStatus = health.status.status;
-      capabilities = runtimeCapabilities.capabilities;
-    } catch (error) {
-      runtimeStatus = supervisorStatus === "stopped" ? "stopped" : "unavailable";
-      if (supervisorStatus !== "stopped") {
+    const shouldProbeRuntimeHttp = supervisorStatus === "starting" || supervisorStatus === "ready";
+    if (shouldProbeRuntimeHttp) {
+      try {
+        const [health, runtimeCapabilities] = await Promise.all([
+          pythonRuntimeFoundation.runtimePort.getHealthStatus(),
+          pythonRuntimeFoundation.runtimePort.getCapabilities(),
+        ]);
+        healthy = health.healthy;
+        runtimeStatus = health.status.status;
+        capabilities = runtimeCapabilities.capabilities;
+      } catch (error) {
+        runtimeStatus = "unavailable";
         recordRuntimeLog({
           level: "warn",
           message: `Unable to read Python runtime diagnostics: ${error instanceof Error ? error.message : String(error)}`,
