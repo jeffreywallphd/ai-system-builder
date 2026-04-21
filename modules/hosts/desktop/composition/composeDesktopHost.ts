@@ -237,7 +237,6 @@ export function composeDesktopHost(
         level: "info",
         message: "Preparing dataset in Python runtime.",
       });
-      await pythonRuntimeFoundation.supervisor.start();
       const result = await pythonRuntimeFoundation.runtimePort.executeTask(request);
       if (result.success) {
         recordRuntimeLog({
@@ -256,6 +255,8 @@ export function composeDesktopHost(
     getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
     getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
     ensureModelDownloaded: (request) => pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request),
+  }, {
+    ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
 
   return {

@@ -80,6 +80,69 @@ describe("createPythonDatasetPreparationPort", () => {
     expect(result.warnings).toBeUndefined();
   });
 
+  it("ensures runtime readiness before model download and task execution when configured", async () => {
+    const callOrder: string[] = [];
+    const ensureRuntimeReady = testDouble.fn(async () => {
+      callOrder.push("ready");
+    });
+    const ensureModelDownloaded = testDouble.fn(async () => {
+      callOrder.push("download-model");
+      return {
+        provider: "transformers" as const,
+        modelId: "test-model",
+        downloaded: false,
+        fromCache: true,
+      };
+    });
+    const executeTask = testDouble.fn(async (request) => {
+      callOrder.push("execute-task");
+      return {
+        requestId: request.requestId,
+        taskType: request.taskType,
+        success: true,
+        data: {
+          outputs: [
+            { name: "dataset-train", role: "train", tempPath: "/tmp/train.jsonl", mediaType: "application/x-ndjson" },
+            { name: "dataset-test", role: "test", tempPath: "/tmp/test.jsonl", mediaType: "application/x-ndjson" },
+          ],
+          summary: {
+            sourceDocumentCount: 1,
+            normalizedDocumentCount: 1,
+            skippedDocumentCount: 0,
+            chunkCount: 2,
+            generatedExampleCount: 10,
+            trainRowCount: 8,
+            testRowCount: 2,
+          },
+        },
+      };
+    });
+
+    const adapter = createPythonDatasetPreparationPort({
+      executeTask,
+      getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
+      getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+      ensureModelDownloaded,
+    }, { ensureRuntimeReady });
+
+    await adapter.prepareTrainingDataset({
+      sourceInputs: [{ artifactId: "a1", localPath: "/tmp/a1.jsonl", mediaType: "application/x-ndjson" }],
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+        generation: {
+          mode: "qa",
+          model: { provider: "transformers", modelId: "test-model" },
+        },
+      },
+      split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
+      output: { format: "jsonl" },
+    });
+
+    expect(ensureRuntimeReady).toHaveBeenCalledOnce();
+    expect(callOrder).toEqual(["ready", "download-model", "execute-task"]);
+  });
+
   it("propagates structured runtime errors without stack traces", async () => {
     const adapter = createPythonDatasetPreparationPort({
       executeTask: async () => ({
