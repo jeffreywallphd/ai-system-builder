@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from modules.adapters.runtime.python.worker.models import PrepareTrainingDatasetRequest
 from modules.adapters.runtime.python.worker.tasks.example_generation import GeneratedQaExample
@@ -241,6 +242,7 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
 
     def test_generation_requires_at_least_one_generated_row(self) -> None:
         payload = self._build_payload("jsonl")
+        payload.recipe.generation.failurePolicy = "skip"
 
         with self.assertRaises(ValueError) as context:
             prepare_training_dataset(payload, example_generator=lambda _chunks, _config: [])
@@ -249,6 +251,31 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.assertEqual(getattr(error, "stage", None), "generation")
         self.assertEqual(getattr(error, "error_code", None), "generation_no_examples")
         self.assertIn("No training examples were generated", str(error))
+        self.assertEqual(getattr(error, "details", {}).get("chunkCount"), 3)
+        self.assertEqual(getattr(error, "details", {}).get("failurePolicy"), "skip")
+
+    def test_fails_early_when_generation_model_is_not_available_locally(self) -> None:
+        payload = self._build_payload("jsonl")
+        generator_called = False
+
+        def generator(_chunks, _config):
+            nonlocal generator_called
+            generator_called = True
+            return []
+
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.prepare_training_dataset.ensure_generation_model_is_available",
+            side_effect=RuntimeError("Generation model 'test-model' is not available in the local Hugging Face cache."),
+        ):
+            with self.assertRaises(ValueError) as context:
+                prepare_training_dataset(payload, example_generator=generator)
+
+        error = context.exception
+        self.assertFalse(generator_called)
+        self.assertEqual(getattr(error, "stage", None), "generation")
+        self.assertEqual(getattr(error, "error_code", None), "generation_model_not_available")
+        self.assertEqual(getattr(error, "details", {}).get("modelId"), "test-model")
+        self.assertIn("not available in the local Hugging Face cache", str(error))
 
     def test_split_requires_at_least_two_generated_rows(self) -> None:
         payload = self._build_payload("jsonl")

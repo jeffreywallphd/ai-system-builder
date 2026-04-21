@@ -100,11 +100,16 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
     except Exception as error:
         error_code = "task_failed"
         stage = None
+        details = None
         message = str(error)
         if hasattr(error, "error_code"):
             error_code = str(getattr(error, "error_code"))
         if hasattr(error, "stage"):
             stage = str(getattr(error, "stage"))
+        if hasattr(error, "details"):
+            error_details = getattr(error, "details")
+            if isinstance(error_details, dict):
+                details = error_details
         return PythonRuntimeTaskResult(
             requestId=request.requestId,
             taskType=request.taskType,
@@ -114,6 +119,7 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
                 errorCode=error_code,
                 stage=stage,  # type: ignore[arg-type]
                 message=message,
+                details=details,
                 retryable=False,
             ),
             metadata={"runtimeId": RUNTIME_ID},
