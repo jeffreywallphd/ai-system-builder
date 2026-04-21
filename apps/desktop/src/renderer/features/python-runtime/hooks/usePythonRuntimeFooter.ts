@@ -32,7 +32,7 @@ export function usePythonRuntimeFooter(options: UsePythonRuntimeFooterOptions): 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const inFlightRefresh = useRef(false);
-  const lastSnapshotSignature = useRef<string>();
+  const lastSnapshotSignature = useRef<string | undefined>(undefined);
 
   const toSnapshotSignature = useCallback((snapshot: Awaited<ReturnType<DesktopPythonRuntimeClient["readStatus"]>>) => {
     const lastLogEntry = snapshot.logs[snapshot.logs.length - 1];
