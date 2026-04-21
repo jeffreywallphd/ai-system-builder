@@ -151,6 +151,29 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.assertIn("generation_example_skipped", warning_codes)
         self.assertEqual(result.summary.generatedExampleCount, 2)
 
+    def test_generation_skip_merges_generation_warnings_with_normalization_warnings(self) -> None:
+        payload = self._build_payload("jsonl")
+        payload.recipe.generation.failurePolicy = "skip"
+
+        def flaky_generator(chunks, _config):
+            chunk = chunks[0]
+            if chunk.chunk_index == 0:
+                raise RuntimeError("generation failed for first chunk")
+            return [
+                GeneratedQaExample(
+                    artifact_id=chunk.artifact_id,
+                    chunk_index=chunk.chunk_index,
+                    question="Q",
+                    answer=chunk.text,
+                )
+            ]
+
+        result = prepare_training_dataset(payload, example_generator=flaky_generator)
+
+        warning_codes = [warning.code for warning in result.warnings or []]
+        self.assertIn("document_normalization_skipped", warning_codes)
+        self.assertIn("generation_example_skipped", warning_codes)
+
     def test_generation_failure_default_is_fail_fast_in_strict_mode(self) -> None:
         payload = self._build_payload("jsonl")
         payload.recipe.normalization.normalizationMode = "strict"
