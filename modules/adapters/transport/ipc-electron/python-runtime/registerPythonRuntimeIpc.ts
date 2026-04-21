@@ -26,24 +26,45 @@ export interface RegisterPythonRuntimeIpcDependencies extends PythonRuntimeContr
   ipcMain: IpcMainHandlePort;
 }
 
-function mapRuntimeErrorToIpcFailure(
-  channel:
-    | typeof DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL
-    | typeof DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
+interface RuntimeRequestCorrelation {
+  requestId?: string;
+  correlationId?: string;
+}
+
+function createRuntimeErrorDetails(operation: string): Record<string, string> {
+  return { operation };
+}
+
+function mapStatusReadRuntimeErrorToIpcFailure(
   operation: string,
-  request: { requestId?: string; correlationId?: string },
+  request: RuntimeRequestCorrelation,
   error: unknown,
-) {
+): DesktopPythonRuntimeStatusReadResponse {
   return createIpcFailureResponse(createIpcError(
-    channel,
+    DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
     "internal",
     error instanceof Error ? error.message : "Python runtime operation failed.",
     {
       requestId: request.requestId,
       correlationId: request.correlationId,
-      details: {
-        operation,
-      },
+      details: createRuntimeErrorDetails(operation),
+    },
+  ));
+}
+
+function mapControlRuntimeErrorToIpcFailure(
+  operation: string,
+  request: RuntimeRequestCorrelation,
+  error: unknown,
+): DesktopPythonRuntimeControlResponse {
+  return createIpcFailureResponse(createIpcError(
+    DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
+    "internal",
+    error instanceof Error ? error.message : "Python runtime operation failed.",
+    {
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+      details: createRuntimeErrorDetails(operation),
     },
   ));
 }
@@ -65,12 +86,11 @@ export function createDesktopPythonRuntimeStatusReadIpcHandler(
         },
       );
     } catch (error) {
-      return mapRuntimeErrorToIpcFailure(
-        DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
+      return mapStatusReadRuntimeErrorToIpcFailure(
         "status-read",
         request,
         error,
-      ) as DesktopPythonRuntimeStatusReadResponse;
+      );
     }
   };
 }
@@ -100,12 +120,11 @@ export function createDesktopPythonRuntimeControlIpcHandler(
         },
       );
     } catch (error) {
-      return mapRuntimeErrorToIpcFailure(
-        DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
+      return mapControlRuntimeErrorToIpcFailure(
         request.payload.action,
         request,
         error,
-      ) as DesktopPythonRuntimeControlResponse;
+      );
     }
   };
 }
