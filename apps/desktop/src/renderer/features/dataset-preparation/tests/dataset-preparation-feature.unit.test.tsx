@@ -91,7 +91,46 @@ describe("DatasetPreparationFeature", () => {
 
     expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.objectContaining({
       sourceArtifactIds: ["artifact-1"],
-      output: { format: "jsonl" },
+      recipe: {
+        normalization: {
+          targetFormat: "markdown",
+          normalizationMode: undefined,
+          unsupportedDocumentPolicy: undefined,
+        },
+        chunking: {
+          strategy: "character",
+          chunkSize: 1000,
+          chunkOverlap: 200,
+          preserveDocumentBoundaries: true,
+          maxChunkCount: undefined,
+        },
+        generation: {
+          mode: "qa",
+          model: {
+            provider: "transformers",
+            modelId: "Qwen/Qwen2.5-1.5B-Instruct",
+            device: "auto",
+            torchDtype: undefined,
+          },
+          promptTemplate: "Prompt: {{text}}",
+          maxExamplesPerChunk: 4,
+          batchSize: 4,
+          failurePolicy: "skip",
+          generationParams: {
+            temperature: undefined,
+            topP: undefined,
+            maxNewTokens: undefined,
+          },
+        },
+      },
+      output: {
+        format: "jsonl",
+        naming: { baseName: undefined },
+        destinations: {
+          local: { enabled: true },
+          huggingFace: undefined,
+        },
+      },
     }), expect.objectContaining({
       requestId: expect.stringMatching(/^dataset-preparation-/),
     }));
