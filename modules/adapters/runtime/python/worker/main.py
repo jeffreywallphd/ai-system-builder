@@ -1,12 +1,31 @@
+from __future__ import annotations
+
+import importlib
+import sys
 from os import getenv
+from pathlib import Path
 
 import uvicorn
 
-try:
-    from .app import app
-except ImportError:
+
+def _load_app():
+    if __package__:
+        from .app import app as package_app
+
+        return package_app
+
     # Support direct script execution (`python main.py`) used by the desktop supervisor.
-    from app import app
+    # In script mode, ensure repository root is importable so package-relative imports work.
+    repository_root = Path(__file__).resolve().parents[5]
+    root_path = str(repository_root)
+    if root_path not in sys.path:
+        sys.path.insert(0, root_path)
+
+    module = importlib.import_module("modules.adapters.runtime.python.worker.app")
+    return module.app
+
+
+app = _load_app()
 
 
 if __name__ == "__main__":
