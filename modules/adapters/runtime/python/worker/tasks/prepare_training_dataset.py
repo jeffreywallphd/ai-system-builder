@@ -37,6 +37,20 @@ def _validate_split_config(train_ratio: float, test_ratio: float) -> None:
     if abs((train_ratio + test_ratio) - 1.0) > 1e-6:
         raise ValueError("split.trainRatio + split.testRatio must equal 1.0")
 
+def _resolve_split_index(total_rows: int, train_ratio: float) -> int:
+    if total_rows < 2:
+        raise DatasetPreparationStageError(
+            "split",
+            (
+                "Generated examples cannot be split into non-empty train/test outputs. "
+                f"At least 2 rows are required, but only {total_rows} row(s) were generated."
+            ),
+            "split_insufficient_rows",
+        )
+
+    raw_split_index = int(total_rows * train_ratio)
+    return max(1, min(total_rows - 1, raw_split_index))
+
 
 def _emit_rows(
     rows: list[dict[str, object]],
@@ -168,7 +182,7 @@ def prepare_training_dataset(
 
     train_ratio = float(payload.split.trainRatio)
 
-    split_index = int(len(rows) * train_ratio)
+    split_index = _resolve_split_index(len(rows), train_ratio)
     train_rows = rows[:split_index]
     test_rows = rows[split_index:]
 
