@@ -144,10 +144,11 @@ function mapRuntimeErrorToContractError(runtimeError: PythonRuntimeError | undef
 
 export function createPythonDatasetPreparationPort(
   runtimePort: PythonRuntimePort,
-  options?: { taskTimeoutMs?: number },
+  options?: { taskTimeoutMs?: number; ensureRuntimeReady?: () => Promise<void> | void },
 ): PythonDatasetPreparationPort {
   let sequence = 0;
   const taskTimeoutMs = options?.taskTimeoutMs;
+  const ensureRuntimeReady = options?.ensureRuntimeReady;
 
   const nextRequestId = () => {
     sequence += 1;
@@ -157,6 +158,10 @@ export function createPythonDatasetPreparationPort(
 
   return {
     async prepareTrainingDataset(request: PrepareTrainingDatasetRequest): Promise<PrepareTrainingDatasetResult> {
+      if (ensureRuntimeReady) {
+        await ensureRuntimeReady();
+      }
+
       await runtimePort.ensureModelDownloaded({
         provider: request.recipe.generation.model.provider,
         modelId: request.recipe.generation.model.modelId,
