@@ -51,6 +51,20 @@ def _resolve_split_index(total_rows: int, train_ratio: float) -> int:
     raw_split_index = int(total_rows * train_ratio)
     return max(1, min(total_rows - 1, raw_split_index))
 
+def _validate_generated_rows(total_rows: int, chunk_count: int) -> None:
+    if total_rows > 0:
+        return
+
+    raise DatasetPreparationStageError(
+        "generation",
+        (
+            "No training examples were generated from the normalized chunks. "
+            f"Processed {chunk_count} chunk(s), but generation produced 0 row(s). "
+            "Check source content, chunking settings, and generation model configuration."
+        ),
+        "generation_no_examples",
+    )
+
 
 def _emit_rows(
     rows: list[dict[str, object]],
@@ -175,6 +189,7 @@ def prepare_training_dataset(
         raise DatasetPreparationStageError("split", str(error), "split_validation_failed") from error
 
     rows, warnings, normalized_count, skipped_count, chunk_count = _build_generated_rows(payload, example_generator)
+    _validate_generated_rows(len(rows), chunk_count)
 
     if payload.split.shuffle:
         seed = int(payload.split.seed or 0)

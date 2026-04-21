@@ -239,6 +239,17 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.assertTrue(Path(train_output.tempPath).read_text(encoding="utf-8").strip())
         self.assertTrue(Path(test_output.tempPath).read_text(encoding="utf-8").strip())
 
+    def test_generation_requires_at_least_one_generated_row(self) -> None:
+        payload = self._build_payload("jsonl")
+
+        with self.assertRaises(ValueError) as context:
+            prepare_training_dataset(payload, example_generator=lambda _chunks, _config: [])
+
+        error = context.exception
+        self.assertEqual(getattr(error, "stage", None), "generation")
+        self.assertEqual(getattr(error, "error_code", None), "generation_no_examples")
+        self.assertIn("No training examples were generated", str(error))
+
     def test_split_requires_at_least_two_generated_rows(self) -> None:
         payload = self._build_payload("jsonl")
 
