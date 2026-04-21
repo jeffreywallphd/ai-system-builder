@@ -15,9 +15,14 @@ import {
   registerDatasetPreparationIpc,
   type RegisterDatasetPreparationIpcDependencies,
 } from "./dataset-preparation/registerDatasetPreparationIpc";
+import {
+  registerPythonRuntimeIpc,
+  type PythonRuntimeControlPort,
+} from "./python-runtime/registerPythonRuntimeIpc";
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
+  pythonRuntime: PythonRuntimeControlPort;
   getHuggingFaceTokenStatus: RegisterArtifactBrowserIpcDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
@@ -81,6 +86,14 @@ export function registerElectronIpc(
   registerDatasetPreparationIpc({
     ipcMain: dependencies.ipcMain,
     prepareTrainingDatasetFromArtifactsUseCase: dependencies.prepareTrainingDatasetFromArtifactsUseCase,
+  });
+
+  registerPythonRuntimeIpc({
+    ipcMain: dependencies.ipcMain,
+    startPythonRuntime: dependencies.pythonRuntime.startPythonRuntime,
+    stopPythonRuntime: dependencies.pythonRuntime.stopPythonRuntime,
+    restartPythonRuntime: dependencies.pythonRuntime.restartPythonRuntime,
+    readPythonRuntimeStatus: dependencies.pythonRuntime.readPythonRuntimeStatus,
   });
 }
 

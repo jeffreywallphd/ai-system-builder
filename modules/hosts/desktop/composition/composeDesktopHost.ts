@@ -48,6 +48,7 @@ import {
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
+import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 
 export interface ComposeDesktopHostLoggingOptions {
   verbosity?: string;
@@ -80,6 +81,8 @@ export interface DesktopHostComposition {
   clearHuggingFaceToken: () => HuggingFaceTokenStatus;
   startPythonRuntime: () => Promise<void>;
   stopPythonRuntime: () => Promise<void>;
+  restartPythonRuntime: () => Promise<void>;
+  readPythonRuntimeStatus: () => Promise<DesktopPythonRuntimeStatusPayload>;
   getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
 }
@@ -101,6 +104,34 @@ export function composeDesktopHost(
     sink: options.logSink,
     now: options.now,
   });
+  const now = options.now ?? (() => new Date().toISOString());
+  const runtimeLogs: DesktopPythonRuntimeLogEntry[] = [];
+  const pushRuntimeLog = (entry: DesktopPythonRuntimeLogEntry) => {
+    runtimeLogs.push(entry);
+    if (runtimeLogs.length > 200) {
+      runtimeLogs.splice(0, runtimeLogs.length - 200);
+    }
+  };
+  const recordRuntimeLog = (entry: Omit<DesktopPythonRuntimeLogEntry, "timestamp"> & { timestamp?: string }) => {
+    const timestamp = entry.timestamp ?? now();
+    const normalized: DesktopPythonRuntimeLogEntry = {
+      timestamp,
+      level: entry.level,
+      message: entry.message,
+    };
+    pushRuntimeLog(normalized);
+    void loggingPort.log({
+      timestamp,
+      level: entry.level,
+      verbosity: "normal",
+      event: "runtime.python.activity",
+      message: normalized.message,
+      component: "python-runtime-supervisor",
+      data: {
+        severity: entry.level,
+      },
+    });
+  };
   const tokenConfigStore = createHuggingFaceTokenConfigStore({
     filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/desktop/hugging-face-token.json",
     fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
@@ -110,16 +141,89 @@ export function composeDesktopHost(
       baseUrl: process.env.PYTHON_RUNTIME_BASE_URL ?? "http://127.0.0.1:43111",
     },
     supervisor: {
-      command: process.env.PYTHON_RUNTIME_COMMAND ?? "python3",
+      command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
       args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
       cwd: process.env.PYTHON_RUNTIME_WORKER_DIR ?? "modules/adapters/runtime/python/worker",
       env: process.env,
+      onEvent(event) {
+        if (event.type === "stdio") {
+          const message = event.detail?.trim();
+          if (!message) {
+            return;
+          }
+          const stream = event.data?.source === "stderr" ? "stderr" : "stdout";
+          const level = stream === "stderr" ? "warn" : "info";
+          recordRuntimeLog({
+            level,
+            message: `Python runtime ${stream}: ${message}`,
+          });
+          return;
+        }
+
+        const message = event.detail ?? `Python runtime event: ${event.type}`;
+        const level: "info" | "warn" | "error" = event.type === "process-error" || event.type === "startup-timeout"
+          ? "error"
+          : (event.type === "health-probe-failed" || event.type === "process-exit" ? "warn" : "info");
+        recordRuntimeLog({
+          level,
+          message,
+        });
+      },
     },
   });
+  const readPythonRuntimeStatus = async (): Promise<DesktopPythonRuntimeStatusPayload> => {
+    const supervisorStatus = pythonRuntimeFoundation.supervisor.getStatus();
+
+    let healthy = false;
+    let runtimeStatus = supervisorStatus === "ready" ? "ready" : supervisorStatus;
+    let capabilities: string[] = [];
+    try {
+      const [health, runtimeCapabilities] = await Promise.all([
+        pythonRuntimeFoundation.runtimePort.getHealthStatus(),
+        pythonRuntimeFoundation.runtimePort.getCapabilities(),
+      ]);
+      healthy = health.healthy;
+      runtimeStatus = health.status.status;
+      capabilities = runtimeCapabilities.capabilities;
+    } catch (error) {
+      runtimeStatus = supervisorStatus === "stopped" ? "stopped" : "unavailable";
+      if (supervisorStatus !== "stopped") {
+        recordRuntimeLog({
+          level: "warn",
+          message: `Unable to read Python runtime diagnostics: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    }
+
+    return {
+      supervisorStatus,
+      healthy,
+      runtimeStatus,
+      capabilities,
+      logs: [...runtimeLogs],
+    };
+  };
   const datasetPreparationPort = createPythonDatasetPreparationPort({
     executeTask: async (request) => {
+      recordRuntimeLog({
+        level: "info",
+        message: "Preparing dataset in Python runtime.",
+      });
       await pythonRuntimeFoundation.supervisor.start();
-      return pythonRuntimeFoundation.runtimePort.executeTask(request);
+      const result = await pythonRuntimeFoundation.runtimePort.executeTask(request);
+      if (result.success) {
+        recordRuntimeLog({
+          level: "info",
+          message: "Dataset preparation finished successfully.",
+        });
+      } else {
+        recordRuntimeLog({
+          level: "error",
+          message: `Dataset preparation failed: ${result.error?.message ?? "Unknown runtime error."}`,
+        });
+      }
+
+      return result;
     },
     getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
     getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
@@ -138,20 +242,35 @@ export function composeDesktopHost(
       return tokenConfigStore.clearToken();
     },
     async startPythonRuntime() {
+      recordRuntimeLog({
+        level: "info",
+        message: "Starting Python runtime.",
+      });
       await pythonRuntimeFoundation.supervisor.start();
     },
     async stopPythonRuntime() {
+      recordRuntimeLog({
+        level: "info",
+        message: "Stopping Python runtime.",
+      });
       await pythonRuntimeFoundation.supervisor.stop();
     },
+    async restartPythonRuntime() {
+      recordRuntimeLog({
+        level: "info",
+        message: "Restarting Python runtime.",
+      });
+      await pythonRuntimeFoundation.supervisor.restart();
+    },
+    async readPythonRuntimeStatus() {
+      return readPythonRuntimeStatus();
+    },
     async getPythonRuntimeDiagnostics() {
-      const [health, capabilities] = await Promise.all([
-        pythonRuntimeFoundation.runtimePort.getHealthStatus(),
-        pythonRuntimeFoundation.runtimePort.getCapabilities(),
-      ]);
+      const status = await readPythonRuntimeStatus();
       return {
-        status: health.status.status,
-        healthy: health.healthy,
-        capabilities: capabilities.capabilities,
+        status: status.runtimeStatus,
+        healthy: status.healthy,
+        capabilities: status.capabilities,
       };
     },
     registerArtifactUploadIpc(registerOptions) {
@@ -282,6 +401,12 @@ export function composeDesktopHost(
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
+        pythonRuntime: {
+          startPythonRuntime: () => pythonRuntimeFoundation.supervisor.start(),
+          stopPythonRuntime: () => pythonRuntimeFoundation.supervisor.stop(),
+          restartPythonRuntime: () => pythonRuntimeFoundation.supervisor.restart(),
+          readPythonRuntimeStatus,
+        },
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),

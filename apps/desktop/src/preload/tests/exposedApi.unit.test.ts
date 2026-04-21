@@ -34,6 +34,10 @@ import {
   createDesktopIngestWebsitePagesBatchSuccessResponse,
   DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
   createDesktopPrepareTrainingDatasetSuccessResponse,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
+  createDesktopPythonRuntimeStatusReadSuccessResponse,
+  createDesktopPythonRuntimeControlSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
@@ -405,4 +409,36 @@ it("maps website pages batch ingestion bridge calls to dedicated IPC request cha
 
   expect(response.ok).toBe(true);
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value);
+});
+
+it("maps python runtime status/control bridge calls to dedicated IPC request channels", async () => {
+  const responses = [
+    createDesktopPythonRuntimeStatusReadSuccessResponse({
+      supervisorStatus: "ready",
+      healthy: true,
+      runtimeStatus: "ready",
+      capabilities: ["prepare-training-dataset"],
+      logs: [],
+    }),
+    createDesktopPythonRuntimeControlSuccessResponse({
+      supervisorStatus: "starting",
+      healthy: false,
+      runtimeStatus: "starting",
+      capabilities: [],
+      logs: [],
+    }),
+  ];
+  let index = 0;
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
+    const response = responses[index];
+    index += 1;
+    return response;
+  });
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.readPythonRuntimeStatus();
+  await api.controlPythonRuntime({ action: "restart" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value);
 });
