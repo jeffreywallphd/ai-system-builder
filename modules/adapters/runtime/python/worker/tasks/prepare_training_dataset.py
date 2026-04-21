@@ -112,6 +112,7 @@ def _build_generated_rows(
 
     batch_size = int(payload.recipe.generation.batchSize or 1)
     rows: list[dict[str, object]] = []
+    warnings: list[DatasetPreparationWarning] = list(normalization.warnings)
     for start in range(0, len(chunks), batch_size):
         chunk_batch = chunks[start : start + batch_size]
         try:
@@ -143,7 +144,7 @@ def _build_generated_rows(
 
     return (
         rows,
-        normalization.warnings,
+        warnings,
         len(normalization.documents),
         normalization.skipped_document_count,
         len(chunks),
