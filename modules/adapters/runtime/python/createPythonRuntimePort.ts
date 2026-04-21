@@ -33,6 +33,7 @@ export function createPythonRuntimeAdapterFoundation(
     executeTask: (request) => client.executeTask(request),
     getHealthStatus: () => client.getHealthStatus(),
     getCapabilities: () => client.getCapabilities(),
+    ensureModelDownloaded: (request) => client.ensureModelDownloaded(request),
   };
 
   return {

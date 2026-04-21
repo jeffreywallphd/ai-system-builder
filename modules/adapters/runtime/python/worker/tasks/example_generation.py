@@ -17,6 +17,15 @@ class GeneratedQaExample:
     generation_mode: str = "qa"
 
 
+@dataclass
+class GenerationModelAvailability:
+    provider: str
+    model_id: str
+    downloaded: bool
+    from_cache: bool
+    local_path: str | None = None
+
+
 class QaTextGenerator:
     def generate_question(self, prompt: str) -> str:
         raise NotImplementedError
@@ -70,29 +79,55 @@ class TransformersQaTextGenerator(QaTextGenerator):
         return text
 
 
-def ensure_generation_model_is_available(config: ExampleGenerationConfig) -> None:
-    if config.model.provider != "transformers":
-        raise ValueError(f"Unsupported generation model provider: {config.model.provider}")
+def ensure_generation_model_downloaded(model_config: LocalModelConfig) -> GenerationModelAvailability:
+    if model_config.provider != "transformers":
+        raise ValueError(f"Unsupported generation model provider: {model_config.provider}")
 
     try:
         from huggingface_hub import snapshot_download
     except ImportError as error:
         raise RuntimeError(
-            "The 'huggingface_hub' package is required to validate local generation model availability."
+            "The 'huggingface_hub' package is required to validate and download generation models."
         ) from error
 
     try:
-        snapshot_download(
-            repo_id=config.model.modelId,
+        local_path = snapshot_download(
+            repo_id=model_config.modelId,
             local_files_only=True,
+        )
+        return GenerationModelAvailability(
+            provider=model_config.provider,
+            model_id=model_config.modelId,
+            downloaded=False,
+            from_cache=True,
+            local_path=local_path,
+        )
+    except Exception:
+        pass
+
+    try:
+        local_path = snapshot_download(
+            repo_id=model_config.modelId,
+            local_files_only=False,
+        )
+        return GenerationModelAvailability(
+            provider=model_config.provider,
+            model_id=model_config.modelId,
+            downloaded=True,
+            from_cache=False,
+            local_path=local_path,
         )
     except Exception as error:
         raise RuntimeError(
             (
-                f"Generation model '{config.model.modelId}' is not available in the local Hugging Face cache. "
-                "Download the model before running dataset preparation."
+                f"Generation model '{model_config.modelId}' is not available in the local Hugging Face cache. "
+                "Automatic download failed. Verify network access and Hugging Face authentication/token configuration."
             )
         ) from error
+
+
+def ensure_generation_model_is_available(config: ExampleGenerationConfig) -> GenerationModelAvailability:
+    return ensure_generation_model_downloaded(config.model)
 
 
 _GENERATOR_CACHE: dict[tuple[str, str, str, str], QaTextGenerator] = {}

@@ -157,6 +157,11 @@ export function createPythonDatasetPreparationPort(
 
   return {
     async prepareTrainingDataset(request: PrepareTrainingDatasetRequest): Promise<PrepareTrainingDatasetResult> {
+      await runtimePort.ensureModelDownloaded({
+        provider: request.recipe.generation.model.provider,
+        modelId: request.recipe.generation.model.modelId,
+      });
+
       const taskResult = await runtimePort.executeTask({
         requestId: nextRequestId(),
         taskType: "prepare-training-dataset",

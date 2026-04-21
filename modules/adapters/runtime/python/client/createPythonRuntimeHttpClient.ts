@@ -15,6 +15,13 @@ import {
 export interface PythonRuntimeHttpClient {
   getHealthStatus(): Promise<PythonRuntimeHealthCheckResult>;
   getCapabilities(): Promise<PythonRuntimeCapabilitiesResult>;
+  ensureModelDownloaded(request: { provider: "transformers"; modelId: string }): Promise<{
+    provider: "transformers";
+    modelId: string;
+    downloaded: boolean;
+    fromCache: boolean;
+    localPath?: string;
+  }>;
   executeTask(request: PythonRuntimeTaskRequest): Promise<PythonRuntimeTaskResult>;
 }
 
@@ -67,6 +74,26 @@ function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
+function mapModelDownloadResponse(endpoint: string, response: Response, payload: unknown | undefined) {
+  const parsed = mapRuntimeResponsePayload(endpoint, response, payload, (value) => value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`Python runtime request failed for ${endpoint} with invalid JSON response body.`);
+  }
+
+  const record = parsed as Record<string, unknown>;
+  if (record.provider !== "transformers" || typeof record.modelId !== "string") {
+    throw new Error(`Python runtime request failed for ${endpoint} with invalid structured payload.`);
+  }
+
+  return {
+    provider: "transformers" as const,
+    modelId: record.modelId,
+    downloaded: record.downloaded === true,
+    fromCache: record.fromCache === true,
+    localPath: typeof record.localPath === "string" && record.localPath.length > 0 ? record.localPath : undefined,
+  };
+}
+
 export function createPythonRuntimeHttpClient(
   options: CreatePythonRuntimeHttpClientOptions,
 ): PythonRuntimeHttpClient {
@@ -85,6 +112,18 @@ export function createPythonRuntimeHttpClient(
       const response = await fetcher(`${baseUrl}/capabilities`, { method: "GET" });
       const payload = await parseJsonResponseSafe(response);
       return mapRuntimeResponsePayload("/capabilities", response, payload, mapCapabilitiesResponseFromHttpPayload);
+    },
+
+    async ensureModelDownloaded(request) {
+      const response = await fetcher(`${baseUrl}/models/ensure-downloaded`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(request),
+      });
+      const payload = await parseJsonResponseSafe(response);
+      return mapModelDownloadResponse("/models/ensure-downloaded", response, payload);
     },
 
     async executeTask(request: PythonRuntimeTaskRequest) {

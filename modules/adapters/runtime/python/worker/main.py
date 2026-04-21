@@ -34,4 +34,5 @@ if __name__ == "__main__":
         host=getenv("PYTHON_RUNTIME_HOST", "127.0.0.1"),
         port=int(getenv("PYTHON_RUNTIME_PORT", "43111")),
         reload=False,
+        access_log=False,
     )

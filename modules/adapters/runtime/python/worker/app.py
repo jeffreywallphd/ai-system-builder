@@ -8,6 +8,9 @@ from os import getenv
 from fastapi import FastAPI
 
 from .models import (
+    EnsureModelDownloadRequest,
+    EnsureModelDownloadResult,
+    LocalModelConfig,
     PrepareTrainingDatasetRequest,
     PythonRuntimeCapabilitiesResult,
     PythonRuntimeError,
@@ -17,6 +20,7 @@ from .models import (
     PythonRuntimeTaskResult,
 )
 from .tasks.prepare_training_dataset import prepare_training_dataset
+from .tasks.example_generation import ensure_generation_model_downloaded
 
 RUNTIME_ID = getenv("PYTHON_RUNTIME_ID", "python-sidecar")
 WORKER_VERSION = getenv("PYTHON_RUNTIME_WORKER_VERSION", "0.1.0")
@@ -47,7 +51,19 @@ def health() -> PythonRuntimeHealthCheckResult:
 def capabilities() -> PythonRuntimeCapabilitiesResult:
     return PythonRuntimeCapabilitiesResult(
         runtimeId=RUNTIME_ID,
-        capabilities=["prepare-training-dataset"],
+        capabilities=["prepare-training-dataset", "ensure-model-download"],
+    )
+
+
+@app.post("/models/ensure-downloaded", response_model=EnsureModelDownloadResult)
+def ensure_model_download(request: EnsureModelDownloadRequest) -> EnsureModelDownloadResult:
+    availability = ensure_generation_model_downloaded(LocalModelConfig(provider=request.provider, modelId=request.modelId))
+    return EnsureModelDownloadResult(
+        provider=request.provider,
+        modelId=request.modelId,
+        downloaded=availability.downloaded,
+        fromCache=availability.from_cache,
+        localPath=availability.local_path,
     )
 
 

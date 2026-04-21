@@ -11,4 +11,11 @@ export interface PythonRuntimePort {
   ): Promise<PythonRuntimeTaskResult>;
   getHealthStatus(): Promise<PythonRuntimeHealthCheckResult>;
   getCapabilities(): Promise<PythonRuntimeCapabilitiesResult>;
+  ensureModelDownloaded(request: { provider: "transformers"; modelId: string }): Promise<{
+    provider: "transformers";
+    modelId: string;
+    downloaded: boolean;
+    fromCache: boolean;
+    localPath?: string;
+  }>;
 }

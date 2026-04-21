@@ -21,7 +21,7 @@ describe("createPythonRuntimeHttpClient", () => {
         expect(init?.method).toBe("GET");
         return new Response(JSON.stringify({
           runtimeId: "python-sidecar",
-          capabilities: ["prepare-training-dataset"],
+          capabilities: ["prepare-training-dataset", "ensure-model-download"],
         }), { status: 200 });
       }
 
@@ -54,8 +54,47 @@ describe("createPythonRuntimeHttpClient", () => {
 
     expect(health.healthy).toBe(true);
     expect(capabilities.capabilities).toContain("prepare-training-dataset");
+    expect(capabilities.capabilities).toContain("ensure-model-download");
     expect(task.success).toBe(false);
     expect(fetchImplementation).toHaveBeenCalledTimes(3);
+  });
+
+  it("supports ensure-model-downloaded endpoint over local HTTP", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      expect(url.endsWith("/models/ensure-downloaded")).toBe(true);
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toMatchObject({ "content-type": "application/json" });
+      expect(JSON.parse(String(init?.body ?? "{}"))).toEqual({
+        provider: "transformers",
+        modelId: "Qwen/Qwen2.5-1.5B-Instruct",
+      });
+      return new Response(JSON.stringify({
+        provider: "transformers",
+        modelId: "Qwen/Qwen2.5-1.5B-Instruct",
+        downloaded: true,
+        fromCache: false,
+        localPath: "/tmp/model-cache",
+      }), { status: 200 });
+    });
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+    });
+
+    const result = await client.ensureModelDownloaded({
+      provider: "transformers",
+      modelId: "Qwen/Qwen2.5-1.5B-Instruct",
+    });
+
+    expect(result).toEqual({
+      provider: "transformers",
+      modelId: "Qwen/Qwen2.5-1.5B-Instruct",
+      downloaded: true,
+      fromCache: false,
+      localPath: "/tmp/model-cache",
+    });
   });
 
   it("maps structured health payloads from non-2xx responses", async () => {

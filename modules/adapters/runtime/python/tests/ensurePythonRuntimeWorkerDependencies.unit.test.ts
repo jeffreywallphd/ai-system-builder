@@ -29,16 +29,16 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
     expect(spawnSyncImplementation).toHaveBeenCalledTimes(1);
     expect(spawnSyncImplementation).toHaveBeenCalledWith(
       "python",
-      ["-c", "import fastapi, uvicorn"],
+      ["-c", "import fastapi, uvicorn, huggingface_hub"],
       expect.any(Object),
     );
   });
 
-  it("installs dependencies when fastapi is missing", () => {
+  it("installs dependencies when required worker dependencies are missing", () => {
     const responses = [
       createSpawnSyncResult({
         status: 1,
-        stderr: "ModuleNotFoundError: No module named 'fastapi'",
+        stderr: "ModuleNotFoundError: No module named 'huggingface_hub'",
       }),
       createSpawnSyncResult({ status: 0 }),
     ];

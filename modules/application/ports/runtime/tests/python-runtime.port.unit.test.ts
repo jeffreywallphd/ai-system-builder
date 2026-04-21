@@ -16,7 +16,7 @@ import type {
 describe("Python runtime ports", () => {
   it("exposes runtime lifecycle, health, capabilities, and generic task execution seams", () => {
     expectTypeOf<keyof PythonRuntimePort>().toEqualTypeOf<
-      "executeTask" | "getHealthStatus" | "getCapabilities"
+      "executeTask" | "getHealthStatus" | "getCapabilities" | "ensureModelDownloaded"
     >();
 
     expectTypeOf<Parameters<PythonRuntimePort["executeTask"]>[0]>().toExtend<
@@ -32,6 +32,13 @@ describe("Python runtime ports", () => {
     expectTypeOf<Awaited<ReturnType<PythonRuntimePort["getCapabilities"]>>>().toEqualTypeOf<
       PythonRuntimeCapabilitiesResult
     >();
+    expectTypeOf<Awaited<ReturnType<PythonRuntimePort["ensureModelDownloaded"]>>>().toEqualTypeOf<{
+      provider: "transformers";
+      modelId: string;
+      downloaded: boolean;
+      fromCache: boolean;
+      localPath?: string;
+    }>();
   });
 
   it("keeps dataset preparation as a task-specific application-facing seam", () => {

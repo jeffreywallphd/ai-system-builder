@@ -107,6 +107,9 @@ export function composeDesktopHost(
   });
   const now = options.now ?? (() => new Date().toISOString());
   const runtimeLogs: DesktopPythonRuntimeLogEntry[] = [];
+  let lastObservedRuntimeHealthSnapshot:
+    | { supervisorStatus: string; runtimeStatus: string; healthy: boolean }
+    | undefined;
   const pushRuntimeLog = (entry: DesktopPythonRuntimeLogEntry) => {
     runtimeLogs.push(entry);
     if (runtimeLogs.length > 200) {
@@ -196,11 +199,28 @@ export function composeDesktopHost(
         capabilities = runtimeCapabilities.capabilities;
       } catch (error) {
         runtimeStatus = "unavailable";
-        recordRuntimeLog({
-          level: "warn",
-          message: `Unable to read Python runtime diagnostics: ${error instanceof Error ? error.message : String(error)}`,
-        });
+        const diagnosticsMessage = error instanceof Error ? error.message : String(error);
+        const wasAlreadyUnavailable = lastObservedRuntimeHealthSnapshot?.runtimeStatus === "unavailable";
+        if (!wasAlreadyUnavailable) {
+          recordRuntimeLog({
+            level: "warn",
+            message: `Unable to read Python runtime diagnostics: ${diagnosticsMessage}`,
+          });
+        }
       }
+    }
+
+    const nextHealthSnapshot = { supervisorStatus, runtimeStatus, healthy };
+    const healthChanged = lastObservedRuntimeHealthSnapshot === undefined
+      || lastObservedRuntimeHealthSnapshot.supervisorStatus !== nextHealthSnapshot.supervisorStatus
+      || lastObservedRuntimeHealthSnapshot.runtimeStatus !== nextHealthSnapshot.runtimeStatus
+      || lastObservedRuntimeHealthSnapshot.healthy !== nextHealthSnapshot.healthy;
+    if (healthChanged) {
+      recordRuntimeLog({
+        level: healthy ? "info" : "warn",
+        message: `Python runtime health changed: supervisor=${supervisorStatus}, status=${runtimeStatus}, healthy=${healthy}.`,
+      });
+      lastObservedRuntimeHealthSnapshot = nextHealthSnapshot;
     }
 
     return {
@@ -235,6 +255,7 @@ export function composeDesktopHost(
     },
     getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
     getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
+    ensureModelDownloaded: (request) => pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request),
   });
 
   return {
