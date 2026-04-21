@@ -27,7 +27,9 @@ export interface RegisterPythonRuntimeIpcDependencies extends PythonRuntimeContr
 }
 
 function mapRuntimeErrorToIpcFailure(
-  channel: string,
+  channel:
+    | typeof DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL
+    | typeof DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
   operation: string,
   request: { requestId?: string; correlationId?: string },
   error: unknown,
@@ -64,7 +66,7 @@ export function createDesktopPythonRuntimeStatusReadIpcHandler(
       );
     } catch (error) {
       return mapRuntimeErrorToIpcFailure(
-        DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL.value,
+        DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
         "status-read",
         request,
         error,
@@ -99,7 +101,7 @@ export function createDesktopPythonRuntimeControlIpcHandler(
       );
     } catch (error) {
       return mapRuntimeErrorToIpcFailure(
-        DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL.value,
+        DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
         request.payload.action,
         request,
         error,

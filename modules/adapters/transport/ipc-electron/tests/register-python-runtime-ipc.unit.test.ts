@@ -2,7 +2,9 @@ import { describe, expect, it, testDouble } from "../../../../testing/node-test"
 
 import {
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
   createDesktopPythonRuntimeControlRequest,
   createDesktopPythonRuntimeStatusReadRequest,
 } from "../../../../contracts/ipc";
@@ -61,6 +63,66 @@ describe("registerPythonRuntimeIpc", () => {
     expect(startPythonRuntime).toHaveBeenCalledOnce();
     expect(response.ok).toBe(true);
     expect(response.value.supervisorStatus).toBe("starting");
+  });
+
+  it("maps status-read handler errors to IPC failure envelopes with the status-read response channel", async () => {
+    const handler = createDesktopPythonRuntimeStatusReadIpcHandler({
+      readPythonRuntimeStatus: testDouble.fn(async () => {
+        throw new Error("status not available");
+      }),
+    });
+
+    const response = await handler({}, createDesktopPythonRuntimeStatusReadRequest({
+      boundary: {
+        host: "desktop",
+        source: "desktop.renderer.runtime-footer",
+      },
+    }, {
+      requestId: "req-python-status",
+      correlationId: "corr-python-status",
+    }));
+
+    expect(response).toMatchObject({
+      ok: false,
+      channel: DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL.value,
+      requestId: "req-python-status",
+      correlationId: "corr-python-status",
+    });
+  });
+
+  it("maps control handler errors to IPC failure envelopes with the control response channel", async () => {
+    const handler = createDesktopPythonRuntimeControlIpcHandler({
+      startPythonRuntime: testDouble.fn(async () => undefined),
+      stopPythonRuntime: testDouble.fn(async () => undefined),
+      restartPythonRuntime: testDouble.fn(async () => {
+        throw new Error("restart failed");
+      }),
+      readPythonRuntimeStatus: testDouble.fn(async () => ({
+        supervisorStatus: "failed",
+        healthy: false,
+        runtimeStatus: "failed",
+        capabilities: [],
+        logs: [],
+      })),
+    });
+
+    const response = await handler({}, createDesktopPythonRuntimeControlRequest({
+      action: "restart",
+      boundary: {
+        host: "desktop",
+        source: "desktop.renderer.runtime-footer",
+      },
+    }, {
+      requestId: "req-python-control",
+      correlationId: "corr-python-control",
+    }));
+
+    expect(response).toMatchObject({
+      ok: false,
+      channel: DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL.value,
+      requestId: "req-python-control",
+      correlationId: "corr-python-control",
+    });
   });
 
   it("registers python runtime IPC channels", () => {
