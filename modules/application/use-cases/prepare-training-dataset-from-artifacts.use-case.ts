@@ -276,8 +276,9 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           && typeof (descriptorMetadata as { originalName?: unknown }).originalName === "string"
           ? (descriptorMetadata as { originalName: string }).originalName
           : undefined;
-        const catalogOriginalName = this.artifactCatalog
-          ? await this.artifactCatalog.readArtifactCatalogRecord({ storageKey }, context)
+        const artifactCatalog = this.artifactCatalog;
+        const catalogOriginalName = artifactCatalog
+          ? await artifactCatalog.readArtifactCatalogRecord({ storageKey }, context)
             .then((result) => (result.ok ? result.value.record.originalName : undefined))
           : undefined;
 

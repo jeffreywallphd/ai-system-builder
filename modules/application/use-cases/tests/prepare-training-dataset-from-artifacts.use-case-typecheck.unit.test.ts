@@ -21,6 +21,17 @@ describe("prepare training dataset TypeScript regression guards", () => {
     expect(source).not.toContain("this.artifactRepoStorage.hasArtifactInRepo(");
   });
 
+  it("keeps optional artifact catalog narrowed via a local alias in async read flow", () => {
+    const source = readSourceFile(
+      "modules/application/use-cases/prepare-training-dataset-from-artifacts.use-case.ts",
+    );
+
+    expect(source).toContain("const artifactCatalog = this.artifactCatalog;");
+    expect(source).toContain("const catalogOriginalName = artifactCatalog");
+    expect(source).toContain("artifactCatalog.readArtifactCatalogRecord(");
+    expect(source).not.toContain("this.artifactCatalog.readArtifactCatalogRecord(");
+  });
+
   it("reads repo publish targets from store descriptor contract shape", () => {
     const source = readSourceFile(
       "modules/application/use-cases/prepare-training-dataset-from-artifacts.use-case.ts",
