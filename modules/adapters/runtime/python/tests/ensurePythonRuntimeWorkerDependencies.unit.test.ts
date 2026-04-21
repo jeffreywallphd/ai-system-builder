@@ -308,4 +308,51 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
         diagnosticsFile: "/tmp/diag.json",
       })).toThrow("PyTorch verification failed");
   });
+
+  it("does not fail startup preparation when worker directory is read-only", () => {
+    const spawnSyncImplementation = createSpawnSyncImplementation((command, args) => {
+      if (command === "python" && args[0] === "-c" && args[1]?.includes("asb:python-env-inspect")) {
+        return createSpawnSyncResult({ stdout: createEnvironmentInspectionJson() });
+      }
+      if (command === "python" && args.join(" ") === "-m pip --version") {
+        return createSpawnSyncResult({ stdout: "pip 25.0 from /venv/lib/python3.11/site-packages/pip (python 3.11)" });
+      }
+      if (command === "python" && args[0] === "-c" && args[1]?.includes("os.access") && args[2] === "/tmp/runtime-worker") {
+        return createSpawnSyncResult({ stdout: "0\n" });
+      }
+      if (command === "python" && args[0] === "-c" && args[1] === "import fastapi, uvicorn, huggingface_hub, transformers") {
+        return createSpawnSyncResult({ status: 0 });
+      }
+      if (command === "nvidia-smi") {
+        return createSpawnSyncResult({ status: 1, stderr: "not found" });
+      }
+      if (command === "rocminfo") {
+        return createSpawnSyncResult({ status: 1, stderr: "not found" });
+      }
+      if (command === "python" && args[0] === "-c" && args[1]?.includes("asb:torch-install-probe")) {
+        return createSpawnSyncResult({
+          stdout: JSON.stringify({
+            installed: true,
+            version: "2.6.0+cpu",
+            cudaVersion: null,
+            hipVersion: null,
+            cudaAvailable: false,
+          }),
+        });
+      }
+      if (command === "python" && args[0] === "-c" && args[1]?.includes("asb:torch-verification")) {
+        return createSpawnSyncResult({ status: 0, stdout: "{\"ok\": true, \"backend\": \"cpu\"}" });
+      }
+
+      throw new Error(`Unexpected command: ${command} ${args.join(" ")}`);
+    });
+
+    expect(() =>
+      ensurePythonRuntimeWorkerDependencies({
+        command: "python",
+        cwd: "/tmp/runtime-worker",
+        spawnSyncImplementation: spawnSyncImplementation as any,
+        diagnosticsFile: "/tmp/diag.json",
+      })).not.toThrow();
+  });
 });

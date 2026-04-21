@@ -243,8 +243,17 @@ function validatePrerequisites(
   diagnostics.executedCommands.push(
     buildRecord("probe-write-access", options.command, ["-c", "import os; import sys; target=sys.argv[1]; print('1' if os.access(target, os.W_OK) else '0')", options.cwd], writeAccessProbe),
   );
-  if (writeAccessProbe.status !== 0 || !String(writeAccessProbe.stdout ?? "").trim().endsWith("1")) {
-    throw new Error(`Python runtime worker directory is not writable: ${options.cwd}`);
+  if (writeAccessProbe.status !== 0) {
+    diagnostics.fallbackActions.push(
+      `Unable to verify write access for Python runtime worker directory (${options.cwd}); continuing startup without write-access precondition.`,
+    );
+    return environment;
+  }
+
+  if (!String(writeAccessProbe.stdout ?? "").trim().endsWith("1")) {
+    diagnostics.fallbackActions.push(
+      `Python runtime worker directory is not writable (${options.cwd}); continuing startup with read-only worker directory.`,
+    );
   }
 
   return environment;
