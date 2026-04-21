@@ -1,4 +1,4 @@
-import { access, mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -247,6 +247,90 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       expect.objectContaining({ key: artifactId }),
       undefined,
     );
+    await expectFileMissing(runtimeTrain);
+    await expectFileMissing(runtimeTest);
+  });
+
+  it("materializes runtime source input files for nested upload artifact ids", async () => {
+    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeTrain, runtimeTest);
+    deps.readArtifactStorageBindings.mockImplementationOnce(async () => ({
+      ok: false as const,
+      error: {
+        code: "not-found",
+        message: "No storage binding found.",
+      },
+    }));
+
+    deps.retrieveArtifact.mockImplementationOnce(async ({ key }: { key: string }) => ({
+      ok: true as const,
+      value: {
+        descriptor: {
+          key,
+          mediaType: "text/markdown",
+          metadata: { originalName: "source-a.md" },
+        },
+        content: new TextEncoder().encode("# source-a\n\nmarkdown input\n"),
+      },
+    }));
+
+    deps.prepareTrainingDataset.mockImplementationOnce(async (request) => {
+      const runtimeLocalPath = request.sourceInputs[0]?.localPath;
+      expect(typeof runtimeLocalPath).toBe("string");
+      const runtimeSourceBytes = await readFile(runtimeLocalPath as string, "utf-8");
+      expect(runtimeSourceBytes).toContain("markdown input");
+      return {
+        outputs: [
+          {
+            name: "dataset-train",
+            role: "train",
+            tempPath: runtimeTrain,
+            mediaType: "application/x-ndjson",
+            metadata: { stage: "generated-examples", generationMode: "qa" },
+          },
+          {
+            name: "dataset-test",
+            role: "test",
+            tempPath: runtimeTest,
+            mediaType: "application/x-ndjson",
+            metadata: { stage: "generated-examples", generationMode: "qa" },
+          },
+        ],
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 1,
+          generatedExampleCount: 2,
+          trainRowCount: 1,
+          testRowCount: 1,
+        },
+      };
+    });
+
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
+      storageBindings: {
+        readArtifactStorageBindings: deps.readArtifactStorageBindings,
+        upsertArtifactStorageBinding: testDouble.fn(),
+        deleteArtifactStorageBindings: testDouble.fn(),
+      },
+      storage: {
+        retrieveArtifact: deps.retrieveArtifact,
+        storeArtifact: deps.storeArtifact,
+        hasArtifact: testDouble.fn(),
+        deleteArtifact: testDouble.fn(),
+      },
+    });
+
+    const result = await useCase.execute({
+      sourceArtifactIds: ["uploads/session/source-a.md"],
+      recipe,
+      split,
+      output: { format: "jsonl" },
+    });
+
+    expect(result.ok).toBe(true);
     await expectFileMissing(runtimeTrain);
     await expectFileMissing(runtimeTest);
   });
