@@ -60,6 +60,8 @@ export function createPythonRuntimeSupervisor(
   let childProcess: ChildProcess | undefined;
   let status: PythonRuntimeSupervisorStatus = "stopped";
   let lastHealthProbeError: string | undefined;
+  let healthProbeFailureCount = 0;
+  let lastEmittedHealthProbeError: string | undefined;
   let lastStartupFailure: string | undefined;
   const recentRuntimeOutput: string[] = [];
 
@@ -92,6 +94,9 @@ export function createPythonRuntimeSupervisor(
     const details = [
       lastStartupFailure,
       lastHealthProbeError ? `Last health probe error: ${lastHealthProbeError}` : undefined,
+      healthProbeFailureCount > 0
+        ? `Health probe failures during startup: ${healthProbeFailureCount}.`
+        : undefined,
       recentRuntimeOutput.length > 0
         ? `Recent runtime output: ${recentRuntimeOutput.join(" | ")}`
         : undefined,
@@ -192,7 +197,10 @@ export function createPythonRuntimeSupervisor(
         const health = await options.runtimeClient.getHealthStatus();
         if (health.healthy) {
           status = "ready";
-          emitEvent("health-ready", "Python runtime reported healthy startup state.");
+          const readyDetail = healthProbeFailureCount > 0
+            ? `Python runtime reported healthy startup state after ${healthProbeFailureCount} failed health probe attempt(s).`
+            : "Python runtime reported healthy startup state.";
+          emitEvent("health-ready", readyDetail);
           return;
         }
 
@@ -204,7 +212,11 @@ export function createPythonRuntimeSupervisor(
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         lastHealthProbeError = message;
-        emitEvent("health-probe-failed", message);
+        healthProbeFailureCount += 1;
+        if (lastEmittedHealthProbeError !== message) {
+          lastEmittedHealthProbeError = message;
+          emitEvent("health-probe-failed", message);
+        }
       }
 
       await delay(healthCheckIntervalMs);
@@ -225,6 +237,8 @@ export function createPythonRuntimeSupervisor(
       }
 
       lastHealthProbeError = undefined;
+      healthProbeFailureCount = 0;
+      lastEmittedHealthProbeError = undefined;
       lastStartupFailure = undefined;
       recentRuntimeOutput.splice(0, recentRuntimeOutput.length);
 
@@ -238,11 +252,21 @@ export function createPythonRuntimeSupervisor(
       maybeWarnOnWindowsCommand(command);
 
       status = "starting";
-      childProcess = spawnImplementation(command, args, {
-        cwd: options.cwd,
-        env: options.env,
-        stdio: "pipe",
-      } satisfies SpawnOptions);
+      try {
+        childProcess = spawnImplementation(command, args, {
+          cwd: options.cwd,
+          env: options.env,
+          stdio: "pipe",
+        } satisfies SpawnOptions);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        lastStartupFailure = `Python runtime process failed to start: ${message}`;
+        status = "failed";
+        emitEvent("process-error", lastStartupFailure, {
+          errorName: error instanceof Error ? error.name : "Error",
+        });
+        throw new Error(startFailureMessage("Python runtime failed during startup."));
+      }
       applyChildExitBinding(childProcess);
       emitEvent("spawned", "Python runtime process spawned.");
 

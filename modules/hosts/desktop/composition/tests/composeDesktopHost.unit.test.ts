@@ -231,4 +231,38 @@ describe("composeDesktopHost", () => {
     const cleared = host.clearHuggingFaceToken();
     expect(cleared.configured).toBe(false);
   });
+  it("does not emit repeated diagnostics fetch warnings when runtime startup fails", async () => {
+    const previousCommand = process.env.PYTHON_RUNTIME_COMMAND;
+    const previousArgs = process.env.PYTHON_RUNTIME_ARGS;
+    process.env.PYTHON_RUNTIME_COMMAND = "__missing_python_runtime_command__";
+    process.env.PYTHON_RUNTIME_ARGS = "";
+
+    try {
+      const host = composeDesktopHost();
+
+      await expect(host.startPythonRuntime()).rejects.toThrow();
+
+      await host.readPythonRuntimeStatus();
+      const statusAfterSecondRead = await host.readPythonRuntimeStatus();
+
+      expect(statusAfterSecondRead.supervisorStatus).toBe("failed");
+      const diagnosticsFetchWarnings = statusAfterSecondRead.logs.filter((entry) =>
+        entry.message.includes("Unable to read Python runtime diagnostics:"),
+      );
+      expect(diagnosticsFetchWarnings.length).toBe(0);
+    } finally {
+      if (previousCommand === undefined) {
+        delete process.env.PYTHON_RUNTIME_COMMAND;
+      } else {
+        process.env.PYTHON_RUNTIME_COMMAND = previousCommand;
+      }
+
+      if (previousArgs === undefined) {
+        delete process.env.PYTHON_RUNTIME_ARGS;
+      } else {
+        process.env.PYTHON_RUNTIME_ARGS = previousArgs;
+      }
+    }
+  });
 });
+
