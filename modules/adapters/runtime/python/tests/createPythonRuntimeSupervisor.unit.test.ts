@@ -175,4 +175,56 @@ describe("createPythonRuntimeSupervisor", () => {
       detail: expect.stringMatching(/spawn EPERM/),
     });
   });
+
+  it("runs runtime-environment preparation before spawning", async () => {
+    const child = createMockChildProcess();
+    const prepareRuntimeEnvironment = testDouble.fn(async () => undefined);
+    const spawnImplementation = testDouble.fn(() => child as any);
+    const supervisor = createPythonRuntimeSupervisor({
+      command: "python",
+      args: ["main.py"],
+      runtimeClient: {
+        getHealthStatus: async () => ({
+          healthy: true,
+          status: { runtimeId: "python-sidecar", status: "ready" },
+        }),
+      },
+      prepareRuntimeEnvironment,
+      spawnImplementation: spawnImplementation as any,
+      startupTimeoutMs: 100,
+      healthCheckIntervalMs: 1,
+    });
+
+    await supervisor.start();
+
+    expect(prepareRuntimeEnvironment).toHaveBeenCalledOnce();
+    expect(spawnImplementation).toHaveBeenCalledOnce();
+  });
+
+  it("fails startup when runtime-environment preparation fails", async () => {
+    const prepareRuntimeEnvironment = testDouble.fn(async () => {
+      throw new Error("missing fastapi");
+    });
+    const spawnImplementation = testDouble.fn(() => createMockChildProcess() as any);
+    const supervisor = createPythonRuntimeSupervisor({
+      command: "python",
+      args: ["main.py"],
+      runtimeClient: {
+        getHealthStatus: async () => ({
+          healthy: true,
+          status: { runtimeId: "python-sidecar", status: "ready" },
+        }),
+      },
+      prepareRuntimeEnvironment,
+      spawnImplementation: spawnImplementation as any,
+      startupTimeoutMs: 100,
+      healthCheckIntervalMs: 1,
+    });
+
+    await expect(supervisor.start()).rejects.toThrow(
+      "Python runtime environment preparation failed: missing fastapi",
+    );
+    expect(supervisor.getStatus()).toBe("failed");
+    expect(spawnImplementation).not.toHaveBeenCalled();
+  });
 });

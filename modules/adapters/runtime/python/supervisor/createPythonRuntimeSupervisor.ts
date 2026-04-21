@@ -36,6 +36,12 @@ export interface CreatePythonRuntimeSupervisorOptions {
   args?: readonly string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  prepareRuntimeEnvironment?: (context: {
+    command: string;
+    args: readonly string[];
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+  }) => void | Promise<void>;
   startupTimeoutMs?: number;
   healthCheckIntervalMs?: number;
   runtimeClient: Pick<PythonRuntimeHttpClient, "getHealthStatus">;
@@ -252,6 +258,25 @@ export function createPythonRuntimeSupervisor(
       maybeWarnOnWindowsCommand(command);
 
       status = "starting";
+      if (options.prepareRuntimeEnvironment) {
+        try {
+          await options.prepareRuntimeEnvironment({
+            command,
+            args,
+            cwd: options.cwd,
+            env: options.env,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          lastStartupFailure = `Python runtime environment preparation failed: ${message}`;
+          status = "failed";
+          emitEvent("process-error", lastStartupFailure, {
+            errorName: error instanceof Error ? error.name : "Error",
+          });
+          throw new Error(startFailureMessage("Python runtime failed during startup."));
+        }
+      }
+
       try {
         childProcess = spawnImplementation(command, args, {
           cwd: options.cwd,
