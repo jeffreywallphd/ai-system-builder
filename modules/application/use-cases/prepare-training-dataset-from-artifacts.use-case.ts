@@ -451,7 +451,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           train: {
             provider: "huggingface",
             repository: publishTrainTarget.repository,
-            path: publishTrainTarget.path,
+            path: publishTrainTarget.path ?? trainPath,
             revision: publishTrainTarget.revision,
             exists: verifyTrain.value.exists,
             verifiedAt,
@@ -459,7 +459,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           test: {
             provider: "huggingface",
             repository: publishTestTarget.repository,
-            path: publishTestTarget.path,
+            path: publishTestTarget.path ?? testPath,
             revision: publishTestTarget.revision,
             exists: verifyTest.value.exists,
             verifiedAt,

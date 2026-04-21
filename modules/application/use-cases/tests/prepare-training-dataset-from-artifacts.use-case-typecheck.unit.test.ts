@@ -39,7 +39,10 @@ describe("prepare training dataset TypeScript regression guards", () => {
 
     expect(source).toContain("publishTrain.value.descriptor.target");
     expect(source).toContain("publishTest.value.descriptor.target");
+    expect(source).toContain("path: publishTrainTarget.path ?? trainPath");
+    expect(source).toContain("path: publishTestTarget.path ?? testPath");
     expect(source).not.toContain("publishTrain.value.target");
     expect(source).not.toContain("publishTest.value.target");
   });
 });
+
