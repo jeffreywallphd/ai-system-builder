@@ -80,6 +80,19 @@ export interface PrepareTrainingDatasetFromArtifactsUseCaseDependencies {
   now?: () => string;
 }
 
+function resolveArtifactBindingsReadFailureAsEmpty(
+  result: Awaited<ReturnType<ArtifactStorageBindingPort["readArtifactStorageBindings"]>>,
+): Awaited<ReturnType<ArtifactStorageBindingPort["readArtifactStorageBindings"]>> {
+  if (result.ok || result.error.code !== "not-found") {
+    return result;
+  }
+
+  return createSuccessResult({ bindings: [] }, {
+    requestId: result.requestId,
+    correlationId: result.correlationId,
+  });
+}
+
 function resolvePreferredObjectStorageBinding(
   bindings: ArtifactStorageBinding[],
 ): ArtifactStorageBinding | undefined {
@@ -257,7 +270,9 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       };
 
       for (const artifactId of command.sourceArtifactIds) {
-        const bindingsResult = await this.storageBindings.readArtifactStorageBindings({ artifactId }, context);
+        const bindingsResult = resolveArtifactBindingsReadFailureAsEmpty(
+          await this.storageBindings.readArtifactStorageBindings({ artifactId }, context),
+        );
         if (!bindingsResult.ok) {
           return createFailureResult(bindingsResult.error, context);
         }
