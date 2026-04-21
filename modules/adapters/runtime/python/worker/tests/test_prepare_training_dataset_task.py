@@ -212,6 +212,49 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.assertEqual(result.summary.generatedExampleCount, 3)
         self.assertEqual(batch_sizes, [2, 1])
 
+    def test_split_clamps_to_keep_train_and_test_non_empty(self) -> None:
+        payload = self._build_payload("jsonl")
+        payload.split.trainRatio = 0.1
+        payload.split.testRatio = 0.9
+
+        def generator(chunks, _config):
+            return [
+                GeneratedQaExample(
+                    artifact_id=chunk.artifact_id,
+                    chunk_index=chunk.chunk_index,
+                    question=f"Q{chunk.chunk_index}",
+                    answer=chunk.text,
+                )
+                for chunk in chunks
+            ]
+
+        result = prepare_training_dataset(payload, example_generator=generator)
+
+        self.assertEqual(result.summary.generatedExampleCount, 3)
+        self.assertEqual(result.summary.trainRowCount, 1)
+        self.assertEqual(result.summary.testRowCount, 2)
+
+        train_output = next(output for output in result.outputs if output.role == "train")
+        test_output = next(output for output in result.outputs if output.role == "test")
+        self.assertTrue(Path(train_output.tempPath).read_text(encoding="utf-8").strip())
+        self.assertTrue(Path(test_output.tempPath).read_text(encoding="utf-8").strip())
+
+    def test_split_requires_at_least_two_generated_rows(self) -> None:
+        payload = self._build_payload("jsonl")
+
+        def one_row_generator(_chunks, _config):
+            return [
+                GeneratedQaExample(
+                    artifact_id="doc-1",
+                    chunk_index=0,
+                    question="Q0",
+                    answer="A0",
+                )
+            ]
+
+        with self.assertRaisesRegex(ValueError, "At least 2 rows are required"):
+            prepare_training_dataset(payload, example_generator=one_row_generator)
+
 
 if __name__ == "__main__":
     unittest.main()
