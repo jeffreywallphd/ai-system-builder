@@ -152,6 +152,20 @@ function extensionForMediaType(mediaType: string | undefined): string {
       return "gif";
     case "image/svg+xml":
       return "svg";
+    case "application/x-ndjson":
+    case "application/jsonl":
+      return "jsonl";
+    case "application/json":
+    case "text/json":
+      return "json";
+    case "text/csv":
+    case "application/csv":
+      return "csv";
+    case "application/x-parquet":
+    case "application/vnd.apache.parquet":
+      return "parquet";
+    case "text/plain":
+      return "txt";
     default:
       return "bin";
   }

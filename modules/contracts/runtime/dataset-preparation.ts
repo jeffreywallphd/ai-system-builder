@@ -57,7 +57,7 @@ export interface DatasetSplitConfig {
 }
 
 export interface DatasetOutputConfig {
-  format: "jsonl" | "json" | "csv";
+  format: "jsonl" | "json" | "csv" | "parquet";
   naming?: {
     baseName?: string;
   };

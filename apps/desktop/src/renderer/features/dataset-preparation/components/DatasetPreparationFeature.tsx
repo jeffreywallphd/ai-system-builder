@@ -246,6 +246,7 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
         <label className="ui-stack ui-stack--sm">
           <span>Output format</span>
           <select className="ui-input" value={outputFormat} onChange={(event) => setOutputFormat(event.target.value as typeof outputFormat)}>
+            <option value="parquet">Parquet</option>
             <option value="jsonl">JSONL</option>
             <option value="json">JSON</option>
             <option value="csv">CSV</option>

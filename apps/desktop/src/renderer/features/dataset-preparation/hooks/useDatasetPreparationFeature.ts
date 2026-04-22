@@ -47,7 +47,7 @@ export interface UseDatasetPreparationFeatureResult {
   testRatio: string;
   seed: string;
   shuffle: boolean;
-  outputFormat: "jsonl" | "json" | "csv";
+  outputFormat: "jsonl" | "json" | "csv" | "parquet";
   outputBaseName: string;
   localDestinationEnabled: boolean;
   huggingFaceDestinationEnabled: boolean;
@@ -77,7 +77,7 @@ export interface UseDatasetPreparationFeatureResult {
   setTestRatio: (value: string) => void;
   setSeed: (value: string) => void;
   setShuffle: (value: boolean) => void;
-  setOutputFormat: (value: "jsonl" | "json" | "csv") => void;
+  setOutputFormat: (value: "jsonl" | "json" | "csv" | "parquet") => void;
   setOutputBaseName: (value: string) => void;
   setLocalDestinationEnabled: (value: boolean) => void;
   setHuggingFaceDestinationEnabled: (value: boolean) => void;
@@ -252,7 +252,7 @@ export function useDatasetPreparationFeature(
   const [testRatio, setTestRatio] = useState("0.2");
   const [seed, setSeed] = useState("");
   const [shuffle, setShuffle] = useState(true);
-  const [outputFormat, setOutputFormat] = useState<"jsonl" | "json" | "csv">("jsonl");
+  const [outputFormat, setOutputFormat] = useState<"jsonl" | "json" | "csv" | "parquet">("parquet");
   const [outputBaseName, setOutputBaseName] = useState("");
   const [localDestinationEnabled, setLocalDestinationEnabled] = useState(true);
   const [huggingFaceDestinationEnabled, setHuggingFaceDestinationEnabled] = useState(false);

@@ -88,7 +88,7 @@ def _emit_rows(
     base_name: str,
     metadata: dict[str, object],
 ) -> PythonRuntimeOutputDescriptor:
-    suffix = {"jsonl": ".jsonl", "json": ".json", "csv": ".csv"}[output_format]
+    suffix = {"jsonl": ".jsonl", "json": ".json", "csv": ".csv", "parquet": ".parquet"}[output_format]
     fd, temp_path = tempfile.mkstemp(prefix=f"{base_name}-{role}-", suffix=suffix)
     path = Path(temp_path)
 
@@ -100,13 +100,24 @@ def _emit_rows(
             )
         elif output_format == "json":
             path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
-        else:
+        elif output_format == "csv":
             with path.open("w", encoding="utf-8", newline="") as handle:
                 fieldnames = ["artifactId", "chunkIndex", "question", "answer", "generationMode"]
                 writer = csv.DictWriter(handle, fieldnames=fieldnames)
                 writer.writeheader()
                 for row in rows:
                     writer.writerow(row)
+        else:
+            try:
+                import pyarrow as pa
+                import pyarrow.parquet as pq
+            except ImportError as error:
+                raise RuntimeError(
+                    "The 'pyarrow' package is required for output.format='parquet'."
+                ) from error
+
+            table = pa.Table.from_pylist(rows)
+            pq.write_table(table, path)
     finally:
         os.close(fd)
 
@@ -114,6 +125,7 @@ def _emit_rows(
         "jsonl": "application/x-ndjson",
         "json": "application/json",
         "csv": "text/csv",
+        "parquet": "application/x-parquet",
     }[output_format]
 
     return PythonRuntimeOutputDescriptor(
