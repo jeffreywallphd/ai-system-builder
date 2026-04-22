@@ -128,7 +128,7 @@ class DatasetOutputConfigNaming(BaseModel):
 
 
 class DatasetOutputConfig(BaseModel):
-    format: Literal["jsonl", "json", "csv"]
+    format: Literal["jsonl", "json", "csv", "parquet"]
     naming: DatasetOutputConfigNaming | None = None
     destinations: dict[str, Any] | None = None
 

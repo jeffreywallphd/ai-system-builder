@@ -95,11 +95,24 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
                 for chunk in chunks
             ]
 
-        for output_format in ["jsonl", "json", "csv"]:
+        output_formats = ["jsonl", "json", "csv"]
+        try:
+            import pyarrow  # noqa: F401
+
+            output_formats.append("parquet")
+        except ImportError:
+            pass
+
+        for output_format in output_formats:
             payload = self._build_payload(output_format)
             result = prepare_training_dataset(payload, example_generator=generator)
 
             train_output = next(output for output in result.outputs if output.role == "train")
+            if output_format == "parquet":
+                self.assertEqual(train_output.mediaType, "application/x-parquet")
+                self.assertTrue(Path(train_output.tempPath).stat().st_size > 0)
+                continue
+
             contents = Path(train_output.tempPath).read_text(encoding="utf-8")
 
             if output_format == "jsonl":

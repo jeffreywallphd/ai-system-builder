@@ -40,7 +40,7 @@ describe("DatasetPreparationFeature", () => {
               generation: { mode: "qa", model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" } },
             },
             split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
-            output: { format: "jsonl" },
+            output: { format: "parquet" },
             generationModelId: "Qwen/Qwen2.5-1.5B-Instruct",
             summary: {
               sourceDocumentCount: 1,
@@ -124,7 +124,7 @@ describe("DatasetPreparationFeature", () => {
         },
       },
       output: {
-        format: "jsonl",
+        format: "parquet",
         naming: { baseName: undefined },
         destinations: {
           local: { enabled: true },

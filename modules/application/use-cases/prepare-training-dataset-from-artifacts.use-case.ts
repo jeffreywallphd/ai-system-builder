@@ -138,6 +138,10 @@ function extensionForMediaType(mediaType: string): string {
     return ".csv";
   }
 
+  if (mediaType === "application/x-parquet" || mediaType === "application/vnd.apache.parquet") {
+    return ".parquet";
+  }
+
   return ".txt";
 }
 
@@ -235,6 +239,10 @@ async function validateDatasetOutput(tempPath: string, format: PrepareTrainingDa
   const outputStat = await stat(tempPath);
   if (outputStat.size <= 0) {
     throw new Error(`Runtime output file '${tempPath}' is empty.`);
+  }
+
+  if (format === "parquet") {
+    return;
   }
 
   const contents = await readFile(tempPath, "utf-8");
@@ -384,6 +392,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
             descriptor: {
               mediaType: trainOutput.mediaType,
               metadata: {
+                originalFileName: `${trainOutput.name}.${command.output.format}`,
                 runtimeRole: "train",
                 ...buildDatasetMetadata(command, prepared.summary, { provider: "local" }, trainOutput.metadata),
               },
@@ -393,6 +402,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
             descriptor: {
               mediaType: testOutput.mediaType,
               metadata: {
+                originalFileName: `${testOutput.name}.${command.output.format}`,
                 runtimeRole: "test",
                 ...buildDatasetMetadata(command, prepared.summary, { provider: "local" }, testOutput.metadata),
               },
