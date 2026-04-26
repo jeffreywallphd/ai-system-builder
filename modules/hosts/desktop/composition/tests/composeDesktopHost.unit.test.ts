@@ -229,6 +229,7 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("createPythonRuntimeAdapterFoundation");
     expect(source).toContain("createPythonDatasetPreparationPort");
     expect(source).toContain("ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start()");
+    expect(source).toContain("HF_HUB_DISABLE_XET");
     expect(source).toContain("PrepareTrainingDatasetFromArtifactsUseCase");
     expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
   });

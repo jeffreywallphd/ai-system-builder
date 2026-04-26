@@ -97,6 +97,31 @@ describe("createPythonRuntimeHttpClient", () => {
     });
   });
 
+  it("maps structured model download failures without exposing ASGI stack traces", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({
+        error: {
+          code: "model_download_failed",
+          errorCode: "generation_model_not_available",
+          stage: "generation",
+          message: "Automatic download failed. Verify network access.",
+          retryable: true,
+        },
+      }), { status: 502 }));
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+    });
+
+    await expect(client.ensureModelDownloaded({
+      provider: "transformers",
+      modelId: "Qwen/Qwen3.5-4B",
+    })).rejects.toThrow(
+      "Python runtime model download failed: Automatic download failed. Verify network access.",
+    );
+  });
+
   it("maps structured health payloads from non-2xx responses", async () => {
     const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
       new Response(JSON.stringify({

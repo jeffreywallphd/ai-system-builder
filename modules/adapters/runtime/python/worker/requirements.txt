@@ -5,5 +5,4 @@ pypdf==5.4.0
 python-docx==1.1.2
 transformers==4.51.3
 huggingface_hub==0.31.4
-hf_xet==1.0.0
 pyarrow==21.0.0

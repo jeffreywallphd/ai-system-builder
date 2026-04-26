@@ -187,6 +187,100 @@ describe("DatasetPreparationFeature", () => {
     expect(container.textContent).toContain("failed");
   });
 
+  it("shows model download progress from Python runtime logs while preparation is running", async () => {
+    let resolvePreparation: ((value: { ok: true; value: any }) => void) | undefined;
+    const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
+      resolvePreparation = resolve;
+    }));
+    const runtimeStatusClient = {
+      readStatus: vi.fn().mockResolvedValue({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["prepare-training-dataset"],
+        logs: [{
+          timestamp: new Date(Date.now() + 1_000).toISOString(),
+          level: "warn",
+          message: "Python runtime stderr: Fetching 14 files: 43%|####2 | 6/14 [00:00<00:00, 11.15it/s]",
+        }],
+      }),
+    };
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          settingsClient={settingsClient}
+          runtimeStatusClient={runtimeStatusClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts,
+          }}
+        />,
+      );
+    });
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Downloading model google/flan-t5-base: 43% (6/14 files).");
+
+    await act(async () => {
+      resolvePreparation?.({
+        ok: true,
+        value: {
+          outputs: {
+            local: {
+              train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
+              test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+            },
+          },
+          provenance: {
+            sourceArtifactIds: ["artifact-1"],
+            recipe: {
+              normalization: { targetFormat: "markdown" },
+              chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+              generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } },
+            },
+            split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
+            output: { format: "parquet" },
+            generationModelId: "google/flan-t5-base",
+            summary: {
+              sourceDocumentCount: 1,
+              normalizedDocumentCount: 1,
+              skippedDocumentCount: 0,
+              chunkCount: 2,
+              generatedExampleCount: 10,
+              trainRowCount: 8,
+              testRowCount: 2,
+            },
+          },
+          summary: {
+            sourceDocumentCount: 1,
+            normalizedDocumentCount: 1,
+            skippedDocumentCount: 0,
+            chunkCount: 2,
+            generatedExampleCount: 10,
+            trainRowCount: 8,
+            testRowCount: 2,
+          },
+        },
+      });
+      await Promise.resolve();
+    });
+  });
+
   it("surfaces warning when model default settings resolution fails", async () => {
     container = document.createElement("div");
     document.body.appendChild(container);

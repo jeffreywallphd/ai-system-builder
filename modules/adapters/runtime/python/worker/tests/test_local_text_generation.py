@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import unittest
+from os import environ
 from unittest.mock import patch
 
 from modules.adapters.runtime.python.worker.models import ExampleGenerationConfig
 from modules.adapters.runtime.python.worker.tasks.local_text_generation import (
     _GENERATOR_CACHE,
+    configure_huggingface_download_environment,
     get_or_create_local_text_generator,
 )
 
@@ -76,6 +78,25 @@ class _NoChatTokenizer:
 class LocalTextGenerationTests(unittest.TestCase):
     def setUp(self) -> None:
         _GENERATOR_CACHE.clear()
+
+    def test_configures_huggingface_downloads_to_avoid_optional_xet_path(self) -> None:
+        previous_xet = environ.pop("HF_HUB_DISABLE_XET", None)
+        previous_symlink_warning = environ.pop("HF_HUB_DISABLE_SYMLINKS_WARNING", None)
+
+        try:
+            configure_huggingface_download_environment()
+
+            self.assertEqual(environ.get("HF_HUB_DISABLE_XET"), "1")
+            self.assertEqual(environ.get("HF_HUB_DISABLE_SYMLINKS_WARNING"), "1")
+        finally:
+            if previous_xet is not None:
+                environ["HF_HUB_DISABLE_XET"] = previous_xet
+            else:
+                environ.pop("HF_HUB_DISABLE_XET", None)
+            if previous_symlink_warning is not None:
+                environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = previous_symlink_warning
+            else:
+                environ.pop("HF_HUB_DISABLE_SYMLINKS_WARNING", None)
 
     def test_text2text_mode_uses_text2text_pipeline_behavior(self) -> None:
         config = ExampleGenerationConfig.model_validate(

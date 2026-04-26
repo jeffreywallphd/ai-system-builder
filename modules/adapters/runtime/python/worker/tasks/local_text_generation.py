@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from os import getenv
+from os import environ, getenv
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
 from ..models import ExampleGenerationConfig, LocalModelConfig
+
+
+def configure_huggingface_download_environment() -> None:
+    environ.setdefault("HF_HUB_DISABLE_XET", "1")
+    environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 
 @dataclass
@@ -30,6 +35,7 @@ class TransformersText2TextGenerator(LocalTextGenerator):
 
     @staticmethod
     def _build_pipeline(model_config: LocalModelConfig):
+        configure_huggingface_download_environment()
         try:
             from transformers import pipeline
         except ImportError as error:
@@ -60,6 +66,7 @@ class TransformersCausalGenerator(LocalTextGenerator):
 
     @staticmethod
     def _load_model(model_config: LocalModelConfig):
+        configure_huggingface_download_environment()
         try:
             from transformers import AutoModelForCausalLM, AutoTokenizer
         except ImportError as error:
@@ -126,6 +133,8 @@ def ensure_generation_model_downloaded(model_config: LocalModelConfig) -> Genera
     if model_config.provider != "transformers":
         raise ValueError(f"Unsupported generation model provider: {model_config.provider}")
 
+    configure_huggingface_download_environment()
+
     try:
         from huggingface_hub import snapshot_download
     except ImportError as error:
@@ -146,6 +155,10 @@ def ensure_generation_model_downloaded(model_config: LocalModelConfig) -> Genera
         )
 
     try:
+        print(
+            f"Checking local Hugging Face cache for generation model {model_config.modelId}.",
+            flush=True,
+        )
         local_path = snapshot_download(
             repo_id=model_config.modelId,
             local_files_only=True,
@@ -162,9 +175,17 @@ def ensure_generation_model_downloaded(model_config: LocalModelConfig) -> Genera
         pass
 
     try:
+        print(
+            f"Downloading generation model {model_config.modelId} from Hugging Face.",
+            flush=True,
+        )
         local_path = snapshot_download(
             repo_id=model_config.modelId,
             local_files_only=False,
+        )
+        print(
+            f"Finished downloading generation model {model_config.modelId}.",
+            flush=True,
         )
         _RESOLVED_MODEL_REFERENCES[model_config.modelId] = local_path
         return GenerationModelAvailability(
