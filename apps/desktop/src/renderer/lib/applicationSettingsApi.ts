@@ -80,11 +80,12 @@ export function createApplicationSettingsApi(): ApplicationSettingsApi {
     },
 
     async resolveModelDefault(input) {
-      if (!desktopApi.resolveModelDefault) {
+      const resolver = desktopApi.resolveApplicationModelDefault ?? desktopApi.resolveModelDefault;
+      if (!resolver) {
         throw new Error("Desktop preload model default resolver bridge is unavailable.");
       }
       return ensureSuccess(
-        await desktopApi.resolveModelDefault(input),
+        await resolver(input),
         (value) => value as DesktopResolvedModelDefaultResult,
         "Failed to resolve model default.",
       );

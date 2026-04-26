@@ -13,6 +13,7 @@
 @import "./components/tabs.css";
 @import "./components/feedback.css";
 @import "./components/python-runtime-footer.css";
+@import "./components/settings.css";
 
 #root {
   min-height: 100vh;
