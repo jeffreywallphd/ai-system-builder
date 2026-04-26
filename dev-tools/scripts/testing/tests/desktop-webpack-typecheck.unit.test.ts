@@ -51,4 +51,40 @@ describe("desktop webpack typecheck", () => {
       `Expected no TypeScript diagnostics for python runtime footer hook.\n${diagnostics.map(formatDiagnostic).join("\n")}`,
     );
   });
+
+  it("typechecks the default model resolver under desktop webpack tsconfig", () => {
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+    const configPath = path.resolve(repoRoot, "apps/desktop/tsconfig.webpack.json");
+    const targetFile = path.resolve(
+      repoRoot,
+      "modules/application/services/settings/default-model-default-resolver.ts",
+    );
+
+    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (configFile.error) {
+      assert.fail(formatDiagnostic(configFile.error));
+    }
+
+    const parsedConfig = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      path.dirname(configPath),
+      { noEmit: true },
+      configPath,
+    );
+
+    const program = ts.createProgram({
+      rootNames: [targetFile],
+      options: parsedConfig.options,
+    });
+    const diagnostics = ts
+      .getPreEmitDiagnostics(program)
+      .filter((diagnostic) => diagnostic.file?.fileName === targetFile);
+
+    assert.deepEqual(
+      diagnostics,
+      [],
+      `Expected no TypeScript diagnostics for default model resolver.\n${diagnostics.map(formatDiagnostic).join("\n")}`,
+    );
+  });
 });

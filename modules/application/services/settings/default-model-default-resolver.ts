@@ -2,6 +2,8 @@ import {
   createFeatureModelDefaultSettingKey,
   createTaskModelDefaultSettingKey,
   GLOBAL_MODEL_DEFAULT_SETTING_KEY,
+  type ApplicationSettingKey,
+  type ApplicationSettingValue,
   type ModelDefaultConfig,
   type ResolveModelDefaultRequest,
   type ResolvedModelDefault,
@@ -16,12 +18,17 @@ const BUILTIN_MODEL_DEFAULT: ModelDefaultConfig = {
   torchDtype: "auto",
 };
 
+const RUNTIME_DEFAULT_DEVICE_SETTING_KEY: ApplicationSettingKey = "runtime.python.defaultDevice";
+const RUNTIME_DEFAULT_TORCH_DTYPE_SETTING_KEY: ApplicationSettingKey = "runtime.python.defaultTorchDtype";
+
 type ResolutionSource = {
   source: ResolvedModelDefault["source"];
-  settingKey?: string;
+  settingKey?: ResolvedModelDefault["settingKey"];
   configured?: boolean;
   value: unknown;
 };
+
+type ConfiguredResolutionSource = Exclude<ResolvedModelDefault["source"], "builtin">;
 
 export interface DefaultModelDefaultResolverDependencies {
   settings: ApplicationSettingsPort;
@@ -35,44 +42,36 @@ export class DefaultModelDefaultResolver implements ModelDefaultResolverPort {
   }
 
   public async resolve(request: ResolveModelDefaultRequest): Promise<ResolvedModelDefault> {
+    const featureSettingKey = request.featureKey
+      ? createFeatureModelDefaultSettingKey(request.featureKey, request.taskKey)
+      : undefined;
+    const taskSettingKey = createTaskModelDefaultSettingKey(request.taskKey);
+
     const keys = [
-      request.featureKey ? createFeatureModelDefaultSettingKey(request.featureKey, request.taskKey) : undefined,
-      createTaskModelDefaultSettingKey(request.taskKey),
+      featureSettingKey,
+      taskSettingKey,
       GLOBAL_MODEL_DEFAULT_SETTING_KEY,
-      "runtime.python.defaultDevice",
-      "runtime.python.defaultTorchDtype",
-    ].filter((key): key is string => Boolean(key));
+      RUNTIME_DEFAULT_DEVICE_SETTING_KEY,
+      RUNTIME_DEFAULT_TORCH_DTYPE_SETTING_KEY,
+    ].filter((key): key is ApplicationSettingKey => Boolean(key));
 
     const values = await this.settings.readValues({ keys });
     const valuesByKey = new Map(values.map((value) => [value.key, value] as const));
 
-    const sources: ResolutionSource[] = [
-      request.featureKey
-        ? {
-          source: "feature",
-          settingKey: createFeatureModelDefaultSettingKey(request.featureKey, request.taskKey),
-          configured: valuesByKey.get(createFeatureModelDefaultSettingKey(request.featureKey, request.taskKey))?.configured,
-          value: valuesByKey.get(createFeatureModelDefaultSettingKey(request.featureKey, request.taskKey))?.value,
-        }
-        : undefined,
-      {
-        source: "task",
-        settingKey: createTaskModelDefaultSettingKey(request.taskKey),
-        configured: valuesByKey.get(createTaskModelDefaultSettingKey(request.taskKey))?.configured,
-        value: valuesByKey.get(createTaskModelDefaultSettingKey(request.taskKey))?.value,
-      },
-      {
-        source: "global",
-        settingKey: GLOBAL_MODEL_DEFAULT_SETTING_KEY,
-        configured: valuesByKey.get(GLOBAL_MODEL_DEFAULT_SETTING_KEY)?.configured,
-        value: valuesByKey.get(GLOBAL_MODEL_DEFAULT_SETTING_KEY)?.value,
-      },
+    const sources: ResolutionSource[] = [];
+    if (featureSettingKey) {
+      sources.push(this.createConfiguredResolutionSource("feature", featureSettingKey, valuesByKey));
+    }
+
+    sources.push(
+      this.createConfiguredResolutionSource("task", taskSettingKey, valuesByKey),
+      this.createConfiguredResolutionSource("global", GLOBAL_MODEL_DEFAULT_SETTING_KEY, valuesByKey),
       {
         source: "builtin",
         configured: true,
         value: BUILTIN_MODEL_DEFAULT,
       },
-    ].filter((source): source is ResolutionSource => Boolean(source));
+    );
 
     let resolved: ResolvedModelDefault | undefined;
     for (const candidate of sources) {
@@ -96,12 +95,26 @@ export class DefaultModelDefaultResolver implements ModelDefaultResolverPort {
       ...resolved,
       device: this.resolveDevice(
         sources.filter((source) => source.source !== "builtin"),
-        valuesByKey.get("runtime.python.defaultDevice")?.value,
+        valuesByKey.get(RUNTIME_DEFAULT_DEVICE_SETTING_KEY)?.value,
       ),
       torchDtype: this.resolveTorchDtype(
         sources.filter((source) => source.source !== "builtin"),
-        valuesByKey.get("runtime.python.defaultTorchDtype")?.value,
+        valuesByKey.get(RUNTIME_DEFAULT_TORCH_DTYPE_SETTING_KEY)?.value,
       ),
+    };
+  }
+
+  private createConfiguredResolutionSource(
+    source: ConfiguredResolutionSource,
+    settingKey: NonNullable<ResolvedModelDefault["settingKey"]>,
+    valuesByKey: ReadonlyMap<ApplicationSettingKey, ApplicationSettingValue>,
+  ): ResolutionSource {
+    const value = valuesByKey.get(settingKey);
+    return {
+      source,
+      settingKey,
+      configured: value?.configured,
+      value: value?.value,
     };
   }
 
