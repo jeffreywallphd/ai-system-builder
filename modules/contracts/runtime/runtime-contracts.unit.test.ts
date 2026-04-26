@@ -400,6 +400,7 @@ describe("python sidecar runtime contracts", () => {
         model: {
           provider: "transformers",
           modelId: "Qwen/Qwen2.5-3B-Instruct",
+          inferenceMode: "chat",
           device: "auto",
           torchDtype: "bfloat16",
         },
@@ -478,6 +479,7 @@ describe("python sidecar runtime contracts", () => {
     };
 
     expect(request.recipe.generation.mode).toBe("qa");
+    expect(request.recipe.generation.model.inferenceMode).toBe("chat");
     expect(request.recipe.normalization.targetFormat).toBe("markdown");
     expect(request.recipe.chunking.strategy).toBe("character");
     expect(request.split.shuffle).toBe(true);
@@ -487,5 +489,37 @@ describe("python sidecar runtime contracts", () => {
     expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
     expect(result.summary.trainRowCount + result.summary.testRowCount).toBe(56);
     expect(result.warnings?.[0]?.code).toBe("source_media_type_inferred");
+  });
+
+  it("restricts local model inference mode to explicit supported literals", () => {
+    const text2textModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "google/flan-t5-base",
+      inferenceMode: "text2text",
+    };
+    const causalModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "Qwen/Qwen2.5-3B",
+      inferenceMode: "causal",
+    };
+    const chatModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "Qwen/Qwen2.5-3B-Instruct",
+      inferenceMode: "chat",
+    };
+
+    expect([text2textModel, causalModel, chatModel].map((model) => model.inferenceMode)).toEqual([
+      "text2text",
+      "causal",
+      "chat",
+    ]);
+
+    const invalidModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "broken/model",
+      // @ts-expect-error Inference mode is intentionally narrow and explicit.
+      inferenceMode: "seq2seq",
+    };
+    expect(invalidModel).toBeDefined();
   });
 });
