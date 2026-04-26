@@ -64,20 +64,35 @@ class TransformersQaTextGenerator(QaTextGenerator):
 
         resolved_model_reference = _RESOLVED_MODEL_REFERENCES.get(model_config.modelId, model_config.modelId)
 
-        return pipeline(
-            "text2text-generation",
-            model=resolved_model_reference,
-            tokenizer=resolved_model_reference,
-            model_kwargs=model_kwargs or None,
-        )
+        try:
+            return pipeline(
+                "text2text-generation",
+                model=resolved_model_reference,
+                tokenizer=resolved_model_reference,
+                model_kwargs=model_kwargs or None,
+            )
+        except Exception:
+            return pipeline(
+                "text-generation",
+                model=resolved_model_reference,
+                tokenizer=resolved_model_reference,
+                model_kwargs=model_kwargs or None,
+            )
 
     def generate_text(self, prompt: str) -> str:
-        generation = self._pipeline(prompt, **self._generation_params)
+        generation_params = dict(self._generation_params)
+        generation_params.setdefault("return_full_text", False)
+
+        generation = self._pipeline(prompt, **generation_params)
         if not generation:
             raise RuntimeError("Model returned no generated text.")
 
         first = generation[0]
         text = str(first.get("generated_text", "")).strip()
+        if not text:
+            text = str(first.get("summary_text", "")).strip()
+        if text.startswith(prompt):
+            text = text[len(prompt) :].strip()
         if not text:
             raise RuntimeError("Model returned an empty generation.")
         return text
@@ -266,6 +281,38 @@ def _build_answer_prompt(question: str, chunk: MarkdownChunk) -> str:
     )
 
 
+def _extract_single_question(text: str, chunk: MarkdownChunk) -> str:
+    normalized = " ".join(text.replace("\r", "\n").split())
+    prefixes = (
+        "question:",
+        "q:",
+        "write one concise question answerable from the context below. return only the question.",
+        "write exactly one clear user question answerable only from the context.",
+    )
+    lowered = normalized.lower()
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            normalized = normalized[len(prefix) :].strip()
+            lowered = normalized.lower()
+            break
+
+    context_marker = lowered.find("context:")
+    if context_marker != -1:
+        normalized = normalized[:context_marker].strip()
+
+    for delimiter in ("?", "\n"):
+        if delimiter in normalized:
+            leading = normalized.split(delimiter, 1)[0].strip()
+            if leading:
+                return f"{leading}?"
+
+    if normalized.endswith("?"):
+        return normalized
+    if normalized:
+        return f"{normalized.rstrip('.')}?"
+    return f"What is the main idea of this passage about {chunk.artifact_id}?"
+
+
 def generate_qa_examples_for_chunks(
     chunks: list[MarkdownChunk],
     config: ExampleGenerationConfig,
@@ -277,7 +324,7 @@ def generate_qa_examples_for_chunks(
 
     examples: list[GeneratedQaExample] = []
     for chunk in chunks:
-        question = generator.generate_text(_build_question_prompt(chunk)).strip()
+        question = _extract_single_question(generator.generate_text(_build_question_prompt(chunk)).strip(), chunk)
         answer = generator.generate_text(_build_answer_prompt(question, chunk)).strip()
         examples.append(
             GeneratedQaExample(

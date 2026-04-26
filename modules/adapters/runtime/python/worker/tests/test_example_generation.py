@@ -11,6 +11,7 @@ from modules.adapters.runtime.python.worker.tasks.example_generation import (
     GeneratedQaExample,
     _GENERATOR_CACHE,
     _RESOLVED_MODEL_REFERENCES,
+    _extract_single_question,
     ensure_generation_model_downloaded,
     generate_qa_examples_for_chunks,
 )
@@ -63,6 +64,15 @@ class ExampleGenerationTests(unittest.TestCase):
                 )
             ],
         )
+
+    def test_extract_single_question_handles_prompt_echo_with_context_block(self) -> None:
+        chunk = MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")
+        generated_text = (
+            "Write one concise question answerable from the context below. Return only the question.\n\n"
+            "Context:\nSome context"
+        )
+        question = _extract_single_question(generated_text, chunk)
+        self.assertEqual(question, "What is the main idea of this passage about artifact-1?")
 
     def test_reuses_cached_generator_for_same_model_config(self) -> None:
         config = ExampleGenerationConfig.model_validate(
