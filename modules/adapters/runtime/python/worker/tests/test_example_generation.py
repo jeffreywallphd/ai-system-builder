@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -8,6 +10,7 @@ from modules.adapters.runtime.python.worker.models import ExampleGenerationConfi
 from modules.adapters.runtime.python.worker.tasks.example_generation import (
     GeneratedQaExample,
     _GENERATOR_CACHE,
+    _RESOLVED_MODEL_REFERENCES,
     ensure_generation_model_downloaded,
     generate_qa_examples_for_chunks,
 )
@@ -26,6 +29,7 @@ class _FakeGenerator:
 class ExampleGenerationTests(unittest.TestCase):
     def setUp(self) -> None:
         _GENERATOR_CACHE.clear()
+        _RESOLVED_MODEL_REFERENCES.clear()
 
     def test_generates_qa_examples_from_chunks(self) -> None:
         config = ExampleGenerationConfig.model_validate(
@@ -100,6 +104,33 @@ class ExampleGenerationTests(unittest.TestCase):
         self.assertTrue(result.from_cache)
         self.assertEqual(result.local_path, "/tmp/hf-cache/model")
         snapshot_download.assert_called_once_with(repo_id="test-model", local_files_only=True)
+
+    def test_ensure_generation_model_downloaded_uses_existing_safetensors_cache_before_download(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            cache_root = Path(temporary_directory)
+            snapshot_path = cache_root / "models--Qwen--Qwen3-8B" / "snapshots" / "abcdef"
+            snapshot_path.mkdir(parents=True, exist_ok=True)
+            (snapshot_path / "model-00001-of-00002.safetensors").write_bytes(b"weights")
+
+            snapshot_download = unittest.mock.Mock(side_effect=RuntimeError("should-not-download"))
+            with patch.dict(
+                "sys.modules",
+                {"huggingface_hub": SimpleNamespace(snapshot_download=snapshot_download)},
+            ):
+                with patch.dict("os.environ", {"HF_HUB_CACHE": temporary_directory}, clear=False):
+                    result = ensure_generation_model_downloaded(
+                        ExampleGenerationConfig.model_validate(
+                            {
+                                "mode": "qa",
+                                "model": {"provider": "transformers", "modelId": "Qwen/Qwen3-8B"},
+                            }
+                        ).model
+                    )
+
+        self.assertFalse(result.downloaded)
+        self.assertTrue(result.from_cache)
+        self.assertEqual(result.local_path, str(snapshot_path))
+        snapshot_download.assert_not_called()
 
     def test_ensure_generation_model_downloaded_auto_downloads_when_missing_from_cache(self) -> None:
         snapshot_download = unittest.mock.Mock()

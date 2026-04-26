@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from os import getenv
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
@@ -60,10 +62,12 @@ class TransformersQaTextGenerator(QaTextGenerator):
         if model_config.device and model_config.device not in {"auto"}:
             model_kwargs["device"] = model_config.device
 
+        resolved_model_reference = _RESOLVED_MODEL_REFERENCES.get(model_config.modelId, model_config.modelId)
+
         return pipeline(
             "text2text-generation",
-            model=model_config.modelId,
-            tokenizer=model_config.modelId,
+            model=resolved_model_reference,
+            tokenizer=resolved_model_reference,
             model_kwargs=model_kwargs or None,
         )
 
@@ -90,11 +94,24 @@ def ensure_generation_model_downloaded(model_config: LocalModelConfig) -> Genera
             "The 'huggingface_hub' package is required to validate and download generation models."
         ) from error
 
+    cached_reference = _find_cached_model_reference(model_config.modelId)
+    if cached_reference is not None:
+        resolved_path = str(cached_reference)
+        _RESOLVED_MODEL_REFERENCES[model_config.modelId] = resolved_path
+        return GenerationModelAvailability(
+            provider=model_config.provider,
+            model_id=model_config.modelId,
+            downloaded=False,
+            from_cache=True,
+            local_path=resolved_path,
+        )
+
     try:
         local_path = snapshot_download(
             repo_id=model_config.modelId,
             local_files_only=True,
         )
+        _RESOLVED_MODEL_REFERENCES[model_config.modelId] = local_path
         return GenerationModelAvailability(
             provider=model_config.provider,
             model_id=model_config.modelId,
@@ -110,6 +127,7 @@ def ensure_generation_model_downloaded(model_config: LocalModelConfig) -> Genera
             repo_id=model_config.modelId,
             local_files_only=False,
         )
+        _RESOLVED_MODEL_REFERENCES[model_config.modelId] = local_path
         return GenerationModelAvailability(
             provider=model_config.provider,
             model_id=model_config.modelId,
@@ -132,6 +150,58 @@ def ensure_generation_model_is_available(config: ExampleGenerationConfig) -> Gen
 
 _GENERATOR_CACHE: dict[tuple[str, str, str, str], QaTextGenerator] = {}
 _GENERATOR_CACHE_LOCK = Lock()
+_RESOLVED_MODEL_REFERENCES: dict[str, str] = {}
+
+
+def _candidate_huggingface_cache_roots() -> list[Path]:
+    candidates: list[Path] = []
+    for environment_variable in (
+        "HF_HUB_CACHE",
+        "HUGGINGFACE_HUB_CACHE",
+        "TRANSFORMERS_CACHE",
+    ):
+        configured = getenv(environment_variable)
+        if configured:
+            candidates.append(Path(configured))
+
+    hf_home = getenv("HF_HOME")
+    if hf_home:
+        hf_home_path = Path(hf_home)
+        candidates.extend([hf_home_path / "hub", hf_home_path / "models"])
+
+    home = Path.home()
+    candidates.extend(
+        [
+            home / ".cache" / "huggingface" / "hub",
+            home / ".cache" / "huggingface" / "models",
+        ]
+    )
+    return candidates
+
+
+def _find_cached_model_reference(model_id: str) -> Path | None:
+    normalized_repo_id = model_id.replace("/", "--")
+    repo_folder_name = f"models--{normalized_repo_id}"
+    for cache_root in _candidate_huggingface_cache_roots():
+        repo_root = cache_root / repo_folder_name
+        if not repo_root.exists():
+            continue
+
+        snapshots_dir = repo_root / "snapshots"
+        if snapshots_dir.exists():
+            snapshot_directories = sorted(
+                (path for path in snapshots_dir.iterdir() if path.is_dir()),
+                key=lambda path: path.stat().st_mtime,
+                reverse=True,
+            )
+            for snapshot_path in snapshot_directories:
+                if any(snapshot_path.rglob("*.safetensors")):
+                    return snapshot_path
+
+        if any(repo_root.rglob("*.safetensors")):
+            return repo_root
+
+    return None
 
 
 def _generator_cache_key(model: LocalModelConfig) -> tuple[str, str, str, str]:
