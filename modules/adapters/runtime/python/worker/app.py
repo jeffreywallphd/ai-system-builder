@@ -74,7 +74,13 @@ def health() -> PythonRuntimeHealthCheckResult:
 def capabilities() -> PythonRuntimeCapabilitiesResult:
     return PythonRuntimeCapabilitiesResult(
         runtimeId=RUNTIME_ID,
-        capabilities=["prepare-training-dataset", "ensure-model-download", "model-status", "unload-model"],
+        capabilities=[
+            "prepare-training-dataset",
+            "ensure-model-download",
+            "model-status",
+            "unload-model",
+            "dataset-preparation.auto-inference-mode",
+        ],
     )
 
 

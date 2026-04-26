@@ -13,6 +13,7 @@ export interface PythonRuntimeSupervisorEvent {
     | "spawned"
     | "health-probe-failed"
     | "health-unhealthy"
+    | "capability-mismatch"
     | "health-ready"
     | "startup-timeout"
     | "process-exit"
@@ -45,7 +46,10 @@ export interface CreatePythonRuntimeSupervisorOptions {
   }) => void | Promise<void>;
   startupTimeoutMs?: number;
   healthCheckIntervalMs?: number;
-  runtimeClient: Pick<PythonRuntimeHttpClient, "getHealthStatus">;
+  runtimeClient:
+    & Pick<PythonRuntimeHttpClient, "getHealthStatus">
+    & Partial<Pick<PythonRuntimeHttpClient, "getCapabilities">>;
+  requiredCapabilities?: readonly string[];
   spawnImplementation?: typeof spawn;
   onEvent?: (event: PythonRuntimeSupervisorEvent) => void;
 }
@@ -63,6 +67,7 @@ export function createPythonRuntimeSupervisor(
   const healthCheckIntervalMs = options.healthCheckIntervalMs ?? 100;
   const spawnImplementation = options.spawnImplementation ?? spawn;
   const onEvent = options.onEvent;
+  const requiredCapabilities = options.requiredCapabilities ?? [];
 
   let childProcess: ChildProcess | undefined;
   let status: PythonRuntimeSupervisorStatus = "stopped";
@@ -71,6 +76,7 @@ export function createPythonRuntimeSupervisor(
   let healthProbeFailureCount = 0;
   let lastEmittedHealthProbeError: string | undefined;
   let lastStartupFailure: string | undefined;
+  let incompatibleExistingRuntimeFailure: string | undefined;
   const recentRuntimeOutput: string[] = [];
 
   const emitEvent = (
@@ -205,6 +211,19 @@ export function createPythonRuntimeSupervisor(
         return false;
       }
 
+      const missingCapabilities = await resolveMissingRequiredCapabilities();
+      if (missingCapabilities.length > 0) {
+        const detail = `Healthy Python runtime is missing required capability/capabilities: ${missingCapabilities.join(", ")}.`;
+        lastStartupFailure = detail;
+        incompatibleExistingRuntimeFailure = detail;
+        emitEvent("capability-mismatch", detail, {
+          runtimeStatus: health.status.status,
+          runtimeId: health.status.runtimeId,
+          missingCapabilities,
+        });
+        return false;
+      }
+
       attachedToExistingRuntime = true;
       childProcess = undefined;
       status = "ready";
@@ -222,6 +241,20 @@ export function createPythonRuntimeSupervisor(
     }
   };
 
+  const resolveMissingRequiredCapabilities = async (): Promise<string[]> => {
+    if (requiredCapabilities.length === 0) {
+      return [];
+    }
+
+    if (typeof options.runtimeClient.getCapabilities !== "function") {
+      return [...requiredCapabilities];
+    }
+
+    const capabilities = await options.runtimeClient.getCapabilities();
+    const advertised = new Set(capabilities.capabilities);
+    return requiredCapabilities.filter((capability) => !advertised.has(capability));
+  };
+
   const startHealthPolling = async () => {
     const startedAt = Date.now();
     while ((Date.now() - startedAt) < startupTimeoutMs) {
@@ -229,6 +262,19 @@ export function createPythonRuntimeSupervisor(
       try {
         const health = await options.runtimeClient.getHealthStatus();
         if (health.healthy) {
+          const missingCapabilities = await resolveMissingRequiredCapabilities();
+          if (missingCapabilities.length > 0) {
+            const detail = `Python runtime is healthy but missing required capability/capabilities: ${missingCapabilities.join(", ")}.`;
+            lastStartupFailure = detail;
+            emitEvent("capability-mismatch", detail, {
+              runtimeStatus: health.status.status,
+              runtimeId: health.status.runtimeId,
+              missingCapabilities,
+            });
+            await delay(healthCheckIntervalMs);
+            continue;
+          }
+
           status = "ready";
           const readyDetail = healthProbeFailureCount > 0
             ? `Python runtime reported healthy startup state after ${healthProbeFailureCount} failed health probe attempt(s).`
@@ -281,6 +327,7 @@ export function createPythonRuntimeSupervisor(
       healthProbeFailureCount = 0;
       lastEmittedHealthProbeError = undefined;
       lastStartupFailure = undefined;
+      incompatibleExistingRuntimeFailure = undefined;
       recentRuntimeOutput.splice(0, recentRuntimeOutput.length);
 
       const command = resolveCommand();
@@ -295,6 +342,11 @@ export function createPythonRuntimeSupervisor(
       status = "starting";
       if (await tryAttachToExistingRuntime()) {
         return;
+      }
+      if (incompatibleExistingRuntimeFailure) {
+        throwStartupFailure(
+          `${incompatibleExistingRuntimeFailure} Stop the existing Python runtime or use a different PYTHON_RUNTIME_BASE_URL/PYTHON_RUNTIME_PORT before starting a new worker.`,
+        );
       }
 
       if (options.prepareRuntimeEnvironment) {
