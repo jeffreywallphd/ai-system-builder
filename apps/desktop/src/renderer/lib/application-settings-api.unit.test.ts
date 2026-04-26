@@ -75,4 +75,29 @@ describe("applicationSettingsApi", () => {
     expect(window.desktopApi.resolveModelDefault).toHaveBeenCalledOnce();
     expect(resolved.resolved.inferenceMode).toBe("chat");
   });
+
+  it("rejects unknown setting categories before invoking preload", async () => {
+    window.desktopApi = {
+      listApplicationSettingDefinitions: vi.fn(),
+      readApplicationSettings: vi.fn(),
+    } as never;
+
+    const api = createApplicationSettingsApi();
+    await expect(api.listDefinitions({ category: "invalid" })).rejects.toThrow(
+      'Unknown application settings category "invalid".',
+    );
+    expect(window.desktopApi.listApplicationSettingDefinitions).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown model default task keys before invoking preload", async () => {
+    window.desktopApi = {
+      resolveApplicationModelDefault: vi.fn(),
+    } as never;
+
+    const api = createApplicationSettingsApi();
+    await expect(api.resolveModelDefault({ taskKey: "unknown-task" })).rejects.toThrow(
+      'Unknown model default task key "unknown-task".',
+    );
+    expect(window.desktopApi.resolveApplicationModelDefault).not.toHaveBeenCalled();
+  });
 });

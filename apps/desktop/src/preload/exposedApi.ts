@@ -164,6 +164,12 @@ import {
   type DesktopApplicationSettingsResolveModelDefaultResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
+import type {
+  ListApplicationSettingDefinitionsRequest,
+  ReadApplicationSettingsRequest,
+  ResolveModelDefaultRequest,
+  UpdateApplicationSettingRequest,
+} from "../../../../modules/contracts/settings";
 
 const DEFAULT_UPLOAD_SOURCE = "desktop.renderer.artifact-upload.form";
 const DEFAULT_ARTIFACT_SOURCE = "desktop.renderer.artifact-browser";
@@ -320,15 +326,15 @@ export interface DesktopPreloadApi {
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactLocalizeFromRepoResponse>;
   listApplicationSettingDefinitions: (
-    input?: { category?: string; keys?: string[] },
+    input?: ListApplicationSettingDefinitionsRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsListDefinitionsResponse>;
   readApplicationSettings: (
-    input?: { category?: string; keys?: string[] },
+    input?: ReadApplicationSettingsRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsReadResponse>;
   updateApplicationSetting: (
-    input: { key: string; value: unknown },
+    input: UpdateApplicationSettingRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsUpdateResponse>;
   clearApplicationSetting: (
@@ -336,11 +342,11 @@ export interface DesktopPreloadApi {
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsClearResponse>;
   resolveApplicationModelDefault: (
-    input: { taskKey: string; featureKey?: string },
+    input: ResolveModelDefaultRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
   resolveModelDefault: (
-    input: { taskKey: string; featureKey?: string },
+    input: ResolveModelDefaultRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
 }
@@ -986,7 +992,7 @@ export function createDesktopPreloadApi(
       });
     },
     async resolveApplicationModelDefault(input, context = {}) {
-      const request = createDesktopApplicationSettingsResolveModelDefaultRequest(input as never, context);
+      const request = createDesktopApplicationSettingsResolveModelDefaultRequest(input, context);
       const response = await dependencies.ipcRenderer.invoke(
         DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL.value,
         request,
