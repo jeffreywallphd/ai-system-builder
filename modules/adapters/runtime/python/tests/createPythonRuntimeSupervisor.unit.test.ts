@@ -77,6 +77,40 @@ describe("createPythonRuntimeSupervisor", () => {
     expect(onEvent.mock.calls.map((call) => call[0]).some((event) => event.type === "attached")).toBe(true);
   });
 
+  it("fails clearly before spawning when a healthy runtime is missing required capabilities", async () => {
+    const spawnImplementation = testDouble.fn(() => createMockChildProcess() as any);
+    const onEvent = testDouble.fn();
+    const supervisor = createPythonRuntimeSupervisor({
+      command: "python",
+      args: ["main.py"],
+      runtimeClient: {
+        getHealthStatus: async () => ({
+          healthy: true,
+          status: { runtimeId: "python-sidecar", status: "ready" as const },
+        }),
+        getCapabilities: async () => {
+          return {
+            runtimeId: "python-sidecar",
+            capabilities: ["prepare-training-dataset"],
+          };
+        },
+      },
+      requiredCapabilities: ["prepare-training-dataset", "dataset-preparation.auto-inference-mode"],
+      spawnImplementation: spawnImplementation as any,
+      startupTimeoutMs: 100,
+      healthCheckIntervalMs: 1,
+      onEvent,
+    });
+
+    await expect(supervisor.start()).rejects.toThrow("missing required capability/capabilities");
+
+    expect(supervisor.getStatus()).toBe("failed");
+    expect(spawnImplementation).not.toHaveBeenCalled();
+    const eventTypes = onEvent.mock.calls.map((call) => call[0].type);
+    expect(eventTypes).toContain("capability-mismatch");
+    expect(eventTypes).not.toContain("attached");
+  });
+
   it("stops the process and marks status stopped", async () => {
     const child = createMockChildProcess();
     const supervisor = createPythonRuntimeSupervisor({

@@ -11,6 +11,8 @@ import {
   type PrepareTrainingDatasetRequest,
   type PrepareTrainingDatasetResult,
   type PythonRuntimeCapabilitiesResult,
+  PYTHON_RUNTIME_CAPABILITY_DATASET_PREPARATION_AUTO_INFERENCE_MODE,
+  PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES,
   type PythonRuntimeHealthCheckResult,
   type PythonRuntimeHealthStatus,
   type PythonRuntimeOutputDescriptor,
@@ -318,12 +320,17 @@ describe("python sidecar runtime contracts", () => {
       runtimeId: "python-sidecar-1",
       capabilities: [
         "prepare-training-dataset",
+        PYTHON_RUNTIME_CAPABILITY_DATASET_PREPARATION_AUTO_INFERENCE_MODE,
         "future-task-type",
       ],
     };
 
     expect(capabilities.runtimeId).toBe("python-sidecar-1");
     expect(capabilities.capabilities).toContain("prepare-training-dataset");
+    expect(PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES).toEqual([
+      "prepare-training-dataset",
+      "dataset-preparation.auto-inference-mode",
+    ]);
   });
 
   it("uses runtime output descriptors as canonical output handoff contracts", () => {

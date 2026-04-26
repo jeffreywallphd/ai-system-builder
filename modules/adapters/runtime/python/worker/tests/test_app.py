@@ -139,6 +139,7 @@ class WorkerAppTests(unittest.TestCase):
     def test_capabilities_endpoint_contains_dataset_task(self) -> None:
         result = capabilities()
         self.assertIn("prepare-training-dataset", result.capabilities)
+        self.assertIn("dataset-preparation.auto-inference-mode", result.capabilities)
         self.assertIn("ensure-model-download", result.capabilities)
         self.assertIn("unload-model", result.capabilities)
 
