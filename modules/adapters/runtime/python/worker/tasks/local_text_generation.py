@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import gc
+import inspect
 from os import environ, getenv
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
 from ..models import ExampleGenerationConfig, LocalModelConfig
+
+DEFAULT_MAX_NEW_TOKENS = 256
 
 
 def configure_huggingface_download_environment() -> None:
@@ -92,6 +95,7 @@ class TransformersCausalGenerator(LocalTextGenerator):
             self._generation_params,
             self._tokenizer,
         )
+        generation_params = _filter_supported_generation_params(generation_params, self._model.generate)
         generation_output = self._model.generate(**generation_inputs, **generation_params)
 
         first_output = generation_output[0]
@@ -294,10 +298,13 @@ def _generator_cache_key(model: LocalModelConfig) -> tuple[str, str, str, str, s
 def _resolve_generation_params(config: ExampleGenerationConfig) -> dict[str, Any]:
     params: dict[str, Any] = {}
     if config.generationParams is None:
+        params["max_new_tokens"] = DEFAULT_MAX_NEW_TOKENS
         return params
 
     if config.generationParams.maxNewTokens is not None:
         params["max_new_tokens"] = config.generationParams.maxNewTokens
+    else:
+        params["max_new_tokens"] = DEFAULT_MAX_NEW_TOKENS
     if config.generationParams.temperature is not None:
         params["temperature"] = config.generationParams.temperature
     if config.generationParams.topP is not None:
@@ -316,6 +323,19 @@ def _resolve_runtime_generation_params(params: dict[str, Any], tokenizer: Any) -
         elif eos_token_id is not None:
             resolved["pad_token_id"] = eos_token_id
     return resolved
+
+
+def _filter_supported_generation_params(params: dict[str, Any], generate_callable: Any) -> dict[str, Any]:
+    try:
+        signature = inspect.signature(generate_callable)
+    except (TypeError, ValueError):
+        return params
+
+    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in signature.parameters.values()):
+        return params
+
+    supported = set(signature.parameters.keys())
+    return {key: value for key, value in params.items() if key in supported}
 
 
 def _resolve_model_kwargs(model_config: LocalModelConfig) -> dict[str, Any]:

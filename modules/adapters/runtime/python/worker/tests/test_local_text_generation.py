@@ -6,7 +6,9 @@ from unittest.mock import patch
 
 from modules.adapters.runtime.python.worker.models import ExampleGenerationConfig
 from modules.adapters.runtime.python.worker.tasks.local_text_generation import (
+    DEFAULT_MAX_NEW_TOKENS,
     _GENERATOR_CACHE,
+    _resolve_generation_params,
     _resolve_model_kwargs,
     _supports_manual_device_move,
     configure_huggingface_download_environment,
@@ -119,6 +121,13 @@ class LocalTextGenerationTests(unittest.TestCase):
         )
 
         self.assertEqual(_resolve_model_kwargs(config.model), {"device_map": "auto"})
+
+    def test_generation_params_use_model_agnostic_default_token_budget(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {"mode": "qa", "model": {"provider": "transformers", "modelId": "m"}}
+        )
+
+        self.assertEqual(_resolve_generation_params(config)["max_new_tokens"], DEFAULT_MAX_NEW_TOKENS)
 
     def test_quantized_models_are_not_moved_manually_after_load(self) -> None:
         class _QuantizedModel(_FakeModel):

@@ -13,7 +13,7 @@ const DEFAULT_DATASET_PREPARATION_RECIPE_BASE = {
   },
 };
 
-const VALID_MODEL_INFERENCE_MODES: readonly ModelDefaultInferenceMode[] = ["text2text", "chat"];
+const VALID_MODEL_INFERENCE_MODES: readonly ModelDefaultInferenceMode[] = ["text2text", "causal", "chat"];
 
 export interface BuildDatasetPreparationRequestInput {
   selectedArtifactIds: string[];

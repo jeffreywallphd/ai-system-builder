@@ -6,7 +6,7 @@ import os
 import random
 import tempfile
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from ..models import (
     DatasetPreparationSummary,
@@ -78,6 +78,26 @@ def _validate_generated_rows(total_rows: int, chunk_count: int) -> None:
             "chunkCount": chunk_count,
             "generatedRowCount": total_rows,
         },
+    )
+
+
+def _log_generation_failure_diagnostics(
+    raw_data: dict[str, Any],
+    prepared_data: dict[str, Any],
+    errors: list[str],
+) -> None:
+    print(
+        json.dumps(
+            {
+                "event": "runtime.dataset_preparation.generation.failed",
+                "rawData": raw_data,
+                "preparedData": prepared_data,
+                "errors": errors,
+            },
+            ensure_ascii=False,
+            default=str,
+        ),
+        flush=True,
     )
 
 
@@ -289,6 +309,37 @@ def _build_generated_rows(
 
     if not rows:
         model = payload.recipe.generation.model
+        raw_data = {
+            "sourceInputs": [source.model_dump(mode="json") for source in payload.sourceInputs],
+            "normalizedDocuments": [
+                {
+                    "artifactId": document.artifact_id,
+                    "mediaType": document.media_type,
+                    "sourcePath": document.source_path,
+                    "markdown": document.markdown,
+                }
+                for document in normalization.documents
+            ],
+        }
+        prepared_data = {
+            "chunking": payload.recipe.chunking.model_dump(mode="json"),
+            "generation": payload.recipe.generation.model_dump(mode="json"),
+            "chunks": [
+                {
+                    "artifactId": chunk.artifact_id,
+                    "chunkIndex": chunk.chunk_index,
+                    "text": chunk.text,
+                }
+                for chunk in chunks
+            ],
+            "failurePolicy": failure_policy,
+            "generationBatchSize": batch_size,
+            "skippedGenerationChunkCount": skipped_generation_chunk_count,
+        }
+        diagnostic_errors = list(generation_error_samples)
+        if not diagnostic_errors:
+            diagnostic_errors.append("Generation completed without producing any usable examples.")
+        _log_generation_failure_diagnostics(raw_data, prepared_data, diagnostic_errors)
         details = {
             "chunkCount": len(chunks),
             "generatedRowCount": 0,

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -298,9 +300,14 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
     def test_generation_requires_at_least_one_generated_row(self) -> None:
         payload = self._build_payload("jsonl")
         payload.recipe.generation.failurePolicy = "skip"
+        output = io.StringIO()
 
-        with self.assertRaises(ValueError) as context:
-            prepare_training_dataset(payload, example_generator=lambda _chunks, _config: [])
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.prepare_training_dataset.ensure_generation_model_is_available",
+        ):
+            with redirect_stdout(output):
+                with self.assertRaises(ValueError) as context:
+                    prepare_training_dataset(payload, example_generator=lambda _chunks, _config: [])
 
         error = context.exception
         self.assertEqual(getattr(error, "stage", None), "generation")
@@ -309,6 +316,11 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.assertEqual(getattr(error, "details", {}).get("chunkCount"), 3)
         self.assertEqual(getattr(error, "details", {}).get("failurePolicy"), "skip")
         self.assertEqual(getattr(error, "details", {}).get("skippedGenerationChunkCount"), 3)
+        diagnostic = json.loads(output.getvalue().strip())
+        self.assertEqual(diagnostic["event"], "runtime.dataset_preparation.generation.failed")
+        self.assertEqual(diagnostic["rawData"]["sourceInputs"][0]["artifactId"], "doc-1")
+        self.assertEqual(diagnostic["preparedData"]["chunks"][0]["text"], "abcd")
+        self.assertTrue(diagnostic["errors"])
 
     def test_skip_policy_counts_generator_omitted_chunks(self) -> None:
         payload = self._build_payload("jsonl")

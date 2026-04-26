@@ -117,14 +117,14 @@ describe("datasetPreparationRequestBuilder", () => {
     expect(request.split.seed).toBeUndefined();
   });
 
-  it("includes inferenceMode", () => {
+  it("includes causal inferenceMode", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
       unsupportedDocumentPolicy: "",
       normalizationMode: "",
       preserveDocumentBoundaries: true,
       modelId: "Qwen/Qwen2.5-1.5B-Instruct",
-      modelInferenceMode: "chat",
+      modelInferenceMode: "causal",
       modelDevice: "cuda",
       modelTorchDtype: "float16",
       failurePolicy: "skip",
@@ -159,7 +159,7 @@ describe("datasetPreparationRequestBuilder", () => {
       },
     });
 
-    expect(request.recipe.generation.model.inferenceMode).toBe("chat");
+    expect(request.recipe.generation.model.inferenceMode).toBe("causal");
   });
 
   it("falls back to resolved default inference mode when input inference mode is invalid", () => {
