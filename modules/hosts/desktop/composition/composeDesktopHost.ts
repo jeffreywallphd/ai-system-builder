@@ -19,6 +19,11 @@ import {
   IngestWebsitePageUseCase,
   IngestWebsitePagesBatchUseCase,
   PrepareTrainingDatasetFromArtifactsUseCase,
+  ListSettingsDefinitionsUseCase,
+  ReadSettingsUseCase,
+  UpdateSettingUseCase,
+  ClearSettingUseCase,
+  ResolveModelDefaultUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
@@ -448,6 +453,24 @@ export function composeDesktopHost(
         artifactCatalog,
         now: options.now,
       });
+      const listSettingsDefinitions = new ListSettingsDefinitionsUseCase({
+        settings: applicationSettings,
+      });
+      const readSettings = new ReadSettingsUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
+      });
+      const updateSetting = new UpdateSettingUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
+      });
+      const clearSetting = new ClearSettingUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
+      });
+      const resolveModelDefault = new ResolveModelDefaultUseCase({
+        modelDefaultResolver,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -479,6 +502,11 @@ export function composeDesktopHost(
         ingestWebsitePageUseCase: ingestWebsitePage,
         ingestWebsitePagesBatchUseCase: ingestWebsitePagesBatch,
         prepareTrainingDatasetFromArtifactsUseCase: prepareTrainingDatasetFromArtifacts,
+        listSettingsDefinitionsUseCase: listSettingsDefinitions,
+        readSettingsUseCase: readSettings,
+        updateSettingUseCase: updateSetting,
+        clearSettingUseCase: clearSetting,
+        resolveModelDefaultUseCase: resolveModelDefault,
       });
     },
   };

@@ -58,3 +58,25 @@ describe("createLocalApplicationSettingsAdapter", () => {
     });
   });
 });
+
+  it("never persists secret values in local settings storage", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "app-settings-"));
+    const path = join(dir, "settings.json");
+    const adapter = createLocalApplicationSettingsAdapter({
+      filePath: path,
+      definitions: [
+        ...DEFINITIONS,
+        {
+          key: "huggingface.token",
+          category: "huggingface",
+          label: "Token",
+          valueKind: "secret",
+          sensitive: true,
+        },
+      ],
+    });
+
+    await expect(adapter.updateValue({ key: "huggingface.token", value: "hf_secret" })).rejects.toThrow(
+      'Secret setting "huggingface.token" must be stored via ApplicationSecretsPort.',
+    );
+  });

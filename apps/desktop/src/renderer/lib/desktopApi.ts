@@ -8,6 +8,13 @@ import type {
   DatasetPreparationWarning,
   PrepareTrainingDatasetRequest,
 } from "../../../../../modules/contracts/runtime";
+import type {
+  ApplicationSettingDefinition,
+  ApplicationSettingValue,
+  ResolveModelDefaultRequest,
+  ResolvedModelDefault,
+  UpdateApplicationSettingRequest,
+} from "../../../../../modules/contracts/settings";
 
 export interface DesktopArtifactUploadInput {
   fileName: string;
@@ -326,6 +333,12 @@ interface DesktopApiBridge {
   localizeArtifactFromRepo: (input: {
     artifactId: string;
   }) => Promise<unknown>;
+
+  listApplicationSettingDefinitions?: (input?: { category?: string; keys?: string[] }) => Promise<unknown>;
+  readApplicationSettings?: (input?: { category?: string; keys?: string[] }) => Promise<unknown>;
+  updateApplicationSetting?: (input: UpdateApplicationSettingRequest) => Promise<unknown>;
+  clearApplicationSetting?: (input: { key: string }) => Promise<unknown>;
+  resolveModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
 }
 
 declare global {
@@ -384,4 +397,21 @@ export interface DesktopUnregisteredArtifactBrowseItem {
   fileName: string;
   mediaType?: string;
   sizeBytes?: number;
+}
+
+
+export interface DesktopApplicationSettingsReadResult {
+  values: ApplicationSettingValue[];
+}
+
+export interface DesktopApplicationSettingsDefinitionsResult {
+  definitions: ApplicationSettingDefinition[];
+}
+
+export interface DesktopApplicationSettingUpdateResult {
+  value: ApplicationSettingValue;
+}
+
+export interface DesktopResolvedModelDefaultResult {
+  resolved: ResolvedModelDefault;
 }

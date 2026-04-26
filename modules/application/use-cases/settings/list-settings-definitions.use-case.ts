@@ -1,4 +1,7 @@
-import type { ApplicationSettingDefinition } from "../../../contracts/settings";
+import type {
+  ApplicationSettingDefinition,
+  ListApplicationSettingDefinitionsRequest,
+} from "../../../contracts/settings";
 import type { ApplicationSettingsPort } from "../../ports/settings";
 
 export interface ListSettingsDefinitionsUseCaseDependencies {
@@ -12,7 +15,19 @@ export class ListSettingsDefinitionsUseCase {
     this.settings = dependencies.settings;
   }
 
-  public async execute(): Promise<ApplicationSettingDefinition[]> {
-    return this.settings.listDefinitions();
+  public async execute(request: ListApplicationSettingDefinitionsRequest = {}): Promise<ApplicationSettingDefinition[]> {
+    const definitions = await this.settings.listDefinitions();
+
+    return definitions.filter((definition) => {
+      if (request.category && definition.category !== request.category) {
+        return false;
+      }
+
+      if (request.keys && request.keys.length > 0 && !request.keys.includes(definition.key)) {
+        return false;
+      }
+
+      return true;
+    });
   }
 }

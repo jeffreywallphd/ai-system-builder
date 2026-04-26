@@ -442,3 +442,42 @@ it("maps python runtime status/control bridge calls to dedicated IPC request cha
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value);
 });
+
+it("maps application settings bridge calls to dedicated settings channels", async () => {
+  const responses = [
+    {
+      ok: true,
+      operation: "application-settings.list-definitions",
+      channel: "ipc.application-settings.list-definitions.response",
+      value: { definitions: [] },
+    },
+    {
+      ok: true,
+      operation: "application-settings.read",
+      channel: "ipc.application-settings.read.response",
+      value: { values: [{ key: "huggingface.token", configured: true, masked: true, maskedValue: "********" }] },
+    },
+    {
+      ok: true,
+      operation: "application-settings.resolve-model-default",
+      channel: "ipc.application-settings.resolve-model-default.response",
+      value: { resolved: { provider: "transformers", modelId: "google/flan-t5-small", inferenceMode: "text2text", source: "builtin" } },
+    },
+  ];
+  let index = 0;
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
+    const response = responses[index];
+    index += 1;
+    return response;
+  });
+
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+  await api.listApplicationSettingDefinitions();
+  const read = await api.readApplicationSettings({ keys: ["huggingface.token"] });
+  const resolved = await api.resolveModelDefault({ taskKey: "qaGeneration" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe("ipc.application-settings.list-definitions.request");
+  expect(invoke.mock.calls[1]?.[0]).toBe("ipc.application-settings.read.request");
+  expect(read.value.values[0]?.maskedValue).toBe("********");
+  expect(resolved.value.resolved.inferenceMode).toBe("text2text");
+});
