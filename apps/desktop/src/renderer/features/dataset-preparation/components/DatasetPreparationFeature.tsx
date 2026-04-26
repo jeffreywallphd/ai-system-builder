@@ -12,7 +12,6 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
   const {
     artifacts,
     selectedArtifactIds,
-    template,
     unsupportedDocumentPolicy,
     normalizationMode,
     chunkSize,
@@ -42,7 +41,6 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
     status,
     resultSummary,
     onToggleArtifact,
-    setTemplate,
     setUnsupportedDocumentPolicy,
     setNormalizationMode,
     setChunkSize,
@@ -93,11 +91,6 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
             </label>
           ))}
         </section>
-
-        <label className="ui-stack ui-stack--sm">
-          <span>Template</span>
-          <textarea className="ui-input" value={template} onChange={(event) => setTemplate(event.target.value)} rows={3} />
-        </label>
 
         <section className="ui-stack ui-stack--sm">
           <h3>Normalization</h3>

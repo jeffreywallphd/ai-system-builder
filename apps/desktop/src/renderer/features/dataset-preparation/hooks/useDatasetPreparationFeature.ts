@@ -27,7 +27,6 @@ const DEFAULT_DATASET_PREPARATION_RECIPE_BASE = {
 export interface UseDatasetPreparationFeatureResult {
   artifacts: Array<{ artifactId: string; label: string }>;
   selectedArtifactIds: string[];
-  template: string;
   unsupportedDocumentPolicy: "" | "fail" | "skip";
   normalizationMode: "" | "best-effort" | "strict";
   chunkSize: string;
@@ -57,7 +56,6 @@ export interface UseDatasetPreparationFeatureResult {
   status: DatasetPreparationStatus;
   resultSummary?: DatasetPreparationResultSummary;
   onToggleArtifact: (artifactId: string) => void;
-  setTemplate: (value: string) => void;
   setUnsupportedDocumentPolicy: (value: "" | "fail" | "skip") => void;
   setNormalizationMode: (value: "" | "best-effort" | "strict") => void;
   setChunkSize: (value: string) => void;
@@ -123,7 +121,6 @@ function parseOptionalInteger(value: string): number | undefined {
 
 function validateInputs(input: {
   selectedArtifactIds: string[];
-  template: string;
   chunkSize: string;
   chunkOverlap: string;
   maxChunkCount: string;
@@ -142,10 +139,6 @@ function validateInputs(input: {
 }): string | undefined {
   if (input.selectedArtifactIds.length === 0) {
     return "Select at least one source artifact.";
-  }
-
-  if (input.template.trim().length === 0) {
-    return "Template is required.";
   }
 
   if (input.modelId.trim().length === 0) {
@@ -232,7 +225,6 @@ export function useDatasetPreparationFeature(
   const datasetClient = useDatasetPreparationClient(options.client);
   const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string }>>([]);
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
-  const [template, setTemplate] = useState("Prompt: {{text}}");
   const [unsupportedDocumentPolicy, setUnsupportedDocumentPolicy] = useState<"" | "fail" | "skip">("");
   const [normalizationMode, setNormalizationMode] = useState<"" | "best-effort" | "strict">("");
   const [chunkSize, setChunkSize] = useState("1000");
@@ -290,7 +282,6 @@ export function useDatasetPreparationFeature(
 
     const validationError = validateInputs({
       selectedArtifactIds,
-      template,
       chunkSize,
       chunkOverlap,
       maxChunkCount,
@@ -352,7 +343,6 @@ export function useDatasetPreparationFeature(
               device: modelDevice || undefined,
               torchDtype: modelTorchDtype || undefined,
             },
-            promptTemplate: template.trim(),
             maxExamplesPerChunk: typeof parsedMaxExamplesPerChunk === "number" && !Number.isNaN(parsedMaxExamplesPerChunk)
               ? parsedMaxExamplesPerChunk
               : undefined,
@@ -420,7 +410,6 @@ export function useDatasetPreparationFeature(
     options.onPrepared?.();
   }, [
     selectedArtifactIds,
-    template,
     unsupportedDocumentPolicy,
     normalizationMode,
     chunkSize,
@@ -455,7 +444,6 @@ export function useDatasetPreparationFeature(
   return {
     artifacts,
     selectedArtifactIds,
-    template,
     unsupportedDocumentPolicy,
     normalizationMode,
     chunkSize,
@@ -485,7 +473,6 @@ export function useDatasetPreparationFeature(
     status,
     resultSummary,
     onToggleArtifact,
-    setTemplate,
     setUnsupportedDocumentPolicy,
     setNormalizationMode,
     setChunkSize,

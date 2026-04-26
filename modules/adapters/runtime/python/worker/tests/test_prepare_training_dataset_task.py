@@ -117,13 +117,55 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
 
             if output_format == "jsonl":
                 first_row = json.loads(contents.splitlines()[0])
-                self.assertEqual(set(first_row.keys()), {"artifactId", "chunkIndex", "question", "answer", "generationMode"})
+                self.assertEqual(
+                    set(first_row.keys()),
+                    {
+                        "artifactId",
+                        "chunkIndex",
+                        "instruction",
+                        "input",
+                        "output",
+                        "prompt",
+                        "completion",
+                        "question",
+                        "answer",
+                        "generationMode",
+                    },
+                )
             elif output_format == "json":
                 first_row = json.loads(contents)[0]
-                self.assertEqual(set(first_row.keys()), {"artifactId", "chunkIndex", "question", "answer", "generationMode"})
+                self.assertEqual(
+                    set(first_row.keys()),
+                    {
+                        "artifactId",
+                        "chunkIndex",
+                        "instruction",
+                        "input",
+                        "output",
+                        "prompt",
+                        "completion",
+                        "question",
+                        "answer",
+                        "generationMode",
+                    },
+                )
             else:
                 reader = csv.DictReader(contents.splitlines())
-                self.assertEqual(reader.fieldnames, ["artifactId", "chunkIndex", "question", "answer", "generationMode"])
+                self.assertEqual(
+                    reader.fieldnames,
+                    [
+                        "artifactId",
+                        "chunkIndex",
+                        "instruction",
+                        "input",
+                        "output",
+                        "prompt",
+                        "completion",
+                        "question",
+                        "answer",
+                        "generationMode",
+                    ],
+                )
 
     def test_split_validation_requires_positive_ratios_and_total_of_one(self) -> None:
         payload = self._build_payload("jsonl")

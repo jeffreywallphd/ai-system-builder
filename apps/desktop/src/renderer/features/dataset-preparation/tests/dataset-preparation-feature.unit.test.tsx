@@ -112,7 +112,6 @@ describe("DatasetPreparationFeature", () => {
             device: "auto",
             torchDtype: undefined,
           },
-          promptTemplate: "Prompt: {{text}}",
           maxExamplesPerChunk: 4,
           batchSize: 4,
           failurePolicy: "skip",
