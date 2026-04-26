@@ -36,6 +36,8 @@ describe("createPythonDatasetPreparationPort", () => {
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded,
+      getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+      unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
     });
 
     const result = await adapter.prepareTrainingDataset({
@@ -123,6 +125,8 @@ describe("createPythonDatasetPreparationPort", () => {
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded,
+      getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+      unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
     }, { ensureRuntimeReady });
 
     await adapter.prepareTrainingDataset({
@@ -158,6 +162,8 @@ describe("createPythonDatasetPreparationPort", () => {
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
+      getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+      unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
     });
 
     try {
@@ -209,6 +215,8 @@ describe("createPythonDatasetPreparationPort", () => {
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
+      getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+      unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
     }, { taskTimeoutMs: 25_000 });
 
     await adapter.prepareTrainingDataset({
@@ -247,6 +255,8 @@ describe("createPythonDatasetPreparationPort", () => {
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
+      getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+      unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
     });
 
     await expect(adapter.prepareTrainingDataset({
@@ -283,6 +293,8 @@ describe("createPythonDatasetPreparationPort", () => {
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
+      getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+      unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
     });
 
     await expect(adapter.prepareTrainingDataset({
@@ -319,6 +331,8 @@ describe("createPythonDatasetPreparationPort", () => {
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
+      getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+      unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
     });
 
     await expect(adapter.prepareTrainingDataset({

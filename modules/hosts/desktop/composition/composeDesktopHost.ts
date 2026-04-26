@@ -97,6 +97,7 @@ export interface DesktopHostComposition {
   startPythonRuntime: () => Promise<void>;
   stopPythonRuntime: () => Promise<void>;
   restartPythonRuntime: () => Promise<void>;
+  unloadPythonRuntimeModel: () => Promise<void>;
   readPythonRuntimeStatus: () => Promise<DesktopPythonRuntimeStatusPayload>;
   getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
@@ -206,16 +207,21 @@ export function composeDesktopHost(
     let healthy = false;
     let runtimeStatus = supervisorStatus === "ready" ? "ready" : supervisorStatus;
     let capabilities: string[] = [];
+    let loadedModels: DesktopPythonRuntimeStatusPayload["loadedModels"] = [];
+    let activeTaskCount = 0;
     const shouldProbeRuntimeHttp = supervisorStatus === "starting" || supervisorStatus === "ready";
     if (shouldProbeRuntimeHttp) {
       try {
-        const [health, runtimeCapabilities] = await Promise.all([
+        const [health, runtimeCapabilities, modelStatus] = await Promise.all([
           pythonRuntimeFoundation.runtimePort.getHealthStatus(),
           pythonRuntimeFoundation.runtimePort.getCapabilities(),
+          pythonRuntimeFoundation.runtimePort.getModelStatus(),
         ]);
         healthy = health.healthy;
         runtimeStatus = health.status.status;
         capabilities = runtimeCapabilities.capabilities;
+        loadedModels = modelStatus.loadedModels;
+        activeTaskCount = modelStatus.activeTaskCount;
       } catch (error) {
         runtimeStatus = "unavailable";
         const diagnosticsMessage = error instanceof Error ? error.message : String(error);
@@ -247,6 +253,8 @@ export function composeDesktopHost(
       healthy,
       runtimeStatus,
       capabilities,
+      loadedModels,
+      activeTaskCount,
       logs: [...runtimeLogs],
     };
   };
@@ -281,7 +289,18 @@ export function composeDesktopHost(
     },
     getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
     getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
-    ensureModelDownloaded: (request) => pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request),
+    ensureModelDownloaded: async (request) => {
+      const availability = await pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+      recordRuntimeLog({
+        level: "info",
+        message: availability.localPath
+          ? `Generation model ${request.modelId} will be loaded from ${availability.localPath}.`
+          : `Generation model ${request.modelId} will be loaded from the configured Transformers model reference.`,
+      });
+      return availability;
+    },
+    getModelStatus: () => pythonRuntimeFoundation.runtimePort.getModelStatus(),
+    unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels(),
   }, {
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
@@ -321,6 +340,17 @@ export function composeDesktopHost(
         message: "Restarting Python runtime.",
       });
       await pythonRuntimeFoundation.supervisor.restart();
+    },
+    async unloadPythonRuntimeModel() {
+      recordRuntimeLog({
+        level: "info",
+        message: "Unloading Python runtime generation model from memory.",
+      });
+      const result = await pythonRuntimeFoundation.runtimePort.unloadModels();
+      recordRuntimeLog({
+        level: "info",
+        message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.`,
+      });
     },
     async readPythonRuntimeStatus() {
       return readPythonRuntimeStatus();
@@ -483,6 +513,17 @@ export function composeDesktopHost(
           startPythonRuntime: () => pythonRuntimeFoundation.supervisor.start(),
           stopPythonRuntime: () => pythonRuntimeFoundation.supervisor.stop(),
           restartPythonRuntime: () => pythonRuntimeFoundation.supervisor.restart(),
+          unloadPythonRuntimeModel: async () => {
+            recordRuntimeLog({
+              level: "info",
+              message: "Unloading Python runtime generation model from memory.",
+            });
+            const result = await pythonRuntimeFoundation.runtimePort.unloadModels();
+            recordRuntimeLog({
+              level: "info",
+              message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.`,
+            });
+          },
           readPythonRuntimeStatus,
         },
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),

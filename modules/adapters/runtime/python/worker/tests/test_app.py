@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from modules.adapters.runtime.python.worker.app import capabilities, ensure_model_download, execute_task, health
+from modules.adapters.runtime.python.worker.app import capabilities, ensure_model_download, execute_task, health, model_status, unload_models
 from modules.adapters.runtime.python.worker.models import EnsureModelDownloadRequest
 from modules.adapters.runtime.python.worker.models import PythonRuntimeTaskRequest
 from modules.adapters.runtime.python.worker.tasks.prepare_training_dataset import DatasetPreparationStageError
@@ -87,6 +87,7 @@ class WorkerAppTests(unittest.TestCase):
         result = capabilities()
         self.assertIn("prepare-training-dataset", result.capabilities)
         self.assertIn("ensure-model-download", result.capabilities)
+        self.assertIn("unload-model", result.capabilities)
 
     def test_ensure_model_download_endpoint_returns_download_status(self) -> None:
         request = EnsureModelDownloadRequest(provider="transformers", modelId="Qwen/Qwen2.5-1.5B-Instruct")
@@ -103,6 +104,37 @@ class WorkerAppTests(unittest.TestCase):
         self.assertTrue(result.downloaded)
         self.assertFalse(result.fromCache)
         self.assertEqual(result.localPath, "/tmp/models/qwen")
+
+    def test_model_status_endpoint_reports_loaded_models_and_active_tasks(self) -> None:
+        with patch("modules.adapters.runtime.python.worker.app.describe_loaded_generation_models") as describe_mock:
+            describe_mock.return_value = [{
+                "provider": "transformers",
+                "modelId": "test-model",
+                "inferenceMode": "text2text",
+                "device": "auto",
+                "torchDtype": "auto",
+                "localPath": "/tmp/models/test-model",
+            }]
+            result = model_status()
+
+        self.assertEqual(result.activeTaskCount, 0)
+        self.assertEqual(result.loadedModels[0].modelId, "test-model")
+        self.assertEqual(result.loadedModels[0].localPath, "/tmp/models/test-model")
+
+    def test_unload_models_endpoint_clears_loaded_models_when_idle(self) -> None:
+        with patch("modules.adapters.runtime.python.worker.app.unload_generation_models") as unload_mock:
+            unload_mock.return_value = [{
+                "provider": "transformers",
+                "modelId": "test-model",
+                "inferenceMode": "text2text",
+                "device": "auto",
+                "torchDtype": "auto",
+                "localPath": "/tmp/models/test-model",
+            }]
+            result = unload_models()
+
+        self.assertEqual(result.unloadedModels[0].modelId, "test-model")
+        self.assertEqual(result.activeTaskCount, 0)
 
     def test_timeout_returns_structured_error(self) -> None:
         request = PythonRuntimeTaskRequest(

@@ -43,6 +43,7 @@ describe("registerPythonRuntimeIpc", () => {
       startPythonRuntime,
       stopPythonRuntime: testDouble.fn(async () => undefined),
       restartPythonRuntime: testDouble.fn(async () => undefined),
+      unloadPythonRuntimeModel: testDouble.fn(async () => undefined),
       readPythonRuntimeStatus: testDouble.fn(async () => ({
         supervisorStatus: "starting",
         healthy: false,
@@ -97,6 +98,7 @@ describe("registerPythonRuntimeIpc", () => {
       restartPythonRuntime: testDouble.fn(async () => {
         throw new Error("restart failed");
       }),
+      unloadPythonRuntimeModel: testDouble.fn(async () => undefined),
       readPythonRuntimeStatus: testDouble.fn(async () => ({
         supervisorStatus: "failed",
         healthy: false,
@@ -136,6 +138,7 @@ describe("registerPythonRuntimeIpc", () => {
       startPythonRuntime: testDouble.fn(async () => undefined),
       stopPythonRuntime: testDouble.fn(async () => undefined),
       restartPythonRuntime: testDouble.fn(async () => undefined),
+      unloadPythonRuntimeModel: testDouble.fn(async () => undefined),
       readPythonRuntimeStatus: testDouble.fn(async () => ({
         supervisorStatus: "stopped",
         healthy: false,
@@ -149,5 +152,35 @@ describe("registerPythonRuntimeIpc", () => {
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
+  });
+
+  it("maps unload-model control requests to the runtime model unload operation", async () => {
+    const unloadPythonRuntimeModel = testDouble.fn(async () => undefined);
+    const handler = createDesktopPythonRuntimeControlIpcHandler({
+      startPythonRuntime: testDouble.fn(async () => undefined),
+      stopPythonRuntime: testDouble.fn(async () => undefined),
+      restartPythonRuntime: testDouble.fn(async () => undefined),
+      unloadPythonRuntimeModel,
+      readPythonRuntimeStatus: testDouble.fn(async () => ({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["unload-model"],
+        logs: [],
+        loadedModels: [],
+        activeTaskCount: 0,
+      })),
+    });
+
+    const response = await handler({}, createDesktopPythonRuntimeControlRequest({
+      action: "unload-model",
+      boundary: {
+        host: "desktop",
+        source: "desktop.renderer.dataset-preparation",
+      },
+    }));
+
+    expect(unloadPythonRuntimeModel).toHaveBeenCalledOnce();
+    expect(response.ok).toBe(true);
   });
 });

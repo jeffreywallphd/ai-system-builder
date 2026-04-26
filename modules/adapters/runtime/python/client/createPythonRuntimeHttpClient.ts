@@ -1,15 +1,19 @@
 import type {
   PythonRuntimeCapabilitiesResult,
   PythonRuntimeHealthCheckResult,
+  PythonRuntimeModelStatusResult,
   PythonRuntimeTaskRequest,
   PythonRuntimeTaskResult,
+  PythonRuntimeUnloadModelsResult,
 } from "../../../../contracts/runtime";
 
 import {
   mapCapabilitiesResponseFromHttpPayload,
   mapHealthResponseFromHttpPayload,
+  mapModelStatusResponseFromHttpPayload,
   mapTaskRequestToHttpPayload,
   mapTaskResponseFromHttpPayload,
+  mapUnloadModelsResponseFromHttpPayload,
 } from "../protocol/pythonRuntimeHttpProtocol";
 
 export interface PythonRuntimeHttpClient {
@@ -22,6 +26,8 @@ export interface PythonRuntimeHttpClient {
     fromCache: boolean;
     localPath?: string;
   }>;
+  getModelStatus(): Promise<PythonRuntimeModelStatusResult>;
+  unloadModels(): Promise<PythonRuntimeUnloadModelsResult>;
   executeTask(request: PythonRuntimeTaskRequest): Promise<PythonRuntimeTaskResult>;
 }
 
@@ -133,6 +139,31 @@ export function createPythonRuntimeHttpClient(
       });
       const payload = await parseJsonResponseSafe(response);
       return mapModelDownloadResponse("/models/ensure-downloaded", response, payload);
+    },
+
+    async getModelStatus() {
+      const response = await fetcher(`${baseUrl}/models/status`, { method: "GET" });
+      const payload = await parseJsonResponseSafe(response);
+      return mapRuntimeResponsePayload("/models/status", response, payload, mapModelStatusResponseFromHttpPayload);
+    },
+
+    async unloadModels() {
+      const response = await fetcher(`${baseUrl}/models/unload`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+      const payload = await parseJsonResponseSafe(response);
+      if (!response.ok && payload && typeof payload === "object" && "error" in payload) {
+        const error = (payload as { error?: { message?: unknown } }).error;
+        const message = typeof error?.message === "string"
+          ? error.message
+          : `Python runtime request failed for /models/unload with status ${response.status}.`;
+        throw new Error(`Python runtime model unload failed: ${message}`);
+      }
+
+      return mapRuntimeResponsePayload("/models/unload", response, payload, mapUnloadModelsResponseFromHttpPayload);
     },
 
     async executeTask(request: PythonRuntimeTaskRequest) {

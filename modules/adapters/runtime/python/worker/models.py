@@ -48,6 +48,25 @@ class EnsureModelDownloadResult(BaseModel):
     localPath: str | None = None
 
 
+class LoadedModelDescriptor(BaseModel):
+    provider: Literal["transformers"]
+    modelId: str
+    inferenceMode: Literal["text2text", "causal", "chat"]
+    device: Literal["cpu", "cuda", "auto"] | None = None
+    torchDtype: Literal["auto", "float16", "bfloat16", "float32"] | None = None
+    localPath: str | None = None
+
+
+class ModelStatusResult(BaseModel):
+    loadedModels: list[LoadedModelDescriptor]
+    activeTaskCount: int
+
+
+class UnloadModelsResult(BaseModel):
+    unloadedModels: list[LoadedModelDescriptor]
+    activeTaskCount: int
+
+
 class PythonRuntimeTaskRequest(BaseModel):
     requestId: str
     taskType: str

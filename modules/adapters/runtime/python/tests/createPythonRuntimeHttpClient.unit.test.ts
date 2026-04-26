@@ -97,6 +97,52 @@ describe("createPythonRuntimeHttpClient", () => {
     });
   });
 
+  it("supports model status and unload endpoints over local HTTP", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/models/status")) {
+        expect(init?.method).toBe("GET");
+        return new Response(JSON.stringify({
+          loadedModels: [{
+            provider: "transformers",
+            modelId: "google/flan-t5-base",
+            inferenceMode: "text2text",
+            device: "auto",
+            torchDtype: "auto",
+            localPath: "/tmp/models/flan",
+          }],
+          activeTaskCount: 0,
+        }), { status: 200 });
+      }
+
+      expect(url.endsWith("/models/unload")).toBe(true);
+      expect(init?.method).toBe("POST");
+      return new Response(JSON.stringify({
+        unloadedModels: [{
+          provider: "transformers",
+          modelId: "google/flan-t5-base",
+          inferenceMode: "text2text",
+          device: "auto",
+          torchDtype: "auto",
+          localPath: "/tmp/models/flan",
+        }],
+        activeTaskCount: 0,
+      }), { status: 200 });
+    });
+
+    const client = createPythonRuntimeHttpClient({
+      baseUrl: "http://127.0.0.1:43111",
+      fetchImplementation,
+    });
+
+    const status = await client.getModelStatus();
+    const unload = await client.unloadModels();
+
+    expect(status.loadedModels[0]?.localPath).toBe("/tmp/models/flan");
+    expect(unload.unloadedModels[0]?.modelId).toBe("google/flan-t5-base");
+    expect(fetchImplementation).toHaveBeenCalledTimes(2);
+  });
+
   it("maps structured model download failures without exposing ASGI stack traces", async () => {
     const fetchImplementation = testDouble.fn<typeof fetch>(async () =>
       new Response(JSON.stringify({
