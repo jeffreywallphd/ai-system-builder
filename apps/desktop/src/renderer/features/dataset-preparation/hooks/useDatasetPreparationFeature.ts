@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 
 import type { ModelDefaultInferenceMode } from "../../../../../../../modules/contracts/settings";
 import { createDesktopApplicationSettingsClient, type DesktopApplicationSettingsClient } from "../../settings";
+import { createDesktopPythonRuntimeClient, type DesktopPythonRuntimeClient } from "../../python-runtime/api/desktopPythonRuntimeClient";
 import type { DesktopDatasetPreparationClient } from "../api/desktopDatasetPreparationClient";
 import { buildDatasetPreparationRequest } from "./datasetPreparationRequestBuilder";
 import {
   validateAndParseDatasetPreparationInputs,
 } from "./datasetPreparationRequestValidation";
+import { resolveLatestModelDownloadProgress } from "./modelDownloadProgress";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 
 interface DatasetPreparationStatus {
@@ -88,6 +90,7 @@ export interface UseDatasetPreparationFeatureResult {
 export interface UseDatasetPreparationFeatureOptions {
   client?: DesktopDatasetPreparationClient;
   settingsClient?: DesktopApplicationSettingsClient;
+  runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus">;
   onPrepared?: () => void;
 }
 
@@ -115,6 +118,16 @@ export function useDatasetPreparationFeature(
       return undefined;
     }
   }, [options.settingsClient]);
+  const runtimeStatusClient = useMemo(() => {
+    if (options.runtimeStatusClient) {
+      return options.runtimeStatusClient;
+    }
+    try {
+      return createDesktopPythonRuntimeClient();
+    } catch {
+      return undefined;
+    }
+  }, [options.runtimeStatusClient]);
   const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string }>>([]);
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
   const [unsupportedDocumentPolicy, setUnsupportedDocumentPolicy] = useState<"" | "fail" | "skip">("");
@@ -231,12 +244,12 @@ export function useDatasetPreparationFeature(
       huggingFaceRepository,
     });
 
-    if (!validationResult.ok) {
+    if (validationResult.ok === false) {
       setStatus({ kind: "error", message: validationResult.error });
       return;
     }
 
-    setStatus({ kind: "loading", message: "Preparing training dataset..." });
+    setStatus({ kind: "loading", message: "Resolving generation model settings..." });
     setResultSummary(undefined);
 
     const resolvedDefault = await (settingsClient?.resolveModelDefault({
@@ -250,33 +263,71 @@ export function useDatasetPreparationFeature(
       device: undefined,
       torchDtype: undefined,
     }));
+    const request = buildDatasetPreparationRequest({
+      selectedArtifactIds,
+      unsupportedDocumentPolicy,
+      normalizationMode,
+      preserveDocumentBoundaries,
+      modelId,
+      modelInferenceMode,
+      modelDevice,
+      modelTorchDtype,
+      failurePolicy,
+      shuffle,
+      outputFormat,
+      outputBaseName,
+      localDestinationEnabled,
+      huggingFaceDestinationEnabled,
+      huggingFaceRepository,
+      huggingFaceRevision,
+      huggingFacePathPrefix,
+      parsed: validationResult.parsed,
+      resolvedDefault,
+    });
+    const generationModelId = request.recipe.generation.model.modelId;
     const requestId = createDatasetPreparationRequestId();
-    const response = await datasetClient.prepareTrainingDatasetFromArtifacts(
-      buildDatasetPreparationRequest({
-        selectedArtifactIds,
-        unsupportedDocumentPolicy,
-        normalizationMode,
-        preserveDocumentBoundaries,
-        modelId,
-        modelInferenceMode,
-        modelDevice,
-        modelTorchDtype,
-        failurePolicy,
-        shuffle,
-        outputFormat,
-        outputBaseName,
-        localDestinationEnabled,
-        huggingFaceDestinationEnabled,
-        huggingFaceRepository,
-        huggingFaceRevision,
-        huggingFacePathPrefix,
-        parsed: validationResult.parsed,
-        resolvedDefault,
-      }),
-      { requestId },
-    );
+    const progressStartedAtMs = Date.now();
+    let preparationActive = true;
+    let progressReadInFlight = false;
+    const refreshModelDownloadProgress = async () => {
+      if (!runtimeStatusClient || progressReadInFlight || !preparationActive) {
+        return;
+      }
 
-    if (!response.ok) {
+      progressReadInFlight = true;
+      try {
+        const snapshot = await runtimeStatusClient.readStatus();
+        if (!preparationActive) {
+          return;
+        }
+        const progress = resolveLatestModelDownloadProgress(snapshot, generationModelId, {
+          sinceEpochMs: progressStartedAtMs,
+        });
+        if (progress) {
+          setStatus({ kind: "loading", message: progress.message });
+        }
+      } catch {
+        // Progress polling is best-effort; the preparation request owns final success/failure.
+      } finally {
+        progressReadInFlight = false;
+      }
+    };
+
+    setStatus({ kind: "loading", message: `Checking model ${generationModelId} before dataset preparation...` });
+    void refreshModelDownloadProgress();
+    const progressTimer = window.setInterval(() => {
+      void refreshModelDownloadProgress();
+    }, 750);
+
+    const response = await datasetClient.prepareTrainingDatasetFromArtifacts(
+      request,
+      { requestId },
+    ).finally(() => {
+      preparationActive = false;
+      window.clearInterval(progressTimer);
+    });
+
+    if (response.ok === false) {
       setStatus({ kind: "error", message: response.error.message });
       return;
     }
@@ -322,6 +373,7 @@ export function useDatasetPreparationFeature(
     huggingFacePathPrefix,
     datasetClient,
     settingsClient,
+    runtimeStatusClient,
     refreshArtifacts,
     onPrepared,
   ]);

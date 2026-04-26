@@ -154,6 +154,11 @@ export function composeDesktopHost(
     filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/desktop/hugging-face-token.json",
     fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
   });
+  const pythonRuntimeEnvironment = {
+    ...process.env,
+    HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? "1",
+    HF_HUB_DISABLE_SYMLINKS_WARNING: process.env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
+  };
   const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
     client: {
       baseUrl: process.env.PYTHON_RUNTIME_BASE_URL ?? "http://127.0.0.1:43111",
@@ -162,7 +167,7 @@ export function composeDesktopHost(
       command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
       args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
       cwd: process.env.PYTHON_RUNTIME_WORKER_DIR ?? "modules/adapters/runtime/python/worker",
-      env: process.env,
+      env: pythonRuntimeEnvironment,
       prepareRuntimeEnvironment(context) {
         ensurePythonRuntimeWorkerDependencies({
           command: context.command,

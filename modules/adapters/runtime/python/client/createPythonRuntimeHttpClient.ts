@@ -81,6 +81,15 @@ function mapModelDownloadResponse(endpoint: string, response: Response, payload:
   }
 
   const record = parsed as Record<string, unknown>;
+  if (!response.ok) {
+    const error = record.error;
+    const message = error && typeof error === "object" && !Array.isArray(error)
+      && typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message
+      : `Python runtime request failed for ${endpoint} with status ${response.status}.`;
+    throw new Error(`Python runtime model download failed: ${message}`);
+  }
+
   if (record.provider !== "transformers" || typeof record.modelId !== "string") {
     throw new Error(`Python runtime request failed for ${endpoint} with invalid structured payload.`);
   }

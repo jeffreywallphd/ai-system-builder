@@ -1,6 +1,7 @@
 import {
   type DesktopDatasetPreparationClient,
 } from "../api/desktopDatasetPreparationClient";
+import type { DesktopPythonRuntimeClient } from "../../python-runtime/api/desktopPythonRuntimeClient";
 import type { DesktopApplicationSettingsClient } from "../../settings";
 import { SettingsPanel } from "../../settings";
 import { useDatasetPreparationFeature } from "../hooks/useDatasetPreparationFeature";
@@ -9,9 +10,10 @@ export interface DatasetPreparationFeatureProps {
   onPrepared?: () => void;
   client?: DesktopDatasetPreparationClient;
   settingsClient?: DesktopApplicationSettingsClient;
+  runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus">;
 }
 
-export function DatasetPreparationFeature({ onPrepared, client, settingsClient }: DatasetPreparationFeatureProps) {
+export function DatasetPreparationFeature({ onPrepared, client, settingsClient, runtimeStatusClient }: DatasetPreparationFeatureProps) {
   const {
     artifacts,
     selectedArtifactIds,
@@ -77,6 +79,7 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient }
   } = useDatasetPreparationFeature({
     client,
     settingsClient,
+    runtimeStatusClient,
     onPrepared,
   });
 

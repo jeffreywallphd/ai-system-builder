@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from os import getenv
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 from .models import (
     EnsureModelDownloadRequest,
@@ -56,8 +57,27 @@ def capabilities() -> PythonRuntimeCapabilitiesResult:
 
 
 @app.post("/models/ensure-downloaded", response_model=EnsureModelDownloadResult)
-def ensure_model_download(request: EnsureModelDownloadRequest) -> EnsureModelDownloadResult:
-    availability = ensure_generation_model_downloaded(LocalModelConfig(provider=request.provider, modelId=request.modelId))
+def ensure_model_download(request: EnsureModelDownloadRequest) -> EnsureModelDownloadResult | JSONResponse:
+    try:
+        availability = ensure_generation_model_downloaded(LocalModelConfig(provider=request.provider, modelId=request.modelId))
+    except Exception as error:
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": PythonRuntimeError(
+                    code="model_download_failed",
+                    errorCode="generation_model_not_available",
+                    stage="generation",
+                    message=str(error),
+                    details={
+                        "provider": request.provider,
+                        "modelId": request.modelId,
+                    },
+                    retryable=True,
+                ).model_dump(mode="json"),
+            },
+        )
+
     return EnsureModelDownloadResult(
         provider=request.provider,
         modelId=request.modelId,
