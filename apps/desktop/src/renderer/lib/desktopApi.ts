@@ -9,8 +9,11 @@ import type {
   PrepareTrainingDatasetRequest,
 } from "../../../../../modules/contracts/runtime";
 import type {
+  ApplicationSettingCategory,
   ApplicationSettingDefinition,
   ApplicationSettingValue,
+  ListApplicationSettingDefinitionsRequest,
+  ReadApplicationSettingsRequest,
   ResolveModelDefaultRequest,
   ResolvedModelDefault,
   UpdateApplicationSettingRequest,
@@ -334,8 +337,8 @@ interface DesktopApiBridge {
     artifactId: string;
   }) => Promise<unknown>;
 
-  listApplicationSettingDefinitions?: (input?: { category?: string; keys?: string[] }) => Promise<unknown>;
-  readApplicationSettings?: (input?: { category?: string; keys?: string[] }) => Promise<unknown>;
+  listApplicationSettingDefinitions?: (input?: ListApplicationSettingDefinitionsRequest) => Promise<unknown>;
+  readApplicationSettings?: (input?: ReadApplicationSettingsRequest) => Promise<unknown>;
   updateApplicationSetting?: (input: UpdateApplicationSettingRequest) => Promise<unknown>;
   clearApplicationSetting?: (input: { key: string }) => Promise<unknown>;
   resolveApplicationModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
@@ -407,6 +410,11 @@ export interface DesktopApplicationSettingsReadResult {
 
 export interface DesktopApplicationSettingsDefinitionsResult {
   definitions: ApplicationSettingDefinition[];
+}
+
+export interface DesktopApplicationSettingsFilterInput {
+  category?: ApplicationSettingCategory;
+  keys?: string[];
 }
 
 export interface DesktopApplicationSettingUpdateResult {

@@ -11,7 +11,7 @@ import type {
   UpdateApplicationSettingResult,
 } from "../settings";
 import { createTransportOperation } from "../transport";
-import { createIpcChannel, type IpcChannel, type IpcChannelValue } from "./ipc-channel";
+import { createIpcChannel } from "./ipc-channel";
 import { createIpcRequest, type IpcRequest } from "./ipc-request";
 import { createIpcSuccessResponse, type IpcResponse } from "./ipc-response";
 
@@ -218,7 +218,7 @@ export function createDesktopApplicationSettingsResolveModelDefaultSuccessRespon
 export function getDesktopApplicationSettingsChannel(
   operation: "listDefinitions" | "readSettings" | "updateSetting" | "clearSetting" | "resolveModelDefault",
   kind: "request" | "response",
-): IpcChannel<string, "request" | "response", IpcChannelValue<string, "request" | "response">> {
+) {
   if (operation === "listDefinitions") {
     return kind === "request"
       ? DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL

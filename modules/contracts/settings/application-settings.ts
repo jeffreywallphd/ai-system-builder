@@ -10,6 +10,10 @@ export const APPLICATION_SETTING_CATEGORIES = [
 
 export type ApplicationSettingCategory = (typeof APPLICATION_SETTING_CATEGORIES)[number];
 
+export function isApplicationSettingCategory(value: string): value is ApplicationSettingCategory {
+  return (APPLICATION_SETTING_CATEGORIES as readonly string[]).includes(value);
+}
+
 export const APPLICATION_SETTING_VALUE_KINDS = [
   "string",
   "number",
@@ -38,7 +42,7 @@ export type ApplicationSettingPrimitiveValue =
   | string
   | number
   | boolean
-  | Record<string, unknown>
+  | object
   | SecretSettingValue;
 
 export interface ApplicationSettingDefinition {

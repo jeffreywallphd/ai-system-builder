@@ -11,9 +11,17 @@ export const MODEL_DEFAULT_TASK_KEYS = [
 
 export type ModelDefaultTaskKey = (typeof MODEL_DEFAULT_TASK_KEYS)[number];
 
+export function isModelDefaultTaskKey(value: string): value is ModelDefaultTaskKey {
+  return (MODEL_DEFAULT_TASK_KEYS as readonly string[]).includes(value);
+}
+
 export const MODEL_DEFAULT_FEATURE_KEYS = ["datasetPreparation"] as const;
 
 export type ModelDefaultFeatureKey = (typeof MODEL_DEFAULT_FEATURE_KEYS)[number];
+
+export function isModelDefaultFeatureKey(value: string): value is ModelDefaultFeatureKey {
+  return (MODEL_DEFAULT_FEATURE_KEYS as readonly string[]).includes(value);
+}
 
 export type ModelDefaultInferenceMode = NonNullable<LocalModelConfig["inferenceMode"]>;
 

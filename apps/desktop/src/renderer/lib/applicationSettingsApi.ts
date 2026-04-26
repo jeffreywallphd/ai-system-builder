@@ -5,6 +5,15 @@ import {
   type DesktopApplicationSettingUpdateResult,
   type DesktopResolvedModelDefaultResult,
 } from "./desktopApi";
+import {
+  type ApplicationSettingCategory,
+  type ApplicationSettingPrimitiveValue,
+  isApplicationSettingCategory,
+  isModelDefaultFeatureKey,
+  isModelDefaultTaskKey,
+  type ModelDefaultFeatureKey,
+  type ModelDefaultTaskKey,
+} from "../../../../../modules/contracts/settings";
 
 function ensureSuccess<T>(
   response: unknown,
@@ -26,9 +35,36 @@ function ensureSuccess<T>(
 export interface ApplicationSettingsApi {
   listDefinitions: (input?: { category?: string; keys?: string[] }) => Promise<DesktopApplicationSettingsDefinitionsResult>;
   readSettings: (input?: { category?: string; keys?: string[] }) => Promise<DesktopApplicationSettingsReadResult>;
-  updateSetting: (input: { key: string; value: unknown }) => Promise<DesktopApplicationSettingUpdateResult>;
+  updateSetting: (input: { key: string; value: ApplicationSettingPrimitiveValue }) => Promise<DesktopApplicationSettingUpdateResult>;
   clearSetting: (input: { key: string }) => Promise<DesktopApplicationSettingUpdateResult>;
   resolveModelDefault: (input: { taskKey: string; featureKey?: string }) => Promise<DesktopResolvedModelDefaultResult>;
+}
+
+function normalizeOptionalCategory(category?: string): ApplicationSettingCategory | undefined {
+  if (!category) {
+    return undefined;
+  }
+  if (!isApplicationSettingCategory(category)) {
+    throw new Error(`Unknown application settings category "${category}".`);
+  }
+  return category;
+}
+
+function normalizeResolveTaskKey(taskKey: string): ModelDefaultTaskKey {
+  if (!isModelDefaultTaskKey(taskKey)) {
+    throw new Error(`Unknown model default task key "${taskKey}".`);
+  }
+  return taskKey;
+}
+
+function normalizeOptionalFeatureKey(featureKey?: string): ModelDefaultFeatureKey | undefined {
+  if (!featureKey) {
+    return undefined;
+  }
+  if (!isModelDefaultFeatureKey(featureKey)) {
+    throw new Error(`Unknown model default feature key "${featureKey}".`);
+  }
+  return featureKey;
 }
 
 export function createApplicationSettingsApi(): ApplicationSettingsApi {
@@ -39,8 +75,12 @@ export function createApplicationSettingsApi(): ApplicationSettingsApi {
       if (!desktopApi.listApplicationSettingDefinitions) {
         throw new Error("Desktop preload application settings list-definitions bridge is unavailable.");
       }
+      const normalizedInput = {
+        category: normalizeOptionalCategory(input.category),
+        keys: input.keys,
+      };
       return ensureSuccess(
-        await desktopApi.listApplicationSettingDefinitions(input),
+        await desktopApi.listApplicationSettingDefinitions(normalizedInput),
         (value) => value as DesktopApplicationSettingsDefinitionsResult,
         "Failed to list application setting definitions.",
       );
@@ -50,8 +90,12 @@ export function createApplicationSettingsApi(): ApplicationSettingsApi {
       if (!desktopApi.readApplicationSettings) {
         throw new Error("Desktop preload application settings read bridge is unavailable.");
       }
+      const normalizedInput = {
+        category: normalizeOptionalCategory(input.category),
+        keys: input.keys,
+      };
       return ensureSuccess(
-        await desktopApi.readApplicationSettings(input),
+        await desktopApi.readApplicationSettings(normalizedInput),
         (value) => value as DesktopApplicationSettingsReadResult,
         "Failed to read application settings.",
       );
@@ -84,8 +128,12 @@ export function createApplicationSettingsApi(): ApplicationSettingsApi {
       if (!resolver) {
         throw new Error("Desktop preload model default resolver bridge is unavailable.");
       }
+      const normalizedInput: { taskKey: ModelDefaultTaskKey; featureKey?: ModelDefaultFeatureKey } = {
+        taskKey: normalizeResolveTaskKey(input.taskKey),
+        featureKey: normalizeOptionalFeatureKey(input.featureKey),
+      };
       return ensureSuccess(
-        await resolver(input),
+        await resolver(normalizedInput),
         (value) => value as DesktopResolvedModelDefaultResult,
         "Failed to resolve model default.",
       );
