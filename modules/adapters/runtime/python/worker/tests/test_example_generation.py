@@ -11,6 +11,7 @@ from modules.adapters.runtime.python.worker.tasks.example_generation import (
     GeneratedQaExample,
     _GENERATOR_CACHE,
     _RESOLVED_MODEL_REFERENCES,
+    _extract_single_answer,
     _extract_single_question,
     ensure_generation_model_downloaded,
     generate_qa_examples_for_chunks,
@@ -27,6 +28,15 @@ class _FakeGenerator:
         if "Return only the question." in prompt:
             return "Generated question?"
         return "Generated answer."
+
+
+class _EchoingGenerator:
+    def __init__(self, _config, _params):
+        self.calls: list[str] = []
+
+    def generate_text(self, prompt: str) -> str:
+        self.calls.append(prompt)
+        return prompt
 
 
 class ExampleGenerationTests(unittest.TestCase):
@@ -73,6 +83,50 @@ class ExampleGenerationTests(unittest.TestCase):
         )
         question = _extract_single_question(generated_text, chunk)
         self.assertEqual(question, "What is the main idea of this passage about artifact-1?")
+
+    def test_extract_single_question_handles_full_instruction_prompt_echo(self) -> None:
+        chunk = MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")
+        generated_text = (
+            "You are creating supervised training data.\n"
+            "Write one concise question answerable from the context below. Return only the question.\n\n"
+            "Context:\nSome context"
+        )
+        question = _extract_single_question(generated_text, chunk)
+        self.assertEqual(question, "What is the main idea of this passage about artifact-1?")
+
+    def test_extract_single_answer_handles_prompt_echo(self) -> None:
+        chunk = MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")
+        generated_text = (
+            "You are creating supervised training data.\n"
+            "Answer the user question using only facts in the context.\n"
+            "Write in a conversational tone while staying concise and faithful.\n"
+            "Do not add details not present in the context.\n"
+            "Return only the answer.\n\n"
+            "Question:\nWhat does the context say?\n\n"
+            "Context:\nSome context"
+        )
+        answer = _extract_single_answer(generated_text, "What does the context say?", chunk)
+        self.assertEqual(answer, "Some context")
+
+    def test_generation_strips_prompt_echo_for_question_and_answer(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "model": {"provider": "transformers", "modelId": "test-model"},
+            }
+        )
+
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.example_generation.TransformersQaTextGenerator",
+            _EchoingGenerator,
+        ):
+            examples = generate_qa_examples_for_chunks(
+                [MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")],
+                config,
+            )
+
+        self.assertEqual(examples[0].question, "What is the main idea of this passage about artifact-1?")
+        self.assertEqual(examples[0].answer, "Some context")
 
     def test_reuses_cached_generator_for_same_model_config(self) -> None:
         config = ExampleGenerationConfig.model_validate(
