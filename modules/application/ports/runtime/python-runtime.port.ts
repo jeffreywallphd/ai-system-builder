@@ -1,8 +1,10 @@
 import {
   PythonRuntimeCapabilitiesResult,
   PythonRuntimeHealthCheckResult,
+  PythonRuntimeModelStatusResult,
   PythonRuntimeTaskRequest,
-  PythonRuntimeTaskResult
+  PythonRuntimeTaskResult,
+  PythonRuntimeUnloadModelsResult
 } from "../../../contracts/runtime";
 
 export interface PythonRuntimePort {
@@ -18,4 +20,6 @@ export interface PythonRuntimePort {
     fromCache: boolean;
     localPath?: string;
   }>;
+  getModelStatus(): Promise<PythonRuntimeModelStatusResult>;
+  unloadModels(): Promise<PythonRuntimeUnloadModelsResult>;
 }

@@ -240,12 +240,23 @@ export interface DesktopPythonRuntimeLogEntry {
   message: string;
 }
 
+export interface DesktopPythonRuntimeLoadedModel {
+  provider: "transformers";
+  modelId: string;
+  inferenceMode: "text2text" | "causal" | "chat";
+  device?: "cpu" | "cuda" | "auto";
+  torchDtype?: "auto" | "float16" | "bfloat16" | "float32";
+  localPath?: string;
+}
+
 export interface DesktopPythonRuntimeStatusSnapshot {
   supervisorStatus: "stopped" | "starting" | "ready" | "failed";
   healthy: boolean;
   runtimeStatus: string;
   capabilities: string[];
   logs: DesktopPythonRuntimeLogEntry[];
+  loadedModels: DesktopPythonRuntimeLoadedModel[];
+  activeTaskCount: number;
 }
 
 export interface DesktopArtifactUploadApi {
@@ -276,7 +287,7 @@ export interface DesktopDatasetPreparationApi {
 
 export interface DesktopPythonRuntimeApi {
   readPythonRuntimeStatus: () => Promise<unknown>;
-  controlPythonRuntime: (input: { action: "start" | "stop" | "restart" }) => Promise<unknown>;
+  controlPythonRuntime: (input: { action: "start" | "stop" | "restart" | "unload-model" }) => Promise<unknown>;
 }
 
 interface DesktopApiBridge {
@@ -298,7 +309,7 @@ interface DesktopApiBridge {
   }) => Promise<unknown>;
   prepareTrainingDatasetFromArtifacts?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
-  controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" }) => Promise<unknown>;
+  controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" }) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;

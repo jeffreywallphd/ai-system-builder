@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import gc
 from os import environ, getenv
 from pathlib import Path
 from threading import Lock
@@ -342,6 +343,11 @@ def get_or_create_local_text_generator(config: ExampleGenerationConfig) -> Local
             raise ValueError(f"Unsupported generation model provider: {config.model.provider}")
 
         generation_params = _resolve_generation_params(config)
+        resolved_model_reference = _RESOLVED_MODEL_REFERENCES.get(config.model.modelId, config.model.modelId)
+        print(
+            f"Loading generation model {config.model.modelId} from {resolved_model_reference}.",
+            flush=True,
+        )
         if config.model.inferenceMode == "text2text":
             created: LocalTextGenerator = TransformersText2TextGenerator(config.model, generation_params)
         elif config.model.inferenceMode == "causal":
@@ -353,3 +359,37 @@ def get_or_create_local_text_generator(config: ExampleGenerationConfig) -> Local
 
         _GENERATOR_CACHE[key] = created
         return created
+
+
+def _describe_loaded_generation_models_unlocked() -> list[dict[str, str | None]]:
+    return [
+        {
+            "provider": provider,
+            "modelId": model_id,
+            "inferenceMode": inference_mode,
+            "device": device,
+            "torchDtype": torch_dtype,
+            "localPath": _RESOLVED_MODEL_REFERENCES.get(model_id),
+        }
+        for provider, model_id, inference_mode, device, torch_dtype in _GENERATOR_CACHE.keys()
+    ]
+
+
+def describe_loaded_generation_models() -> list[dict[str, str | None]]:
+    with _GENERATOR_CACHE_LOCK:
+        return _describe_loaded_generation_models_unlocked()
+
+
+def unload_generation_models() -> list[dict[str, str | None]]:
+    with _GENERATOR_CACHE_LOCK:
+        unloaded = _describe_loaded_generation_models_unlocked()
+        _GENERATOR_CACHE.clear()
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+    return unloaded

@@ -24,6 +24,20 @@ describe("createPythonRuntimeAdapterFoundation", () => {
         }), { status: 200 });
       }
 
+      if (url.endsWith("/models/status")) {
+        return new Response(JSON.stringify({
+          loadedModels: [],
+          activeTaskCount: 0,
+        }), { status: 200 });
+      }
+
+      if (url.endsWith("/models/unload")) {
+        return new Response(JSON.stringify({
+          unloadedModels: [],
+          activeTaskCount: 0,
+        }), { status: 200 });
+      }
+
       return new Response(JSON.stringify({
         requestId: "req-1",
         taskType: "prepare-training-dataset",
@@ -56,6 +70,8 @@ describe("createPythonRuntimeAdapterFoundation", () => {
 
     const health = await foundation.runtimePort.getHealthStatus();
     const capabilities = await foundation.runtimePort.getCapabilities();
+    const modelStatus = await foundation.runtimePort.getModelStatus();
+    const unloadResult = await foundation.runtimePort.unloadModels();
     const taskResult = await foundation.runtimePort.executeTask({
       requestId: "req-1",
       taskType: "prepare-training-dataset",
@@ -64,6 +80,8 @@ describe("createPythonRuntimeAdapterFoundation", () => {
 
     expect(health.healthy).toBe(true);
     expect(capabilities.capabilities).toContain("prepare-training-dataset");
+    expect(modelStatus.loadedModels).toEqual([]);
+    expect(unloadResult.unloadedModels).toEqual([]);
     expect(taskResult.success).toBe(false);
     expect(foundation.supervisor.getStatus()).toBe("stopped");
   });

@@ -27,6 +27,13 @@ function toStatusSnapshot(value: unknown): DesktopPythonRuntimeStatusSnapshot {
     healthy: payload.healthy === true,
     runtimeStatus: typeof payload.runtimeStatus === "string" ? payload.runtimeStatus : "unknown",
     capabilities: Array.isArray(payload.capabilities) ? payload.capabilities.filter((value): value is string => typeof value === "string") : [],
+    loadedModels: Array.isArray(payload.loadedModels)
+      ? payload.loadedModels.filter((entry): entry is DesktopPythonRuntimeStatusSnapshot["loadedModels"][number] =>
+        typeof entry?.modelId === "string"
+        && entry?.provider === "transformers"
+        && (entry?.inferenceMode === "text2text" || entry?.inferenceMode === "causal" || entry?.inferenceMode === "chat"))
+      : [],
+    activeTaskCount: typeof payload.activeTaskCount === "number" ? payload.activeTaskCount : 0,
     logs: Array.isArray(payload.logs)
       ? payload.logs.filter((entry): entry is DesktopPythonRuntimeStatusSnapshot["logs"][number] =>
         typeof entry?.timestamp === "string"
@@ -50,7 +57,7 @@ function unwrap(response: unknown, fallbackMessage: string): unknown {
 
 export interface DesktopPythonRuntimeClient {
   readStatus: () => Promise<DesktopPythonRuntimeStatusSnapshot>;
-  controlRuntime: (action: "start" | "stop" | "restart") => Promise<DesktopPythonRuntimeStatusSnapshot>;
+  controlRuntime: (action: "start" | "stop" | "restart" | "unload-model") => Promise<DesktopPythonRuntimeStatusSnapshot>;
 }
 
 export function createDesktopPythonRuntimeClient(): DesktopPythonRuntimeClient {

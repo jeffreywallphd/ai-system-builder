@@ -10,7 +10,7 @@ export interface DatasetPreparationFeatureProps {
   onPrepared?: () => void;
   client?: DesktopDatasetPreparationClient;
   settingsClient?: DesktopApplicationSettingsClient;
-  runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus">;
+  runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus" | "controlRuntime">;
 }
 
 export function DatasetPreparationFeature({ onPrepared, client, settingsClient, runtimeStatusClient }: DatasetPreparationFeatureProps) {
@@ -47,6 +47,9 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
     defaultHuggingFaceNamespace,
     status,
     resultSummary,
+    canUnloadModel,
+    stopTrainingInFlight,
+    unloadModelInFlight,
     onToggleArtifact,
     setUnsupportedDocumentPolicy,
     setNormalizationMode,
@@ -76,6 +79,8 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
     setHuggingFaceRevision,
     setHuggingFacePathPrefix,
     onSubmit,
+    onStopTraining,
+    onUnloadModel,
   } = useDatasetPreparationFeature({
     client,
     settingsClient,
@@ -326,6 +331,16 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
         <button className="ui-button" type="submit" disabled={selectedArtifactIds.length === 0 || status.kind === "loading"}>
           {status.kind === "loading" ? "Preparing..." : "Prepare training dataset"}
         </button>
+        {status.kind === "loading" ? (
+          <button className="ui-button" type="button" onClick={() => void onStopTraining()} disabled={stopTrainingInFlight}>
+            {stopTrainingInFlight ? "Stopping training..." : "Stop training"}
+          </button>
+        ) : null}
+        {canUnloadModel ? (
+          <button className="ui-button" type="button" onClick={() => void onUnloadModel()} disabled={unloadModelInFlight}>
+            {unloadModelInFlight ? "Unloading model..." : "Unload model"}
+          </button>
+        ) : null}
       </form>
 
       {status.message ? <p role={status.kind === "error" ? "alert" : "status"}>{status.message}</p> : null}

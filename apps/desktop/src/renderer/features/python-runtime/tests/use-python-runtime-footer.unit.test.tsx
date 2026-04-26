@@ -29,6 +29,8 @@ function createSnapshot() {
     runtimeStatus: "ready",
     capabilities: ["prepare-training-dataset"],
     logs: [],
+    loadedModels: [],
+    activeTaskCount: 0,
   };
 }
 

@@ -198,12 +198,15 @@ describe("DatasetPreparationFeature", () => {
         healthy: true,
         runtimeStatus: "ready",
         capabilities: ["prepare-training-dataset"],
+        loadedModels: [],
+        activeTaskCount: 1,
         logs: [{
           timestamp: new Date(Date.now() + 1_000).toISOString(),
           level: "warn",
           message: "Python runtime stderr: Fetching 14 files: 43%|####2 | 6/14 [00:00<00:00, 11.15it/s]",
         }],
       }),
+      controlRuntime: vi.fn(),
     };
 
     container = document.createElement("div");
@@ -279,6 +282,136 @@ describe("DatasetPreparationFeature", () => {
       });
       await Promise.resolve();
     });
+  });
+
+  it("shows stop training while preparation is active and stops the Python runtime", async () => {
+    let rejectPreparation: ((error: Error) => void) | undefined;
+    const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<any>((_resolve, reject) => {
+      rejectPreparation = reject;
+    }));
+    const runtimeStatusClient = {
+      readStatus: vi.fn().mockResolvedValue({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["prepare-training-dataset"],
+        loadedModels: [],
+        activeTaskCount: 1,
+        logs: [],
+      }),
+      controlRuntime: vi.fn().mockResolvedValue({
+        supervisorStatus: "stopped",
+        healthy: false,
+        runtimeStatus: "stopped",
+        capabilities: [],
+        loadedModels: [],
+        activeTaskCount: 0,
+        logs: [],
+      }),
+    };
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          settingsClient={settingsClient}
+          runtimeStatusClient={runtimeStatusClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts,
+          }}
+        />,
+      );
+    });
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Stop training");
+
+    const stopButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Stop training") as HTMLButtonElement;
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+
+    expect(runtimeStatusClient.controlRuntime).toHaveBeenCalledWith("stop");
+
+    await act(async () => {
+      rejectPreparation?.(new Error("runtime stopped"));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Training stopped.");
+  });
+
+  it("shows unload model when a model is loaded and no training is active", async () => {
+    const runtimeStatusClient = {
+      readStatus: vi.fn().mockResolvedValue({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["prepare-training-dataset", "unload-model"],
+        loadedModels: [{
+          provider: "transformers" as const,
+          modelId: "google/flan-t5-base",
+          inferenceMode: "text2text" as const,
+          localPath: "/models/google/flan-t5-base",
+        }],
+        activeTaskCount: 0,
+        logs: [],
+      }),
+      controlRuntime: vi.fn().mockResolvedValue({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["prepare-training-dataset", "unload-model"],
+        loadedModels: [],
+        activeTaskCount: 0,
+        logs: [],
+      }),
+    };
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          runtimeStatusClient={runtimeStatusClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+          }}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Unload model");
+
+    const unloadButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Unload model") as HTMLButtonElement;
+    await act(async () => {
+      unloadButton.click();
+      await Promise.resolve();
+    });
+
+    expect(runtimeStatusClient.controlRuntime).toHaveBeenCalledWith("unload-model");
+    expect(container.textContent).toContain("Model unloaded from memory.");
   });
 
   it("surfaces warning when model default settings resolution fails", async () => {

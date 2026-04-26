@@ -10,6 +10,7 @@ export * from "./python-runtime-error";
 export * from "./python-runtime-health-status";
 export * from "./python-runtime-health-check-result";
 export * from "./python-runtime-capabilities-result";
+export * from "./python-runtime-loaded-model";
 export * from "./python-runtime-output-descriptor";
 export * from "./python-runtime-task-request";
 export * from "./python-runtime-task-result";

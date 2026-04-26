@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import type { ModelDefaultInferenceMode } from "../../../../../../../modules/contracts/settings";
 import { createDesktopApplicationSettingsClient, type DesktopApplicationSettingsClient } from "../../settings";
@@ -56,6 +56,10 @@ export interface UseDatasetPreparationFeatureResult {
   defaultHuggingFaceNamespace?: string;
   status: DatasetPreparationStatus;
   resultSummary?: DatasetPreparationResultSummary;
+  loadedModelCount: number;
+  canUnloadModel: boolean;
+  stopTrainingInFlight: boolean;
+  unloadModelInFlight: boolean;
   onToggleArtifact: (artifactId: string) => void;
   setUnsupportedDocumentPolicy: (value: "" | "fail" | "skip") => void;
   setNormalizationMode: (value: "" | "best-effort" | "strict") => void;
@@ -85,12 +89,14 @@ export interface UseDatasetPreparationFeatureResult {
   setHuggingFaceRevision: (value: string) => void;
   setHuggingFacePathPrefix: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onStopTraining: () => Promise<void>;
+  onUnloadModel: () => Promise<void>;
 }
 
 export interface UseDatasetPreparationFeatureOptions {
   client?: DesktopDatasetPreparationClient;
   settingsClient?: DesktopApplicationSettingsClient;
-  runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus">;
+  runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus" | "controlRuntime">;
   onPrepared?: () => void;
 }
 
@@ -160,6 +166,11 @@ export function useDatasetPreparationFeature(
   const [status, setStatus] = useState<DatasetPreparationStatus>({ kind: "idle" });
   const [resultSummary, setResultSummary] = useState<DatasetPreparationResultSummary>();
   const [defaultHuggingFaceNamespace, setDefaultHuggingFaceNamespace] = useState<string | undefined>(undefined);
+  const [loadedModelCount, setLoadedModelCount] = useState(0);
+  const [runtimeActiveTaskCount, setRuntimeActiveTaskCount] = useState(0);
+  const [stopTrainingInFlight, setStopTrainingInFlight] = useState(false);
+  const [unloadModelInFlight, setUnloadModelInFlight] = useState(false);
+  const stopTrainingRequestedRef = useRef(false);
 
   const setStatusWarningMessage = useCallback((warningMessage: string) => {
     setStatus((current) => {
@@ -215,6 +226,31 @@ export function useDatasetPreparationFeature(
     });
   }, [settingsClient, setStatusWarningMessage]);
 
+  const refreshRuntimeModelStatus = useCallback(async () => {
+    if (!runtimeStatusClient) {
+      return;
+    }
+
+    try {
+      const snapshot = await runtimeStatusClient.readStatus();
+      setLoadedModelCount(snapshot.loadedModels.length);
+      setRuntimeActiveTaskCount(snapshot.activeTaskCount);
+    } catch {
+      // Runtime status is best-effort for model lifecycle controls.
+    }
+  }, [runtimeStatusClient]);
+
+  useEffect(() => {
+    void refreshRuntimeModelStatus();
+    const timer = window.setInterval(() => {
+      void refreshRuntimeModelStatus();
+    }, 5_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [refreshRuntimeModelStatus]);
+
   const onToggleArtifact = useCallback((artifactId: string) => {
     setSelectedArtifactIds((current) =>
       current.includes(artifactId)
@@ -249,6 +285,7 @@ export function useDatasetPreparationFeature(
       return;
     }
 
+    stopTrainingRequestedRef.current = false;
     setStatus({ kind: "loading", message: "Resolving generation model settings..." });
     setResultSummary(undefined);
 
@@ -319,16 +356,29 @@ export function useDatasetPreparationFeature(
       void refreshModelDownloadProgress();
     }, 750);
 
-    const response = await datasetClient.prepareTrainingDatasetFromArtifacts(
-      request,
-      { requestId },
-    ).finally(() => {
+    let response: Awaited<ReturnType<DesktopDatasetPreparationClient["prepareTrainingDatasetFromArtifacts"]>>;
+    try {
+      response = await datasetClient.prepareTrainingDatasetFromArtifacts(
+        request,
+        { requestId },
+      );
+    } catch (error) {
+      if (stopTrainingRequestedRef.current) {
+        setStatus({ kind: "idle", message: "Training stopped." });
+      } else {
+        setStatus({ kind: "error", message: error instanceof Error ? error.message : "Dataset preparation failed." });
+      }
+      return;
+    } finally {
       preparationActive = false;
       window.clearInterval(progressTimer);
-    });
+      void refreshRuntimeModelStatus();
+    }
 
     if (response.ok === false) {
-      setStatus({ kind: "error", message: response.error.message });
+      setStatus(stopTrainingRequestedRef.current
+        ? { kind: "idle", message: "Training stopped." }
+        : { kind: "error", message: response.error.message });
       return;
     }
 
@@ -341,6 +391,7 @@ export function useDatasetPreparationFeature(
     });
 
     await refreshArtifacts();
+    await refreshRuntimeModelStatus();
     onPrepared?.();
   }, [
     selectedArtifactIds,
@@ -375,8 +426,51 @@ export function useDatasetPreparationFeature(
     settingsClient,
     runtimeStatusClient,
     refreshArtifacts,
+    refreshRuntimeModelStatus,
     onPrepared,
   ]);
+
+  const onStopTraining = useCallback(async () => {
+    if (!runtimeStatusClient?.controlRuntime || status.kind !== "loading") {
+      return;
+    }
+
+    stopTrainingRequestedRef.current = true;
+    setStopTrainingInFlight(true);
+    setStatus({ kind: "loading", message: "Stopping training..." });
+    try {
+      const snapshot = await runtimeStatusClient.controlRuntime("stop");
+      setLoadedModelCount(snapshot.loadedModels.length);
+      setRuntimeActiveTaskCount(snapshot.activeTaskCount);
+      setStatus({ kind: "idle", message: "Training stopped." });
+    } catch (error) {
+      setStatus({ kind: "error", message: error instanceof Error ? error.message : "Failed to stop training." });
+    } finally {
+      setStopTrainingInFlight(false);
+      void refreshRuntimeModelStatus();
+    }
+  }, [refreshRuntimeModelStatus, runtimeStatusClient, status.kind]);
+
+  const onUnloadModel = useCallback(async () => {
+    if (!runtimeStatusClient?.controlRuntime || status.kind === "loading") {
+      return;
+    }
+
+    setUnloadModelInFlight(true);
+    try {
+      const snapshot = await runtimeStatusClient.controlRuntime("unload-model");
+      setLoadedModelCount(snapshot.loadedModels.length);
+      setRuntimeActiveTaskCount(snapshot.activeTaskCount);
+      setStatus({ kind: "idle", message: "Model unloaded from memory." });
+    } catch (error) {
+      setStatus({ kind: "error", message: error instanceof Error ? error.message : "Failed to unload model." });
+    } finally {
+      setUnloadModelInFlight(false);
+      void refreshRuntimeModelStatus();
+    }
+  }, [refreshRuntimeModelStatus, runtimeStatusClient, status.kind]);
+
+  const canUnloadModel = loadedModelCount > 0 && runtimeActiveTaskCount === 0 && status.kind !== "loading";
 
   return {
     artifacts,
@@ -411,6 +505,10 @@ export function useDatasetPreparationFeature(
     defaultHuggingFaceNamespace,
     status,
     resultSummary,
+    loadedModelCount,
+    canUnloadModel,
+    stopTrainingInFlight,
+    unloadModelInFlight,
     onToggleArtifact,
     setUnsupportedDocumentPolicy,
     setNormalizationMode,
@@ -440,5 +538,7 @@ export function useDatasetPreparationFeature(
     setHuggingFaceRevision,
     setHuggingFacePathPrefix,
     onSubmit,
+    onStopTraining,
+    onUnloadModel,
   };
 }
