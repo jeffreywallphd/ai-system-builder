@@ -17,6 +17,7 @@ from modules.adapters.runtime.python.worker.tasks.example_generation import (
     ensure_generation_model_downloaded,
     generate_qa_examples_for_chunks,
 )
+from modules.adapters.runtime.python.worker.tasks.local_text_generation import _resolve_auto_inference_mode
 from modules.adapters.runtime.python.worker.tasks.markdown_chunking import MarkdownChunk
 
 
@@ -49,6 +50,30 @@ class _ReasoningGenerator:
         if "Return only the question." in prompt:
             return "<think>\nIdentify a grounded question.\n</think>\n\nQuestion: What does the context describe?"
         return "<think>\nUse only the supplied context.\n</think>\n\nAnswer: The context describes generated content."
+
+
+class _EncoderDecoderConfig:
+    is_encoder_decoder = True
+
+
+class _DecoderOnlyConfig:
+    is_encoder_decoder = False
+
+
+class _ConfigFactory:
+    def __init__(self, config):
+        self._config = config
+
+    def from_pretrained(self, _model_reference):
+        return self._config
+
+
+class _TokenizerFactory:
+    def __init__(self, chat_template=None):
+        self._chat_template = chat_template
+
+    def from_pretrained(self, _model_reference):
+        return SimpleNamespace(chat_template=self._chat_template)
 
 
 class ExampleGenerationTests(unittest.TestCase):
@@ -186,6 +211,57 @@ class ExampleGenerationTests(unittest.TestCase):
 
         self.assertEqual(examples[0].question, "What does the context describe?")
         self.assertEqual(examples[0].answer, "The context describes generated content.")
+
+    def test_auto_inference_mode_resolves_encoder_decoder_models_to_text2text(self) -> None:
+        transformers = SimpleNamespace(
+            AutoConfig=_ConfigFactory(_EncoderDecoderConfig()),
+            AutoTokenizer=_TokenizerFactory(chat_template="unused"),
+        )
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "model": {"provider": "transformers", "modelId": "google/flan-t5-base", "inferenceMode": "auto"},
+            }
+        )
+
+        with patch.dict("sys.modules", {"transformers": transformers}):
+            resolved = _resolve_auto_inference_mode(config.model)
+
+        self.assertEqual(resolved, "text2text")
+
+    def test_auto_inference_mode_resolves_chat_template_models_to_chat(self) -> None:
+        transformers = SimpleNamespace(
+            AutoConfig=_ConfigFactory(_DecoderOnlyConfig()),
+            AutoTokenizer=_TokenizerFactory(chat_template="{{ messages }}"),
+        )
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "model": {"provider": "transformers", "modelId": "Qwen/Qwen3-1.7B", "inferenceMode": "auto"},
+            }
+        )
+
+        with patch.dict("sys.modules", {"transformers": transformers}):
+            resolved = _resolve_auto_inference_mode(config.model)
+
+        self.assertEqual(resolved, "chat")
+
+    def test_auto_inference_mode_resolves_decoder_only_without_chat_template_to_causal(self) -> None:
+        transformers = SimpleNamespace(
+            AutoConfig=_ConfigFactory(_DecoderOnlyConfig()),
+            AutoTokenizer=_TokenizerFactory(chat_template=None),
+        )
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "model": {"provider": "transformers", "modelId": "gpt2", "inferenceMode": "auto"},
+            }
+        )
+
+        with patch.dict("sys.modules", {"transformers": transformers}):
+            resolved = _resolve_auto_inference_mode(config.model)
+
+        self.assertEqual(resolved, "causal")
 
     def test_reuses_cached_generator_for_same_model_config(self) -> None:
         config = ExampleGenerationConfig.model_validate(

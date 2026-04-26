@@ -60,9 +60,9 @@ export function normalizeModelDefaultConfig(config: ModelDefaultConfig): ModelDe
     throw new Error("Model default config modelId must be a non-empty string.");
   }
 
-  if (!["text2text", "causal", "chat"].includes(config.inferenceMode)) {
+  if (!["auto", "text2text", "causal", "chat"].includes(config.inferenceMode)) {
     throw new Error(
-      `Model default config inferenceMode must be one of text2text, causal, chat. Received "${String(config.inferenceMode)}".`,
+      `Model default config inferenceMode must be one of auto, text2text, causal, chat. Received "${String(config.inferenceMode)}".`,
     );
   }
 

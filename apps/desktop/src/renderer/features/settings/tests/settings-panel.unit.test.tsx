@@ -150,6 +150,7 @@ describe("SettingsPanel", () => {
     await renderPanel({ keys: ["models.default"] as never });
 
     expect(container?.textContent).toContain("Inference mode");
+    expect(container?.textContent).toContain("auto");
     expect(container?.textContent).toContain("text2text");
     expect(container?.textContent).toContain("causal");
     expect(container?.textContent).toContain("chat");
