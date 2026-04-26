@@ -3,7 +3,68 @@ import { describe, expect, it } from "vitest";
 import { buildDatasetPreparationRequest } from "../hooks/datasetPreparationRequestBuilder";
 
 describe("datasetPreparationRequestBuilder", () => {
-  it("builds request with resolved defaults and parsed values", () => {
+  it("includes optional numeric values when provided", () => {
+    const request = buildDatasetPreparationRequest({
+      selectedArtifactIds: ["artifact-1"],
+      unsupportedDocumentPolicy: "",
+      normalizationMode: "",
+      preserveDocumentBoundaries: true,
+      modelId: "",
+      modelInferenceMode: "text2text",
+      modelDevice: "",
+      modelTorchDtype: "",
+      failurePolicy: "skip",
+      shuffle: true,
+      outputFormat: "parquet",
+      outputBaseName: "",
+      localDestinationEnabled: true,
+      huggingFaceDestinationEnabled: false,
+      huggingFaceRepository: "",
+      huggingFaceRevision: "",
+      huggingFacePathPrefix: "",
+      parsed: {
+        chunkSize: 1000,
+        chunkOverlap: 200,
+        maxChunkCount: 20,
+        maxExamplesPerChunk: 4,
+        batchSize: 4,
+        generationTemperature: 0.3,
+        generationTopP: 0.95,
+        generationMaxNewTokens: 256,
+        trainRatio: 0.8,
+        testRatio: 0.2,
+        seed: 1234,
+      },
+      resolvedDefault: {
+        provider: "transformers",
+        modelId: "google/flan-t5-base",
+        inferenceMode: "text2text",
+        source: "global",
+        device: "auto",
+        torchDtype: "auto",
+      },
+    });
+
+    expect(request.recipe.generation.model).toMatchObject({
+      provider: "transformers",
+      modelId: "google/flan-t5-base",
+      inferenceMode: "text2text",
+      device: "auto",
+      torchDtype: "auto",
+    });
+    expect(request.recipe.chunking.maxChunkCount).toBe(20);
+    expect(request.recipe.generation.maxExamplesPerChunk).toBe(4);
+    expect(request.recipe.generation.batchSize).toBe(4);
+    expect(request.recipe.generation.generationParams).toEqual({
+      temperature: 0.3,
+      topP: 0.95,
+      maxNewTokens: 256,
+    });
+    expect(request.split.seed).toBe(1234);
+    expect(request.split).toMatchObject({ trainRatio: 0.8, testRatio: 0.2 });
+  });
+
+  it("omits optional numeric values when undefined", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
       unsupportedDocumentPolicy: "",
@@ -26,8 +87,8 @@ describe("datasetPreparationRequestBuilder", () => {
         chunkSize: 1000,
         chunkOverlap: 200,
         maxChunkCount: undefined,
-        maxExamplesPerChunk: 4,
-        batchSize: 4,
+        maxExamplesPerChunk: undefined,
+        batchSize: undefined,
         generationTemperature: undefined,
         generationTopP: undefined,
         generationMaxNewTokens: undefined,
@@ -45,17 +106,18 @@ describe("datasetPreparationRequestBuilder", () => {
       },
     });
 
-    expect(request.recipe.generation.model).toMatchObject({
-      provider: "transformers",
-      modelId: "google/flan-t5-base",
-      inferenceMode: "text2text",
-      device: "auto",
-      torchDtype: "auto",
+    expect(request.recipe.chunking.maxChunkCount).toBeUndefined();
+    expect(request.recipe.generation.maxExamplesPerChunk).toBeUndefined();
+    expect(request.recipe.generation.batchSize).toBeUndefined();
+    expect(request.recipe.generation.generationParams).toEqual({
+      temperature: undefined,
+      topP: undefined,
+      maxNewTokens: undefined,
     });
-    expect(request.split).toMatchObject({ trainRatio: 0.8, testRatio: 0.2 });
+    expect(request.split.seed).toBeUndefined();
   });
 
-  it("uses explicit model id and inference mode when provided", () => {
+  it("includes inferenceMode", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
       unsupportedDocumentPolicy: "",
@@ -97,11 +159,51 @@ describe("datasetPreparationRequestBuilder", () => {
       },
     });
 
-    expect(request.recipe.generation.model).toMatchObject({
+    expect(request.recipe.generation.model.inferenceMode).toBe("chat");
+  });
+
+  it("falls back to resolved default inference mode when input inference mode is invalid", () => {
+    const request = buildDatasetPreparationRequest({
+      selectedArtifactIds: ["artifact-1"],
+      unsupportedDocumentPolicy: "",
+      normalizationMode: "",
+      preserveDocumentBoundaries: true,
       modelId: "Qwen/Qwen2.5-1.5B-Instruct",
-      inferenceMode: "chat",
-      device: "cuda",
-      torchDtype: "float16",
+      modelInferenceMode: "" as never,
+      modelDevice: "cuda",
+      modelTorchDtype: "float16",
+      failurePolicy: "skip",
+      shuffle: true,
+      outputFormat: "parquet",
+      outputBaseName: "",
+      localDestinationEnabled: true,
+      huggingFaceDestinationEnabled: false,
+      huggingFaceRepository: "",
+      huggingFaceRevision: "",
+      huggingFacePathPrefix: "",
+      parsed: {
+        chunkSize: 1000,
+        chunkOverlap: 200,
+        maxChunkCount: undefined,
+        maxExamplesPerChunk: 4,
+        batchSize: 4,
+        generationTemperature: undefined,
+        generationTopP: undefined,
+        generationMaxNewTokens: undefined,
+        trainRatio: 0.8,
+        testRatio: 0.2,
+        seed: undefined,
+      },
+      resolvedDefault: {
+        provider: "transformers",
+        modelId: "google/flan-t5-base",
+        inferenceMode: "text2text",
+        source: "global",
+        device: "auto",
+        torchDtype: "auto",
+      },
     });
+
+    expect(request.recipe.generation.model.inferenceMode).toBe("text2text");
   });
 });

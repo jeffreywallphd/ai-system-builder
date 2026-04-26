@@ -13,6 +13,8 @@ const DEFAULT_DATASET_PREPARATION_RECIPE_BASE = {
   },
 };
 
+const VALID_MODEL_INFERENCE_MODES: readonly ModelDefaultInferenceMode[] = ["text2text", "chat"];
+
 export interface BuildDatasetPreparationRequestInput {
   selectedArtifactIds: string[];
   unsupportedDocumentPolicy: "" | "fail" | "skip";
@@ -37,7 +39,9 @@ export interface BuildDatasetPreparationRequestInput {
 
 export function buildDatasetPreparationRequest(input: BuildDatasetPreparationRequestInput) {
   const effectiveModelId = input.modelId.trim() || input.resolvedDefault.modelId;
-  const effectiveInferenceMode = input.modelInferenceMode;
+  const effectiveInferenceMode = VALID_MODEL_INFERENCE_MODES.includes(input.modelInferenceMode)
+    ? input.modelInferenceMode
+    : input.resolvedDefault.inferenceMode;
   const effectiveDevice = input.modelDevice || input.resolvedDefault.device;
   const effectiveTorchDtype = input.modelTorchDtype || input.resolvedDefault.torchDtype;
 
@@ -55,9 +59,7 @@ export function buildDatasetPreparationRequest(input: BuildDatasetPreparationReq
         chunkSize: input.parsed.chunkSize,
         chunkOverlap: input.parsed.chunkOverlap,
         preserveDocumentBoundaries: input.preserveDocumentBoundaries,
-        maxChunkCount: typeof input.parsed.maxChunkCount === "number" && !Number.isNaN(input.parsed.maxChunkCount)
-          ? input.parsed.maxChunkCount
-          : undefined,
+        maxChunkCount: input.parsed.maxChunkCount,
       },
       generation: {
         ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE.generation,
@@ -68,30 +70,20 @@ export function buildDatasetPreparationRequest(input: BuildDatasetPreparationReq
           device: effectiveDevice || undefined,
           torchDtype: effectiveTorchDtype || undefined,
         },
-        maxExamplesPerChunk: typeof input.parsed.maxExamplesPerChunk === "number" && !Number.isNaN(input.parsed.maxExamplesPerChunk)
-          ? input.parsed.maxExamplesPerChunk
-          : undefined,
-        batchSize: typeof input.parsed.batchSize === "number" && !Number.isNaN(input.parsed.batchSize)
-          ? input.parsed.batchSize
-          : undefined,
+        maxExamplesPerChunk: input.parsed.maxExamplesPerChunk,
+        batchSize: input.parsed.batchSize,
         failurePolicy: input.failurePolicy || undefined,
         generationParams: {
-          temperature: typeof input.parsed.generationTemperature === "number" && !Number.isNaN(input.parsed.generationTemperature)
-            ? input.parsed.generationTemperature
-            : undefined,
-          topP: typeof input.parsed.generationTopP === "number" && !Number.isNaN(input.parsed.generationTopP)
-            ? input.parsed.generationTopP
-            : undefined,
-          maxNewTokens: typeof input.parsed.generationMaxNewTokens === "number" && !Number.isNaN(input.parsed.generationMaxNewTokens)
-            ? input.parsed.generationMaxNewTokens
-            : undefined,
+          temperature: input.parsed.generationTemperature,
+          topP: input.parsed.generationTopP,
+          maxNewTokens: input.parsed.generationMaxNewTokens,
         },
       },
     },
     split: {
       trainRatio: input.parsed.trainRatio,
       testRatio: input.parsed.testRatio,
-      seed: typeof input.parsed.seed === "number" && !Number.isNaN(input.parsed.seed) ? input.parsed.seed : undefined,
+      seed: input.parsed.seed,
       shuffle: input.shuffle,
     },
     output: {
