@@ -1,10 +1,11 @@
 import type {
-  ApplicationSettingDefinition,
   ApplicationSettingValue,
-  SecretSettingValue,
   UpdateApplicationSettingRequest,
 } from "../../../contracts/settings";
 import type { ApplicationSecretsPort, ApplicationSettingsPort } from "../../ports/settings";
+import { getKnownSettingDefinition } from "./setting-definition-guards";
+
+const SECRET_MASK = "********";
 
 export interface UpdateSettingUseCaseDependencies {
   settings: ApplicationSettingsPort;
@@ -21,12 +22,14 @@ export class UpdateSettingUseCase {
   }
 
   public async execute(request: UpdateApplicationSettingRequest): Promise<ApplicationSettingValue> {
-    const definition = await this.getDefinition(request.key);
-    if (definition?.valueKind === "secret") {
-      const secretValue = request.value as SecretSettingValue | string;
-      const rawSecret = typeof secretValue === "string" ? secretValue : secretValue.maskedValue;
-      if (typeof rawSecret !== "string" || rawSecret.length === 0) {
+    const definition = await getKnownSettingDefinition(this.settings, request.key);
+    if (definition.valueKind === "secret") {
+      const rawSecret = this.parseRawSecret(request.value);
+      if (rawSecret.length === 0) {
         throw new Error(`Secret setting "${request.key}" requires a non-empty string value.`);
+      }
+      if (rawSecret === SECRET_MASK) {
+        throw new Error(`Secret setting "${request.key}" cannot be updated with the masked placeholder value.`);
       }
       await this.secrets.setSecret(request.key, rawSecret);
       return {
@@ -40,8 +43,15 @@ export class UpdateSettingUseCase {
     return this.settings.updateValue(request);
   }
 
-  private async getDefinition(key: string): Promise<ApplicationSettingDefinition | undefined> {
-    const definitions = await this.settings.listDefinitions();
-    return definitions.find((definition) => definition.key === key);
+  private parseRawSecret(input: unknown): string {
+    if (typeof input === "string") {
+      return input;
+    }
+
+    if (input && typeof input === "object" && "rawValue" in input && typeof input.rawValue === "string") {
+      return input.rawValue;
+    }
+
+    throw new Error("Secret updates require a raw string value.");
   }
 }

@@ -45,6 +45,8 @@ describe("settings contracts", () => {
       provider: "transformers",
       modelId: expect.any(String),
       inferenceMode: expect.any(String),
+      device: expect.any(String),
+      torchDtype: expect.any(String),
     });
 
     const featureOverride = findApplicationSettingDefinition(
@@ -57,6 +59,17 @@ describe("settings contracts", () => {
         inferenceMode: expect.any(String),
       });
     }
+  });
+
+  it("uses desktop-safe qa task model default", () => {
+    const qaTask = findApplicationSettingDefinition(createTaskModelDefaultSettingKey("qaGeneration"));
+    expect(qaTask?.defaultValue).toMatchObject({
+      provider: "transformers",
+      modelId: "google/flan-t5-small",
+      inferenceMode: "text2text",
+      device: "auto",
+      torchDtype: "auto",
+    });
   });
 
   it("validates model default config inferenceMode in normalizer and remains runtime-compatible", () => {

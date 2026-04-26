@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { ModelDefaultInferenceMode } from "../../../../../../../modules/contracts/settings";
-import { createDesktopApplicationSettingsClient } from "../../settings";
+import { createDesktopApplicationSettingsClient, type DesktopApplicationSettingsClient } from "../../settings";
 import type { DesktopDatasetPreparationClient } from "../api/desktopDatasetPreparationClient";
+import { buildDatasetPreparationRequest } from "./datasetPreparationRequestBuilder";
+import {
+  parseOptionalInteger,
+  parseOptionalNumber,
+  validateDatasetPreparationInputs,
+} from "./datasetPreparationRequestValidation";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 
 interface DatasetPreparationStatus {
@@ -16,15 +22,6 @@ interface DatasetPreparationResultSummary {
   trainRows: number;
   testRows: number;
 }
-
-const DEFAULT_DATASET_PREPARATION_RECIPE_BASE = {
-  normalization: { targetFormat: "markdown" as const },
-  chunking: { strategy: "character" as const },
-  generation: {
-    mode: "qa" as const,
-    model: { provider: "transformers" as const },
-  },
-};
 
 export interface UseDatasetPreparationFeatureResult {
   artifacts: Array<{ artifactId: string; label: string }>;
@@ -92,10 +89,9 @@ export interface UseDatasetPreparationFeatureResult {
 
 export interface UseDatasetPreparationFeatureOptions {
   client?: DesktopDatasetPreparationClient;
+  settingsClient?: DesktopApplicationSettingsClient;
   onPrepared?: () => void;
 }
-
-const TRAIN_TEST_SUM_TOLERANCE = 0.000_001;
 
 function createDatasetPreparationRequestId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -105,132 +101,21 @@ function createDatasetPreparationRequestId(): string {
   return `dataset-preparation-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function parseOptionalNumber(value: string): number | undefined {
-  const normalized = value.trim();
-  if (normalized.length === 0) {
-    return undefined;
-  }
-
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : Number.NaN;
-}
-
-function parseOptionalInteger(value: string): number | undefined {
-  const parsed = parseOptionalNumber(value);
-  if (typeof parsed !== "number") {
-    return undefined;
-  }
-
-  return Number.isInteger(parsed) ? parsed : Number.NaN;
-}
-
-function validateInputs(input: {
-  selectedArtifactIds: string[];
-  chunkSize: string;
-  chunkOverlap: string;
-  maxChunkCount: string;
-  modelId: string;
-  maxExamplesPerChunk: string;
-  batchSize: string;
-  generationTemperature: string;
-  generationTopP: string;
-  generationMaxNewTokens: string;
-  trainRatio: string;
-  testRatio: string;
-  seed: string;
-  localDestinationEnabled: boolean;
-  huggingFaceDestinationEnabled: boolean;
-  huggingFaceRepository: string;
-}): string | undefined {
-  if (input.selectedArtifactIds.length === 0) {
-    return "Select at least one source artifact.";
-  }
-
-  const chunkSize = parseOptionalInteger(input.chunkSize);
-  if (typeof chunkSize !== "number" || Number.isNaN(chunkSize) || chunkSize <= 0) {
-    return "Chunk size must be a positive integer.";
-  }
-
-  const chunkOverlap = parseOptionalInteger(input.chunkOverlap);
-  if (typeof chunkOverlap !== "number" || Number.isNaN(chunkOverlap) || chunkOverlap < 0) {
-    return "Chunk overlap must be an integer greater than or equal to 0.";
-  }
-
-  const maxChunkCount = parseOptionalInteger(input.maxChunkCount);
-  if (typeof maxChunkCount === "number" && (Number.isNaN(maxChunkCount) || maxChunkCount <= 0)) {
-    return "Max chunk count must be a positive integer when provided.";
-  }
-
-  const maxExamplesPerChunk = parseOptionalInteger(input.maxExamplesPerChunk);
-  if (typeof maxExamplesPerChunk === "number" && (Number.isNaN(maxExamplesPerChunk) || maxExamplesPerChunk <= 0)) {
-    return "Max examples per chunk must be a positive integer when provided.";
-  }
-
-  const batchSize = parseOptionalInteger(input.batchSize);
-  if (typeof batchSize === "number" && (Number.isNaN(batchSize) || batchSize <= 0)) {
-    return "Batch size must be a positive integer when provided.";
-  }
-
-  const generationMaxNewTokens = parseOptionalInteger(input.generationMaxNewTokens);
-  if (typeof generationMaxNewTokens === "number" && (Number.isNaN(generationMaxNewTokens) || generationMaxNewTokens <= 0)) {
-    return "Generation max new tokens must be a positive integer when provided.";
-  }
-
-  const generationTemperature = parseOptionalNumber(input.generationTemperature);
-  if (typeof generationTemperature === "number" && Number.isNaN(generationTemperature)) {
-    return "Generation temperature must be numeric when provided.";
-  }
-
-  const generationTopP = parseOptionalNumber(input.generationTopP);
-  if (typeof generationTopP === "number" && Number.isNaN(generationTopP)) {
-    return "Generation top-p must be numeric when provided.";
-  }
-
-  const trainRatio = Number(input.trainRatio);
-  if (!Number.isFinite(trainRatio)) {
-    return "Train ratio must be a valid number.";
-  }
-
-  const testRatio = Number(input.testRatio);
-  if (!Number.isFinite(testRatio)) {
-    return "Test ratio must be a valid number.";
-  }
-
-  if (trainRatio <= 0 || testRatio <= 0) {
-    return "Train and test ratios must both be greater than 0.";
-  }
-
-  if (Math.abs((trainRatio + testRatio) - 1) > TRAIN_TEST_SUM_TOLERANCE) {
-    return "Train and test ratios must sum to 1.0.";
-  }
-
-  const parsedSeed = parseOptionalNumber(input.seed);
-  if (typeof parsedSeed === "number" && Number.isNaN(parsedSeed)) {
-    return "Seed must be numeric when provided.";
-  }
-
-  if (!input.localDestinationEnabled && !input.huggingFaceDestinationEnabled) {
-    return "Enable at least one output destination.";
-  }
-
-  if (input.huggingFaceDestinationEnabled && input.huggingFaceRepository.trim().length === 0) {
-    return "Hugging Face repository is required when that destination is enabled.";
-  }
-
-  return undefined;
-}
 
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
 ): UseDatasetPreparationFeatureResult {
   const datasetClient = useDatasetPreparationClient(options.client);
   const settingsClient = useMemo(() => {
+    if (options.settingsClient) {
+      return options.settingsClient;
+    }
     try {
       return createDesktopApplicationSettingsClient();
     } catch {
       return undefined;
     }
-  }, []);
+  }, [options.settingsClient]);
   const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string }>>([]);
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
   const [unsupportedDocumentPolicy, setUnsupportedDocumentPolicy] = useState<"" | "fail" | "skip">("");
@@ -318,7 +203,7 @@ export function useDatasetPreparationFeature(
   const onSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const validationError = validateInputs({
+    const validationError = validateDatasetPreparationInputs({
       selectedArtifactIds,
       chunkSize,
       chunkOverlap,
@@ -367,84 +252,38 @@ export function useDatasetPreparationFeature(
       torchDtype: undefined,
     }));
     const requestId = createDatasetPreparationRequestId();
-    const effectiveModelId = modelId.trim() || resolvedDefault.modelId;
-    const effectiveInferenceMode = modelInferenceMode || resolvedDefault.inferenceMode;
-    const effectiveDevice = modelDevice || resolvedDefault.device;
-    const effectiveTorchDtype = modelTorchDtype || resolvedDefault.torchDtype;
-
     const response = await datasetClient.prepareTrainingDatasetFromArtifacts(
-      {
-        sourceArtifactIds: selectedArtifactIds,
-        recipe: {
-          ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE,
-          normalization: {
-            ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE.normalization,
-            unsupportedDocumentPolicy: unsupportedDocumentPolicy || undefined,
-            normalizationMode: normalizationMode || undefined,
-          },
-          chunking: {
-            ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE.chunking,
-            chunkSize: parsedChunkSize as number,
-            chunkOverlap: parsedChunkOverlap as number,
-            preserveDocumentBoundaries,
-            maxChunkCount: typeof parsedMaxChunkCount === "number" && !Number.isNaN(parsedMaxChunkCount) ? parsedMaxChunkCount : undefined,
-          },
-          generation: {
-            ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE.generation,
-            model: {
-              ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE.generation.model,
-              modelId: effectiveModelId,
-              inferenceMode: effectiveInferenceMode,
-              device: effectiveDevice || undefined,
-              torchDtype: effectiveTorchDtype || undefined,
-            },
-            maxExamplesPerChunk: typeof parsedMaxExamplesPerChunk === "number" && !Number.isNaN(parsedMaxExamplesPerChunk)
-              ? parsedMaxExamplesPerChunk
-              : undefined,
-            batchSize: typeof parsedBatchSize === "number" && !Number.isNaN(parsedBatchSize)
-              ? parsedBatchSize
-              : undefined,
-            failurePolicy: failurePolicy || undefined,
-            generationParams: {
-              temperature: typeof parsedGenerationTemperature === "number" && !Number.isNaN(parsedGenerationTemperature)
-                ? parsedGenerationTemperature
-                : undefined,
-              topP: typeof parsedGenerationTopP === "number" && !Number.isNaN(parsedGenerationTopP)
-                ? parsedGenerationTopP
-                : undefined,
-              maxNewTokens: typeof parsedGenerationMaxNewTokens === "number" && !Number.isNaN(parsedGenerationMaxNewTokens)
-                ? parsedGenerationMaxNewTokens
-                : undefined,
-            },
-          },
-        },
-        split: {
-          trainRatio: Number(trainRatio),
-          testRatio: Number(testRatio),
-          seed: typeof parsedSeed === "number" && !Number.isNaN(parsedSeed) ? parsedSeed : undefined,
-          shuffle,
-        },
-        output: {
-          format: outputFormat,
-          naming: {
-            baseName: outputBaseName.trim() || undefined,
-          },
-          destinations: {
-            local: {
-              enabled: localDestinationEnabled,
-            },
-            huggingFace: huggingFaceDestinationEnabled
-              ? {
-                enabled: true,
-                provider: "huggingface",
-                repository: huggingFaceRepository.trim(),
-                revision: huggingFaceRevision.trim() || undefined,
-                pathPrefix: huggingFacePathPrefix.trim() || undefined,
-              }
-              : undefined,
-          },
-        },
-      },
+      buildDatasetPreparationRequest({
+        selectedArtifactIds,
+        unsupportedDocumentPolicy,
+        normalizationMode,
+        preserveDocumentBoundaries,
+        modelId,
+        modelInferenceMode,
+        modelDevice,
+        modelTorchDtype,
+        failurePolicy,
+        trainRatio,
+        testRatio,
+        shuffle,
+        outputFormat,
+        outputBaseName,
+        localDestinationEnabled,
+        huggingFaceDestinationEnabled,
+        huggingFaceRepository,
+        huggingFaceRevision,
+        huggingFacePathPrefix,
+        parsedSeed,
+        parsedChunkSize,
+        parsedChunkOverlap,
+        parsedMaxChunkCount,
+        parsedMaxExamplesPerChunk,
+        parsedBatchSize,
+        parsedGenerationTemperature,
+        parsedGenerationTopP,
+        parsedGenerationMaxNewTokens,
+        resolvedDefault,
+      }),
       { requestId },
     );
 

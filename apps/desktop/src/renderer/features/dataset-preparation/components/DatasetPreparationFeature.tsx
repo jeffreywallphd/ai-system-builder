@@ -1,15 +1,17 @@
 import {
   type DesktopDatasetPreparationClient,
 } from "../api/desktopDatasetPreparationClient";
+import type { DesktopApplicationSettingsClient } from "../../settings";
 import { SettingsPanel } from "../../settings";
 import { useDatasetPreparationFeature } from "../hooks/useDatasetPreparationFeature";
 
 export interface DatasetPreparationFeatureProps {
   onPrepared?: () => void;
   client?: DesktopDatasetPreparationClient;
+  settingsClient?: DesktopApplicationSettingsClient;
 }
 
-export function DatasetPreparationFeature({ onPrepared, client }: DatasetPreparationFeatureProps) {
+export function DatasetPreparationFeature({ onPrepared, client, settingsClient }: DatasetPreparationFeatureProps) {
   const {
     artifacts,
     selectedArtifactIds,
@@ -74,6 +76,7 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
     onSubmit,
   } = useDatasetPreparationFeature({
     client,
+    settingsClient,
     onPrepared,
   });
 

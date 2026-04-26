@@ -20,7 +20,7 @@ const GLOBAL_MODEL_DEFAULT: ModelDefaultConfig = {
 
 const QA_TASK_MODEL_DEFAULT: ModelDefaultConfig = {
   provider: "transformers",
-  modelId: "google/flan-t5-large",
+  modelId: "google/flan-t5-small",
   inferenceMode: "text2text",
   device: "auto",
   torchDtype: "auto",
