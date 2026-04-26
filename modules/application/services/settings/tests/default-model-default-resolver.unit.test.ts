@@ -25,26 +25,23 @@ function createSettingsPort(values: Record<string, unknown>): ApplicationSetting
 }
 
 describe("DefaultModelDefaultResolver", () => {
-  it("uses feature override first", async () => {
+  it("fails clearly for invalid configured feature override", async () => {
     const resolver = new DefaultModelDefaultResolver({
       settings: createSettingsPort({
-        "features.datasetPreparation.qaGeneration.default": {
-          modelId: "feature/model",
-          inferenceMode: "chat",
-        },
+        "features.datasetPreparation.qaGeneration.default": { modelId: "feature/model" },
       }),
     });
 
-    const resolved = await resolver.resolve({ taskKey: "qaGeneration", featureKey: "datasetPreparation" });
-    expect(resolved.source).toBe("feature");
-    expect(resolved.modelId).toBe("feature/model");
-    expect(resolved.inferenceMode).toBe("chat");
+    await expect(resolver.resolve({ taskKey: "qaGeneration", featureKey: "datasetPreparation" })).rejects.toThrow(
+      'Configured model default "features.datasetPreparation.qaGeneration.default" is invalid: must include a supported inferenceMode.',
+    );
   });
 
-  it("falls back to task default", async () => {
+  it("falls back from absent feature override to task default", async () => {
     const resolver = new DefaultModelDefaultResolver({
       settings: createSettingsPort({
         "models.tasks.qaGeneration.default": {
+          provider: "transformers",
           modelId: "task/model",
           inferenceMode: "causal",
         },
@@ -56,10 +53,27 @@ describe("DefaultModelDefaultResolver", () => {
     expect(resolved.modelId).toBe("task/model");
   });
 
-  it("falls back to global default", async () => {
+  it("fails clearly for invalid configured task default when selected", async () => {
+    const resolver = new DefaultModelDefaultResolver({
+      settings: createSettingsPort({
+        "models.tasks.qaGeneration.default": {
+          provider: "unsupported",
+          modelId: "task/model",
+          inferenceMode: "text2text",
+        },
+      }),
+    });
+
+    await expect(resolver.resolve({ taskKey: "qaGeneration" })).rejects.toThrow(
+      'Configured model default "models.tasks.qaGeneration.default" is invalid: provider must be "transformers".',
+    );
+  });
+
+  it("falls back from absent task default to global default", async () => {
     const resolver = new DefaultModelDefaultResolver({
       settings: createSettingsPort({
         "models.default": {
+          provider: "transformers",
           modelId: "global/model",
           inferenceMode: "text2text",
         },
@@ -71,46 +85,32 @@ describe("DefaultModelDefaultResolver", () => {
     expect(resolved.modelId).toBe("global/model");
   });
 
-  it("falls back to builtin default", async () => {
-    const resolver = new DefaultModelDefaultResolver({ settings: createSettingsPort({}) });
-    const resolved = await resolver.resolve({ taskKey: "qaGeneration" });
-
-    expect(resolved.source).toBe("builtin");
-    expect(resolved.modelId).toBe("google/flan-t5-small");
-    expect(resolved.inferenceMode).toBe("text2text");
-  });
-
-  it("requires inferenceMode on configured values and skips invalid entries", async () => {
+  it("uses runtime device and torchDtype when selected model default omits them", async () => {
     const resolver = new DefaultModelDefaultResolver({
       settings: createSettingsPort({
-        "models.tasks.qaGeneration.default": {
-          modelId: "task/model-without-mode",
-        },
         "models.default": {
+          provider: "transformers",
           modelId: "global/model",
-          inferenceMode: "causal",
+          inferenceMode: "text2text",
         },
+        "runtime.python.defaultDevice": "cuda",
+        "runtime.python.defaultTorchDtype": "float16",
       }),
     });
 
     const resolved = await resolver.resolve({ taskKey: "qaGeneration" });
     expect(resolved.source).toBe("global");
-    expect(resolved.modelId).toBe("global/model");
-    expect(resolved.inferenceMode).toBe("causal");
+    expect(resolved.device).toBe("cuda");
+    expect(resolved.torchDtype).toBe("float16");
+  });
+
+  it("uses builtin fallback defaults when no settings are configured", async () => {
+    const resolver = new DefaultModelDefaultResolver({ settings: createSettingsPort({}) });
+    const resolved = await resolver.resolve({ taskKey: "qaGeneration" });
+
+    expect(resolved.source).toBe("builtin");
+    expect(resolved.modelId).toBe("google/flan-t5-small");
+    expect(resolved.device).toBe("auto");
+    expect(resolved.torchDtype).toBe("auto");
   });
 });
-
-  it("uses deterministic fallback order feature -> task -> global -> builtin", async () => {
-    const resolver = new DefaultModelDefaultResolver({
-      settings: createSettingsPort({
-        "features.datasetPreparation.qaGeneration.default": { modelId: "", inferenceMode: "chat" },
-        "models.tasks.qaGeneration.default": { modelId: "task/model", inferenceMode: "chat" },
-        "models.default": { modelId: "global/model", inferenceMode: "causal" },
-      }),
-    });
-
-    const resolved = await resolver.resolve({ taskKey: "qaGeneration", featureKey: "datasetPreparation" });
-    expect(resolved.source).toBe("task");
-    expect(resolved.modelId).toBe("task/model");
-    expect(resolved.inferenceMode).toBe("chat");
-  });

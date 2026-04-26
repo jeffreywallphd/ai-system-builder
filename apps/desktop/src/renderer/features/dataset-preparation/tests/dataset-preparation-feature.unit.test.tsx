@@ -4,6 +4,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DatasetPreparationFeature } from "../components/DatasetPreparationFeature";
 
+const settingsClient = {
+  listDefinitions: vi.fn(),
+  readSettings: vi.fn().mockResolvedValue({ values: [] }),
+  updateSetting: vi.fn(),
+  clearSetting: vi.fn(),
+  resolveModelDefault: vi.fn().mockResolvedValue({
+    resolved: {
+      provider: "transformers",
+      modelId: "google/flan-t5-base",
+      inferenceMode: "text2text",
+      source: "global",
+      device: "auto",
+    },
+  }),
+};
+
 describe("DatasetPreparationFeature", () => {
   let root: Root | undefined;
   let container: HTMLDivElement | undefined;
@@ -72,6 +88,7 @@ describe("DatasetPreparationFeature", () => {
     await act(async () => {
       root?.render(
         <DatasetPreparationFeature
+          settingsClient={settingsClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts,
@@ -137,6 +154,7 @@ describe("DatasetPreparationFeature", () => {
     }), expect.objectContaining({
       requestId: expect.stringMatching(/^dataset-preparation-/),
     }));
+    expect(settingsClient.resolveModelDefault).toHaveBeenCalled();
     expect(container.textContent).toContain("stored-train");
     expect(container.textContent).toContain("stored-test");
   });
@@ -168,6 +186,4 @@ describe("DatasetPreparationFeature", () => {
 
     expect(container.textContent).toContain("failed");
   });
-
-
 });

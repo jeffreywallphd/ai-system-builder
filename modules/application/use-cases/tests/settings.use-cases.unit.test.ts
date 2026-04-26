@@ -131,6 +131,28 @@ describe("settings use cases", () => {
     expect(settingsUpdated).toBe(true);
   });
 
+  it("rejects masked placeholder for secret updates and never reads maskedValue as input", async () => {
+    const useCase = new UpdateSettingUseCase({ settings: createSettingsPort(), secrets: createSecretsPort() });
+
+    await expect(useCase.execute({ key: "huggingface.token", value: { rawValue: "********" } as never }))
+      .rejects.toThrow('Secret setting "huggingface.token" cannot be updated with the masked placeholder value.');
+  });
+
+  it("rejects blank and unknown keys for update and clear", async () => {
+    const updateUseCase = new UpdateSettingUseCase({ settings: createSettingsPort(), secrets: createSecretsPort() });
+    const clearUseCase = new ClearSettingUseCase({ settings: createSettingsPort(), secrets: createSecretsPort() });
+
+    await expect(updateUseCase.execute({ key: "   ", value: "value" })).rejects.toThrow(
+      "Setting key must be a non-empty string.",
+    );
+    await expect(updateUseCase.execute({ key: "unknown.setting", value: "value" })).rejects.toThrow(
+      'Unknown setting key "unknown.setting".',
+    );
+    await expect(clearUseCase.execute({ key: "unknown.setting" })).rejects.toThrow(
+      'Unknown setting key "unknown.setting".',
+    );
+  });
+
   it("clears values from the correct store", async () => {
     let settingsCleared = false;
     let secretCleared = false;
