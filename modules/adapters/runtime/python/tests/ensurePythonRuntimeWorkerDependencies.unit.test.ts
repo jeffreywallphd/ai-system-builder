@@ -34,6 +34,8 @@ function createEnvironmentInspectionJson(version = "3.11.9"): string {
   });
 }
 
+const workerDependencyProbeScript = "import accelerate, fastapi, hf_xet, uvicorn, huggingface_hub, transformers";
+
 describe("ensurePythonRuntimeWorkerDependencies", () => {
   it("keeps existing torch installation when already matching selected CPU target", () => {
     const spawnSyncImplementation = createSpawnSyncImplementation((command, args) => {
@@ -46,7 +48,7 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
       if (command === "python" && args[0] === "-c" && args[1]?.includes("os.access") && args[2] === "/tmp/runtime-worker") {
         return createSpawnSyncResult({ stdout: "1\n" });
       }
-      if (command === "python" && args[0] === "-c" && args[1] === "import fastapi, uvicorn, huggingface_hub, transformers") {
+      if (command === "python" && args[0] === "-c" && args[1] === workerDependencyProbeScript) {
         return createSpawnSyncResult({ status: 0 });
       }
       if (command === "nvidia-smi") {
@@ -99,7 +101,7 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
       if (command === "python" && args[0] === "-c" && args[1]?.includes("os.access") && args[2] === "/tmp/runtime-worker") {
         return createSpawnSyncResult({ stdout: "1\n" });
       }
-      if (command === "python" && args[0] === "-c" && args[1] === "import fastapi, uvicorn, huggingface_hub, transformers") {
+      if (command === "python" && args[0] === "-c" && args[1] === workerDependencyProbeScript) {
         return createSpawnSyncResult({ status: 0 });
       }
       if (command === "nvidia-smi") {
@@ -181,10 +183,10 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
       if (command === "python" && args[0] === "-c" && args[1]?.includes("os.access") && args[2] === "/tmp/runtime-worker") {
         return createSpawnSyncResult({ stdout: "1\n" });
       }
-      if (command === "python" && args[0] === "-c" && args[1] === "import fastapi, uvicorn, huggingface_hub, transformers") {
+      if (command === "python" && args[0] === "-c" && args[1] === workerDependencyProbeScript) {
         return createSpawnSyncResult({
           status: 1,
-          stderr: "ModuleNotFoundError: No module named 'transformers'",
+          stderr: "ModuleNotFoundError: No module named 'accelerate'",
         });
       }
       if (command === "python" && args.join(" ") === "-m pip install -r requirements.txt") {
@@ -258,7 +260,7 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
       if (command === "python" && args[0] === "-c" && args[1]?.includes("os.access") && args[2] === "/tmp/runtime-worker") {
         return createSpawnSyncResult({ stdout: "1\n" });
       }
-      if (command === "python" && args[0] === "-c" && args[1] === "import fastapi, uvicorn, huggingface_hub, transformers") {
+      if (command === "python" && args[0] === "-c" && args[1] === workerDependencyProbeScript) {
         return createSpawnSyncResult({ status: 0 });
       }
       if (command === "nvidia-smi") {
@@ -320,7 +322,7 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
       if (command === "python" && args[0] === "-c" && args[1]?.includes("os.access") && args[2] === "/tmp/runtime-worker") {
         return createSpawnSyncResult({ stdout: "0\n" });
       }
-      if (command === "python" && args[0] === "-c" && args[1] === "import fastapi, uvicorn, huggingface_hub, transformers") {
+      if (command === "python" && args[0] === "-c" && args[1] === workerDependencyProbeScript) {
         return createSpawnSyncResult({ status: 0 });
       }
       if (command === "nvidia-smi") {
