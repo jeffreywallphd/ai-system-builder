@@ -11,7 +11,6 @@ from ..models import ExampleGenerationConfig, LocalModelConfig
 
 
 def configure_huggingface_download_environment() -> None:
-    environ.setdefault("HF_HUB_DISABLE_XET", "1")
     environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 
@@ -80,7 +79,7 @@ class TransformersCausalGenerator(LocalTextGenerator):
         tokenizer = AutoTokenizer.from_pretrained(resolved_model_reference)
         model = AutoModelForCausalLM.from_pretrained(resolved_model_reference, **model_kwargs)
 
-        if model_config.device in {"cpu", "cuda"}:
+        if model_config.device in {"cpu", "cuda"} and _supports_manual_device_move(model):
             model = model.to(model_config.device)
 
         return tokenizer, model
@@ -292,6 +291,9 @@ def _resolve_generation_params(config: ExampleGenerationConfig) -> dict[str, Any
 
 def _resolve_model_kwargs(model_config: LocalModelConfig) -> dict[str, Any]:
     model_kwargs: dict[str, Any] = {}
+    if model_config.device == "auto":
+        model_kwargs["device_map"] = "auto"
+
     if model_config.torchDtype and model_config.torchDtype != "auto":
         import torch
 
@@ -303,6 +305,14 @@ def _resolve_model_kwargs(model_config: LocalModelConfig) -> dict[str, Any]:
         model_kwargs["torch_dtype"] = dtype_mapping[model_config.torchDtype]
 
     return model_kwargs
+
+
+def _supports_manual_device_move(model: Any) -> bool:
+    if getattr(model, "hf_device_map", None) is not None:
+        return False
+    if getattr(model, "quantization_config", None) is not None:
+        return False
+    return True
 
 
 def _extract_pipeline_text(generation: Any) -> str:

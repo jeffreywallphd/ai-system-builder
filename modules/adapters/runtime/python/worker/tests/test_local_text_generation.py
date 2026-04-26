@@ -7,6 +7,8 @@ from unittest.mock import patch
 from modules.adapters.runtime.python.worker.models import ExampleGenerationConfig
 from modules.adapters.runtime.python.worker.tasks.local_text_generation import (
     _GENERATOR_CACHE,
+    _resolve_model_kwargs,
+    _supports_manual_device_move,
     configure_huggingface_download_environment,
     get_or_create_local_text_generator,
 )
@@ -79,14 +81,14 @@ class LocalTextGenerationTests(unittest.TestCase):
     def setUp(self) -> None:
         _GENERATOR_CACHE.clear()
 
-    def test_configures_huggingface_downloads_to_avoid_optional_xet_path(self) -> None:
+    def test_configures_huggingface_downloads_without_disabling_xet(self) -> None:
         previous_xet = environ.pop("HF_HUB_DISABLE_XET", None)
         previous_symlink_warning = environ.pop("HF_HUB_DISABLE_SYMLINKS_WARNING", None)
 
         try:
             configure_huggingface_download_environment()
 
-            self.assertEqual(environ.get("HF_HUB_DISABLE_XET"), "1")
+            self.assertIsNone(environ.get("HF_HUB_DISABLE_XET"))
             self.assertEqual(environ.get("HF_HUB_DISABLE_SYMLINKS_WARNING"), "1")
         finally:
             if previous_xet is not None:
@@ -97,6 +99,19 @@ class LocalTextGenerationTests(unittest.TestCase):
                 environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = previous_symlink_warning
             else:
                 environ.pop("HF_HUB_DISABLE_SYMLINKS_WARNING", None)
+
+    def test_auto_device_uses_transformers_device_map(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {"mode": "qa", "model": {"provider": "transformers", "modelId": "m", "device": "auto"}}
+        )
+
+        self.assertEqual(_resolve_model_kwargs(config.model), {"device_map": "auto"})
+
+    def test_quantized_models_are_not_moved_manually_after_load(self) -> None:
+        class _QuantizedModel(_FakeModel):
+            quantization_config = object()
+
+        self.assertFalse(_supports_manual_device_move(_QuantizedModel()))
 
     def test_text2text_mode_uses_text2text_pipeline_behavior(self) -> None:
         config = ExampleGenerationConfig.model_validate(
