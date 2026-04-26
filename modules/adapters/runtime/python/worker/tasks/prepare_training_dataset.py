@@ -221,6 +221,28 @@ def _build_generated_rows(
         chunk_batch = chunks[start : start + batch_size]
         try:
             generated_examples = generator(chunk_batch, payload.recipe.generation)
+            generated_chunk_keys = {
+                (example.artifact_id, example.chunk_index)
+                for example in generated_examples
+            }
+            if failure_policy == "skip":
+                skipped_chunks = [
+                    chunk
+                    for chunk in chunk_batch
+                    if (chunk.artifact_id, chunk.chunk_index) not in generated_chunk_keys
+                ]
+                skipped_generation_chunk_count += len(skipped_chunks)
+                for chunk in skipped_chunks:
+                    warnings.append(
+                        DatasetPreparationWarning(
+                            code="generation_example_skipped",
+                            message=(
+                                f"Skipped chunk {chunk.chunk_index} from source '{chunk.artifact_id}' during generation: "
+                                "generation returned no usable example"
+                            ),
+                            sourceArtifactId=chunk.artifact_id,
+                        )
+                    )
             for example in generated_examples:
                 rows.append(
                     {

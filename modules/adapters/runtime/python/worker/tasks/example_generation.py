@@ -49,6 +49,30 @@ def _normalize_text(value: str) -> str:
     return " ".join(value.replace("\r", "\n").split()).strip().lower()
 
 
+def _strip_reasoning_blocks(text: str) -> str:
+    candidate = text.replace("\r", "\n").strip()
+    lowered = candidate.lower()
+
+    while lowered.startswith("<think>"):
+        closing_index = lowered.find("</think>")
+        if closing_index < 0:
+            return ""
+        candidate = candidate[closing_index + len("</think>") :].strip()
+        lowered = candidate.lower()
+
+    return candidate
+
+
+def _strip_response_label(text: str, labels: tuple[str, ...]) -> str:
+    candidate = text.strip()
+    lowered = candidate.lower()
+    for label in labels:
+        prefix = f"{label.lower()}:"
+        if lowered.startswith(prefix):
+            return candidate[len(prefix) :].strip()
+    return candidate
+
+
 def _is_substantial_prompt_echo(generated: str, prompt: str) -> bool:
     normalized_generated = _normalize_text(generated)
     normalized_prompt = _normalize_text(prompt)
@@ -62,7 +86,10 @@ def _is_substantial_prompt_echo(generated: str, prompt: str) -> bool:
 
 
 def _extract_single_question(text: str, prompt: str) -> str:
-    candidate = text.replace("\r", "\n").strip()
+    candidate = _strip_response_label(
+        _strip_reasoning_blocks(text),
+        ("question", "user question"),
+    )
     lowered = candidate.lower()
 
     if "context:" in lowered or "return only the question" in lowered:
@@ -70,7 +97,7 @@ def _extract_single_question(text: str, prompt: str) -> str:
     if _is_substantial_prompt_echo(candidate, prompt):
         raise ValueError("Question generation substantially echoed the prompt.")
 
-    question_line = next((line.strip() for line in candidate.splitlines() if line.strip()), "")
+    question_line = next((line.strip() for line in candidate.splitlines() if "?" in line), "")
     if not question_line or "?" not in question_line:
         raise ValueError("Question generation did not produce a usable question.")
 
@@ -78,7 +105,10 @@ def _extract_single_question(text: str, prompt: str) -> str:
 
 
 def _extract_single_answer(text: str, question: str) -> str:
-    candidate = text.replace("\r", "\n").strip()
+    candidate = _strip_response_label(
+        _strip_reasoning_blocks(text),
+        ("answer", "assistant"),
+    )
     lowered = candidate.lower()
     if "context:" in lowered:
         raise ValueError("Answer generation echoed context block instead of returning an answer.")

@@ -28,6 +28,8 @@ class _FakeTensor:
 
 class _FakeTokenizer:
     supports_chat = True
+    pad_token_id = 0
+    eos_token_id = 99
 
     def __call__(self, prompt: str, return_tensors: str = "pt"):
         del return_tensors
@@ -39,21 +41,32 @@ class _FakeTokenizer:
         del skip_special_tokens
         return " ".join(str(token) for token in ids)
 
-    def apply_chat_template(self, _messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"):
+    def apply_chat_template(
+        self,
+        _messages,
+        tokenize=True,
+        add_generation_prompt=True,
+        return_tensors="pt",
+        return_dict=False,
+    ):
         del tokenize, add_generation_prompt, return_tensors
         if not self.supports_chat:
             raise AttributeError("missing")
+        if return_dict:
+            return {"input_ids": _FakeTensor([7, 8]), "attention_mask": _FakeTensor([1, 1])}
         return _FakeTensor([7, 8])
 
 
 class _FakeModel:
     def __init__(self):
         self.device = "cpu"
+        self.generate_calls: list[dict] = []
 
     def to(self, _device):
         return self
 
     def generate(self, **kwargs):
+        self.generate_calls.append(kwargs)
         input_ids = kwargs["input_ids"]
         if isinstance(input_ids, _FakeTensor):
             values = input_ids.values
@@ -130,26 +143,30 @@ class LocalTextGenerationTests(unittest.TestCase):
             {"mode": "qa", "model": {"provider": "transformers", "modelId": "m", "inferenceMode": "causal"}}
         )
 
+        fake_model = _FakeModel()
         with patch(
             "modules.adapters.runtime.python.worker.tasks.local_text_generation.TransformersCausalGenerator._load_model",
-            return_value=(_FakeTokenizer(), _FakeModel()),
+            return_value=(_FakeTokenizer(), fake_model),
         ):
             generator = get_or_create_local_text_generator(config)
 
         self.assertEqual(generator.generate_text("prompt"), "44 55")
+        self.assertEqual(fake_model.generate_calls[0]["pad_token_id"], 0)
 
     def test_chat_mode_uses_chat_template_when_available(self) -> None:
         config = ExampleGenerationConfig.model_validate(
             {"mode": "qa", "model": {"provider": "transformers", "modelId": "m", "inferenceMode": "chat"}}
         )
 
+        fake_model = _FakeModel()
         with patch(
             "modules.adapters.runtime.python.worker.tasks.local_text_generation.TransformersCausalGenerator._load_model",
-            return_value=(_FakeTokenizer(), _FakeModel()),
+            return_value=(_FakeTokenizer(), fake_model),
         ):
             generator = get_or_create_local_text_generator(config)
 
         self.assertEqual(generator.generate_text("prompt"), "44 55")
+        self.assertIn("attention_mask", fake_model.generate_calls[0])
 
     def test_chat_mode_fails_clearly_without_chat_template(self) -> None:
         config = ExampleGenerationConfig.model_validate(

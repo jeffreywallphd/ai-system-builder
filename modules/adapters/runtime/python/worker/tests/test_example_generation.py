@@ -37,6 +37,17 @@ class _EchoingGenerator:
         return prompt
 
 
+class _ReasoningGenerator:
+    def __init__(self, _config, _params):
+        self.calls: list[str] = []
+
+    def generate_text(self, prompt: str) -> str:
+        self.calls.append(prompt)
+        if "Return only the question." in prompt:
+            return "<think>\nIdentify a grounded question.\n</think>\n\nQuestion: What does the context describe?"
+        return "<think>\nUse only the supplied context.\n</think>\n\nAnswer: The context describes generated content."
+
+
 class ExampleGenerationTests(unittest.TestCase):
     def setUp(self) -> None:
         _GENERATOR_CACHE.clear()
@@ -124,6 +135,27 @@ class ExampleGenerationTests(unittest.TestCase):
             )
 
         self.assertEqual(examples, [])
+
+    def test_extracts_question_and_answer_from_reasoning_model_wrappers(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "failurePolicy": "fail",
+                "model": {"provider": "transformers", "modelId": "test-model", "inferenceMode": "chat"},
+            }
+        )
+
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.example_generation.get_or_create_local_text_generator",
+            return_value=_ReasoningGenerator(None, None),
+        ):
+            examples = generate_qa_examples_for_chunks(
+                [MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="The context describes generated content.")],
+                config,
+            )
+
+        self.assertEqual(examples[0].question, "What does the context describe?")
+        self.assertEqual(examples[0].answer, "The context describes generated content.")
 
     def test_reuses_cached_generator_for_same_model_config(self) -> None:
         config = ExampleGenerationConfig.model_validate(

@@ -79,13 +79,20 @@ class TransformersCausalGenerator(LocalTextGenerator):
         tokenizer = AutoTokenizer.from_pretrained(resolved_model_reference)
         model = AutoModelForCausalLM.from_pretrained(resolved_model_reference, **model_kwargs)
 
+        if getattr(tokenizer, "pad_token_id", None) is None:
+            tokenizer.pad_token_id = getattr(tokenizer, "eos_token_id", None)
+
         if model_config.device in {"cpu", "cuda"} and _supports_manual_device_move(model):
             model = model.to(model_config.device)
 
         return tokenizer, model
 
     def _generate_new_tokens_text(self, input_ids: Any, generation_inputs: dict[str, Any]) -> str:
-        generation_output = self._model.generate(**generation_inputs, **dict(self._generation_params))
+        generation_params = _resolve_runtime_generation_params(
+            self._generation_params,
+            self._tokenizer,
+        )
+        generation_output = self._model.generate(**generation_inputs, **generation_params)
 
         first_output = generation_output[0]
         prompt_length = input_ids.shape[-1]
@@ -111,12 +118,22 @@ class TransformersChatGenerator(TransformersCausalGenerator):
                 "Chat inference mode requires a tokenizer with apply_chat_template support."
             )
 
-        templated = apply_chat_template(
-            [{"role": "user", "content": prompt}],
-            tokenize=True,
-            add_generation_prompt=True,
-            return_tensors="pt",
-        )
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            templated = apply_chat_template(
+                messages,
+                tokenize=True,
+                add_generation_prompt=True,
+                return_tensors="pt",
+                return_dict=True,
+            )
+        except TypeError:
+            templated = apply_chat_template(
+                messages,
+                tokenize=True,
+                add_generation_prompt=True,
+                return_tensors="pt",
+            )
 
         if isinstance(templated, dict):
             input_ids = templated["input_ids"]
@@ -287,6 +304,18 @@ def _resolve_generation_params(config: ExampleGenerationConfig) -> dict[str, Any
         params["top_p"] = config.generationParams.topP
 
     return params
+
+
+def _resolve_runtime_generation_params(params: dict[str, Any], tokenizer: Any) -> dict[str, Any]:
+    resolved = dict(params)
+    if "pad_token_id" not in resolved:
+        pad_token_id = getattr(tokenizer, "pad_token_id", None)
+        eos_token_id = getattr(tokenizer, "eos_token_id", None)
+        if pad_token_id is not None:
+            resolved["pad_token_id"] = pad_token_id
+        elif eos_token_id is not None:
+            resolved["pad_token_id"] = eos_token_id
+    return resolved
 
 
 def _resolve_model_kwargs(model_config: LocalModelConfig) -> dict[str, Any]:

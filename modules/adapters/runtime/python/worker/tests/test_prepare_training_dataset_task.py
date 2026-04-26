@@ -308,6 +308,32 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.assertIn("No training examples were generated", str(error))
         self.assertEqual(getattr(error, "details", {}).get("chunkCount"), 3)
         self.assertEqual(getattr(error, "details", {}).get("failurePolicy"), "skip")
+        self.assertEqual(getattr(error, "details", {}).get("skippedGenerationChunkCount"), 3)
+
+    def test_skip_policy_counts_generator_omitted_chunks(self) -> None:
+        payload = self._build_payload("jsonl")
+        payload.recipe.generation.failurePolicy = "skip"
+
+        def partial_generator(chunks, _config):
+            return [
+                GeneratedQaExample(
+                    artifact_id=chunk.artifact_id,
+                    chunk_index=chunk.chunk_index,
+                    question="Q",
+                    answer=chunk.text,
+                )
+                for chunk in chunks
+                if chunk.chunk_index != 1
+            ]
+
+        result = prepare_training_dataset(payload, example_generator=partial_generator)
+
+        self.assertEqual(result.summary.generatedExampleCount, 2)
+        skipped_warnings = [
+            warning for warning in result.warnings or [] if warning.code == "generation_example_skipped"
+        ]
+        self.assertEqual(len(skipped_warnings), 1)
+        self.assertIn("returned no usable example", skipped_warnings[0].message)
 
     def test_fails_early_when_generation_model_is_not_available_locally(self) -> None:
         payload = self._build_payload("jsonl")
