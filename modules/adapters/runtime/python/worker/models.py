@@ -96,6 +96,7 @@ class GenerationParams(BaseModel):
 class LocalModelConfig(BaseModel):
     provider: Literal["transformers"]
     modelId: str
+    inferenceMode: Literal["text2text", "causal", "chat"] = "text2text"
     device: Literal["cpu", "cuda", "auto"] | None = None
     torchDtype: Literal["auto", "float16", "bfloat16", "float32"] | None = None
 

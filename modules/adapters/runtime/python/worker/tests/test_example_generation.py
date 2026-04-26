@@ -11,8 +11,6 @@ from modules.adapters.runtime.python.worker.tasks.example_generation import (
     GeneratedQaExample,
     _GENERATOR_CACHE,
     _RESOLVED_MODEL_REFERENCES,
-    _extract_single_answer,
-    _extract_single_question,
     ensure_generation_model_downloaded,
     generate_qa_examples_for_chunks,
 )
@@ -54,8 +52,8 @@ class ExampleGenerationTests(unittest.TestCase):
         )
 
         with patch(
-            "modules.adapters.runtime.python.worker.tasks.example_generation.TransformersQaTextGenerator",
-            _FakeGenerator,
+            "modules.adapters.runtime.python.worker.tasks.example_generation.get_or_create_local_text_generator",
+            return_value=_FakeGenerator(None, None),
         ):
             examples = generate_qa_examples_for_chunks(
                 [MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="chunk text")],
@@ -75,58 +73,57 @@ class ExampleGenerationTests(unittest.TestCase):
             ],
         )
 
-    def test_extract_single_question_handles_prompt_echo_with_context_block(self) -> None:
-        chunk = MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")
-        generated_text = (
-            "Write one concise question answerable from the context below. Return only the question.\n\n"
-            "Context:\nSome context"
-        )
-        question = _extract_single_question(generated_text, chunk)
-        self.assertEqual(question, "What is the main idea of this passage about artifact-1?")
+    def test_local_model_inference_mode_validation_rejects_invalid_value(self) -> None:
+        with self.assertRaisesRegex(ValueError, "inferenceMode"):
+            ExampleGenerationConfig.model_validate(
+                {
+                    "mode": "qa",
+                    "model": {
+                        "provider": "transformers",
+                        "modelId": "test-model",
+                        "inferenceMode": "invalid",
+                    },
+                }
+            )
 
-    def test_extract_single_question_handles_full_instruction_prompt_echo(self) -> None:
-        chunk = MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")
-        generated_text = (
-            "You are creating supervised training data.\n"
-            "Write one concise question answerable from the context below. Return only the question.\n\n"
-            "Context:\nSome context"
-        )
-        question = _extract_single_question(generated_text, chunk)
-        self.assertEqual(question, "What is the main idea of this passage about artifact-1?")
-
-    def test_extract_single_answer_handles_prompt_echo(self) -> None:
-        chunk = MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")
-        generated_text = (
-            "You are creating supervised training data.\n"
-            "Answer the user question using only facts in the context.\n"
-            "Write in a conversational tone while staying concise and faithful.\n"
-            "Do not add details not present in the context.\n"
-            "Return only the answer.\n\n"
-            "Question:\nWhat does the context say?\n\n"
-            "Context:\nSome context"
-        )
-        answer = _extract_single_answer(generated_text, "What does the context say?", chunk)
-        self.assertEqual(answer, "Some context")
-
-    def test_generation_strips_prompt_echo_for_question_and_answer(self) -> None:
+    def test_invalid_prompt_echo_raises_for_fail_policy(self) -> None:
         config = ExampleGenerationConfig.model_validate(
             {
                 "mode": "qa",
+                "failurePolicy": "fail",
                 "model": {"provider": "transformers", "modelId": "test-model"},
             }
         )
 
         with patch(
-            "modules.adapters.runtime.python.worker.tasks.example_generation.TransformersQaTextGenerator",
-            _EchoingGenerator,
+            "modules.adapters.runtime.python.worker.tasks.example_generation.get_or_create_local_text_generator",
+            return_value=_EchoingGenerator(None, None),
+        ):
+            with self.assertRaisesRegex(ValueError, "echoed"):
+                generate_qa_examples_for_chunks(
+                    [MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")],
+                    config,
+                )
+
+    def test_invalid_prompt_echo_skips_chunk_for_skip_policy(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "failurePolicy": "skip",
+                "model": {"provider": "transformers", "modelId": "test-model"},
+            }
+        )
+
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.example_generation.get_or_create_local_text_generator",
+            return_value=_EchoingGenerator(None, None),
         ):
             examples = generate_qa_examples_for_chunks(
                 [MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")],
                 config,
             )
 
-        self.assertEqual(examples[0].question, "What is the main idea of this passage about artifact-1?")
-        self.assertEqual(examples[0].answer, "Some context")
+        self.assertEqual(examples, [])
 
     def test_reuses_cached_generator_for_same_model_config(self) -> None:
         config = ExampleGenerationConfig.model_validate(
@@ -145,7 +142,7 @@ class ExampleGenerationTests(unittest.TestCase):
                 super().__init__(model_config, params)
 
         with patch(
-            "modules.adapters.runtime.python.worker.tasks.example_generation.TransformersQaTextGenerator",
+            "modules.adapters.runtime.python.worker.tasks.local_text_generation.TransformersText2TextGenerator",
             _CountingGenerator,
         ):
             generate_qa_examples_for_chunks([MarkdownChunk("a", 0, "first")], config)
