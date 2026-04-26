@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateDatasetPreparationInputs } from "../hooks/datasetPreparationRequestValidation";
+import { validateAndParseDatasetPreparationInputs } from "../hooks/datasetPreparationRequestValidation";
 
 function createValidInput() {
   return {
@@ -24,13 +24,29 @@ function createValidInput() {
 }
 
 describe("datasetPreparationRequestValidation", () => {
-  it("accepts valid input", () => {
-    expect(validateDatasetPreparationInputs(createValidInput())).toBeUndefined();
+  it("returns parsed values for valid input", () => {
+    expect(validateAndParseDatasetPreparationInputs(createValidInput())).toEqual({
+      ok: true,
+      parsed: {
+        chunkSize: 1000,
+        chunkOverlap: 200,
+        maxChunkCount: undefined,
+        maxExamplesPerChunk: 4,
+        batchSize: 4,
+        generationTemperature: undefined,
+        generationTopP: undefined,
+        generationMaxNewTokens: undefined,
+        trainRatio: 0.8,
+        testRatio: 0.2,
+        seed: undefined,
+      },
+    });
   });
 
-  it("rejects invalid chunk size", () => {
-    expect(validateDatasetPreparationInputs({ ...createValidInput(), chunkSize: "0" })).toBe(
-      "Chunk size must be a positive integer.",
-    );
+  it("returns error for invalid input", () => {
+    expect(validateAndParseDatasetPreparationInputs({ ...createValidInput(), chunkSize: "0" })).toEqual({
+      ok: false,
+      error: "Chunk size must be a positive integer.",
+    });
   });
 });

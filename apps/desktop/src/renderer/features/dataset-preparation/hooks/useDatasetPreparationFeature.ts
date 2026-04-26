@@ -5,9 +5,7 @@ import { createDesktopApplicationSettingsClient, type DesktopApplicationSettings
 import type { DesktopDatasetPreparationClient } from "../api/desktopDatasetPreparationClient";
 import { buildDatasetPreparationRequest } from "./datasetPreparationRequestBuilder";
 import {
-  parseOptionalInteger,
-  parseOptionalNumber,
-  validateDatasetPreparationInputs,
+  validateAndParseDatasetPreparationInputs,
 } from "./datasetPreparationRequestValidation";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 
@@ -105,6 +103,7 @@ function createDatasetPreparationRequestId(): string {
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
 ): UseDatasetPreparationFeatureResult {
+  const onPrepared = options.onPrepared;
   const datasetClient = useDatasetPreparationClient(options.client);
   const settingsClient = useMemo(() => {
     if (options.settingsClient) {
@@ -149,6 +148,16 @@ export function useDatasetPreparationFeature(
   const [resultSummary, setResultSummary] = useState<DatasetPreparationResultSummary>();
   const [defaultHuggingFaceNamespace, setDefaultHuggingFaceNamespace] = useState<string | undefined>(undefined);
 
+  const setStatusWarningMessage = useCallback((warningMessage: string) => {
+    setStatus((current) => {
+      const existingMessage = current.message?.trim();
+      const nextMessage = existingMessage && existingMessage.length > 0
+        ? `${existingMessage} ${warningMessage}`
+        : warningMessage;
+      return { kind: current.kind, message: nextMessage };
+    });
+  }, []);
+
   const refreshArtifacts = useCallback(async () => {
     const sourceArtifacts = await datasetClient.browseSourceArtifacts();
     setArtifacts(sourceArtifacts);
@@ -179,7 +188,7 @@ export function useDatasetPreparationFeature(
       setModelDevice(result.resolved.device ?? "auto");
       setModelTorchDtype(result.resolved.torchDtype ?? "");
     }).catch(() => {
-      // Keep local defaults if resolution fails.
+      setStatusWarningMessage("Using built-in model defaults because settings could not be loaded.");
     });
 
     void settingsClient.readSettings({ keys: ["huggingface.defaultNamespace"] }).then((result) => {
@@ -189,9 +198,9 @@ export function useDatasetPreparationFeature(
         setHuggingFaceRepository((current) => (current.trim().length === 0 ? `${namespace.trim()}/` : current));
       }
     }).catch(() => {
-      // Ignore settings read errors in feature bootstrapping.
+      setStatusWarningMessage("Hugging Face namespace default could not be loaded.");
     });
-  }, [settingsClient]);
+  }, [settingsClient, setStatusWarningMessage]);
 
   const onToggleArtifact = useCallback((artifactId: string) => {
     setSelectedArtifactIds((current) =>
@@ -203,7 +212,7 @@ export function useDatasetPreparationFeature(
   const onSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const validationError = validateDatasetPreparationInputs({
+    const validationResult = validateAndParseDatasetPreparationInputs({
       selectedArtifactIds,
       chunkSize,
       chunkOverlap,
@@ -222,20 +231,10 @@ export function useDatasetPreparationFeature(
       huggingFaceRepository,
     });
 
-    if (validationError) {
-      setStatus({ kind: "error", message: validationError });
+    if (!validationResult.ok) {
+      setStatus({ kind: "error", message: validationResult.error });
       return;
     }
-
-    const parsedSeed = parseOptionalNumber(seed);
-    const parsedChunkSize = parseOptionalInteger(chunkSize);
-    const parsedChunkOverlap = parseOptionalInteger(chunkOverlap);
-    const parsedMaxChunkCount = parseOptionalInteger(maxChunkCount);
-    const parsedMaxExamplesPerChunk = parseOptionalInteger(maxExamplesPerChunk);
-    const parsedBatchSize = parseOptionalInteger(batchSize);
-    const parsedGenerationTemperature = parseOptionalNumber(generationTemperature);
-    const parsedGenerationTopP = parseOptionalNumber(generationTopP);
-    const parsedGenerationMaxNewTokens = parseOptionalInteger(generationMaxNewTokens);
 
     setStatus({ kind: "loading", message: "Preparing training dataset..." });
     setResultSummary(undefined);
@@ -263,8 +262,6 @@ export function useDatasetPreparationFeature(
         modelDevice,
         modelTorchDtype,
         failurePolicy,
-        trainRatio,
-        testRatio,
         shuffle,
         outputFormat,
         outputBaseName,
@@ -273,15 +270,7 @@ export function useDatasetPreparationFeature(
         huggingFaceRepository,
         huggingFaceRevision,
         huggingFacePathPrefix,
-        parsedSeed,
-        parsedChunkSize,
-        parsedChunkOverlap,
-        parsedMaxChunkCount,
-        parsedMaxExamplesPerChunk,
-        parsedBatchSize,
-        parsedGenerationTemperature,
-        parsedGenerationTopP,
-        parsedGenerationMaxNewTokens,
+        parsed: validationResult.parsed,
         resolvedDefault,
       }),
       { requestId },
@@ -301,7 +290,7 @@ export function useDatasetPreparationFeature(
     });
 
     await refreshArtifacts();
-    options.onPrepared?.();
+    onPrepared?.();
   }, [
     selectedArtifactIds,
     unsupportedDocumentPolicy,
@@ -334,7 +323,7 @@ export function useDatasetPreparationFeature(
     datasetClient,
     settingsClient,
     refreshArtifacts,
-    options,
+    onPrepared,
   ]);
 
   return {
