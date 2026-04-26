@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import io
+import json
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -135,6 +138,33 @@ class ExampleGenerationTests(unittest.TestCase):
             )
 
         self.assertEqual(examples, [])
+
+    def test_generation_skip_logs_raw_prepared_data_and_errors(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "failurePolicy": "skip",
+                "model": {"provider": "transformers", "modelId": "test-model"},
+            }
+        )
+        output = io.StringIO()
+
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.example_generation.get_or_create_local_text_generator",
+            return_value=_EchoingGenerator(None, None),
+        ):
+            with redirect_stdout(output):
+                examples = generate_qa_examples_for_chunks(
+                    [MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")],
+                    config,
+                )
+
+        self.assertEqual(examples, [])
+        diagnostic = json.loads(output.getvalue().strip())
+        self.assertEqual(diagnostic["event"], "runtime.dataset_preparation.generation.chunk_failed")
+        self.assertEqual(diagnostic["rawData"]["chunk"]["text"], "Some context")
+        self.assertIn("questionPrompt", diagnostic["preparedData"])
+        self.assertTrue(any("echoed" in error for error in diagnostic["errors"]))
 
     def test_extracts_question_and_answer_from_reasoning_model_wrappers(self) -> None:
         config = ExampleGenerationConfig.model_validate(

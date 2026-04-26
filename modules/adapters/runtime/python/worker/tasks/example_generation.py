@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+import json
+from typing import Any
 
 from ..models import ExampleGenerationConfig
 from .local_text_generation import (
@@ -28,6 +30,7 @@ def _build_question_prompt(chunk: MarkdownChunk) -> str:
         "You are creating supervised training data.\n"
         "Write exactly one clear user question answerable only from the context.\n"
         "The question should be specific, natural, and grounded in the context.\n"
+        "The context is the source material, not a list of generation examples.\n"
         "Return only the question.\n\n"
         f"Context:\n{chunk.text}"
     )
@@ -39,6 +42,7 @@ def _build_answer_prompt(question: str, chunk: MarkdownChunk) -> str:
         "Answer the user question using only facts in the context.\n"
         "Write in a conversational tone while staying concise and faithful.\n"
         "Do not add details not present in the context.\n"
+        "The context is the source material, not a list of generation examples.\n"
         "Return only the answer.\n\n"
         f"Question:\n{question}\n\n"
         f"Context:\n{chunk.text}"
@@ -83,6 +87,62 @@ def _is_substantial_prompt_echo(generated: str, prompt: str) -> bool:
     if len(normalized_generated) > 20 and SequenceMatcher(None, normalized_generated, normalized_prompt).ratio() > 0.8:
         return True
     return False
+
+
+def _log_generation_diagnostic(
+    event: str,
+    raw_data: dict[str, Any],
+    prepared_data: dict[str, Any],
+    errors: list[str],
+) -> None:
+    print(
+        json.dumps(
+            {
+                "event": event,
+                "rawData": raw_data,
+                "preparedData": prepared_data,
+                "errors": errors,
+            },
+            ensure_ascii=False,
+            default=str,
+        ),
+        flush=True,
+    )
+
+
+def _log_chunk_generation_failure(
+    chunk: MarkdownChunk,
+    config: ExampleGenerationConfig,
+    question_prompt: str,
+    answer_prompt: str,
+    raw_question_output: str,
+    raw_answer_output: str,
+    error: Exception,
+) -> None:
+    _log_generation_diagnostic(
+        "runtime.dataset_preparation.generation.chunk_failed",
+        raw_data={
+            "chunk": {
+                "artifactId": chunk.artifact_id,
+                "chunkIndex": chunk.chunk_index,
+                "text": chunk.text,
+            },
+            "questionOutput": raw_question_output,
+            "answerOutput": raw_answer_output,
+        },
+        prepared_data={
+            "model": config.model.model_dump(mode="json"),
+            "generationParams": (
+                config.generationParams.model_dump(mode="json")
+                if config.generationParams is not None
+                else None
+            ),
+            "failurePolicy": config.failurePolicy,
+            "questionPrompt": question_prompt,
+            "answerPrompt": answer_prompt or None,
+        },
+        errors=[str(error)],
+    )
 
 
 def _extract_single_question(text: str, prompt: str) -> str:
@@ -131,15 +191,41 @@ def generate_qa_examples_for_chunks(
     examples: list[GeneratedQaExample] = []
     for chunk in chunks:
         question_prompt = _build_question_prompt(chunk)
+        answer_prompt = ""
+        raw_question_output = ""
+        raw_answer_output = ""
         try:
-            question = _extract_single_question(generator.generate_text(question_prompt).strip(), question_prompt)
+            raw_question_output = generator.generate_text(question_prompt).strip()
+            question = _extract_single_question(raw_question_output, question_prompt)
+            answer_prompt = _build_answer_prompt(question, chunk)
+            raw_answer_output = generator.generate_text(answer_prompt).strip()
             answer = _extract_single_answer(
-                generator.generate_text(_build_answer_prompt(question, chunk)).strip(),
+                raw_answer_output,
                 question,
             )
-        except ValueError:
+        except ValueError as error:
+            _log_chunk_generation_failure(
+                chunk,
+                config,
+                question_prompt,
+                answer_prompt,
+                raw_question_output,
+                raw_answer_output,
+                error,
+            )
             if config.failurePolicy == "skip":
                 continue
+            raise
+        except Exception as error:
+            _log_chunk_generation_failure(
+                chunk,
+                config,
+                question_prompt,
+                answer_prompt,
+                raw_question_output,
+                raw_answer_output,
+                error,
+            )
             raise
 
         examples.append(
