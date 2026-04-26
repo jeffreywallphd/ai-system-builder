@@ -73,6 +73,59 @@ class WorkerAppTests(unittest.TestCase):
             self.assertIsNotNone(response.data)
             self.assertEqual(response.data["summary"]["generatedExampleCount"], 1)
 
+    def test_prepare_training_dataset_dispatch_accepts_auto_inference_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "source.txt"
+            input_path.write_text("alpha beta gamma", encoding="utf-8")
+
+            request = PythonRuntimeTaskRequest(
+                requestId="req-auto-inference-mode",
+                taskType="prepare-training-dataset",
+                payload={
+                    "sourceInputs": [
+                        {
+                            "artifactId": "artifact-1",
+                            "localPath": str(input_path),
+                            "mediaType": "text/plain",
+                        }
+                    ],
+                    "recipe": {
+                        "normalization": {"targetFormat": "markdown"},
+                        "chunking": {"strategy": "character", "chunkSize": 128, "chunkOverlap": 8},
+                        "generation": {
+                            "mode": "qa",
+                            "model": {
+                                "provider": "transformers",
+                                "modelId": "Qwen/Qwen3-1.7B",
+                                "inferenceMode": "auto",
+                            },
+                        },
+                    },
+                    "split": {"trainRatio": 0.5, "testRatio": 0.5},
+                    "output": {"format": "jsonl"},
+                },
+            )
+
+            with patch("modules.adapters.runtime.python.worker.app.prepare_training_dataset") as prepare_mock:
+                prepare_mock.return_value = type("Result", (), {"model_dump": lambda self, mode: {
+                    "outputs": [],
+                    "summary": {
+                        "sourceDocumentCount": 1,
+                        "normalizedDocumentCount": 1,
+                        "skippedDocumentCount": 0,
+                        "chunkCount": 1,
+                        "generatedExampleCount": 1,
+                        "trainRowCount": 1,
+                        "testRowCount": 0,
+                    },
+                }})()
+                response = execute_task(request)
+
+            self.assertTrue(response.success)
+            prepare_mock.assert_called_once()
+            payload = prepare_mock.call_args.args[0]
+            self.assertEqual(payload.recipe.generation.model.inferenceMode, "auto")
+
     def test_unknown_task_preserves_generic_execution_path(self) -> None:
         request = PythonRuntimeTaskRequest(
             requestId="req-unknown",
