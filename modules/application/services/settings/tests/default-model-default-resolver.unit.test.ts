@@ -99,3 +99,18 @@ describe("DefaultModelDefaultResolver", () => {
     expect(resolved.inferenceMode).toBe("causal");
   });
 });
+
+  it("uses deterministic fallback order feature -> task -> global -> builtin", async () => {
+    const resolver = new DefaultModelDefaultResolver({
+      settings: createSettingsPort({
+        "features.datasetPreparation.qaGeneration.default": { modelId: "", inferenceMode: "chat" },
+        "models.tasks.qaGeneration.default": { modelId: "task/model", inferenceMode: "chat" },
+        "models.default": { modelId: "global/model", inferenceMode: "causal" },
+      }),
+    });
+
+    const resolved = await resolver.resolve({ taskKey: "qaGeneration", featureKey: "datasetPreparation" });
+    expect(resolved.source).toBe("task");
+    expect(resolved.modelId).toBe("task/model");
+    expect(resolved.inferenceMode).toBe("chat");
+  });

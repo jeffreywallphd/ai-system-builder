@@ -137,6 +137,31 @@ import {
   type DesktopPrepareTrainingDatasetResponse,
   type DesktopPythonRuntimeControlResponse,
   type DesktopPythonRuntimeStatusReadResponse,
+  DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_READ_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_READ_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_READ_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_UPDATE_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_UPDATE_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_CLEAR_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_CLEAR_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL,
+  createDesktopApplicationSettingsListDefinitionsRequest,
+  createDesktopApplicationSettingsReadRequest,
+  createDesktopApplicationSettingsUpdateRequest,
+  createDesktopApplicationSettingsClearRequest,
+  createDesktopApplicationSettingsResolveModelDefaultRequest,
+  type DesktopApplicationSettingsListDefinitionsResponse,
+  type DesktopApplicationSettingsReadResponse,
+  type DesktopApplicationSettingsUpdateResponse,
+  type DesktopApplicationSettingsClearResponse,
+  type DesktopApplicationSettingsResolveModelDefaultResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 
@@ -294,6 +319,26 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactLocalizeFromRepoResponse>;
+  listApplicationSettingDefinitions: (
+    input?: { category?: string; keys?: string[] },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsListDefinitionsResponse>;
+  readApplicationSettings: (
+    input?: { category?: string; keys?: string[] },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsReadResponse>;
+  updateApplicationSetting: (
+    input: { key: string; value: unknown },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsUpdateResponse>;
+  clearApplicationSetting: (
+    input: { key: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsClearResponse>;
+  resolveModelDefault: (
+    input: { taskKey: string; featureKey?: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -882,6 +927,71 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_OPERATION,
         channel: DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact localize-from-repo IPC response envelope.",
+      });
+    },
+    async listApplicationSettingDefinitions(input = {}, context = {}) {
+      const request = createDesktopApplicationSettingsListDefinitionsRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsListDefinitionsResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings list-definitions IPC response envelope.",
+      });
+    },
+    async readApplicationSettings(input = {}, context = {}) {
+      const request = createDesktopApplicationSettingsReadRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsReadResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_READ_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings read IPC response envelope.",
+      });
+    },
+    async updateApplicationSetting(input, context = {}) {
+      const request = createDesktopApplicationSettingsUpdateRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsUpdateResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_UPDATE_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_UPDATE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings update IPC response envelope.",
+      });
+    },
+    async clearApplicationSetting(input, context = {}) {
+      const request = createDesktopApplicationSettingsClearRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsClearResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_CLEAR_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_CLEAR_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings clear IPC response envelope.",
+      });
+    },
+    async resolveModelDefault(input, context = {}) {
+      const request = createDesktopApplicationSettingsResolveModelDefaultRequest(input as never, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsResolveModelDefaultResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings resolve-model-default IPC response envelope.",
       });
     },
   };

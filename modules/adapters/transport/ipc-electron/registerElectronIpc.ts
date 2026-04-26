@@ -19,6 +19,10 @@ import {
   registerPythonRuntimeIpc,
   type PythonRuntimeControlPort,
 } from "./python-runtime/registerPythonRuntimeIpc";
+import {
+  registerApplicationSettingsIpc,
+  type RegisterApplicationSettingsIpcDependencies,
+} from "./settings/registerApplicationSettingsIpc";
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
@@ -45,6 +49,11 @@ export interface RegisterElectronIpcDependencies {
   ingestWebsitePageUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePageUseCase"];
   ingestWebsitePagesBatchUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePagesBatchUseCase"];
   prepareTrainingDatasetFromArtifactsUseCase: RegisterDatasetPreparationIpcDependencies["prepareTrainingDatasetFromArtifactsUseCase"];
+  listSettingsDefinitionsUseCase: RegisterApplicationSettingsIpcDependencies["listSettingsDefinitionsUseCase"];
+  readSettingsUseCase: RegisterApplicationSettingsIpcDependencies["readSettingsUseCase"];
+  updateSettingUseCase: RegisterApplicationSettingsIpcDependencies["updateSettingUseCase"];
+  clearSettingUseCase: RegisterApplicationSettingsIpcDependencies["clearSettingUseCase"];
+  resolveModelDefaultUseCase: RegisterApplicationSettingsIpcDependencies["resolveModelDefaultUseCase"];
 }
 
 export function registerElectronIpc(
@@ -86,6 +95,15 @@ export function registerElectronIpc(
   registerDatasetPreparationIpc({
     ipcMain: dependencies.ipcMain,
     prepareTrainingDatasetFromArtifactsUseCase: dependencies.prepareTrainingDatasetFromArtifactsUseCase,
+  });
+
+  registerApplicationSettingsIpc({
+    ipcMain: dependencies.ipcMain,
+    listSettingsDefinitionsUseCase: dependencies.listSettingsDefinitionsUseCase,
+    readSettingsUseCase: dependencies.readSettingsUseCase,
+    updateSettingUseCase: dependencies.updateSettingUseCase,
+    clearSettingUseCase: dependencies.clearSettingUseCase,
+    resolveModelDefaultUseCase: dependencies.resolveModelDefaultUseCase,
   });
 
   registerPythonRuntimeIpc({

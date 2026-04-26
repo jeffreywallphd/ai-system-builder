@@ -28,6 +28,7 @@ export function createLocalApplicationSettingsAdapter(
 ): ApplicationSettingsPort {
   const now = options.now ?? (() => new Date().toISOString());
   const definitions = options.definitions ?? INITIAL_APPLICATION_SETTING_DEFINITIONS;
+  const definitionByKey = new Map(definitions.map((definition) => [definition.key, definition] as const));
 
   async function readDocument(): Promise<SettingsFileShape> {
     try {
@@ -101,6 +102,14 @@ export function createLocalApplicationSettingsAdapter(
       const settings = document.settings ?? {};
 
       return selectedDefinitions.map((definition) => {
+        if (definition.valueKind === "secret") {
+          return {
+            key: definition.key,
+            configured: false,
+            value: undefined,
+          };
+        }
+
         const storedValue = settings[definition.key];
         return {
           key: definition.key,
@@ -110,6 +119,11 @@ export function createLocalApplicationSettingsAdapter(
       });
     },
     async updateValue(request: UpdateApplicationSettingRequest): Promise<ApplicationSettingValue> {
+      const definition = definitionByKey.get(request.key);
+      if (definition?.valueKind === "secret") {
+        throw new Error(`Secret setting "${request.key}" must be stored via ApplicationSecretsPort.`);
+      }
+
       await updateSetting(request.key, request.value);
       return {
         key: request.key,
