@@ -15,3 +15,5 @@ export * as host from "./host";
 export * as config from "./config";
 export * as ingestion from "./ingestion";
 export * as artifactUpload from "./artifact-upload";
+
+export * as settings from "./settings";
