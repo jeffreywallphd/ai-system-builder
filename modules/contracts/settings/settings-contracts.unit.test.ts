@@ -85,6 +85,39 @@ describe("settings contracts", () => {
     expectTypeOf<ModelDefaultConfig>().toExtend<LocalModelConfig>();
   });
 
+
+
+  it("uses canonical value kinds for secrets and model defaults", () => {
+    expect(findApplicationSettingDefinition("huggingface.token")?.valueKind).toBe("secret");
+    expect(findApplicationSettingDefinition(GLOBAL_MODEL_DEFAULT_SETTING_KEY)?.valueKind).toBe("object");
+    expect(findApplicationSettingDefinition(createTaskModelDefaultSettingKey("qaGeneration"))?.valueKind).toBe("object");
+    expect(
+      findApplicationSettingDefinition(createFeatureModelDefaultSettingKey("datasetPreparation", "qaGeneration"))?.valueKind,
+    ).toBe("object");
+  });
+
+  it("requires inferenceMode whenever model default values are present", () => {
+    const modelDefaultKeys = [
+      GLOBAL_MODEL_DEFAULT_SETTING_KEY,
+      createTaskModelDefaultSettingKey("qaGeneration"),
+      createFeatureModelDefaultSettingKey("datasetPreparation", "qaGeneration"),
+    ];
+
+    for (const key of modelDefaultKeys) {
+      const definition = findApplicationSettingDefinition(key);
+      expect(definition).toBeDefined();
+      expect(definition?.valueKind).toBe("object");
+      if (!definition?.defaultValue) {
+        continue;
+      }
+
+      expect(definition.defaultValue).toMatchObject({
+        modelId: expect.any(String),
+        inferenceMode: expect.any(String),
+      });
+    }
+  });
+
   it("builds known model default setting keys for layered resolution", () => {
     expect(GLOBAL_MODEL_DEFAULT_SETTING_KEY).toBe("models.default");
     expect(createTaskModelDefaultSettingKey("qaGeneration")).toBe(

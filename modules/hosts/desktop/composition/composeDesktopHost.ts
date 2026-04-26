@@ -21,6 +21,9 @@ import {
   PrepareTrainingDatasetFromArtifactsUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
+import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
+import { DefaultModelDefaultResolver } from "../../../application/services/settings";
+import type { ApplicationSecretsPort, ApplicationSettingsPort, ModelDefaultResolverPort } from "../../../application/ports/settings";
 import { createWebsiteHtmlAcquisitionPort } from "../../../adapters/ingestion";
 import {
   createArtifactRepoStorageAdapter,
@@ -67,6 +70,9 @@ export interface ComposeDesktopHostOptions {
     huggingFaceTokenConfigFilePath?: string;
     huggingFaceFetchImplementation?: HuggingFaceFetchImplementation;
   };
+  settings?: {
+    localSettingsFilePath?: string;
+  };
 }
 
 export interface RegisterDesktopArtifactUploadIpcOptions {
@@ -77,6 +83,9 @@ export interface RegisterDesktopArtifactUploadIpcOptions {
 export interface DesktopHostComposition {
   loggingPort: LoggingPort;
   loggingConfig: LoggingConfig;
+  applicationSettings: ApplicationSettingsPort;
+  applicationSecrets: ApplicationSecretsPort;
+  modelDefaultResolver: ModelDefaultResolverPort;
   getHuggingFaceTokenStatus: () => HuggingFaceTokenStatus;
   setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
   clearHuggingFaceToken: () => HuggingFaceTokenStatus;
@@ -231,6 +240,14 @@ export function composeDesktopHost(
       logs: [...runtimeLogs],
     };
   };
+  const applicationSettings = createLocalApplicationSettingsAdapter({
+    filePath: options.settings?.localSettingsFilePath ?? "/tmp/ai-system-builder/desktop/application-settings.json",
+  });
+  const applicationSecrets = createInMemorySecretsAdapter();
+  const modelDefaultResolver = new DefaultModelDefaultResolver({
+    settings: applicationSettings,
+  });
+
   const datasetPreparationPort = createPythonDatasetPreparationPort({
     executeTask: async (request) => {
       recordRuntimeLog({
@@ -262,6 +279,9 @@ export function composeDesktopHost(
   return {
     loggingPort,
     loggingConfig,
+    applicationSettings,
+    applicationSecrets,
+    modelDefaultResolver,
     getHuggingFaceTokenStatus() {
       return tokenConfigStore.getStatus();
     },
