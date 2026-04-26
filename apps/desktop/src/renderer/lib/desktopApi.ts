@@ -338,6 +338,7 @@ interface DesktopApiBridge {
   readApplicationSettings?: (input?: { category?: string; keys?: string[] }) => Promise<unknown>;
   updateApplicationSetting?: (input: UpdateApplicationSettingRequest) => Promise<unknown>;
   clearApplicationSetting?: (input: { key: string }) => Promise<unknown>;
+  resolveApplicationModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
   resolveModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
 }
 

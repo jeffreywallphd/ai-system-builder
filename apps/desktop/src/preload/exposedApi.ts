@@ -335,6 +335,10 @@ export interface DesktopPreloadApi {
     input: { key: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsClearResponse>;
+  resolveApplicationModelDefault: (
+    input: { taskKey: string; featureKey?: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
   resolveModelDefault: (
     input: { taskKey: string; featureKey?: string },
     context?: DesktopArtifactUploadBridgeContext,
@@ -981,7 +985,7 @@ export function createDesktopPreloadApi(
         message: "Received invalid desktop application settings clear IPC response envelope.",
       });
     },
-    async resolveModelDefault(input, context = {}) {
+    async resolveApplicationModelDefault(input, context = {}) {
       const request = createDesktopApplicationSettingsResolveModelDefaultRequest(input as never, context);
       const response = await dependencies.ipcRenderer.invoke(
         DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL.value,
@@ -993,6 +997,9 @@ export function createDesktopPreloadApi(
         channel: DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop application settings resolve-model-default IPC response envelope.",
       });
+    },
+    async resolveModelDefault(input, context = {}) {
+      return this.resolveApplicationModelDefault(input, context);
     },
   };
 }
