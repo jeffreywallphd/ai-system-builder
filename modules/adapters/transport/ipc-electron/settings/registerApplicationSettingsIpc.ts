@@ -26,6 +26,7 @@ import {
   type DesktopApplicationSettingsResolveModelDefaultResponse,
   type DesktopApplicationSettingsUpdateRequest,
   type DesktopApplicationSettingsUpdateResponse,
+  type IpcFailureResponse,
 } from "../../../../contracts/ipc";
 import type {
   ClearSettingUseCase,
@@ -45,21 +46,42 @@ export interface RegisterApplicationSettingsIpcDependencies {
   resolveModelDefaultUseCase: Pick<ResolveModelDefaultUseCase, "execute">;
 }
 
-function toFailureResponse(
-  channel: typeof DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_RESPONSE_CHANNEL
+type ApplicationSettingsFailureResponseChannel =
+  | typeof DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_RESPONSE_CHANNEL
   | typeof DESKTOP_APPLICATION_SETTINGS_READ_RESPONSE_CHANNEL
   | typeof DESKTOP_APPLICATION_SETTINGS_UPDATE_RESPONSE_CHANNEL
   | typeof DESKTOP_APPLICATION_SETTINGS_CLEAR_RESPONSE_CHANNEL
-  | typeof DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL,
+  | typeof DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL;
+
+type ApplicationSettingsFailureResponse =
+  IpcFailureResponse<
+    Record<string, unknown>,
+    ApplicationSettingsFailureResponseChannel["operation"],
+    Record<string, never>,
+    ApplicationSettingsFailureResponseChannel["value"]
+  >;
+
+type ApplicationSettingsRequestCorrelation = {
+  requestId?: string;
+  correlationId?: string;
+};
+
+function toFailureResponse(
+  channel: ApplicationSettingsFailureResponseChannel,
   error: unknown,
-  request: { requestId?: string; correlationId?: string },
-) {
+  request: ApplicationSettingsRequestCorrelation,
+): ApplicationSettingsFailureResponse {
   const message = error instanceof Error ? error.message : String(error);
   return createIpcFailureResponse(
-    createIpcError(channel, "internal", message, {
-      requestId: request.requestId,
-      correlationId: request.correlationId,
-    }),
+    createIpcError<Record<string, unknown>, typeof channel.operation, Record<string, never>, typeof channel.value>(
+      channel,
+      "internal",
+      message,
+      {
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
   );
 }
 
