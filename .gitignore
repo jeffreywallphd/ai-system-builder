@@ -46,3 +46,15 @@ apps/web-thin-client/*.tsbuildinfo
 artifacts/
 
 *.tsbuildinfo
+
+# Python runtime local artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
