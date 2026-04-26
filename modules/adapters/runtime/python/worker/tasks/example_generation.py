@@ -282,8 +282,17 @@ def _build_answer_prompt(question: str, chunk: MarkdownChunk) -> str:
 
 
 def _extract_single_question(text: str, chunk: MarkdownChunk) -> str:
-    normalized = " ".join(text.replace("\r", "\n").split())
+    original = text.replace("\r", "\n").strip()
+    lowered_original = original.lower()
+
+    if "return only the question." in lowered_original and "context:" in lowered_original:
+        prompt_prefix = lowered_original.split("context:", 1)[0]
+        if "?" not in prompt_prefix:
+            return f"What is the main idea of this passage about {chunk.artifact_id}?"
+
+    normalized = " ".join(original.split())
     prefixes = (
+        "you are creating supervised training data.",
         "question:",
         "q:",
         "write one concise question answerable from the context below. return only the question.",
@@ -309,8 +318,51 @@ def _extract_single_question(text: str, chunk: MarkdownChunk) -> str:
     if normalized.endswith("?"):
         return normalized
     if normalized:
+        if "return only the question" in normalized.lower():
+            return f"What is the main idea of this passage about {chunk.artifact_id}?"
         return f"{normalized.rstrip('.')}?"
     return f"What is the main idea of this passage about {chunk.artifact_id}?"
+
+
+def _extract_single_answer(text: str, question: str, chunk: MarkdownChunk) -> str:
+    normalized = text.replace("\r", "\n").strip()
+    lowered = normalized.lower()
+
+    prefixes = (
+        "answer:",
+        "a:",
+        "you are creating supervised training data.",
+        "answer the user question using only facts in the context.",
+        "write in a conversational tone while staying concise and faithful.",
+        "do not add details not present in the context.",
+        "return only the answer.",
+    )
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            normalized = normalized[len(prefix) :].strip()
+            lowered = normalized.lower()
+
+    question_marker = lowered.find("question:")
+    if question_marker != -1:
+        normalized = normalized[question_marker + len("question:") :].strip()
+        lowered = normalized.lower()
+        context_after_question = lowered.find("context:")
+        if context_after_question != -1:
+            normalized = normalized[context_after_question + len("context:") :].strip()
+            lowered = normalized.lower()
+
+    context_marker = lowered.find("context:")
+    if context_marker != -1:
+        normalized = normalized[:context_marker].strip()
+        lowered = normalized.lower()
+
+    if not normalized:
+        return chunk.text.splitlines()[0].strip() or f"The context discusses {chunk.artifact_id}."
+
+    if normalized.strip().lower() == question.strip().lower():
+        return chunk.text.splitlines()[0].strip() or f"The context discusses {chunk.artifact_id}."
+
+    return normalized
 
 
 def generate_qa_examples_for_chunks(
@@ -325,7 +377,11 @@ def generate_qa_examples_for_chunks(
     examples: list[GeneratedQaExample] = []
     for chunk in chunks:
         question = _extract_single_question(generator.generate_text(_build_question_prompt(chunk)).strip(), chunk)
-        answer = generator.generate_text(_build_answer_prompt(question, chunk)).strip()
+        answer = _extract_single_answer(
+            generator.generate_text(_build_answer_prompt(question, chunk)).strip(),
+            question,
+            chunk,
+        )
         examples.append(
             GeneratedQaExample(
                 artifact_id=chunk.artifact_id,
