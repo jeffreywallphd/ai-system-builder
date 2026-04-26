@@ -35,7 +35,16 @@ export interface UseApplicationSettingsResult {
 }
 
 export function useApplicationSettings(options: UseApplicationSettingsOptions = {}): UseApplicationSettingsResult {
-  const client = useMemo(() => options.client ?? createDesktopApplicationSettingsClient(), [options.client]);
+  const client = useMemo(() => {
+    if (options.client) {
+      return options.client;
+    }
+    try {
+      return createDesktopApplicationSettingsClient();
+    } catch {
+      return undefined;
+    }
+  }, [options.client]);
   const [definitions, setDefinitions] = useState<ApplicationSettingDefinition[]>([]);
   const [valuesByKey, setValuesByKey] = useState<Map<ApplicationSettingKey, ApplicationSettingValue>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -49,6 +58,14 @@ export function useApplicationSettings(options: UseApplicationSettingsOptions = 
   const refresh = useCallback(async () => {
     setLoading(true);
     setErrorMessage(undefined);
+    if (!client) {
+      setDefinitions([]);
+      setValuesByKey(new Map());
+      setStatus("error");
+      setErrorMessage("Application settings API is unavailable.");
+      setLoading(false);
+      return;
+    }
     try {
       const [definitionsResult, valuesResult] = await Promise.all([
         client.listDefinitions(query),
@@ -74,6 +91,12 @@ export function useApplicationSettings(options: UseApplicationSettingsOptions = 
     setSaving(true);
     setErrorMessage(undefined);
     setSuccessMessage(undefined);
+    if (!client) {
+      setStatus("error");
+      setErrorMessage("Application settings API is unavailable.");
+      setSaving(false);
+      return;
+    }
     try {
       await client.updateSetting({ key, value });
       await refresh();
@@ -91,6 +114,12 @@ export function useApplicationSettings(options: UseApplicationSettingsOptions = 
     setSaving(true);
     setErrorMessage(undefined);
     setSuccessMessage(undefined);
+    if (!client) {
+      setStatus("error");
+      setErrorMessage("Application settings API is unavailable.");
+      setSaving(false);
+      return;
+    }
     try {
       await client.clearSetting({ key });
       await refresh();
@@ -105,6 +134,9 @@ export function useApplicationSettings(options: UseApplicationSettingsOptions = 
   }, [client, refresh]);
 
   const resolveModelDefault = useCallback(async (request: ResolveModelDefaultRequest) => {
+    if (!client) {
+      throw new Error("Application settings API is unavailable.");
+    }
     const result = await client.resolveModelDefault(request);
     return result.resolved;
   }, [client]);

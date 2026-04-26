@@ -20,7 +20,7 @@ describe("desktop renderer page composition", () => {
     mountedContainer = undefined;
   });
 
-  it("renders landing Home page by default and switches to Artifacts/System pages", async () => {
+  it("renders landing Home page by default and switches to Data/Settings/System pages", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -66,7 +66,7 @@ describe("desktop renderer page composition", () => {
     expect(container.textContent).toContain("Build visual AI workflows from your artifacts");
 
     const artifactsButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Artifacts",
+      (button) => button.textContent === "Data",
     );
     expect(artifactsButton).toBeDefined();
 
@@ -98,6 +98,16 @@ describe("desktop renderer page composition", () => {
     });
 
     expect(container.textContent).toContain("Python Runtime");
+
+    const settingsButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Settings",
+    );
+    expect(settingsButton).toBeDefined();
+
+    await act(async () => {
+      settingsButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Manage global desktop defaults used by feature workflows.");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "System",

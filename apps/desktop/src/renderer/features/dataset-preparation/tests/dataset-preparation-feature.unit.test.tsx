@@ -80,6 +80,9 @@ describe("DatasetPreparationFeature", () => {
       );
     });
 
+    expect(container.textContent).toContain("Dataset preparation model defaults");
+    expect(container.textContent).toContain("Inference mode");
+
     const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
     await act(async () => {
       checkbox.click();
@@ -106,12 +109,13 @@ describe("DatasetPreparationFeature", () => {
         },
         generation: {
           mode: "qa",
-          model: {
-            provider: "transformers",
-            modelId: "Qwen/Qwen2.5-1.5B-Instruct",
-            device: "auto",
-            torchDtype: undefined,
-          },
+            model: {
+              provider: "transformers",
+              modelId: "google/flan-t5-base",
+              inferenceMode: "text2text",
+              device: "auto",
+              torchDtype: undefined,
+            },
           maxExamplesPerChunk: 4,
           batchSize: 4,
           failurePolicy: "skip",
