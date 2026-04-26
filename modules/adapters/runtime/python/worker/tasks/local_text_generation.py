@@ -295,6 +295,35 @@ def _generator_cache_key(model: LocalModelConfig) -> tuple[str, str, str, str, s
     )
 
 
+def _resolved_model_reference_for(model_id: str) -> str:
+    return _RESOLVED_MODEL_REFERENCES.get(model_id, model_id)
+
+
+def _resolve_auto_inference_mode(model_config: LocalModelConfig) -> str:
+    if model_config.inferenceMode != "auto":
+        return model_config.inferenceMode
+
+    configure_huggingface_download_environment()
+    try:
+        from transformers import AutoConfig, AutoTokenizer
+    except ImportError as error:
+        raise RuntimeError(
+            "The 'transformers' package is required for automatic inference mode resolution."
+        ) from error
+
+    resolved_model_reference = _resolved_model_reference_for(model_config.modelId)
+    model_config_metadata = AutoConfig.from_pretrained(resolved_model_reference)
+    if bool(getattr(model_config_metadata, "is_encoder_decoder", False)):
+        return "text2text"
+
+    tokenizer = AutoTokenizer.from_pretrained(resolved_model_reference)
+    chat_template = getattr(tokenizer, "chat_template", None)
+    if isinstance(chat_template, str) and chat_template.strip():
+        return "chat"
+
+    return "causal"
+
+
 def _resolve_generation_params(config: ExampleGenerationConfig) -> dict[str, Any]:
     params: dict[str, Any] = {}
     if config.generationParams is None:
@@ -402,19 +431,29 @@ def get_or_create_local_text_generator(config: ExampleGenerationConfig) -> Local
             raise ValueError(f"Unsupported generation model provider: {config.model.provider}")
 
         generation_params = _resolve_generation_params(config)
-        resolved_model_reference = _RESOLVED_MODEL_REFERENCES.get(config.model.modelId, config.model.modelId)
+        resolved_inference_mode = _resolve_auto_inference_mode(config.model)
+        resolved_model_config = config.model.model_copy(update={"inferenceMode": resolved_inference_mode})
+        key = _generator_cache_key(resolved_model_config)
+        existing_after_resolution = _GENERATOR_CACHE.get(key)
+        if existing_after_resolution:
+            return existing_after_resolution
+
+        resolved_model_reference = _resolved_model_reference_for(resolved_model_config.modelId)
         print(
-            f"Loading generation model {config.model.modelId} from {resolved_model_reference}.",
+            (
+                f"Loading generation model {resolved_model_config.modelId} from {resolved_model_reference} "
+                f"with inference mode {resolved_inference_mode}."
+            ),
             flush=True,
         )
-        if config.model.inferenceMode == "text2text":
-            created: LocalTextGenerator = TransformersText2TextGenerator(config.model, generation_params)
-        elif config.model.inferenceMode == "causal":
-            created = TransformersCausalGenerator(config.model, generation_params)
-        elif config.model.inferenceMode == "chat":
-            created = TransformersChatGenerator(config.model, generation_params)
+        if resolved_inference_mode == "text2text":
+            created: LocalTextGenerator = TransformersText2TextGenerator(resolved_model_config, generation_params)
+        elif resolved_inference_mode == "causal":
+            created = TransformersCausalGenerator(resolved_model_config, generation_params)
+        elif resolved_inference_mode == "chat":
+            created = TransformersChatGenerator(resolved_model_config, generation_params)
         else:
-            raise ValueError(f"Unsupported inference mode: {config.model.inferenceMode}")
+            raise ValueError(f"Unsupported inference mode: {resolved_inference_mode}")
 
         _GENERATOR_CACHE[key] = created
         return created

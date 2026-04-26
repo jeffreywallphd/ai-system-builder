@@ -13,7 +13,7 @@ import type { ApplicationSettingsPort, ModelDefaultResolverPort } from "../../po
 const BUILTIN_MODEL_DEFAULT: ModelDefaultConfig = {
   provider: "transformers",
   modelId: "google/flan-t5-small",
-  inferenceMode: "text2text",
+  inferenceMode: "auto",
   device: "auto",
   torchDtype: "auto",
 };
@@ -133,7 +133,12 @@ export class DefaultModelDefaultResolver implements ModelDefaultResolverPort {
       throw new Error(this.createInvalidMessage(source, 'provider must be "transformers".'));
     }
 
-    if (input.inferenceMode !== "text2text" && input.inferenceMode !== "causal" && input.inferenceMode !== "chat") {
+    if (
+      input.inferenceMode !== "auto"
+      && input.inferenceMode !== "text2text"
+      && input.inferenceMode !== "causal"
+      && input.inferenceMode !== "chat"
+    ) {
       throw new Error(this.createInvalidMessage(source, "must include a supported inferenceMode."));
     }
 

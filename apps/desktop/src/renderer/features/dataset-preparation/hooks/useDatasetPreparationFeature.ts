@@ -143,7 +143,7 @@ export function useDatasetPreparationFeature(
   const [preserveDocumentBoundaries, setPreserveDocumentBoundaries] = useState(true);
   const [maxChunkCount, setMaxChunkCount] = useState("");
   const [modelId, setModelId] = useState("");
-  const [modelInferenceMode, setModelInferenceMode] = useState<ModelDefaultInferenceMode>("text2text");
+  const [modelInferenceMode, setModelInferenceMode] = useState<ModelDefaultInferenceMode>("auto");
   const [modelDevice, setModelDevice] = useState<"" | "auto" | "cpu" | "cuda">("auto");
   const [modelTorchDtype, setModelTorchDtype] = useState<"" | "auto" | "float16" | "bfloat16" | "float32">("");
   const [maxExamplesPerChunk, setMaxExamplesPerChunk] = useState("4");
@@ -295,7 +295,7 @@ export function useDatasetPreparationFeature(
     }) ?? Promise.reject(new Error("settings unavailable"))).then((result) => result.resolved).catch(() => ({
       provider: "transformers" as const,
       modelId: "google/flan-t5-base",
-      inferenceMode: "text2text" as const,
+      inferenceMode: "auto" as const,
       source: "builtin" as const,
       device: undefined,
       torchDtype: undefined,

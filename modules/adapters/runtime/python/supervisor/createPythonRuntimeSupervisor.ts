@@ -9,6 +9,7 @@ export interface PythonRuntimeSupervisorEvent {
   type:
     | "start-requested"
     | "start-skipped"
+    | "attached"
     | "spawned"
     | "health-probe-failed"
     | "health-unhealthy"
@@ -65,6 +66,7 @@ export function createPythonRuntimeSupervisor(
 
   let childProcess: ChildProcess | undefined;
   let status: PythonRuntimeSupervisorStatus = "stopped";
+  let attachedToExistingRuntime = false;
   let lastHealthProbeError: string | undefined;
   let healthProbeFailureCount = 0;
   let lastEmittedHealthProbeError: string | undefined;
@@ -120,6 +122,7 @@ export function createPythonRuntimeSupervisor(
       const exitDetail = `Python runtime process exited during lifecycle (code=${String(code ?? "null")}, signal=${String(signal ?? "null")}).`;
       lastStartupFailure = exitDetail;
       childProcess = undefined;
+      attachedToExistingRuntime = false;
       status = "stopped";
       emitEvent("process-exit", exitDetail, { code, signal });
     });
@@ -168,7 +171,7 @@ export function createPythonRuntimeSupervisor(
   };
 
   const hasRuntimeExited = () => {
-    return !childProcess || status === "stopped";
+    return (!childProcess && !attachedToExistingRuntime) || status === "stopped";
   };
 
   const throwStartupFailure = (message: string): never => {
@@ -192,6 +195,30 @@ export function createPythonRuntimeSupervisor(
         "Configured python runtime command is `python3` on Windows; `python` is usually required.",
       );
       lastStartupFailure = "Configured command `python3` is uncommon on Windows.";
+    }
+  };
+
+  const tryAttachToExistingRuntime = async (): Promise<boolean> => {
+    try {
+      const health = await options.runtimeClient.getHealthStatus();
+      if (!health.healthy) {
+        return false;
+      }
+
+      attachedToExistingRuntime = true;
+      childProcess = undefined;
+      status = "ready";
+      emitEvent(
+        "attached",
+        "Attached to an already healthy Python runtime instead of spawning a new process.",
+        {
+          runtimeStatus: health.status.status,
+          runtimeId: health.status.runtimeId,
+        },
+      );
+      return true;
+    } catch {
+      return false;
     }
   };
 
@@ -241,6 +268,14 @@ export function createPythonRuntimeSupervisor(
         emitEvent("start-skipped", "Runtime start skipped because supervisor is already active.");
         return;
       }
+      if (status === "ready" && attachedToExistingRuntime) {
+        if (await tryAttachToExistingRuntime()) {
+          emitEvent("start-skipped", "Runtime start skipped because supervisor is attached to an existing runtime.");
+          return;
+        }
+        attachedToExistingRuntime = false;
+        status = "stopped";
+      }
 
       lastHealthProbeError = undefined;
       healthProbeFailureCount = 0;
@@ -258,6 +293,10 @@ export function createPythonRuntimeSupervisor(
       maybeWarnOnWindowsCommand(command);
 
       status = "starting";
+      if (await tryAttachToExistingRuntime()) {
+        return;
+      }
+
       if (options.prepareRuntimeEnvironment) {
         try {
           await options.prepareRuntimeEnvironment({
@@ -278,6 +317,7 @@ export function createPythonRuntimeSupervisor(
       }
 
       try {
+        attachedToExistingRuntime = false;
         childProcess = spawnImplementation(command, args, {
           cwd: options.cwd,
           env: options.env,
@@ -301,6 +341,7 @@ export function createPythonRuntimeSupervisor(
     async stop() {
       emitEvent("stop-requested", "Stopping Python runtime process.");
       if (!childProcess) {
+        attachedToExistingRuntime = false;
         status = "stopped";
         emitEvent("stop-complete", "Python runtime process was already stopped.");
         return;

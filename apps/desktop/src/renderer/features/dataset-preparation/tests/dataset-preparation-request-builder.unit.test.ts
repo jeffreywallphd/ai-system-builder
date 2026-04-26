@@ -162,6 +162,51 @@ describe("datasetPreparationRequestBuilder", () => {
     expect(request.recipe.generation.model.inferenceMode).toBe("causal");
   });
 
+  it("includes auto inferenceMode so the runtime can resolve model architecture", () => {
+    const request = buildDatasetPreparationRequest({
+      selectedArtifactIds: ["artifact-1"],
+      unsupportedDocumentPolicy: "",
+      normalizationMode: "",
+      preserveDocumentBoundaries: true,
+      modelId: "Qwen/Qwen3-1.7B",
+      modelInferenceMode: "auto",
+      modelDevice: "auto",
+      modelTorchDtype: "",
+      failurePolicy: "skip",
+      shuffle: true,
+      outputFormat: "parquet",
+      outputBaseName: "",
+      localDestinationEnabled: true,
+      huggingFaceDestinationEnabled: false,
+      huggingFaceRepository: "",
+      huggingFaceRevision: "",
+      huggingFacePathPrefix: "",
+      parsed: {
+        chunkSize: 1000,
+        chunkOverlap: 200,
+        maxChunkCount: undefined,
+        maxExamplesPerChunk: 4,
+        batchSize: 4,
+        generationTemperature: undefined,
+        generationTopP: undefined,
+        generationMaxNewTokens: undefined,
+        trainRatio: 0.8,
+        testRatio: 0.2,
+        seed: undefined,
+      },
+      resolvedDefault: {
+        provider: "transformers",
+        modelId: "google/flan-t5-base",
+        inferenceMode: "auto",
+        source: "builtin",
+        device: "auto",
+        torchDtype: "auto",
+      },
+    });
+
+    expect(request.recipe.generation.model.inferenceMode).toBe("auto");
+  });
+
   it("falls back to resolved default inference mode when input inference mode is invalid", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],

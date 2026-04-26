@@ -110,6 +110,7 @@ describe("DefaultModelDefaultResolver", () => {
 
     expect(resolved.source).toBe("builtin");
     expect(resolved.modelId).toBe("google/flan-t5-small");
+    expect(resolved.inferenceMode).toBe("auto");
     expect(resolved.device).toBe("auto");
     expect(resolved.torchDtype).toBe("auto");
   });

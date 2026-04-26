@@ -52,6 +52,31 @@ describe("createPythonRuntimeSupervisor", () => {
     expect(getHealthStatus).toHaveBeenCalled();
   });
 
+  it("attaches to an already healthy runtime instead of spawning a duplicate process", async () => {
+    const spawnImplementation = testDouble.fn(() => createMockChildProcess() as any);
+    const onEvent = testDouble.fn();
+    const supervisor = createPythonRuntimeSupervisor({
+      command: "python",
+      args: ["main.py"],
+      runtimeClient: {
+        getHealthStatus: async () => ({
+          healthy: true,
+          status: { runtimeId: "python-sidecar", status: "ready" as const },
+        }),
+      },
+      spawnImplementation: spawnImplementation as any,
+      startupTimeoutMs: 100,
+      healthCheckIntervalMs: 1,
+      onEvent,
+    });
+
+    await supervisor.start();
+
+    expect(supervisor.getStatus()).toBe("ready");
+    expect(spawnImplementation).not.toHaveBeenCalled();
+    expect(onEvent.mock.calls.map((call) => call[0]).some((event) => event.type === "attached")).toBe(true);
+  });
+
   it("stops the process and marks status stopped", async () => {
     const child = createMockChildProcess();
     const supervisor = createPythonRuntimeSupervisor({

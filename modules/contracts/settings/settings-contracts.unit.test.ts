@@ -66,7 +66,7 @@ describe("settings contracts", () => {
     expect(qaTask?.defaultValue).toMatchObject({
       provider: "transformers",
       modelId: "google/flan-t5-small",
-      inferenceMode: "text2text",
+      inferenceMode: "auto",
       device: "auto",
       torchDtype: "auto",
     });
@@ -93,7 +93,7 @@ describe("settings contracts", () => {
         modelId: "google/flan-t5-base",
         inferenceMode: "invalid" as unknown as ModelDefaultConfig["inferenceMode"],
       }),
-    ).toThrow('Model default config inferenceMode must be one of text2text, causal, chat. Received "invalid".');
+    ).toThrow('Model default config inferenceMode must be one of auto, text2text, causal, chat. Received "invalid".');
 
     expectTypeOf<ModelDefaultConfig>().toExtend<LocalModelConfig>();
   });

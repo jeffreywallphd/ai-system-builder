@@ -8,7 +8,7 @@ export interface ModelDefaultSettingFieldProps {
   onSave: (value: ModelDefaultConfig) => Promise<void>;
 }
 
-const INFERENCE_MODE_OPTIONS: ModelDefaultInferenceMode[] = ["text2text", "causal", "chat"];
+const INFERENCE_MODE_OPTIONS: ModelDefaultInferenceMode[] = ["auto", "text2text", "causal", "chat"];
 
 function toInitialDraft(value?: unknown): ModelDefaultConfig {
   const source = (value && typeof value === "object" ? value : {}) as Partial<ModelDefaultConfig>;
@@ -16,7 +16,7 @@ function toInitialDraft(value?: unknown): ModelDefaultConfig {
   return {
     provider: "transformers",
     modelId: source.modelId ?? "",
-    inferenceMode: source.inferenceMode ?? "text2text",
+    inferenceMode: source.inferenceMode ?? "auto",
     device: source.device,
     torchDtype: source.torchDtype,
   };

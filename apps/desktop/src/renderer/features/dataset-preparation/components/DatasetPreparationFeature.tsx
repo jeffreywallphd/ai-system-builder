@@ -182,6 +182,7 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
             <label className="ui-stack ui-stack--sm">
               <span>Inference mode</span>
               <select className="ui-input" value={modelInferenceMode} onChange={(event) => setModelInferenceMode(event.target.value as typeof modelInferenceMode)}>
+                <option value="auto">auto</option>
                 <option value="text2text">text2text</option>
                 <option value="causal">causal</option>
                 <option value="chat">chat</option>

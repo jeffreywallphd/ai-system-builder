@@ -492,6 +492,11 @@ describe("python sidecar runtime contracts", () => {
   });
 
   it("restricts local model inference mode to explicit supported literals", () => {
+    const autoModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "Qwen/Qwen3-1.7B",
+      inferenceMode: "auto",
+    };
     const text2textModel: DatasetPreparationRecipe["generation"]["model"] = {
       provider: "transformers",
       modelId: "google/flan-t5-base",
@@ -508,7 +513,8 @@ describe("python sidecar runtime contracts", () => {
       inferenceMode: "chat",
     };
 
-    expect([text2textModel, causalModel, chatModel].map((model) => model.inferenceMode)).toEqual([
+    expect([autoModel, text2textModel, causalModel, chatModel].map((model) => model.inferenceMode)).toEqual([
+      "auto",
       "text2text",
       "causal",
       "chat",
