@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect } from "react";
 
 import {
   deriveArtifactBackingState,
@@ -10,6 +10,7 @@ import {
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { ARTIFACT_BROWSER_FAMILY_OPTIONS } from "../artifactFamilyOptions";
 import { useArtifactBrowserFeature } from "../hooks/useArtifactBrowserFeature";
+import { SettingsPanel, useApplicationSettings } from "../../settings";
 
 export interface ArtifactBrowserFeatureProps {
   client?: DesktopArtifactBrowserClient;
@@ -48,6 +49,7 @@ function PublishedBackingPanel(
 }
 
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
+  const settings = useApplicationSettings({ keys: ["huggingface.defaultNamespace"] });
   const {
     items,
     unregisteredItems,
@@ -86,6 +88,18 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     togglePublishForm,
   } = useArtifactBrowserFeature(client);
   const backingState = deriveArtifactBackingState(detail, content);
+  const defaultNamespace = settings.valuesByKey.get("huggingface.defaultNamespace")?.value;
+
+  useEffect(() => {
+    if (
+      publishForm.showPublishForm
+      && publishForm.repository.trim().length === 0
+      && typeof defaultNamespace === "string"
+      && defaultNamespace.trim().length > 0
+    ) {
+      setRepository(`${defaultNamespace.trim()}/`);
+    }
+  }, [defaultNamespace, publishForm.repository, publishForm.showPublishForm, setRepository]);
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -310,12 +324,17 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
           {htmlPreview && content?.availability === "available" ? (
             <section className="ui-stack ui-stack--sm">
               <h3>HTML source preview</h3>
-              <pre className="ui-panel" style={{ maxHeight: "16rem", overflow: "auto" }}>{htmlPreview}</pre>
+              <pre className="ui-panel artifact-browser__html-preview">{htmlPreview}</pre>
             </section>
           ) : null}
 
           {detail ? (
             <section className="ui-stack ui-stack--sm">
+              <SettingsPanel
+                compact
+                title="Hugging Face defaults"
+                keys={["huggingface.token", "huggingface.defaultNamespace"]}
+              />
               {backingState.hasLocalObjectAvailable ? (
                 <>
                   <button className="ui-button" type="button" disabled={publishState.status === "loading"} onClick={togglePublishForm}>Publish to Hugging Face</button>

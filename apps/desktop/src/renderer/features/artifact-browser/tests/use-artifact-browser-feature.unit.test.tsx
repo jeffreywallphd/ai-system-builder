@@ -238,7 +238,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     expect(container.textContent).toContain("Artifact Browser");
-    expect(container.textContent).not.toContain("Hugging Face token");
+    expect(container.textContent).toContain("Hugging Face settings");
     expect(container.textContent).not.toContain("Register from Hugging Face");
   });
 

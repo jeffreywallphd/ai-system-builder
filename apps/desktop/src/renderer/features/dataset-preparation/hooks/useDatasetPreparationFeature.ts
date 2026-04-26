@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
+import type { ModelDefaultInferenceMode } from "../../../../../../../modules/contracts/settings";
+import { createDesktopApplicationSettingsClient } from "../../settings";
 import type { DesktopDatasetPreparationClient } from "../api/desktopDatasetPreparationClient";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 
@@ -34,6 +36,7 @@ export interface UseDatasetPreparationFeatureResult {
   preserveDocumentBoundaries: boolean;
   maxChunkCount: string;
   modelId: string;
+  modelInferenceMode: ModelDefaultInferenceMode;
   modelDevice: "" | "auto" | "cpu" | "cuda";
   modelTorchDtype: "" | "auto" | "float16" | "bfloat16" | "float32";
   maxExamplesPerChunk: string;
@@ -53,6 +56,7 @@ export interface UseDatasetPreparationFeatureResult {
   huggingFaceRepository: string;
   huggingFaceRevision: string;
   huggingFacePathPrefix: string;
+  defaultHuggingFaceNamespace?: string;
   status: DatasetPreparationStatus;
   resultSummary?: DatasetPreparationResultSummary;
   onToggleArtifact: (artifactId: string) => void;
@@ -63,6 +67,7 @@ export interface UseDatasetPreparationFeatureResult {
   setPreserveDocumentBoundaries: (value: boolean) => void;
   setMaxChunkCount: (value: string) => void;
   setModelId: (value: string) => void;
+  setModelInferenceMode: (value: ModelDefaultInferenceMode) => void;
   setModelDevice: (value: "" | "auto" | "cpu" | "cuda") => void;
   setModelTorchDtype: (value: "" | "auto" | "float16" | "bfloat16" | "float32") => void;
   setMaxExamplesPerChunk: (value: string) => void;
@@ -139,10 +144,6 @@ function validateInputs(input: {
 }): string | undefined {
   if (input.selectedArtifactIds.length === 0) {
     return "Select at least one source artifact.";
-  }
-
-  if (input.modelId.trim().length === 0) {
-    return "Model ID is required.";
   }
 
   const chunkSize = parseOptionalInteger(input.chunkSize);
@@ -223,6 +224,13 @@ export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
 ): UseDatasetPreparationFeatureResult {
   const datasetClient = useDatasetPreparationClient(options.client);
+  const settingsClient = useMemo(() => {
+    try {
+      return createDesktopApplicationSettingsClient();
+    } catch {
+      return undefined;
+    }
+  }, []);
   const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string }>>([]);
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
   const [unsupportedDocumentPolicy, setUnsupportedDocumentPolicy] = useState<"" | "fail" | "skip">("");
@@ -231,7 +239,8 @@ export function useDatasetPreparationFeature(
   const [chunkOverlap, setChunkOverlap] = useState("200");
   const [preserveDocumentBoundaries, setPreserveDocumentBoundaries] = useState(true);
   const [maxChunkCount, setMaxChunkCount] = useState("");
-  const [modelId, setModelId] = useState("Qwen/Qwen2.5-1.5B-Instruct");
+  const [modelId, setModelId] = useState("");
+  const [modelInferenceMode, setModelInferenceMode] = useState<ModelDefaultInferenceMode>("text2text");
   const [modelDevice, setModelDevice] = useState<"" | "auto" | "cpu" | "cuda">("auto");
   const [modelTorchDtype, setModelTorchDtype] = useState<"" | "auto" | "float16" | "bfloat16" | "float32">("");
   const [maxExamplesPerChunk, setMaxExamplesPerChunk] = useState("4");
@@ -253,6 +262,7 @@ export function useDatasetPreparationFeature(
   const [huggingFacePathPrefix, setHuggingFacePathPrefix] = useState("");
   const [status, setStatus] = useState<DatasetPreparationStatus>({ kind: "idle" });
   const [resultSummary, setResultSummary] = useState<DatasetPreparationResultSummary>();
+  const [defaultHuggingFaceNamespace, setDefaultHuggingFaceNamespace] = useState<string | undefined>(undefined);
 
   const refreshArtifacts = useCallback(async () => {
     const sourceArtifacts = await datasetClient.browseSourceArtifacts();
@@ -269,6 +279,34 @@ export function useDatasetPreparationFeature(
       setStatus({ kind: "error", message });
     });
   }, [refreshArtifacts]);
+
+  useEffect(() => {
+    if (!settingsClient) {
+      return;
+    }
+
+    void settingsClient.resolveModelDefault({
+      taskKey: "qaGeneration",
+      featureKey: "datasetPreparation",
+    }).then((result) => {
+      setModelId((current) => current || result.resolved.modelId);
+      setModelInferenceMode(result.resolved.inferenceMode);
+      setModelDevice(result.resolved.device ?? "auto");
+      setModelTorchDtype(result.resolved.torchDtype ?? "");
+    }).catch(() => {
+      // Keep local defaults if resolution fails.
+    });
+
+    void settingsClient.readSettings({ keys: ["huggingface.defaultNamespace"] }).then((result) => {
+      const namespace = result.values.find((value) => value.key === "huggingface.defaultNamespace")?.value;
+      if (typeof namespace === "string" && namespace.trim().length > 0) {
+        setDefaultHuggingFaceNamespace(namespace.trim());
+        setHuggingFaceRepository((current) => (current.trim().length === 0 ? `${namespace.trim()}/` : current));
+      }
+    }).catch(() => {
+      // Ignore settings read errors in feature bootstrapping.
+    });
+  }, [settingsClient]);
 
   const onToggleArtifact = useCallback((artifactId: string) => {
     setSelectedArtifactIds((current) =>
@@ -317,7 +355,23 @@ export function useDatasetPreparationFeature(
     setStatus({ kind: "loading", message: "Preparing training dataset..." });
     setResultSummary(undefined);
 
+    const resolvedDefault = await (settingsClient?.resolveModelDefault({
+      taskKey: "qaGeneration",
+      featureKey: "datasetPreparation",
+    }) ?? Promise.reject(new Error("settings unavailable"))).then((result) => result.resolved).catch(() => ({
+      provider: "transformers" as const,
+      modelId: "google/flan-t5-base",
+      inferenceMode: "text2text" as const,
+      source: "builtin" as const,
+      device: undefined,
+      torchDtype: undefined,
+    }));
     const requestId = createDatasetPreparationRequestId();
+    const effectiveModelId = modelId.trim() || resolvedDefault.modelId;
+    const effectiveInferenceMode = modelInferenceMode || resolvedDefault.inferenceMode;
+    const effectiveDevice = modelDevice || resolvedDefault.device;
+    const effectiveTorchDtype = modelTorchDtype || resolvedDefault.torchDtype;
+
     const response = await datasetClient.prepareTrainingDatasetFromArtifacts(
       {
         sourceArtifactIds: selectedArtifactIds,
@@ -339,9 +393,10 @@ export function useDatasetPreparationFeature(
             ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE.generation,
             model: {
               ...DEFAULT_DATASET_PREPARATION_RECIPE_BASE.generation.model,
-              modelId: modelId.trim(),
-              device: modelDevice || undefined,
-              torchDtype: modelTorchDtype || undefined,
+              modelId: effectiveModelId,
+              inferenceMode: effectiveInferenceMode,
+              device: effectiveDevice || undefined,
+              torchDtype: effectiveTorchDtype || undefined,
             },
             maxExamplesPerChunk: typeof parsedMaxExamplesPerChunk === "number" && !Number.isNaN(parsedMaxExamplesPerChunk)
               ? parsedMaxExamplesPerChunk
@@ -417,6 +472,7 @@ export function useDatasetPreparationFeature(
     preserveDocumentBoundaries,
     maxChunkCount,
     modelId,
+    modelInferenceMode,
     modelDevice,
     modelTorchDtype,
     maxExamplesPerChunk,
@@ -437,6 +493,7 @@ export function useDatasetPreparationFeature(
     huggingFaceRevision,
     huggingFacePathPrefix,
     datasetClient,
+    settingsClient,
     refreshArtifacts,
     options,
   ]);
@@ -451,6 +508,7 @@ export function useDatasetPreparationFeature(
     preserveDocumentBoundaries,
     maxChunkCount,
     modelId,
+    modelInferenceMode,
     modelDevice,
     modelTorchDtype,
     maxExamplesPerChunk,
@@ -470,6 +528,7 @@ export function useDatasetPreparationFeature(
     huggingFaceRepository,
     huggingFaceRevision,
     huggingFacePathPrefix,
+    defaultHuggingFaceNamespace,
     status,
     resultSummary,
     onToggleArtifact,
@@ -480,6 +539,7 @@ export function useDatasetPreparationFeature(
     setPreserveDocumentBoundaries,
     setMaxChunkCount,
     setModelId,
+    setModelInferenceMode,
     setModelDevice,
     setModelTorchDtype,
     setMaxExamplesPerChunk,

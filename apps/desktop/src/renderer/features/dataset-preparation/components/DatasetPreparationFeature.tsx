@@ -1,6 +1,7 @@
 import {
   type DesktopDatasetPreparationClient,
 } from "../api/desktopDatasetPreparationClient";
+import { SettingsPanel } from "../../settings";
 import { useDatasetPreparationFeature } from "../hooks/useDatasetPreparationFeature";
 
 export interface DatasetPreparationFeatureProps {
@@ -19,6 +20,7 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
     preserveDocumentBoundaries,
     maxChunkCount,
     modelId,
+    modelInferenceMode,
     modelDevice,
     modelTorchDtype,
     maxExamplesPerChunk,
@@ -38,6 +40,7 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
     huggingFaceRepository,
     huggingFaceRevision,
     huggingFacePathPrefix,
+    defaultHuggingFaceNamespace,
     status,
     resultSummary,
     onToggleArtifact,
@@ -48,6 +51,7 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
     setPreserveDocumentBoundaries,
     setMaxChunkCount,
     setModelId,
+    setModelInferenceMode,
     setModelDevice,
     setModelTorchDtype,
     setMaxExamplesPerChunk,
@@ -150,10 +154,27 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
 
         <section className="ui-stack ui-stack--sm">
           <h3>Generation</h3>
+          <p className="ui-text-muted">Model override applies to this run only. Save global defaults from settings panels below.</p>
+          <SettingsPanel
+            compact
+            title="Dataset preparation model defaults"
+            keys={[
+              "features.datasetPreparation.qaGeneration.default",
+              "models.tasks.qaGeneration.default",
+            ]}
+          />
           <div className="ui-grid ui-grid--two">
             <label className="ui-stack ui-stack--sm">
               <span>Model ID</span>
               <input className="ui-input" value={modelId} onChange={(event) => setModelId(event.target.value)} />
+            </label>
+            <label className="ui-stack ui-stack--sm">
+              <span>Inference mode</span>
+              <select className="ui-input" value={modelInferenceMode} onChange={(event) => setModelInferenceMode(event.target.value as typeof modelInferenceMode)}>
+                <option value="text2text">text2text</option>
+                <option value="causal">causal</option>
+                <option value="chat">chat</option>
+              </select>
             </label>
             <label className="ui-stack ui-stack--sm">
               <span>Model device</span>
@@ -252,6 +273,11 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
 
         <section className="ui-stack ui-stack--sm">
           <h3>Output destinations</h3>
+          <SettingsPanel
+            compact
+            title="Hugging Face defaults"
+            keys={["huggingface.token", "huggingface.defaultNamespace"]}
+          />
           <label>
             <input
               type="checkbox"
@@ -272,7 +298,12 @@ export function DatasetPreparationFeature({ onPrepared, client }: DatasetPrepara
             <div className="ui-grid ui-grid--two">
               <label className="ui-stack ui-stack--sm">
                 <span>Hugging Face repository</span>
-                <input className="ui-input" value={huggingFaceRepository} onChange={(event) => setHuggingFaceRepository(event.target.value)} />
+                <input
+                  className="ui-input"
+                  value={huggingFaceRepository}
+                  onChange={(event) => setHuggingFaceRepository(event.target.value)}
+                  placeholder={defaultHuggingFaceNamespace ? `${defaultHuggingFaceNamespace}/your-dataset-repo` : "owner/repository"}
+                />
               </label>
               <label className="ui-stack ui-stack--sm">
                 <span>Revision (optional)</span>

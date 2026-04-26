@@ -169,7 +169,7 @@ describe("desktop renderer artifact workflow page", () => {
       root.render(<App />);
     });
 
-    const artifactsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Artifacts");
+    const artifactsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Data");
     await act(async () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });

@@ -50,11 +50,10 @@ describe("ArtifactIngestionFeature", () => {
     });
 
     expect(container.textContent).toContain("Data Artifact Ingester");
-    expect(container.textContent).toContain("Hugging Face token");
+    expect(container.textContent).toContain("Hugging Face settings");
     expect(container.textContent).toContain("Register from Hugging Face");
     expect(container.textContent).toContain("Scrape web data");
     expect(container.textContent).toContain("Ingest page");
     expect(container.textContent).toContain("Ingest batch");
   });
 });
-
