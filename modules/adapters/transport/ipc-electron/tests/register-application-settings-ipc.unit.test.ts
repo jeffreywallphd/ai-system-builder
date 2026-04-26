@@ -4,6 +4,7 @@ import {
   DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_READ_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_READ_RESPONSE_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL,
   createDesktopApplicationSettingsReadRequest,
@@ -41,5 +42,29 @@ describe("registerApplicationSettingsIpc", () => {
 
     expect(execute).toHaveBeenCalledWith({ keys: ["huggingface.token"] });
     expect(response.ok).toBe(true);
+  });
+
+  it("maps read handler errors to the application settings read failure envelope", async () => {
+    const handler = createReadApplicationSettingsIpcHandler({
+      execute: testDouble.fn(async () => {
+        throw new Error("settings unavailable");
+      }),
+    });
+
+    const response = await handler({}, createDesktopApplicationSettingsReadRequest(
+      { keys: ["huggingface.token"] },
+      { requestId: "req-settings-read", correlationId: "corr-settings-read" },
+    ));
+
+    expect(response).toMatchObject({
+      ok: false,
+      channel: DESKTOP_APPLICATION_SETTINGS_READ_RESPONSE_CHANNEL.value,
+      requestId: "req-settings-read",
+      correlationId: "corr-settings-read",
+      error: {
+        code: "internal",
+        message: "settings unavailable",
+      },
+    });
   });
 });
