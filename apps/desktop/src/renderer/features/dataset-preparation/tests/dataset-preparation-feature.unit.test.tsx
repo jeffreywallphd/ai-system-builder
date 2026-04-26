@@ -186,4 +186,136 @@ describe("DatasetPreparationFeature", () => {
 
     expect(container.textContent).toContain("failed");
   });
+
+  it("surfaces warning when model default settings resolution fails", async () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          settingsClient={{
+            ...settingsClient,
+            resolveModelDefault: vi.fn().mockRejectedValue(new Error("settings failed")),
+          }}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+          }}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Using built-in model defaults because settings could not be loaded.");
+  });
+
+  it("surfaces warning when Hugging Face namespace settings cannot be read", async () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          settingsClient={{
+            ...settingsClient,
+            readSettings: vi.fn().mockRejectedValue(new Error("read failed")),
+          }}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+          }}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Hugging Face namespace default could not be loaded.");
+  });
+
+  it("keeps submit behavior stable when rerendered with a new options object shape", async () => {
+    const prepareTrainingDatasetFromArtifacts = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        outputs: {
+          local: {
+            train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
+            test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+          },
+        },
+        provenance: {
+          sourceArtifactIds: ["artifact-1"],
+          recipe: {
+            normalization: { targetFormat: "markdown" },
+            chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+            generation: { mode: "qa", model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" } },
+          },
+          split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
+          output: { format: "parquet" },
+          generationModelId: "Qwen/Qwen2.5-1.5B-Instruct",
+          summary: {
+            sourceDocumentCount: 1,
+            normalizedDocumentCount: 1,
+            skippedDocumentCount: 0,
+            chunkCount: 2,
+            generatedExampleCount: 10,
+            trainRowCount: 8,
+            testRowCount: 2,
+          },
+        },
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 2,
+          generatedExampleCount: 10,
+          trainRowCount: 8,
+          testRowCount: 2,
+        },
+      },
+    });
+    const onPrepared = vi.fn();
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          onPrepared={onPrepared}
+          settingsClient={settingsClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts,
+          }}
+        />,
+      );
+    });
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          onPrepared={onPrepared}
+          settingsClient={settingsClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts,
+          }}
+        />,
+      );
+    });
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledTimes(1);
+    expect(onPrepared).toHaveBeenCalledTimes(1);
+  });
 });
