@@ -102,7 +102,18 @@ def _emit_rows(
             path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
         elif output_format == "csv":
             with path.open("w", encoding="utf-8", newline="") as handle:
-                fieldnames = ["artifactId", "chunkIndex", "question", "answer", "generationMode"]
+                fieldnames = [
+                    "artifactId",
+                    "chunkIndex",
+                    "instruction",
+                    "input",
+                    "output",
+                    "prompt",
+                    "completion",
+                    "question",
+                    "answer",
+                    "generationMode",
+                ]
                 writer = csv.DictWriter(handle, fieldnames=fieldnames)
                 writer.writeheader()
                 for row in rows:
@@ -215,6 +226,11 @@ def _build_generated_rows(
                     {
                         "artifactId": example.artifact_id,
                         "chunkIndex": example.chunk_index,
+                        "instruction": "Answer the user question using only the provided context.",
+                        "input": example.question,
+                        "output": example.answer,
+                        "prompt": example.question,
+                        "completion": example.answer,
                         "question": example.question,
                         "answer": example.answer,
                         "generationMode": example.generation_mode,

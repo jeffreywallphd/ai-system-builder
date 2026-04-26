@@ -21,9 +21,11 @@ class _FakeGenerator:
     def __init__(self, _config, _params):
         self.calls: list[str] = []
 
-    def generate_question(self, prompt: str) -> str:
+    def generate_text(self, prompt: str) -> str:
         self.calls.append(prompt)
-        return "Generated question?"
+        if "Return only the question." in prompt:
+            return "Generated question?"
+        return "Generated answer."
 
 
 class ExampleGenerationTests(unittest.TestCase):
@@ -56,7 +58,7 @@ class ExampleGenerationTests(unittest.TestCase):
                     artifact_id="artifact-1",
                     chunk_index=0,
                     question="Generated question?",
-                    answer="chunk text",
+                    answer="Generated answer.",
                     generation_mode="qa",
                 )
             ],

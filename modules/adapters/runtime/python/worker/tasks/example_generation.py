@@ -29,7 +29,7 @@ class GenerationModelAvailability:
 
 
 class QaTextGenerator:
-    def generate_question(self, prompt: str) -> str:
+    def generate_text(self, prompt: str) -> str:
         raise NotImplementedError
 
 
@@ -71,7 +71,7 @@ class TransformersQaTextGenerator(QaTextGenerator):
             model_kwargs=model_kwargs or None,
         )
 
-    def generate_question(self, prompt: str) -> str:
+    def generate_text(self, prompt: str) -> str:
         generation = self._pipeline(prompt, **self._generation_params)
         if not generation:
             raise RuntimeError("Model returned no generated text.")
@@ -79,7 +79,7 @@ class TransformersQaTextGenerator(QaTextGenerator):
         first = generation[0]
         text = str(first.get("generated_text", "")).strip()
         if not text:
-            raise RuntimeError("Model returned an empty generated question.")
+            raise RuntimeError("Model returned an empty generation.")
         return text
 
 
@@ -244,12 +244,26 @@ def _get_or_create_generator(config: ExampleGenerationConfig) -> QaTextGenerator
         return created
 
 
-def _build_question_prompt(chunk: MarkdownChunk, config: ExampleGenerationConfig) -> str:
-    template = (
-        config.promptTemplate
-        or "Write one concise question answerable from the context below. Return only the question.\n\nContext:\n{context}"
+def _build_question_prompt(chunk: MarkdownChunk) -> str:
+    return (
+        "You are creating supervised training data.\n"
+        "Write exactly one clear user question answerable only from the context.\n"
+        "The question should be specific, natural, and grounded in the context.\n"
+        "Return only the question.\n\n"
+        f"Context:\n{chunk.text}"
     )
-    return template.replace("{context}", chunk.text)
+
+
+def _build_answer_prompt(question: str, chunk: MarkdownChunk) -> str:
+    return (
+        "You are creating supervised training data.\n"
+        "Answer the user question using only facts in the context.\n"
+        "Write in a conversational tone while staying concise and faithful.\n"
+        "Do not add details not present in the context.\n"
+        "Return only the answer.\n\n"
+        f"Question:\n{question}\n\n"
+        f"Context:\n{chunk.text}"
+    )
 
 
 def generate_qa_examples_for_chunks(
@@ -263,13 +277,14 @@ def generate_qa_examples_for_chunks(
 
     examples: list[GeneratedQaExample] = []
     for chunk in chunks:
-        question = generator.generate_question(_build_question_prompt(chunk, config))
+        question = generator.generate_text(_build_question_prompt(chunk)).strip()
+        answer = generator.generate_text(_build_answer_prompt(question, chunk)).strip()
         examples.append(
             GeneratedQaExample(
                 artifact_id=chunk.artifact_id,
                 chunk_index=chunk.chunk_index,
                 question=question,
-                answer=chunk.text,
+                answer=answer,
             )
         )
 
