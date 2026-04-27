@@ -39,6 +39,12 @@ import {
   DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL,
+  DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL,
+  DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
+  DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
@@ -111,7 +117,7 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: "/tmp/desktop-artifact-upload-test",
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(30);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(36);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -142,6 +148,12 @@ describe("composeDesktopHost", () => {
       DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL.value,
       DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL.value,
       DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
@@ -337,4 +349,3 @@ describe("composeDesktopHost", () => {
     expect(healthTransitionLogsSecondRead.length).toBe(1);
   });
 });
-

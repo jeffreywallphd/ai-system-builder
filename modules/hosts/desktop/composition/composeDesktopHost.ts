@@ -24,6 +24,12 @@ import {
   UpdateSettingUseCase,
   ClearSettingUseCase,
   ResolveModelDefaultUseCase,
+  BrowseModelsUseCase,
+  GetModelDetailsUseCase,
+  ListModelsUseCase,
+  SaveModelReferenceUseCase,
+  UpdateModelRecordUseCase,
+  DeleteModelRecordUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
@@ -47,6 +53,8 @@ import {
 } from "../../../adapters/storage/filesystem";
 import { createHuggingFaceArtifactRepoStorageAdapter } from "../../../adapters/storage/huggingface";
 import type { HuggingFaceFetchImplementation } from "../../../adapters/storage/huggingface";
+import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
+import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import {
   createHuggingFaceTokenConfigStore,
   type HuggingFaceTokenStatus,
@@ -554,6 +562,36 @@ export function composeDesktopHost(
       const resolveModelDefault = new ResolveModelDefaultUseCase({
         modelDefaultResolver,
       });
+      const modelRegistry = createLocalModelRegistryAdapter({
+        filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
+        now,
+      });
+      const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
+        accessTokenProvider: () => tokenConfigStore.getToken(),
+      });
+      const browseModels = new BrowseModelsUseCase({
+        providers: {
+          huggingface: huggingFaceModelBrowseDetails,
+        },
+      });
+      const getModelDetails = new GetModelDetailsUseCase({
+        providers: {
+          huggingface: huggingFaceModelBrowseDetails,
+        },
+      });
+      const listModels = new ListModelsUseCase({
+        modelRegistry,
+      });
+      const saveModelReference = new SaveModelReferenceUseCase({
+        modelRegistry,
+      });
+      const updateModelRecord = new UpdateModelRecordUseCase({
+        modelRegistry,
+      });
+      const deleteModelRecord = new DeleteModelRecordUseCase({
+        modelRegistry,
+        artifactCatalogDeletePort: artifactCatalog,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -601,6 +639,12 @@ export function composeDesktopHost(
         updateSettingUseCase: updateSetting,
         clearSettingUseCase: clearSetting,
         resolveModelDefaultUseCase: resolveModelDefault,
+        browseModelsUseCase: browseModels,
+        getModelDetailsUseCase: getModelDetails,
+        listModelsUseCase: listModels,
+        saveModelReferenceUseCase: saveModelReference,
+        updateModelRecordUseCase: updateModelRecord,
+        deleteModelRecordUseCase: deleteModelRecord,
       });
     },
   };

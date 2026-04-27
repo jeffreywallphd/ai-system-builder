@@ -1,4 +1,4 @@
-export type DesktopPageKey = "home" | "artifacts" | "settings" | "system";
+export type DesktopPageKey = "home" | "artifacts" | "models" | "settings" | "system";
 
 export interface DesktopPageDefinition {
   key: DesktopPageKey;
@@ -9,6 +9,10 @@ export const desktopPageDefinitions: readonly DesktopPageDefinition[] = [
   {
     key: "artifacts",
     label: "Data",
+  },
+  {
+    key: "models",
+    label: "Models",
   },
   {
     key: "settings",

@@ -18,6 +18,18 @@ import type {
   ResolvedModelDefault,
   UpdateApplicationSettingRequest,
 } from "../../../../../modules/contracts/settings";
+import type {
+  BrowseModelsRequest,
+  GetModelDetailsRequest,
+  ModelBrowseItem,
+  ModelDetails,
+  ModelInventoryRecord,
+  DeleteModelRecordRequest,
+  DeleteModelRecordResult,
+  ListModelsRequest,
+  SaveModelReferenceRequest,
+  UpdateModelRecordRequest,
+} from "../../../../../modules/contracts/model";
 
 export interface DesktopArtifactUploadInput {
   fileName: string;
@@ -345,6 +357,12 @@ interface DesktopApiBridge {
   clearApplicationSetting?: (input: { key: string }) => Promise<unknown>;
   resolveApplicationModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
   resolveModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
+  browseModels?: (input: DesktopModelBrowseRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  getModelDetails?: (input: DesktopModelDetailsRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  listModels?: (input?: DesktopModelListRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  saveModelReference?: (input: DesktopSaveModelReferenceRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  updateModelRecord?: (input: DesktopUpdateModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  deleteModelRecord?: (input: DesktopDeleteModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
 }
 
 declare global {
@@ -426,3 +444,30 @@ export interface DesktopApplicationSettingUpdateResult {
 export interface DesktopResolvedModelDefaultResult {
   resolved: ResolvedModelDefault;
 }
+
+export type DesktopModelBrowseRequest = BrowseModelsRequest;
+export type DesktopModelBrowseItem = ModelBrowseItem;
+export interface DesktopModelBrowseResult {
+  models: ModelBrowseItem[];
+  nextCursor?: string;
+}
+export type DesktopModelDetailsRequest = GetModelDetailsRequest;
+export interface DesktopModelDetailsResult {
+  model: ModelDetails;
+}
+export type DesktopModelListRequest = ListModelsRequest;
+export type DesktopModelInventoryRecord = ModelInventoryRecord;
+export interface DesktopModelListResult {
+  models: ModelInventoryRecord[];
+  nextCursor?: string;
+}
+export type DesktopSaveModelReferenceRequest = SaveModelReferenceRequest;
+export interface DesktopSaveModelReferenceResult {
+  model: ModelInventoryRecord;
+}
+export type DesktopUpdateModelRecordRequest = UpdateModelRecordRequest;
+export interface DesktopUpdateModelRecordResult {
+  model: ModelInventoryRecord;
+}
+export type DesktopDeleteModelRecordRequest = DeleteModelRecordRequest;
+export type DesktopDeleteModelRecordResult = DeleteModelRecordResult;

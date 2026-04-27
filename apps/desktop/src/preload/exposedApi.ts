@@ -162,6 +162,36 @@ import {
   type DesktopApplicationSettingsUpdateResponse,
   type DesktopApplicationSettingsClearResponse,
   type DesktopApplicationSettingsResolveModelDefaultResponse,
+  DESKTOP_MODEL_BROWSE_OPERATION,
+  DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_DETAILS_READ_OPERATION,
+  DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DETAILS_READ_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_LIST_OPERATION,
+  DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
+  DESKTOP_MODEL_LIST_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_REFERENCE_SAVE_OPERATION,
+  DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_RECORD_UPDATE_OPERATION,
+  DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_RECORD_DELETE_OPERATION,
+  DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL,
+  createDesktopModelBrowseRequest,
+  createDesktopModelDetailsReadRequest,
+  createDesktopModelListRequest,
+  createDesktopModelReferenceSaveRequest,
+  createDesktopModelRecordUpdateRequest,
+  createDesktopModelRecordDeleteRequest,
+  type DesktopModelBrowseResponse,
+  type DesktopModelDetailsReadResponse,
+  type DesktopModelListResponse,
+  type DesktopModelReferenceSaveResponse,
+  type DesktopModelRecordUpdateResponse,
+  type DesktopModelRecordDeleteResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 import type {
@@ -349,6 +379,30 @@ export interface DesktopPreloadApi {
     input: ResolveModelDefaultRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
+  browseModels: (
+    input: Parameters<typeof createDesktopModelBrowseRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelBrowseResponse>;
+  getModelDetails: (
+    input: Parameters<typeof createDesktopModelDetailsReadRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelDetailsReadResponse>;
+  listModels: (
+    input?: Parameters<typeof createDesktopModelListRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelListResponse>;
+  saveModelReference: (
+    input: Parameters<typeof createDesktopModelReferenceSaveRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelReferenceSaveResponse>;
+  updateModelRecord: (
+    input: Parameters<typeof createDesktopModelRecordUpdateRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelRecordUpdateResponse>;
+  deleteModelRecord: (
+    input: Parameters<typeof createDesktopModelRecordDeleteRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelRecordDeleteResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -1006,6 +1060,78 @@ export function createDesktopPreloadApi(
     },
     async resolveModelDefault(input, context = {}) {
       return this.resolveApplicationModelDefault(input, context);
+    },
+    async browseModels(input, context = {}) {
+      const request = createDesktopModelBrowseRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelBrowseResponse>(response, {
+        operation: DESKTOP_MODEL_BROWSE_OPERATION,
+        channel: DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model browse IPC response envelope.",
+      });
+    },
+    async getModelDetails(input, context = {}) {
+      const request = createDesktopModelDetailsReadRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelDetailsReadResponse>(response, {
+        operation: DESKTOP_MODEL_DETAILS_READ_OPERATION,
+        channel: DESKTOP_MODEL_DETAILS_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model details IPC response envelope.",
+      });
+    },
+    async listModels(input = {}, context = {}) {
+      const request = createDesktopModelListRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_LIST_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelListResponse>(response, {
+        operation: DESKTOP_MODEL_LIST_OPERATION,
+        channel: DESKTOP_MODEL_LIST_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model list IPC response envelope.",
+      });
+    },
+    async saveModelReference(input, context = {}) {
+      const request = createDesktopModelReferenceSaveRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelReferenceSaveResponse>(response, {
+        operation: DESKTOP_MODEL_REFERENCE_SAVE_OPERATION,
+        channel: DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model reference-save IPC response envelope.",
+      });
+    },
+    async updateModelRecord(input, context = {}) {
+      const request = createDesktopModelRecordUpdateRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelRecordUpdateResponse>(response, {
+        operation: DESKTOP_MODEL_RECORD_UPDATE_OPERATION,
+        channel: DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model record-update IPC response envelope.",
+      });
+    },
+    async deleteModelRecord(input, context = {}) {
+      const request = createDesktopModelRecordDeleteRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelRecordDeleteResponse>(response, {
+        operation: DESKTOP_MODEL_RECORD_DELETE_OPERATION,
+        channel: DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model record-delete IPC response envelope.",
+      });
     },
   };
 }
