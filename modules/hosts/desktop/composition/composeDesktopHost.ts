@@ -110,10 +110,40 @@ export function resolvePythonRuntimeBaseUrl(env: NodeJS.ProcessEnv = process.env
     return configuredBaseUrl;
   }
 
-  const host = env.PYTHON_RUNTIME_HOST?.trim() || "127.0.0.1";
-  const port = env.PYTHON_RUNTIME_PORT?.trim() || "43111";
+  const { host, port } = resolvePythonRuntimeHostAndPort(env);
 
   return `http://${host}:${port}`;
+}
+
+const PYTHON_RUNTIME_MANAGED_BASE_PORT = 43111;
+const PYTHON_RUNTIME_MANAGED_PORT_SPAN = 10_000;
+
+export function resolveDefaultManagedPythonRuntimePort(processId: number = process.pid): string {
+  const processPortOffset = Math.abs(processId) % PYTHON_RUNTIME_MANAGED_PORT_SPAN;
+  return String(PYTHON_RUNTIME_MANAGED_BASE_PORT + processPortOffset);
+}
+
+function resolvePythonRuntimeHostAndPort(env: NodeJS.ProcessEnv = process.env): { host: string; port: string } {
+  const configuredBaseUrl = env.PYTHON_RUNTIME_BASE_URL?.trim();
+  if (configuredBaseUrl) {
+    try {
+      const parsed = new URL(configuredBaseUrl);
+      return {
+        host: env.PYTHON_RUNTIME_HOST?.trim() || parsed.hostname || "127.0.0.1",
+        port: env.PYTHON_RUNTIME_PORT?.trim() || parsed.port || (parsed.protocol === "https:" ? "443" : "80"),
+      };
+    } catch {
+      return {
+        host: env.PYTHON_RUNTIME_HOST?.trim() || "127.0.0.1",
+        port: env.PYTHON_RUNTIME_PORT?.trim() || resolveDefaultManagedPythonRuntimePort(),
+      };
+    }
+  }
+
+  return {
+    host: env.PYTHON_RUNTIME_HOST?.trim() || "127.0.0.1",
+    port: env.PYTHON_RUNTIME_PORT?.trim() || resolveDefaultManagedPythonRuntimePort(),
+  };
 }
 
 export function composeDesktopHost(
@@ -168,14 +198,18 @@ export function composeDesktopHost(
     filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/desktop/hugging-face-token.json",
     fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
   });
+  const pythonRuntimeEndpoint = resolvePythonRuntimeHostAndPort();
+  const pythonRuntimeBaseUrl = resolvePythonRuntimeBaseUrl();
   const pythonRuntimeEnvironment = {
     ...process.env,
+    PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.host,
+    PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port,
     HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? "1",
     HF_HUB_DISABLE_SYMLINKS_WARNING: process.env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
   };
   const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
     client: {
-      baseUrl: resolvePythonRuntimeBaseUrl(),
+      baseUrl: pythonRuntimeBaseUrl,
     },
     supervisor: {
       command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
