@@ -44,6 +44,7 @@ import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-elect
 
 import {
   composeDesktopHost,
+  resolveDefaultManagedPythonRuntimePort,
   resolvePythonRuntimeBaseUrl,
   type ComposeDesktopHostOptions,
   type RegisterDesktopArtifactUploadIpcOptions,
@@ -247,6 +248,25 @@ describe("composeDesktopHost", () => {
       PYTHON_RUNTIME_HOST: "localhost",
       PYTHON_RUNTIME_PORT: "45124",
     })).toBe("http://192.0.2.10:46000");
+  });
+
+  it("uses a process-scoped managed Python runtime port when no runtime endpoint is configured", () => {
+    expect(resolveDefaultManagedPythonRuntimePort(0)).toBe("43111");
+    expect(resolveDefaultManagedPythonRuntimePort(1)).toBe("43112");
+    expect(resolveDefaultManagedPythonRuntimePort(10_123)).toBe("43234");
+  });
+
+  it("passes the resolved managed Python runtime endpoint to spawned workers", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("const pythonRuntimeEndpoint = resolvePythonRuntimeHostAndPort()");
+    expect(source).toContain("PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.host");
+    expect(source).toContain("PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port");
   });
 
   it("stores and exposes desktop Hugging Face token status", () => {
