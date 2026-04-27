@@ -63,16 +63,15 @@ function normalizeBrowseLimit(limit: number | undefined): number {
     return DEFAULT_BROWSE_MODELS_LIMIT;
   }
 
-  const rounded = Math.trunc(limit);
-  if (rounded <= 0) {
+  if (!Number.isInteger(limit) || limit <= 0) {
     return DEFAULT_BROWSE_MODELS_LIMIT;
   }
 
-  if (rounded > MAX_BROWSE_MODELS_LIMIT) {
+  if (limit > MAX_BROWSE_MODELS_LIMIT) {
     return MAX_BROWSE_MODELS_LIMIT;
   }
 
-  return rounded;
+  return limit;
 }
 
 export function normalizeBrowseModelsRequest(request: BrowseModelsRequest): BrowseModelsRequest {
