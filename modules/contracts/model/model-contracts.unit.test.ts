@@ -4,6 +4,7 @@ import type { LocalModelConfig } from "../runtime";
 import {
   DEFAULT_BROWSE_MODELS_LIMIT,
   MAX_BROWSE_MODELS_LIMIT,
+  MAX_LIST_MODELS_LIMIT,
   MODEL_BROWSE_PROVIDERS,
   MODEL_INFERENCE_MODES,
   MODEL_TRAINING_METHODS,
@@ -11,6 +12,8 @@ import {
   MODEL_VALIDATION_STATUSES,
   normalizeBrowseModelsRequest,
   normalizeBrowseModelsResult,
+  normalizeDeleteModelRecordRequest,
+  normalizeListModelsRequest,
   normalizeModelDetails,
   normalizeModelInferenceMode,
   normalizeModelInventoryRecord,
@@ -77,7 +80,7 @@ describe("model contracts", () => {
   it("normalizes invalid browse limits to defaults and max", () => {
     expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: 0 }).limit).toBe(DEFAULT_BROWSE_MODELS_LIMIT);
     expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: -5 }).limit).toBe(DEFAULT_BROWSE_MODELS_LIMIT);
-    expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: 12.9 }).limit).toBe(12);
+    expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: 12.9 }).limit).toBe(DEFAULT_BROWSE_MODELS_LIMIT);
     expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: 5000 }).limit).toBe(MAX_BROWSE_MODELS_LIMIT);
     expect(normalizeBrowseModelsRequest({ provider: "huggingface" }).limit).toBe(DEFAULT_BROWSE_MODELS_LIMIT);
   });
@@ -193,4 +196,53 @@ describe("model contracts", () => {
     });
     expect(MODEL_VALIDATION_STATUSES).toEqual(["unknown", "valid", "invalid", "warning"]);
   });
+
+  it("supports inventory backing artifact links and generated/adapter lineage fields", () => {
+    const generated = normalizeModelInventoryRecord({
+      modelRecordId: "gen-1",
+      displayName: "Generated Adapter",
+      source: "generated",
+      lifecycleStatus: "generated",
+      artifactForm: "adapter",
+      provider: "huggingface",
+      createdAt: "2026-04-27T00:00:00.000Z",
+      baseModelId: "base-1",
+      adapterOfModelId: "base-1",
+      generatedFromRunId: "run-77",
+      backingArtifactIds: [" artifact/a ", "artifact/b"],
+      primaryArtifactId: " artifact/a ",
+    });
+
+    expect(generated.backingArtifactIds).toEqual(["artifact/a", "artifact/b"]);
+    expect(generated.primaryArtifactId).toBe("artifact/a");
+    expect(generated.generatedFromRunId).toBe("run-77");
+    expect(generated.baseModelId).toBe("base-1");
+    expect(generated.adapterOfModelId).toBe("base-1");
+  });
+
+  it("normalizes list/delete model-management operation requests", () => {
+    const list = normalizeListModelsRequest({
+      source: "generated",
+      lifecycleStatus: "generated",
+      artifactForm: "adapter",
+      search: " demo ",
+      limit: 999,
+    });
+
+    expect(list.limit).toBe(MAX_LIST_MODELS_LIMIT);
+    expect(list.search).toBe("demo");
+
+    const del = normalizeDeleteModelRecordRequest({
+      modelRecordId: " model-1 ",
+      deleteLocalFiles: true,
+      deleteBackingArtifacts: false,
+    });
+
+    expect(del).toEqual({
+      modelRecordId: "model-1",
+      deleteLocalFiles: true,
+      deleteBackingArtifacts: false,
+    });
+  });
+
 });

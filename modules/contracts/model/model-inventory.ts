@@ -33,6 +33,8 @@ export interface ModelInventoryRecord {
   baseModelId?: string;
   generatedFromRunId?: string;
   adapterOfModelId?: string;
+  backingArtifactIds?: string[];
+  primaryArtifactId?: string;
   validationStatus?: ModelValidationStatus;
   validationReportPath?: string;
   metadata?: Record<string, unknown>;
@@ -44,6 +46,15 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
   }
 
   const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function normalizeOptionalTextList(values: readonly string[] | undefined): string[] | undefined {
+  if (!values) {
+    return undefined;
+  }
+
+  const normalized = values.map((value) => value.trim()).filter((value) => value.length > 0);
   return normalized.length > 0 ? normalized : undefined;
 }
 
@@ -90,6 +101,8 @@ export function normalizeModelInventoryRecord(record: ModelInventoryRecord): Mod
     baseModelId: normalizeOptionalText(record.baseModelId),
     generatedFromRunId: normalizeOptionalText(record.generatedFromRunId),
     adapterOfModelId: normalizeOptionalText(record.adapterOfModelId),
+    backingArtifactIds: normalizeOptionalTextList(record.backingArtifactIds),
+    primaryArtifactId: normalizeOptionalText(record.primaryArtifactId),
     validationStatus:
       typeof record.validationStatus === "string"
         ? normalizeModelValidationStatus(record.validationStatus)
