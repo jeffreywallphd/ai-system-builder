@@ -90,6 +90,33 @@ class _BatchEncodingChatTokenizer(_FakeTokenizer):
         return _FakeBatchEncoding()
 
 
+class _ThinkingAwareChatTokenizer(_FakeTokenizer):
+    def __init__(self):
+        self.template_calls: list[dict] = []
+
+    def apply_chat_template(
+        self,
+        _messages,
+        tokenize=True,
+        add_generation_prompt=True,
+        return_tensors="pt",
+        return_dict=False,
+        enable_thinking=True,
+    ):
+        self.template_calls.append(
+            {
+                "tokenize": tokenize,
+                "add_generation_prompt": add_generation_prompt,
+                "return_tensors": return_tensors,
+                "return_dict": return_dict,
+                "enable_thinking": enable_thinking,
+            }
+        )
+        if return_dict:
+            return {"input_ids": _FakeTensor([7, 8]), "attention_mask": _FakeTensor([1, 1])}
+        return _FakeTensor([7, 8])
+
+
 class _FakeModel:
     def __init__(self):
         self.device = "cpu"
@@ -234,6 +261,22 @@ class LocalTextGenerationTests(unittest.TestCase):
 
         self.assertEqual(generator.generate_text("prompt"), "44 55")
         self.assertIn("attention_mask", fake_model.generate_calls[0])
+
+    def test_chat_mode_disables_template_thinking_when_supported(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {"mode": "qa", "model": {"provider": "transformers", "modelId": "m", "inferenceMode": "chat"}}
+        )
+
+        fake_model = _FakeModel()
+        tokenizer = _ThinkingAwareChatTokenizer()
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.local_text_generation.TransformersCausalGenerator._load_model",
+            return_value=(tokenizer, fake_model),
+        ):
+            generator = get_or_create_local_text_generator(config)
+
+        self.assertEqual(generator.generate_text("prompt"), "44 55")
+        self.assertEqual(tokenizer.template_calls[0]["enable_thinking"], False)
 
     def test_chat_mode_accepts_batch_encoding_tokenizer_output(self) -> None:
         config = ExampleGenerationConfig.model_validate(
