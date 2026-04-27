@@ -44,6 +44,7 @@ import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-elect
 
 import {
   composeDesktopHost,
+  resolvePythonRuntimeBaseUrl,
   type ComposeDesktopHostOptions,
   type RegisterDesktopArtifactUploadIpcOptions,
 } from "../composeDesktopHost";
@@ -233,6 +234,19 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("HF_HUB_DISABLE_XET");
     expect(source).toContain("PrepareTrainingDatasetFromArtifactsUseCase");
     expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
+  });
+
+  it("derives the Python runtime client URL from host and port when no base URL is configured", () => {
+    expect(resolvePythonRuntimeBaseUrl({ PYTHON_RUNTIME_PORT: "45123" })).toBe("http://127.0.0.1:45123");
+    expect(resolvePythonRuntimeBaseUrl({
+      PYTHON_RUNTIME_HOST: "localhost",
+      PYTHON_RUNTIME_PORT: "45124",
+    })).toBe("http://localhost:45124");
+    expect(resolvePythonRuntimeBaseUrl({
+      PYTHON_RUNTIME_BASE_URL: "http://192.0.2.10:46000",
+      PYTHON_RUNTIME_HOST: "localhost",
+      PYTHON_RUNTIME_PORT: "45124",
+    })).toBe("http://192.0.2.10:46000");
   });
 
   it("stores and exposes desktop Hugging Face token status", () => {

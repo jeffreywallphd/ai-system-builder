@@ -104,6 +104,18 @@ export interface DesktopHostComposition {
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
 }
 
+export function resolvePythonRuntimeBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+  const configuredBaseUrl = env.PYTHON_RUNTIME_BASE_URL?.trim();
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
+  const host = env.PYTHON_RUNTIME_HOST?.trim() || "127.0.0.1";
+  const port = env.PYTHON_RUNTIME_PORT?.trim() || "43111";
+
+  return `http://${host}:${port}`;
+}
+
 export function composeDesktopHost(
   options: ComposeDesktopHostOptions = {},
 ): DesktopHostComposition {
@@ -163,7 +175,7 @@ export function composeDesktopHost(
   };
   const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
     client: {
-      baseUrl: process.env.PYTHON_RUNTIME_BASE_URL ?? "http://127.0.0.1:43111",
+      baseUrl: resolvePythonRuntimeBaseUrl(),
     },
     supervisor: {
       command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
