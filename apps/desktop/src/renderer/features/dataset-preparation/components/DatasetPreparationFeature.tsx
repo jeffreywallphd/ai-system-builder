@@ -1,9 +1,12 @@
+import { useState } from "react";
+
 import {
   type DesktopDatasetPreparationClient,
 } from "../api/desktopDatasetPreparationClient";
 import type { DesktopPythonRuntimeClient } from "../../python-runtime/api/desktopPythonRuntimeClient";
 import type { DesktopApplicationSettingsClient } from "../../settings";
 import { SettingsPanel } from "../../settings";
+import { CollapsiblePanel } from "../../../components/ui/CollapsiblePanel";
 import { useDatasetPreparationFeature } from "../hooks/useDatasetPreparationFeature";
 
 export interface DatasetPreparationFeatureProps {
@@ -16,6 +19,10 @@ export interface DatasetPreparationFeatureProps {
 export function DatasetPreparationFeature({ onPrepared, client, settingsClient, runtimeStatusClient }: DatasetPreparationFeatureProps) {
   const {
     artifacts,
+    filteredArtifacts,
+    uploadedArtifacts,
+    generatedArtifacts,
+    selectedArtifactStorageFilter,
     selectedArtifactIds,
     unsupportedDocumentPolicy,
     normalizationMode,
@@ -51,6 +58,7 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
     stopTrainingInFlight,
     unloadModelInFlight,
     onToggleArtifact,
+    setSelectedArtifactStorageFilter,
     setUnsupportedDocumentPolicy,
     setNormalizationMode,
     setChunkSize,
@@ -87,6 +95,10 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
     runtimeStatusClient,
     onPrepared,
   });
+  const [showModelOverrides, setShowModelOverrides] = useState(false);
+  const [showHuggingFaceDefaults, setShowHuggingFaceDefaults] = useState(false);
+  const showUploadedArtifacts = selectedArtifactStorageFilter !== "generated";
+  const showGeneratedArtifacts = selectedArtifactStorageFilter !== "uploaded";
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -95,16 +107,51 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
       <form className="ui-stack ui-stack--sm" onSubmit={(event) => void onSubmit(event)}>
         <section className="ui-stack ui-stack--sm">
           <h3>Source artifacts</h3>
-          {artifacts.length === 0 ? <p>No artifacts available yet.</p> : artifacts.map((artifact) => (
-            <label key={artifact.artifactId}>
-              <input
-                type="checkbox"
-                checked={selectedArtifactIds.includes(artifact.artifactId)}
-                onChange={() => onToggleArtifact(artifact.artifactId)}
-              />
-              {artifact.label}
-            </label>
-          ))}
+          <label className="ui-stack ui-stack--sm">
+            <span>Filter artifacts</span>
+            <select
+              className="ui-input"
+              value={selectedArtifactStorageFilter}
+              onChange={(event) => setSelectedArtifactStorageFilter(event.target.value as typeof selectedArtifactStorageFilter)}
+            >
+              <option value="all">All artifacts</option>
+              <option value="uploaded">Uploaded artifacts</option>
+              <option value="generated">Generated artifacts</option>
+            </select>
+          </label>
+          {artifacts.length === 0 ? <p>No artifacts available yet.</p> : (
+            <>
+              <section className="ui-stack ui-stack--sm">
+                <h4>Uploaded Artifacts</h4>
+                {!showUploadedArtifacts ? <p className="ui-text-muted">Filtered out.</p> : uploadedArtifacts.length === 0 ? <p>No uploaded artifacts available.</p> : uploadedArtifacts.map((artifact) => (
+                  <label key={artifact.artifactId}>
+                    <input
+                      type="checkbox"
+                      checked={selectedArtifactIds.includes(artifact.artifactId)}
+                      onChange={() => onToggleArtifact(artifact.artifactId)}
+                    />
+                    {artifact.label}
+                  </label>
+                ))}
+              </section>
+              <section className="ui-stack ui-stack--sm">
+                <h4>Generated Artifacts</h4>
+                {!showGeneratedArtifacts ? <p className="ui-text-muted">Filtered out.</p> : generatedArtifacts.length === 0 ? <p>No generated artifacts available.</p> : generatedArtifacts.map((artifact) => (
+                  <label key={artifact.artifactId}>
+                    <input
+                      type="checkbox"
+                      checked={selectedArtifactIds.includes(artifact.artifactId)}
+                      onChange={() => onToggleArtifact(artifact.artifactId)}
+                    />
+                    {artifact.label}
+                  </label>
+                ))}
+              </section>
+              {selectedArtifactStorageFilter !== "all" ? (
+                <p className="ui-text-muted">Showing {filteredArtifacts.length} artifact(s) for the selected filter.</p>
+              ) : null}
+            </>
+          )}
         </section>
 
         <section className="ui-stack ui-stack--sm">
@@ -174,7 +221,12 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
               "models.tasks.qaGeneration.default",
             ]}
           />
-          <div className="ui-grid ui-grid--two">
+          <CollapsiblePanel
+            title="Model override defaults"
+            isExpanded={showModelOverrides}
+            onToggle={() => setShowModelOverrides((current) => !current)}
+          >
+            <div className="ui-grid ui-grid--two">
             <label className="ui-stack ui-stack--sm">
               <span>Model ID</span>
               <input className="ui-input" value={modelId} onChange={(event) => setModelId(event.target.value)} />
@@ -247,7 +299,8 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
                 onChange={(event) => setGenerationMaxNewTokens(event.target.value)}
               />
             </label>
-          </div>
+            </div>
+          </CollapsiblePanel>
         </section>
 
         <section className="ui-grid ui-grid--two">
@@ -285,11 +338,17 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
 
         <section className="ui-stack ui-stack--sm">
           <h3>Output destinations</h3>
-          <SettingsPanel
-            compact
+          <CollapsiblePanel
             title="Hugging Face defaults"
-            keys={["huggingface.token", "huggingface.defaultNamespace"]}
-          />
+            isExpanded={showHuggingFaceDefaults}
+            onToggle={() => setShowHuggingFaceDefaults((current) => !current)}
+          >
+            <SettingsPanel
+              compact
+              title="Hugging Face defaults"
+              keys={["huggingface.token", "huggingface.defaultNamespace"]}
+            />
+          </CollapsiblePanel>
           <label>
             <input
               type="checkbox"

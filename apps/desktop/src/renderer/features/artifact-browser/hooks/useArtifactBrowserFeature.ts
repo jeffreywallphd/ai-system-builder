@@ -30,6 +30,8 @@ export interface UseArtifactBrowserFeatureResult {
   tokenInput: string;
   tokenState: ArtifactBrowserViewState;
   items: DesktopArtifactBrowseItem[];
+  uploadedItems: DesktopArtifactBrowseItem[];
+  generatedItems: DesktopArtifactBrowseItem[];
   unregisteredItems: DesktopUnregisteredArtifactBrowseItem[];
   selectedStorageKey?: string;
   detail?: DesktopArtifactDetail;
@@ -64,6 +66,8 @@ export interface UseArtifactBrowserFeatureResult {
   cancelPendingDelete: () => void;
   selectedArtifactFamily: DesktopArtifactFamily | "all";
   setSelectedArtifactFamily: (value: DesktopArtifactFamily | "all") => void;
+  selectedStorageFilter: "all" | "uploaded" | "generated";
+  setSelectedStorageFilter: (value: "all" | "uploaded" | "generated") => void;
   publishArtifactToHuggingFace: () => Promise<void>;
   registerArtifactFromHuggingFace: (input?: {
     repository?: string;
@@ -169,6 +173,8 @@ export function useArtifactBrowserFeature(
     tokenInput: huggingFace.tokenInput,
     tokenState: huggingFace.tokenState,
     items: artifacts.items,
+    uploadedItems: artifacts.uploadedItems,
+    generatedItems: artifacts.generatedItems,
     unregisteredItems: artifacts.unregisteredItems,
     selectedStorageKey: selection.selectedStorageKey,
     detail: selection.detail,
@@ -196,6 +202,8 @@ export function useArtifactBrowserFeature(
     cancelPendingDelete: deleteFlow.cancelPendingDelete,
     selectedArtifactFamily: artifacts.selectedArtifactFamily,
     setSelectedArtifactFamily: artifacts.setSelectedArtifactFamily,
+    selectedStorageFilter: artifacts.selectedStorageFilter,
+    setSelectedStorageFilter: artifacts.setSelectedStorageFilter,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace: huggingFace.registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace: huggingFace.registerHuggingFaceNamespace,

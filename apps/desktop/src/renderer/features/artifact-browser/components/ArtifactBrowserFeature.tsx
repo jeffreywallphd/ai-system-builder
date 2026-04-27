@@ -51,7 +51,8 @@ function PublishedBackingPanel(
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
   const settings = useApplicationSettings({ keys: ["huggingface.defaultNamespace"] });
   const {
-    items,
+    uploadedItems,
+    generatedItems,
     unregisteredItems,
     selectedStorageKey,
     detail,
@@ -77,6 +78,8 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     cancelPendingDelete,
     selectedArtifactFamily,
     setSelectedArtifactFamily,
+    selectedStorageFilter,
+    setSelectedStorageFilter,
     publishArtifactToHuggingFace,
     localizeArtifactFromRepo,
     recheckPublishedBacking,
@@ -126,6 +129,18 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
             ))}
           </select>
         </label>
+        <label className="ui-stack ui-stack--sm">
+          <span>Filter by source</span>
+          <select
+            className="ui-input"
+            value={selectedStorageFilter}
+            onChange={(event) => setSelectedStorageFilter(event.target.value as typeof selectedStorageFilter)}
+          >
+            <option value="all">All Artifacts</option>
+            <option value="uploaded">Uploaded Artifacts</option>
+            <option value="generated">Generated Artifacts</option>
+          </select>
+        </label>
       </section>
       {pendingDeleteConfirmation ? (
         <section className="ui-panel ui-stack ui-stack--sm" role="dialog" aria-label="Delete confirmation">
@@ -155,9 +170,9 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       ) : null}
       <div className="ui-grid ui-grid--two">
         <div className="ui-stack ui-stack--sm">
-          <h3>Artifacts</h3>
+          <h3>Uploaded Artifacts</h3>
           <section className="ui-stack ui-stack--sm">
-            {items.map((item) => (
+            {uploadedItems.map((item) => (
               <section key={item.storageKey}>
                 <p>{item.originalName ?? item.storageKey}</p>
                 <p>Status: {item.metadata?.backingState ? (
@@ -168,6 +183,21 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
                   View Details
                 </button>                
               </section>              
+            ))}
+          </section>
+          <h3>Generated Artifacts</h3>
+          <section className="ui-stack ui-stack--sm">
+            {generatedItems.map((item) => (
+              <section key={item.storageKey}>
+                <p>{item.originalName ?? item.storageKey}</p>
+                <p>Status: {item.metadata?.backingState ? (
+                  <small>{deriveArtifactListStatusLabels(item.metadata.backingState).join(" · ")}</small>
+                ) : null}
+                </p>
+                <button className="ui-button" type="button" onClick={() => void selectArtifact(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
+                  View Details
+                </button>
+              </section>
             ))}
           </section>
           <section className="ui-stack ui-stack--sm">
