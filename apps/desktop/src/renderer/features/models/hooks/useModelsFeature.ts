@@ -50,6 +50,7 @@ export function useModelsFeature(client?: DesktopModelsClient) {
   const [selectedManagedModel, setSelectedManagedModel] = useState<DesktopModelInventoryRecord>();
   const [pendingDeleteModelRecordId, setPendingDeleteModelRecordId] = useState<string>();
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
+  const [publishRepository, setPublishRepository] = useState("");
 
   const searchModels = useCallback(async () => {
     setBrowseState({ status: "loading", message: "Searching models..." });
@@ -143,6 +144,34 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     downloaded: models.filter((item) => item.lifecycleStatus === "downloaded").length,
   }), [models]);
 
+  const validateManagedModel = useCallback(async () => {
+    if (!selectedManagedModel) {
+      return;
+    }
+    setManageState({ status: "loading", message: "Validating model..." });
+    try {
+      const result = await modelClient.validateModel({ modelRecordId: selectedManagedModel.modelRecordId });
+      setManageState({ status: result.status === "invalid" ? "error" : "success", message: `Validation ${result.status}.` });
+      await refreshModels();
+    } catch (error) {
+      setManageState({ status: "error", message: error instanceof Error ? error.message : "Validation failed." });
+    }
+  }, [modelClient, refreshModels, selectedManagedModel]);
+
+  const publishManagedModel = useCallback(async () => {
+    if (!selectedManagedModel || publishRepository.trim().length === 0) {
+      return;
+    }
+    setManageState({ status: "loading", message: "Publishing model..." });
+    try {
+      const result = await modelClient.publishModel({ modelRecordId: selectedManagedModel.modelRecordId, repository: publishRepository.trim() });
+      setManageState({ status: result.published ? "success" : "error", message: result.published ? "Model published." : "Publish failed." });
+      await refreshModels();
+    } catch (error) {
+      setManageState({ status: "error", message: error instanceof Error ? error.message : "Publish failed." });
+    }
+  }, [modelClient, publishRepository, refreshModels, selectedManagedModel]);
+
   return {
     browseQuery,
     setBrowseQuery,
@@ -177,5 +206,9 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     setDeleteConfirmationInput,
     confirmDeleteModelRecord,
     lifecycleCounts,
+    validateManagedModel,
+    publishManagedModel,
+    publishRepository,
+    setPublishRepository,
   };
 }

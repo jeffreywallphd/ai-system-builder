@@ -175,6 +175,8 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
         localPath: request.localPath,
         backingArtifactIds: request.backingArtifactIds,
         primaryArtifactId: request.primaryArtifactId,
+        validationStatus: request.validationStatus,
+        validationReportPath: request.validationReportPath,
         inferenceMode: request.inferenceMode,
         taskTags: request.taskTags,
         baseModelId: request.baseModelId,

@@ -64,6 +64,9 @@ export class TrainModelUseCase {
 
     const generated = trainingResult.generatedModelCandidate;
     const registration = normalizedRequest.output.registration;
+    const trainingValidation = generated.metadata && typeof generated.metadata["validation"] === "object"
+      ? generated.metadata["validation"] as Record<string, unknown>
+      : undefined;
     const registered = await this.dependencies.modelRegistry.registerGeneratedModel({
       displayName: registration?.displayName ?? generated.displayName,
       provider: generated.provider,
@@ -82,6 +85,13 @@ export class TrainModelUseCase {
         ...registration?.metadata,
         ...generated.metadata,
       },
+      validationStatus: typeof trainingValidation?.["status"] === "string"
+        ? trainingValidation["status"] as "unknown" | "valid" | "invalid" | "warning"
+        : undefined,
+      validationReportPath:
+        typeof trainingResult.validationReportPath === "string"
+          ? trainingResult.validationReportPath
+          : (typeof trainingValidation?.["validationReportPath"] === "string" ? trainingValidation["validationReportPath"] : undefined),
     });
 
     return {

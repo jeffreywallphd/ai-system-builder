@@ -4,6 +4,7 @@ import platform
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
 from os import getenv
+from pathlib import Path
 from threading import Lock
 
 from fastapi import FastAPI
@@ -17,6 +18,8 @@ from .models import (
     ModelStatusResult,
     PrepareTrainingDatasetRequest,
     TrainModelTaskRequest,
+    ValidateModelTaskRequest,
+    ValidateModelTaskResult,
     PythonRuntimeCapabilitiesResult,
     PythonRuntimeError,
     PythonRuntimeHealthCheckResult,
@@ -27,6 +30,7 @@ from .models import (
 )
 from .tasks.prepare_training_dataset import prepare_training_dataset
 from .tasks.train_model import train_model
+from .tasks.model_validation import validate_model_output
 from .tasks.example_generation import ensure_generation_model_downloaded
 from .tasks.local_text_generation import describe_loaded_generation_models, unload_generation_models
 
@@ -83,6 +87,7 @@ def capabilities() -> PythonRuntimeCapabilitiesResult:
             "unload-model",
             "dataset-preparation.auto-inference-mode",
             "train-model",
+            "validate-model",
         ],
     )
 
@@ -218,6 +223,59 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
                         errorCode="runtime_timeout",
                         stage="generation",
                         message=f"Dataset preparation timed out after {request.timeoutMs}ms.",
+                        retryable=False,
+                    ),
+                    metadata={"runtimeId": RUNTIME_ID},
+                )
+            return PythonRuntimeTaskResult(
+                requestId=request.requestId,
+                taskType=request.taskType,
+                success=True,
+                data=result.model_dump(mode="json"),
+                metadata={"runtimeId": RUNTIME_ID},
+            )
+
+        if request.taskType == "validate-model":
+            payload = ValidateModelTaskRequest.model_validate(request.payload)
+
+            def run_validate_model() -> object:
+                _mark_task_active(request.requestId)
+                try:
+                    result = validate_model_output(
+                        Path(payload.modelPath),
+                        expected_lora=bool(payload.expectedLoRA),
+                        expected_recurrent_additions=bool(payload.expectedRecurrentAdditions),
+                    )
+                    return ValidateModelTaskResult(
+                        modelRecordId=payload.modelRecordId,
+                        status=result["status"],
+                        validationReportPath=result.get("validationReportPath"),
+                        validationDiffPath=result.get("validationDiffPath"),
+                        serializationFormat=result.get("serializationFormat"),
+                        shardCount=result.get("shardCount"),
+                        detectedLoRA=result.get("detectedLoRA"),
+                        detectedRecurrentAdditions=result.get("detectedRecurrentAdditions"),
+                        warnings=result.get("warnings"),
+                        errors=result.get("errors"),
+                    )
+                finally:
+                    _mark_task_complete(request.requestId)
+
+            task_future = TASK_EXECUTOR.submit(run_validate_model)
+            timeout_seconds = (request.timeoutMs / 1000) if request.timeoutMs else None
+            try:
+                result = task_future.result(timeout=timeout_seconds)
+            except FutureTimeoutError:
+                task_future.cancel()
+                return PythonRuntimeTaskResult(
+                    requestId=request.requestId,
+                    taskType=request.taskType,
+                    success=False,
+                    error=PythonRuntimeError(
+                        code="task_timeout",
+                        errorCode="runtime_timeout",
+                        stage="generation",
+                        message=f"Model validation timed out after {request.timeoutMs}ms.",
                         retryable=False,
                     ),
                     metadata={"runtimeId": RUNTIME_ID},

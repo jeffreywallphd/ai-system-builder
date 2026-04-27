@@ -31,6 +31,10 @@ import type {
   ModelTrainingResult,
   SaveModelReferenceRequest,
   UpdateModelRecordRequest,
+  ValidateModelRequest,
+  ValidateModelResult,
+  PublishModelRequest,
+  PublishModelResult,
 } from "../../../../../modules/contracts/model";
 
 export interface DesktopArtifactUploadInput {
@@ -366,6 +370,8 @@ interface DesktopApiBridge {
   updateModelRecord?: (input: DesktopUpdateModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   deleteModelRecord?: (input: DesktopDeleteModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   trainModel?: (input: DesktopModelTrainingRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  validateModel?: (input: DesktopValidateModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  publishModel?: (input: DesktopPublishModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
 }
 
 declare global {
@@ -478,3 +484,7 @@ export type DesktopDeleteModelRecordResult = DeleteModelRecordResult;
 
 export type DesktopModelTrainingRequest = ModelTrainingRequest;
 export type DesktopModelTrainingResult = ModelTrainingResult;
+export type DesktopValidateModelRequest = ValidateModelRequest;
+export type DesktopValidateModelResult = ValidateModelResult;
+export type DesktopPublishModelRequest = PublishModelRequest;
+export type DesktopPublishModelResult = PublishModelResult;

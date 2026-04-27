@@ -58,6 +58,7 @@ export interface TrainModelTaskRequest {
   output: {
     outputModelName: string;
     outputDirectory?: string;
+    maxShardSize?: string;
   };
   validation?: {
     enabled?: boolean;

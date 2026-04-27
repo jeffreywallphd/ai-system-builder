@@ -74,6 +74,8 @@ function createClientDouble() {
         createdAt: "2026-04-27T00:05:00.000Z",
       },
     }),
+    validateModel: vi.fn().mockResolvedValue({ modelRecordId: "generated-1", status: "valid", reportPath: "/tmp/report.md" }),
+    publishModel: vi.fn().mockResolvedValue({ modelRecordId: "generated-1", published: true, provider: "huggingface", repository: "owner/repo" }),
   };
 }
 
@@ -109,7 +111,7 @@ describe("ModelsFeature", () => {
       trainTab?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Current backend support: LoRA skeleton execution");
+    expect(container.textContent).toContain("Current backend support: LoRA, QLoRA, and full fine-tuning");
     expect(container.textContent).toContain("Dataset artifact IDs");
 
     const datasetInput = container.querySelector("input[placeholder='artifact-1,artifact-2']") as HTMLInputElement;
@@ -117,6 +119,13 @@ describe("ModelsFeature", () => {
       datasetInput.value = "dataset-1";
       datasetInput.dispatchEvent(new Event("input", { bubbles: true }));
     });
+    const baseModelSelect = container.querySelector("select.ui-input") as HTMLSelectElement;
+    if (baseModelSelect?.options?.length > 1) {
+      await act(async () => {
+        baseModelSelect.value = baseModelSelect.options[1]?.value ?? "";
+        baseModelSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
 
     const submitButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Start Training") as HTMLButtonElement;
     expect(submitButton.disabled).toBe(false);
@@ -128,5 +137,27 @@ describe("ModelsFeature", () => {
     expect(client.trainModel).toHaveBeenCalled();
     expect(container.textContent).toContain("Generated model record: generated-1");
     expect(container.textContent).not.toContain("planning shell");
+  });
+
+  it("shows validate and disabled publish actions in manage models tab", async () => {
+    const client = createClientDouble();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ModelsFeature client={client as never} />);
+    });
+
+    const manageTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Manage Models");
+    await act(async () => {
+      manageTab?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Validate");
+    const publishButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    expect(publishButton.disabled).toBe(true);
   });
 });

@@ -6,6 +6,8 @@ import type {
   SaveModelReferenceUseCase,
   UpdateModelRecordUseCase,
   TrainModelUseCase,
+  ValidateModelUseCase,
+  PublishModelUseCase,
 } from "../../../../application/use-cases/model";
 import {
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -22,6 +24,10 @@ import {
   DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
   DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL,
   DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL,
   createDesktopModelBrowseSuccessResponse,
   createDesktopModelDetailsReadSuccessResponse,
   createDesktopModelListSuccessResponse,
@@ -29,6 +35,8 @@ import {
   createDesktopModelTrainSuccessResponse,
   createDesktopModelRecordUpdateSuccessResponse,
   createDesktopModelReferenceSaveSuccessResponse,
+  createDesktopModelValidateSuccessResponse,
+  createDesktopModelPublishSuccessResponse,
   createIpcError,
   createIpcFailureResponse,
   type DesktopModelBrowseRequest,
@@ -45,6 +53,10 @@ import {
   type DesktopModelRecordUpdateResponse,
   type DesktopModelReferenceSaveRequest,
   type DesktopModelReferenceSaveResponse,
+  type DesktopModelValidateRequest,
+  type DesktopModelValidateResponse,
+  type DesktopModelPublishRequest,
+  type DesktopModelPublishResponse,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
@@ -57,6 +69,8 @@ export interface RegisterModelManagementIpcDependencies {
   updateModelRecordUseCase: Pick<UpdateModelRecordUseCase, "execute">;
   deleteModelRecordUseCase: Pick<DeleteModelRecordUseCase, "execute">;
   trainModelUseCase: Pick<TrainModelUseCase, "execute">;
+  validateModelUseCase: Pick<ValidateModelUseCase, "execute">;
+  publishModelUseCase: Pick<PublishModelUseCase, "execute">;
 }
 
 function toFailureResponse<TResponse>(channel: { value: string }, error: unknown, request: { requestId?: string; correlationId?: string }): TResponse {
@@ -148,6 +162,28 @@ export function createTrainModelIpcHandler(useCase: Pick<TrainModelUseCase, "exe
   };
 }
 
+export function createValidateModelIpcHandler(useCase: Pick<ValidateModelUseCase, "execute">) {
+  return async (_event: unknown, request: DesktopModelValidateRequest): Promise<DesktopModelValidateResponse> => {
+    try {
+      const result = await useCase.execute(request.payload);
+      return createDesktopModelValidateSuccessResponse(result, { requestId: request.requestId, correlationId: request.correlationId });
+    } catch (error) {
+      return toFailureResponse<DesktopModelValidateResponse>(DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL, error, request);
+    }
+  };
+}
+
+export function createPublishModelIpcHandler(useCase: Pick<PublishModelUseCase, "execute">) {
+  return async (_event: unknown, request: DesktopModelPublishRequest): Promise<DesktopModelPublishResponse> => {
+    try {
+      const result = await useCase.execute(request.payload);
+      return createDesktopModelPublishSuccessResponse(result, { requestId: request.requestId, correlationId: request.correlationId });
+    } catch (error) {
+      return toFailureResponse<DesktopModelPublishResponse>(DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL, error, request);
+    }
+  };
+}
+
 export function registerModelManagementIpc(dependencies: RegisterModelManagementIpcDependencies): void {
   dependencies.ipcMain.handle(
     DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value,
@@ -176,5 +212,13 @@ export function registerModelManagementIpc(dependencies: RegisterModelManagement
   dependencies.ipcMain.handle(
     DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
     createTrainModelIpcHandler(dependencies.trainModelUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
+    createValidateModelIpcHandler(dependencies.validateModelUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
+    createPublishModelIpcHandler(dependencies.publishModelUseCase),
   );
 }

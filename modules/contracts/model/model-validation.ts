@@ -20,6 +20,27 @@ export interface ModelValidationSummary {
   errors?: string[];
 }
 
+export interface ValidateModelRequest {
+  modelRecordId: string;
+  modelPath?: string;
+  expectedLoRA?: boolean;
+  expectedRecurrentAdditions?: boolean;
+  allowWarnings?: boolean;
+}
+
+export interface ValidateModelResult {
+  modelRecordId: string;
+  status: ModelValidationStatus;
+  reportPath?: string;
+  diffPath?: string;
+  serializationFormat?: ModelSerializationFormat;
+  shardCount?: number;
+  detectedLoRA?: boolean;
+  detectedRecurrentAdditions?: boolean;
+  warnings?: string[];
+  errors?: string[];
+}
+
 function normalizeOptionalText(value: string | undefined): string | undefined {
   if (typeof value !== "string") {
     return undefined;
