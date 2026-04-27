@@ -11,6 +11,8 @@ import type {
   SaveModelReferenceResult,
   UpdateModelRecordRequest,
   UpdateModelRecordResult,
+  ModelTrainingRequest,
+  ModelTrainingResult,
 } from "../model";
 import { createTransportOperation } from "../transport";
 import { createIpcChannel } from "./ipc-channel";
@@ -23,6 +25,7 @@ export const DESKTOP_MODEL_LIST_OPERATION = createTransportOperation("model", "l
 export const DESKTOP_MODEL_REFERENCE_SAVE_OPERATION = createTransportOperation("model", "reference-save");
 export const DESKTOP_MODEL_RECORD_UPDATE_OPERATION = createTransportOperation("model", "record-update");
 export const DESKTOP_MODEL_RECORD_DELETE_OPERATION = createTransportOperation("model", "record-delete");
+export const DESKTOP_MODEL_TRAIN_OPERATION = createTransportOperation("model", "train");
 
 export const DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_BROWSE_OPERATION, "request");
 export const DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_BROWSE_OPERATION, "response");
@@ -36,6 +39,8 @@ export const DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL = createIpcChannel(DESK
 export const DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_RECORD_UPDATE_OPERATION, "response");
 export const DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_RECORD_DELETE_OPERATION, "request");
 export const DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_RECORD_DELETE_OPERATION, "response");
+export const DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_TRAIN_OPERATION, "request");
+export const DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_TRAIN_OPERATION, "response");
 
 export type DesktopModelBrowseRequest = IpcRequest<
   BrowseModelsRequest,
@@ -116,6 +121,20 @@ export type DesktopModelRecordDeleteResponse = IpcResponse<
   typeof DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL.value
 >;
 
+export type DesktopModelTrainRequest = IpcRequest<
+  ModelTrainingRequest,
+  typeof DESKTOP_MODEL_TRAIN_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value
+>;
+export type DesktopModelTrainResponse = IpcResponse<
+  ModelTrainingResult,
+  Record<string, unknown>,
+  typeof DESKTOP_MODEL_TRAIN_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value
+>;
+
 export function createDesktopModelBrowseRequest(payload: BrowseModelsRequest, options?: { requestId?: string; correlationId?: string }): DesktopModelBrowseRequest {
   return createIpcRequest(DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL, payload, options);
 }
@@ -151,4 +170,11 @@ export function createDesktopModelRecordDeleteRequest(payload: DeleteModelRecord
 }
 export function createDesktopModelRecordDeleteSuccessResponse(result: DeleteModelRecordResult, options?: { requestId?: string; correlationId?: string }): DesktopModelRecordDeleteResponse {
   return createIpcSuccessResponse(DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL, result, options) as DesktopModelRecordDeleteResponse;
+}
+
+export function createDesktopModelTrainRequest(payload: ModelTrainingRequest, options?: { requestId?: string; correlationId?: string }): DesktopModelTrainRequest {
+  return createIpcRequest(DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL, payload, options);
+}
+export function createDesktopModelTrainSuccessResponse(result: ModelTrainingResult, options?: { requestId?: string; correlationId?: string }): DesktopModelTrainResponse {
+  return createIpcSuccessResponse(DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL, result, options) as DesktopModelTrainResponse;
 }

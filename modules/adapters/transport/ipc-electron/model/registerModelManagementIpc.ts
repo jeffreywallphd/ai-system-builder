@@ -5,6 +5,7 @@ import type {
   ListModelsUseCase,
   SaveModelReferenceUseCase,
   UpdateModelRecordUseCase,
+  TrainModelUseCase,
 } from "../../../../application/use-cases/model";
 import {
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -17,12 +18,15 @@ import {
   DESKTOP_MODEL_DETAILS_READ_RESPONSE_CHANNEL,
   DESKTOP_MODEL_LIST_RESPONSE_CHANNEL,
   DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
   DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL,
   DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL,
   createDesktopModelBrowseSuccessResponse,
   createDesktopModelDetailsReadSuccessResponse,
   createDesktopModelListSuccessResponse,
   createDesktopModelRecordDeleteSuccessResponse,
+  createDesktopModelTrainSuccessResponse,
   createDesktopModelRecordUpdateSuccessResponse,
   createDesktopModelReferenceSaveSuccessResponse,
   createIpcError,
@@ -36,6 +40,8 @@ import {
   type DesktopModelRecordDeleteRequest,
   type DesktopModelRecordDeleteResponse,
   type DesktopModelRecordUpdateRequest,
+  type DesktopModelTrainRequest,
+  type DesktopModelTrainResponse,
   type DesktopModelRecordUpdateResponse,
   type DesktopModelReferenceSaveRequest,
   type DesktopModelReferenceSaveResponse,
@@ -50,6 +56,7 @@ export interface RegisterModelManagementIpcDependencies {
   saveModelReferenceUseCase: Pick<SaveModelReferenceUseCase, "execute">;
   updateModelRecordUseCase: Pick<UpdateModelRecordUseCase, "execute">;
   deleteModelRecordUseCase: Pick<DeleteModelRecordUseCase, "execute">;
+  trainModelUseCase: Pick<TrainModelUseCase, "execute">;
 }
 
 function toFailureResponse<TResponse>(channel: { value: string }, error: unknown, request: { requestId?: string; correlationId?: string }): TResponse {
@@ -129,6 +136,18 @@ export function createDeleteModelRecordIpcHandler(useCase: Pick<DeleteModelRecor
   };
 }
 
+
+export function createTrainModelIpcHandler(useCase: Pick<TrainModelUseCase, "execute">) {
+  return async (_event: unknown, request: DesktopModelTrainRequest): Promise<DesktopModelTrainResponse> => {
+    try {
+      const result = await useCase.execute(request.payload);
+      return createDesktopModelTrainSuccessResponse(result, { requestId: request.requestId, correlationId: request.correlationId });
+    } catch (error) {
+      return toFailureResponse<DesktopModelTrainResponse>(DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL, error, request);
+    }
+  };
+}
+
 export function registerModelManagementIpc(dependencies: RegisterModelManagementIpcDependencies): void {
   dependencies.ipcMain.handle(
     DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value,
@@ -153,5 +172,9 @@ export function registerModelManagementIpc(dependencies: RegisterModelManagement
   dependencies.ipcMain.handle(
     DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
     createDeleteModelRecordIpcHandler(dependencies.deleteModelRecordUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
+    createTrainModelIpcHandler(dependencies.trainModelUseCase),
   );
 }

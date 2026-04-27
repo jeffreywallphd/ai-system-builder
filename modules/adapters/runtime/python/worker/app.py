@@ -16,6 +16,7 @@ from .models import (
     LoadedModelDescriptor,
     ModelStatusResult,
     PrepareTrainingDatasetRequest,
+    TrainModelTaskRequest,
     PythonRuntimeCapabilitiesResult,
     PythonRuntimeError,
     PythonRuntimeHealthCheckResult,
@@ -25,6 +26,7 @@ from .models import (
     UnloadModelsResult,
 )
 from .tasks.prepare_training_dataset import prepare_training_dataset
+from .tasks.train_model import train_model
 from .tasks.example_generation import ensure_generation_model_downloaded
 from .tasks.local_text_generation import describe_loaded_generation_models, unload_generation_models
 
@@ -80,6 +82,7 @@ def capabilities() -> PythonRuntimeCapabilitiesResult:
             "model-status",
             "unload-model",
             "dataset-preparation.auto-inference-mode",
+            "train-model",
         ],
     )
 
@@ -155,6 +158,42 @@ def unload_models() -> UnloadModelsResult | JSONResponse:
 @app.post("/tasks/execute", response_model=PythonRuntimeTaskResult)
 def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
     try:
+        if request.taskType == "train-model":
+            payload = TrainModelTaskRequest.model_validate(request.payload)
+            def run_train_model() -> object:
+                _mark_task_active(request.requestId)
+                try:
+                    return train_model(payload)
+                finally:
+                    _mark_task_complete(request.requestId)
+
+            task_future = TASK_EXECUTOR.submit(run_train_model)
+            timeout_seconds = (request.timeoutMs / 1000) if request.timeoutMs else None
+            try:
+                result = task_future.result(timeout=timeout_seconds)
+            except FutureTimeoutError:
+                task_future.cancel()
+                return PythonRuntimeTaskResult(
+                    requestId=request.requestId,
+                    taskType=request.taskType,
+                    success=False,
+                    error=PythonRuntimeError(
+                        code="task_timeout",
+                        errorCode="runtime_timeout",
+                        stage="generation",
+                        message=f"Model training timed out after {request.timeoutMs}ms.",
+                        retryable=False,
+                    ),
+                    metadata={"runtimeId": RUNTIME_ID},
+                )
+            return PythonRuntimeTaskResult(
+                requestId=request.requestId,
+                taskType=request.taskType,
+                success=True,
+                data=result.model_dump(mode="json"),
+                metadata={"runtimeId": RUNTIME_ID},
+            )
+
         if request.taskType == "prepare-training-dataset":
             payload = PrepareTrainingDatasetRequest.model_validate(request.payload)
             def run_prepare_training_dataset() -> object:

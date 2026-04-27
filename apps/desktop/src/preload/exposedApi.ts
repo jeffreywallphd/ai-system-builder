@@ -186,12 +186,17 @@ import {
   createDesktopModelReferenceSaveRequest,
   createDesktopModelRecordUpdateRequest,
   createDesktopModelRecordDeleteRequest,
+  createDesktopModelTrainRequest,
   type DesktopModelBrowseResponse,
   type DesktopModelDetailsReadResponse,
   type DesktopModelListResponse,
   type DesktopModelReferenceSaveResponse,
   type DesktopModelRecordUpdateResponse,
   type DesktopModelRecordDeleteResponse,
+  type DesktopModelTrainResponse,
+  DESKTOP_MODEL_TRAIN_OPERATION,
+  DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 import type {
@@ -403,6 +408,10 @@ export interface DesktopPreloadApi {
     input: Parameters<typeof createDesktopModelRecordDeleteRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopModelRecordDeleteResponse>;
+  trainModel: (
+    input: Parameters<typeof createDesktopModelTrainRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelTrainResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -1131,6 +1140,18 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_MODEL_RECORD_DELETE_OPERATION,
         channel: DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop model record-delete IPC response envelope.",
+      });
+    },
+    async trainModel(input, context = {}) {
+      const request = createDesktopModelTrainRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelTrainResponse>(response, {
+        operation: DESKTOP_MODEL_TRAIN_OPERATION,
+        channel: DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model train IPC response envelope.",
       });
     },
   };

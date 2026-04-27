@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../../modules/domain/model";
 import type { DesktopModelBrowseItem, DesktopModelDetailsResult, DesktopModelInventoryRecord } from "../../../lib/desktopApi";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsClient } from "./useModelsClient";
@@ -7,6 +8,26 @@ import { useModelsClient } from "./useModelsClient";
 interface ViewState {
   status: "idle" | "loading" | "success" | "error";
   message?: string;
+}
+
+function normalizeOptionalNumber(value: string): number | undefined {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeOptionalTaskTag(value: string): ModelTaskTag | undefined {
+  const normalized = value.trim().toLowerCase();
+  const allowed: ModelTaskTag[] = ["text-generation", "text2text-generation", "chat", "embeddings", "classification", "summarization", "question-answering", "code-generation"];
+  return allowed.includes(normalized as ModelTaskTag) ? normalized as ModelTaskTag : undefined;
+}
+
+function normalizeOptionalSelect<TOption extends string>(value: string, options: readonly TOption[]): TOption | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+
+  return options.includes(normalized as TOption) ? normalized as TOption : undefined;
 }
 
 export function useModelsFeature(client?: DesktopModelsClient) {
@@ -33,12 +54,12 @@ export function useModelsFeature(client?: DesktopModelsClient) {
   const searchModels = useCallback(async () => {
     setBrowseState({ status: "loading", message: "Searching models..." });
     try {
-      const limitValue = Number.parseInt(browseLimit, 10);
+      const taskTag = normalizeOptionalTaskTag(browseTaskTag);
       const result = await modelClient.browseModels({
         provider: "huggingface",
         query: browseQuery || undefined,
-        taskTags: browseTaskTag ? [browseTaskTag as never] : undefined,
-        limit: Number.isFinite(limitValue) ? limitValue : undefined,
+        taskTags: taskTag ? [taskTag] : undefined,
+        limit: normalizeOptionalNumber(browseLimit),
       });
       setBrowseItems(result.models);
       setBrowseState({ status: "success", message: result.models.length > 0 ? "Loaded model results." : "No model results found." });
@@ -89,9 +110,9 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     setManageState({ status: "loading", message: "Loading model inventory..." });
     try {
       const listed = await modelClient.listModels({
-        source: (manageSource || undefined) as never,
-        lifecycleStatus: (manageLifecycleStatus || undefined) as never,
-        artifactForm: (manageArtifactForm || undefined) as never,
+        source: normalizeOptionalSelect<ModelSource>(manageSource, ["huggingface", "local", "generated"]),
+        lifecycleStatus: normalizeOptionalSelect<ModelLifecycleStatus>(manageLifecycleStatus, ["remote-reference", "saved-reference", "downloaded", "generated", "validated", "invalid"]),
+        artifactForm: normalizeOptionalSelect<ModelArtifactForm>(manageArtifactForm, ["full-model", "adapter", "merged-model", "quantized-model", "checkpoint"]),
         search: manageSearch || undefined,
       });
       setModels(listed);

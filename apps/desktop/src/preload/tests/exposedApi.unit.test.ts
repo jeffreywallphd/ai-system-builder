@@ -530,6 +530,12 @@ it("maps model management bridge calls to dedicated model channels", async () =>
       deletedLocalFiles: false,
       deletedBackingArtifactIds: [],
     }),
+    {
+      ok: true,
+      operation: "model.train",
+      channel: "ipc.model.train.response",
+      value: { runId: "run-1", status: "succeeded" },
+    },
   ];
   let index = 0;
   const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
@@ -545,6 +551,13 @@ it("maps model management bridge calls to dedicated model channels", async () =>
   await api.saveModelReference({ provider: "huggingface", modelId: "org/model" });
   await api.updateModelRecord({ modelRecordId: "m1", patch: {} });
   await api.deleteModelRecord({ modelRecordId: "m1" });
+  await api.trainModel({
+    baseModel: { modelRecordId: "m1" },
+    datasets: [{ artifactId: "dataset-1", splitRole: "train" }],
+    method: "lora",
+    commonParameters: {},
+    output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } } },
+  });
 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value);
@@ -552,4 +565,5 @@ it("maps model management bridge calls to dedicated model channels", async () =>
   expect(invoke.mock.calls[3]?.[0]).toBe(DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[4]?.[0]).toBe(DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[5]?.[0]).toBe(DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[6]?.[0]).toBe("ipc.model.train.request");
 });

@@ -17,3 +17,5 @@ export * from "./python-runtime-task-result";
 export * from "./dataset-preparation";
 export * from "./prepare-training-dataset-request";
 export * from "./prepare-training-dataset-result";
+export * from "./train-model-task-request";
+export * from "./train-model-task-result";
