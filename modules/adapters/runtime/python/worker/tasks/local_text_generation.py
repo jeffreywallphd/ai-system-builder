@@ -117,28 +117,8 @@ class TransformersCausalGenerator(LocalTextGenerator):
 
 class TransformersChatGenerator(TransformersCausalGenerator):
     def generate_text(self, prompt: str) -> str:
-        apply_chat_template = getattr(self._tokenizer, "apply_chat_template", None)
-        if not callable(apply_chat_template):
-            raise RuntimeError(
-                "Chat inference mode requires a tokenizer with apply_chat_template support."
-            )
-
         messages = [{"role": "user", "content": prompt}]
-        try:
-            templated = apply_chat_template(
-                messages,
-                tokenize=True,
-                add_generation_prompt=True,
-                return_tensors="pt",
-                return_dict=True,
-            )
-        except TypeError:
-            templated = apply_chat_template(
-                messages,
-                tokenize=True,
-                add_generation_prompt=True,
-                return_tensors="pt",
-            )
+        templated = _apply_chat_template_for_generation(self._tokenizer, messages)
 
         if isinstance(templated, Mapping):
             input_ids = templated["input_ids"]
@@ -366,6 +346,55 @@ def _filter_supported_generation_params(params: dict[str, Any], generate_callabl
 
     supported = set(signature.parameters.keys())
     return {key: value for key, value in params.items() if key in supported}
+
+
+def _apply_chat_template_for_generation(tokenizer: Any, messages: list[dict[str, str]]) -> Any:
+    apply_chat_template = getattr(tokenizer, "apply_chat_template", None)
+    if not callable(apply_chat_template):
+        raise RuntimeError(
+            "Chat inference mode requires a tokenizer with apply_chat_template support."
+        )
+
+    base_kwargs: dict[str, Any] = {
+        "tokenize": True,
+        "add_generation_prompt": True,
+        "return_tensors": "pt",
+    }
+    accepts_enable_thinking = _callable_accepts_keyword(apply_chat_template, "enable_thinking")
+    attempts = (
+        [
+            {**base_kwargs, "return_dict": True, "enable_thinking": False},
+            {**base_kwargs, "return_dict": True},
+            {**base_kwargs, "enable_thinking": False},
+            base_kwargs,
+        ]
+        if accepts_enable_thinking is not False
+        else [
+            {**base_kwargs, "return_dict": True},
+            base_kwargs,
+        ]
+    )
+    last_type_error: TypeError | None = None
+    for kwargs in attempts:
+        try:
+            return apply_chat_template(messages, **kwargs)
+        except TypeError as error:
+            last_type_error = error
+
+    if last_type_error is not None:
+        raise last_type_error
+    raise RuntimeError("Chat inference mode could not apply the tokenizer chat template.")
+
+
+def _callable_accepts_keyword(callable_value: Any, keyword: str) -> bool | None:
+    try:
+        signature = inspect.signature(callable_value)
+    except (TypeError, ValueError):
+        return None
+
+    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in signature.parameters.values()):
+        return True
+    return keyword in signature.parameters
 
 
 def _resolve_model_kwargs(model_config: LocalModelConfig) -> dict[str, Any]:
