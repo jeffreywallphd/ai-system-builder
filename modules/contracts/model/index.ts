@@ -1,3 +1,11 @@
+export type {
+  ModelArtifactForm,
+  ModelLifecycleStatus,
+  ModelSerializationFormat,
+  ModelSource,
+  ModelTaskTag,
+} from "../../domain/model";
+
 export * from "./model-browse-provider";
 export * from "./model-inference-mode";
 export * from "./model-inference-recommendation";

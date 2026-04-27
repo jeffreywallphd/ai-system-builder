@@ -18,10 +18,13 @@ import {
   normalizeModelInferenceMode,
   normalizeModelInventoryRecord,
   normalizeModelValidationSummary,
+  normalizeRegisterDownloadedModelRequest,
+  normalizeRegisterGeneratedModelRequest,
   recommendModelInferenceMode,
   type BrowseModelsResult,
   type ModelInferenceMode,
   type ModelInventoryRecord,
+  type RegisterDownloadedModelRequest,
   type ModelTrainingRequest,
   type ModelTrainingResult,
 } from ".";
@@ -272,6 +275,38 @@ describe("model contracts", () => {
       modelRecordId: "model-1",
       deleteLocalFiles: true,
       deleteBackingArtifacts: false,
+    });
+  });
+
+  it("preserves validation metadata when registering downloaded and generated models", () => {
+    const downloaded: RegisterDownloadedModelRequest = {
+      displayName: " Downloaded Model ",
+      source: "huggingface",
+      provider: "huggingface",
+      localPath: " C:/models/downloaded ",
+      artifactForm: "full-model",
+      validationStatus: "warning",
+      validationReportPath: " reports/downloaded.md ",
+    };
+
+    expect(normalizeRegisterDownloadedModelRequest(downloaded)).toMatchObject({
+      displayName: "Downloaded Model",
+      validationStatus: "warning",
+      validationReportPath: "reports/downloaded.md",
+    });
+
+    expect(normalizeRegisterGeneratedModelRequest({
+      displayName: " Generated Adapter ",
+      provider: "huggingface",
+      localPath: " C:/models/generated ",
+      artifactForm: "adapter",
+      baseModelId: " base-model ",
+      validationStatus: "valid",
+      validationReportPath: " reports/generated.md ",
+    })).toMatchObject({
+      displayName: "Generated Adapter",
+      validationStatus: "valid",
+      validationReportPath: "reports/generated.md",
     });
   });
 
