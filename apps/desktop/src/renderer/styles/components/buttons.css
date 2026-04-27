@@ -1,9 +1,9 @@
 .ui-button {
   min-height: var(--control-height-sm);
-  padding: 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
+  background: var(--color-bg-accent);
   color: var(--color-text-primary);
   cursor: pointer;
   transition:
@@ -12,8 +12,8 @@
 }
 
 .ui-button:hover:enabled {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border-strong);
+  background: var(--color-bg-accent-hover);
+  border-color: var(--color-border-inverse);
 }
 
 .ui-button[aria-current="page"] {
@@ -27,12 +27,12 @@
 }
 
 .ui-button--destructive {
-  border-color: color-mix(in srgb, var(--color-danger) 65%, var(--color-border));
-  background: color-mix(in srgb, var(--color-danger) 18%, var(--color-bg-elevated));
-  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
 }
 
 .ui-button--destructive:hover:enabled {
-  border-color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 26%, var(--color-bg-elevated));
+  border-color: var(--color-border-inverse);
+  background: var(--color-danger);
 }

@@ -200,6 +200,7 @@ async function readLatestRepoBackingByRole(
 
 function toBrowseItem(record: ArtifactCatalogRecord): ArtifactBrowseItem {
   return {
+    artifactId: record.storageKey,
     storageKey: record.storageKey,
     artifactFamily: record.artifactFamily,
     mediaType: record.mediaType,

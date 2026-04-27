@@ -28,6 +28,7 @@ export interface DesktopArtifactBrowserClient {
   readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactDetail>;
   readArtifactContent: (locator: DesktopArtifactBrowserLocator) => Promise<DesktopArtifactContentDescriptor>;
   createArtifactMediaViewUrl: (locator: DesktopArtifactBrowserLocator) => Promise<string>;
+  readArtifactMedia: (locator: DesktopArtifactBrowserLocator) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
   publishArtifactToHuggingFace: (input: {
     artifactId: string;
     repository: string;
@@ -50,6 +51,41 @@ export interface DesktopArtifactBrowserClient {
   localizeArtifactFromRepo: (input: {
     artifactId: string;
   }) => Promise<DesktopLocalizedArtifactFromRepo>;
+}
+
+function toBrowseItems(value: unknown): DesktopArtifactBrowseItem[] {
+  if (Array.isArray(value)) {
+    return value as DesktopArtifactBrowseItem[];
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+
+  const payload = value as {
+    items?: DesktopArtifactBrowseItem[];
+    registeredItems?: DesktopArtifactBrowseItem[];
+    registered?: { items?: DesktopArtifactBrowseItem[] };
+    registeredItemsMap?: Record<string, DesktopArtifactBrowseItem>;
+  };
+
+  if (Array.isArray(payload.items)) {
+    return payload.items;
+  }
+
+  if (Array.isArray(payload.registeredItems)) {
+    return payload.registeredItems;
+  }
+
+  if (Array.isArray(payload.registered?.items)) {
+    return payload.registered.items;
+  }
+
+  if (payload.registeredItemsMap && typeof payload.registeredItemsMap === "object") {
+    return Object.values(payload.registeredItemsMap);
+  }
+
+  return [];
 }
 
 function ensureSuccess<T>(
@@ -125,10 +161,7 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
     async browseArtifacts(input = {}) {
       return ensureSuccess(
         await desktopApi.browseArtifacts({ artifactFamily: input.artifactFamily }),
-        (value) => {
-          const items = (value as { items?: DesktopArtifactBrowseItem[] } | undefined)?.items;
-          return Array.isArray(items) ? items : [];
-        },
+        (value) => toBrowseItems(value),
         "Failed to browse artifacts.",
       );
     },
@@ -209,6 +242,16 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         },
         "Failed to read artifact content descriptor.",
       );
+    },
+
+    async readArtifactMedia(locator) {
+      const media = ensureSuccess(
+        await desktopApi.readArtifactViewerMedia(locator),
+        (value) => value as { mediaType?: string; bytes: Uint8Array },
+        "Failed to read artifact media.",
+      );
+
+      return { mediaType: media.mediaType, bytes: Uint8Array.from(media.bytes) };
     },
 
     async createArtifactMediaViewUrl(locator) {

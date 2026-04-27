@@ -20,7 +20,7 @@ describe("desktop renderer page composition", () => {
     mountedContainer = undefined;
   });
 
-  it("renders landing Home page by default and switches to Artifacts/System pages", async () => {
+  it("renders landing Home page by default and switches to Data/Settings/System pages", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -37,6 +37,26 @@ describe("desktop renderer page composition", () => {
       verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
       registerArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
       localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      readPythonRuntimeStatus: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          supervisorStatus: "stopped",
+          healthy: false,
+          runtimeStatus: "stopped",
+          capabilities: [],
+          logs: [],
+        },
+      }),
+      controlPythonRuntime: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          supervisorStatus: "starting",
+          healthy: false,
+          runtimeStatus: "starting",
+          capabilities: [],
+          logs: [],
+        },
+      }),
     };
 
     await act(async () => {
@@ -46,7 +66,7 @@ describe("desktop renderer page composition", () => {
     expect(container.textContent).toContain("Build visual AI workflows from your artifacts");
 
     const artifactsButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Artifacts",
+      (button) => button.textContent === "Data",
     );
     expect(artifactsButton).toBeDefined();
 
@@ -54,8 +74,40 @@ describe("desktop renderer page composition", () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Artifact upload");
-    expect(container.textContent).toContain("Data Artifact Browser");
+    expect(container.textContent).toContain("Data Artifact Ingester");
+    expect(container.textContent).not.toContain("Data Artifact Browser");
+
+    const artifactBrowserTab = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Artifact Browser",
+    );
+    expect(artifactBrowserTab).toBeDefined();
+
+    await act(async () => {
+      artifactBrowserTab?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Artifact Browser");
+
+    const datasetPreparationTab = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Dataset Preparation",
+    );
+    expect(datasetPreparationTab).toBeDefined();
+
+    await act(async () => {
+      datasetPreparationTab?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Python Runtime");
+
+    const settingsButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Settings",
+    );
+    expect(settingsButton).toBeDefined();
+
+    await act(async () => {
+      settingsButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Manage global desktop defaults used by feature workflows.");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "System",

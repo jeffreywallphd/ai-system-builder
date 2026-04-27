@@ -10,6 +10,12 @@ function setInputValue(input: HTMLInputElement, value: string): void {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+function setSelectValue(select: HTMLSelectElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value");
+  descriptor?.set?.call(select, value);
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 describe("Desktop ArtifactBrowserFeature publish flow", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
@@ -64,6 +70,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      readArtifactMedia: vi.fn().mockResolvedValue({ mediaType: "text/plain", bytes: new Uint8Array([97]) }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -159,6 +166,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      readArtifactMedia: vi.fn().mockResolvedValue({ mediaType: "text/plain", bytes: new Uint8Array([97]) }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -209,6 +217,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      readArtifactMedia: vi.fn().mockResolvedValue({ mediaType: "text/plain", bytes: new Uint8Array([97]) }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn(),
       clearHuggingFaceToken: vi.fn(),
@@ -229,7 +238,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     expect(container.textContent).toContain("Artifact Browser");
-    expect(container.textContent).not.toContain("Hugging Face token");
+    expect(container.textContent).toContain("Hugging Face settings");
     expect(container.textContent).not.toContain("Register from Hugging Face");
   });
 
@@ -252,6 +261,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      readArtifactMedia: vi.fn().mockResolvedValue({ mediaType: "text/plain", bytes: new Uint8Array([97]) }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn(),
       clearHuggingFaceToken: vi.fn(),
@@ -302,6 +312,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn(),
+      readArtifactMedia: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn(),
       clearHuggingFaceToken: vi.fn(),
@@ -367,6 +378,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn(),
+      readArtifactMedia: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn(),
       clearHuggingFaceToken: vi.fn(),
@@ -404,7 +416,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     expect(client.deleteUnregisteredArtifact).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("typed confirmation must be exactly Delete");
+    expect(container.textContent).toContain("Type Delete to confirm this destructive action.");
 
     const cancelButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Cancel") as HTMLButtonElement;
@@ -427,6 +439,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       }),
       readArtifactContent: vi.fn().mockResolvedValue({ locator: { storageKey: "uploads/cat.png" }, availability: "available" as const, retrieval: "deferred" as const }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      readArtifactMedia: vi.fn().mockResolvedValue({ mediaType: "text/plain", bytes: new Uint8Array([97]) }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn(),
       clearHuggingFaceToken: vi.fn(),
@@ -471,7 +484,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
 
     expect(promptSpy).not.toHaveBeenCalled();
     expect(client.deleteRegisteredArtifact).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("typed confirmation must be exactly Delete");
+    expect(container.textContent).toContain("Type Delete to confirm this destructive action.");
   });
 
   it("deletes registered artifact only after exact typed confirmation", async () => {
@@ -484,6 +497,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       }),
       readArtifactContent: vi.fn().mockResolvedValue({ locator: { storageKey: "uploads/cat.png" }, availability: "available" as const, retrieval: "deferred" as const }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      readArtifactMedia: vi.fn().mockResolvedValue({ mediaType: "text/plain", bytes: new Uint8Array([97]) }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn(),
       clearHuggingFaceToken: vi.fn(),
@@ -529,12 +543,13 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
   });
 
 
-  it("renders family filter options and requests filtered browse", async () => {
+  it("renders family filter select and requests filtered browse", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([]),
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn(),
+      readArtifactMedia: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn(),
       clearHuggingFaceToken: vi.fn(),
@@ -555,12 +570,13 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     expect(container.textContent).toContain("Filter by family");
-    expect(container.textContent).toContain("All");
-    expect(container.textContent).toContain("structured-text");
+    const familySelect = container.querySelector("select") as HTMLSelectElement;
+    expect(familySelect).toBeTruthy();
+    expect(Array.from(familySelect.options).map((option) => option.value)).toContain("all");
+    expect(Array.from(familySelect.options).map((option) => option.value)).toContain("structured-text");
 
-    const tabularFilter = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "tabular") as HTMLButtonElement;
     await act(async () => {
-      tabularFilter.click();
+      setSelectValue(familySelect, "tabular");
     });
 
     expect(client.browseArtifacts).toHaveBeenCalledWith({ artifactFamily: "tabular" });
@@ -592,6 +608,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      readArtifactMedia: vi.fn().mockResolvedValue({ mediaType: "text/plain", bytes: new Uint8Array([97]) }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -671,6 +688,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
           retrieval: "deferred" as const,
         }),
       createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+      readArtifactMedia: vi.fn().mockResolvedValue({ mediaType: "text/plain", bytes: new Uint8Array([97]) }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -810,4 +828,141 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     expect(container.textContent).toContain("Re-check source backing");
     expect(container.textContent).toContain("Localize artifact");
   });
+});
+
+it("renders website capture metadata and HTML source preview for website-ingested artifacts", async () => {
+  const client = {
+    browseArtifacts: vi.fn().mockResolvedValue([
+      { storageKey: "staged/website/example.com/index.html", artifactFamily: "structured-text" as const, mediaType: "text/html" },
+    ]),
+    readArtifactDetail: vi.fn().mockResolvedValue({
+      locator: { storageKey: "staged/website/example.com/index.html" },
+      artifactFamily: "structured-text" as const,
+      mediaType: "text/html",
+      sourceKind: "scrape",
+      metadata: {
+        websiteCapture: {
+          sourceUrl: "https://example.com",
+          resolvedUrl: "https://example.com/",
+          requestedMode: "automatic",
+          acquisitionMechanismUsed: "simple-http",
+          retrievedAt: "2026-04-18T00:00:00.000Z",
+          httpStatus: 200,
+          contentTypeHeader: "text/html; charset=utf-8",
+        },
+      },
+    }),
+    readArtifactContent: vi.fn().mockResolvedValue({
+      locator: { storageKey: "staged/website/example.com/index.html" },
+      mediaType: "text/html",
+      availability: "available" as const,
+      retrieval: "deferred" as const,
+    }),
+    createArtifactMediaViewUrl: vi.fn().mockResolvedValue("blob:desktop-preview"),
+    readArtifactMedia: vi.fn().mockResolvedValue({
+      mediaType: "text/html",
+      bytes: new TextEncoder().encode("<html><body><h1>Hello</h1></body></html>"),
+    }),
+    getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+    setHuggingFaceToken: vi.fn(),
+    clearHuggingFaceToken: vi.fn(),
+    publishArtifactToHuggingFace: vi.fn(),
+    verifyPublishedArtifactBacking: vi.fn(),
+    registerArtifactFromRepo: vi.fn(),
+    localizeArtifactFromRepo: vi.fn(),
+  };
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  await act(async () => {
+    root.render(<ArtifactBrowserFeature client={client} />);
+  });
+
+  const artifactButton = Array.from(container.querySelectorAll("button"))
+    .find((button) => button.textContent?.includes("staged/website/example.com/index.html")) as HTMLButtonElement;
+
+  await act(async () => {
+    artifactButton.click();
+  });
+
+  expect(container.textContent).toContain("Website capture metadata");
+  expect(container.textContent).toContain("https://example.com/");
+  expect(container.textContent).toContain("simple-http");
+  expect(container.textContent).toContain("HTML source preview");
+  expect(container.textContent).toContain("<html><body><h1>Hello</h1></body></html>");
+  expect(client.createArtifactMediaViewUrl).not.toHaveBeenCalled();
+  expect(client.readArtifactMedia).toHaveBeenCalledWith({ storageKey: "staged/website/example.com/index.html" });
+
+  await act(async () => {
+    root.unmount();
+  });
+  container.remove();
+});
+
+it("revokes prior object URLs when image preview selection changes and on unmount", async () => {
+  const revokeObjectURL = vi.fn();
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: revokeObjectURL,
+  });
+
+  const client = {
+    browseArtifacts: vi.fn().mockResolvedValue([
+      { storageKey: "uploads/cat-1.png", artifactFamily: "image" as const, mediaType: "image/png" },
+      { storageKey: "uploads/cat-2.png", artifactFamily: "image" as const, mediaType: "image/png" },
+    ]),
+    readArtifactDetail: vi.fn().mockImplementation(async ({ storageKey }: { storageKey: string }) => ({
+      locator: { storageKey },
+      artifactFamily: "image" as const,
+      mediaType: "image/png",
+    })),
+    readArtifactContent: vi.fn().mockResolvedValue({
+      locator: { storageKey: "uploads/cat-1.png" },
+      mediaType: "image/png",
+      availability: "available" as const,
+      retrieval: "deferred" as const,
+    }),
+    createArtifactMediaViewUrl: vi.fn()
+      .mockResolvedValueOnce("blob:desktop-preview-1")
+      .mockResolvedValueOnce("blob:desktop-preview-2"),
+    readArtifactMedia: vi.fn(),
+    getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+    setHuggingFaceToken: vi.fn(),
+    clearHuggingFaceToken: vi.fn(),
+    publishArtifactToHuggingFace: vi.fn(),
+    verifyPublishedArtifactBacking: vi.fn(),
+    registerArtifactFromRepo: vi.fn(),
+    localizeArtifactFromRepo: vi.fn(),
+  };
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  await act(async () => {
+    root.render(<ArtifactBrowserFeature client={client} />);
+  });
+
+  const first = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("cat-1")) as HTMLButtonElement;
+  const second = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("cat-2")) as HTMLButtonElement;
+
+  await act(async () => {
+    first.click();
+  });
+
+  await act(async () => {
+    second.click();
+  });
+
+  expect(revokeObjectURL).toHaveBeenCalledWith("blob:desktop-preview-1");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  expect(revokeObjectURL).toHaveBeenCalledWith("blob:desktop-preview-2");
+  container.remove();
 });

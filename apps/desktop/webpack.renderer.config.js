@@ -19,6 +19,10 @@ module.exports = {
         test: /\.css$/,
         use: ['style-loader', 'css-loader'],
       },
+      {
+        test: /\.(png|svg)$/i,
+        type: "asset/resource",
+      },
     ],
   },
   resolve: {

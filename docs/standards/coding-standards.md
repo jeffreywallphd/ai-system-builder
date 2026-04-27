@@ -35,6 +35,8 @@ Prefer explicit, readable code over compact or clever patterns.
 
 If a reader needs deep context to understand a function, simplify it.
 
+Make sure that all code files are commented using best practices in code commenting.
+
 ## Abstraction restraint
 
 This repository explicitly avoids speculative abstraction.

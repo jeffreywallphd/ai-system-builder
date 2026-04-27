@@ -25,6 +25,7 @@ At the same time, fully rejecting non-Node runtimes would unnecessarily block in
 - Runtime operation identity must use shared operation identity helpers (`lowercase.dot.segments`) to prevent per-adapter naming drift.
 - Runtime diagnostics must remain a specialization of shared logging diagnostics (`StructuredLogDiagnosticFields`) and be mechanically mappable to `StructuredLogEvent`.
 - Runtime diagnostic event names must stay in the `runtime.*` namespace; alternative runtime-only diagnostic vocabularies are out of bounds.
+- All additional runtimes should have appropriate .gitignore rules
 
 Preferred implementation model:
 

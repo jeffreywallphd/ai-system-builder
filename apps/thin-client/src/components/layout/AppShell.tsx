@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { ThinClientPageDefinition, ThinClientPageKey } from "../../routes/thinClientPages";
+import appLogoSrc from "../../../../../modules/ui/shared/assets/branding/logo.svg";
 
 export interface AppShellProps {
   activePage: ThinClientPageKey;
@@ -12,12 +13,14 @@ export interface AppShellProps {
 export function AppShell({ activePage, onNavigate, pages, children }: AppShellProps) {
   return (
     <main className="ui-shell">
-      <div className="ui-container ui-stack ui-stack--md">
-        <header className="ui-panel ui-stack ui-stack--xs">
-          <h1>AI System Builder Thin Client</h1>
-          <p className="ui-text-muted">
-            Server-backed host surface using feature-local HTTP API clients.
-          </p>
+      <header className="ui-shell__header">
+        <div className="ui-container ui-shell__header-inner">
+          <div className="ui-shell__brand">
+            <span className="ui-shell__logo-frame">
+              <img className="ui-shell__logo-image" src={appLogoSrc} alt="AI System Builder logo" />
+            </span>
+            <h1 className="ui-shell__title">AI System Builder</h1>
+          </div>
           <nav className="ui-shell__nav" aria-label="Primary">
             {pages.map((page) => (
               <button
@@ -31,7 +34,9 @@ export function AppShell({ activePage, onNavigate, pages, children }: AppShellPr
               </button>
             ))}
           </nav>
-        </header>
+        </div>
+      </header>
+      <div className="ui-container ui-stack ui-stack--md ui-shell__main">
         {children}
       </div>
     </main>

@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -215,4 +215,134 @@ describe("useArtifactUploadFeature", () => {
 
     expect(container.querySelector("[data-testid='status']")?.textContent).toBe("success");
   });
+});
+
+interface WebsiteHookProbeProps {
+  client: ArtifactUploadClient;
+  onUploadComplete?: () => void;
+  initialBatchInput?: string;
+}
+
+function WebsiteHookProbe({ client, onUploadComplete, initialBatchInput }: WebsiteHookProbeProps) {
+  const {
+    websiteSingleUrl,
+    websiteBatchInput,
+    websiteSingleViewState,
+    websiteBatchViewState,
+    setWebsiteSingleUrl,
+    setWebsiteBatchInput,
+    ingestWebsiteSingle,
+    ingestWebsiteBatch,
+  } = useArtifactUploadFeature(client, onUploadComplete);
+
+  useEffect(() => {
+    if (initialBatchInput) {
+      setWebsiteBatchInput(initialBatchInput);
+    }
+  }, [initialBatchInput, setWebsiteBatchInput]);
+
+  return (
+    <div>
+      <input data-testid="single-url" value={websiteSingleUrl} onChange={(event) => setWebsiteSingleUrl(event.target.value)} />
+      <textarea data-testid="batch-urls" value={websiteBatchInput} onChange={(event) => setWebsiteBatchInput(event.target.value)} />
+      <button data-testid="set-single" type="button" onClick={() => setWebsiteSingleUrl("https://example.com")}>set-single</button>
+      <button data-testid="set-batch" type="button" onClick={() => setWebsiteBatchInput("https://example.com/a\n\nhttps://example.com/b")}>set-batch</button>
+      <button data-testid="ingest-single" type="button" onClick={() => void ingestWebsiteSingle()}>single</button>
+      <button data-testid="ingest-batch" type="button" onClick={() => void ingestWebsiteBatch()}>batch</button>
+      <p data-testid="single-status">{websiteSingleViewState.status}</p>
+      <p data-testid="batch-status">{websiteBatchViewState.status}</p>
+      <p data-testid="batch-message">{websiteBatchViewState.message ?? ""}</p>
+    </div>
+  );
+}
+
+it("submits single website ingestion and refreshes upload browser on success", async () => {
+  const onUploadComplete = vi.fn();
+  const ingestWebsitePage = vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      target: { url: "https://example.com" },
+      resolvedUrl: "https://example.com",
+      acquisitionMechanismUsed: "simple-http",
+      stagedArtifact: { sourceKind: "scrape", storage: { key: "staged/website/example.com/index.html" } },
+    },
+  });
+  const client: ArtifactUploadClient = {
+    uploadArtifact: vi.fn(),
+    getAcceptedTypes: vi.fn().mockResolvedValue({ acceptedExtensions: [".html"], acceptedMediaTypes: ["text/html"] }),
+    ingestWebsitePage,
+    ingestWebsitePagesBatch: vi.fn(),
+  };
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  await act(async () => {
+    root.render(<WebsiteHookProbe client={client} onUploadComplete={onUploadComplete} />);
+  });
+
+  await act(async () => {
+    (container.querySelector("[data-testid='set-single']") as HTMLButtonElement).click();
+  });
+  await act(async () => {
+    (container.querySelector("[data-testid='ingest-single']") as HTMLButtonElement).click();
+  });
+
+  expect(ingestWebsitePage).toHaveBeenCalledWith({ url: "https://example.com", mode: "automatic" });
+  expect(onUploadComplete).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    root.unmount();
+  });
+  container.remove();
+});
+
+it("submits website batch ingestion, renders summary message, and triggers one refresh callback", async () => {
+  const onUploadComplete = vi.fn();
+  const ingestWebsitePagesBatch = vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      items: [
+        { target: { url: "https://example.com/a" }, ok: true, result: { target: { url: "https://example.com/a" }, resolvedUrl: "https://example.com/a", acquisitionMechanismUsed: "simple-http", stagedArtifact: { sourceKind: "scrape", storage: { key: "staged/website/example.com/a.html" } } } },
+        { target: { url: "https://example.com/b" }, ok: true, result: { target: { url: "https://example.com/b" }, resolvedUrl: "https://example.com/b", acquisitionMechanismUsed: "simple-http", stagedArtifact: { sourceKind: "scrape", storage: { key: "staged/website/example.com/b.html" } } } },
+      ],
+      summary: { attempted: 2, succeeded: 2, failed: 0 },
+    },
+  });
+  const client: ArtifactUploadClient = {
+    uploadArtifact: vi.fn(),
+    getAcceptedTypes: vi.fn().mockResolvedValue({ acceptedExtensions: [".html"], acceptedMediaTypes: ["text/html"] }),
+    ingestWebsitePage: vi.fn(),
+    ingestWebsitePagesBatch,
+  };
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  await act(async () => {
+    root.render(<WebsiteHookProbe client={client} onUploadComplete={onUploadComplete} initialBatchInput={"https://example.com/a\n\nhttps://example.com/b"} />);
+  });
+
+  await act(async () => {
+    const textarea = container.querySelector("[data-testid='batch-urls']") as HTMLTextAreaElement;
+    textarea.value = "https://example.com/a\n\nhttps://example.com/b";
+    textarea.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await act(async () => {
+    (container.querySelector("[data-testid='ingest-batch']") as HTMLButtonElement).click();
+  });
+
+  expect(ingestWebsitePagesBatch).toHaveBeenCalledWith({
+    targets: [{ url: "https://example.com/a" }, { url: "https://example.com/b" }],
+    mode: "automatic",
+  });
+  expect(container.querySelector("[data-testid='batch-message']")?.textContent).toContain("2/2 succeeded");
+  expect(onUploadComplete).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    root.unmount();
+  });
+  container.remove();
 });

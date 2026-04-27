@@ -102,8 +102,35 @@ describe("desktop artifact upload end-to-end", () => {
 
     registerElectronIpc({
       ipcMain,
+      pythonRuntime: {
+        startPythonRuntime: async () => undefined,
+        stopPythonRuntime: async () => undefined,
+        restartPythonRuntime: async () => undefined,
+        readPythonRuntimeStatus: async () => ({
+          supervisorStatus: "stopped",
+          healthy: false,
+          runtimeStatus: "stopped",
+          capabilities: [],
+          logs: [],
+        }),
+      },
+      getHuggingFaceTokenStatus: () => ({ configured: false }),
+      setHuggingFaceToken: () => ({ configured: true, maskedToken: "****0000" }),
+      clearHuggingFaceToken: () => ({ configured: false }),
       storeArtifactUploadUseCase: useCase,
       browseArtifactsUseCase: {
+        execute: async () => unavailableResult,
+      },
+      browseUnregisteredArtifactsUseCase: {
+        execute: async () => unavailableResult,
+      },
+      registerUnregisteredArtifactUseCase: {
+        execute: async () => unavailableResult,
+      },
+      deleteUnregisteredArtifactUseCase: {
+        execute: async () => unavailableResult,
+      },
+      deleteRegisteredArtifactUseCase: {
         execute: async () => unavailableResult,
       },
       readArtifactDetailUseCase: {
@@ -128,6 +155,21 @@ describe("desktop artifact upload end-to-end", () => {
         execute: async () => unavailableResult,
       },
       localizeArtifactFromRepoUseCase: {
+        execute: async () => unavailableResult,
+      },
+      browseHuggingFaceNamespaceDatasetsUseCase: {
+        execute: async () => unavailableResult,
+      },
+      browseHuggingFaceDatasetParquetFilesUseCase: {
+        execute: async () => unavailableResult,
+      },
+      ingestWebsitePageUseCase: {
+        execute: async () => unavailableResult,
+      },
+      ingestWebsitePagesBatchUseCase: {
+        execute: async () => unavailableResult,
+      },
+      prepareTrainingDatasetFromArtifactsUseCase: {
         execute: async () => unavailableResult,
       },
     });
