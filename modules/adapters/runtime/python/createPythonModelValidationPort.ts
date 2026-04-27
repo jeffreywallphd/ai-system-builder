@@ -28,6 +28,7 @@ export function createPythonModelValidationPort(
         payload: {
           modelRecordId: request.modelRecordId,
           modelPath: request.modelPath,
+          reportOutputDirectory: request.reportOutputDirectory,
           expectedLoRA: request.expectedLoRA,
           expectedRecurrentAdditions: request.expectedRecurrentAdditions,
           validationStrictness: request.validationStrictness,

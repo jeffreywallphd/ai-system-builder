@@ -101,6 +101,23 @@ function createWarningModelClientDouble() {
   return client;
 }
 
+function createValidModelClientDouble() {
+  const client = createClientDouble();
+  client.listModels = vi.fn().mockResolvedValue([
+    {
+      modelRecordId: "generated-valid-1",
+      displayName: "Generated Valid Model",
+      source: "generated",
+      lifecycleStatus: "validated",
+      artifactForm: "adapter",
+      provider: "unknown",
+      validationStatus: "valid",
+      createdAt: "2026-04-27T00:00:00.000Z",
+    },
+  ]);
+  return client;
+}
+
 describe("ModelsFeature", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
@@ -199,6 +216,66 @@ describe("ModelsFeature", () => {
 
     expect(container.textContent).toContain("Warning validation is not safely publishable by default.");
     const publishButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    expect(publishButton.disabled).toBe(true);
+  });
+
+  it("keeps publish disabled when repository is blank even for valid models", async () => {
+    const client = createValidModelClientDouble();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ModelsFeature client={client as never} />);
+      await flushUi();
+    });
+
+    const manageTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Manage Models");
+    await act(async () => {
+      manageTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    const detailsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Details") as HTMLButtonElement;
+    await act(async () => {
+      detailsButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    const publishButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    expect(publishButton.disabled).toBe(true);
+  });
+
+  it("shows repository input before publish action", async () => {
+    const client = createValidModelClientDouble();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ModelsFeature client={client as never} />);
+      await flushUi();
+    });
+
+    const manageTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Manage Models");
+    await act(async () => {
+      manageTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    const detailsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Details") as HTMLButtonElement;
+    await act(async () => {
+      detailsButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    const repositoryInput = container.querySelector("input[placeholder='owner/model-name']") as HTMLInputElement;
+    const publishButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    expect(repositoryInput.compareDocumentPosition(publishButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(publishButton.disabled).toBe(true);
   });
 });

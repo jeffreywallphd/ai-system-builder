@@ -29,6 +29,7 @@ export class PublishModelUseCase {
 
     let validationStatus = model.validationStatus;
     let validationResult: Awaited<ReturnType<ModelValidationPort["validateModel"]>> | undefined;
+    let latestMetadata: Record<string, unknown> = { ...(model.metadata ?? {}) };
 
     if (request.forceRevalidate || !hasCurrentValidation) {
       validationResult = await this.dependencies.modelValidation.validateModel({
@@ -37,28 +38,36 @@ export class PublishModelUseCase {
         validationStrictness: "publish",
       });
       validationStatus = validationResult.status;
+      latestMetadata = {
+        ...latestMetadata,
+        validationDiffPath: validationResult.diffPath,
+        validationWarnings: validationResult.warnings,
+        validationErrors: validationResult.errors,
+        shardCount: validationResult.shardCount,
+        validatedModelPath: validationResult.validatedModelPath ?? model.localPath,
+        validatedAt: validationResult.validatedAt ?? new Date().toISOString(),
+        validationStrictness: validationResult.validationStrictness ?? "publish",
+        tensorChecksCompleted: validationResult.tensorChecksCompleted,
+      };
       await this.dependencies.modelRegistry.updateModelRecord({
         modelRecordId: request.modelRecordId,
         patch: {
           validationStatus: validationResult.status,
           validationReportPath: validationResult.reportPath,
           serializationFormat: validationResult.serializationFormat,
-          metadata: {
-            ...(model.metadata ?? {}),
-            validationDiffPath: validationResult.diffPath,
-            validationWarnings: validationResult.warnings,
-            validationErrors: validationResult.errors,
-            shardCount: validationResult.shardCount,
-            validatedModelPath: validationResult.validatedModelPath ?? model.localPath,
-            validatedAt: validationResult.validatedAt ?? new Date().toISOString(),
-            validationStrictness: validationResult.validationStrictness ?? "publish",
-            tensorChecksCompleted: validationResult.tensorChecksCompleted,
-          },
+          metadata: latestMetadata,
         },
       });
     }
 
-    if (!request.allowInvalid && validationStatus !== "valid") {
+    const allowWarningValidation = request.allowWarningValidation ?? request.allowInvalid === true;
+    const allowInvalidValidation = request.allowInvalidValidation ?? request.allowInvalid === true;
+    const isWarning = validationStatus === "warning";
+    const isInvalid = validationStatus === "invalid";
+    const isPublishBlocked = validationStatus !== "valid"
+      && ((isWarning && !allowWarningValidation) || (isInvalid && !allowInvalidValidation) || (!isWarning && !isInvalid));
+
+    if (isPublishBlocked) {
       throw new Error(`Model '${request.modelRecordId}' failed validation and cannot be published without override.`);
     }
 
@@ -79,7 +88,7 @@ export class PublishModelUseCase {
           publishedAt,
         },
         metadata: {
-          ...(model.metadata ?? {}),
+          ...latestMetadata,
           publishedProvider: published.provider,
           publishedRepository: published.repository,
           publishedRevision: published.revision,

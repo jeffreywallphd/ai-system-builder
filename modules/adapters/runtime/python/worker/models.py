@@ -236,6 +236,7 @@ class TrainModelTaskResult(BaseModel):
 class ValidateModelTaskRequest(BaseModel):
     modelRecordId: str
     modelPath: str
+    reportOutputDirectory: str | None = None
     expectedLoRA: bool | None = None
     expectedRecurrentAdditions: bool | None = None
     validationStrictness: Literal["normal", "publish"] | None = None

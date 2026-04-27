@@ -23,6 +23,7 @@ export interface ModelValidationSummary {
 export interface ValidateModelRequest {
   modelRecordId: string;
   modelPath?: string;
+  reportOutputDirectory?: string;
   expectedLoRA?: boolean;
   expectedRecurrentAdditions?: boolean;
   allowWarnings?: boolean;

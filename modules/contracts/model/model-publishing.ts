@@ -8,6 +8,9 @@ export interface PublishModelRequest {
   private?: boolean;
   pathPrefix?: string;
   token?: string;
+  allowWarningValidation?: boolean;
+  allowInvalidValidation?: boolean;
+  /** @deprecated Use allowWarningValidation and/or allowInvalidValidation instead. */
   allowInvalid?: boolean;
   forceRevalidate?: boolean;
 }
