@@ -33,18 +33,25 @@ export class PublishModelUseCase {
       ...request,
       modelPath: model.localPath,
     });
+    const publishedAt = new Date().toISOString();
 
     await this.dependencies.modelRegistry.updateModelRecord({
       modelRecordId: request.modelRecordId,
       patch: {
-        provider: "huggingface",
-        source: "huggingface",
-        lifecycleStatus: "validated",
-        modelId: request.repository,
+        published: {
+          provider: published.provider,
+          repository: published.repository,
+          revision: published.revision,
+          url: published.url,
+          publishedAt,
+        },
         metadata: {
           ...(model.metadata ?? {}),
-          publishedRepo: request.repository,
-          publishedRevision: request.revision,
+          publishedProvider: published.provider,
+          publishedRepository: published.repository,
+          publishedRevision: published.revision,
+          publishedUrl: published.url,
+          publishedAt,
         },
       },
     });

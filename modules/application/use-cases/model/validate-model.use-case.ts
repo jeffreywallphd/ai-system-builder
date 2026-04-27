@@ -20,13 +20,17 @@ export class ValidateModelUseCase {
       modelPath: request.modelPath ?? model.localPath,
     });
 
+    const nextLifecycleStatus = result.status === "valid"
+      ? "validated"
+      : (result.status === "invalid" ? "invalid" : model.lifecycleStatus);
+
     await this.dependencies.modelRegistry.updateModelRecord({
       modelRecordId: request.modelRecordId,
       patch: {
         validationStatus: result.status,
         validationReportPath: result.reportPath,
         serializationFormat: result.serializationFormat,
-        lifecycleStatus: result.status === "invalid" ? "invalid" : "validated",
+        lifecycleStatus: nextLifecycleStatus,
         metadata: {
           ...(model.metadata ?? {}),
           validationDiffPath: result.diffPath,
