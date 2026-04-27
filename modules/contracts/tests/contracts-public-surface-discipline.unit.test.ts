@@ -16,6 +16,7 @@ const CONTRACT_FAMILIES = [
   "ipc",
   "lineage",
   "logging",
+  "model",
   "persistence",
   "runtime",
   "settings",
