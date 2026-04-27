@@ -174,6 +174,9 @@ import {
   DESKTOP_MODEL_REFERENCE_SAVE_OPERATION,
   DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
   DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_DOWNLOAD_OPERATION,
+  DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DOWNLOAD_RESPONSE_CHANNEL,
   DESKTOP_MODEL_RECORD_UPDATE_OPERATION,
   DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL,
@@ -184,6 +187,7 @@ import {
   createDesktopModelDetailsReadRequest,
   createDesktopModelListRequest,
   createDesktopModelReferenceSaveRequest,
+  createDesktopModelDownloadRequest,
   createDesktopModelRecordUpdateRequest,
   createDesktopModelRecordDeleteRequest,
   createDesktopModelTrainRequest,
@@ -193,6 +197,7 @@ import {
   type DesktopModelDetailsReadResponse,
   type DesktopModelListResponse,
   type DesktopModelReferenceSaveResponse,
+  type DesktopModelDownloadResponse,
   type DesktopModelRecordUpdateResponse,
   type DesktopModelRecordDeleteResponse,
   type DesktopModelTrainResponse,
@@ -410,6 +415,10 @@ export interface DesktopPreloadApi {
     input: Parameters<typeof createDesktopModelReferenceSaveRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopModelReferenceSaveResponse>;
+  downloadModel: (
+    input: Parameters<typeof createDesktopModelDownloadRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelDownloadResponse>;
   updateModelRecord: (
     input: Parameters<typeof createDesktopModelRecordUpdateRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
@@ -1134,6 +1143,18 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_MODEL_REFERENCE_SAVE_OPERATION,
         channel: DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop model reference-save IPC response envelope.",
+      });
+    },
+    async downloadModel(input, context = {}) {
+      const request = createDesktopModelDownloadRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelDownloadResponse>(response, {
+        operation: DESKTOP_MODEL_DOWNLOAD_OPERATION,
+        channel: DESKTOP_MODEL_DOWNLOAD_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model download IPC response envelope.",
       });
     },
     async updateModelRecord(input, context = {}) {

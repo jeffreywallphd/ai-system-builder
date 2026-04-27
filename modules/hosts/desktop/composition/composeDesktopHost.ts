@@ -28,6 +28,7 @@ import {
   GetModelDetailsUseCase,
   ListModelsUseCase,
   SaveModelReferenceUseCase,
+  DownloadModelUseCase,
   UpdateModelRecordUseCase,
   DeleteModelRecordUseCase,
   TrainModelUseCase,
@@ -646,6 +647,15 @@ export function composeDesktopHost(
       const saveModelReference = new SaveModelReferenceUseCase({
         modelRegistry,
       });
+      const downloadModel = new DownloadModelUseCase({
+        modelRegistry,
+        modelDownloader: {
+          ensureModelDownloaded: async (request) => {
+            await pythonRuntimeFoundation.supervisor.start();
+            return pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+          },
+        },
+      });
       const updateModelRecord = new UpdateModelRecordUseCase({
         modelRegistry,
       });
@@ -717,6 +727,7 @@ export function composeDesktopHost(
         getModelDetailsUseCase: getModelDetails,
         listModelsUseCase: listModels,
         saveModelReferenceUseCase: saveModelReference,
+        downloadModelUseCase: downloadModel,
         updateModelRecordUseCase: updateModelRecord,
         deleteModelRecordUseCase: deleteModelRecord,
         trainModelUseCase: trainModel,

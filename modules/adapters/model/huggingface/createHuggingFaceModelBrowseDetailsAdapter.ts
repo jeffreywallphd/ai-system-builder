@@ -124,6 +124,29 @@ function inferDisplayName(modelId: string): string {
   return segments[segments.length - 1] ?? modelId;
 }
 
+function looksLikeOpaqueProviderId(value: string): boolean {
+  return /^[a-f0-9]{24}$/i.test(value);
+}
+
+function selectProviderModelId(entry: HuggingFaceModelListEntry): string | undefined {
+  const explicitModelId = toOptionalText(entry.modelId);
+  if (explicitModelId) {
+    return explicitModelId;
+  }
+
+  const name = toOptionalText(entry.name);
+  if (name && (name.includes("/") || !looksLikeOpaqueProviderId(name))) {
+    return name;
+  }
+
+  const id = toOptionalText(entry.id);
+  if (id && (id.includes("/") || !looksLikeOpaqueProviderId(id))) {
+    return id;
+  }
+
+  return name ?? id;
+}
+
 function inferAuthorOrOrg(modelId: string, explicitAuthor?: string): string | undefined {
   const normalizedExplicit = toOptionalText(explicitAuthor);
   if (normalizedExplicit) {
@@ -139,7 +162,7 @@ function inferAuthorOrOrg(modelId: string, explicitAuthor?: string): string | un
 }
 
 function toModelBrowseItem(entry: HuggingFaceModelListEntry): ModelBrowseItem {
-  const modelId = toOptionalText(entry.id) ?? toOptionalText(entry.modelId) ?? toOptionalText(entry.name);
+  const modelId = selectProviderModelId(entry);
   if (!modelId) {
     throw new Error("Hugging Face listModels entry did not include a model id.");
   }

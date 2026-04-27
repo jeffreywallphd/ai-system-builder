@@ -3,6 +3,8 @@ import type {
   BrowseModelsResult,
   DeleteModelRecordRequest,
   DeleteModelRecordResult,
+  DownloadModelRequest,
+  DownloadModelResult,
   GetModelDetailsRequest,
   GetModelDetailsResult,
   ListModelsRequest,
@@ -27,6 +29,7 @@ export const DESKTOP_MODEL_BROWSE_OPERATION = createTransportOperation("model", 
 export const DESKTOP_MODEL_DETAILS_READ_OPERATION = createTransportOperation("model", "details-read");
 export const DESKTOP_MODEL_LIST_OPERATION = createTransportOperation("model", "list");
 export const DESKTOP_MODEL_REFERENCE_SAVE_OPERATION = createTransportOperation("model", "reference-save");
+export const DESKTOP_MODEL_DOWNLOAD_OPERATION = createTransportOperation("model", "download");
 export const DESKTOP_MODEL_RECORD_UPDATE_OPERATION = createTransportOperation("model", "record-update");
 export const DESKTOP_MODEL_RECORD_DELETE_OPERATION = createTransportOperation("model", "record-delete");
 export const DESKTOP_MODEL_TRAIN_OPERATION = createTransportOperation("model", "train");
@@ -41,6 +44,8 @@ export const DESKTOP_MODEL_LIST_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL
 export const DESKTOP_MODEL_LIST_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_LIST_OPERATION, "response");
 export const DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_REFERENCE_SAVE_OPERATION, "request");
 export const DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_REFERENCE_SAVE_OPERATION, "response");
+export const DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_DOWNLOAD_OPERATION, "request");
+export const DESKTOP_MODEL_DOWNLOAD_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_DOWNLOAD_OPERATION, "response");
 export const DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_RECORD_UPDATE_OPERATION, "request");
 export const DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_RECORD_UPDATE_OPERATION, "response");
 export const DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_RECORD_DELETE_OPERATION, "request");
@@ -103,6 +108,19 @@ export type DesktopModelReferenceSaveResponse = IpcResponse<
   typeof DESKTOP_MODEL_REFERENCE_SAVE_OPERATION,
   Record<string, never>,
   typeof DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL.value
+>;
+export type DesktopModelDownloadRequest = IpcRequest<
+  DownloadModelRequest,
+  typeof DESKTOP_MODEL_DOWNLOAD_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL.value
+>;
+export type DesktopModelDownloadResponse = IpcResponse<
+  DownloadModelResult,
+  Record<string, unknown>,
+  typeof DESKTOP_MODEL_DOWNLOAD_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_MODEL_DOWNLOAD_RESPONSE_CHANNEL.value
 >;
 export type DesktopModelRecordUpdateRequest = IpcRequest<
   UpdateModelRecordRequest,
@@ -194,6 +212,12 @@ export function createDesktopModelReferenceSaveRequest(payload: SaveModelReferen
 }
 export function createDesktopModelReferenceSaveSuccessResponse(result: SaveModelReferenceResult, options?: { requestId?: string; correlationId?: string }): DesktopModelReferenceSaveResponse {
   return createIpcSuccessResponse(DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL, result, options) as DesktopModelReferenceSaveResponse;
+}
+export function createDesktopModelDownloadRequest(payload: DownloadModelRequest, options?: { requestId?: string; correlationId?: string }): DesktopModelDownloadRequest {
+  return createIpcRequest(DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL, payload, options);
+}
+export function createDesktopModelDownloadSuccessResponse(result: DownloadModelResult, options?: { requestId?: string; correlationId?: string }): DesktopModelDownloadResponse {
+  return createIpcSuccessResponse(DESKTOP_MODEL_DOWNLOAD_RESPONSE_CHANNEL, result, options) as DesktopModelDownloadResponse;
 }
 export function createDesktopModelRecordUpdateRequest(payload: UpdateModelRecordRequest, options?: { requestId?: string; correlationId?: string }): DesktopModelRecordUpdateRequest {
   return createIpcRequest(DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL, payload, options);

@@ -26,6 +26,8 @@ import type {
   ModelInventoryRecord,
   DeleteModelRecordRequest,
   DeleteModelRecordResult,
+  DownloadModelRequest,
+  DownloadModelResult,
   ListModelsRequest,
   ModelTrainingRequest,
   ModelTrainingResult,
@@ -367,6 +369,7 @@ interface DesktopApiBridge {
   getModelDetails?: (input: DesktopModelDetailsRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   listModels?: (input?: DesktopModelListRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   saveModelReference?: (input: DesktopSaveModelReferenceRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  downloadModel?: (input: DesktopDownloadModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   updateModelRecord?: (input: DesktopUpdateModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   deleteModelRecord?: (input: DesktopDeleteModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   trainModel?: (input: DesktopModelTrainingRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
@@ -474,6 +477,8 @@ export type DesktopSaveModelReferenceRequest = SaveModelReferenceRequest;
 export interface DesktopSaveModelReferenceResult {
   model: ModelInventoryRecord;
 }
+export type DesktopDownloadModelRequest = DownloadModelRequest;
+export type DesktopDownloadModelResult = DownloadModelResult;
 export type DesktopUpdateModelRecordRequest = UpdateModelRecordRequest;
 export interface DesktopUpdateModelRecordResult {
   model: ModelInventoryRecord;

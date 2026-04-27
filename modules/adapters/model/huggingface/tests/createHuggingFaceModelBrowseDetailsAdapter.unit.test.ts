@@ -60,6 +60,27 @@ describe("createHuggingFaceModelBrowseDetailsAdapter", () => {
     });
   });
 
+  it("prefers human-readable repository ids over opaque provider ids", async () => {
+    const hubClient = createHubClientDouble({
+      listModels: testDouble.fn(async function* () {
+        yield {
+          id: "69e864fd6b68f7e6cfc63ca3",
+          modelId: "sentence-transformers/all-MiniLM-L6-v2",
+          name: "sentence-transformers/all-MiniLM-L6-v2",
+          downloads: 137784,
+          likes: 3003,
+        };
+      }),
+    });
+    const adapter = createHuggingFaceModelBrowseDetailsAdapter({ hubClient });
+
+    const result = await adapter.browseModels({ provider: "huggingface", limit: 25 });
+
+    expect(result.models[0]?.modelId).toBe("sentence-transformers/all-MiniLM-L6-v2");
+    expect(result.models[0]?.displayName).toBe("all-MiniLM-L6-v2");
+    expect(result.models[0]?.authorOrOrg).toBe("sentence-transformers");
+  });
+
   it("maps model details and infers file availability flags", async () => {
     const hubClient = createHubClientDouble();
     const adapter = createHuggingFaceModelBrowseDetailsAdapter({ hubClient });

@@ -62,6 +62,7 @@ export interface RegisterElectronIpcDependencies {
   getModelDetailsUseCase: RegisterModelManagementIpcDependencies["getModelDetailsUseCase"];
   listModelsUseCase: RegisterModelManagementIpcDependencies["listModelsUseCase"];
   saveModelReferenceUseCase: RegisterModelManagementIpcDependencies["saveModelReferenceUseCase"];
+  downloadModelUseCase: RegisterModelManagementIpcDependencies["downloadModelUseCase"];
   updateModelRecordUseCase: RegisterModelManagementIpcDependencies["updateModelRecordUseCase"];
   deleteModelRecordUseCase: RegisterModelManagementIpcDependencies["deleteModelRecordUseCase"];
   trainModelUseCase: RegisterModelManagementIpcDependencies["trainModelUseCase"];
@@ -124,6 +125,7 @@ export function registerElectronIpc(
     getModelDetailsUseCase: dependencies.getModelDetailsUseCase,
     listModelsUseCase: dependencies.listModelsUseCase,
     saveModelReferenceUseCase: dependencies.saveModelReferenceUseCase,
+    downloadModelUseCase: dependencies.downloadModelUseCase,
     updateModelRecordUseCase: dependencies.updateModelRecordUseCase,
     deleteModelRecordUseCase: dependencies.deleteModelRecordUseCase,
     trainModelUseCase: dependencies.trainModelUseCase,

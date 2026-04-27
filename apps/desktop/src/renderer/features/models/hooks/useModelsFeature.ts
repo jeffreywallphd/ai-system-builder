@@ -39,7 +39,9 @@ export function useModelsFeature(client?: DesktopModelsClient) {
   const [browseItems, setBrowseItems] = useState<DesktopModelBrowseItem[]>([]);
   const [selectedBrowseModel, setSelectedBrowseModel] = useState<DesktopModelBrowseItem>();
   const [selectedBrowseModelDetails, setSelectedBrowseModelDetails] = useState<DesktopModelDetailsResult["model"]>();
+  const [detailsState, setDetailsState] = useState<ViewState>({ status: "idle" });
   const [saveState, setSaveState] = useState<ViewState>({ status: "idle" });
+  const [downloadState, setDownloadState] = useState<ViewState>({ status: "idle" });
 
   const [manageState, setManageState] = useState<ViewState>({ status: "idle" });
   const [models, setModels] = useState<DesktopModelInventoryRecord[]>([]);
@@ -63,6 +65,9 @@ export function useModelsFeature(client?: DesktopModelsClient) {
         limit: normalizeOptionalNumber(browseLimit),
       });
       setBrowseItems(result.models);
+      setSelectedBrowseModel(undefined);
+      setSelectedBrowseModelDetails(undefined);
+      setDetailsState({ status: "idle" });
       setBrowseState({ status: "success", message: result.models.length > 0 ? "Loaded model results." : "No model results found." });
     } catch (error) {
       setBrowseState({ status: "error", message: error instanceof Error ? error.message : "Failed to browse models." });
@@ -72,32 +77,36 @@ export function useModelsFeature(client?: DesktopModelsClient) {
   const selectBrowseModel = useCallback(async (model: DesktopModelBrowseItem) => {
     setSelectedBrowseModel(model);
     setSelectedBrowseModelDetails(undefined);
+    setDetailsState({ status: "loading", message: "Loading model details..." });
     try {
       const details = await modelClient.getModelDetails({ provider: "huggingface", modelId: model.modelId });
       setSelectedBrowseModelDetails(details);
-    } catch {
+      setDetailsState({ status: "success", message: "Loaded model details." });
+    } catch (error) {
       setSelectedBrowseModelDetails(undefined);
+      setDetailsState({ status: "error", message: error instanceof Error ? error.message : "Failed to load model details." });
     }
   }, [modelClient]);
 
-  const saveModelReference = useCallback(async () => {
-    if (!selectedBrowseModel) {
+  const saveModelReference = useCallback(async (model?: DesktopModelBrowseItem) => {
+    const modelToSave = model ?? selectedBrowseModel;
+    if (!modelToSave) {
       return;
     }
     setSaveState({ status: "loading", message: "Saving model reference..." });
     try {
       await modelClient.saveModelReference({
-        modelId: selectedBrowseModel.modelId,
-        displayName: selectedBrowseModel.displayName,
-        inferenceMode: selectedBrowseModel.inferenceMode,
-        taskTags: selectedBrowseModel.taskTags,
+        modelId: modelToSave.modelId,
+        displayName: modelToSave.displayName,
+        inferenceMode: modelToSave.inferenceMode,
+        taskTags: modelToSave.taskTags,
         metadata: {
           source: "huggingface",
-          likes: selectedBrowseModel.likes,
-          downloads: selectedBrowseModel.downloads,
-          gated: selectedBrowseModel.gated,
-          private: selectedBrowseModel.private,
-          license: selectedBrowseModel.license,
+          likes: modelToSave.likes,
+          downloads: modelToSave.downloads,
+          gated: modelToSave.gated,
+          private: modelToSave.private,
+          license: modelToSave.license,
         },
       });
       setSaveState({ status: "success", message: "Model reference saved." });
@@ -127,6 +136,34 @@ export function useModelsFeature(client?: DesktopModelsClient) {
   useEffect(() => {
     void refreshModels();
   }, [refreshModels]);
+
+  const downloadModel = useCallback(async (model?: DesktopModelBrowseItem) => {
+    const modelToDownload = model ?? selectedBrowseModel;
+    if (!modelToDownload) {
+      return;
+    }
+    setDownloadState({ status: "loading", message: "Downloading model..." });
+    try {
+      const result = await modelClient.downloadModel({
+        modelId: modelToDownload.modelId,
+        displayName: modelToDownload.displayName,
+        inferenceMode: modelToDownload.inferenceMode,
+        taskTags: modelToDownload.taskTags,
+        metadata: {
+          source: "huggingface",
+          likes: modelToDownload.likes,
+          downloads: modelToDownload.downloads,
+          gated: modelToDownload.gated,
+          private: modelToDownload.private,
+          license: modelToDownload.license,
+        },
+      });
+      setDownloadState({ status: "success", message: `Model downloaded to ${result.download.localPath}.` });
+      await refreshModels();
+    } catch (error) {
+      setDownloadState({ status: "error", message: error instanceof Error ? error.message : "Failed to download model." });
+    }
+  }, [modelClient, refreshModels, selectedBrowseModel]);
 
   const confirmDeleteModelRecord = useCallback(async () => {
     if (!pendingDeleteModelRecordId || deleteConfirmationInput !== "Delete") {
@@ -183,10 +220,13 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     browseItems,
     selectedBrowseModel,
     selectedBrowseModelDetails,
+    detailsState,
     saveState,
+    downloadState,
     searchModels,
     selectBrowseModel,
     saveModelReference,
+    downloadModel,
     manageState,
     models,
     manageSource,

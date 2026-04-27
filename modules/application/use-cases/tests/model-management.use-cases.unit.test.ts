@@ -4,6 +4,7 @@ import type { ArtifactCatalogDeletePort } from "../../ports/artifact-catalog";
 import type { ModelRegistryPort } from "../../ports/model";
 import {
   DeleteModelRecordUseCase,
+  DownloadModelUseCase,
   RegisterDownloadedModelUseCase,
   RegisterGeneratedModelUseCase,
   SaveModelReferenceUseCase,
@@ -75,6 +76,61 @@ describe("model management use cases", () => {
       provider: "huggingface",
       artifactForm: "full-model",
     })).rejects.toThrow("requires localPath or backingArtifactIds");
+  });
+
+  it("downloads a remote Hugging Face model and registers the local cache path", async () => {
+    const registerDownloadedModel = testDouble.fn<ModelRegistryPort["registerDownloadedModel"]>(async (request) => ({
+      model: {
+        modelRecordId: "downloaded-1",
+        displayName: request.displayName,
+        source: "huggingface",
+        lifecycleStatus: "downloaded",
+        artifactForm: request.artifactForm,
+        provider: request.provider,
+        modelId: request.modelId,
+        localPath: request.localPath,
+        createdAt: "2026-04-27T00:00:00.000Z",
+        metadata: request.metadata,
+      },
+    }));
+    const ensureModelDownloaded = testDouble.fn(async () => ({
+      provider: "transformers" as const,
+      modelId: "org/demo-model",
+      downloaded: true,
+      fromCache: false,
+      localPath: "/models/org/demo-model",
+    }));
+    const useCase = new DownloadModelUseCase({
+      modelDownloader: { ensureModelDownloaded },
+      modelRegistry: {
+        listModels: async () => ({ models: [] }),
+        getModelRecord: async () => undefined,
+        saveModelReference: async () => { throw new Error("not used"); },
+        registerDownloadedModel,
+        registerGeneratedModel: async () => { throw new Error("not used"); },
+        updateModelRecord: async () => { throw new Error("not used"); },
+        deleteModelRecord: async () => { throw new Error("not used"); },
+      },
+    });
+
+    const result = await useCase.execute({
+      provider: "huggingface",
+      modelId: " org/demo-model ",
+      displayName: " Demo Model ",
+      inferenceMode: "causal",
+      taskTags: ["text-generation"],
+      metadata: { likes: 10 },
+    });
+
+    expect(ensureModelDownloaded).toHaveBeenCalledWith({ provider: "transformers", modelId: "org/demo-model" });
+    const registerCall = registerDownloadedModel.mock.calls[0]?.[0];
+    expect(registerCall?.displayName).toBe("Demo Model");
+    expect(registerCall?.source).toBe("huggingface");
+    expect(registerCall?.provider).toBe("huggingface");
+    expect(registerCall?.modelId).toBe("org/demo-model");
+    expect(registerCall?.localPath).toBe("/models/org/demo-model");
+    expect(result.model.lifecycleStatus).toBe("downloaded");
+    expect(result.download.localPath).toBe("/models/org/demo-model");
   });
 
   it("registers generated adapter models with run/base linkage", async () => {

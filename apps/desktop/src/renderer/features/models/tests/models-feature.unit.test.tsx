@@ -59,6 +59,20 @@ function createClientDouble() {
       modelId: "org/demo-model",
       createdAt: "2026-04-27T00:03:00.000Z",
     }),
+    downloadModel: vi.fn().mockResolvedValue({
+      model: {
+        modelRecordId: "downloaded-1",
+        displayName: "Demo Model",
+        source: "huggingface",
+        lifecycleStatus: "downloaded",
+        artifactForm: "full-model",
+        provider: "huggingface",
+        modelId: "org/demo-model",
+        localPath: "/models/org/demo-model",
+        createdAt: "2026-04-27T00:04:00.000Z",
+      },
+      download: { provider: "transformers", modelId: "org/demo-model", downloaded: true, fromCache: false, localPath: "/models/org/demo-model" },
+    }),
     updateModelRecord: vi.fn(),
     deleteModelRecord: vi.fn().mockResolvedValue({
       deletedModelRecordId: "saved-1",
@@ -131,6 +145,41 @@ describe("ModelsFeature", () => {
     mountedContainer?.remove();
     mountedRoot = undefined;
     mountedContainer = undefined;
+  });
+
+  it("shows browse result actions and loads model details", async () => {
+    const client = createClientDouble();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ModelsFeature client={client as never} />);
+      await flushUi();
+    });
+
+    const searchButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Search Models") as HTMLButtonElement;
+    await act(async () => {
+      searchButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    expect(container.textContent).toContain("Demo Model");
+    expect(container.textContent).toContain("org/demo-model");
+    expect(Array.from(container.querySelectorAll("button")).some((button) => button.textContent === "Save")).toBe(true);
+    expect(Array.from(container.querySelectorAll("button")).some((button) => button.textContent === "Download")).toBe(true);
+
+    const detailsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "View Details") as HTMLButtonElement;
+    await act(async () => {
+      detailsButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    expect(client.getModelDetails).toHaveBeenCalledWith({ provider: "huggingface", modelId: "org/demo-model" });
+    expect(container.textContent).toContain("Demo description");
+    expect(container.textContent).toContain("Download Model");
   });
 
   it("renders train form content through dedicated training flow", async () => {
