@@ -408,14 +408,49 @@ def _extract_pipeline_text(generation: Any) -> str:
     raise RuntimeError("Model returned an empty generation.")
 
 
-def _move_tokenized_inputs_to_model_device(tokenized: dict[str, Any], model: Any) -> dict[str, Any]:
+def _is_usable_tensor_device(device: Any) -> bool:
+    if device is None:
+        return False
+
+    normalized = str(device).strip().lower()
+    if not normalized:
+        return False
+
+    return normalized not in {"disk", "meta"} and not normalized.startswith(("disk:", "meta:"))
+
+
+def _select_device_map_input_device(device_map: Any) -> Any | None:
+    if not isinstance(device_map, dict):
+        return None
+
+    usable_devices = [device for device in device_map.values() if _is_usable_tensor_device(device)]
+    if not usable_devices:
+        return None
+
+    non_cpu_device = next((device for device in usable_devices if str(device).strip().lower() != "cpu"), None)
+    return non_cpu_device if non_cpu_device is not None else usable_devices[0]
+
+
+def _resolve_tokenized_input_device(model: Any) -> Any | None:
+    device_map = getattr(model, "hf_device_map", None)
+    if device_map is not None:
+        return _select_device_map_input_device(device_map)
+
     model_device = getattr(model, "device", None)
-    if model_device is None:
+    if _is_usable_tensor_device(model_device):
+        return model_device
+
+    return None
+
+
+def _move_tokenized_inputs_to_model_device(tokenized: dict[str, Any], model: Any) -> dict[str, Any]:
+    target_device = _resolve_tokenized_input_device(model)
+    if target_device is None:
         return tokenized
 
     moved: dict[str, Any] = {}
     for key, value in tokenized.items():
-        moved[key] = value.to(model_device) if hasattr(value, "to") else value
+        moved[key] = value.to(target_device) if hasattr(value, "to") else value
     return moved
 
 

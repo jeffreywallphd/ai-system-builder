@@ -110,6 +110,13 @@ def _log_generation_diagnostic(
     )
 
 
+def _format_generation_error(error: Exception) -> str:
+    message = str(error).strip()
+    if message:
+        return message
+    return error.__class__.__name__
+
+
 def _log_chunk_generation_failure(
     chunk: MarkdownChunk,
     config: ExampleGenerationConfig,
@@ -141,7 +148,7 @@ def _log_chunk_generation_failure(
             "questionPrompt": question_prompt,
             "answerPrompt": answer_prompt or None,
         },
-        errors=[str(error)],
+        errors=[_format_generation_error(error)],
     )
 
 

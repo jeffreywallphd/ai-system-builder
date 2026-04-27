@@ -8,6 +8,7 @@ from modules.adapters.runtime.python.worker.models import ExampleGenerationConfi
 from modules.adapters.runtime.python.worker.tasks.local_text_generation import (
     DEFAULT_MAX_NEW_TOKENS,
     _GENERATOR_CACHE,
+    _move_tokenized_inputs_to_model_device,
     _resolve_generation_params,
     _resolve_model_kwargs,
     _supports_manual_device_move,
@@ -20,11 +21,13 @@ class _FakeTensor:
     def __init__(self, values: list[int]):
         self.values = values
         self.shape = (1, len(values))
+        self.moved_to = None
 
     def __getitem__(self, item):
         return self.values[item]
 
-    def to(self, _device):
+    def to(self, device):
+        self.moved_to = device
         return self
 
 
@@ -134,6 +137,33 @@ class LocalTextGenerationTests(unittest.TestCase):
             quantization_config = object()
 
         self.assertFalse(_supports_manual_device_move(_QuantizedModel()))
+
+    def test_device_map_offload_does_not_move_inputs_to_meta_device(self) -> None:
+        input_ids = _FakeTensor([1, 2, 3])
+        attention_mask = _FakeTensor([1, 1, 1])
+        model = _FakeModel()
+        model.device = "meta"
+        model.hf_device_map = {"model.embed_tokens": "cpu", "lm_head": "disk"}
+
+        moved = _move_tokenized_inputs_to_model_device(
+            {"input_ids": input_ids, "attention_mask": attention_mask},
+            model,
+        )
+
+        self.assertIs(moved["input_ids"], input_ids)
+        self.assertEqual(input_ids.moved_to, "cpu")
+        self.assertEqual(attention_mask.moved_to, "cpu")
+
+    def test_meta_only_device_map_leaves_inputs_on_existing_device(self) -> None:
+        input_ids = _FakeTensor([1, 2, 3])
+        model = _FakeModel()
+        model.device = "meta"
+        model.hf_device_map = {"model.embed_tokens": "meta", "lm_head": "disk"}
+
+        moved = _move_tokenized_inputs_to_model_device({"input_ids": input_ids}, model)
+
+        self.assertIs(moved["input_ids"], input_ids)
+        self.assertIsNone(input_ids.moved_to)
 
     def test_text2text_mode_uses_text2text_pipeline_behavior(self) -> None:
         config = ExampleGenerationConfig.model_validate(
