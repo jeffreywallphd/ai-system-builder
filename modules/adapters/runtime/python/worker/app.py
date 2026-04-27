@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from os import getenv
 from pathlib import Path
 from threading import Lock
+import time
+from typing import Any, Callable
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -43,6 +45,7 @@ app = FastAPI(title="ai-system-builder python runtime worker", version=WORKER_VE
 TASK_EXECUTOR = ThreadPoolExecutor(max_workers=1)
 ACTIVE_TASK_LOCK = Lock()
 ACTIVE_TASK_IDS: set[str] = set()
+TASK_WAIT_POLL_SECONDS = 1.0
 
 
 def _active_task_count() -> int:
@@ -58,6 +61,39 @@ def _mark_task_active(request_id: str) -> None:
 def _mark_task_complete(request_id: str) -> None:
     with ACTIVE_TASK_LOCK:
         ACTIVE_TASK_IDS.discard(request_id)
+
+
+def _resolve_dataset_preparation_inactivity_timeout_ms(request: PythonRuntimeTaskRequest) -> int | None:
+    if (
+        request.metadata
+        and isinstance(request.metadata, dict)
+        and isinstance(request.metadata.get("datasetPreparationInactivityTimeoutMs"), int)
+    ):
+        metadata_timeout_ms = int(request.metadata["datasetPreparationInactivityTimeoutMs"])
+        if metadata_timeout_ms > 0:
+            return metadata_timeout_ms
+
+    if request.timeoutMs and request.timeoutMs > 0:
+        return int(request.timeoutMs)
+
+    return None
+
+
+def _await_task_result_with_inactivity_timeout(
+    task_future: Any,
+    inactivity_timeout_ms: int | None,
+    get_last_progress_time_seconds: Callable[[], float],
+) -> object:
+    while True:
+        try:
+            return task_future.result(timeout=TASK_WAIT_POLL_SECONDS)
+        except FutureTimeoutError:
+            if inactivity_timeout_ms is None:
+                continue
+
+            elapsed_ms = int((time.monotonic() - get_last_progress_time_seconds()) * 1000)
+            if elapsed_ms > inactivity_timeout_ms:
+                raise
 
 
 @app.get("/health", response_model=PythonRuntimeHealthCheckResult)
@@ -201,19 +237,30 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
 
         if request.taskType == "prepare-training-dataset":
             payload = PrepareTrainingDatasetRequest.model_validate(request.payload)
+            last_progress_time_seconds = time.monotonic()
+
+            def on_generation_progress(_progress: dict[str, int]) -> None:
+                nonlocal last_progress_time_seconds
+                last_progress_time_seconds = time.monotonic()
+
             def run_prepare_training_dataset() -> object:
                 _mark_task_active(request.requestId)
                 try:
-                    return prepare_training_dataset(payload)
+                    return prepare_training_dataset(payload, on_generation_progress=on_generation_progress)
                 finally:
                     _mark_task_complete(request.requestId)
 
             task_future = TASK_EXECUTOR.submit(run_prepare_training_dataset)
-            timeout_seconds = (request.timeoutMs / 1000) if request.timeoutMs else None
+            inactivity_timeout_ms = _resolve_dataset_preparation_inactivity_timeout_ms(request)
             try:
-                result = task_future.result(timeout=timeout_seconds)
+                result = _await_task_result_with_inactivity_timeout(
+                    task_future,
+                    inactivity_timeout_ms,
+                    lambda: last_progress_time_seconds,
+                )
             except FutureTimeoutError:
                 task_future.cancel()
+                timeout_value_ms = inactivity_timeout_ms if inactivity_timeout_ms is not None else request.timeoutMs
                 return PythonRuntimeTaskResult(
                     requestId=request.requestId,
                     taskType=request.taskType,
@@ -222,7 +269,7 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
                         code="task_timeout",
                         errorCode="runtime_timeout",
                         stage="generation",
-                        message=f"Dataset preparation timed out after {request.timeoutMs}ms.",
+                        message=f"Dataset preparation stalled for {timeout_value_ms}ms without chunk progress.",
                         retryable=False,
                     ),
                     metadata={"runtimeId": RUNTIME_ID},

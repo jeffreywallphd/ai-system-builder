@@ -189,7 +189,7 @@ describe("createPythonDatasetPreparationPort", () => {
     }
   });
 
-  it("applies adapter-level task timeout controls", async () => {
+  it("applies adapter-level timeout and inactivity controls", async () => {
     const executeTask = testDouble.fn(async (request) => ({
       requestId: request.requestId,
       taskType: request.taskType,
@@ -217,7 +217,7 @@ describe("createPythonDatasetPreparationPort", () => {
       ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
       getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
       unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
-    }, { taskTimeoutMs: 25_000 });
+    }, { taskTimeoutMs: 25_000, inactivityTimeoutMs: 90_000 });
 
     await adapter.prepareTrainingDataset({
       sourceInputs: [{ artifactId: "a1", localPath: "/tmp/a1.jsonl", mediaType: "application/x-ndjson" }],
@@ -231,6 +231,9 @@ describe("createPythonDatasetPreparationPort", () => {
     });
 
     expect(executeTask.mock.calls[0]?.[0]?.timeoutMs).toBe(25_000);
+    expect(executeTask.mock.calls[0]?.[0]?.metadata).toEqual({
+      datasetPreparationInactivityTimeoutMs: 90_000,
+    });
   });
 
   it("fails clearly for invalid runtime output role values", async () => {

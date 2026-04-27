@@ -132,6 +132,8 @@ export function resolvePythonRuntimeBaseUrl(env: NodeJS.ProcessEnv = process.env
 
 const PYTHON_RUNTIME_MANAGED_BASE_PORT = 43111;
 const PYTHON_RUNTIME_MANAGED_PORT_SPAN = 10_000;
+const DATASET_PREPARATION_TASK_TIMEOUT_MS = 12 * 60 * 60 * 1000;
+const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 
 export function resolveDefaultManagedPythonRuntimePort(processId: number = process.pid): string {
   const processPortOffset = Math.abs(processId) % PYTHON_RUNTIME_MANAGED_PORT_SPAN;
@@ -365,6 +367,8 @@ export function composeDesktopHost(
     getModelStatus: () => pythonRuntimeFoundation.runtimePort.getModelStatus(),
     unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels(),
   }, {
+    taskTimeoutMs: DATASET_PREPARATION_TASK_TIMEOUT_MS,
+    inactivityTimeoutMs: DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS,
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
 

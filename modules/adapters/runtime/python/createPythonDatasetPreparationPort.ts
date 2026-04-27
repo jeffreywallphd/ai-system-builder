@@ -149,10 +149,15 @@ function mapRuntimeErrorToContractError(runtimeError: PythonRuntimeError | undef
 
 export function createPythonDatasetPreparationPort(
   runtimePort: PythonRuntimePort,
-  options?: { taskTimeoutMs?: number; ensureRuntimeReady?: () => Promise<void> | void },
+  options?: {
+    taskTimeoutMs?: number;
+    inactivityTimeoutMs?: number;
+    ensureRuntimeReady?: () => Promise<void> | void;
+  },
 ): PythonDatasetPreparationPort {
   let sequence = 0;
   const taskTimeoutMs = options?.taskTimeoutMs;
+  const inactivityTimeoutMs = options?.inactivityTimeoutMs;
   const ensureRuntimeReady = options?.ensureRuntimeReady;
 
   const nextRequestId = () => {
@@ -177,6 +182,9 @@ export function createPythonDatasetPreparationPort(
         taskType: "prepare-training-dataset",
         payload: request,
         timeoutMs: taskTimeoutMs,
+        metadata: inactivityTimeoutMs !== undefined
+          ? { datasetPreparationInactivityTimeoutMs: inactivityTimeoutMs }
+          : undefined,
       });
 
       if (!taskResult.success) {
