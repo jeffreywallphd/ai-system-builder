@@ -5,6 +5,8 @@ import {
   type DesktopModelDetailsResult,
   type DesktopModelInventoryRecord,
   type DesktopModelBrowseRequest,
+  type DesktopModelTrainingRequest,
+  type DesktopModelTrainingResult,
 } from "../../../lib/desktopApi";
 import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../modules/domain/model";
 
@@ -32,6 +34,7 @@ export interface DesktopModelsClient {
   saveModelReference: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
   updateModelRecord: (input: { modelRecordId: string; patch: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
   deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean }) => Promise<DesktopDeleteModelRecordResult>;
+  trainModel: (input: DesktopModelTrainingRequest) => Promise<DesktopModelTrainingResult>;
 }
 
 export function createDesktopModelsClient(): DesktopModelsClient {
@@ -103,6 +106,16 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         await desktopApi.deleteModelRecord(input),
         (value) => value as DesktopDeleteModelRecordResult,
         "Failed to delete model record.",
+      );
+    },
+    async trainModel(input) {
+      if (!desktopApi.trainModel) {
+        throw new Error("Desktop preload model training bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.trainModel(input),
+        (value) => value as DesktopModelTrainingResult,
+        "Failed to train model.",
       );
     },
   };

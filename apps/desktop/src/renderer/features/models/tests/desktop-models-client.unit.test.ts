@@ -34,6 +34,7 @@ describe("desktop models client", () => {
         ok: true,
         value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] },
       }),
+      trainModel: vi.fn().mockResolvedValue({ ok: true, value: { runId: "run-1", status: "succeeded" } }),
     } as never;
 
     const client = createDesktopModelsClient();
@@ -43,10 +44,18 @@ describe("desktop models client", () => {
     await client.saveModelReference({ modelId: "org/model", displayName: "Model" });
     await client.updateModelRecord({ modelRecordId: "m1", patch: { validationStatus: "valid" } });
     await client.deleteModelRecord({ modelRecordId: "m1" });
+    await client.trainModel({
+      baseModel: { modelRecordId: "m1" },
+      datasets: [{ artifactId: "dataset-1", splitRole: "train" }],
+      method: "lora",
+      commonParameters: {},
+      output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } } },
+    });
 
     expect(window.desktopApi.browseModels).toHaveBeenCalled();
     expect(window.desktopApi.getModelDetails).toHaveBeenCalledWith({ provider: "huggingface", modelId: "org/model" });
     expect(window.desktopApi.saveModelReference).toHaveBeenCalledWith(expect.objectContaining({ provider: "huggingface", modelId: "org/model" }));
     expect(window.desktopApi.deleteModelRecord).toHaveBeenCalledWith({ modelRecordId: "m1" });
+    expect(window.desktopApi.trainModel).toHaveBeenCalled();
   });
 });

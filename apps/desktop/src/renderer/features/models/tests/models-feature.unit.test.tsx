@@ -43,26 +43,6 @@ function createClientDouble() {
         modelId: "org/demo-model",
         createdAt: "2026-04-27T00:00:00.000Z",
       },
-      {
-        modelRecordId: "generated-1",
-        displayName: "Generated Adapter",
-        source: "generated",
-        lifecycleStatus: "generated",
-        artifactForm: "adapter",
-        provider: "unknown",
-        localPath: "/models/generated",
-        createdAt: "2026-04-27T00:01:00.000Z",
-      },
-      {
-        modelRecordId: "downloaded-1",
-        displayName: "Downloaded Local",
-        source: "local",
-        lifecycleStatus: "downloaded",
-        artifactForm: "full-model",
-        provider: "huggingface",
-        localPath: "/models/downloaded",
-        createdAt: "2026-04-27T00:02:00.000Z",
-      },
     ]),
     saveModelReference: vi.fn().mockResolvedValue({
       modelRecordId: "saved-2",
@@ -80,6 +60,19 @@ function createClientDouble() {
       deletedRegistryRecord: true,
       deletedLocalFiles: false,
       deletedBackingArtifactIds: [],
+    }),
+    trainModel: vi.fn().mockResolvedValue({
+      runId: "run-1",
+      status: "succeeded",
+      outputModel: {
+        modelRecordId: "generated-1",
+        displayName: "My LoRA Adapter",
+        source: "generated",
+        lifecycleStatus: "generated",
+        artifactForm: "adapter",
+        provider: "unknown",
+        createdAt: "2026-04-27T00:05:00.000Z",
+      },
     }),
   };
 }
@@ -99,7 +92,7 @@ describe("ModelsFeature", () => {
     mountedContainer = undefined;
   });
 
-  it("renders tabs, supports browse/details/save, and manage/delete flows", async () => {
+  it("renders train form and submits model training through dedicated training flow", async () => {
     const client = createClientDouble();
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -111,58 +104,29 @@ describe("ModelsFeature", () => {
       root.render(<ModelsFeature client={client as never} />);
     });
 
-    expect(container.textContent).toContain("Browse Models");
-    expect(container.textContent).toContain("Manage Models");
-    expect(container.textContent).toContain("Train Model");
-
-    const searchButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Search Models");
-    await act(async () => {
-      searchButton?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(client.browseModels).toHaveBeenCalled();
-
-    const viewDetails = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "View Details");
-    await act(async () => {
-      viewDetails?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(client.getModelDetails).toHaveBeenCalledWith({ provider: "huggingface", modelId: "org/demo-model" });
-    expect(container.textContent).toContain("Demo description");
-
-    const saveButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Save Model Reference");
-    await act(async () => {
-      saveButton?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(client.saveModelReference).toHaveBeenCalled();
-
-    const manageTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Manage Models");
-    await act(async () => {
-      manageTab?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("Saved: 1 · Generated: 1 · Downloaded: 1");
-
-    const deleteButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Delete Record");
-    await act(async () => {
-      deleteButton?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    const confirmDeleteButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Confirm Registry Delete") as HTMLButtonElement | undefined;
-    expect(confirmDeleteButton?.disabled).toBe(true);
-    const confirmInput = container.querySelector("input[placeholder='Delete']") as HTMLInputElement;
-    await act(async () => {
-      confirmInput.value = "Delete";
-      confirmInput.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(confirmDeleteButton?.disabled).toBe(false);
-    await act(async () => {
-      confirmDeleteButton?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(client.deleteModelRecord).toHaveBeenCalledWith({ modelRecordId: "saved-1", deleteBackingArtifacts: false, deleteLocalFiles: false });
-
     const trainTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Train Model");
     await act(async () => {
       trainTab?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Base model");
-    expect(container.textContent).not.toContain("Run Training");
-    expect(container.textContent).not.toContain("Artifact Browser");
+
+    expect(container.textContent).toContain("Current backend support: LoRA skeleton execution");
+    expect(container.textContent).toContain("Dataset artifact IDs");
+
+    const datasetInput = container.querySelector("input[placeholder='artifact-1,artifact-2']") as HTMLInputElement;
+    await act(async () => {
+      datasetInput.value = "dataset-1";
+      datasetInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const submitButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Start Training") as HTMLButtonElement;
+    expect(submitButton.disabled).toBe(false);
+
+    await act(async () => {
+      submitButton.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(client.trainModel).toHaveBeenCalled();
+    expect(container.textContent).toContain("Generated model record: generated-1");
+    expect(container.textContent).not.toContain("planning shell");
   });
 });

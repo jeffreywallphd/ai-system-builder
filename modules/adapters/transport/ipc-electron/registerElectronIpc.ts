@@ -64,6 +64,7 @@ export interface RegisterElectronIpcDependencies {
   saveModelReferenceUseCase: RegisterModelManagementIpcDependencies["saveModelReferenceUseCase"];
   updateModelRecordUseCase: RegisterModelManagementIpcDependencies["updateModelRecordUseCase"];
   deleteModelRecordUseCase: RegisterModelManagementIpcDependencies["deleteModelRecordUseCase"];
+  trainModelUseCase: RegisterModelManagementIpcDependencies["trainModelUseCase"];
 }
 
 export function registerElectronIpc(
@@ -123,6 +124,7 @@ export function registerElectronIpc(
     saveModelReferenceUseCase: dependencies.saveModelReferenceUseCase,
     updateModelRecordUseCase: dependencies.updateModelRecordUseCase,
     deleteModelRecordUseCase: dependencies.deleteModelRecordUseCase,
+    trainModelUseCase: dependencies.trainModelUseCase,
   });
 
   registerPythonRuntimeIpc({

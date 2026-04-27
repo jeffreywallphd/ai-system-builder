@@ -1,17 +1,79 @@
-export function TrainModelTab() {
+import type { useModelTrainingFeature } from "../hooks/useModelTrainingFeature";
+
+type ModelTrainingState = ReturnType<typeof useModelTrainingFeature>;
+
+export function TrainModelTab(props: { state: ModelTrainingState }) {
+  const s = props.state;
+
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <h2>Train Model</h2>
-      <p>This tab is a planning shell for future training workflows. Execution is intentionally disabled.</p>
-      <ul>
-        <li>Base model</li>
-        <li>Dataset</li>
-        <li>Method</li>
-        <li>Common parameters</li>
-        <li>Advanced parameters</li>
-        <li>Output</li>
-        <li>Validation</li>
-      </ul>
+      <p>Current backend support: LoRA skeleton execution. QLoRA and full-finetune are intentionally disabled.</p>
+
+      <label className="ui-stack ui-stack--sm">
+        <span>Base model</span>
+        <select className="ui-input" value={s.baseModelRecordId} onChange={(event) => s.setBaseModelRecordId(event.target.value)}>
+          <option value="">Select model</option>
+          {s.models.map((model) => (
+            <option key={model.modelRecordId} value={model.modelRecordId}>
+              {model.displayName} · {model.modelId ?? model.localPath ?? "n/a"} · {model.source} · {model.lifecycleStatus}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="ui-stack ui-stack--sm">
+        <span>Dataset artifact IDs (comma-separated)</span>
+        <input className="ui-input" value={s.datasetArtifactIdsText} onChange={(event) => s.setDatasetArtifactIdsText(event.target.value)} placeholder="artifact-1,artifact-2" />
+      </label>
+
+      <label className="ui-stack ui-stack--sm">
+        <span>Method</span>
+        <select className="ui-input" value={s.method} onChange={(event) => s.setMethod(event.target.value as "lora" | "qlora" | "full-finetune") }>
+          <option value="lora">lora</option>
+          <option value="qlora" disabled>qlora (not yet supported)</option>
+          <option value="full-finetune" disabled>full-finetune (not yet supported)</option>
+        </select>
+      </label>
+
+      <div className="ui-grid ui-grid--two">
+        <label className="ui-stack ui-stack--sm"><span>Epochs</span><input className="ui-input" value={s.numEpochs} onChange={(e) => s.setNumEpochs(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span>Max steps</span><input className="ui-input" value={s.maxSteps} onChange={(e) => s.setMaxSteps(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span>Batch size</span><input className="ui-input" value={s.batchSize} onChange={(e) => s.setBatchSize(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span>Learning rate</span><input className="ui-input" value={s.learningRate} onChange={(e) => s.setLearningRate(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span>Sequence length</span><input className="ui-input" value={s.maxSequenceLength} onChange={(e) => s.setMaxSequenceLength(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span>Seed</span><input className="ui-input" value={s.seed} onChange={(e) => s.setSeed(e.target.value)} /></label>
+      </div>
+
+      <button className="ui-button" type="button" onClick={() => s.setShowAdvanced(!s.showAdvanced)}>
+        {s.showAdvanced ? "Hide Advanced" : "Show Advanced"}
+      </button>
+
+      {s.showAdvanced ? (
+        <div className="ui-grid ui-grid--two">
+          <label className="ui-stack ui-stack--sm"><span>LoRA rank</span><input className="ui-input" value={s.loraRank} onChange={(e) => s.setLoraRank(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span>LoRA alpha</span><input className="ui-input" value={s.loraAlpha} onChange={(e) => s.setLoraAlpha(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span>LoRA dropout</span><input className="ui-input" value={s.loraDropout} onChange={(e) => s.setLoraDropout(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span>Target modules</span><input className="ui-input" value={s.loraTargetModules} onChange={(e) => s.setLoraTargetModules(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span>Grad accumulation</span><input className="ui-input" value={s.gradientAccumulationSteps} onChange={(e) => s.setGradientAccumulationSteps(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span>Checkpoint interval</span><input className="ui-input" value={s.checkpointIntervalSteps} onChange={(e) => s.setCheckpointIntervalSteps(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span>Eval interval</span><input className="ui-input" value={s.evalIntervalSteps} onChange={(e) => s.setEvalIntervalSteps(e.target.value)} /></label>
+        </div>
+      ) : null}
+
+      <div className="ui-grid ui-grid--two">
+        <label className="ui-stack ui-stack--sm"><span>Output model name</span><input className="ui-input" value={s.outputModelName} onChange={(e) => s.setOutputModelName(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span>Local output directory</span><input className="ui-input" value={s.localOutputDirectory} onChange={(e) => s.setLocalOutputDirectory(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span>Generated model display name</span><input className="ui-input" value={s.generatedDisplayName} onChange={(e) => s.setGeneratedDisplayName(e.target.value)} /></label>
+      </div>
+
+      <button className="ui-button" type="button" onClick={() => void s.submitTraining()} disabled={!s.canSubmit}>
+        Start Training
+      </button>
+      {s.message ? <p role={s.status === "failed" ? "alert" : "status"}>{s.message}</p> : null}
+      {s.result?.outputModel ? (
+        <p>Generated model record: {s.result.outputModel.modelRecordId} · {s.result.outputModel.displayName}</p>
+      ) : null}
     </section>
   );
 }

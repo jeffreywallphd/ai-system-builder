@@ -531,3 +531,27 @@ describe("python sidecar runtime contracts", () => {
     expect(invalidModel).toBeDefined();
   });
 });
+
+
+describe("train-model runtime contracts", () => {
+  it("defines python-friendly train-model request/result shapes", () => {
+    const request: import(".").TrainModelTaskRequest = {
+      baseModel: { modelRecordId: "base-1", modelId: "org/base" },
+      datasets: [{ artifactId: "dataset-1", splitRole: "train", format: "jsonl" }],
+      method: "lora",
+      commonParameters: { numEpochs: 3, learningRate: 0.0002 },
+      output: { outputModelName: "demo-adapter", outputDirectory: "/tmp/output" },
+      runMetadata: { source: "desktop" },
+    };
+
+    const result: import(".").TrainModelTaskResult = {
+      runId: "run-1",
+      status: "failed",
+      warnings: ["lora only"],
+      error: { code: "unsupported_method", message: "qlora is not implemented" },
+    };
+
+    expect(request.method).toBe("lora");
+    expect(result.error?.code).toBe("unsupported_method");
+  });
+});

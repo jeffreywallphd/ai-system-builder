@@ -1,12 +1,14 @@
 import { TabbedPanel } from "../../../components/ui/TabbedPanel";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsFeature } from "../hooks/useModelsFeature";
+import { useModelTrainingFeature } from "../hooks/useModelTrainingFeature";
 import { BrowseModelsTab } from "./BrowseModelsTab";
 import { ManageModelsTab } from "./ManageModelsTab";
 import { TrainModelTab } from "./TrainModelTab";
 
 export function ModelsFeature(props: { client?: DesktopModelsClient }) {
   const state = useModelsFeature(props.client);
+  const trainingState = useModelTrainingFeature(props.client);
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <TabbedPanel
@@ -26,7 +28,7 @@ export function ModelsFeature(props: { client?: DesktopModelsClient }) {
           {
             id: "train-model",
             label: "Train Model",
-            content: <TrainModelTab />,
+            content: <TrainModelTab state={trainingState} />,
           },
         ]}
       />

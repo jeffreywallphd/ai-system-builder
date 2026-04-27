@@ -30,6 +30,7 @@ import {
   SaveModelReferenceUseCase,
   UpdateModelRecordUseCase,
   DeleteModelRecordUseCase,
+  TrainModelUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
@@ -43,6 +44,7 @@ import {
   createPythonDatasetPreparationPort,
   createPythonRuntimeAdapterFoundation,
   ensurePythonRuntimeWorkerDependencies,
+  createPythonModelTrainingPort,
 } from "../../../adapters/runtime/python";
 import {
   createFilesystemArtifactBrowserReadAdapter,
@@ -582,6 +584,34 @@ export function composeDesktopHost(
       const listModels = new ListModelsUseCase({
         modelRegistry,
       });
+      const modelTrainingPort = createPythonModelTrainingPort({
+        executeTask: async (request) => {
+          recordRuntimeLog({
+            level: "info",
+            message: "Executing model training in Python runtime.",
+          });
+          const result = await pythonRuntimeFoundation.runtimePort.executeTask(request);
+          if (result.success) {
+            recordRuntimeLog({
+              level: "info",
+              message: "Model training completed in Python runtime.",
+            });
+          } else {
+            recordRuntimeLog({
+              level: "error",
+              message: `Model training failed: ${result.error?.message ?? "Unknown runtime error."}`,
+            });
+          }
+          return result;
+        },
+        getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
+        getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
+        ensureModelDownloaded: (request) => pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request),
+        getModelStatus: () => pythonRuntimeFoundation.runtimePort.getModelStatus(),
+        unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels(),
+      }, {
+        ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
+      });
       const saveModelReference = new SaveModelReferenceUseCase({
         modelRegistry,
       });
@@ -591,6 +621,10 @@ export function composeDesktopHost(
       const deleteModelRecord = new DeleteModelRecordUseCase({
         modelRegistry,
         artifactCatalogDeletePort: artifactCatalog,
+      });
+      const trainModel = new TrainModelUseCase({
+        modelTraining: modelTrainingPort,
+        modelRegistry,
       });
 
       registerElectronIpc({
@@ -645,6 +679,7 @@ export function composeDesktopHost(
         saveModelReferenceUseCase: saveModelReference,
         updateModelRecordUseCase: updateModelRecord,
         deleteModelRecordUseCase: deleteModelRecord,
+        trainModelUseCase: trainModel,
       });
     },
   };

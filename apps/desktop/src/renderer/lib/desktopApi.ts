@@ -27,6 +27,8 @@ import type {
   DeleteModelRecordRequest,
   DeleteModelRecordResult,
   ListModelsRequest,
+  ModelTrainingRequest,
+  ModelTrainingResult,
   SaveModelReferenceRequest,
   UpdateModelRecordRequest,
 } from "../../../../../modules/contracts/model";
@@ -363,6 +365,7 @@ interface DesktopApiBridge {
   saveModelReference?: (input: DesktopSaveModelReferenceRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   updateModelRecord?: (input: DesktopUpdateModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   deleteModelRecord?: (input: DesktopDeleteModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  trainModel?: (input: DesktopModelTrainingRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
 }
 
 declare global {
@@ -471,3 +474,7 @@ export interface DesktopUpdateModelRecordResult {
 }
 export type DesktopDeleteModelRecordRequest = DeleteModelRecordRequest;
 export type DesktopDeleteModelRecordResult = DeleteModelRecordResult;
+
+
+export type DesktopModelTrainingRequest = ModelTrainingRequest;
+export type DesktopModelTrainingResult = ModelTrainingResult;

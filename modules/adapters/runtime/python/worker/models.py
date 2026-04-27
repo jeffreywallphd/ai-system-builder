@@ -191,3 +191,42 @@ class PrepareTrainingDatasetResult(BaseModel):
     outputs: list[PythonRuntimeOutputDescriptor]
     summary: DatasetPreparationSummary
     warnings: list[DatasetPreparationWarning] | None = None
+
+
+class TrainModelBaseModelInput(BaseModel):
+    modelRecordId: str | None = None
+    provider: str | None = None
+    modelId: str | None = None
+    localPath: str | None = None
+    inferenceMode: Literal["text2text", "causal", "chat"] | None = None
+
+
+class TrainModelDatasetInput(BaseModel):
+    artifactId: str
+    splitRole: Literal["train", "validation", "test"]
+    format: str | None = None
+    path: str | None = None
+
+
+class TrainModelTaskRequest(BaseModel):
+    baseModel: TrainModelBaseModelInput
+    datasets: list[TrainModelDatasetInput]
+    method: Literal["lora", "qlora", "full-finetune"]
+    commonParameters: dict[str, Any] | None = None
+    advancedParameters: dict[str, Any] | None = None
+    output: dict[str, Any]
+    validation: dict[str, Any] | None = None
+    runMetadata: dict[str, Any] | None = None
+
+
+class TrainModelTaskResult(BaseModel):
+    runId: str
+    status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
+    outputDirectory: str | None = None
+    outputModelName: str | None = None
+    checkpoints: list[dict[str, Any]] | None = None
+    metrics: dict[str, float] | None = None
+    logs: list[str] | None = None
+    warnings: list[str] | None = None
+    generatedModelCandidate: dict[str, Any] | None = None
+    error: dict[str, Any] | None = None

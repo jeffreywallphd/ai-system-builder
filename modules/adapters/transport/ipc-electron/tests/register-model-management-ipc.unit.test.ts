@@ -8,10 +8,13 @@ import {
   DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
   DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
   createDesktopModelBrowseRequest,
+  createDesktopModelTrainRequest,
 } from "../../../../contracts/ipc";
 import {
   createBrowseModelsIpcHandler,
+  createTrainModelIpcHandler,
   registerModelManagementIpc,
 } from "../model/registerModelManagementIpc";
 
@@ -26,6 +29,7 @@ describe("registerModelManagementIpc", () => {
       saveModelReferenceUseCase: { execute: testDouble.fn() },
       updateModelRecordUseCase: { execute: testDouble.fn() },
       deleteModelRecordUseCase: { execute: testDouble.fn() },
+      trainModelUseCase: { execute: testDouble.fn() },
     });
 
     expect(channels).toEqual([
@@ -35,6 +39,7 @@ describe("registerModelManagementIpc", () => {
       DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
     ]);
   });
 
@@ -67,4 +72,20 @@ describe("registerModelManagementIpc", () => {
       error: { code: "internal", message: "browse failed" },
     });
   });
+});
+
+
+it("maps train handler to use case", async () => {
+  const execute = testDouble.fn().mockResolvedValue({ runId: "run-1", status: "succeeded" });
+  const handler = createTrainModelIpcHandler({ execute });
+  const response = await handler({}, createDesktopModelTrainRequest({
+    baseModel: { modelRecordId: "base-1" },
+    datasets: [{ artifactId: "dataset-1", splitRole: "train" }],
+    method: "lora",
+    commonParameters: {},
+    output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } } },
+  }));
+
+  expect(execute).toHaveBeenCalled();
+  expect(response.ok).toBe(true);
 });
