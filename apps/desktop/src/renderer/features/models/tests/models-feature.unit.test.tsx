@@ -84,6 +84,23 @@ function createClientDouble() {
   };
 }
 
+function createWarningModelClientDouble() {
+  const client = createClientDouble();
+  client.listModels = vi.fn().mockResolvedValue([
+    {
+      modelRecordId: "generated-1",
+      displayName: "Generated Warning Model",
+      source: "generated",
+      lifecycleStatus: "generated",
+      artifactForm: "adapter",
+      provider: "unknown",
+      validationStatus: "warning",
+      createdAt: "2026-04-27T00:00:00.000Z",
+    },
+  ]);
+  return client;
+}
+
 describe("ModelsFeature", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
@@ -151,6 +168,36 @@ describe("ModelsFeature", () => {
     });
 
     expect(container.textContent).toContain("Validate");
+    const publishButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    expect(publishButton.disabled).toBe(true);
+  });
+
+  it("treats warning validation as not safely publishable", async () => {
+    const client = createWarningModelClientDouble();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ModelsFeature client={client as never} />);
+      await flushUi();
+    });
+
+    const manageTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Manage Models");
+    await act(async () => {
+      manageTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    const detailsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Details") as HTMLButtonElement;
+    await act(async () => {
+      detailsButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    expect(container.textContent).toContain("Warning validation is not safely publishable by default.");
     const publishButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Publish") as HTMLButtonElement;
     expect(publishButton.disabled).toBe(true);
   });

@@ -18,6 +18,7 @@ export class ValidateModelUseCase {
     const result = await this.dependencies.modelValidation.validateModel({
       ...request,
       modelPath: request.modelPath ?? model.localPath,
+      validationStrictness: request.validationStrictness ?? "normal",
     });
 
     const nextLifecycleStatus = result.status === "valid"
@@ -37,6 +38,10 @@ export class ValidateModelUseCase {
           validationWarnings: result.warnings,
           validationErrors: result.errors,
           shardCount: result.shardCount,
+          validatedModelPath: result.validatedModelPath,
+          validatedAt: result.validatedAt,
+          validationStrictness: result.validationStrictness,
+          tensorChecksCompleted: result.tensorChecksCompleted,
         },
       },
     });

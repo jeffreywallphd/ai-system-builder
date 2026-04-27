@@ -26,6 +26,7 @@ export interface ValidateModelRequest {
   expectedLoRA?: boolean;
   expectedRecurrentAdditions?: boolean;
   allowWarnings?: boolean;
+  validationStrictness?: "normal" | "publish";
 }
 
 export interface ValidateModelResult {
@@ -37,6 +38,10 @@ export interface ValidateModelResult {
   shardCount?: number;
   detectedLoRA?: boolean;
   detectedRecurrentAdditions?: boolean;
+  validatedModelPath?: string;
+  validatedAt?: string;
+  validationStrictness?: "normal" | "publish";
+  tensorChecksCompleted?: boolean;
   warnings?: string[];
   errors?: string[];
 }

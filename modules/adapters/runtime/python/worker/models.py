@@ -238,6 +238,7 @@ class ValidateModelTaskRequest(BaseModel):
     modelPath: str
     expectedLoRA: bool | None = None
     expectedRecurrentAdditions: bool | None = None
+    validationStrictness: Literal["normal", "publish"] | None = None
 
 
 class ValidateModelTaskResult(BaseModel):
@@ -249,5 +250,9 @@ class ValidateModelTaskResult(BaseModel):
     shardCount: int | None = None
     detectedLoRA: bool | None = None
     detectedRecurrentAdditions: bool | None = None
+    validatedModelPath: str | None = None
+    validatedAt: str | None = None
+    validationStrictness: Literal["normal", "publish"] | None = None
+    tensorChecksCompleted: bool | None = None
     warnings: list[str] | None = None
     errors: list[str] | None = None

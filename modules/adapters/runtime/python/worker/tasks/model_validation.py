@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -81,14 +82,37 @@ def validate_model_output(
     *,
     expected_lora: bool = False,
     expected_recurrent_additions: bool = False,
+    validation_strictness: str = "normal",
     recurrent_key_patterns: tuple[str, ...] = RECURRENT_KEY_PATTERNS,
     lora_key_patterns: tuple[str, ...] = LORA_KEY_PATTERNS,
 ) -> dict[str, Any]:
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     warnings: list[str] = []
     errors: list[str] = []
+    if not output_dir.exists():
+        errors.append(f"Model path does not exist: {output_dir}")
+    elif not output_dir.is_dir():
+        errors.append(f"Model path is not a directory: {output_dir}")
+
+    if errors:
+        status = "invalid"
+        return {
+            "status": status,
+            "serializationFormat": "unknown",
+            "validationReportPath": None,
+            "validationDiffPath": None,
+            "warnings": warnings,
+            "errors": errors,
+            "shardCount": 0,
+            "detectedLoRA": False,
+            "detectedRecurrentAdditions": False,
+            "tensorChecksCompleted": False,
+            "validationStrictness": validation_strictness,
+            "validatedModelPath": str(output_dir),
+            "validatedAt": datetime.now(timezone.utc).isoformat(),
+        }
     format_name = _detect_format(output_dir)
+    tensor_checks_required = format_name in {"safetensors", "sharded-safetensors", "adapter-safetensors"}
+    tensor_checks_completed = True
 
     has_config = (output_dir / "config.json").exists()
     has_tokenizer = any((output_dir / name).exists() for name in ["tokenizer.json", "tokenizer_config.json"])
@@ -131,7 +155,11 @@ def validate_model_output(
             all_tensor_keys.update(present_keys)
             tensor_shape_summary.update(shapes)
             if shard_warning:
-                warnings.append(shard_warning)
+                tensor_checks_completed = False
+                if validation_strictness == "publish":
+                    errors.append(shard_warning)
+                else:
+                    warnings.append(shard_warning)
                 continue
             for expected_key in sorted(expected_keys):
                 if expected_key not in present_keys:
@@ -144,14 +172,25 @@ def validate_model_output(
             all_tensor_keys.update(present_keys)
             tensor_shape_summary.update(shapes)
             if shard_warning:
-                warnings.append(shard_warning)
+                tensor_checks_completed = False
+                if validation_strictness == "publish":
+                    errors.append(shard_warning)
+                else:
+                    warnings.append(shard_warning)
 
     if has_adapter_model:
         present_keys, shapes, shard_warning = _read_safetensors_tensors(output_dir / "adapter_model.safetensors")
         all_tensor_keys.update(present_keys)
         tensor_shape_summary.update(shapes)
         if shard_warning:
-            warnings.append(shard_warning)
+            tensor_checks_completed = False
+            if validation_strictness == "publish":
+                errors.append(shard_warning)
+            else:
+                warnings.append(shard_warning)
+
+    if tensor_checks_required and not tensor_checks_completed and validation_strictness == "publish":
+        errors.append("Tensor-level safetensors checks are required for publish-bound validation.")
 
     if missing_tensor_keys:
         errors.append(f"Missing tensor keys referenced by index: {', '.join(missing_tensor_keys)}")
@@ -200,6 +239,9 @@ def validate_model_output(
             "safetensors": format_name in {"safetensors", "sharded-safetensors", "adapter-safetensors"},
             "adapterFiles": has_adapter_config and has_adapter_model,
         },
+        "tensorChecksCompleted": tensor_checks_completed if tensor_checks_required else True,
+        "validationStrictness": validation_strictness,
+        "validatedModelPath": str(output_dir),
     }
 
     diff_path = output_dir / "model_validation_diff.json"
@@ -237,4 +279,8 @@ def validate_model_output(
         "shardCount": len(shard_names),
         "detectedLoRA": detected_lora,
         "detectedRecurrentAdditions": detected_recurrent,
+        "tensorChecksCompleted": tensor_checks_completed if tensor_checks_required else True,
+        "validationStrictness": validation_strictness,
+        "validatedModelPath": str(output_dir),
+        "validatedAt": datetime.now(timezone.utc).isoformat(),
     }

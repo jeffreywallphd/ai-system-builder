@@ -16,16 +16,49 @@ export class PublishModelUseCase {
       throw new Error(`Model '${request.modelRecordId}' is missing a local model path and cannot be published.`);
     }
 
+    const validationMetadata = (model.metadata ?? {}) as Record<string, unknown>;
+    const hasCurrentValidation = (
+      model.validationStatus
+      && model.validationStatus !== "unknown"
+      && typeof validationMetadata.validatedModelPath === "string"
+      && validationMetadata.validatedModelPath === model.localPath
+      && typeof validationMetadata.validatedAt === "string"
+      && validationMetadata.validatedAt.length > 0
+      && validationMetadata.validationStrictness === "publish"
+    );
+
     let validationStatus = model.validationStatus;
-    if (request.forceRevalidate || !validationStatus || validationStatus === "unknown") {
-      const validation = await this.dependencies.modelValidation.validateModel({
+    let validationResult: Awaited<ReturnType<ModelValidationPort["validateModel"]>> | undefined;
+
+    if (request.forceRevalidate || !hasCurrentValidation) {
+      validationResult = await this.dependencies.modelValidation.validateModel({
         modelRecordId: model.modelRecordId,
         modelPath: model.localPath,
+        validationStrictness: "publish",
       });
-      validationStatus = validation.status;
+      validationStatus = validationResult.status;
+      await this.dependencies.modelRegistry.updateModelRecord({
+        modelRecordId: request.modelRecordId,
+        patch: {
+          validationStatus: validationResult.status,
+          validationReportPath: validationResult.reportPath,
+          serializationFormat: validationResult.serializationFormat,
+          metadata: {
+            ...(model.metadata ?? {}),
+            validationDiffPath: validationResult.diffPath,
+            validationWarnings: validationResult.warnings,
+            validationErrors: validationResult.errors,
+            shardCount: validationResult.shardCount,
+            validatedModelPath: validationResult.validatedModelPath ?? model.localPath,
+            validatedAt: validationResult.validatedAt ?? new Date().toISOString(),
+            validationStrictness: validationResult.validationStrictness ?? "publish",
+            tensorChecksCompleted: validationResult.tensorChecksCompleted,
+          },
+        },
+      });
     }
 
-    if (!request.allowInvalid && validationStatus !== "valid" && validationStatus !== "warning") {
+    if (!request.allowInvalid && validationStatus !== "valid") {
       throw new Error(`Model '${request.modelRecordId}' failed validation and cannot be published without override.`);
     }
 
@@ -56,6 +89,11 @@ export class PublishModelUseCase {
       },
     });
 
-    return { ...published, validationStatus };
+    return {
+      ...published,
+      validationStatus,
+      warnings: validationResult?.warnings,
+      errors: validationResult?.errors,
+    };
   }
 }

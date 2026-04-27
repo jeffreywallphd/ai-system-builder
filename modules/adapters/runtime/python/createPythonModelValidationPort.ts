@@ -30,6 +30,7 @@ export function createPythonModelValidationPort(
           modelPath: request.modelPath,
           expectedLoRA: request.expectedLoRA,
           expectedRecurrentAdditions: request.expectedRecurrentAdditions,
+          validationStrictness: request.validationStrictness,
         },
         timeoutMs: options?.taskTimeoutMs,
       });
@@ -52,6 +53,10 @@ export function createPythonModelValidationPort(
         shardCount: typeof payload.shardCount === "number" ? payload.shardCount : undefined,
         detectedLoRA: typeof payload.detectedLoRA === "boolean" ? payload.detectedLoRA : undefined,
         detectedRecurrentAdditions: typeof payload.detectedRecurrentAdditions === "boolean" ? payload.detectedRecurrentAdditions : undefined,
+        validatedModelPath: typeof payload.validatedModelPath === "string" ? payload.validatedModelPath : undefined,
+        validatedAt: typeof payload.validatedAt === "string" ? payload.validatedAt : undefined,
+        validationStrictness: payload.validationStrictness === "publish" ? "publish" : "normal",
+        tensorChecksCompleted: typeof payload.tensorChecksCompleted === "boolean" ? payload.tensorChecksCompleted : undefined,
         warnings: Array.isArray(payload.warnings) ? payload.warnings.map(String) : undefined,
         errors: Array.isArray(payload.errors) ? payload.errors.map(String) : undefined,
       };
