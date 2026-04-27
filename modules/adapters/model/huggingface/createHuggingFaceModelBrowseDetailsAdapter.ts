@@ -25,6 +25,7 @@ interface HuggingFaceModelListEntry {
   modelId?: string;
   name?: string;
   author?: string;
+  description?: string;
   pipeline_tag?: string;
   tags?: string[];
   downloads?: number;

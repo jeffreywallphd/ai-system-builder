@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
@@ -46,6 +47,8 @@ import {
   DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
@@ -111,14 +114,18 @@ describe("composeDesktopHost", () => {
     const ipcMain = {
       handle: testDouble.fn(),
     };
-    const host = composeDesktopHost();
+    const host = composeDesktopHost({
+      artifactRepo: {
+        huggingFaceTokenConfigFilePath: join(tmpdir(), `desktop-host-token-${Date.now()}.json`),
+      },
+    });
 
     host.registerArtifactUploadIpc({
       ipcMain,
-      storageRootDirectory: "/tmp/desktop-artifact-upload-test",
+      storageRootDirectory: join(tmpdir(), `desktop-artifact-upload-test-${Date.now()}`),
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(37);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(39);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -156,6 +163,8 @@ describe("composeDesktopHost", () => {
       DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
@@ -284,7 +293,11 @@ describe("composeDesktopHost", () => {
   });
 
   it("stores and exposes desktop Hugging Face token status", () => {
-    const host = composeDesktopHost();
+    const host = composeDesktopHost({
+      artifactRepo: {
+        huggingFaceTokenConfigFilePath: join(tmpdir(), `desktop-host-token-${Date.now()}.json`),
+      },
+    });
     expect(host.getHuggingFaceTokenStatus().configured).toBe(false);
     const saved = host.setHuggingFaceToken("hf_desktop_token");
     expect(saved.configured).toBe(true);

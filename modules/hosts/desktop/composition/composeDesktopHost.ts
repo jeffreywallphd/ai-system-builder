@@ -635,7 +635,7 @@ export function composeDesktopHost(
               repo: { type: "model", name: params.repo },
               file: {
                 path: params.path,
-                content: params.content,
+                content: new Blob([new Uint8Array(params.content)]),
               },
               branch: params.revision,
               accessToken: params.token,

@@ -39,6 +39,9 @@ import {
   createDesktopModelPublishSuccessResponse,
   createIpcError,
   createIpcFailureResponse,
+  type IpcChannel,
+  type IpcChannelValue,
+  type IpcOperation,
   type DesktopModelBrowseRequest,
   type DesktopModelBrowseResponse,
   type DesktopModelDetailsReadRequest,
@@ -73,7 +76,15 @@ export interface RegisterModelManagementIpcDependencies {
   publishModelUseCase: Pick<PublishModelUseCase, "execute">;
 }
 
-function toFailureResponse<TResponse>(channel: { value: string }, error: unknown, request: { requestId?: string; correlationId?: string }): TResponse {
+function toFailureResponse<
+  TResponse,
+  TOperation extends IpcOperation = IpcOperation,
+  TChannel extends IpcChannelValue<TOperation, "response"> = IpcChannelValue<TOperation, "response">,
+>(
+  channel: IpcChannel<TOperation, "response", TChannel>,
+  error: unknown,
+  request: { requestId?: string; correlationId?: string },
+): TResponse {
   return createIpcFailureResponse(
     createIpcError(
       channel,

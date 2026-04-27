@@ -5,6 +5,7 @@ import type {
   ModelTrainingResult,
   ModelTrainingStatus,
 } from "../../../contracts/model";
+import { normalizeModelTaskTag, type ModelTaskTag } from "../../../domain/model";
 import type {
   PythonRuntimeError,
   TrainModelTaskRequest,
@@ -32,12 +33,33 @@ function asStatus(value: unknown): ModelTrainingStatus {
   throw new Error("Invalid train-model result: status must be queued|running|succeeded|failed|cancelled.");
 }
 
+function toOptionalModelTaskTags(value: unknown): ModelTaskTag[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const tags: ModelTaskTag[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+
+    try {
+      tags.push(normalizeModelTaskTag(entry));
+    } catch {
+      // Runtime metadata can include provider-specific tags; only expose canonical model task tags.
+    }
+  }
+
+  return tags.length > 0 ? tags : undefined;
+}
+
 function mapRuntimeError(error: PythonRuntimeError | undefined): ModelTrainingResult {
   return {
     runId: error?.details && typeof error.details.runId === "string" ? error.details.runId : "runtime-error",
     status: "failed",
     error: {
-      code: error?.errorCode ?? error?.code ?? "runtime_task_failed",
+      code: error?.code ?? "runtime_task_failed",
       message: error?.message ?? "Python runtime training task failed.",
       details: error?.details,
     },
@@ -86,7 +108,7 @@ function mapRuntimeResult(data: unknown): ModelTrainingResult {
           localPath: typeof generatedCandidate.localPath === "string" ? generatedCandidate.localPath : undefined,
           artifactForm: typeof generatedCandidate.artifactForm === "string" ? generatedCandidate.artifactForm as "adapter" | "merged-model" | "full-model" | "checkpoint" : undefined,
           inferenceMode: typeof generatedCandidate.inferenceMode === "string" ? generatedCandidate.inferenceMode as "text2text" | "causal" | "chat" : undefined,
-          taskTags: Array.isArray(generatedCandidate.taskTags) ? generatedCandidate.taskTags.map((entry) => String(entry)) : undefined,
+          taskTags: toOptionalModelTaskTags(generatedCandidate.taskTags),
           baseModelId: typeof generatedCandidate.baseModelId === "string" ? generatedCandidate.baseModelId : undefined,
           adapterOfModelId: typeof generatedCandidate.adapterOfModelId === "string" ? generatedCandidate.adapterOfModelId : undefined,
           generatedFromRunId: typeof generatedCandidate.generatedFromRunId === "string" ? generatedCandidate.generatedFromRunId : undefined,
