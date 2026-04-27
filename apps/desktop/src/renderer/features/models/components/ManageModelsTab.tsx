@@ -97,6 +97,9 @@ export function ManageModelsTab(props: { state: ModelsState }) {
               <p>Primary artifact: {s.selectedManagedModel.primaryArtifactId ?? "none"}</p>
               <p>Backing artifact IDs: {s.selectedManagedModel.backingArtifactIds?.join(", ") ?? "none"}</p>
               <p>Validation: {s.selectedManagedModel.validationStatus ?? "unknown"}</p>
+              {s.selectedManagedModel.validationStatus === "warning" ? (
+                <p role="status">Warning validation is not safely publishable by default.</p>
+              ) : null}
               <p>Validation report: {s.selectedManagedModel.validationReportPath ?? "n/a"}</p>
               <div className="ui-grid ui-grid--two">
                 <button className="ui-button" type="button" onClick={() => void s.validateManagedModel()}>
@@ -106,7 +109,7 @@ export function ManageModelsTab(props: { state: ModelsState }) {
                   className="ui-button"
                   type="button"
                   onClick={() => void s.publishManagedModel()}
-                  disabled={s.selectedManagedModel.validationStatus !== "valid" && s.selectedManagedModel.validationStatus !== "warning"}
+                  disabled={s.selectedManagedModel.validationStatus !== "valid"}
                 >
                   Publish
                 </button>

@@ -245,6 +245,7 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
                         Path(payload.modelPath),
                         expected_lora=bool(payload.expectedLoRA),
                         expected_recurrent_additions=bool(payload.expectedRecurrentAdditions),
+                        validation_strictness=payload.validationStrictness or "normal",
                     )
                     return ValidateModelTaskResult(
                         modelRecordId=payload.modelRecordId,
@@ -255,6 +256,10 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
                         shardCount=result.get("shardCount"),
                         detectedLoRA=result.get("detectedLoRA"),
                         detectedRecurrentAdditions=result.get("detectedRecurrentAdditions"),
+                        validatedModelPath=result.get("validatedModelPath"),
+                        validatedAt=result.get("validatedAt"),
+                        validationStrictness=result.get("validationStrictness"),
+                        tensorChecksCompleted=result.get("tensorChecksCompleted"),
                         warnings=result.get("warnings"),
                         errors=result.get("errors"),
                     )

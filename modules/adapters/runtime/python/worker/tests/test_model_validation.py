@@ -35,6 +35,23 @@ def _mock_safe_open(monkeypatch, by_file: dict[str, dict[str, list[int]]]) -> No
     monkeypatch.setattr(validation_module, "_safe_open_module", lambda: _safe_open)
 
 
+def test_validate_missing_model_path_is_invalid(tmp_path: Path) -> None:
+    missing = tmp_path / "missing-model"
+    result = validate_model_output(missing)
+
+    assert result["status"] == "invalid"
+    assert any("does not exist" in error for error in result["errors"])
+
+
+def test_validate_model_path_must_be_directory(tmp_path: Path) -> None:
+    model_file = tmp_path / "model.safetensors"
+    model_file.write_bytes(b"x")
+    result = validate_model_output(model_file)
+
+    assert result["status"] == "invalid"
+    assert any("not a directory" in error for error in result["errors"])
+
+
 def test_validate_sharded_safetensors_detects_missing_shard(tmp_path: Path) -> None:
     (tmp_path / "model.safetensors.index.json").write_text(
         json.dumps({"weight_map": {"layer.0": "model-00001-of-00002.safetensors", "layer.1": "model-00002-of-00002.safetensors"}}),
@@ -108,3 +125,18 @@ def test_validate_detects_lora_tensor_keys(monkeypatch, tmp_path: Path) -> None:
 
     assert result["detectedLoRA"] is True
     assert diff["detectedLoRAKeys"] == ["layers.0.attn.q_proj.lora_A.weight"]
+
+
+def test_publish_strict_validation_fails_when_tensor_checks_are_skipped(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "model.safetensors").write_bytes(b"x")
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(validation_module, "_safe_open_module", lambda: None)
+
+    result = validate_model_output(tmp_path, validation_strictness="publish")
+    diff = json.loads((tmp_path / "model_validation_diff.json").read_text(encoding="utf-8"))
+
+    assert result["status"] == "invalid"
+    assert result["tensorChecksCompleted"] is False
+    assert diff["tensorChecksCompleted"] is False
+    assert diff["validationStrictness"] == "publish"
+    assert diff["validatedModelPath"] == str(tmp_path)
