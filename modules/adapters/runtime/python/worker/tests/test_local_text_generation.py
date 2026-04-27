@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import unittest
 from os import environ
 from unittest.mock import patch
@@ -60,6 +61,33 @@ class _FakeTokenizer:
         if return_dict:
             return {"input_ids": _FakeTensor([7, 8]), "attention_mask": _FakeTensor([1, 1])}
         return _FakeTensor([7, 8])
+
+
+class _FakeBatchEncoding(Mapping):
+    def __init__(self):
+        self._values = {"input_ids": _FakeTensor([7, 8]), "attention_mask": _FakeTensor([1, 1])}
+
+    def __getitem__(self, key):
+        return self._values[key]
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self):
+        return len(self._values)
+
+
+class _BatchEncodingChatTokenizer(_FakeTokenizer):
+    def apply_chat_template(
+        self,
+        _messages,
+        tokenize=True,
+        add_generation_prompt=True,
+        return_tensors="pt",
+        return_dict=False,
+    ):
+        del _messages, tokenize, add_generation_prompt, return_tensors, return_dict
+        return _FakeBatchEncoding()
 
 
 class _FakeModel:
@@ -205,6 +233,22 @@ class LocalTextGenerationTests(unittest.TestCase):
             generator = get_or_create_local_text_generator(config)
 
         self.assertEqual(generator.generate_text("prompt"), "44 55")
+        self.assertIn("attention_mask", fake_model.generate_calls[0])
+
+    def test_chat_mode_accepts_batch_encoding_tokenizer_output(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {"mode": "qa", "model": {"provider": "transformers", "modelId": "m", "inferenceMode": "chat"}}
+        )
+
+        fake_model = _FakeModel()
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.local_text_generation.TransformersCausalGenerator._load_model",
+            return_value=(_BatchEncodingChatTokenizer(), fake_model),
+        ):
+            generator = get_or_create_local_text_generator(config)
+
+        self.assertEqual(generator.generate_text("prompt"), "44 55")
+        self.assertIsInstance(fake_model.generate_calls[0]["input_ids"], _FakeTensor)
         self.assertIn("attention_mask", fake_model.generate_calls[0])
 
     def test_chat_mode_fails_clearly_without_chat_template(self) -> None:
