@@ -5,6 +5,9 @@ import { normalizeModelInferenceMode, type ModelInferenceMode } from "./model-in
 export type ModelBrowseSort = "downloads" | "likes" | "lastModified" | "relevance";
 export type SortDirection = "asc" | "desc";
 
+export const DEFAULT_BROWSE_MODELS_LIMIT = 25;
+export const MAX_BROWSE_MODELS_LIMIT = 100;
+
 export interface BrowseModelsRequest {
   provider: ModelBrowseProvider;
   query?: string;
@@ -55,13 +58,30 @@ function normalizeOptionalNonNegativeNumber(value: number | undefined): number |
   return value >= 0 ? value : undefined;
 }
 
+function normalizeBrowseLimit(limit: number | undefined): number {
+  if (typeof limit !== "number" || !Number.isFinite(limit)) {
+    return DEFAULT_BROWSE_MODELS_LIMIT;
+  }
+
+  const rounded = Math.trunc(limit);
+  if (rounded <= 0) {
+    return DEFAULT_BROWSE_MODELS_LIMIT;
+  }
+
+  if (rounded > MAX_BROWSE_MODELS_LIMIT) {
+    return MAX_BROWSE_MODELS_LIMIT;
+  }
+
+  return rounded;
+}
+
 export function normalizeBrowseModelsRequest(request: BrowseModelsRequest): BrowseModelsRequest {
   return {
     provider: normalizeModelBrowseProvider(request.provider),
     query: normalizeOptionalText(request.query),
     taskTags: normalizeModelTaskTags(request.taskTags),
     authorOrOrg: normalizeOptionalText(request.authorOrOrg),
-    limit: typeof request.limit === "number" ? request.limit : undefined,
+    limit: normalizeBrowseLimit(request.limit),
     cursor: normalizeOptionalText(request.cursor),
     sort: request.sort,
     direction: request.direction,

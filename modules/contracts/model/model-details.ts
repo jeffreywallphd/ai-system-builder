@@ -1,4 +1,3 @@
-import { type ModelTaskTag, normalizeModelTaskTags } from "../../domain/model";
 import { normalizeModelBrowseProvider, type ModelBrowseProvider } from "./model-browse-provider";
 import { normalizeModelInferenceMode, type ModelInferenceMode } from "./model-inference-mode";
 import { normalizeModelBrowseItem, type ModelBrowseItem } from "./browse-models";
@@ -8,11 +7,19 @@ export interface GetModelDetailsRequest {
   modelId: string;
 }
 
+export interface ModelFileDescriptor {
+  path: string;
+  sizeBytes?: number;
+  blobId?: string;
+  lfs?: boolean;
+}
+
 export interface ModelDetails extends ModelBrowseItem {
   cardMarkdown?: string;
   tags?: string[];
   pipelineTag?: string;
   siblings?: string[];
+  files?: ModelFileDescriptor[];
   config?: Record<string, unknown>;
   tokenizerAvailable?: boolean;
   safetensorsAvailable?: boolean;
@@ -52,6 +59,29 @@ function normalizeOptionalNonNegativeNumber(value: number | undefined): number |
   return value >= 0 ? value : undefined;
 }
 
+function normalizeModelFileDescriptor(file: ModelFileDescriptor): ModelFileDescriptor {
+  const path = file.path.trim();
+  if (path.length === 0) {
+    throw new Error("Model file descriptor path must be a non-empty trimmed string.");
+  }
+
+  return {
+    path,
+    sizeBytes: normalizeOptionalNonNegativeNumber(file.sizeBytes),
+    blobId: normalizeOptionalText(file.blobId),
+    lfs: typeof file.lfs === "boolean" ? file.lfs : undefined,
+  };
+}
+
+function normalizeModelFileDescriptors(files: readonly ModelFileDescriptor[] | undefined): ModelFileDescriptor[] | undefined {
+  if (!files) {
+    return undefined;
+  }
+
+  const normalized = files.map((file) => normalizeModelFileDescriptor(file));
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 export function normalizeGetModelDetailsRequest(request: GetModelDetailsRequest): GetModelDetailsRequest {
   const modelId = request.modelId.trim();
   if (modelId.length === 0) {
@@ -66,13 +96,16 @@ export function normalizeGetModelDetailsRequest(request: GetModelDetailsRequest)
 
 export function normalizeModelDetails(model: ModelDetails): ModelDetails {
   const browseModel = normalizeModelBrowseItem(model);
+  const files = normalizeModelFileDescriptors(model.files);
+  const siblings = normalizeStringList(model.siblings) ?? files?.map((file) => file.path);
 
   return {
     ...browseModel,
     cardMarkdown: normalizeOptionalText(model.cardMarkdown),
     tags: normalizeStringList(model.tags),
     pipelineTag: normalizeOptionalText(model.pipelineTag),
-    siblings: normalizeStringList(model.siblings),
+    siblings,
+    files,
     config: model.config,
     tokenizerAvailable: typeof model.tokenizerAvailable === "boolean" ? model.tokenizerAvailable : undefined,
     safetensorsAvailable: typeof model.safetensorsAvailable === "boolean" ? model.safetensorsAvailable : undefined,

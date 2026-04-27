@@ -5,6 +5,8 @@ import * as modelContracts from "..";
 describe("model family invariants", () => {
   it("exports only model-family surfaces from the family barrel", () => {
     expect(Object.keys(modelContracts).sort()).toEqual([
+      "DEFAULT_BROWSE_MODELS_LIMIT",
+      "MAX_BROWSE_MODELS_LIMIT",
       "MODEL_BROWSE_PROVIDERS",
       "MODEL_INFERENCE_MODES",
       "MODEL_TRAINING_METHODS",
@@ -22,6 +24,7 @@ describe("model family invariants", () => {
       "normalizeModelInventoryRecord",
       "normalizeModelValidationStatus",
       "normalizeModelValidationSummary",
+      "recommendModelInferenceMode",
     ].sort());
   });
 });

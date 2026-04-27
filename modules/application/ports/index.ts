@@ -11,3 +11,5 @@ export * from "./artifact-catalog";
 export * from "./artifact-content";
 export * from "./ingestion";
 export * from "./settings";
+
+export * from "./model";

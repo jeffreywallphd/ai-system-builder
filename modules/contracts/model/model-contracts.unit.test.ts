@@ -2,6 +2,8 @@ import { describe, expect, expectTypeOf, it } from "../../testing/node-test";
 
 import type { LocalModelConfig } from "../runtime";
 import {
+  DEFAULT_BROWSE_MODELS_LIMIT,
+  MAX_BROWSE_MODELS_LIMIT,
   MODEL_BROWSE_PROVIDERS,
   MODEL_INFERENCE_MODES,
   MODEL_TRAINING_METHODS,
@@ -9,9 +11,11 @@ import {
   MODEL_VALIDATION_STATUSES,
   normalizeBrowseModelsRequest,
   normalizeBrowseModelsResult,
+  normalizeModelDetails,
   normalizeModelInferenceMode,
   normalizeModelInventoryRecord,
   normalizeModelValidationSummary,
+  recommendModelInferenceMode,
   type BrowseModelsResult,
   type ModelInferenceMode,
   type ModelInventoryRecord,
@@ -68,6 +72,35 @@ describe("model contracts", () => {
       inferenceMode: "causal",
     });
     expect(result.nextCursor).toBe("page-2");
+  });
+
+  it("normalizes invalid browse limits to defaults and max", () => {
+    expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: 0 }).limit).toBe(DEFAULT_BROWSE_MODELS_LIMIT);
+    expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: -5 }).limit).toBe(DEFAULT_BROWSE_MODELS_LIMIT);
+    expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: 12.9 }).limit).toBe(12);
+    expect(normalizeBrowseModelsRequest({ provider: "huggingface", limit: 5000 }).limit).toBe(MAX_BROWSE_MODELS_LIMIT);
+    expect(normalizeBrowseModelsRequest({ provider: "huggingface" }).limit).toBe(DEFAULT_BROWSE_MODELS_LIMIT);
+  });
+
+  it("recommends inference mode from known pipeline/task tags", () => {
+    expect(recommendModelInferenceMode({ pipelineTag: "text2text-generation" })).toBe("text2text");
+    expect(recommendModelInferenceMode({ taskTags: ["summarization"] })).toBe("text2text");
+    expect(recommendModelInferenceMode({ taskTags: ["question-answering"] })).toBe("text2text");
+    expect(recommendModelInferenceMode({ pipelineTag: "text-generation" })).toBe("causal");
+    expect(recommendModelInferenceMode({ pipelineTag: "chat" })).toBe("chat");
+    expect(recommendModelInferenceMode({ pipelineTag: "unknown-task" })).toBeUndefined();
+  });
+
+  it("normalizes model details files and preserves siblings compatibility", () => {
+    const model = normalizeModelDetails({
+      provider: "huggingface",
+      modelId: "openai/demo-model",
+      displayName: "Demo Model",
+      files: [{ path: " model.safetensors ", sizeBytes: 1234, blobId: " abc ", lfs: true }],
+    });
+
+    expect(model.files).toEqual([{ path: "model.safetensors", sizeBytes: 1234, blobId: "abc", lfs: true }]);
+    expect(model.siblings).toEqual(["model.safetensors"]);
   });
 
   it("normalizes inventory records with model vocabulary types", () => {
