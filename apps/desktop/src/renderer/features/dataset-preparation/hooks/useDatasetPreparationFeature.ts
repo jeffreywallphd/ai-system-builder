@@ -21,8 +21,14 @@ interface DatasetPreparationResultSummary {
   datasetRows: number;
 }
 
+export type DatasetPreparationArtifactStorageFilter = "all" | "uploaded" | "generated";
+
 export interface UseDatasetPreparationFeatureResult {
-  artifacts: Array<{ artifactId: string; label: string }>;
+  artifacts: Array<{ artifactId: string; label: string; storageKey: string }>;
+  filteredArtifacts: Array<{ artifactId: string; label: string; storageKey: string }>;
+  uploadedArtifacts: Array<{ artifactId: string; label: string; storageKey: string }>;
+  generatedArtifacts: Array<{ artifactId: string; label: string; storageKey: string }>;
+  selectedArtifactStorageFilter: DatasetPreparationArtifactStorageFilter;
   selectedArtifactIds: string[];
   unsupportedDocumentPolicy: "" | "fail" | "skip";
   normalizationMode: "" | "best-effort" | "strict";
@@ -59,6 +65,7 @@ export interface UseDatasetPreparationFeatureResult {
   stopTrainingInFlight: boolean;
   unloadModelInFlight: boolean;
   onToggleArtifact: (artifactId: string) => void;
+  setSelectedArtifactStorageFilter: (value: DatasetPreparationArtifactStorageFilter) => void;
   setUnsupportedDocumentPolicy: (value: "" | "fail" | "skip") => void;
   setNormalizationMode: (value: "" | "best-effort" | "strict") => void;
   setChunkSize: (value: string) => void;
@@ -132,7 +139,9 @@ export function useDatasetPreparationFeature(
       return undefined;
     }
   }, [options.runtimeStatusClient]);
-  const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string }>>([]);
+  const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string; storageKey: string }>>([]);
+  const [selectedArtifactStorageFilter, setSelectedArtifactStorageFilter] =
+    useState<DatasetPreparationArtifactStorageFilter>("all");
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
   const [unsupportedDocumentPolicy, setUnsupportedDocumentPolicy] = useState<"" | "fail" | "skip">("");
   const [normalizationMode, setNormalizationMode] = useState<"" | "best-effort" | "strict">("");
@@ -255,6 +264,24 @@ export function useDatasetPreparationFeature(
         ? current.filter((id) => id !== artifactId)
         : [...current, artifactId]);
   }, []);
+
+  const uploadedArtifacts = useMemo(
+    () => artifacts.filter((artifact) => artifact.storageKey.startsWith("uploads/")),
+    [artifacts],
+  );
+  const generatedArtifacts = useMemo(
+    () => artifacts.filter((artifact) => artifact.storageKey.startsWith("generated/")),
+    [artifacts],
+  );
+  const filteredArtifacts = useMemo(() => {
+    if (selectedArtifactStorageFilter === "uploaded") {
+      return uploadedArtifacts;
+    }
+    if (selectedArtifactStorageFilter === "generated") {
+      return generatedArtifacts;
+    }
+    return artifacts;
+  }, [artifacts, generatedArtifacts, selectedArtifactStorageFilter, uploadedArtifacts]);
 
   const onSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -470,6 +497,10 @@ export function useDatasetPreparationFeature(
 
   return {
     artifacts,
+    filteredArtifacts,
+    uploadedArtifacts,
+    generatedArtifacts,
+    selectedArtifactStorageFilter,
     selectedArtifactIds,
     unsupportedDocumentPolicy,
     normalizationMode,
@@ -506,6 +537,7 @@ export function useDatasetPreparationFeature(
     stopTrainingInFlight,
     unloadModelInFlight,
     onToggleArtifact,
+    setSelectedArtifactStorageFilter,
     setUnsupportedDocumentPolicy,
     setNormalizationMode,
     setChunkSize,

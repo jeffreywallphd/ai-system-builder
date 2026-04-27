@@ -91,7 +91,7 @@ describe("DatasetPreparationFeature", () => {
         <DatasetPreparationFeature
           settingsClient={settingsClient}
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts,
           }}
         />,
@@ -99,6 +99,11 @@ describe("DatasetPreparationFeature", () => {
     });
 
     expect(container.textContent).toContain("Dataset preparation model defaults");
+    const modelOverridesToggle = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Model override defaults"));
+    await act(async () => {
+      modelOverridesToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
     expect(container.textContent).toContain("Inference mode");
 
     const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
@@ -168,7 +173,7 @@ describe("DatasetPreparationFeature", () => {
       root?.render(
         <DatasetPreparationFeature
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
@@ -219,7 +224,7 @@ describe("DatasetPreparationFeature", () => {
           settingsClient={settingsClient}
           runtimeStatusClient={runtimeStatusClient}
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts,
           }}
         />,
@@ -321,7 +326,7 @@ describe("DatasetPreparationFeature", () => {
           settingsClient={settingsClient}
           runtimeStatusClient={runtimeStatusClient}
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts,
           }}
         />,
@@ -394,7 +399,7 @@ describe("DatasetPreparationFeature", () => {
         <DatasetPreparationFeature
           runtimeStatusClient={runtimeStatusClient}
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
@@ -428,7 +433,7 @@ describe("DatasetPreparationFeature", () => {
             resolveModelDefault: vi.fn().mockRejectedValue(new Error("settings failed")),
           }}
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
@@ -451,7 +456,7 @@ describe("DatasetPreparationFeature", () => {
             readSettings: vi.fn().mockRejectedValue(new Error("read failed")),
           }}
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
@@ -515,7 +520,7 @@ describe("DatasetPreparationFeature", () => {
           onPrepared={onPrepared}
           settingsClient={settingsClient}
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts,
           }}
         />,
@@ -528,7 +533,7 @@ describe("DatasetPreparationFeature", () => {
           onPrepared={onPrepared}
           settingsClient={settingsClient}
           client={{
-            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl" }],
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts,
           }}
         />,

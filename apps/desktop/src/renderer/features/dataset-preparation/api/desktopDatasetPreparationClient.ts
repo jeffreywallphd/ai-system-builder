@@ -28,7 +28,7 @@ export interface DesktopDatasetPreparationRequestContext {
 }
 
 export interface DesktopDatasetPreparationClient {
-  browseSourceArtifacts: () => Promise<Array<{ artifactId: string; label: string }>>;
+  browseSourceArtifacts: () => Promise<Array<{ artifactId: string; label: string; storageKey: string }>>;
   prepareTrainingDatasetFromArtifacts: (
     input: DesktopPrepareTrainingDatasetInput,
     context?: DesktopDatasetPreparationRequestContext,
@@ -70,10 +70,14 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         if (typeof artifact.artifactId !== "string" || artifact.artifactId.trim().length === 0) {
           throw new Error("Artifact browse item is missing artifactId.");
         }
+        if (typeof artifact.storageKey !== "string" || artifact.storageKey.trim().length === 0) {
+          throw new Error("Artifact browse item is missing storageKey.");
+        }
 
         return {
           artifactId: artifact.artifactId,
           label: artifact.originalName ?? artifact.storageKey,
+          storageKey: artifact.storageKey,
         };
       });
     },

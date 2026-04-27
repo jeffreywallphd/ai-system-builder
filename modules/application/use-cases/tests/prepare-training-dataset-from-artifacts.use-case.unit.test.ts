@@ -153,6 +153,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     expect(runtimeRequest.sourceInputs[0]?.originalName).toBe("key-artifact-1.md");
     expect(runtimeRequest.runtime).toBeUndefined();
     expect(deps.storeArtifact).toHaveBeenCalledTimes(1);
+    expect(deps.storeArtifact.mock.calls[0]?.[0]?.descriptor?.key?.startsWith("generated/")).toBe(true);
     expect(result.value.outputs.local?.dataset.storage.key).toBe("stored-dataset");
     expect(result.value.outputs.huggingFace).toBeUndefined();
     expect((result.value as Record<string, unknown>).train).toBeUndefined();
@@ -410,6 +411,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     }
 
     expect(deps.storeArtifact).toHaveBeenCalledTimes(1);
+    expect(deps.storeArtifact.mock.calls[0]?.[0]?.descriptor?.key?.startsWith("generated/")).toBe(true);
     expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(1);
     expect(result.value.outputs.local?.dataset.storage.key).toBe("stored-dataset");
     expect(result.value.outputs.huggingFace?.dataset.path).toBe("dataset.jsonl");

@@ -86,7 +86,7 @@ describe("desktop dataset preparation client", () => {
       requestId: "req-123",
     });
 
-    expect(browseResult).toEqual([{ artifactId: "artifact-1", label: "stored/a1.jsonl" }]);
+    expect(browseResult).toEqual([{ artifactId: "artifact-1", label: "stored/a1.jsonl", storageKey: "stored/a1.jsonl" }]);
     expect(response.ok).toBe(true);
     expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.any(Object), { requestId: "req-123" });
   });
@@ -154,6 +154,33 @@ describe("desktop dataset preparation client", () => {
 
     await expect(client.browseSourceArtifacts()).rejects.toThrow(
       "Artifact browse item is missing artifactId.",
+    );
+  });
+
+  it("throws when browse items are missing storageKey", async () => {
+    const hostWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
+    hostWindow.window ??= {} as Window & typeof globalThis;
+    hostWindow.window.desktopApi = {
+      uploadArtifact: async () => ({ ok: false }),
+      getArtifactUploadPolicy: async () => ({ ok: false }),
+      browseArtifacts: async () => ({
+        ok: true,
+        value: { items: [{ artifactId: "artifact-1", artifactFamily: "structured-text" }] },
+      }),
+      readArtifactDetail: async () => ({ ok: false }),
+      readArtifactContentDescriptor: async () => ({ ok: false }),
+      readArtifactViewerMedia: async () => ({ ok: false }),
+      publishArtifactToRepo: async () => ({ ok: false }),
+      verifyPublishedArtifactBacking: async () => ({ ok: false }),
+      registerArtifactFromRepo: async () => ({ ok: false }),
+      localizeArtifactFromRepo: async () => ({ ok: false }),
+      prepareTrainingDatasetFromArtifacts: async () => ({ ok: false }),
+    };
+
+    const client = createDesktopDatasetPreparationClient();
+
+    await expect(client.browseSourceArtifacts()).rejects.toThrow(
+      "Artifact browse item is missing storageKey.",
     );
   });
 });

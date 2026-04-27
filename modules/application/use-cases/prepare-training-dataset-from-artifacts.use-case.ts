@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, parse } from "node:path";
+import { randomUUID } from "node:crypto";
 
 import {
   createStagedArtifactDescriptorFromStorageObjectDescriptor,
@@ -199,6 +200,23 @@ function joinRepoPath(pathPrefix: string | undefined, fileName: string): string 
   return normalizedPrefix ? `${normalizedPrefix}/${fileName}` : fileName;
 }
 
+function buildGeneratedDatasetStorageKey(
+  outputName: string,
+  outputFormat: PrepareTrainingDatasetRequest["output"]["format"],
+  nowIsoString: string,
+): string {
+  const compactTimestamp = nowIsoString.replace(/[-:.TZ]/g, "");
+  const safeOutputName = outputName
+    .trim()
+    .replace(/[\\/]+/g, "-")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const outputBaseName = safeOutputName.length > 0 ? safeOutputName : "dataset";
+  const suffix = randomUUID().replaceAll("-", "");
+  return `generated/${compactTimestamp}-${suffix}-${outputBaseName}.${outputFormat}`;
+}
+
 function buildDatasetMetadata(
   command: PrepareTrainingDatasetFromArtifactsCommand,
   summary: DatasetPreparationSummary,
@@ -368,8 +386,14 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
 
       let localOutputs: PrepareTrainingDatasetFromArtifactsValue["outputs"]["local"];
       if (destinations.local) {
+        const generatedStorageKey = buildGeneratedDatasetStorageKey(
+          datasetOutput.name,
+          command.output.format,
+          this.now(),
+        );
         const storedDataset = await this.storage.storeArtifact(createStoreArtifactRequest(datasetBytes, {
           descriptor: {
+            key: generatedStorageKey,
             mediaType: datasetOutput.mediaType,
             metadata: {
               originalFileName: `${datasetOutput.name}.${command.output.format}`,
