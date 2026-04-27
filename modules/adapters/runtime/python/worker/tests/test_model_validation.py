@@ -40,6 +40,22 @@ def test_validate_missing_model_path_is_invalid(tmp_path: Path) -> None:
     result = validate_model_output(missing)
 
     assert result["status"] == "invalid"
+    assert result["validationReportPath"] is None
+    assert result["validationDiffPath"] is None
+    assert any("does not exist" in error for error in result["errors"])
+
+
+def test_validate_missing_model_path_writes_report_to_fallback_directory(tmp_path: Path) -> None:
+    missing = tmp_path / "missing-model"
+    reports = tmp_path / "reports"
+
+    result = validate_model_output(missing, report_output_dir=reports)
+
+    assert result["status"] == "invalid"
+    assert result["validationReportPath"] is not None
+    assert result["validationDiffPath"] is not None
+    assert Path(result["validationReportPath"]).exists()
+    assert Path(result["validationDiffPath"]).exists()
     assert any("does not exist" in error for error in result["errors"])
 
 

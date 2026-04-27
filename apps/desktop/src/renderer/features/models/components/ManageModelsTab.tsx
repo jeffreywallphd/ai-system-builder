@@ -101,6 +101,10 @@ export function ManageModelsTab(props: { state: ModelsState }) {
                 <p role="status">Warning validation is not safely publishable by default.</p>
               ) : null}
               <p>Validation report: {s.selectedManagedModel.validationReportPath ?? "n/a"}</p>
+              <label className="ui-stack ui-stack--sm">
+                <span>Hugging Face repository (owner/name)</span>
+                <input className="ui-input" value={s.publishRepository} onChange={(event) => s.setPublishRepository(event.target.value)} placeholder="owner/model-name" />
+              </label>
               <div className="ui-grid ui-grid--two">
                 <button className="ui-button" type="button" onClick={() => void s.validateManagedModel()}>
                   Validate
@@ -109,15 +113,11 @@ export function ManageModelsTab(props: { state: ModelsState }) {
                   className="ui-button"
                   type="button"
                   onClick={() => void s.publishManagedModel()}
-                  disabled={s.selectedManagedModel.validationStatus !== "valid"}
+                  disabled={s.selectedManagedModel.validationStatus !== "valid" || s.publishRepository.trim().length === 0}
                 >
                   Publish
                 </button>
               </div>
-              <label className="ui-stack ui-stack--sm">
-                <span>Hugging Face repository (owner/name)</span>
-                <input className="ui-input" value={s.publishRepository} onChange={(event) => s.setPublishRepository(event.target.value)} placeholder="owner/model-name" />
-              </label>
             </>
           ) : <p>Select a model asset record.</p>}
         </section>

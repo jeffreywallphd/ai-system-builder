@@ -80,6 +80,7 @@ def _read_safetensors_index(output_dir: Path) -> tuple[dict[str, str], list[str]
 def validate_model_output(
     output_dir: Path,
     *,
+    report_output_dir: Path | None = None,
     expected_lora: bool = False,
     expected_recurrent_additions: bool = False,
     validation_strictness: str = "normal",
@@ -94,12 +95,48 @@ def validate_model_output(
         errors.append(f"Model path is not a directory: {output_dir}")
 
     if errors:
+        report_path: str | None = None
+        diff_path: str | None = None
+        if report_output_dir is not None:
+            report_output_dir.mkdir(parents=True, exist_ok=True)
+            report_name = f"{output_dir.name or 'model'}_validation_report.md"
+            diff_name = f"{output_dir.name or 'model'}_validation_diff.json"
+            fallback_report = report_output_dir / report_name
+            fallback_diff = report_output_dir / diff_name
+            fallback_diff.write_text(
+                json.dumps(
+                    {
+                        "errors": errors,
+                        "warnings": warnings,
+                        "validationStrictness": validation_strictness,
+                        "validatedModelPath": str(output_dir),
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            fallback_report.write_text(
+                "\n".join([
+                    "# Model Validation Report",
+                    "",
+                    "- Status: **invalid**",
+                    f"- Validation strictness: `{validation_strictness}`",
+                    "",
+                    "## Errors",
+                    *[f"- {error}" for error in errors],
+                ]),
+                encoding="utf-8",
+            )
+            report_path = str(fallback_report)
+            diff_path = str(fallback_diff)
+
         status = "invalid"
         return {
             "status": status,
             "serializationFormat": "unknown",
-            "validationReportPath": None,
-            "validationDiffPath": None,
+            "validationReportPath": report_path,
+            "validationDiffPath": diff_path,
             "warnings": warnings,
             "errors": errors,
             "shardCount": 0,

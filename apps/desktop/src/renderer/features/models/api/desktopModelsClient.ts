@@ -38,7 +38,13 @@ export interface DesktopModelsClient {
   deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean }) => Promise<DesktopDeleteModelRecordResult>;
   trainModel: (input: DesktopModelTrainingRequest) => Promise<DesktopModelTrainingResult>;
   validateModel: (input: { modelRecordId: string; modelPath?: string; expectedLoRA?: boolean }) => Promise<DesktopValidateModelResult>;
-  publishModel: (input: { modelRecordId: string; repository: string; revision?: string; allowInvalid?: boolean }) => Promise<DesktopPublishModelResult>;
+  publishModel: (input: {
+    modelRecordId: string;
+    repository: string;
+    revision?: string;
+    allowWarningValidation?: boolean;
+    allowInvalidValidation?: boolean;
+  }) => Promise<DesktopPublishModelResult>;
 }
 
 export function createDesktopModelsClient(): DesktopModelsClient {

@@ -243,6 +243,7 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
                 try:
                     result = validate_model_output(
                         Path(payload.modelPath),
+                        report_output_dir=Path(payload.reportOutputDirectory) if payload.reportOutputDirectory else None,
                         expected_lora=bool(payload.expectedLoRA),
                         expected_recurrent_additions=bool(payload.expectedRecurrentAdditions),
                         validation_strictness=payload.validationStrictness or "normal",

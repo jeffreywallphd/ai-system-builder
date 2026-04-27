@@ -142,8 +142,84 @@ describe("PublishModelUseCase", () => {
       modelPublisher: { publishModel },
     });
 
-    await useCase.execute({ modelRecordId: "m1", repository: "owner/repo", allowInvalid: true });
+    await useCase.execute({ modelRecordId: "m1", repository: "owner/repo", allowWarningValidation: true });
     expect(publishModel).toHaveBeenCalled();
+  });
+
+  it("treats warning and invalid overrides as distinct controls", async () => {
+    const warningPublish = testDouble.fn().mockResolvedValue({ modelRecordId: "m-warning", published: true, provider: "huggingface", repository: "owner/repo" });
+    const warningUseCase = new PublishModelUseCase({
+      modelRegistry: {
+        getModelRecord: testDouble.fn().mockResolvedValue({
+          modelRecordId: "m-warning",
+          localPath: "/tmp/m-warning",
+          validationStatus: "warning",
+          metadata: { validatedModelPath: "/tmp/m-warning", validatedAt: "2026-04-27T00:00:00.000Z", validationStrictness: "publish" },
+        }),
+        updateModelRecord: testDouble.fn().mockResolvedValue({ model: {} }),
+      } as never,
+      modelValidation: { validateModel: testDouble.fn() },
+      modelPublisher: { publishModel: warningPublish },
+    });
+
+    await expect(warningUseCase.execute({
+      modelRecordId: "m-warning",
+      repository: "owner/repo",
+      allowInvalidValidation: true,
+    })).rejects.toThrow(/failed validation/i);
+    await warningUseCase.execute({
+      modelRecordId: "m-warning",
+      repository: "owner/repo",
+      allowWarningValidation: true,
+    });
+    expect(warningPublish).toHaveBeenCalledTimes(1);
+
+    const invalidPublish = testDouble.fn().mockResolvedValue({ modelRecordId: "m-invalid", published: true, provider: "huggingface", repository: "owner/repo" });
+    const invalidUseCase = new PublishModelUseCase({
+      modelRegistry: {
+        getModelRecord: testDouble.fn().mockResolvedValue({
+          modelRecordId: "m-invalid",
+          localPath: "/tmp/m-invalid",
+          validationStatus: "invalid",
+          metadata: { validatedModelPath: "/tmp/m-invalid", validatedAt: "2026-04-27T00:00:00.000Z", validationStrictness: "publish" },
+        }),
+        updateModelRecord: testDouble.fn().mockResolvedValue({ model: {} }),
+      } as never,
+      modelValidation: { validateModel: testDouble.fn() },
+      modelPublisher: { publishModel: invalidPublish },
+    });
+
+    await expect(invalidUseCase.execute({
+      modelRecordId: "m-invalid",
+      repository: "owner/repo",
+      allowWarningValidation: true,
+    })).rejects.toThrow(/failed validation/i);
+    await invalidUseCase.execute({
+      modelRecordId: "m-invalid",
+      repository: "owner/repo",
+      allowInvalidValidation: true,
+    });
+    expect(invalidPublish).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps deprecated allowInvalid to both warning and invalid overrides", async () => {
+    const publishModel = testDouble.fn().mockResolvedValue({ modelRecordId: "m1", published: true, provider: "huggingface", repository: "owner/repo" });
+    const useCase = new PublishModelUseCase({
+      modelRegistry: {
+        getModelRecord: testDouble.fn().mockResolvedValue({
+          modelRecordId: "m1",
+          localPath: "/tmp/m1",
+          validationStatus: "invalid",
+          metadata: { validatedModelPath: "/tmp/m1", validatedAt: "2026-04-27T00:00:00.000Z", validationStrictness: "publish" },
+        }),
+        updateModelRecord: testDouble.fn().mockResolvedValue({ model: {} }),
+      } as never,
+      modelValidation: { validateModel: testDouble.fn() },
+      modelPublisher: { publishModel },
+    });
+
+    await useCase.execute({ modelRecordId: "m1", repository: "owner/repo", allowInvalid: true });
+    expect(publishModel).toHaveBeenCalledTimes(1);
   });
 
   it("revalidates when validation metadata is stale and requires publish strictness", async () => {
@@ -218,5 +294,54 @@ describe("PublishModelUseCase", () => {
     expect(patch.source).toBeUndefined();
     expect(patch.modelId).toBeUndefined();
     expect(patch.lifecycleStatus).toBeUndefined();
+  });
+
+  it("preserves validation metadata when publish updates metadata after revalidation", async () => {
+    const updateModelRecord = testDouble.fn().mockResolvedValue({ model: {} });
+    const publishModel = testDouble.fn().mockResolvedValue({
+      modelRecordId: "m1",
+      published: true,
+      provider: "huggingface",
+      repository: "owner/repo",
+    });
+    const useCase = new PublishModelUseCase({
+      modelRegistry: {
+        getModelRecord: testDouble.fn().mockResolvedValue({
+          modelRecordId: "m1",
+          localPath: "/tmp/m1",
+          validationStatus: "unknown",
+          metadata: { existing: true },
+        }),
+        updateModelRecord,
+      } as never,
+      modelValidation: {
+        validateModel: testDouble.fn().mockResolvedValue({
+          modelRecordId: "m1",
+          status: "valid",
+          reportPath: "/tmp/report.md",
+          diffPath: "/tmp/diff.json",
+          warnings: ["w1"],
+          errors: [],
+          shardCount: 2,
+          validatedModelPath: "/tmp/m1",
+          validatedAt: "2026-04-27T01:00:00.000Z",
+          validationStrictness: "publish",
+          tensorChecksCompleted: true,
+        }),
+      } as never,
+      modelPublisher: { publishModel },
+    });
+
+    await useCase.execute({ modelRecordId: "m1", repository: "owner/repo" });
+    const publishedPatch = updateModelRecord.mock.calls[1]?.[0]?.patch as { metadata?: Record<string, unknown> };
+    expect(publishedPatch.metadata?.validationDiffPath).toBe("/tmp/diff.json");
+    expect(publishedPatch.metadata?.validationWarnings).toEqual(["w1"]);
+    expect(publishedPatch.metadata?.validationErrors).toEqual([]);
+    expect(publishedPatch.metadata?.shardCount).toBe(2);
+    expect(publishedPatch.metadata?.validatedModelPath).toBe("/tmp/m1");
+    expect(publishedPatch.metadata?.validatedAt).toBe("2026-04-27T01:00:00.000Z");
+    expect(publishedPatch.metadata?.validationStrictness).toBe("publish");
+    expect(publishedPatch.metadata?.tensorChecksCompleted).toBe(true);
+    expect(publishedPatch.metadata?.publishedRepository).toBe("owner/repo");
   });
 });
