@@ -13,6 +13,7 @@ import {
 } from "../../domain/artifact";
 
 export interface ArtifactBrowseItem {
+  artifactId: string;
   storageKey: StorageArtifactKey;
   artifactFamily: ArtifactFamily;
   mediaType?: string;
@@ -39,6 +40,7 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 export function normalizeArtifactBrowseItem(item: ArtifactBrowseItem): ArtifactBrowseItem {
   return {
     ...item,
+    artifactId: normalizeStorageArtifactKey(item.artifactId),
     storageKey: normalizeStorageArtifactKey(item.storageKey),
     artifactFamily: normalizeArtifactFamily(item.artifactFamily),
     mediaType: normalizeOptionalText(item.mediaType),

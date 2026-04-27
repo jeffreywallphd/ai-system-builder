@@ -3,6 +3,14 @@
   color: var(--color-text-secondary);
 }
 
+.ui-input {
+  background: var(--color-bg-panel);
+  border: 1px solid (--color-border-inverse);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
+  color: var(--color-text-primary);
+}
+
 .ui-file-input {
   width: 100%;
   min-height: var(--control-height-md);

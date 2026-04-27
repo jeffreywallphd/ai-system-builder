@@ -25,6 +25,7 @@
 - Use role-revealing names; avoid vague catch-all naming for files, folders, and symbols.
 - Use shared operation identity helpers/patterns for contract operations (lowercase dotted names) to prevent ad hoc drift.
 - Treat API and IPC contracts as specializations of shared transport contracts, not parallel response/error systems.
+- Use best practices in code commenting in all code files.
 - Keep IPC channels operation-derived (`ipc.<operation>.<kind>`) via shared helpers.
 - Update canonical docs in the same change when documented behavior/architecture/standards change.
 - Use structured, meaningful logs with configurable verbosity and stage-level timing for long operations.
@@ -47,6 +48,8 @@
 - Prompt builders must add only targeted companion packs (not all packs by default).
 
 ## Canonical Source Docs
+
+Only use these when needed. Do not overload the context window with uncessary information.
 
 - `docs/adr/README.md` — ADR workflow and decision-record discipline.
 - `docs/architecture/module-dependency-rules.md` — boundary and dependency direction constraints.

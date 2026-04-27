@@ -2,9 +2,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ArtifactUploadFeature } from "../components/ArtifactUploadFeature";
+import { ArtifactIngestionFeature } from "../components/ArtifactIngestionFeature";
 
-describe("ArtifactUploadFeature", () => {
+describe("ArtifactIngestionFeature", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
 
@@ -32,6 +32,7 @@ describe("ArtifactUploadFeature", () => {
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn(),
+      readArtifactMedia: vi.fn(),
       publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn(),
@@ -45,11 +46,14 @@ describe("ArtifactUploadFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ArtifactUploadFeature client={uploadClient} ingestionClient={ingestionClient} />);
+      root.render(<ArtifactIngestionFeature client={uploadClient} ingestionClient={ingestionClient} />);
     });
 
-    expect(container.textContent).toContain("Artifact upload");
-    expect(container.textContent).toContain("Hugging Face token");
+    expect(container.textContent).toContain("Data Artifact Ingester");
+    expect(container.textContent).toContain("Hugging Face settings");
     expect(container.textContent).toContain("Register from Hugging Face");
+    expect(container.textContent).toContain("Scrape web data");
+    expect(container.textContent).toContain("Ingest page");
+    expect(container.textContent).toContain("Ingest batch");
   });
 });

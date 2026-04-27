@@ -6,6 +6,7 @@ import {
   DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL,
+  DESKTOP_ARTIFACT_REGISTERED_DELETE_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL,
   DESKTOP_ARTIFACT_MEDIA_VIEW_RESPONSE_CHANNEL,
@@ -181,7 +182,7 @@ describe("registerArtifactBrowserIpc", () => {
 
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(17);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(18);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value)).toBe(true);
@@ -191,6 +192,7 @@ describe("registerArtifactBrowserIpc", () => {
     expect(handlers.has(DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_ARTIFACT_REGISTERED_DELETE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_CONTENT_READ_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_MEDIA_VIEW_REQUEST_CHANNEL.value)).toBe(true);

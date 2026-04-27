@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect } from "react";
 
 import {
   deriveArtifactBackingState,
@@ -10,6 +10,7 @@ import {
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { ARTIFACT_BROWSER_FAMILY_OPTIONS } from "../artifactFamilyOptions";
 import { useArtifactBrowserFeature } from "../hooks/useArtifactBrowserFeature";
+import { SettingsPanel, useApplicationSettings } from "../../settings";
 
 export interface ArtifactBrowserFeatureProps {
   client?: DesktopArtifactBrowserClient;
@@ -48,6 +49,7 @@ function PublishedBackingPanel(
 }
 
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
+  const settings = useApplicationSettings({ keys: ["huggingface.defaultNamespace"] });
   const {
     items,
     unregisteredItems,
@@ -55,6 +57,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     detail,
     content,
     imageViewUrl,
+    htmlPreview,
     publishState,
     localizeState,
     sourceVerifyState,
@@ -85,6 +88,18 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     togglePublishForm,
   } = useArtifactBrowserFeature(client);
   const backingState = deriveArtifactBackingState(detail, content);
+  const defaultNamespace = settings.valuesByKey.get("huggingface.defaultNamespace")?.value;
+
+  useEffect(() => {
+    if (
+      publishForm.showPublishForm
+      && publishForm.repository.trim().length === 0
+      && typeof defaultNamespace === "string"
+      && defaultNamespace.trim().length > 0
+    ) {
+      setRepository(`${defaultNamespace.trim()}/`);
+    }
+  }, [defaultNamespace, publishForm.repository, publishForm.showPublishForm, setRepository]);
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -96,13 +111,21 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       </header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
       <section className="ui-stack ui-stack--sm">
-        <h3>Filter by family</h3>
-        <div className="ui-grid ui-grid--two">
-          <button className="ui-button" type="button" aria-current={selectedArtifactFamily === "all" ? "page" : undefined} onClick={() => setSelectedArtifactFamily("all")}>All</button>
-          {ARTIFACT_BROWSER_FAMILY_OPTIONS.map((family) => (
-            <button key={family} className="ui-button" type="button" aria-current={selectedArtifactFamily === family ? "page" : undefined} onClick={() => setSelectedArtifactFamily(family)}>{family}</button>
-          ))}
-        </div>
+        <label className="ui-stack ui-stack--sm">
+          <span>Filter artifacts</span>
+          <select
+            className="ui-input"
+            value={selectedArtifactFamily}
+            onChange={(event) => setSelectedArtifactFamily(event.target.value as typeof selectedArtifactFamily)}
+          >
+            <option value="all">All</option>
+            {ARTIFACT_BROWSER_FAMILY_OPTIONS.map((family) => (
+              <option key={family} value={family}>
+                {family}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
       {pendingDeleteConfirmation ? (
         <section className="ui-panel ui-stack ui-stack--sm" role="dialog" aria-label="Delete confirmation">
@@ -133,18 +156,20 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       <div className="ui-grid ui-grid--two">
         <div className="ui-stack ui-stack--sm">
           <h3>Artifacts</h3>
-          <ul className="ui-stack ui-stack--sm">
+          <section className="ui-stack ui-stack--sm">
             {items.map((item) => (
-              <li key={item.storageKey}>
-                <button className="ui-button" type="button" onClick={() => void selectArtifact(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
-                  {item.originalName ?? item.storageKey}
-                </button>
-                {item.metadata?.backingState ? (
+              <section key={item.storageKey}>
+                <p>{item.originalName ?? item.storageKey}</p>
+                <p>Status: {item.metadata?.backingState ? (
                   <small>{deriveArtifactListStatusLabels(item.metadata.backingState).join(" · ")}</small>
                 ) : null}
-              </li>
+                </p>
+                <button className="ui-button" type="button" onClick={() => void selectArtifact(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
+                  View Details
+                </button>                
+              </section>              
             ))}
-          </ul>
+          </section>
           <section className="ui-stack ui-stack--sm">
             <h3>Unregistered Artifacts</h3>
             <ul className="ui-stack ui-stack--sm">
@@ -192,6 +217,28 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <dd>{detail.createdAt ?? "unknown"}</dd>
             </dl>
           ) : (<p className="ui-text-muted">Select an artifact to inspect metadata and preview availability.</p>)}
+
+          {detail?.metadata?.websiteCapture ? (
+            <section className="ui-stack ui-stack--sm">
+              <h3>Website capture metadata</h3>
+              <dl className="ui-grid ui-grid--two">
+                <dt>Source URL</dt>
+                <dd>{detail.metadata.websiteCapture.sourceUrl}</dd>
+                <dt>Resolved URL</dt>
+                <dd>{detail.metadata.websiteCapture.resolvedUrl}</dd>
+                <dt>Requested mode</dt>
+                <dd>{detail.metadata.websiteCapture.requestedMode}</dd>
+                <dt>Acquisition mechanism</dt>
+                <dd>{detail.metadata.websiteCapture.acquisitionMechanismUsed}</dd>
+                <dt>Retrieved at</dt>
+                <dd>{detail.metadata.websiteCapture.retrievedAt}</dd>
+                <dt>HTTP status</dt>
+                <dd>{detail.metadata.websiteCapture.httpStatus ?? "unknown"}</dd>
+                <dt>Content-Type</dt>
+                <dd>{detail.metadata.websiteCapture.contentTypeHeader ?? "unknown"}</dd>
+              </dl>
+            </section>
+          ) : null}
 
           {content ? (
             <dl className="ui-grid ui-grid--two">
@@ -274,8 +321,20 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
             </figure>
           ) : null}
 
+          {htmlPreview && content?.availability === "available" ? (
+            <section className="ui-stack ui-stack--sm">
+              <h3>HTML source preview</h3>
+              <pre className="ui-panel artifact-browser__html-preview">{htmlPreview}</pre>
+            </section>
+          ) : null}
+
           {detail ? (
             <section className="ui-stack ui-stack--sm">
+              <SettingsPanel
+                compact
+                title="Hugging Face defaults"
+                keys={["huggingface.token", "huggingface.defaultNamespace"]}
+              />
               {backingState.hasLocalObjectAvailable ? (
                 <>
                   <button className="ui-button" type="button" disabled={publishState.status === "loading"} onClick={togglePublishForm}>Publish to Hugging Face</button>

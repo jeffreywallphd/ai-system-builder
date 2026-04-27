@@ -107,6 +107,7 @@ describe("desktop artifact-browser ipc contract", () => {
     const browseResponse = createDesktopArtifactBrowseSuccessResponse({
       items: [
         {
+          artifactId: " staged/images/artifact-31 ",
           storageKey: " staged/images/artifact-31 ",
           artifactFamily: "image",
           mediaType: " image/png ",
@@ -137,6 +138,7 @@ describe("desktop artifact-browser ipc contract", () => {
       throw new Error("Expected browse response to be successful.");
     }
     expect(browseResponse.value.items[0].storageKey).toBe("staged/images/artifact-31");
+    expect(browseResponse.value.items[0].artifactId).toBe("staged/images/artifact-31");
     expect("content" in browseResponse.value.items[0]).toBe(false);
 
     if (!readResponse.ok) {

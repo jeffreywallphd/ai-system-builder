@@ -1,7 +1,23 @@
 import { describe, expect, it } from "../../testing/node-test";
 
 import {
+  type DatasetOutputConfig,
+  type DatasetPreparationRecipe,
+  type DatasetPreparationSourceInput,
+  type DatasetPreparationSummary,
+  type DatasetPreparationWarning,
+  type DatasetSplitConfig,
   KNOWN_RUNTIME_KINDS,
+  type PrepareTrainingDatasetRequest,
+  type PrepareTrainingDatasetResult,
+  type PythonRuntimeCapabilitiesResult,
+  PYTHON_RUNTIME_CAPABILITY_DATASET_PREPARATION_AUTO_INFERENCE_MODE,
+  PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES,
+  type PythonRuntimeHealthCheckResult,
+  type PythonRuntimeHealthStatus,
+  type PythonRuntimeOutputDescriptor,
+  type PythonRuntimeTaskRequest,
+  type PythonRuntimeTaskResult,
   createRuntimeOperation,
   createRuntimeExecutionDiagnostic,
   createRuntimeExecutionError,
@@ -266,5 +282,252 @@ describe("runtime contracts", () => {
       requestId: "req-3",
       correlationId: "corr-3",
     });
+  });
+});
+
+describe("python sidecar runtime contracts", () => {
+  it("models health status and health checks with explicit lifecycle states", () => {
+    const status: PythonRuntimeHealthStatus = {
+      runtimeId: "python-sidecar-1",
+      status: "degraded",
+      version: "0.1.0",
+      pythonVersion: "3.12.2",
+      workerStartedAt: "2026-04-20T11:00:00.000Z",
+      lastHeartbeatAt: "2026-04-20T11:00:30.000Z",
+    };
+
+    const healthCheck: PythonRuntimeHealthCheckResult = {
+      healthy: false,
+      status,
+      error: {
+        code: "heartbeat_stale",
+        message: "Heartbeat is stale.",
+        retryable: true,
+        details: {
+          staleByMs: 120000,
+        },
+      },
+      message: "Python runtime heartbeat exceeded threshold.",
+    };
+
+    expect(healthCheck.status.status).toBe("degraded");
+    expect(healthCheck.error?.code).toBe("heartbeat_stale");
+    expect(healthCheck.error?.retryable).toBe(true);
+  });
+
+  it("models runtime capabilities as sidecar-advertised task types", () => {
+    const capabilities: PythonRuntimeCapabilitiesResult = {
+      runtimeId: "python-sidecar-1",
+      capabilities: [
+        "prepare-training-dataset",
+        PYTHON_RUNTIME_CAPABILITY_DATASET_PREPARATION_AUTO_INFERENCE_MODE,
+        "future-task-type",
+      ],
+    };
+
+    expect(capabilities.runtimeId).toBe("python-sidecar-1");
+    expect(capabilities.capabilities).toContain("prepare-training-dataset");
+    expect(PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES).toEqual([
+      "prepare-training-dataset",
+      "dataset-preparation.auto-inference-mode",
+    ]);
+  });
+
+  it("uses runtime output descriptors as canonical output handoff contracts", () => {
+    const output: PythonRuntimeOutputDescriptor = {
+      name: "dataset",
+      role: "dataset",
+      tempPath: "/tmp/runtime/dataset.jsonl",
+      mediaType: "application/x-ndjson",
+      sizeBytes: 1024,
+      metadata: {
+        partition: "dataset",
+      },
+    };
+
+    expect(output).toMatchObject({
+      name: "dataset",
+      role: "dataset",
+      tempPath: "/tmp/runtime/dataset.jsonl",
+      mediaType: "application/x-ndjson",
+    });
+  });
+
+  it("keeps generic python runtime task request/result envelopes stable and metadata-friendly", () => {
+    const request: PythonRuntimeTaskRequest = {
+      requestId: "req-python-1",
+      taskType: "prepare-training-dataset",
+      payload: {
+        sourceInputs: [{ artifactId: "artifact-1", localPath: "/tmp/a.jsonl", mediaType: "application/x-ndjson" }],
+      },
+      timeoutMs: 10000,
+      metadata: {
+        initiatedBy: "application",
+      },
+    };
+    const result: PythonRuntimeTaskResult = {
+      requestId: request.requestId,
+      taskType: request.taskType,
+      success: false,
+      error: {
+        code: "validation_failed",
+        message: "Payload validation failed.",
+        retryable: false,
+      },
+      metadata: {
+        stage: "validation",
+      },
+    };
+
+    expect(result.requestId).toBe(request.requestId);
+    expect(result.taskType).toBe(request.taskType);
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("validation_failed");
+  });
+
+  it("keeps dataset preparation contracts task-specific with recipe, split, output, summary, and warnings", () => {
+    const sourceInputs: DatasetPreparationSourceInput[] = [
+      { artifactId: "artifact-1", localPath: "/tmp/a.md", mediaType: "text/markdown", originalName: "a.md" },
+      { artifactId: "artifact-2", localPath: "/tmp/b.pdf", mediaType: "application/pdf", originalName: "b.pdf" },
+    ];
+    const recipe: DatasetPreparationRecipe = {
+      normalization: {
+        targetFormat: "markdown",
+        unsupportedDocumentPolicy: "skip",
+        normalizationMode: "best-effort",
+      },
+      chunking: {
+        strategy: "character",
+        chunkSize: 800,
+        chunkOverlap: 120,
+        preserveDocumentBoundaries: true,
+      },
+      generation: {
+        mode: "qa",
+        model: {
+          provider: "transformers",
+          modelId: "Qwen/Qwen2.5-3B-Instruct",
+          inferenceMode: "chat",
+          device: "auto",
+          torchDtype: "bfloat16",
+        },
+        promptTemplate: "Generate QA examples from this chunk.",
+        maxExamplesPerChunk: 4,
+        generationParams: {
+          temperature: 0.2,
+          topP: 0.9,
+          maxNewTokens: 256,
+        },
+        failurePolicy: "skip",
+      },
+    };
+    const split: DatasetSplitConfig = {
+      trainRatio: 0.8,
+      testRatio: 0.2,
+      seed: 42,
+      shuffle: true,
+    };
+    const output: DatasetOutputConfig = {
+      format: "jsonl",
+      naming: {
+        baseName: "support-ticket-dataset",
+      },
+      destinations: {
+        local: { enabled: true },
+        huggingFace: {
+          enabled: true,
+          provider: "huggingface",
+          repository: "acme/support-dataset",
+          revision: "main",
+          pathPrefix: "prepared",
+        },
+      },
+    };
+
+    const request: PrepareTrainingDatasetRequest = {
+      sourceInputs,
+      recipe,
+      split,
+      output,
+    };
+
+    const summary: DatasetPreparationSummary = {
+      sourceDocumentCount: 2,
+      normalizedDocumentCount: 2,
+      skippedDocumentCount: 0,
+      chunkCount: 14,
+      generatedExampleCount: 56,
+      datasetRowCount: 56,
+      trainRowCount: 56,
+      testRowCount: 0,
+    };
+    const warnings: DatasetPreparationWarning[] = [{
+      code: "source_media_type_inferred",
+      message: "Inferred media type from extension.",
+      sourceArtifactId: "artifact-2",
+    }];
+
+    const result: PrepareTrainingDatasetResult = {
+      outputs: [
+        {
+          name: "support-ticket-dataset",
+          role: "dataset",
+          tempPath: "/tmp/runtime/support-ticket-dataset.jsonl",
+          mediaType: "application/x-ndjson",
+        },
+      ],
+      summary,
+      warnings,
+    };
+
+    expect(request.recipe.generation.mode).toBe("qa");
+    expect(request.recipe.generation.model.inferenceMode).toBe("chat");
+    expect(request.recipe.normalization.targetFormat).toBe("markdown");
+    expect(request.recipe.chunking.strategy).toBe("character");
+    expect(request.split.shuffle).toBe(true);
+    expect(request.output.naming?.baseName).toBe("support-ticket-dataset");
+    expect(request.output.destinations?.huggingFace?.repository).toBe("acme/support-dataset");
+    expect(result.outputs.length).toBe(1);
+    expect(result.outputs.map((output) => output.role)).toEqual(["dataset"]);
+    expect(result.summary.datasetRowCount).toBe(56);
+    expect(result.warnings?.[0]?.code).toBe("source_media_type_inferred");
+  });
+
+  it("restricts local model inference mode to explicit supported literals", () => {
+    const autoModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "Qwen/Qwen3-1.7B",
+      inferenceMode: "auto",
+    };
+    const text2textModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "google/flan-t5-base",
+      inferenceMode: "text2text",
+    };
+    const causalModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "Qwen/Qwen2.5-3B",
+      inferenceMode: "causal",
+    };
+    const chatModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "Qwen/Qwen2.5-3B-Instruct",
+      inferenceMode: "chat",
+    };
+
+    expect([autoModel, text2textModel, causalModel, chatModel].map((model) => model.inferenceMode)).toEqual([
+      "auto",
+      "text2text",
+      "causal",
+      "chat",
+    ]);
+
+    const invalidModel: DatasetPreparationRecipe["generation"]["model"] = {
+      provider: "transformers",
+      modelId: "broken/model",
+      // @ts-expect-error Inference mode is intentionally narrow and explicit.
+      inferenceMode: "seq2seq",
+    };
+    expect(invalidModel).toBeDefined();
   });
 });

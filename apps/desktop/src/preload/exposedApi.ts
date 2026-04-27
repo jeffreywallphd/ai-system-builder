@@ -109,8 +109,67 @@ import {
   createDesktopHuggingFaceDatasetParquetFilesBrowseRequest,
   type DesktopHuggingFaceNamespaceDatasetsBrowseResponse,
   type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
+  DESKTOP_INGEST_WEBSITE_PAGE_OPERATION,
+  DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGE_RESPONSE_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGES_BATCH_OPERATION,
+  DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGES_BATCH_RESPONSE_CHANNEL,
+  createDesktopIngestWebsitePageRequest,
+  createDesktopIngestWebsitePagesBatchRequest,
+  type DesktopIngestWebsitePageRequest,
+  type DesktopIngestWebsitePageResponse,
+  type DesktopIngestWebsitePagesBatchRequest,
+  type DesktopIngestWebsitePagesBatchResponse,
+  DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
+  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_OPERATION,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
+  createDesktopPrepareTrainingDatasetRequest,
+  createDesktopPythonRuntimeControlRequest,
+  createDesktopPythonRuntimeStatusReadRequest,
+  type DesktopPrepareTrainingDatasetRequest,
+  type DesktopPrepareTrainingDatasetResponse,
+  type DesktopPythonRuntimeControlResponse,
+  type DesktopPythonRuntimeStatusReadResponse,
+  DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_READ_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_READ_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_READ_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_UPDATE_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_UPDATE_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_CLEAR_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_CLEAR_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL,
+  createDesktopApplicationSettingsListDefinitionsRequest,
+  createDesktopApplicationSettingsReadRequest,
+  createDesktopApplicationSettingsUpdateRequest,
+  createDesktopApplicationSettingsClearRequest,
+  createDesktopApplicationSettingsResolveModelDefaultRequest,
+  type DesktopApplicationSettingsListDefinitionsResponse,
+  type DesktopApplicationSettingsReadResponse,
+  type DesktopApplicationSettingsUpdateResponse,
+  type DesktopApplicationSettingsClearResponse,
+  type DesktopApplicationSettingsResolveModelDefaultResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
+import type {
+  ListApplicationSettingDefinitionsRequest,
+  ReadApplicationSettingsRequest,
+  ResolveModelDefaultRequest,
+  UpdateApplicationSettingRequest,
+} from "../../../../modules/contracts/settings";
 
 const DEFAULT_UPLOAD_SOURCE = "desktop.renderer.artifact-upload.form";
 const DEFAULT_ARTIFACT_SOURCE = "desktop.renderer.artifact-browser";
@@ -160,6 +219,37 @@ export interface DesktopPreloadApi {
   getArtifactUploadPolicy: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUploadPolicyReadResponse>;
+  ingestWebsitePage: (
+    input: {
+      url: string;
+      label?: string;
+      mode?: "automatic" | "rendered";
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopIngestWebsitePageResponse>;
+  ingestWebsitePagesBatch: (
+    input: {
+      targets: Array<{ url: string; label?: string }>;
+      mode?: "automatic" | "rendered";
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopIngestWebsitePagesBatchResponse>;
+  prepareTrainingDatasetFromArtifacts: (
+    input: {
+      sourceArtifactIds: string[];
+      recipe: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["recipe"];
+      split: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["split"];
+      output: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["output"];
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopPrepareTrainingDatasetResponse>;
+  readPythonRuntimeStatus: (
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
+  controlPythonRuntime: (
+    input: { action: "start" | "stop" | "restart" | "unload-model" },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopPythonRuntimeControlResponse>;
   browseArtifacts: (
     input?: { artifactFamily?: ArtifactFamily },
     context?: DesktopArtifactUploadBridgeContext,
@@ -235,6 +325,30 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactLocalizeFromRepoResponse>;
+  listApplicationSettingDefinitions: (
+    input?: ListApplicationSettingDefinitionsRequest,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsListDefinitionsResponse>;
+  readApplicationSettings: (
+    input?: ReadApplicationSettingsRequest,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsReadResponse>;
+  updateApplicationSetting: (
+    input: UpdateApplicationSettingRequest,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsUpdateResponse>;
+  clearApplicationSetting: (
+    input: { key: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsClearResponse>;
+  resolveApplicationModelDefault: (
+    input: ResolveModelDefaultRequest,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
+  resolveModelDefault: (
+    input: ResolveModelDefaultRequest,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -411,6 +525,132 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_OPERATION,
         channel: DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact upload policy IPC response envelope.",
+      });
+    },
+
+    async ingestWebsitePage(input, context = {}) {
+      const request: DesktopIngestWebsitePageRequest = createDesktopIngestWebsitePageRequest(
+        {
+          request: {
+            url: input.url,
+            label: input.label,
+            mode: input.mode,
+          },
+          boundary: {
+            host: "desktop",
+            source: uploadSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopIngestWebsitePageResponse>(response, {
+        operation: DESKTOP_INGEST_WEBSITE_PAGE_OPERATION,
+        channel: DESKTOP_INGEST_WEBSITE_PAGE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop website-page ingestion IPC response envelope.",
+      });
+    },
+
+    async ingestWebsitePagesBatch(input, context = {}) {
+      const request: DesktopIngestWebsitePagesBatchRequest = createDesktopIngestWebsitePagesBatchRequest(
+        {
+          request: {
+            targets: input.targets,
+            mode: input.mode,
+          },
+          boundary: {
+            host: "desktop",
+            source: uploadSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopIngestWebsitePagesBatchResponse>(response, {
+        operation: DESKTOP_INGEST_WEBSITE_PAGES_BATCH_OPERATION,
+        channel: DESKTOP_INGEST_WEBSITE_PAGES_BATCH_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop website-pages batch ingestion IPC response envelope.",
+      });
+    },
+
+    async prepareTrainingDatasetFromArtifacts(input, context = {}) {
+      const request: DesktopPrepareTrainingDatasetRequest = createDesktopPrepareTrainingDatasetRequest(
+        {
+          command: {
+            sourceArtifactIds: input.sourceArtifactIds,
+            recipe: input.recipe,
+            split: input.split,
+            output: input.output,
+          },
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.dataset-preparation",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetResponse>(response, {
+        operation: DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
+        channel: DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop dataset preparation IPC response envelope.",
+      });
+    },
+
+    async readPythonRuntimeStatus(context = {}) {
+      const request = createDesktopPythonRuntimeStatusReadRequest(
+        {
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.python-runtime-footer",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopPythonRuntimeStatusReadResponse>(response, {
+        operation: DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
+        channel: DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop python runtime status IPC response envelope.",
+      });
+    },
+
+    async controlPythonRuntime(input, context = {}) {
+      const request = createDesktopPythonRuntimeControlRequest(
+        {
+          action: input.action,
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.python-runtime-footer",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopPythonRuntimeControlResponse>(response, {
+        operation: DESKTOP_PYTHON_RUNTIME_CONTROL_OPERATION,
+        channel: DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop python runtime control IPC response envelope.",
       });
     },
 
@@ -698,6 +938,74 @@ export function createDesktopPreloadApi(
         channel: DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop artifact localize-from-repo IPC response envelope.",
       });
+    },
+    async listApplicationSettingDefinitions(input = {}, context = {}) {
+      const request = createDesktopApplicationSettingsListDefinitionsRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsListDefinitionsResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings list-definitions IPC response envelope.",
+      });
+    },
+    async readApplicationSettings(input = {}, context = {}) {
+      const request = createDesktopApplicationSettingsReadRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsReadResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_READ_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings read IPC response envelope.",
+      });
+    },
+    async updateApplicationSetting(input, context = {}) {
+      const request = createDesktopApplicationSettingsUpdateRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsUpdateResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_UPDATE_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_UPDATE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings update IPC response envelope.",
+      });
+    },
+    async clearApplicationSetting(input, context = {}) {
+      const request = createDesktopApplicationSettingsClearRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsClearResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_CLEAR_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_CLEAR_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings clear IPC response envelope.",
+      });
+    },
+    async resolveApplicationModelDefault(input, context = {}) {
+      const request = createDesktopApplicationSettingsResolveModelDefaultRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsResolveModelDefaultResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings resolve-model-default IPC response envelope.",
+      });
+    },
+    async resolveModelDefault(input, context = {}) {
+      return this.resolveApplicationModelDefault(input, context);
     },
   };
 }

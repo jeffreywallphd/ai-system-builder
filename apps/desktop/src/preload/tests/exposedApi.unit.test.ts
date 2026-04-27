@@ -28,6 +28,16 @@ import {
   createIpcFailureResponse,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   createDesktopHuggingFaceTokenGetSuccessResponse,
+  DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL,
+  createDesktopIngestWebsitePageSuccessResponse,
+  createDesktopIngestWebsitePagesBatchSuccessResponse,
+  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
+  createDesktopPrepareTrainingDatasetSuccessResponse,
+  DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
+  createDesktopPythonRuntimeStatusReadSuccessResponse,
+  createDesktopPythonRuntimeControlSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
@@ -302,4 +312,173 @@ it("maps unregistered artifact browse/register/delete bridge calls to dedicated 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[2]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value);
+});
+
+
+it("maps website page ingestion bridge calls to dedicated IPC request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopIngestWebsitePageSuccessResponse({
+      target: { url: "https://example.com" },
+      resolvedUrl: "https://example.com",
+      acquisitionMechanismUsed: "simple-http",
+      sourceKind: "scrape",
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  const response = await api.ingestWebsitePage({ url: "https://example.com", mode: "automatic" });
+
+  expect(response.ok).toBe(true);
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value);
+});
+
+it("maps training dataset preparation bridge calls to dedicated IPC request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopPrepareTrainingDatasetSuccessResponse({
+      outputs: {
+        local: {
+          dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } },
+        },
+      },
+      provenance: {
+        sourceArtifactIds: ["artifact-1"],
+        recipe: {
+          normalization: { targetFormat: "markdown" },
+          chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+          generation: { mode: "qa", model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" } },
+        },
+        split: { trainRatio: 0.8, testRatio: 0.2, seed: 7, shuffle: true },
+        output: { format: "jsonl" },
+        generationModelId: "Qwen/Qwen2.5-1.5B-Instruct",
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 2,
+          generatedExampleCount: 10,
+          datasetRowCount: 10,
+          trainRowCount: 10,
+          testRowCount: 0,
+        },
+      },
+      summary: {
+        sourceDocumentCount: 1,
+        normalizedDocumentCount: 1,
+        skippedDocumentCount: 0,
+        chunkCount: 2,
+        generatedExampleCount: 10,
+        datasetRowCount: 10,
+        trainRowCount: 10,
+        testRowCount: 0,
+      },
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  const response = await api.prepareTrainingDatasetFromArtifacts({
+    sourceArtifactIds: ["artifact-1"],
+    recipe: {
+      normalization: { targetFormat: "markdown" },
+      chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+      generation: {
+        mode: "qa",
+        model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" },
+        promptTemplate: "Prompt: {{text}}",
+      },
+    },
+    split: { trainRatio: 0.8, testRatio: 0.2, seed: 7, shuffle: true },
+    output: { format: "jsonl" },
+  });
+
+  expect(response.ok).toBe(true);
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value);
+});
+
+it("maps website pages batch ingestion bridge calls to dedicated IPC request channel", async () => {
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+    createDesktopIngestWebsitePagesBatchSuccessResponse({
+      items: [],
+      summary: { attempted: 0, succeeded: 0, failed: 0 },
+    }),
+  );
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  const response = await api.ingestWebsitePagesBatch({
+    targets: [{ url: "https://example.com/a" }, { url: "https://example.com/b" }],
+    mode: "rendered",
+  });
+
+  expect(response.ok).toBe(true);
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value);
+});
+
+it("maps python runtime status/control bridge calls to dedicated IPC request channels", async () => {
+  const responses = [
+    createDesktopPythonRuntimeStatusReadSuccessResponse({
+      supervisorStatus: "ready",
+      healthy: true,
+      runtimeStatus: "ready",
+      capabilities: ["prepare-training-dataset"],
+      logs: [],
+    }),
+    createDesktopPythonRuntimeControlSuccessResponse({
+      supervisorStatus: "starting",
+      healthy: false,
+      runtimeStatus: "starting",
+      capabilities: [],
+      logs: [],
+    }),
+  ];
+  let index = 0;
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
+    const response = responses[index];
+    index += 1;
+    return response;
+  });
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+  await api.readPythonRuntimeStatus();
+  await api.controlPythonRuntime({ action: "restart" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value);
+});
+
+it("maps application settings bridge calls to dedicated settings channels", async () => {
+  const responses = [
+    {
+      ok: true,
+      operation: "application-settings.list-definitions",
+      channel: "ipc.application-settings.list-definitions.response",
+      value: { definitions: [] },
+    },
+    {
+      ok: true,
+      operation: "application-settings.read",
+      channel: "ipc.application-settings.read.response",
+      value: { values: [{ key: "huggingface.token", configured: true, masked: true, maskedValue: "********" }] },
+    },
+    {
+      ok: true,
+      operation: "application-settings.resolve-model-default",
+      channel: "ipc.application-settings.resolve-model-default.response",
+      value: { resolved: { provider: "transformers", modelId: "google/flan-t5-small", inferenceMode: "text2text", source: "builtin" } },
+    },
+  ];
+  let index = 0;
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
+    const response = responses[index];
+    index += 1;
+    return response;
+  });
+
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+  await api.listApplicationSettingDefinitions();
+  const read = await api.readApplicationSettings({ keys: ["huggingface.token"] });
+  const resolved = await api.resolveModelDefault({ taskKey: "qaGeneration" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe("ipc.application-settings.list-definitions.request");
+  expect(invoke.mock.calls[1]?.[0]).toBe("ipc.application-settings.read.request");
+  expect(read.value.values[0]?.maskedValue).toBe("********");
+  expect(resolved.value.resolved.inferenceMode).toBe("text2text");
 });

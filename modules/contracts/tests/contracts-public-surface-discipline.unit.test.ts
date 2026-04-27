@@ -18,6 +18,7 @@ const CONTRACT_FAMILIES = [
   "logging",
   "persistence",
   "runtime",
+  "settings",
   "shared",
   "storage",
   "transform",
