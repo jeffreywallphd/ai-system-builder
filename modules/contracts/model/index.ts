@@ -1,5 +1,6 @@
 export * from "./model-browse-provider";
 export * from "./model-inference-mode";
+export * from "./model-inference-recommendation";
 export * from "./browse-models";
 export * from "./model-details";
 export * from "./model-validation";
