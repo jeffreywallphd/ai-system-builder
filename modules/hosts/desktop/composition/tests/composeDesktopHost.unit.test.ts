@@ -294,6 +294,19 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port");
   });
 
+  it("configures Python runtime startup timeout for slower cold starts", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000");
+    expect(source).toContain("Number(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS)");
+    expect(source).toContain("startupTimeoutMs: pythonRuntimeStartupTimeoutMs");
+  });
+
   it("stores and exposes desktop Hugging Face token status", () => {
     const host = composeDesktopHost({
       artifactRepo: {

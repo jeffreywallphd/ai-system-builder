@@ -132,6 +132,7 @@ export function resolvePythonRuntimeBaseUrl(env: NodeJS.ProcessEnv = process.env
 
 const PYTHON_RUNTIME_MANAGED_BASE_PORT = 43111;
 const PYTHON_RUNTIME_MANAGED_PORT_SPAN = 10_000;
+const PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000;
 const DATASET_PREPARATION_TASK_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 
@@ -217,6 +218,11 @@ export function composeDesktopHost(
   });
   const pythonRuntimeEndpoint = resolvePythonRuntimeHostAndPort();
   const pythonRuntimeBaseUrl = resolvePythonRuntimeBaseUrl();
+  const configuredPythonRuntimeStartupTimeoutMs = Number(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS);
+  const pythonRuntimeStartupTimeoutMs =
+    Number.isFinite(configuredPythonRuntimeStartupTimeoutMs) && configuredPythonRuntimeStartupTimeoutMs > 0
+      ? configuredPythonRuntimeStartupTimeoutMs
+      : PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT;
   const pythonRuntimeEnvironment = {
     ...process.env,
     PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.host,
@@ -233,6 +239,7 @@ export function composeDesktopHost(
       args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
       cwd: process.env.PYTHON_RUNTIME_WORKER_DIR ?? "modules/adapters/runtime/python/worker",
       env: pythonRuntimeEnvironment,
+      startupTimeoutMs: pythonRuntimeStartupTimeoutMs,
       requiredCapabilities: PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES,
       prepareRuntimeEnvironment(context) {
         ensurePythonRuntimeWorkerDependencies({
