@@ -41,6 +41,33 @@ describe("createPythonModelTrainingPort", () => {
     expect(result.outputModelName).toBe("demo-adapter");
   });
 
+  it("maps generated model candidates with canonical task tags only", async () => {
+    const port = createPythonModelTrainingPort({
+      executeTask: testDouble.fn<PythonRuntimePort["executeTask"]>().mockResolvedValue({
+        requestId: "req-generated",
+        taskType: "train-model",
+        success: true,
+        data: {
+          runId: "run-generated",
+          status: "succeeded",
+          generatedModelCandidate: {
+            displayName: "Generated adapter",
+            taskTags: ["chat", "provider-specific"],
+          },
+        },
+      }),
+      getHealthStatus: testDouble.fn(),
+      getCapabilities: testDouble.fn(),
+      ensureModelDownloaded: testDouble.fn(),
+      getModelStatus: testDouble.fn(),
+      unloadModels: testDouble.fn(),
+    });
+
+    const result = await port.trainModel(request);
+
+    expect(result.generatedModelCandidate?.taskTags).toEqual(["chat"]);
+  });
+
   it("maps runtime failures with warnings/details", async () => {
     const port = createPythonModelTrainingPort({
       executeTask: testDouble.fn<PythonRuntimePort["executeTask"]>().mockResolvedValue({
