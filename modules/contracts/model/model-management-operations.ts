@@ -63,6 +63,8 @@ export interface RegisterDownloadedModelRequest {
   adapterOfModelId?: string;
   serializationFormat?: string;
   sizeBytes?: number;
+  validationStatus?: ModelValidationStatus;
+  validationReportPath?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -238,6 +240,11 @@ export function normalizeRegisterGeneratedModelRequest(
     generatedFromRunId: normalizeOptionalText(request.generatedFromRunId),
     serializationFormat: normalizeOptionalText(request.serializationFormat),
     sizeBytes: typeof request.sizeBytes === "number" && request.sizeBytes >= 0 ? request.sizeBytes : undefined,
+    validationStatus:
+      typeof request.validationStatus === "string"
+        ? normalizeModelValidationStatus(request.validationStatus)
+        : undefined,
+    validationReportPath: normalizeOptionalText(request.validationReportPath),
     metadata: request.metadata,
   };
 }

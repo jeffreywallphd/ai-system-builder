@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../../modules/domain/model";
+import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../modules/contracts/model";
 import type { DesktopModelBrowseItem, DesktopModelDetailsResult, DesktopModelInventoryRecord } from "../../../lib/desktopApi";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsClient } from "./useModelsClient";

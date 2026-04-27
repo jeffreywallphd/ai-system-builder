@@ -10,7 +10,7 @@ import {
   type DesktopValidateModelResult,
   type DesktopPublishModelResult,
 } from "../../../lib/desktopApi";
-import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../modules/domain/model";
+import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../modules/contracts/model";
 
 interface PreloadEnvelope {
   ok: boolean;
