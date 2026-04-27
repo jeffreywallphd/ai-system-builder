@@ -47,6 +47,28 @@ export interface SaveModelReferenceResult {
   model: ModelInventoryRecord;
 }
 
+export interface DownloadModelRequest {
+  modelRecordId?: string;
+  provider: ModelBrowseProvider;
+  modelId: string;
+  displayName?: string;
+  inferenceMode?: ModelInferenceMode;
+  taskTags?: ModelTaskTag[];
+  artifactForm?: ModelArtifactForm;
+  metadata?: Record<string, unknown>;
+}
+
+export interface DownloadModelResult {
+  model: ModelInventoryRecord;
+  download: {
+    provider: "transformers";
+    modelId: string;
+    downloaded: boolean;
+    fromCache: boolean;
+    localPath: string;
+  };
+}
+
 export interface RegisterDownloadedModelRequest {
   modelRecordId?: string;
   displayName: string;
@@ -179,6 +201,19 @@ export function normalizeListModelsResult(result: ListModelsResult): ListModelsR
 }
 
 export function normalizeSaveModelReferenceRequest(request: SaveModelReferenceRequest): SaveModelReferenceRequest {
+  return {
+    modelRecordId: normalizeOptionalText(request.modelRecordId),
+    provider: normalizeModelBrowseProvider(request.provider),
+    modelId: normalizeRequiredText(request.modelId, "modelId"),
+    displayName: normalizeOptionalText(request.displayName),
+    inferenceMode: typeof request.inferenceMode === "string" ? normalizeModelInferenceMode(request.inferenceMode) : undefined,
+    taskTags: normalizeModelTaskTags(request.taskTags),
+    artifactForm: typeof request.artifactForm === "string" ? normalizeModelArtifactForm(request.artifactForm) : undefined,
+    metadata: request.metadata,
+  };
+}
+
+export function normalizeDownloadModelRequest(request: DownloadModelRequest): DownloadModelRequest {
   return {
     modelRecordId: normalizeOptionalText(request.modelRecordId),
     provider: normalizeModelBrowseProvider(request.provider),

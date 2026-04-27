@@ -30,26 +30,36 @@ export function BrowseModelsTab(props: { state: ModelsState }) {
             <article key={item.modelId} className="ui-panel ui-stack ui-stack--sm">
               <strong>{item.displayName}</strong>
               <p>{item.modelId}</p>
-              <small>{item.authorOrOrg ?? "unknown author"} · {item.taskTags?.join(", ") ?? "no task tags"}</small>
-              <small>downloads: {item.downloads ?? "n/a"} · likes: {item.likes ?? "n/a"} · license: {item.license ?? "n/a"}</small>
-              <small>inference: {item.inferenceMode ?? "unknown"} · gated: {item.gated ? "yes" : "no"} · private: {item.private ? "yes" : "no"}</small>
+              {item.description ? <p>{item.description}</p> : null}
+              <small>{item.taskTags?.join(", ") ?? "no task tags"}</small>
+              <small>downloads: {item.downloads ?? "n/a"} | likes: {item.likes ?? "n/a"} | license: {item.license ?? "n/a"}</small>
+              <small>inference: {item.inferenceMode ?? "unknown"} | gated: {item.gated ? "yes" : "no"} | private: {item.private ? "yes" : "no"}</small>
               <button className="ui-button" type="button" onClick={() => void s.selectBrowseModel(item)}>View Details</button>
+              <button className="ui-button" type="button" onClick={() => void s.saveModelReference(item)}>Save</button>
+              <button className="ui-button" type="button" onClick={() => void s.downloadModel(item)}>Download</button>
             </article>
           ))}
+          {s.saveState.message ? <p role={s.saveState.status === "error" ? "alert" : "status"}>{s.saveState.message}</p> : null}
+          {s.downloadState.message ? <p role={s.downloadState.status === "error" ? "alert" : "status"}>{s.downloadState.message}</p> : null}
         </section>
         <section className="ui-panel ui-stack ui-stack--sm">
           <h3>Model Details</h3>
+          {s.detailsState.status === "loading" ? <p role="status">{s.detailsState.message}</p> : null}
+          {s.detailsState.status === "error" ? <p role="alert">{s.detailsState.message}</p> : null}
           {s.selectedBrowseModelDetails ? (
             <>
-              <p><strong>{s.selectedBrowseModelDetails.modelId}</strong></p>
+              <p><strong>{s.selectedBrowseModelDetails.displayName}</strong></p>
+              <p>{s.selectedBrowseModelDetails.modelId}</p>
               <p>{s.selectedBrowseModelDetails.description ?? s.selectedBrowseModelDetails.cardMarkdown ?? "No description available."}</p>
-              <p>pipeline: {s.selectedBrowseModelDetails.pipelineTag ?? "n/a"} · inference: {s.selectedBrowseModelDetails.recommendedInferenceMode ?? s.selectedBrowseModelDetails.inferenceMode ?? "n/a"}</p>
+              <p>pipeline: {s.selectedBrowseModelDetails.pipelineTag ?? "n/a"} | inference: {s.selectedBrowseModelDetails.recommendedInferenceMode ?? s.selectedBrowseModelDetails.inferenceMode ?? "n/a"}</p>
               <p>tags: {s.selectedBrowseModelDetails.tags?.join(", ") ?? "none"}</p>
               <p>files: {s.selectedBrowseModelDetails.siblings?.join(", ") ?? "none"}</p>
-              <p>tokenizer: {String(s.selectedBrowseModelDetails.tokenizerAvailable ?? false)} · safetensors: {String(s.selectedBrowseModelDetails.safetensorsAvailable ?? false)} · adapter: {String(s.selectedBrowseModelDetails.adapterAvailable ?? false)}</p>
+              <p>tokenizer: {String(s.selectedBrowseModelDetails.tokenizerAvailable ?? false)} | safetensors: {String(s.selectedBrowseModelDetails.safetensorsAvailable ?? false)} | adapter: {String(s.selectedBrowseModelDetails.adapterAvailable ?? false)}</p>
               {s.selectedBrowseModelDetails.warnings?.length ? <p>Warnings: {s.selectedBrowseModelDetails.warnings.join(" | ")}</p> : null}
               <button className="ui-button" type="button" onClick={() => void s.saveModelReference()}>Save Model Reference</button>
+              <button className="ui-button" type="button" onClick={() => void s.downloadModel()}>Download Model</button>
               {s.saveState.message ? <p role={s.saveState.status === "error" ? "alert" : "status"}>{s.saveState.message}</p> : null}
+              {s.downloadState.message ? <p role={s.downloadState.status === "error" ? "alert" : "status"}>{s.downloadState.message}</p> : null}
             </>
           ) : <p>Select a model result to inspect details.</p>}
         </section>

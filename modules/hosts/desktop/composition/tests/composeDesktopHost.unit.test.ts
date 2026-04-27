@@ -44,6 +44,7 @@ import {
   DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL,
   DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
   DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
@@ -125,7 +126,7 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: join(tmpdir(), `desktop-artifact-upload-test-${Date.now()}`),
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(39);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(40);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -160,6 +161,7 @@ describe("composeDesktopHost", () => {
       DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_LIST_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,

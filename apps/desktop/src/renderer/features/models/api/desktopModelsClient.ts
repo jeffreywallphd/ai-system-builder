@@ -1,6 +1,7 @@
 import {
   getDesktopApi,
   type DesktopDeleteModelRecordResult,
+  type DesktopDownloadModelResult,
   type DesktopModelBrowseItem,
   type DesktopModelDetailsResult,
   type DesktopModelInventoryRecord,
@@ -34,6 +35,7 @@ export interface DesktopModelsClient {
   getModelDetails: (input: { provider: "huggingface"; modelId: string }) => Promise<DesktopModelDetailsResult["model"]>;
   listModels: (input?: { source?: ModelSource; lifecycleStatus?: ModelLifecycleStatus; artifactForm?: ModelArtifactForm; search?: string }) => Promise<DesktopModelInventoryRecord[]>;
   saveModelReference: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
+  downloadModel: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopDownloadModelResult>;
   updateModelRecord: (input: { modelRecordId: string; patch: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
   deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean }) => Promise<DesktopDeleteModelRecordResult>;
   trainModel: (input: DesktopModelTrainingRequest) => Promise<DesktopModelTrainingResult>;
@@ -96,6 +98,24 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         }),
         (value) => (value as { model: DesktopModelInventoryRecord }).model,
         "Failed to save model reference.",
+      );
+    },
+    async downloadModel(input) {
+      if (!desktopApi.downloadModel) {
+        throw new Error("Desktop preload model download bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.downloadModel({
+          provider: "huggingface",
+          modelId: input.modelId,
+          displayName: input.displayName,
+          inferenceMode: input.inferenceMode,
+          taskTags: input.taskTags,
+          artifactForm: input.artifactForm,
+          metadata: input.metadata,
+        }),
+        (value) => value as DesktopDownloadModelResult,
+        "Failed to download model.",
       );
     },
     async updateModelRecord(input) {

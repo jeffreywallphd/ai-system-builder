@@ -42,12 +42,14 @@ import {
   DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL,
   DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
   DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
   createDesktopModelBrowseSuccessResponse,
   createDesktopModelDetailsReadSuccessResponse,
   createDesktopModelListSuccessResponse,
   createDesktopModelReferenceSaveSuccessResponse,
+  createDesktopModelDownloadSuccessResponse,
   createDesktopModelRecordUpdateSuccessResponse,
   createDesktopModelRecordDeleteSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
@@ -512,6 +514,26 @@ it("maps model management bridge calls to dedicated model channels", async () =>
         createdAt: "2026-04-27T00:00:00.000Z",
       },
     }),
+    createDesktopModelDownloadSuccessResponse({
+      model: {
+        modelRecordId: "m2",
+        displayName: "Model",
+        source: "huggingface",
+        lifecycleStatus: "downloaded",
+        artifactForm: "full-model",
+        provider: "huggingface",
+        modelId: "org/model",
+        localPath: "/models/org/model",
+        createdAt: "2026-04-27T00:01:00.000Z",
+      },
+      download: {
+        provider: "transformers",
+        modelId: "org/model",
+        downloaded: true,
+        fromCache: false,
+        localPath: "/models/org/model",
+      },
+    }),
     createDesktopModelRecordUpdateSuccessResponse({
       model: {
         modelRecordId: "m1",
@@ -549,6 +571,7 @@ it("maps model management bridge calls to dedicated model channels", async () =>
   await api.getModelDetails({ provider: "huggingface", modelId: "org/model" });
   await api.listModels();
   await api.saveModelReference({ provider: "huggingface", modelId: "org/model" });
+  await api.downloadModel({ provider: "huggingface", modelId: "org/model" });
   await api.updateModelRecord({ modelRecordId: "m1", patch: {} });
   await api.deleteModelRecord({ modelRecordId: "m1" });
   await api.trainModel({
@@ -563,7 +586,8 @@ it("maps model management bridge calls to dedicated model channels", async () =>
   expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[2]?.[0]).toBe(DESKTOP_MODEL_LIST_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[3]?.[0]).toBe(DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value);
-  expect(invoke.mock.calls[4]?.[0]).toBe(DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value);
-  expect(invoke.mock.calls[5]?.[0]).toBe(DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value);
-  expect(invoke.mock.calls[6]?.[0]).toBe("ipc.model.train.request");
+  expect(invoke.mock.calls[4]?.[0]).toBe(DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[5]?.[0]).toBe(DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[6]?.[0]).toBe(DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[7]?.[0]).toBe("ipc.model.train.request");
 });
