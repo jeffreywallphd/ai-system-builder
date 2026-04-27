@@ -147,7 +147,7 @@ describe("ModelsFeature", () => {
     mountedContainer = undefined;
   });
 
-  it("shows browse result actions and loads model details", async () => {
+  it("shows browse result actions in two-column results without a details card", async () => {
     const client = createClientDouble();
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -170,16 +170,35 @@ describe("ModelsFeature", () => {
     expect(container.textContent).toContain("org/demo-model");
     expect(Array.from(container.querySelectorAll("button")).some((button) => button.textContent === "Save")).toBe(true);
     expect(Array.from(container.querySelectorAll("button")).some((button) => button.textContent === "Download")).toBe(true);
+    expect(container.textContent).not.toContain("Model Details");
+    expect(Array.from(container.querySelectorAll("button")).some((button) => button.textContent === "View Details")).toBe(false);
+    expect(client.getModelDetails).not.toHaveBeenCalled();
+  });
 
-    const detailsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "View Details") as HTMLButtonElement;
+  it("runs each browse search request", async () => {
+    const client = createClientDouble();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
     await act(async () => {
-      detailsButton.dispatchEvent(new Event("click", { bubbles: true }));
+      root.render(<ModelsFeature client={client as never} />);
       await flushUi();
     });
 
-    expect(client.getModelDetails).toHaveBeenCalledWith({ provider: "huggingface", modelId: "org/demo-model" });
-    expect(container.textContent).toContain("Demo description");
-    expect(container.textContent).toContain("Download Model");
+    const searchButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Search Models") as HTMLButtonElement;
+    await act(async () => {
+      searchButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+    await act(async () => {
+      searchButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    expect(client.browseModels).toHaveBeenCalledTimes(2);
   });
 
   it("renders train form content through dedicated training flow", async () => {

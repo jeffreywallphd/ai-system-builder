@@ -9,9 +9,10 @@ function createHubClientDouble(overrides: Partial<NonNullable<CreateHuggingFaceM
   return {
     listModels: testDouble.fn(async function* () {
       yield {
-        id: "openai/demo-model",
+        id: "69e864fd6b68f7e6cfc63ca3",
+        name: "openai/demo-model",
         author: "openai",
-        pipeline_tag: "text-generation",
+        task: "text-generation",
         tags: ["text-generation", "chat"],
         downloads: 123,
         likes: 45,
@@ -22,9 +23,10 @@ function createHubClientDouble(overrides: Partial<NonNullable<CreateHuggingFaceM
       };
     }),
     modelInfo: testDouble.fn(async () => ({
-      id: "openai/demo-model",
+      id: "69e864fd6b68f7e6cfc63ca3",
+      name: "openai/demo-model",
       author: "openai",
-      pipeline_tag: "text-generation",
+      task: "text-generation",
       tags: ["text-generation", "chat"],
       cardData: { content: "# Demo model", license: "apache-2.0" },
       license: "apache-2.0",
@@ -54,10 +56,34 @@ describe("createHuggingFaceModelBrowseDetailsAdapter", () => {
       modelId: "openai/demo-model",
       displayName: "demo-model",
       authorOrOrg: "openai",
+      taskTags: ["text-generation", "chat"],
       downloads: 123,
       likes: 45,
+      license: "apache-2.0",
       inferenceMode: "causal",
     });
+  });
+
+  it("passes current Hugging Face search and expansion parameters for every browse request", async () => {
+    const hubClient = createHubClientDouble();
+    const adapter = createHuggingFaceModelBrowseDetailsAdapter({ hubClient });
+
+    await adapter.browseModels({ provider: "huggingface", query: "qwen", taskTags: ["text-generation"], authorOrOrg: "Qwen", limit: 25 });
+    await adapter.browseModels({ provider: "huggingface", query: "mistral", taskTags: ["chat"], limit: 10 });
+
+    expect(hubClient.listModels.mock.calls.length).toBe(2);
+    expect(hubClient.listModels.mock.calls[0]?.[0]).toMatchObject({
+      search: { query: "qwen", owner: "Qwen", task: "text-generation" },
+      limit: 25,
+    });
+    expect(hubClient.listModels.mock.calls[1]?.[0]).toMatchObject({
+      search: { query: "mistral", task: "chat" },
+      limit: 10,
+    });
+    const firstAdditionalFields = hubClient.listModels.mock.calls[0]?.[0]?.additionalFields;
+    expect(firstAdditionalFields).toContain("author");
+    expect(firstAdditionalFields).toContain("cardData");
+    expect(firstAdditionalFields).toContain("tags");
   });
 
   it("prefers human-readable repository ids over opaque provider ids", async () => {
