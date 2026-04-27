@@ -27,12 +27,14 @@ interface HuggingFaceModelListEntry {
   author?: string;
   description?: string;
   pipeline_tag?: string;
+  task?: string;
   tags?: string[];
   downloads?: number;
   likes?: number;
   private?: boolean;
   gated?: boolean | string;
   lastModified?: string;
+  updatedAt?: Date;
   cardData?: Record<string, unknown>;
 }
 
@@ -55,21 +57,21 @@ interface HuggingFaceModelInfo extends HuggingFaceModelListEntry {
 
 interface HuggingFaceModelHubClient {
   listModels(params: {
-    search?: string;
-    author?: string;
-    filter?: string[];
+    search?: {
+      query?: string;
+      owner?: string;
+      task?: string;
+      tags?: string[];
+    };
     sort?: string;
-    direction?: "asc" | "desc";
     limit?: number;
-    full?: boolean;
-    cardData?: boolean;
+    additionalFields?: string[];
     accessToken?: string;
   }): AsyncIterable<HuggingFaceModelListEntry> | Promise<Iterable<HuggingFaceModelListEntry>>;
   modelInfo(params: {
     name: string;
     accessToken?: string;
-    filesMetadata?: boolean;
-    securityStatus?: boolean;
+    additionalFields?: string[];
   }): Promise<HuggingFaceModelInfo>;
 }
 
@@ -102,6 +104,21 @@ function toOptionalStringArray(value: unknown): string[] | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
+function toOptionalLicense(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return toOptionalText(value);
+  }
+
+  if (Array.isArray(value)) {
+    const licenses = value
+      .map((entry) => toOptionalText(entry))
+      .filter((entry): entry is string => Boolean(entry));
+    return licenses.length > 0 ? licenses.join(", ") : undefined;
+  }
+
+  return undefined;
+}
+
 function toOptionalTaskTags(tags: readonly string[] | undefined): ModelTaskTag[] | undefined {
   if (!tags) {
     return undefined;
@@ -117,6 +134,38 @@ function toOptionalTaskTags(tags: readonly string[] | undefined): ModelTaskTag[]
   }
 
   return normalized.length > 0 ? normalized : undefined;
+}
+
+function selectCardDataTaskTag(cardData: Record<string, unknown> | undefined): string | undefined {
+  return cardData ? toOptionalText(cardData["pipeline_tag"]) : undefined;
+}
+
+function selectPipelineTag(entry: HuggingFaceModelListEntry): string | undefined {
+  return toOptionalText(entry.pipeline_tag)
+    ?? toOptionalText(entry.task)
+    ?? selectCardDataTaskTag(entry.cardData);
+}
+
+function selectTags(entry: HuggingFaceModelListEntry): string[] | undefined {
+  const tags = toOptionalStringArray(entry.tags) ?? [];
+  const cardTags = toOptionalStringArray(entry.cardData?.["tags"]) ?? [];
+  const pipelineTag = selectPipelineTag(entry);
+  const combined = [...(pipelineTag ? [pipelineTag] : []), ...tags, ...cardTags];
+  return combined.length > 0 ? Array.from(new Set(combined)) : undefined;
+}
+
+function selectLicense(entry: HuggingFaceModelListEntry): string | undefined {
+  const cardData = entry.cardData;
+  const cardLicense = toOptionalLicense(cardData?.["license"])
+    ?? toOptionalText(cardData?.["license_name"]);
+  if (cardLicense) {
+    return cardLicense;
+  }
+
+  const licenseTag = selectTags(entry)
+    ?.map((tag) => tag.trim())
+    .find((tag) => tag.toLowerCase().startsWith("license:"));
+  return licenseTag ? toOptionalText(licenseTag.slice("license:".length)) : undefined;
 }
 
 function inferDisplayName(modelId: string): string {
@@ -167,10 +216,11 @@ function toModelBrowseItem(entry: HuggingFaceModelListEntry): ModelBrowseItem {
     throw new Error("Hugging Face listModels entry did not include a model id.");
   }
 
-  const tags = toOptionalStringArray(entry.tags);
-  const pipelineTag = toOptionalText(entry.pipeline_tag);
+  const tags = selectTags(entry);
+  const pipelineTag = selectPipelineTag(entry);
   const cardData = entry.cardData;
   const description = toOptionalText(entry.description)
+    ?? (cardData && typeof cardData["description"] === "string" ? toOptionalText(cardData["description"]) : undefined)
     ?? (cardData && typeof cardData["model_description"] === "string" ? toOptionalText(cardData["model_description"]) : undefined)
     ?? (cardData && typeof cardData["summary"] === "string" ? toOptionalText(cardData["summary"]) : undefined);
 
@@ -183,10 +233,10 @@ function toModelBrowseItem(entry: HuggingFaceModelListEntry): ModelBrowseItem {
     taskTags: toOptionalTaskTags(tags),
     downloads: typeof entry.downloads === "number" ? entry.downloads : undefined,
     likes: typeof entry.likes === "number" ? entry.likes : undefined,
-    license: cardData && typeof cardData["license"] === "string" ? toOptionalText(cardData["license"]) : undefined,
-    lastModified: toOptionalText(entry.lastModified),
+    license: selectLicense(entry),
+    lastModified: toOptionalText(entry.lastModified) ?? entry.updatedAt?.toISOString(),
     inferenceMode: recommendModelInferenceMode({ pipelineTag, taskTags: tags }),
-    gated: typeof entry.gated === "boolean" ? entry.gated : undefined,
+    gated: typeof entry.gated === "boolean" ? entry.gated : typeof entry.gated === "string" ? true : undefined,
     private: typeof entry.private === "boolean" ? entry.private : undefined,
   };
 }
@@ -238,6 +288,10 @@ function getErrorStatus(error: unknown): number | undefined {
 }
 
 function mapHuggingFaceError(operation: HuggingFaceModelOperation, error: unknown): Error {
+  if (error instanceof HuggingFaceModelClientUnavailableError) {
+    return error;
+  }
+
   const status = getErrorStatus(error);
   if (status === 401 || status === 403) {
     return new Error(`Hugging Face ${operation} failed: unauthorized or access denied.`);
@@ -300,6 +354,7 @@ export function createHuggingFaceModelBrowseDetailsAdapter(
 
   const resolveAccessToken = () => accessTokenProvider?.() ?? fallbackAccessToken;
   let lazyHubClient: Promise<HuggingFaceModelHubClient> | undefined;
+  const expandedModelFields = ["author", "cardData", "config", "sha", "tags", "safetensors", "transformersInfo"] as const;
 
   async function resolveHubClient(): Promise<HuggingFaceModelHubClient> {
     if (options.hubClient) {
@@ -322,14 +377,15 @@ export function createHuggingFaceModelBrowseDetailsAdapter(
       try {
         const hubClient = await resolveHubClient();
         const items = await collectListModels(hubClient.listModels({
-          search: request.query,
-          author: request.authorOrOrg,
-          filter: request.taskTags,
+          search: {
+            query: request.query,
+            owner: request.authorOrOrg,
+            task: request.taskTags?.[0],
+            tags: request.taskTags && request.taskTags.length > 1 ? request.taskTags.slice(1) : undefined,
+          },
           sort: request.sort,
-          direction: request.direction,
           limit: request.limit,
-          full: true,
-          cardData: true,
+          additionalFields: [...expandedModelFields],
           accessToken: resolveAccessToken(),
         }));
 
@@ -350,14 +406,13 @@ export function createHuggingFaceModelBrowseDetailsAdapter(
         const info = await hubClient.modelInfo({
           name: request.modelId,
           accessToken: resolveAccessToken(),
-          filesMetadata: true,
-          securityStatus: true,
+          additionalFields: [...expandedModelFields],
         });
 
         const browseItem = toModelBrowseItem(info);
         const cardData = info.cardData;
-        const tags = toOptionalStringArray(info.tags);
-        const pipelineTag = toOptionalText(info.pipeline_tag);
+        const tags = selectTags(info);
+        const pipelineTag = selectPipelineTag(info);
         const siblings = info.siblings ?? [];
         const files = siblings
           .map((sibling) => {
@@ -382,7 +437,7 @@ export function createHuggingFaceModelBrowseDetailsAdapter(
           cardMarkdown: cardData && typeof cardData["content"] === "string" ? toOptionalText(cardData["content"]) : undefined,
           tags,
           pipelineTag,
-          license: browseItem.license ?? toOptionalText(info.license),
+          license: browseItem.license ?? toOptionalLicense(info.license),
           siblings: filePaths,
           files,
           config: info.config,
