@@ -33,6 +33,61 @@ async function collectFiles(root: string, current: string, output: string[] = []
   return output;
 }
 
+function validatePublishLayout(files: string[], fileContentByPath: ReadonlyMap<string, string>): void {
+  const fileSet = new Set(files.map((file) => file.replace(/^\.\//, "")));
+  const hasAdapterConfig = fileSet.has("adapter_config.json");
+  const hasAdapterModel = fileSet.has("adapter_model.safetensors");
+  const hasShardIndex = fileSet.has("model.safetensors.index.json");
+  const shardFiles = files.filter((file) => /model-\d{5}-of-\d{5}\.safetensors$/.test(file));
+  const hasSingleModelSafetensors = fileSet.has("model.safetensors");
+  const hasConfig = fileSet.has("config.json");
+
+  if (hasAdapterConfig || hasAdapterModel) {
+    if (!hasAdapterConfig || !hasAdapterModel) {
+      throw new Error("Publishing adapter outputs requires both adapter_config.json and adapter_model.safetensors.");
+    }
+    return;
+  }
+
+  if (shardFiles.length > 0 && !hasShardIndex) {
+    throw new Error("Publishing sharded full model outputs requires model.safetensors.index.json.");
+  }
+
+  if (hasShardIndex) {
+    if (!hasConfig) {
+      throw new Error("Publishing full model outputs requires config.json.");
+    }
+    const indexFile = files.find((file) => file.replace(/^\.\//, "") === "model.safetensors.index.json");
+    if (!indexFile) {
+      throw new Error("Publishing sharded full model outputs requires model.safetensors.index.json.");
+    }
+    const indexContent = fileContentByPath.get(indexFile);
+    if (!indexContent) {
+      throw new Error("Publishing sharded full model outputs requires a readable model.safetensors.index.json.");
+    }
+    let parsed: { weight_map?: Record<string, string> };
+    try {
+      parsed = JSON.parse(indexContent) as { weight_map?: Record<string, string> };
+    } catch {
+      throw new Error("Publishing sharded full model outputs requires a valid model.safetensors.index.json.");
+    }
+    const referencedShards = new Set(Object.values(parsed.weight_map ?? {}));
+    for (const shard of referencedShards) {
+      if (!fileSet.has(shard)) {
+        throw new Error(`Publishing rejected: missing shard file referenced by index: ${shard}`);
+      }
+    }
+    return;
+  }
+
+  if (!hasSingleModelSafetensors) {
+    throw new Error("Publishing full model outputs requires model.safetensors or a valid shard index.");
+  }
+  if (!hasConfig) {
+    throw new Error("Publishing full model outputs requires config.json.");
+  }
+}
+
 function mapError(error: unknown): Error {
   const value = error as { statusCode?: number; status?: number; message?: string };
   const status = value.statusCode ?? value.status;
@@ -60,22 +115,16 @@ export function createHuggingFaceModelPublisherAdapter(
       }
 
       const files = await collectFiles(request.modelPath, request.modelPath);
-      const required = ["config.json"];
-      if (!files.some((file) => file.endsWith(".safetensors"))) {
-        throw new Error("Publishing requires safetensors artifacts.");
+      const readFile = (await import("node:fs/promises")).readFile;
+      const textFiles = new Map<string, string>();
+      if (files.includes("model.safetensors.index.json")) {
+        textFiles.set("model.safetensors.index.json", await readFile(join(request.modelPath, "model.safetensors.index.json"), "utf8"));
       }
-      for (const requiredFile of required) {
-        if (!files.includes(requiredFile) && !files.includes(`./${requiredFile}`)) {
-          // allow adapter-only publish without config
-          if (!files.includes("adapter_config.json")) {
-            throw new Error(`Publishing requires ${requiredFile} for full model outputs.`);
-          }
-        }
-      }
+      validatePublishLayout(files, textFiles);
 
       for (const file of files) {
         const fullPath = join(request.modelPath, file);
-        const content = new Uint8Array(await (await import("node:fs/promises")).readFile(fullPath));
+        const content = new Uint8Array(await readFile(fullPath));
         const remotePath = `${request.pathPrefix ? `${request.pathPrefix.replace(/\/$/, "")}/` : ""}${file}`;
         try {
           await options.client.uploadFile({

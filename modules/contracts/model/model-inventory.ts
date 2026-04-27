@@ -14,6 +14,14 @@ import { normalizeModelBrowseProvider, type ModelBrowseProvider } from "./model-
 import { normalizeModelInferenceMode, type ModelInferenceMode } from "./model-inference-mode";
 import { normalizeModelValidationStatus, type ModelValidationStatus } from "./model-validation";
 
+export interface ModelPublishedSummary {
+  provider: "huggingface";
+  repository: string;
+  revision?: string;
+  url?: string;
+  publishedAt: string;
+}
+
 export interface ModelInventoryRecord {
   modelRecordId: string;
   displayName: string;
@@ -37,6 +45,7 @@ export interface ModelInventoryRecord {
   primaryArtifactId?: string;
   validationStatus?: ModelValidationStatus;
   validationReportPath?: string;
+  published?: ModelPublishedSummary;
   metadata?: Record<string, unknown>;
 }
 
@@ -75,6 +84,23 @@ function normalizeOptionalNonNegativeNumber(value: number | undefined): number |
   return value >= 0 ? value : undefined;
 }
 
+function normalizePublishedSummary(value: ModelPublishedSummary | undefined): ModelPublishedSummary | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const repository = normalizeRequiredText(value.repository, "published.repository");
+  const publishedAt = normalizeRequiredText(value.publishedAt, "published.publishedAt");
+
+  return {
+    provider: "huggingface",
+    repository,
+    revision: normalizeOptionalText(value.revision),
+    url: normalizeOptionalText(value.url),
+    publishedAt,
+  };
+}
+
 export function normalizeModelInventoryRecord(record: ModelInventoryRecord): ModelInventoryRecord {
   return {
     modelRecordId: normalizeRequiredText(record.modelRecordId, "modelRecordId"),
@@ -108,6 +134,7 @@ export function normalizeModelInventoryRecord(record: ModelInventoryRecord): Mod
         ? normalizeModelValidationStatus(record.validationStatus)
         : undefined,
     validationReportPath: normalizeOptionalText(record.validationReportPath),
+    published: normalizePublishedSummary(record.published),
     metadata: record.metadata,
   };
 }

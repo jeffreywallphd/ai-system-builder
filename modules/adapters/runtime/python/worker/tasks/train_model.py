@@ -273,10 +273,20 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
             artifact_form = "full-model"
 
         validation_config = _to_dict(payload.validation)
-        validation = validate_model_output(
-            output_path,
-            expected_lora=bool(validation_config.get("expectedLoRA", payload.method in {"lora", "qlora"})),
-            expected_recurrent_additions=bool(validation_config.get("expectedRecurrentAdditions", False)),
+        validation_enabled = bool(validation_config.get("enabled", True))
+        validation = (
+            validate_model_output(
+                output_path,
+                expected_lora=bool(validation_config.get("expectedLoRA", payload.method in {"lora", "qlora"})),
+                expected_recurrent_additions=bool(validation_config.get("expectedRecurrentAdditions", False)),
+            )
+            if validation_enabled
+            else {
+                "status": "unknown",
+                "warnings": ["Validation was disabled and did not run."],
+                "errors": [],
+                "validationReportPath": None,
+            }
         )
 
         manifest_path = write_serialization_manifest(output_path, {
@@ -294,7 +304,7 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
                 "baseModel": payload.baseModel.model_dump(mode="json"),
                 "datasets": [dataset_entry.model_dump(mode="json") for dataset_entry in payload.datasets],
                 "startedAt": datetime.now(timezone.utc).isoformat(),
-                "status": "succeeded",
+                "status": "failed" if validation_enabled and validation["status"] == "invalid" else "succeeded",
                 "serializationManifestPath": manifest_path,
             },
         )
@@ -303,7 +313,7 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
         model_id = payload.baseModel.modelId
 
         if validation["status"] == "invalid":
-            warnings.append("Training completed, but output validation failed.")
+            warnings.append("Training output validation failed.")
 
         metadata = {
             "runtimeTask": "train-model",
@@ -312,19 +322,11 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
             "serialization": serialization,
         }
 
-        return TrainModelTaskResult(
-            runId=run_id,
-            status="succeeded",
-            outputDirectory=str(output_path),
-            outputModelName=output_model_name,
-            logs=logs,
-            warnings=warnings + validation.get("warnings", []),
-            checkpoints=checkpoints,
-            metrics=metrics,
-            validationReportPath=validation.get("validationReportPath"),
-            generatedModelCandidate={
+        final_status = "failed" if validation_enabled and validation["status"] == "invalid" else "succeeded"
+        generated_candidate = None
+        if final_status == "succeeded":
+            generated_candidate = {
                 "displayName": output_model_name,
-                "provider": "unknown",
                 "modelId": None,
                 "localPath": generated_model_path,
                 "artifactForm": artifact_form,
@@ -334,7 +336,31 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
                 "generatedFromRunId": run_id,
                 "serializationFormat": validation.get("serializationFormat") or serialization.get("serializationFormat"),
                 "metadata": metadata,
-            },
+            }
+
+        return TrainModelTaskResult(
+            runId=run_id,
+            status=final_status,
+            outputDirectory=str(output_path),
+            outputModelName=output_model_name,
+            logs=logs,
+            warnings=warnings + validation.get("warnings", []),
+            checkpoints=checkpoints,
+            metrics=metrics,
+            validationReportPath=validation.get("validationReportPath"),
+            generatedModelCandidate=generated_candidate,
+            error=(
+                {
+                    "code": "validation_failed",
+                    "message": "Training artifacts failed post-training validation.",
+                    "details": {
+                        "validationStatus": validation.get("status"),
+                        "validationErrors": validation.get("errors", []),
+                    },
+                }
+                if final_status == "failed"
+                else None
+            ),
         )
     except Exception as error:
         return TrainModelTaskResult(

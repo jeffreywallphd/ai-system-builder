@@ -220,6 +220,36 @@ describe("model contracts", () => {
     expect(generated.adapterOfModelId).toBe("base-1");
   });
 
+  it("normalizes published summary metadata without mutating local identity fields", () => {
+    const record = normalizeModelInventoryRecord({
+      modelRecordId: "model-1",
+      displayName: "Generated Adapter",
+      source: "generated",
+      lifecycleStatus: "generated",
+      artifactForm: "adapter",
+      provider: "unknown",
+      modelId: "local/generated-id",
+      createdAt: "2026-04-27T00:00:00.000Z",
+      published: {
+        provider: "huggingface",
+        repository: " owner/repo ",
+        revision: " main ",
+        url: " https://huggingface.co/owner/repo ",
+        publishedAt: " 2026-04-27T00:05:00.000Z ",
+      },
+    });
+
+    expect(record.source).toBe("generated");
+    expect(record.modelId).toBe("local/generated-id");
+    expect(record.published).toEqual({
+      provider: "huggingface",
+      repository: "owner/repo",
+      revision: "main",
+      url: "https://huggingface.co/owner/repo",
+      publishedAt: "2026-04-27T00:05:00.000Z",
+    });
+  });
+
   it("normalizes list/delete model-management operation requests", () => {
     const list = normalizeListModelsRequest({
       source: "generated",
