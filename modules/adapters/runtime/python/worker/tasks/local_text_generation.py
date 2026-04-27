@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 import gc
 import inspect
@@ -139,9 +140,9 @@ class TransformersChatGenerator(TransformersCausalGenerator):
                 return_tensors="pt",
             )
 
-        if isinstance(templated, dict):
+        if isinstance(templated, Mapping):
             input_ids = templated["input_ids"]
-            generation_inputs = _move_tokenized_inputs_to_model_device(templated, self._model)
+            generation_inputs = _move_tokenized_inputs_to_model_device(dict(templated), self._model)
         else:
             input_ids = templated
             generation_inputs = {"input_ids": templated}
