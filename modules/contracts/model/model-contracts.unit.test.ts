@@ -28,7 +28,7 @@ import {
 
 describe("model contracts", () => {
   it("defines browse providers and inference modes", () => {
-    expect(MODEL_BROWSE_PROVIDERS).toEqual(["huggingface"]);
+    expect(MODEL_BROWSE_PROVIDERS).toEqual(["huggingface", "unknown"]);
     expect(MODEL_INFERENCE_MODES).toEqual(["text2text", "causal", "chat"]);
     expect(normalizeModelInferenceMode(" chat ")).toBe("chat");
     expectTypeOf<ModelInferenceMode>().toExtend<Exclude<NonNullable<LocalModelConfig["inferenceMode"]>, "auto">>();

@@ -202,7 +202,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
         source: "generated",
         lifecycleStatus: "generated",
         artifactForm: request.artifactForm,
-        provider: request.provider ?? "huggingface",
+        provider: request.provider ?? "unknown",
         modelId: request.modelId,
         localPath: request.localPath,
         backingArtifactIds: request.backingArtifactIds,

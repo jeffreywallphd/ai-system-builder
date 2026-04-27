@@ -38,6 +38,18 @@ import {
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   createDesktopPythonRuntimeStatusReadSuccessResponse,
   createDesktopPythonRuntimeControlSuccessResponse,
+  DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL,
+  DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
+  DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
+  createDesktopModelBrowseSuccessResponse,
+  createDesktopModelDetailsReadSuccessResponse,
+  createDesktopModelListSuccessResponse,
+  createDesktopModelReferenceSaveSuccessResponse,
+  createDesktopModelRecordUpdateSuccessResponse,
+  createDesktopModelRecordDeleteSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
@@ -481,4 +493,63 @@ it("maps application settings bridge calls to dedicated settings channels", asyn
   expect(invoke.mock.calls[1]?.[0]).toBe("ipc.application-settings.read.request");
   expect(read.value.values[0]?.maskedValue).toBe("********");
   expect(resolved.value.resolved.inferenceMode).toBe("text2text");
+});
+
+it("maps model management bridge calls to dedicated model channels", async () => {
+  const responses = [
+    createDesktopModelBrowseSuccessResponse({ models: [] }),
+    createDesktopModelDetailsReadSuccessResponse({ model: { provider: "huggingface", modelId: "org/model", displayName: "Model" } }),
+    createDesktopModelListSuccessResponse({ models: [] }),
+    createDesktopModelReferenceSaveSuccessResponse({
+      model: {
+        modelRecordId: "m1",
+        displayName: "Model",
+        source: "huggingface",
+        lifecycleStatus: "saved-reference",
+        artifactForm: "full-model",
+        provider: "huggingface",
+        modelId: "org/model",
+        createdAt: "2026-04-27T00:00:00.000Z",
+      },
+    }),
+    createDesktopModelRecordUpdateSuccessResponse({
+      model: {
+        modelRecordId: "m1",
+        displayName: "Model",
+        source: "huggingface",
+        lifecycleStatus: "saved-reference",
+        artifactForm: "full-model",
+        provider: "huggingface",
+        modelId: "org/model",
+        createdAt: "2026-04-27T00:00:00.000Z",
+      },
+    }),
+    createDesktopModelRecordDeleteSuccessResponse({
+      deletedModelRecordId: "m1",
+      deletedRegistryRecord: true,
+      deletedLocalFiles: false,
+      deletedBackingArtifactIds: [],
+    }),
+  ];
+  let index = 0;
+  const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
+    const response = responses[index];
+    index += 1;
+    return response;
+  });
+
+  const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+  await api.browseModels({ provider: "huggingface", query: "demo" });
+  await api.getModelDetails({ provider: "huggingface", modelId: "org/model" });
+  await api.listModels();
+  await api.saveModelReference({ provider: "huggingface", modelId: "org/model" });
+  await api.updateModelRecord({ modelRecordId: "m1", patch: {} });
+  await api.deleteModelRecord({ modelRecordId: "m1" });
+
+  expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[2]?.[0]).toBe(DESKTOP_MODEL_LIST_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[3]?.[0]).toBe(DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[4]?.[0]).toBe(DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value);
+  expect(invoke.mock.calls[5]?.[0]).toBe(DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value);
 });

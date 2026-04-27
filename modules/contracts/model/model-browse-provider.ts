@@ -1,4 +1,4 @@
-export const MODEL_BROWSE_PROVIDERS = ["huggingface"] as const;
+export const MODEL_BROWSE_PROVIDERS = ["huggingface", "unknown"] as const;
 
 export type ModelBrowseProvider = (typeof MODEL_BROWSE_PROVIDERS)[number];
 

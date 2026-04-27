@@ -48,6 +48,9 @@ describe("createLocalModelRegistryAdapter", () => {
       metadata: { custom: { nested: true } },
     });
 
+    const generated = await adapter.getModelRecord("m2");
+    expect(generated?.provider).toBe("unknown");
+
     const list = await adapter.listModels({ search: "adapter", source: "generated", limit: 10 });
     expect(list.models.map((model) => model.modelRecordId)).toEqual(["m2"]);
 

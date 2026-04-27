@@ -217,7 +217,7 @@ export function normalizeRegisterGeneratedModelRequest(
     ...request,
     modelRecordId: normalizeOptionalText(request.modelRecordId),
     displayName: normalizeRequiredText(request.displayName, "displayName"),
-    provider: typeof request.provider === "string" ? normalizeModelBrowseProvider(request.provider) : "huggingface",
+    provider: typeof request.provider === "string" ? normalizeModelBrowseProvider(request.provider) : "unknown",
     modelId: normalizeOptionalText(request.modelId),
     localPath: normalizeOptionalText(request.localPath),
     backingArtifactIds: normalizeOptionalStringList(request.backingArtifactIds),

@@ -23,6 +23,10 @@ import {
   registerApplicationSettingsIpc,
   type RegisterApplicationSettingsIpcDependencies,
 } from "./settings/registerApplicationSettingsIpc";
+import {
+  registerModelManagementIpc,
+  type RegisterModelManagementIpcDependencies,
+} from "./model/registerModelManagementIpc";
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
@@ -54,6 +58,12 @@ export interface RegisterElectronIpcDependencies {
   updateSettingUseCase: RegisterApplicationSettingsIpcDependencies["updateSettingUseCase"];
   clearSettingUseCase: RegisterApplicationSettingsIpcDependencies["clearSettingUseCase"];
   resolveModelDefaultUseCase: RegisterApplicationSettingsIpcDependencies["resolveModelDefaultUseCase"];
+  browseModelsUseCase: RegisterModelManagementIpcDependencies["browseModelsUseCase"];
+  getModelDetailsUseCase: RegisterModelManagementIpcDependencies["getModelDetailsUseCase"];
+  listModelsUseCase: RegisterModelManagementIpcDependencies["listModelsUseCase"];
+  saveModelReferenceUseCase: RegisterModelManagementIpcDependencies["saveModelReferenceUseCase"];
+  updateModelRecordUseCase: RegisterModelManagementIpcDependencies["updateModelRecordUseCase"];
+  deleteModelRecordUseCase: RegisterModelManagementIpcDependencies["deleteModelRecordUseCase"];
 }
 
 export function registerElectronIpc(
@@ -105,6 +115,15 @@ export function registerElectronIpc(
     clearSettingUseCase: dependencies.clearSettingUseCase,
     resolveModelDefaultUseCase: dependencies.resolveModelDefaultUseCase,
   });
+  registerModelManagementIpc({
+    ipcMain: dependencies.ipcMain,
+    browseModelsUseCase: dependencies.browseModelsUseCase,
+    getModelDetailsUseCase: dependencies.getModelDetailsUseCase,
+    listModelsUseCase: dependencies.listModelsUseCase,
+    saveModelReferenceUseCase: dependencies.saveModelReferenceUseCase,
+    updateModelRecordUseCase: dependencies.updateModelRecordUseCase,
+    deleteModelRecordUseCase: dependencies.deleteModelRecordUseCase,
+  });
 
   registerPythonRuntimeIpc({
     ipcMain: dependencies.ipcMain,
@@ -115,4 +134,3 @@ export function registerElectronIpc(
     readPythonRuntimeStatus: dependencies.pythonRuntime.readPythonRuntimeStatus,
   });
 }
-
