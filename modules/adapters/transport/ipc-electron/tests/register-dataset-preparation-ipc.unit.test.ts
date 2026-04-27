@@ -18,8 +18,7 @@ describe("registerDatasetPreparationIpc", () => {
       value: {
         outputs: {
           local: {
-            train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 10 } },
-            test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 10 } },
+            dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 20 } },
           },
         },
         provenance: {
@@ -38,8 +37,9 @@ describe("registerDatasetPreparationIpc", () => {
             skippedDocumentCount: 0,
             chunkCount: 2,
             generatedExampleCount: 10,
-            trainRowCount: 8,
-            testRowCount: 2,
+            datasetRowCount: 10,
+            trainRowCount: 10,
+            testRowCount: 0,
           },
         },
         summary: {
@@ -48,8 +48,9 @@ describe("registerDatasetPreparationIpc", () => {
           skippedDocumentCount: 0,
           chunkCount: 2,
           generatedExampleCount: 10,
-          trainRowCount: 8,
-          testRowCount: 2,
+          datasetRowCount: 10,
+          trainRowCount: 10,
+          testRowCount: 0,
         },
       },
       requestId: "req-1",

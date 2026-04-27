@@ -43,19 +43,10 @@ export interface DesktopPrepareTrainingDatasetSuccessValue {
   result: {
     outputs: {
       local?: {
-        train: StagedArtifactDescriptor;
-        test: StagedArtifactDescriptor;
+        dataset: StagedArtifactDescriptor;
       };
       huggingFace?: {
-        train: {
-          provider: "huggingface";
-          repository: string;
-          path: string;
-          revision?: string;
-          exists: boolean;
-          verifiedAt: string;
-        };
-        test: {
+        dataset: {
           provider: "huggingface";
           repository: string;
           path: string;

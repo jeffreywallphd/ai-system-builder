@@ -1,4 +1,4 @@
-export type PythonRuntimeOutputRole = "train" | "test" | "metrics" | "report" | "artifact";
+export type PythonRuntimeOutputRole = "dataset" | "train" | "test" | "metrics" | "report" | "artifact";
 
 export interface PythonRuntimeOutputDescriptor {
   name: string;

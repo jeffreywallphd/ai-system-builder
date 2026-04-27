@@ -42,13 +42,9 @@ describe("desktop dataset preparation ipc contract", () => {
     const response = createDesktopPrepareTrainingDatasetSuccessResponse({
       outputs: {
         local: {
-          train: {
+          dataset: {
             sourceKind: "runtime",
-            storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 10 },
-          },
-          test: {
-            sourceKind: "runtime",
-            storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 10 },
+            storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 20 },
           },
         },
       },
@@ -64,8 +60,9 @@ describe("desktop dataset preparation ipc contract", () => {
           skippedDocumentCount: 0,
           chunkCount: 2,
           generatedExampleCount: 10,
-          trainRowCount: 8,
-          testRowCount: 2,
+          datasetRowCount: 10,
+          trainRowCount: 10,
+          testRowCount: 0,
         },
       },
       summary: {
@@ -74,14 +71,15 @@ describe("desktop dataset preparation ipc contract", () => {
         skippedDocumentCount: 0,
         chunkCount: 2,
         generatedExampleCount: 10,
-        trainRowCount: 8,
-        testRowCount: 2,
+        datasetRowCount: 10,
+        trainRowCount: 10,
+        testRowCount: 0,
       },
       warnings: [{ code: "skipped_document", message: "Skipped one unsupported artifact." }],
     });
 
     expect(response.ok).toBe(true);
-    expect(response.value.result.outputs.local?.train.storage.key).toBe("stored-train");
-    expect(response.value.result.summary.trainRowCount).toBe(8);
+    expect(response.value.result.outputs.local?.dataset.storage.key).toBe("stored-dataset");
+    expect(response.value.result.summary.datasetRowCount).toBe(10);
   });
 });

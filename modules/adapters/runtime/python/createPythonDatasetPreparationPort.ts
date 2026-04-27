@@ -55,6 +55,7 @@ function parseOutputDescriptors(value: unknown): PythonRuntimeOutputDescriptor[]
 }
 
 const ALLOWED_OUTPUT_ROLES = new Set<PythonRuntimeOutputDescriptor["role"]>([
+  "dataset",
   "train",
   "test",
   "metrics",
@@ -110,8 +111,8 @@ function mapRuntimeDataToResult(data: unknown): PrepareTrainingDatasetResult {
   const payload = asObject(data, "data");
   const summary = asObject(payload.summary, "summary");
   const outputs = parseOutputDescriptors(payload.outputs);
-  if (!outputs.some((output) => output.role === "train") || !outputs.some((output) => output.role === "test")) {
-    throw new Error("Invalid dataset preparation result: outputs must include both train and test roles.");
+  if (!outputs.some((output) => output.role === "dataset" || output.role === "artifact")) {
+    throw new Error("Invalid dataset preparation result: outputs must include a dataset output.");
   }
 
   return {
@@ -122,6 +123,10 @@ function mapRuntimeDataToResult(data: unknown): PrepareTrainingDatasetResult {
       skippedDocumentCount: asNumber(summary.skippedDocumentCount, "summary.skippedDocumentCount"),
       chunkCount: asNumber(summary.chunkCount, "summary.chunkCount"),
       generatedExampleCount: asNumber(summary.generatedExampleCount, "summary.generatedExampleCount"),
+      datasetRowCount: asNumber(
+        summary.datasetRowCount ?? summary.generatedExampleCount,
+        "summary.datasetRowCount",
+      ),
       trainRowCount: asNumber(summary.trainRowCount, "summary.trainRowCount"),
       testRowCount: asNumber(summary.testRowCount, "summary.testRowCount"),
     },

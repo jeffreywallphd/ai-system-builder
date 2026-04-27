@@ -37,12 +37,9 @@ describe("prepare training dataset TypeScript regression guards", () => {
       "modules/application/use-cases/prepare-training-dataset-from-artifacts.use-case.ts",
     );
 
-    expect(source).toContain("publishTrain.value.descriptor.target");
-    expect(source).toContain("publishTest.value.descriptor.target");
-    expect(source).toContain("path: publishTrainTarget.path ?? trainPath");
-    expect(source).toContain("path: publishTestTarget.path ?? testPath");
-    expect(source).not.toContain("publishTrain.value.target");
-    expect(source).not.toContain("publishTest.value.target");
+    expect(source).toContain("publishDataset.value.descriptor.target");
+    expect(source).toContain("path: publishDatasetTarget.path ?? datasetPath");
+    expect(source).not.toContain("publishDataset.value.target");
   });
 });
 

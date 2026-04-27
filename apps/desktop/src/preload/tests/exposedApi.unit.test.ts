@@ -337,8 +337,7 @@ it("maps training dataset preparation bridge calls to dedicated IPC request chan
     createDesktopPrepareTrainingDatasetSuccessResponse({
       outputs: {
         local: {
-          train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
-          test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+          dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } },
         },
       },
       provenance: {
@@ -357,8 +356,9 @@ it("maps training dataset preparation bridge calls to dedicated IPC request chan
           skippedDocumentCount: 0,
           chunkCount: 2,
           generatedExampleCount: 10,
-          trainRowCount: 8,
-          testRowCount: 2,
+          datasetRowCount: 10,
+          trainRowCount: 10,
+          testRowCount: 0,
         },
       },
       summary: {
@@ -367,8 +367,9 @@ it("maps training dataset preparation bridge calls to dedicated IPC request chan
         skippedDocumentCount: 0,
         chunkCount: 2,
         generatedExampleCount: 10,
-        trainRowCount: 8,
-        testRowCount: 2,
+        datasetRowCount: 10,
+        trainRowCount: 10,
+        testRowCount: 0,
       },
     }),
   );

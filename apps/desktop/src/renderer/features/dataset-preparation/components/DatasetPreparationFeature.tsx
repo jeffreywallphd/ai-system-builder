@@ -347,14 +347,10 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
       {status.message ? <p role={status.kind === "error" ? "alert" : "status"}>{status.message}</p> : null}
       {resultSummary ? (
         <dl className="ui-grid ui-grid--two">
-          <dt>Train artifact</dt>
-          <dd>{resultSummary.trainKey}</dd>
-          <dt>Test artifact</dt>
-          <dd>{resultSummary.testKey}</dd>
-          <dt>Train rows</dt>
-          <dd>{resultSummary.trainRows}</dd>
-          <dt>Test rows</dt>
-          <dd>{resultSummary.testRows}</dd>
+          <dt>Dataset artifact</dt>
+          <dd>{resultSummary.datasetKey}</dd>
+          <dt>Dataset rows</dt>
+          <dd>{resultSummary.datasetRows}</dd>
         </dl>
       ) : null}
     </section>

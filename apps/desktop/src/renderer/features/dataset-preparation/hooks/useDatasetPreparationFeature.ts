@@ -17,10 +17,8 @@ interface DatasetPreparationStatus {
 }
 
 interface DatasetPreparationResultSummary {
-  trainKey: string;
-  testKey: string;
-  trainRows: number;
-  testRows: number;
+  datasetKey: string;
+  datasetRows: number;
 }
 
 export interface UseDatasetPreparationFeatureResult {
@@ -384,10 +382,8 @@ export function useDatasetPreparationFeature(
 
     setStatus({ kind: "success", message: "Training dataset is ready." });
     setResultSummary({
-      trainKey: response.value.outputs.local?.train.storage.key ?? "(not produced locally)",
-      testKey: response.value.outputs.local?.test.storage.key ?? "(not produced locally)",
-      trainRows: response.value.summary.trainRowCount,
-      testRows: response.value.summary.testRowCount,
+      datasetKey: response.value.outputs.local?.dataset.storage.key ?? "(not produced locally)",
+      datasetRows: response.value.summary.datasetRowCount ?? response.value.summary.generatedExampleCount,
     });
 
     await refreshArtifacts();
