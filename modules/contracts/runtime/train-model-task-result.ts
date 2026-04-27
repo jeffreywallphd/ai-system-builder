@@ -32,6 +32,7 @@ export interface TrainModelTaskResult {
   metrics?: Record<string, number>;
   logs?: string[];
   warnings?: string[];
+  validationReportPath?: string;
   generatedModelCandidate?: TrainModelGeneratedModelCandidate;
   error?: {
     code: string;

@@ -74,6 +74,7 @@ export function ManageModelsTab(props: { state: ModelsState }) {
               <small>{model.modelId ?? model.localPath ?? model.modelRecordId}</small>
               <small>{model.source} · {model.lifecycleStatus} · {model.artifactForm}</small>
               <small>inference: {model.inferenceMode ?? "n/a"} · validation: {model.validationStatus ?? "unknown"} · backing artifacts: {model.backingArtifactIds?.length ?? 0}</small>
+              <small>serialization: {model.serializationFormat ?? "unknown"} · report: {model.validationReportPath ?? "n/a"}</small>
               <div className="ui-grid ui-grid--two">
                 <button className="ui-button" type="button" onClick={() => s.setSelectedManagedModel(model)}>Details</button>
                 <button className="ui-button ui-button--destructive" type="button" onClick={() => {
@@ -95,6 +96,25 @@ export function ManageModelsTab(props: { state: ModelsState }) {
               <p>Local path: {s.selectedManagedModel.localPath ?? "n/a"}</p>
               <p>Primary artifact: {s.selectedManagedModel.primaryArtifactId ?? "none"}</p>
               <p>Backing artifact IDs: {s.selectedManagedModel.backingArtifactIds?.join(", ") ?? "none"}</p>
+              <p>Validation: {s.selectedManagedModel.validationStatus ?? "unknown"}</p>
+              <p>Validation report: {s.selectedManagedModel.validationReportPath ?? "n/a"}</p>
+              <div className="ui-grid ui-grid--two">
+                <button className="ui-button" type="button" onClick={() => void s.validateManagedModel()}>
+                  Validate
+                </button>
+                <button
+                  className="ui-button"
+                  type="button"
+                  onClick={() => void s.publishManagedModel()}
+                  disabled={s.selectedManagedModel.validationStatus !== "valid" && s.selectedManagedModel.validationStatus !== "warning"}
+                >
+                  Publish
+                </button>
+              </div>
+              <label className="ui-stack ui-stack--sm">
+                <span>Hugging Face repository (owner/name)</span>
+                <input className="ui-input" value={s.publishRepository} onChange={(event) => s.setPublishRepository(event.target.value)} placeholder="owner/model-name" />
+              </label>
             </>
           ) : <p>Select a model asset record.</p>}
         </section>

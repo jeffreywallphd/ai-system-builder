@@ -5,3 +5,5 @@ export * from "./createPythonRuntimePort";
 export * from "./createPythonDatasetPreparationPort";
 export * from "./ensurePythonRuntimeWorkerDependencies";
 export * from "./createPythonModelTrainingPort";
+
+export * from "./createPythonModelValidationPort";

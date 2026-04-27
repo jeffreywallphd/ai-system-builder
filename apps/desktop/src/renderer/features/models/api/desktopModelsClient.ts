@@ -7,6 +7,8 @@ import {
   type DesktopModelBrowseRequest,
   type DesktopModelTrainingRequest,
   type DesktopModelTrainingResult,
+  type DesktopValidateModelResult,
+  type DesktopPublishModelResult,
 } from "../../../lib/desktopApi";
 import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../modules/domain/model";
 
@@ -35,6 +37,8 @@ export interface DesktopModelsClient {
   updateModelRecord: (input: { modelRecordId: string; patch: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
   deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean }) => Promise<DesktopDeleteModelRecordResult>;
   trainModel: (input: DesktopModelTrainingRequest) => Promise<DesktopModelTrainingResult>;
+  validateModel: (input: { modelRecordId: string; modelPath?: string; expectedLoRA?: boolean }) => Promise<DesktopValidateModelResult>;
+  publishModel: (input: { modelRecordId: string; repository: string; revision?: string; allowInvalid?: boolean }) => Promise<DesktopPublishModelResult>;
 }
 
 export function createDesktopModelsClient(): DesktopModelsClient {
@@ -116,6 +120,26 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         await desktopApi.trainModel(input),
         (value) => value as DesktopModelTrainingResult,
         "Failed to train model.",
+      );
+    },
+    async validateModel(input) {
+      if (!desktopApi.validateModel) {
+        throw new Error("Desktop preload model validation bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.validateModel(input),
+        (value) => value as DesktopValidateModelResult,
+        "Failed to validate model.",
+      );
+    },
+    async publishModel(input) {
+      if (!desktopApi.publishModel) {
+        throw new Error("Desktop preload model publish bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.publishModel(input),
+        (value) => value as DesktopPublishModelResult,
+        "Failed to publish model.",
       );
     },
   };

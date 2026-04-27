@@ -9,6 +9,8 @@ import {
   DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
   DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
   createDesktopModelBrowseRequest,
   createDesktopModelTrainRequest,
 } from "../../../../contracts/ipc";
@@ -30,6 +32,8 @@ describe("registerModelManagementIpc", () => {
       updateModelRecordUseCase: { execute: testDouble.fn() },
       deleteModelRecordUseCase: { execute: testDouble.fn() },
       trainModelUseCase: { execute: testDouble.fn() },
+      validateModelUseCase: { execute: testDouble.fn() },
+      publishModelUseCase: { execute: testDouble.fn() },
     });
 
     expect(channels).toEqual([
@@ -40,6 +44,8 @@ describe("registerModelManagementIpc", () => {
       DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
     ]);
   });
 

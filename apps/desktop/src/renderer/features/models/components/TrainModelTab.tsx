@@ -8,7 +8,7 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <h2>Train Model</h2>
-      <p>Current backend support: LoRA skeleton execution. QLoRA and full-finetune are intentionally disabled.</p>
+      <p>Current backend support: LoRA, QLoRA, and full fine-tuning when runtime dependencies are available.</p>
 
       <label className="ui-stack ui-stack--sm">
         <span>Base model</span>
@@ -31,8 +31,8 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
         <span>Method</span>
         <select className="ui-input" value={s.method} onChange={(event) => s.setMethod(event.target.value as "lora" | "qlora" | "full-finetune") }>
           <option value="lora">lora</option>
-          <option value="qlora" disabled>qlora (not yet supported)</option>
-          <option value="full-finetune" disabled>full-finetune (not yet supported)</option>
+          <option value="qlora">qlora</option>
+          <option value="full-finetune">full-finetune</option>
         </select>
       </label>
 
@@ -65,7 +65,12 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
         <label className="ui-stack ui-stack--sm"><span>Output model name</span><input className="ui-input" value={s.outputModelName} onChange={(e) => s.setOutputModelName(e.target.value)} /></label>
         <label className="ui-stack ui-stack--sm"><span>Local output directory</span><input className="ui-input" value={s.localOutputDirectory} onChange={(e) => s.setLocalOutputDirectory(e.target.value)} /></label>
         <label className="ui-stack ui-stack--sm"><span>Generated model display name</span><input className="ui-input" value={s.generatedDisplayName} onChange={(e) => s.setGeneratedDisplayName(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span>Max safetensors shard size</span><input className="ui-input" value={s.maxShardSize} onChange={(e) => s.setMaxShardSize(e.target.value)} /></label>
       </div>
+      <label className="ui-stack ui-stack--sm">
+        <span>Validate after training</span>
+        <input type="checkbox" checked={s.validateAfterTraining} onChange={(event) => s.setValidateAfterTraining(event.target.checked)} />
+      </label>
 
       <button className="ui-button" type="button" onClick={() => void s.submitTraining()} disabled={!s.canSubmit}>
         Start Training
@@ -74,6 +79,7 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
       {s.result?.outputModel ? (
         <p>Generated model record: {s.result.outputModel.modelRecordId} · {s.result.outputModel.displayName}</p>
       ) : null}
+      {s.result?.validationReportPath ? <p>Validation report: {s.result.validationReportPath}</p> : null}
     </section>
   );
 }

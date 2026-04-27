@@ -31,6 +31,8 @@ import {
   UpdateModelRecordUseCase,
   DeleteModelRecordUseCase,
   TrainModelUseCase,
+  ValidateModelUseCase,
+  PublishModelUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
@@ -45,6 +47,7 @@ import {
   createPythonRuntimeAdapterFoundation,
   ensurePythonRuntimeWorkerDependencies,
   createPythonModelTrainingPort,
+  createPythonModelValidationPort,
 } from "../../../adapters/runtime/python";
 import {
   createFilesystemArtifactBrowserReadAdapter,
@@ -56,6 +59,7 @@ import {
 import { createHuggingFaceArtifactRepoStorageAdapter } from "../../../adapters/storage/huggingface";
 import type { HuggingFaceFetchImplementation } from "../../../adapters/storage/huggingface";
 import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
+import { createHuggingFaceModelPublisherAdapter } from "../../../adapters/model/huggingface";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import {
   createHuggingFaceTokenConfigStore,
@@ -612,6 +616,33 @@ export function composeDesktopHost(
       }, {
         ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
       });
+      const modelValidationPort = createPythonModelValidationPort({
+        executeTask: (request) => pythonRuntimeFoundation.runtimePort.executeTask(request),
+        getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
+        getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
+        ensureModelDownloaded: (request) => pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request),
+        getModelStatus: () => pythonRuntimeFoundation.runtimePort.getModelStatus(),
+        unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels(),
+      }, {
+        ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
+      });
+      const modelPublisher = createHuggingFaceModelPublisherAdapter({
+        tokenProvider: () => tokenConfigStore.getToken(),
+        client: {
+          async uploadFile(params) {
+            const hub = await import("@huggingface/hub");
+            await hub.uploadFile({
+              repo: { type: "model", name: params.repo },
+              file: {
+                path: params.path,
+                content: params.content,
+              },
+              branch: params.revision,
+              accessToken: params.token,
+            });
+          },
+        },
+      });
       const saveModelReference = new SaveModelReferenceUseCase({
         modelRegistry,
       });
@@ -625,6 +656,15 @@ export function composeDesktopHost(
       const trainModel = new TrainModelUseCase({
         modelTraining: modelTrainingPort,
         modelRegistry,
+      });
+      const validateModel = new ValidateModelUseCase({
+        modelValidation: modelValidationPort,
+        modelRegistry,
+      });
+      const publishModel = new PublishModelUseCase({
+        modelRegistry,
+        modelValidation: modelValidationPort,
+        modelPublisher,
       });
 
       registerElectronIpc({
@@ -680,6 +720,8 @@ export function composeDesktopHost(
         updateModelRecordUseCase: updateModelRecord,
         deleteModelRecordUseCase: deleteModelRecord,
         trainModelUseCase: trainModel,
+        validateModelUseCase: validateModel,
+        publishModelUseCase: publishModel,
       });
     },
   };

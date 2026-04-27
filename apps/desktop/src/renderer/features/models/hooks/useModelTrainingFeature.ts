@@ -30,12 +30,14 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
   const [outputModelName, setOutputModelName] = useState("my-lora-adapter");
   const [localOutputDirectory, setLocalOutputDirectory] = useState("");
   const [generatedDisplayName, setGeneratedDisplayName] = useState("My LoRA Adapter");
+  const [maxShardSize, setMaxShardSize] = useState("2GB");
+  const [validateAfterTraining, setValidateAfterTraining] = useState(true);
 
   const [status, setStatus] = useState<TrainingStatus>("idle");
   const [message, setMessage] = useState<string>();
   const [result, setResult] = useState<DesktopModelTrainingResult>();
 
-  const isMethodSupported = method === "lora";
+  const isMethodSupported = true;
 
   const datasetArtifactIds = useMemo(
     () => datasetArtifactIdsText.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0),
@@ -93,13 +95,14 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
         output: {
           outputModelName,
           localOutputDirectory: localOutputDirectory.trim() || undefined,
+          maxShardSize: maxShardSize.trim() || undefined,
           destination: { local: { enabled: true } },
           registration: {
             displayName: generatedDisplayName.trim() || outputModelName,
-            artifactForm: "adapter",
+            artifactForm: method === "full-finetune" ? "full-model" : "adapter",
           },
         },
-        validation: { enabled: false },
+        validation: { enabled: validateAfterTraining, expectedLoRA: method !== "full-finetune" },
       });
 
       setResult(trainingResult);
@@ -155,6 +158,10 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
     setLocalOutputDirectory,
     generatedDisplayName,
     setGeneratedDisplayName,
+    maxShardSize,
+    setMaxShardSize,
+    validateAfterTraining,
+    setValidateAfterTraining,
     status,
     message,
     result,

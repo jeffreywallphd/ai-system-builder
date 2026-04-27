@@ -7,3 +7,5 @@ export * from "./model-validation";
 export * from "./model-inventory";
 export * from "./model-management-operations";
 export * from "./model-training";
+
+export * from "./model-publishing";

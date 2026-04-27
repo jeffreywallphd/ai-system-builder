@@ -39,6 +39,7 @@ export interface ModelTrainingOutputRegistrationMetadata {
 export interface ModelTrainingOutputConfig {
   outputModelName: string;
   localOutputDirectory?: string;
+  maxShardSize?: string;
   destination: {
     local: {
       enabled: boolean;
@@ -289,6 +290,7 @@ export function normalizeModelTrainingRequest(request: ModelTrainingRequest): Mo
     output: {
       outputModelName: normalizeRequiredText(request.output.outputModelName, "output.outputModelName"),
       localOutputDirectory: normalizeOptionalText(request.output.localOutputDirectory),
+      maxShardSize: normalizeOptionalText(request.output.maxShardSize),
       destination: {
         local: {
           enabled: request.output.destination.local.enabled === true,

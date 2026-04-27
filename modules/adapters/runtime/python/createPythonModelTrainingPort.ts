@@ -77,6 +77,7 @@ function mapRuntimeResult(data: unknown): ModelTrainingResult {
     metrics: payload.metrics && typeof payload.metrics === "object" ? payload.metrics as Record<string, number> : undefined,
     logs: Array.isArray(payload.logs) ? payload.logs.map((entry) => String(entry)) : undefined,
     warnings: Array.isArray(payload.warnings) ? payload.warnings.map((entry) => String(entry)) : undefined,
+    validationReportPath: typeof payload.validationReportPath === "string" ? payload.validationReportPath : undefined,
     generatedModelCandidate: generatedCandidate
       ? {
           displayName: asString(generatedCandidate.displayName, "generatedModelCandidate.displayName"),
@@ -121,6 +122,7 @@ function toRuntimeTaskRequest(request: ModelTrainingRequest): TrainModelTaskRequ
     output: {
       outputModelName: request.output.outputModelName,
       outputDirectory: request.output.localOutputDirectory,
+      maxShardSize: request.output.maxShardSize,
     },
     validation: request.validation
       ? {

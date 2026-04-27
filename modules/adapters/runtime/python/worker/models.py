@@ -228,5 +228,26 @@ class TrainModelTaskResult(BaseModel):
     metrics: dict[str, float] | None = None
     logs: list[str] | None = None
     warnings: list[str] | None = None
+    validationReportPath: str | None = None
     generatedModelCandidate: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
+
+
+class ValidateModelTaskRequest(BaseModel):
+    modelRecordId: str
+    modelPath: str
+    expectedLoRA: bool | None = None
+    expectedRecurrentAdditions: bool | None = None
+
+
+class ValidateModelTaskResult(BaseModel):
+    modelRecordId: str
+    status: Literal["unknown", "valid", "invalid", "warning"]
+    validationReportPath: str | None = None
+    validationDiffPath: str | None = None
+    serializationFormat: str | None = None
+    shardCount: int | None = None
+    detectedLoRA: bool | None = None
+    detectedRecurrentAdditions: bool | None = None
+    warnings: list[str] | None = None
+    errors: list[str] | None = None

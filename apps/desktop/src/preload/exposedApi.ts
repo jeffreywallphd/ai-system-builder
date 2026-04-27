@@ -187,6 +187,8 @@ import {
   createDesktopModelRecordUpdateRequest,
   createDesktopModelRecordDeleteRequest,
   createDesktopModelTrainRequest,
+  createDesktopModelValidateRequest,
+  createDesktopModelPublishRequest,
   type DesktopModelBrowseResponse,
   type DesktopModelDetailsReadResponse,
   type DesktopModelListResponse,
@@ -194,9 +196,17 @@ import {
   type DesktopModelRecordUpdateResponse,
   type DesktopModelRecordDeleteResponse,
   type DesktopModelTrainResponse,
+  type DesktopModelValidateResponse,
+  type DesktopModelPublishResponse,
   DESKTOP_MODEL_TRAIN_OPERATION,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
   DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_OPERATION,
+  DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_OPERATION,
+  DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 import type {
@@ -412,6 +422,14 @@ export interface DesktopPreloadApi {
     input: Parameters<typeof createDesktopModelTrainRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopModelTrainResponse>;
+  validateModel: (
+    input: Parameters<typeof createDesktopModelValidateRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelValidateResponse>;
+  publishModel: (
+    input: Parameters<typeof createDesktopModelPublishRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelPublishResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -1152,6 +1170,30 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_MODEL_TRAIN_OPERATION,
         channel: DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop model train IPC response envelope.",
+      });
+    },
+    async validateModel(input, context = {}) {
+      const request = createDesktopModelValidateRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelValidateResponse>(response, {
+        operation: DESKTOP_MODEL_VALIDATE_OPERATION,
+        channel: DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model validate IPC response envelope.",
+      });
+    },
+    async publishModel(input, context = {}) {
+      const request = createDesktopModelPublishRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelPublishResponse>(response, {
+        operation: DESKTOP_MODEL_PUBLISH_OPERATION,
+        channel: DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model publish IPC response envelope.",
       });
     },
   };

@@ -13,6 +13,10 @@ import type {
   UpdateModelRecordResult,
   ModelTrainingRequest,
   ModelTrainingResult,
+  ValidateModelRequest,
+  ValidateModelResult,
+  PublishModelRequest,
+  PublishModelResult,
 } from "../model";
 import { createTransportOperation } from "../transport";
 import { createIpcChannel } from "./ipc-channel";
@@ -26,6 +30,8 @@ export const DESKTOP_MODEL_REFERENCE_SAVE_OPERATION = createTransportOperation("
 export const DESKTOP_MODEL_RECORD_UPDATE_OPERATION = createTransportOperation("model", "record-update");
 export const DESKTOP_MODEL_RECORD_DELETE_OPERATION = createTransportOperation("model", "record-delete");
 export const DESKTOP_MODEL_TRAIN_OPERATION = createTransportOperation("model", "train");
+export const DESKTOP_MODEL_VALIDATE_OPERATION = createTransportOperation("model", "validate");
+export const DESKTOP_MODEL_PUBLISH_OPERATION = createTransportOperation("model", "publish");
 
 export const DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_BROWSE_OPERATION, "request");
 export const DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_BROWSE_OPERATION, "response");
@@ -41,6 +47,10 @@ export const DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL = createIpcChannel(DESK
 export const DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_RECORD_DELETE_OPERATION, "response");
 export const DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_TRAIN_OPERATION, "request");
 export const DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_TRAIN_OPERATION, "response");
+export const DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_VALIDATE_OPERATION, "request");
+export const DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_VALIDATE_OPERATION, "response");
+export const DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL = createIpcChannel(DESKTOP_MODEL_PUBLISH_OPERATION, "request");
+export const DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_MODEL_PUBLISH_OPERATION, "response");
 
 export type DesktopModelBrowseRequest = IpcRequest<
   BrowseModelsRequest,
@@ -134,6 +144,32 @@ export type DesktopModelTrainResponse = IpcResponse<
   Record<string, never>,
   typeof DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value
 >;
+export type DesktopModelValidateRequest = IpcRequest<
+  ValidateModelRequest,
+  typeof DESKTOP_MODEL_VALIDATE_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value
+>;
+export type DesktopModelValidateResponse = IpcResponse<
+  ValidateModelResult,
+  Record<string, unknown>,
+  typeof DESKTOP_MODEL_VALIDATE_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL.value
+>;
+export type DesktopModelPublishRequest = IpcRequest<
+  PublishModelRequest,
+  typeof DESKTOP_MODEL_PUBLISH_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value
+>;
+export type DesktopModelPublishResponse = IpcResponse<
+  PublishModelResult,
+  Record<string, unknown>,
+  typeof DESKTOP_MODEL_PUBLISH_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL.value
+>;
 
 export function createDesktopModelBrowseRequest(payload: BrowseModelsRequest, options?: { requestId?: string; correlationId?: string }): DesktopModelBrowseRequest {
   return createIpcRequest(DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL, payload, options);
@@ -177,4 +213,16 @@ export function createDesktopModelTrainRequest(payload: ModelTrainingRequest, op
 }
 export function createDesktopModelTrainSuccessResponse(result: ModelTrainingResult, options?: { requestId?: string; correlationId?: string }): DesktopModelTrainResponse {
   return createIpcSuccessResponse(DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL, result, options) as DesktopModelTrainResponse;
+}
+export function createDesktopModelValidateRequest(payload: ValidateModelRequest, options?: { requestId?: string; correlationId?: string }): DesktopModelValidateRequest {
+  return createIpcRequest(DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL, payload, options);
+}
+export function createDesktopModelValidateSuccessResponse(result: ValidateModelResult, options?: { requestId?: string; correlationId?: string }): DesktopModelValidateResponse {
+  return createIpcSuccessResponse(DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL, result, options) as DesktopModelValidateResponse;
+}
+export function createDesktopModelPublishRequest(payload: PublishModelRequest, options?: { requestId?: string; correlationId?: string }): DesktopModelPublishRequest {
+  return createIpcRequest(DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL, payload, options);
+}
+export function createDesktopModelPublishSuccessResponse(result: PublishModelResult, options?: { requestId?: string; correlationId?: string }): DesktopModelPublishResponse {
+  return createIpcSuccessResponse(DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL, result, options) as DesktopModelPublishResponse;
 }

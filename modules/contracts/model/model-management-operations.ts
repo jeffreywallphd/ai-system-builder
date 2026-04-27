@@ -11,6 +11,7 @@ import {
 import { type ModelInferenceMode, normalizeModelInferenceMode } from "./model-inference-mode";
 import { type ModelBrowseProvider, normalizeModelBrowseProvider } from "./model-browse-provider";
 import { normalizeModelInventoryRecord, type ModelInventoryRecord } from "./model-inventory";
+import { type ModelValidationStatus, normalizeModelValidationStatus } from "./model-validation";
 
 export const DEFAULT_LIST_MODELS_LIMIT = 50;
 export const MAX_LIST_MODELS_LIMIT = 500;
@@ -85,6 +86,8 @@ export interface RegisterGeneratedModelRequest {
   generatedFromRunId?: string;
   serializationFormat?: string;
   sizeBytes?: number;
+  validationStatus?: ModelValidationStatus;
+  validationReportPath?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -206,6 +209,11 @@ export function normalizeRegisterDownloadedModelRequest(
     adapterOfModelId: normalizeOptionalText(request.adapterOfModelId),
     serializationFormat: normalizeOptionalText(request.serializationFormat),
     sizeBytes: typeof request.sizeBytes === "number" && request.sizeBytes >= 0 ? request.sizeBytes : undefined,
+    validationStatus:
+      typeof request.validationStatus === "string"
+        ? normalizeModelValidationStatus(request.validationStatus)
+        : undefined,
+    validationReportPath: normalizeOptionalText(request.validationReportPath),
     metadata: request.metadata,
   };
 }
