@@ -52,6 +52,11 @@ class _ReasoningGenerator:
         return "<think>\nUse only the supplied context.\n</think>\n\nAnswer: The context describes generated content."
 
 
+class _EmptyMessageErrorGenerator:
+    def generate_text(self, _prompt: str) -> str:
+        raise NotImplementedError()
+
+
 class _EncoderDecoderConfig:
     is_encoder_decoder = True
 
@@ -190,6 +195,30 @@ class ExampleGenerationTests(unittest.TestCase):
         self.assertEqual(diagnostic["rawData"]["chunk"]["text"], "Some context")
         self.assertIn("questionPrompt", diagnostic["preparedData"])
         self.assertTrue(any("echoed" in error for error in diagnostic["errors"]))
+
+    def test_generation_skip_logs_error_type_when_exception_message_is_empty(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "failurePolicy": "skip",
+                "model": {"provider": "transformers", "modelId": "test-model"},
+            }
+        )
+        output = io.StringIO()
+
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.example_generation.get_or_create_local_text_generator",
+            return_value=_EmptyMessageErrorGenerator(),
+        ):
+            with redirect_stdout(output):
+                examples = generate_qa_examples_for_chunks(
+                    [MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="Some context")],
+                    config,
+                )
+
+        self.assertEqual(examples, [])
+        diagnostic = json.loads(output.getvalue().strip())
+        self.assertEqual(diagnostic["errors"], ["NotImplementedError"])
 
     def test_extracts_question_and_answer_from_reasoning_model_wrappers(self) -> None:
         config = ExampleGenerationConfig.model_validate(

@@ -101,6 +101,13 @@ def _log_generation_failure_diagnostics(
     )
 
 
+def _format_generation_error(error: Exception) -> str:
+    message = str(error).strip()
+    if message:
+        return message
+    return error.__class__.__name__
+
+
 def _emit_rows(
     rows: list[dict[str, object]],
     output_format: str,
@@ -279,8 +286,9 @@ def _build_generated_rows(
                     }
                 )
         except Exception as error:
+            formatted_error = _format_generation_error(error)
             if len(generation_error_samples) < 3:
-                generation_error_samples.append(str(error))
+                generation_error_samples.append(formatted_error)
             if failure_policy == "skip":
                 skipped_generation_chunk_count += len(chunk_batch)
                 for chunk in chunk_batch:
@@ -288,7 +296,7 @@ def _build_generated_rows(
                         DatasetPreparationWarning(
                             code="generation_example_skipped",
                             message=(
-                                f"Skipped chunk {chunk.chunk_index} from source '{chunk.artifact_id}' during generation: {error}"
+                                f"Skipped chunk {chunk.chunk_index} from source '{chunk.artifact_id}' during generation: {formatted_error}"
                             ),
                             sourceArtifactId=chunk.artifact_id,
                         )
@@ -296,7 +304,7 @@ def _build_generated_rows(
                 continue
             raise DatasetPreparationStageError(
                 "generation",
-                str(error),
+                formatted_error,
                 "generation_failed",
                 details={
                     "failurePolicy": failure_policy,
