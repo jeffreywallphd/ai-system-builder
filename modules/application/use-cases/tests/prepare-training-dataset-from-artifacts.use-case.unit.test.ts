@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -22,18 +22,21 @@ const split = { trainRatio: 0.5, testRatio: 0.5 };
 
 async function setupRuntimeOutputs() {
   const tempDir = await mkdtemp(join(tmpdir(), "dataset-use-case-test-"));
-  const runtimeTrain = join(tempDir, "train.jsonl");
-  const runtimeTest = join(tempDir, "test.jsonl");
-  await writeFile(runtimeTrain, '{"text":"train"}\n', "utf-8");
-  await writeFile(runtimeTest, '{"text":"test"}\n', "utf-8");
-  return { runtimeTrain, runtimeTest };
+  const runtimeDataset = join(tempDir, "dataset.jsonl");
+  await writeFile(runtimeDataset, '{"text":"train"}\n{"text":"test"}\n', "utf-8");
+  return { runtimeDataset };
 }
 
 async function expectFileMissing(path: string) {
-  await expect(access(path)).rejects.toBeDefined();
+  try {
+    await access(path);
+  } catch {
+    return;
+  }
+  throw new Error(`Expected file to be removed: ${path}`);
 }
 
-function createDeps(runtimeTrain: string, runtimeTest: string) {
+function createDeps(runtimeDataset: string) {
   const readArtifactStorageBindings = testDouble.fn(async ({ artifactId }: { artifactId: string }) => ({
     ok: true as const,
     value: {
@@ -61,13 +64,10 @@ function createDeps(runtimeTrain: string, runtimeTest: string) {
     },
   }));
 
-  let storeCall = 0;
-  const storeArtifact = testDouble.fn(async () => {
-    storeCall += 1;
-    return storeCall === 1
-      ? { ok: true as const, value: { key: "stored-train", mediaType: "application/x-ndjson" } }
-      : { ok: true as const, value: { key: "stored-test", mediaType: "application/x-ndjson" } };
-  });
+  const storeArtifact = testDouble.fn(async () => ({
+    ok: true as const,
+    value: { key: "stored-dataset", mediaType: "application/x-ndjson" },
+  }));
 
   const storeArtifactInRepo = testDouble.fn(async ({ target }: { target: { repository: string; path: string; revision?: string } }) => ({
     ok: true as const,
@@ -86,16 +86,9 @@ function createDeps(runtimeTrain: string, runtimeTest: string) {
     return {
       outputs: [
         {
-          name: "dataset-train",
-          role: "train",
-          tempPath: runtimeTrain,
-          mediaType: "application/x-ndjson",
-          metadata: { stage: "generated-examples", generationMode: "qa" },
-        },
-        {
-          name: "dataset-test",
-          role: "test",
-          tempPath: runtimeTest,
+          name: "dataset",
+          role: "dataset",
+          tempPath: runtimeDataset,
           mediaType: "application/x-ndjson",
           metadata: { stage: "generated-examples", generationMode: "qa" },
         },
@@ -106,8 +99,9 @@ function createDeps(runtimeTrain: string, runtimeTest: string) {
         skippedDocumentCount: 0,
         chunkCount: 1,
         generatedExampleCount: 2,
-        trainRowCount: 1,
-        testRowCount: 1,
+        datasetRowCount: 2,
+        trainRowCount: 2,
+        testRowCount: 0,
       },
       request,
     };
@@ -125,8 +119,8 @@ function createDeps(runtimeTrain: string, runtimeTest: string) {
 
 describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
   it("passes originalName to runtime source inputs and stores local outputs by default", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    const deps = createDeps(runtimeTrain, runtimeTest);
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeDataset);
 
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
       datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
@@ -158,20 +152,19 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     const runtimeRequest = deps.prepareTrainingDataset.mock.calls[0]?.[0];
     expect(runtimeRequest.sourceInputs[0]?.originalName).toBe("key-artifact-1.md");
     expect(runtimeRequest.runtime).toBeUndefined();
-    expect(deps.storeArtifact).toHaveBeenCalledTimes(2);
-    expect(result.value.outputs.local?.train.storage.key).toBe("stored-train");
+    expect(deps.storeArtifact).toHaveBeenCalledTimes(1);
+    expect(result.value.outputs.local?.dataset.storage.key).toBe("stored-dataset");
     expect(result.value.outputs.huggingFace).toBeUndefined();
     expect((result.value as Record<string, unknown>).train).toBeUndefined();
     expect((result.value as Record<string, unknown>).localOutputs).toBeUndefined();
     expect(result.value.provenance.generationModelId).toBe("test-model");
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    await expectFileMissing(runtimeDataset);
   });
 
   it("uses artifact id as storage key when artifact has no storage bindings", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    const deps = createDeps(runtimeTrain, runtimeTest);
-    deps.readArtifactStorageBindings.mockImplementationOnce(async () => ({
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeDataset);
+    deps.readArtifactStorageBindings.mockImplementation(async () => ({
       ok: true as const,
       value: { bindings: [] },
     }));
@@ -200,18 +193,15 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(deps.retrieveArtifact).toHaveBeenCalledWith(
-      expect.objectContaining({ key: artifactId }),
-      undefined,
-    );
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    expect(deps.retrieveArtifact.mock.calls[0]?.[0]?.key).toBe(artifactId);
+    expect(deps.retrieveArtifact.mock.calls[0]?.[1]).toBeUndefined();
+    await expectFileMissing(runtimeDataset);
   });
 
   it("uses artifact id as storage key when binding read returns not-found", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    const deps = createDeps(runtimeTrain, runtimeTest);
-    deps.readArtifactStorageBindings.mockImplementationOnce(async () => ({
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeDataset);
+    deps.readArtifactStorageBindings.mockImplementation(async () => ({
       ok: false as const,
       error: {
         code: "not-found",
@@ -243,18 +233,15 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(deps.retrieveArtifact).toHaveBeenCalledWith(
-      expect.objectContaining({ key: artifactId }),
-      undefined,
-    );
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    expect(deps.retrieveArtifact.mock.calls[0]?.[0]?.key).toBe(artifactId);
+    expect(deps.retrieveArtifact.mock.calls[0]?.[1]).toBeUndefined();
+    await expectFileMissing(runtimeDataset);
   });
 
   it("materializes runtime source input files for nested upload artifact ids", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    const deps = createDeps(runtimeTrain, runtimeTest);
-    deps.readArtifactStorageBindings.mockImplementationOnce(async () => ({
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeDataset);
+    deps.readArtifactStorageBindings.mockImplementation(async () => ({
       ok: false as const,
       error: {
         code: "not-found",
@@ -262,7 +249,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       },
     }));
 
-    deps.retrieveArtifact.mockImplementationOnce(async ({ key }: { key: string }) => ({
+    deps.retrieveArtifact.mockImplementation(async ({ key }: { key: string }) => ({
       ok: true as const,
       value: {
         descriptor: {
@@ -274,7 +261,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       },
     }));
 
-    deps.prepareTrainingDataset.mockImplementationOnce(async (request) => {
+    deps.prepareTrainingDataset.mockImplementation(async (request) => {
       const runtimeLocalPath = request.sourceInputs[0]?.localPath;
       expect(typeof runtimeLocalPath).toBe("string");
       const runtimeSourceBytes = await readFile(runtimeLocalPath as string, "utf-8");
@@ -282,16 +269,9 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       return {
         outputs: [
           {
-            name: "dataset-train",
-            role: "train",
-            tempPath: runtimeTrain,
-            mediaType: "application/x-ndjson",
-            metadata: { stage: "generated-examples", generationMode: "qa" },
-          },
-          {
-            name: "dataset-test",
-            role: "test",
-            tempPath: runtimeTest,
+            name: "dataset",
+            role: "dataset",
+            tempPath: runtimeDataset,
             mediaType: "application/x-ndjson",
             metadata: { stage: "generated-examples", generationMode: "qa" },
           },
@@ -302,8 +282,9 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
           skippedDocumentCount: 0,
           chunkCount: 1,
           generatedExampleCount: 2,
-          trainRowCount: 1,
-          testRowCount: 1,
+          datasetRowCount: 2,
+          trainRowCount: 2,
+          testRowCount: 0,
         },
       };
     });
@@ -331,13 +312,12 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     });
 
     expect(result.ok).toBe(true);
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    await expectFileMissing(runtimeDataset);
   });
 
   it("supports huggingface-only output destination", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    const deps = createDeps(runtimeTrain, runtimeTest);
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeDataset);
 
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
       datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
@@ -379,17 +359,16 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     }
 
     expect(deps.storeArtifact).not.toHaveBeenCalled();
-    expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(2);
+    expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(1);
     expect(result.value.outputs.local).toBeUndefined();
-    expect(result.value.outputs.huggingFace?.train.path).toBe("datasets/dataset-train.jsonl");
-    expect(result.value.outputs.huggingFace?.train.repository).toBe("org/repo");
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    expect(result.value.outputs.huggingFace?.dataset.path).toBe("datasets/dataset.jsonl");
+    expect(result.value.outputs.huggingFace?.dataset.repository).toBe("org/repo");
+    await expectFileMissing(runtimeDataset);
   });
 
   it("supports local + huggingface output destinations", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    const deps = createDeps(runtimeTrain, runtimeTest);
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeDataset);
 
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
       datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
@@ -430,11 +409,11 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       return;
     }
 
-    expect(deps.storeArtifact).toHaveBeenCalledTimes(2);
-    expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(2);
-    expect(result.value.outputs.local?.train.storage.key).toBe("stored-train");
-    expect(result.value.outputs.huggingFace?.test.path).toBe("dataset-test.jsonl");
-    expect(result.value.summary.trainRowCount).toBe(1);
+    expect(deps.storeArtifact).toHaveBeenCalledTimes(1);
+    expect(deps.storeArtifactInRepo).toHaveBeenCalledTimes(1);
+    expect(result.value.outputs.local?.dataset.storage.key).toBe("stored-dataset");
+    expect(result.value.outputs.huggingFace?.dataset.path).toBe("dataset.jsonl");
+    expect(result.value.summary.datasetRowCount).toBe(2);
     expect(result.value.provenance.output.destinations?.huggingFace?.repository).toBe("org/repo");
     const firstStoreMetadata = deps.storeArtifact.mock.calls[0]?.[0]?.descriptor?.metadata;
     expect(firstStoreMetadata).toMatchObject({
@@ -443,14 +422,13 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       destination: { provider: "local" },
       generationModel: { modelId: "test-model" },
     });
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    await expectFileMissing(runtimeDataset);
   });
 
   it("fails without storing when runtime output is invalid JSONL", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    await writeFile(runtimeTrain, "not-json\n", "utf-8");
-    const deps = createDeps(runtimeTrain, runtimeTest);
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    await writeFile(runtimeDataset, "not-json\n", "utf-8");
+    const deps = createDeps(runtimeDataset);
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
       datasetPreparation: { prepareTrainingDataset: deps.prepareTrainingDataset },
       storageBindings: {
@@ -475,14 +453,13 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
 
     expect(result.ok).toBe(false);
     expect(deps.storeArtifact).not.toHaveBeenCalled();
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    await expectFileMissing(runtimeDataset);
   });
 
   it("cleans runtime files on partial destination failure", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    const deps = createDeps(runtimeTrain, runtimeTest);
-    deps.storeArtifact.mockImplementationOnce(async () => ({
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeDataset);
+    deps.storeArtifact.mockImplementation(async () => ({
       ok: false as const,
       error: { code: "unavailable", message: "store failed" },
     }));
@@ -509,14 +486,13 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     });
 
     expect(result.ok).toBe(false);
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    await expectFileMissing(runtimeDataset);
   });
 
   it("returns mapped structured runtime contract errors", async () => {
-    const { runtimeTrain, runtimeTest } = await setupRuntimeOutputs();
-    const deps = createDeps(runtimeTrain, runtimeTest);
-    deps.prepareTrainingDataset.mockImplementationOnce(async () => {
+    const { runtimeDataset } = await setupRuntimeOutputs();
+    const deps = createDeps(runtimeDataset);
+    deps.prepareTrainingDataset.mockImplementation(async () => {
       throw new PythonDatasetPreparationError(
         createContractError("internal", "[generation] runtime timeout", {
           details: { stage: "generation", runtimeErrorCode: "runtime_timeout" },
@@ -552,7 +528,6 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     }
     expect(result.error.message).toBe("[generation] runtime timeout");
     expect(result.error.details).toMatchObject({ stage: "generation", runtimeErrorCode: "runtime_timeout" });
-    await expectFileMissing(runtimeTrain);
-    await expectFileMissing(runtimeTest);
+    await rm(runtimeDataset, { force: true });
   });
 });

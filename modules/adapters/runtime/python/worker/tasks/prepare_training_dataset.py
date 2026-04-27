@@ -48,20 +48,6 @@ def _validate_split_config(train_ratio: float, test_ratio: float) -> None:
     if abs((train_ratio + test_ratio) - 1.0) > 1e-6:
         raise ValueError("split.trainRatio + split.testRatio must equal 1.0")
 
-def _resolve_split_index(total_rows: int, train_ratio: float) -> int:
-    if total_rows < 2:
-        raise DatasetPreparationStageError(
-            "split",
-            (
-                "Generated examples cannot be split into non-empty train/test outputs. "
-                f"At least 2 rows are required, but only {total_rows} row(s) were generated."
-            ),
-            "split_insufficient_rows",
-        )
-
-    raw_split_index = int(total_rows * train_ratio)
-    return max(1, min(total_rows - 1, raw_split_index))
-
 def _validate_generated_rows(total_rows: int, chunk_count: int) -> None:
     if total_rows > 0:
         return
@@ -167,7 +153,7 @@ def _emit_rows(
     }[output_format]
 
     return PythonRuntimeOutputDescriptor(
-        name=f"{base_name}-{role}",
+        name=base_name if role == "dataset" else f"{base_name}-{role}",
         role=role,
         tempPath=temp_path,
         mediaType=media_type,
@@ -407,12 +393,6 @@ def prepare_training_dataset(
         seed = int(payload.split.seed or 0)
         random.Random(seed).shuffle(rows)
 
-    train_ratio = float(payload.split.trainRatio)
-
-    split_index = _resolve_split_index(len(rows), train_ratio)
-    train_rows = rows[:split_index]
-    test_rows = rows[split_index:]
-
     base_name = payload.output.naming.baseName if payload.output.naming and payload.output.naming.baseName else "training-dataset"
     output_metadata = {
         "stage": "generated-examples",
@@ -430,19 +410,12 @@ def prepare_training_dataset(
         "outputConfig": payload.output.model_dump(mode="json"),
     }
 
-    train_output = _emit_rows(
-        train_rows,
+    dataset_output = _emit_rows(
+        rows,
         payload.output.format,
-        "train",
+        "dataset",
         base_name,
-        {**output_metadata, "partition": "train"},
-    )
-    test_output = _emit_rows(
-        test_rows,
-        payload.output.format,
-        "test",
-        base_name,
-        {**output_metadata, "partition": "test"},
+        {**output_metadata, "partition": "dataset"},
     )
 
     summary = DatasetPreparationSummary(
@@ -451,12 +424,13 @@ def prepare_training_dataset(
         skippedDocumentCount=skipped_count,
         chunkCount=chunk_count,
         generatedExampleCount=len(rows),
-        trainRowCount=len(train_rows),
-        testRowCount=len(test_rows),
+        datasetRowCount=len(rows),
+        trainRowCount=len(rows),
+        testRowCount=0,
     )
 
     return PrepareTrainingDatasetResult(
-        outputs=[train_output, test_output],
+        outputs=[dataset_output],
         summary=summary,
         warnings=warnings or None,
     )

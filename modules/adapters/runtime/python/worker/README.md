@@ -19,4 +19,4 @@ Implemented task:
   - auto-downloads missing generation models via `huggingface_hub` before generation
   - generates QA training examples from chunks via local `transformers` model configuration
   - supports generation failure handling policy (`generation.failurePolicy`), defaulting to strict fail-fast unless normalization mode is best-effort
-  - emits train/test dataset artifacts in JSONL/JSON/CSV using generated-example rows
+- emits one aggregate dataset artifact in JSONL/JSON/CSV/Parquet using generated-example rows

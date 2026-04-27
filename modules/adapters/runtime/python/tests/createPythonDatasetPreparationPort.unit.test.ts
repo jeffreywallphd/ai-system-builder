@@ -16,8 +16,7 @@ describe("createPythonDatasetPreparationPort", () => {
       success: true,
       data: {
         outputs: [
-          { name: "dataset-train", role: "train", tempPath: "/tmp/train.jsonl", mediaType: "application/x-ndjson" },
-          { name: "dataset-test", role: "test", tempPath: "/tmp/test.jsonl", mediaType: "application/x-ndjson" },
+          { name: "dataset", role: "dataset", tempPath: "/tmp/dataset.jsonl", mediaType: "application/x-ndjson" },
         ],
         summary: {
           sourceDocumentCount: 1,
@@ -25,8 +24,9 @@ describe("createPythonDatasetPreparationPort", () => {
           skippedDocumentCount: 0,
           chunkCount: 2,
           generatedExampleCount: 10,
-          trainRowCount: 8,
-          testRowCount: 2,
+          datasetRowCount: 10,
+          trainRowCount: 10,
+          testRowCount: 0,
         },
       },
     }));
@@ -77,8 +77,8 @@ describe("createPythonDatasetPreparationPort", () => {
       provider: "transformers",
       modelId: "test-model",
     });
-    expect(result.summary.trainRowCount).toBe(8);
-    expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
+    expect(result.summary.datasetRowCount).toBe(10);
+    expect(result.outputs.map((output) => output.role)).toEqual(["dataset"]);
     expect(result.warnings).toBeUndefined();
   });
 
@@ -104,8 +104,7 @@ describe("createPythonDatasetPreparationPort", () => {
         success: true,
         data: {
           outputs: [
-            { name: "dataset-train", role: "train", tempPath: "/tmp/train.jsonl", mediaType: "application/x-ndjson" },
-            { name: "dataset-test", role: "test", tempPath: "/tmp/test.jsonl", mediaType: "application/x-ndjson" },
+            { name: "dataset", role: "dataset", tempPath: "/tmp/dataset.jsonl", mediaType: "application/x-ndjson" },
           ],
           summary: {
             sourceDocumentCount: 1,
@@ -113,8 +112,9 @@ describe("createPythonDatasetPreparationPort", () => {
             skippedDocumentCount: 0,
             chunkCount: 2,
             generatedExampleCount: 10,
-            trainRowCount: 8,
-            testRowCount: 2,
+            datasetRowCount: 10,
+            trainRowCount: 10,
+            testRowCount: 0,
           },
         },
       };
@@ -196,8 +196,7 @@ describe("createPythonDatasetPreparationPort", () => {
       success: true,
       data: {
         outputs: [
-          { name: "dataset-train", role: "train", tempPath: "/tmp/train.jsonl", mediaType: "application/x-ndjson" },
-          { name: "dataset-test", role: "test", tempPath: "/tmp/test.jsonl", mediaType: "application/x-ndjson" },
+          { name: "dataset", role: "dataset", tempPath: "/tmp/dataset.jsonl", mediaType: "application/x-ndjson" },
         ],
         summary: {
           sourceDocumentCount: 1,
@@ -205,8 +204,9 @@ describe("createPythonDatasetPreparationPort", () => {
           skippedDocumentCount: 0,
           chunkCount: 1,
           generatedExampleCount: 2,
-          trainRowCount: 1,
-          testRowCount: 1,
+          datasetRowCount: 2,
+          trainRowCount: 2,
+          testRowCount: 0,
         },
       },
     }));
@@ -247,6 +247,7 @@ describe("createPythonDatasetPreparationPort", () => {
             skippedDocumentCount: 0,
             chunkCount: 1,
             generatedExampleCount: 1,
+            datasetRowCount: 1,
             trainRowCount: 1,
             testRowCount: 0,
           },
@@ -282,8 +283,7 @@ describe("createPythonDatasetPreparationPort", () => {
         success: true,
         data: {
           outputs: [
-            { name: "train", role: "train", tempPath: "/tmp/out", mediaType: "application/json" },
-            { name: "test", role: "test", tempPath: "/tmp/out-test", mediaType: "application/json" },
+            { name: "dataset", role: "dataset", tempPath: "/tmp/out", mediaType: "application/json" },
           ],
           summary: {
             sourceDocumentCount: 1,
@@ -309,20 +309,21 @@ describe("createPythonDatasetPreparationPort", () => {
     })).rejects.toThrow("summary.normalizedDocumentCount must be a number");
   });
 
-  it("fails fast when outputs do not contain train/test roles", async () => {
+  it("fails fast when outputs do not contain a dataset role", async () => {
     const adapter = createPythonDatasetPreparationPort({
       executeTask: async () => ({
         requestId: "req-1",
         taskType: "prepare-training-dataset",
         success: true,
         data: {
-          outputs: [{ name: "dataset", role: "artifact", tempPath: "/tmp/out", mediaType: "application/json" }],
+          outputs: [{ name: "report", role: "report", tempPath: "/tmp/out", mediaType: "application/json" }],
           summary: {
             sourceDocumentCount: 1,
             normalizedDocumentCount: 1,
             skippedDocumentCount: 0,
             chunkCount: 1,
             generatedExampleCount: 1,
+            datasetRowCount: 1,
             trainRowCount: 1,
             testRowCount: 0,
           },
@@ -344,6 +345,6 @@ describe("createPythonDatasetPreparationPort", () => {
       },
       split: { trainRatio: 0.8, testRatio: 0.2 },
       output: { format: "jsonl" },
-    })).rejects.toThrow("outputs must include both train and test roles");
+    })).rejects.toThrow("outputs must include a dataset output");
   });
 });

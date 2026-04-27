@@ -163,7 +163,7 @@ class PrepareTrainingDatasetRequest(BaseModel):
 
 class PythonRuntimeOutputDescriptor(BaseModel):
     name: str
-    role: Literal["train", "test", "metrics", "report", "artifact"] | None = None
+    role: Literal["dataset", "train", "test", "metrics", "report", "artifact"] | None = None
     tempPath: str
     mediaType: str
     sizeBytes: int | None = None
@@ -176,6 +176,7 @@ class DatasetPreparationSummary(BaseModel):
     skippedDocumentCount: int
     chunkCount: int
     generatedExampleCount: int
+    datasetRowCount: int
     trainRowCount: int
     testRowCount: int
 

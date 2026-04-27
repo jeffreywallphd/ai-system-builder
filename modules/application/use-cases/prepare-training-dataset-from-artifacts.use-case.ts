@@ -35,19 +35,10 @@ export interface PrepareTrainingDatasetFromArtifactsCommand {
 export interface PrepareTrainingDatasetFromArtifactsValue {
   outputs: {
     local?: {
-      train: StagedArtifactDescriptor;
-      test: StagedArtifactDescriptor;
+      dataset: StagedArtifactDescriptor;
     };
     huggingFace?: {
-      train: {
-        provider: "huggingface";
-        repository: string;
-        path: string;
-        revision?: string;
-        exists: boolean;
-        verifiedAt: string;
-      };
-      test: {
+      dataset: {
         provider: "huggingface";
         repository: string;
         path: string;
@@ -357,75 +348,45 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       }
 
       const prepared = await this.datasetPreparation.prepareTrainingDataset(runtimeRequest);
-      const trainOutput = prepared.outputs.find((output) => output.role === "train");
-      const testOutput = prepared.outputs.find((output) => output.role === "test");
+      const datasetOutput = prepared.outputs.find((output) => output.role === "dataset")
+        ?? prepared.outputs.find((output) => output.role === "artifact");
 
-      if (!trainOutput || !testOutput) {
+      if (!datasetOutput) {
         return createFailureResult(
-          createContractError("internal", "Runtime did not return both train and test outputs."),
+          createContractError("internal", "Runtime did not return a dataset output."),
           context,
         );
       }
 
-      let trainBytes: Buffer;
-      let testBytes: Buffer;
+      let datasetBytes: Buffer;
       try {
-        await Promise.all([
-          validateDatasetOutput(trainOutput.tempPath, command.output.format),
-          validateDatasetOutput(testOutput.tempPath, command.output.format),
-        ]);
-        [trainBytes, testBytes] = await Promise.all([
-          readFile(trainOutput.tempPath),
-          readFile(testOutput.tempPath),
-        ]);
+        await validateDatasetOutput(datasetOutput.tempPath, command.output.format);
+        datasetBytes = await readFile(datasetOutput.tempPath);
       } finally {
-        await Promise.allSettled([
-          rm(trainOutput.tempPath, { force: true }),
-          rm(testOutput.tempPath, { force: true }),
-        ]);
+        await rm(datasetOutput.tempPath, { force: true });
       }
 
       let localOutputs: PrepareTrainingDatasetFromArtifactsValue["outputs"]["local"];
       if (destinations.local) {
-        const [storedTrain, storedTest] = await Promise.all([
-          this.storage.storeArtifact(createStoreArtifactRequest(trainBytes, {
-            descriptor: {
-              mediaType: trainOutput.mediaType,
-              metadata: {
-                originalFileName: `${trainOutput.name}.${command.output.format}`,
-                runtimeRole: "train",
-                ...buildDatasetMetadata(command, prepared.summary, { provider: "local" }, trainOutput.metadata),
-              },
+        const storedDataset = await this.storage.storeArtifact(createStoreArtifactRequest(datasetBytes, {
+          descriptor: {
+            mediaType: datasetOutput.mediaType,
+            metadata: {
+              originalFileName: `${datasetOutput.name}.${command.output.format}`,
+              runtimeRole: "dataset",
+              ...buildDatasetMetadata(command, prepared.summary, { provider: "local" }, datasetOutput.metadata),
             },
-          }), context),
-          this.storage.storeArtifact(createStoreArtifactRequest(testBytes, {
-            descriptor: {
-              mediaType: testOutput.mediaType,
-              metadata: {
-                originalFileName: `${testOutput.name}.${command.output.format}`,
-                runtimeRole: "test",
-                ...buildDatasetMetadata(command, prepared.summary, { provider: "local" }, testOutput.metadata),
-              },
-            },
-          }), context),
-        ]);
+          },
+        }), context);
 
-        if (!storedTrain.ok) {
-          return createFailureResult(storedTrain.error, context);
-        }
-
-        if (!storedTest.ok) {
-          return createFailureResult(storedTest.error, context);
+        if (!storedDataset.ok) {
+          return createFailureResult(storedDataset.error, context);
         }
 
         localOutputs = {
-          train: createStagedArtifactDescriptorFromStorageObjectDescriptor(storedTrain.value, {
+          dataset: createStagedArtifactDescriptorFromStorageObjectDescriptor(storedDataset.value, {
             sourceKind: "runtime",
-            originalName: `${trainOutput.name}.${command.output.format}`,
-          }),
-          test: createStagedArtifactDescriptorFromStorageObjectDescriptor(storedTest.value, {
-            sourceKind: "runtime",
-            originalName: `${testOutput.name}.${command.output.format}`,
+            originalName: `${datasetOutput.name}.${command.output.format}`,
           }),
         };
       }
@@ -440,13 +401,9 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           );
         }
 
-        const trainPath = joinRepoPath(
+        const datasetPath = joinRepoPath(
           destinations.huggingFace.pathPrefix,
-          `${trainOutput.name}.${command.output.format}`,
-        );
-        const testPath = joinRepoPath(
-          destinations.huggingFace.pathPrefix,
-          `${testOutput.name}.${command.output.format}`,
+          `${datasetOutput.name}.${command.output.format}`,
         );
         const target = {
           provider: destinations.huggingFace.provider,
@@ -454,82 +411,47 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           revision: destinations.huggingFace.revision,
         };
 
-        const [publishTrain, publishTest] = await Promise.all([
-          artifactRepoStorage.storeArtifactInRepo(
-            createStoreArtifactInRepoRequest(new Uint8Array(trainBytes), {
-              target: { ...target, path: trainPath },
-              mediaType: trainOutput.mediaType,
-              metadata: {
-                runtimeRole: "train",
-                ...buildDatasetMetadata(command, prepared.summary, {
-                  provider: "huggingface",
-                  publication: {
-                    repository: target.repository,
-                    path: trainPath,
-                    revision: target.revision,
-                  },
-                }, trainOutput.metadata),
-              },
-            }),
-            context,
-          ),
-          artifactRepoStorage.storeArtifactInRepo(
-            createStoreArtifactInRepoRequest(new Uint8Array(testBytes), {
-              target: { ...target, path: testPath },
-              mediaType: testOutput.mediaType,
-              metadata: {
-                runtimeRole: "test",
-                ...buildDatasetMetadata(command, prepared.summary, {
-                  provider: "huggingface",
-                  publication: {
-                    repository: target.repository,
-                    path: testPath,
-                    revision: target.revision,
-                  },
-                }, testOutput.metadata),
-              },
-            }),
-            context,
-          ),
-        ]);
+        const publishDataset = await artifactRepoStorage.storeArtifactInRepo(
+          createStoreArtifactInRepoRequest(new Uint8Array(datasetBytes), {
+            target: { ...target, path: datasetPath },
+            mediaType: datasetOutput.mediaType,
+            metadata: {
+              runtimeRole: "dataset",
+              ...buildDatasetMetadata(command, prepared.summary, {
+                provider: "huggingface",
+                publication: {
+                  repository: target.repository,
+                  path: datasetPath,
+                  revision: target.revision,
+                },
+              }, datasetOutput.metadata),
+            },
+          }),
+          context,
+        );
 
-        if (!publishTrain.ok) {
-          return createFailureResult(publishTrain.error, context);
-        }
-        if (!publishTest.ok) {
-          return createFailureResult(publishTest.error, context);
+        if (!publishDataset.ok) {
+          return createFailureResult(publishDataset.error, context);
         }
 
-        const [verifyTrain, verifyTest] = await Promise.all([
-          artifactRepoStorage.hasArtifactInRepo(createHasArtifactInRepoRequest({ ...target, path: trainPath }), context),
-          artifactRepoStorage.hasArtifactInRepo(createHasArtifactInRepoRequest({ ...target, path: testPath }), context),
-        ]);
+        const verifyDataset = await artifactRepoStorage.hasArtifactInRepo(
+          createHasArtifactInRepoRequest({ ...target, path: datasetPath }),
+          context,
+        );
 
-        if (!verifyTrain.ok) {
-          return createFailureResult(verifyTrain.error, context);
-        }
-        if (!verifyTest.ok) {
-          return createFailureResult(verifyTest.error, context);
+        if (!verifyDataset.ok) {
+          return createFailureResult(verifyDataset.error, context);
         }
 
         const verifiedAt = this.now();
-        const publishTrainTarget = publishTrain.value.descriptor.target;
-        const publishTestTarget = publishTest.value.descriptor.target;
+        const publishDatasetTarget = publishDataset.value.descriptor.target;
         huggingFaceOutputs = {
-          train: {
+          dataset: {
             provider: "huggingface",
-            repository: publishTrainTarget.repository,
-            path: publishTrainTarget.path ?? trainPath,
-            revision: publishTrainTarget.revision,
-            exists: verifyTrain.value.exists,
-            verifiedAt,
-          },
-          test: {
-            provider: "huggingface",
-            repository: publishTestTarget.repository,
-            path: publishTestTarget.path ?? testPath,
-            revision: publishTestTarget.revision,
-            exists: verifyTest.value.exists,
+            repository: publishDatasetTarget.repository,
+            path: publishDatasetTarget.path ?? datasetPath,
+            revision: publishDatasetTarget.revision,
+            exists: verifyDataset.value.exists,
             verifiedAt,
           },
         };

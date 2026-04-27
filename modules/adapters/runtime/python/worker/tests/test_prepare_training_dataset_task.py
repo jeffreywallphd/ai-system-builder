@@ -81,8 +81,9 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.assertEqual(result.summary.skippedDocumentCount, 1)
         self.assertEqual(result.summary.chunkCount, 3)
         self.assertEqual(result.summary.generatedExampleCount, 3)
-        self.assertEqual(result.summary.trainRowCount, 1)
-        self.assertEqual(result.summary.testRowCount, 2)
+        self.assertEqual(result.summary.datasetRowCount, 3)
+        self.assertEqual(result.summary.trainRowCount, 3)
+        self.assertEqual(result.summary.testRowCount, 0)
         self.assertTrue(any(warning.code == "document_normalization_skipped" for warning in result.warnings or []))
 
     def test_writes_generated_schema_as_jsonl_json_and_csv(self) -> None:
@@ -109,7 +110,8 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
             payload = self._build_payload(output_format)
             result = prepare_training_dataset(payload, example_generator=generator)
 
-            train_output = next(output for output in result.outputs if output.role == "train")
+            self.assertEqual(len(result.outputs), 1)
+            train_output = next(output for output in result.outputs if output.role == "dataset")
             if output_format == "parquet":
                 self.assertEqual(train_output.mediaType, "application/x-parquet")
                 self.assertTrue(Path(train_output.tempPath).stat().st_size > 0)
@@ -289,13 +291,12 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         result = prepare_training_dataset(payload, example_generator=generator)
 
         self.assertEqual(result.summary.generatedExampleCount, 3)
-        self.assertEqual(result.summary.trainRowCount, 1)
-        self.assertEqual(result.summary.testRowCount, 2)
+        self.assertEqual(result.summary.datasetRowCount, 3)
+        self.assertEqual(result.summary.trainRowCount, 3)
+        self.assertEqual(result.summary.testRowCount, 0)
 
-        train_output = next(output for output in result.outputs if output.role == "train")
-        test_output = next(output for output in result.outputs if output.role == "test")
-        self.assertTrue(Path(train_output.tempPath).read_text(encoding="utf-8").strip())
-        self.assertTrue(Path(test_output.tempPath).read_text(encoding="utf-8").strip())
+        dataset_output = next(output for output in result.outputs if output.role == "dataset")
+        self.assertTrue(Path(dataset_output.tempPath).read_text(encoding="utf-8").strip())
 
     def test_generation_requires_at_least_one_generated_row(self) -> None:
         payload = self._build_payload("jsonl")
@@ -370,7 +371,7 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.assertEqual(getattr(error, "details", {}).get("modelId"), "test-model")
         self.assertIn("not available in the local Hugging Face cache", str(error))
 
-    def test_split_requires_at_least_two_generated_rows(self) -> None:
+    def test_single_generated_row_can_be_written_to_one_dataset_file(self) -> None:
         payload = self._build_payload("jsonl")
 
         def one_row_generator(_chunks, _config):
@@ -383,8 +384,10 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
                 )
             ]
 
-        with self.assertRaisesRegex(ValueError, "At least 2 rows are required"):
-            prepare_training_dataset(payload, example_generator=one_row_generator)
+        result = prepare_training_dataset(payload, example_generator=one_row_generator)
+
+        self.assertEqual(result.summary.datasetRowCount, 1)
+        self.assertEqual(len(result.outputs), 1)
 
 
 if __name__ == "__main__":

@@ -335,20 +335,20 @@ describe("python sidecar runtime contracts", () => {
 
   it("uses runtime output descriptors as canonical output handoff contracts", () => {
     const output: PythonRuntimeOutputDescriptor = {
-      name: "dataset-train",
-      role: "train",
-      tempPath: "/tmp/runtime/train.jsonl",
+      name: "dataset",
+      role: "dataset",
+      tempPath: "/tmp/runtime/dataset.jsonl",
       mediaType: "application/x-ndjson",
       sizeBytes: 1024,
       metadata: {
-        partition: "train",
+        partition: "dataset",
       },
     };
 
     expect(output).toMatchObject({
-      name: "dataset-train",
-      role: "train",
-      tempPath: "/tmp/runtime/train.jsonl",
+      name: "dataset",
+      role: "dataset",
+      tempPath: "/tmp/runtime/dataset.jsonl",
       mediaType: "application/x-ndjson",
     });
   });
@@ -457,8 +457,9 @@ describe("python sidecar runtime contracts", () => {
       skippedDocumentCount: 0,
       chunkCount: 14,
       generatedExampleCount: 56,
-      trainRowCount: 45,
-      testRowCount: 11,
+      datasetRowCount: 56,
+      trainRowCount: 56,
+      testRowCount: 0,
     };
     const warnings: DatasetPreparationWarning[] = [{
       code: "source_media_type_inferred",
@@ -469,15 +470,9 @@ describe("python sidecar runtime contracts", () => {
     const result: PrepareTrainingDatasetResult = {
       outputs: [
         {
-          name: "support-ticket-dataset-train",
-          role: "train",
-          tempPath: "/tmp/runtime/support-ticket-dataset-train.jsonl",
-          mediaType: "application/x-ndjson",
-        },
-        {
-          name: "support-ticket-dataset-test",
-          role: "test",
-          tempPath: "/tmp/runtime/support-ticket-dataset-test.jsonl",
+          name: "support-ticket-dataset",
+          role: "dataset",
+          tempPath: "/tmp/runtime/support-ticket-dataset.jsonl",
           mediaType: "application/x-ndjson",
         },
       ],
@@ -492,9 +487,9 @@ describe("python sidecar runtime contracts", () => {
     expect(request.split.shuffle).toBe(true);
     expect(request.output.naming?.baseName).toBe("support-ticket-dataset");
     expect(request.output.destinations?.huggingFace?.repository).toBe("acme/support-dataset");
-    expect(result.outputs.length).toBe(2);
-    expect(result.outputs.map((output) => output.role)).toEqual(["train", "test"]);
-    expect(result.summary.trainRowCount + result.summary.testRowCount).toBe(56);
+    expect(result.outputs.length).toBe(1);
+    expect(result.outputs.map((output) => output.role)).toEqual(["dataset"]);
+    expect(result.summary.datasetRowCount).toBe(56);
     expect(result.warnings?.[0]?.code).toBe("source_media_type_inferred");
   });
 

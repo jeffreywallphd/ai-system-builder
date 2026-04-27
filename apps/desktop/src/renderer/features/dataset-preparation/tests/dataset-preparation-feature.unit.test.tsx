@@ -44,8 +44,7 @@ describe("DatasetPreparationFeature", () => {
         value: {
           outputs: {
             local: {
-              train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
-              test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+              dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } },
             },
           },
           provenance: {
@@ -64,8 +63,9 @@ describe("DatasetPreparationFeature", () => {
               skippedDocumentCount: 0,
               chunkCount: 2,
               generatedExampleCount: 10,
-              trainRowCount: 8,
-              testRowCount: 2,
+              datasetRowCount: 10,
+              trainRowCount: 10,
+              testRowCount: 0,
             },
           },
           summary: {
@@ -74,8 +74,9 @@ describe("DatasetPreparationFeature", () => {
             skippedDocumentCount: 0,
             chunkCount: 2,
             generatedExampleCount: 10,
-            trainRowCount: 8,
-            testRowCount: 2,
+            datasetRowCount: 10,
+            trainRowCount: 10,
+            testRowCount: 0,
           },
         },
       };
@@ -155,8 +156,7 @@ describe("DatasetPreparationFeature", () => {
       requestId: expect.stringMatching(/^dataset-preparation-/),
     }));
     expect(settingsClient.resolveModelDefault).toHaveBeenCalled();
-    expect(container.textContent).toContain("stored-train");
-    expect(container.textContent).toContain("stored-test");
+    expect(container.textContent).toContain("stored-dataset");
   });
 
   it("shows error state when preparation fails", async () => {
@@ -245,8 +245,7 @@ describe("DatasetPreparationFeature", () => {
         value: {
           outputs: {
             local: {
-              train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
-              test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+              dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } },
             },
           },
           provenance: {
@@ -265,8 +264,9 @@ describe("DatasetPreparationFeature", () => {
               skippedDocumentCount: 0,
               chunkCount: 2,
               generatedExampleCount: 10,
-              trainRowCount: 8,
-              testRowCount: 2,
+              datasetRowCount: 10,
+              trainRowCount: 10,
+              testRowCount: 0,
             },
           },
           summary: {
@@ -275,8 +275,9 @@ describe("DatasetPreparationFeature", () => {
             skippedDocumentCount: 0,
             chunkCount: 2,
             generatedExampleCount: 10,
-            trainRowCount: 8,
-            testRowCount: 2,
+            datasetRowCount: 10,
+            trainRowCount: 10,
+            testRowCount: 0,
           },
         },
       });
@@ -464,12 +465,11 @@ describe("DatasetPreparationFeature", () => {
     const prepareTrainingDatasetFromArtifacts = vi.fn().mockResolvedValue({
       ok: true,
       value: {
-        outputs: {
-          local: {
-            train: { sourceKind: "runtime", storage: { key: "stored-train", mediaType: "application/x-ndjson", sizeBytes: 8 } },
-            test: { sourceKind: "runtime", storage: { key: "stored-test", mediaType: "application/x-ndjson", sizeBytes: 2 } },
+          outputs: {
+            local: {
+              dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } },
+            },
           },
-        },
         provenance: {
           sourceArtifactIds: ["artifact-1"],
           recipe: {
@@ -483,21 +483,23 @@ describe("DatasetPreparationFeature", () => {
           summary: {
             sourceDocumentCount: 1,
             normalizedDocumentCount: 1,
-            skippedDocumentCount: 0,
-            chunkCount: 2,
-            generatedExampleCount: 10,
-            trainRowCount: 8,
-            testRowCount: 2,
+              skippedDocumentCount: 0,
+              chunkCount: 2,
+              generatedExampleCount: 10,
+              datasetRowCount: 10,
+              trainRowCount: 10,
+              testRowCount: 0,
           },
         },
         summary: {
           sourceDocumentCount: 1,
           normalizedDocumentCount: 1,
-          skippedDocumentCount: 0,
-          chunkCount: 2,
-          generatedExampleCount: 10,
-          trainRowCount: 8,
-          testRowCount: 2,
+            skippedDocumentCount: 0,
+            chunkCount: 2,
+            generatedExampleCount: 10,
+            datasetRowCount: 10,
+            trainRowCount: 10,
+            testRowCount: 0,
         },
       },
     });

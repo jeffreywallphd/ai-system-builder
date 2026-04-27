@@ -82,6 +82,7 @@ export interface DatasetPreparationSummary {
   skippedDocumentCount: number;
   chunkCount: number;
   generatedExampleCount: number;
+  datasetRowCount: number;
   trainRowCount: number;
   testRowCount: number;
 }
