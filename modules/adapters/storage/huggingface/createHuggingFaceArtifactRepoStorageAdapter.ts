@@ -100,7 +100,8 @@ function toUploadContent(content: Uint8Array, mediaType?: string): Blob | Uint8A
     return content;
   }
 
-  return new Blob([content], {
+  const blobContent = new Uint8Array(content);
+  return new Blob([blobContent], {
     type: mediaType?.trim() || "application/octet-stream",
   });
 }
