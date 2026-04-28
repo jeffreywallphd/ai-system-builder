@@ -138,10 +138,16 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
       repo: { type: string; name: string };
       branch: string;
       accessToken: string;
+      file: { content: Blob | Uint8Array };
     };
     expect(uploadCall.repo).toEqual({ type: "dataset", name: "openai/demo" });
     expect(uploadCall.branch).toBe("main");
     expect(uploadCall.accessToken).toBe("token-123");
+    if (typeof Blob !== "undefined") {
+      expect(uploadCall.file.content instanceof Blob).toBe(true);
+    } else {
+      expect(uploadCall.file.content instanceof Uint8Array).toBe(true);
+    }
     expect(hubClient.downloadFile).toHaveBeenCalledWith({
       repo: { type: "dataset", name: "openai/demo" },
       path: "artifacts/a.bin",
