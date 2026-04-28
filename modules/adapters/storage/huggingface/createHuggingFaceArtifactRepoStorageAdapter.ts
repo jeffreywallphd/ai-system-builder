@@ -443,6 +443,23 @@ function mapUnexpectedHubError(
   });
 }
 
+function logHuggingFaceOperation(
+  operation: HuggingFaceOperation,
+  event: "start" | "success" | "error",
+  metadata: Record<string, unknown>,
+): void {
+  const payload = {
+    operation,
+    event,
+    ...metadata,
+  };
+  if (event === "error") {
+    console.error("[huggingface-artifact-repo]", payload);
+    return;
+  }
+  console.info("[huggingface-artifact-repo]", payload);
+}
+
 function toRepoBrowserError(error: ReturnType<typeof mapUnexpectedHubError>): {
   code: HuggingFaceRepoBrowserErrorCode;
   message: string;
@@ -593,7 +610,26 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
     try {
       const resolvedTarget = resolveTarget(request.target, defaultRepoType);
       const token = getAccessToken()?.trim();
+      logHuggingFaceOperation("storeArtifactInRepo", "start", {
+        repository: resolvedTarget.repositoryName,
+        repoType: resolvedTarget.repoType,
+        pathInRepo: resolvedTarget.pathInRepo,
+        revision: resolvedTarget.revision,
+        hasAccessToken: Boolean(token),
+        contentSizeBytes: request.content.byteLength,
+        requestId: requestContext.requestId,
+        correlationId: requestContext.correlationId,
+      });
       if (!token) {
+        logHuggingFaceOperation("storeArtifactInRepo", "error", {
+          repository: resolvedTarget.repositoryName,
+          pathInRepo: resolvedTarget.pathInRepo,
+          revision: resolvedTarget.revision,
+          hasAccessToken: false,
+          requestId: requestContext.requestId,
+          correlationId: requestContext.correlationId,
+          reason: "missing-access-token",
+        });
         return createStoreArtifactInRepoFailureResult(
           createAuthRequiredError("storeArtifactInRepo"),
           requestContext,
@@ -610,6 +646,15 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
         commitTitle: `Store ${resolvedTarget.pathInRepo} via ai-system-builder artifact-repo adapter`,
         accessToken: token,
       });
+      logHuggingFaceOperation("storeArtifactInRepo", "success", {
+        repository: resolvedTarget.repositoryName,
+        pathInRepo: resolvedTarget.pathInRepo,
+        revision: resolvedTarget.revision,
+        hasAccessToken: true,
+        contentSizeBytes: request.content.byteLength,
+        requestId: requestContext.requestId,
+        correlationId: requestContext.correlationId,
+      });
 
       return createStoreArtifactInRepoSuccessResult(
         {
@@ -620,19 +665,30 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
         requestContext,
       );
     } catch (error) {
+      const mappedError = mapUnexpectedHubError(
+        "storeArtifactInRepo",
+        error,
+        getAccessToken(),
+        {
+          repository: request.target.repository,
+          pathInRepo: request.target.path,
+          revision: request.target.revision,
+          hasAccessToken: Boolean(getAccessToken()?.trim()),
+          contentSizeBytes: request.content.byteLength,
+        },
+      );
+      logHuggingFaceOperation("storeArtifactInRepo", "error", {
+        repository: request.target.repository,
+        pathInRepo: request.target.path,
+        revision: request.target.revision,
+        requestId: requestContext.requestId,
+        correlationId: requestContext.correlationId,
+        errorCode: mappedError.code,
+        errorMessage: mappedError.message,
+        details: mappedError.details,
+      });
       return createStoreArtifactInRepoFailureResult(
-        mapUnexpectedHubError(
-          "storeArtifactInRepo",
-          error,
-          getAccessToken(),
-          {
-            repository: request.target.repository,
-            pathInRepo: request.target.path,
-            revision: request.target.revision,
-            hasAccessToken: Boolean(getAccessToken()?.trim()),
-            contentSizeBytes: request.content.byteLength,
-          },
-        ),
+        mappedError,
         requestContext,
       );
     }

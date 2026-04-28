@@ -75,6 +75,8 @@ import { PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES } from "../../
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 
+const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
+
 export interface ComposeDesktopHostLoggingOptions {
   verbosity?: string;
   fallbackVerbosity?: LogVerbosity;
@@ -334,7 +336,44 @@ export function composeDesktopHost(
   const applicationSettings = createLocalApplicationSettingsAdapter({
     filePath: options.settings?.localSettingsFilePath ?? "/tmp/ai-system-builder/desktop/application-settings.json",
   });
-  const applicationSecrets = createInMemorySecretsAdapter();
+  const baseApplicationSecrets = createInMemorySecretsAdapter();
+  const applicationSecrets: ApplicationSecretsPort = {
+    async setSecret(key, value) {
+      await baseApplicationSecrets.setSecret(key, value);
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
+        tokenConfigStore.setToken(value);
+      }
+    },
+    async getSecret(key) {
+      const inMemorySecret = await baseApplicationSecrets.getSecret(key);
+      if (inMemorySecret?.trim()) {
+        return inMemorySecret;
+      }
+
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
+        return tokenConfigStore.getToken();
+      }
+
+      return undefined;
+    },
+    async clearSecret(key) {
+      await baseApplicationSecrets.clearSecret(key);
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
+        tokenConfigStore.clearToken();
+      }
+    },
+    async hasSecret(key) {
+      if (await baseApplicationSecrets.hasSecret(key)) {
+        return true;
+      }
+
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
+        return Boolean(tokenConfigStore.getToken()?.trim());
+      }
+
+      return false;
+    },
+  };
   const modelDefaultResolver = new DefaultModelDefaultResolver({
     settings: applicationSettings,
   });
