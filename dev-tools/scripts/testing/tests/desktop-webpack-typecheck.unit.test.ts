@@ -16,6 +16,42 @@ function formatDiagnostic(diagnostic: ts.Diagnostic): string {
 }
 
 describe("desktop webpack typecheck", () => {
+  it("typechecks the Hugging Face artifact repo storage adapter under desktop webpack tsconfig", () => {
+    const repoRoot = process.cwd();
+    const configPath = path.resolve(repoRoot, "apps/desktop/tsconfig.webpack.json");
+    const targetFile = path.resolve(
+      repoRoot,
+      "modules/adapters/storage/huggingface/createHuggingFaceArtifactRepoStorageAdapter.ts",
+    );
+
+    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (configFile.error) {
+      assert.fail(formatDiagnostic(configFile.error));
+    }
+
+    const parsedConfig = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      path.dirname(configPath),
+      { noEmit: true },
+      configPath,
+    );
+
+    const program = ts.createProgram({
+      rootNames: [targetFile],
+      options: parsedConfig.options,
+    });
+    const diagnostics = ts
+      .getPreEmitDiagnostics(program)
+      .filter((diagnostic) => diagnostic.file?.fileName === targetFile);
+
+    assert.deepEqual(
+      diagnostics,
+      [],
+      `Expected no TypeScript diagnostics for the Hugging Face artifact repo storage adapter.\n${diagnostics.map(formatDiagnostic).join("\n")}`,
+    );
+  });
+
   it("typechecks the desktop host composition dependency closure under desktop webpack tsconfig", () => {
     const repoRoot = process.cwd();
     const configPath = path.resolve(repoRoot, "apps/desktop/tsconfig.webpack.json");
