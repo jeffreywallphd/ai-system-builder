@@ -82,6 +82,49 @@ describe("createPythonDatasetPreparationPort", () => {
     expect(result.warnings).toBeUndefined();
   });
 
+  it("reuses provided request context requestId for runtime task correlation", async () => {
+    const executeTask = testDouble.fn(async (request) => ({
+      requestId: request.requestId,
+      taskType: request.taskType,
+      success: true,
+      data: {
+        outputs: [{ name: "dataset", role: "dataset", tempPath: "/tmp/dataset.jsonl", mediaType: "application/x-ndjson" }],
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 1,
+          generatedExampleCount: 1,
+          datasetRowCount: 1,
+          trainRowCount: 1,
+          testRowCount: 0,
+        },
+      },
+    }));
+    const adapter = createPythonDatasetPreparationPort({
+      executeTask,
+      getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
+      getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+      ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
+      getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+      unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
+    });
+
+    await adapter.prepareTrainingDataset({
+      sourceInputs: [{ artifactId: "a1", localPath: "/tmp/a1.jsonl", mediaType: "application/x-ndjson" }],
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+        generation: { mode: "qa", model: { provider: "transformers", modelId: "test-model" } },
+      },
+      split: { trainRatio: 0.8, testRatio: 0.2 },
+      output: { format: "jsonl" },
+    }, { requestId: "dataset-preparation-renderer-request-1" });
+
+    expect(executeTask).toHaveBeenCalledOnce();
+    expect(executeTask.mock.calls[0]?.[0]?.requestId).toBe("dataset-preparation-renderer-request-1");
+  });
+
   it("ensures runtime readiness before model download and task execution when configured", async () => {
     const callOrder: string[] = [];
     const ensureRuntimeReady = testDouble.fn(async () => {

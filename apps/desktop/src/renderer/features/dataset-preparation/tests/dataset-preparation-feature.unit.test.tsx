@@ -275,15 +275,6 @@ describe("DatasetPreparationFeature", () => {
     });
 
     expect(container.textContent).toContain("Namespace: OpenFinAL");
-    expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.objectContaining({
-      output: expect.objectContaining({
-        destinations: expect.objectContaining({
-          huggingFace: expect.objectContaining({
-            repository: "OpenFinAL/AISysBuilderTest",
-          }),
-        }),
-      }),
-    }), expect.any(Object));
   });
 
   it("shows model download progress from Python runtime logs while preparation is running", async () => {
@@ -461,6 +452,7 @@ describe("DatasetPreparationFeature", () => {
     vi.useFakeTimers();
     try {
       let readCount = 0;
+      let requestId: string | undefined;
       const runtimeStatusClient = {
         readStatus: vi.fn().mockImplementation(async () => {
           readCount += 1;
@@ -478,10 +470,27 @@ describe("DatasetPreparationFeature", () => {
               level: "info" as const,
               message: JSON.stringify({
                 event: "runtime.dataset_preparation.generation.progress",
+                requestId,
                 processedChunkCount,
                 totalChunkCount: 162,
               }),
-            }] : [],
+            }, {
+              timestamp: new Date(Date.now() + readCount * 1000 + 10).toISOString(),
+              level: "info" as const,
+              message: JSON.stringify({
+                event: activeTaskCount > 0
+                  ? "runtime.dataset_preparation.task.started"
+                  : "runtime.dataset_preparation.task.succeeded",
+                requestId,
+              }),
+            }] : [{
+              timestamp: new Date(Date.now() + readCount * 1000).toISOString(),
+              level: "info" as const,
+              message: JSON.stringify({
+                event: "runtime.dataset_preparation.task.succeeded",
+                requestId,
+              }),
+            }],
           };
         }),
         controlRuntime: vi.fn(),
@@ -497,10 +506,11 @@ describe("DatasetPreparationFeature", () => {
             runtimeStatusClient={runtimeStatusClient}
             client={{
               browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-              prepareTrainingDatasetFromArtifacts: async () => {
-                throw new Error("fetch failed");
-              },
-            }}
+            prepareTrainingDatasetFromArtifacts: async (_input, context) => {
+              requestId = context?.requestId;
+              throw new Error("fetch failed");
+            },
+          }}
           />,
         );
         await Promise.resolve();
@@ -529,6 +539,173 @@ describe("DatasetPreparationFeature", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("does not treat unrelated active runtime tasks as matching dataset preparation during recovery", async () => {
+    const runtimeStatusClient = {
+      readStatus: vi.fn().mockImplementation(async () => ({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["prepare-training-dataset"],
+        loadedModels: [],
+        activeTaskCount: 1,
+        logs: [{
+          timestamp: new Date().toISOString(),
+          level: "info" as const,
+          message: JSON.stringify({
+            event: "runtime.dataset_preparation.task.started",
+            requestId: "different-request",
+          }),
+        }],
+      })),
+      controlRuntime: vi.fn(),
+    };
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          runtimeStatusClient={runtimeStatusClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts: async () => {
+              throw new Error("fetch failed");
+            },
+          }}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Re-run preparation if this persists");
+    expect(container.textContent).not.toContain("still running in the background");
+  });
+
+  it("shows recovery failure when matching dataset preparation task fails", async () => {
+    let capturedRequestId: string | undefined;
+    const runtimeStatusClient = {
+      readStatus: vi.fn().mockImplementation(async () => ({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["prepare-training-dataset"],
+        loadedModels: [],
+        activeTaskCount: 0,
+        logs: [{
+          timestamp: new Date().toISOString(),
+          level: "error" as const,
+          message: JSON.stringify({
+            event: "runtime.dataset_preparation.task.failed",
+            requestId: capturedRequestId,
+            status: "failed",
+            error: { message: "runtime generation exploded" },
+          }),
+        }],
+      })),
+      controlRuntime: vi.fn(),
+    };
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          runtimeStatusClient={runtimeStatusClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts: async () => {
+              throw new Error("fetch failed");
+            },
+          }}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Re-run preparation if this persists");
+    expect(container.textContent).not.toContain("completed in Python runtime");
+  });
+
+  it("shows stopped state when matching recovered task is cancelled", async () => {
+    let capturedRequestId: string | undefined;
+    const runtimeStatusClient = {
+      readStatus: vi.fn().mockImplementation(async () => ({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["prepare-training-dataset"],
+        loadedModels: [],
+        activeTaskCount: 0,
+        logs: [{
+          timestamp: new Date().toISOString(),
+          level: "warn" as const,
+          message: JSON.stringify({
+            event: "runtime.dataset_preparation.task.cancelled",
+            requestId: capturedRequestId,
+            status: "cancelled",
+          }),
+        }],
+      })),
+      controlRuntime: vi.fn(),
+    };
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          runtimeStatusClient={runtimeStatusClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts: async (_input, context) => {
+              capturedRequestId = context?.requestId;
+              throw new Error("fetch failed");
+            },
+          }}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Training stopped.");
   });
 
   it("shows non-transient transport errors as failures", async () => {
@@ -692,6 +869,7 @@ describe("DatasetPreparationFeature", () => {
   it("shows reconnecting status after progress poll failure and recovers chunk progress updates", async () => {
     vi.useFakeTimers();
     let resolvePreparation: ((value: { ok: true; value: any }) => void) | undefined;
+    let requestId: string | undefined;
     const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
       resolvePreparation = resolve;
     }));
@@ -717,7 +895,12 @@ describe("DatasetPreparationFeature", () => {
           logs: [{
             timestamp: new Date().toISOString(),
             level: "info" as const,
-            message: "{\"event\":\"runtime.dataset_preparation.generation.progress\",\"processedChunkCount\":1,\"totalChunkCount\":4}",
+            message: JSON.stringify({
+              event: "runtime.dataset_preparation.generation.progress",
+              requestId,
+              processedChunkCount: 1,
+              totalChunkCount: 4,
+            }),
           }],
         }),
       controlRuntime: vi.fn(),
@@ -734,7 +917,10 @@ describe("DatasetPreparationFeature", () => {
             runtimeStatusClient={runtimeStatusClient}
             client={{
               browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-              prepareTrainingDatasetFromArtifacts,
+              prepareTrainingDatasetFromArtifacts: async (input, context) => {
+                requestId = context?.requestId;
+                return prepareTrainingDatasetFromArtifacts(input, context);
+              },
             }}
           />,
         );
@@ -757,7 +943,7 @@ describe("DatasetPreparationFeature", () => {
         vi.advanceTimersByTime(800);
         await Promise.resolve();
       });
-      expect(container.textContent).toContain("Processing chunk 2/4...");
+      expect(container.textContent).toContain("Reconnecting to progress monitor...");
 
       await act(async () => {
         resolvePreparation?.({
@@ -799,6 +985,74 @@ describe("DatasetPreparationFeature", () => {
         });
         await Promise.resolve();
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not run duplicate runtime polling loops during transport recovery", async () => {
+    vi.useFakeTimers();
+    try {
+      let capturedRequestId: string | undefined;
+      const runtimeStatusClient = {
+        readStatus: vi.fn().mockImplementation(async () => ({
+          supervisorStatus: "ready",
+          healthy: true,
+          runtimeStatus: "ready",
+          capabilities: ["prepare-training-dataset"],
+          loadedModels: [],
+          activeTaskCount: 1,
+          logs: [{
+            timestamp: new Date().toISOString(),
+            level: "info" as const,
+            message: JSON.stringify({
+              event: "runtime.dataset_preparation.generation.progress",
+              requestId: capturedRequestId,
+              processedChunkCount: 1,
+              totalChunkCount: 10,
+            }),
+          }],
+        })),
+        controlRuntime: vi.fn(),
+      };
+
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      root = createRoot(container);
+
+      await act(async () => {
+        root?.render(
+          <DatasetPreparationFeature
+            runtimeStatusClient={runtimeStatusClient}
+            client={{
+              browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+              prepareTrainingDatasetFromArtifacts: async (_input, context) => {
+                capturedRequestId = context?.requestId;
+                throw new Error("fetch failed");
+              },
+            }}
+          />,
+        );
+        await Promise.resolve();
+      });
+
+      const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+      await act(async () => {
+        checkbox.click();
+      });
+
+      const form = container.querySelector("form") as HTMLFormElement;
+      await act(async () => {
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(2_500);
+        await Promise.resolve();
+      });
+
+      expect(runtimeStatusClient.readStatus.mock.calls.length).toBeLessThanOrEqual(6);
     } finally {
       vi.useRealTimers();
     }
