@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname } from "node:path";
 
 import {
@@ -28,6 +29,12 @@ interface ModelRegistryFileShape {
 export interface LocalModelRegistryAdapterOptions {
   filePath: string;
   now?: () => string;
+  discovery?: {
+    enabled?: boolean;
+    searchRoots?: string[];
+    env?: NodeJS.ProcessEnv;
+    homeDirectory?: string;
+  };
 }
 
 function toTrimmedText(value: string | undefined): string | undefined {
@@ -44,8 +51,16 @@ function buildStableModelRecordId(seed: string): string {
   return `model_${hash}`;
 }
 
+function normalizeOptionalPath(value: string | undefined): string | undefined {
+  const normalized = toTrimmedText(value);
+  return normalized;
+}
+
 export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapterOptions): ModelRegistryPort {
   const now = options.now ?? (() => new Date().toISOString());
+  const discoveryEnabled = options.discovery?.enabled !== false;
+  const environment = options.discovery?.env ?? process.env;
+  const homeDirectory = options.discovery?.homeDirectory ?? homedir();
 
   async function readDocument(): Promise<ModelRegistryFileShape> {
     try {
@@ -118,11 +133,156 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     return next;
   }
 
+  function resolveDiscoveryRoots(): string[] {
+    const roots = new Set<string>();
+    for (const configuredRoot of options.discovery?.searchRoots ?? []) {
+      const normalized = normalizeOptionalPath(configuredRoot);
+      if (normalized) {
+        roots.add(normalized);
+      }
+    }
+
+    for (const variableName of ["HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE"] as const) {
+      const value = normalizeOptionalPath(environment[variableName]);
+      if (value) {
+        roots.add(value);
+      }
+    }
+
+    const hfHome = normalizeOptionalPath(environment.HF_HOME);
+    if (hfHome) {
+      roots.add(`${hfHome}/hub`);
+      roots.add(`${hfHome}/models`);
+    }
+
+    roots.add(`${homeDirectory}/.cache/huggingface/hub`);
+    roots.add(`${homeDirectory}/.cache/huggingface/models`);
+    return [...roots];
+  }
+
+  function toModelIdFromRepoDirectoryName(directoryName: string): string | undefined {
+    if (!directoryName.startsWith("models--")) {
+      return undefined;
+    }
+
+    const normalized = directoryName.slice("models--".length);
+    if (normalized.length === 0) {
+      return undefined;
+    }
+
+    return normalized.replaceAll("--", "/");
+  }
+
+  async function newestDirectory(path: string): Promise<string | undefined> {
+    let entries: Awaited<ReturnType<typeof readdir>>;
+    try {
+      entries = await readdir(path, { withFileTypes: true });
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") {
+        return undefined;
+      }
+
+      throw error;
+    }
+
+    const directories = entries.filter((entry) => entry.isDirectory());
+    let newest: { path: string; modifiedAtMs: number } | undefined;
+    for (const entry of directories) {
+      const candidatePath = `${path}/${entry.name}`;
+      let stats: Awaited<ReturnType<typeof stat>>;
+      try {
+        stats = await stat(candidatePath);
+      } catch {
+        continue;
+      }
+
+      if (!newest || stats.mtimeMs > newest.modifiedAtMs) {
+        newest = { path: candidatePath, modifiedAtMs: stats.mtimeMs };
+      }
+    }
+
+    return newest?.path;
+  }
+
+  async function discoverCachedModels(existing: ModelInventoryRecord[]): Promise<ModelInventoryRecord[]> {
+    if (!discoveryEnabled) {
+      return [];
+    }
+
+    const knownPaths = new Set(existing.map((record) => normalizeOptionalPath(record.localPath)).filter((value): value is string => Boolean(value)));
+    const knownModelIds = new Set(existing.map((record) => normalizeOptionalPath(record.modelId)).filter((value): value is string => Boolean(value)));
+    const discovered: ModelInventoryRecord[] = [];
+    const seenDiscoveredPaths = new Set<string>();
+
+    for (const cacheRoot of resolveDiscoveryRoots()) {
+      let rootEntries: Awaited<ReturnType<typeof readdir>>;
+      try {
+        rootEntries = await readdir(cacheRoot, { withFileTypes: true });
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "ENOENT" || code === "ENOTDIR" || code === "EACCES") {
+          continue;
+        }
+
+        throw error;
+      }
+
+      for (const entry of rootEntries) {
+        if (!entry.isDirectory()) {
+          continue;
+        }
+
+        const modelId = toModelIdFromRepoDirectoryName(entry.name);
+        if (!modelId || knownModelIds.has(modelId)) {
+          continue;
+        }
+
+        const repoRoot = `${cacheRoot}/${entry.name}`;
+        const snapshotRoot = await newestDirectory(`${repoRoot}/snapshots`);
+        const localPath = snapshotRoot ?? repoRoot;
+        if (knownPaths.has(localPath) || seenDiscoveredPaths.has(localPath)) {
+          continue;
+        }
+
+        const timestamp = now();
+        discovered.push(normalizeModelInventoryRecord({
+          modelRecordId: buildStableModelRecordId(`discovered:${localPath}`),
+          displayName: modelId,
+          source: "local",
+          lifecycleStatus: "downloaded",
+          artifactForm: "full-model",
+          provider: "huggingface",
+          modelId,
+          localPath,
+          createdAt: timestamp,
+          metadata: {
+            discoveredFrom: cacheRoot,
+            discovery: "huggingface-cache",
+          },
+        }));
+        seenDiscoveredPaths.add(localPath);
+      }
+    }
+
+    return discovered;
+  }
+
   return {
     async listModels(request: ListModelsRequest): Promise<ListModelsResult> {
       const document = await readDocument();
       const limit = request.limit ?? 50;
-      const filtered = (document.models ?? []).map(normalizeModelInventoryRecord).filter((model) => matchesFilters(model, request));
+      const normalizedModels = (document.models ?? []).map(normalizeModelInventoryRecord);
+      const discovered = await discoverCachedModels(normalizedModels);
+      const allModels = discovered.length > 0 ? [...normalizedModels, ...discovered] : normalizedModels;
+      if (discovered.length > 0) {
+        await writeDocument({
+          ...document,
+          models: allModels,
+        });
+      }
+
+      const filtered = allModels.filter((model) => matchesFilters(model, request));
       return {
         models: filtered.slice(0, limit),
         nextCursor: filtered.length > limit ? filtered[limit]?.modelRecordId : undefined,

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -81,5 +81,35 @@ describe("createLocalModelRegistryAdapter", () => {
     expect(serialized).not.toContain("huggingface.token");
     expect(serialized).not.toContain("deleteFile");
     expect(serialized).not.toContain("unlink");
+  });
+
+  it("discovers unregistered local Hugging Face cache models and persists them", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
+    const filePath = join(dir, "models.json");
+    const cacheRoot = join(dir, "hf-cache");
+    const newestSnapshot = join(cacheRoot, "models--org--demo-model", "snapshots", "bbb");
+    const olderSnapshot = join(cacheRoot, "models--org--demo-model", "snapshots", "aaa");
+    await mkdir(olderSnapshot, { recursive: true });
+    await mkdir(newestSnapshot, { recursive: true });
+
+    const adapter = createLocalModelRegistryAdapter({
+      filePath,
+      now: () => "2026-04-27T00:00:00.000Z",
+      discovery: {
+        searchRoots: [cacheRoot],
+        env: {},
+        homeDirectory: join(dir, "home"),
+      },
+    });
+
+    const listed = await adapter.listModels({ limit: 10 });
+    expect(listed.models.length).toBe(1);
+    expect(listed.models[0]?.source).toBe("local");
+    expect(listed.models[0]?.provider).toBe("huggingface");
+    expect(listed.models[0]?.modelId).toBe("org/demo-model");
+    expect([newestSnapshot, olderSnapshot]).toContain(listed.models[0]?.localPath);
+
+    const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
+    expect(persisted.models?.[0]?.modelId).toBe("org/demo-model");
   });
 });
