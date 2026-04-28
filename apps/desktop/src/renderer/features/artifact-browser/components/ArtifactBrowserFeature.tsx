@@ -11,6 +11,7 @@ import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowser
 import { ARTIFACT_BROWSER_FAMILY_OPTIONS } from "../artifactFamilyOptions";
 import { useArtifactBrowserFeature } from "../hooks/useArtifactBrowserFeature";
 import { SettingsPanel, useApplicationSettings } from "../../settings";
+import { copyArtifactMediaBytesToArrayBuffer } from "../helpers/artifactMediaBytes";
 
 export interface ArtifactBrowserFeatureProps {
   client?: DesktopArtifactBrowserClient;
@@ -123,7 +124,9 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     try {
       const media = await readArtifactMedia(detail.locator.storageKey);
 
-      const blob = new Blob([media.bytes], { type: media.mediaType ?? detail.mediaType ?? "application/octet-stream" });
+      const blob = new Blob([copyArtifactMediaBytesToArrayBuffer(media.bytes)], {
+        type: media.mediaType ?? detail.mediaType ?? "application/octet-stream",
+      });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
