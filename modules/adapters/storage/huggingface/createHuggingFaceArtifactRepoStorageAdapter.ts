@@ -77,7 +77,7 @@ interface HuggingFaceHubClient {
     repo: HuggingFaceRepoDesignation;
     file: {
       path: string;
-      content: Uint8Array;
+      content: Blob | Uint8Array;
     };
     branch?: string;
     commitTitle?: string;
@@ -93,6 +93,16 @@ interface HuggingFaceHubClient {
     hubUrl?: string;
     fetch?: HuggingFaceFetchImplementation;
   }) => Promise<HuggingFaceFetchResponse>;
+}
+
+function toUploadContent(content: Uint8Array, mediaType?: string): Blob | Uint8Array {
+  if (typeof Blob === "undefined") {
+    return content;
+  }
+
+  return new Blob([content], {
+    type: mediaType?.trim() || "application/octet-stream",
+  });
 }
 
 export interface CreateHuggingFaceArtifactRepoStorageAdapterOptions {
@@ -640,7 +650,7 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
         repo: toRepoDesignation(resolvedTarget),
         file: {
           path: resolvedTarget.pathInRepo,
-          content: request.content,
+          content: toUploadContent(request.content, request.mediaType),
         },
         branch: resolvedTarget.revision,
         commitTitle: `Store ${resolvedTarget.pathInRepo} via ai-system-builder artifact-repo adapter`,
