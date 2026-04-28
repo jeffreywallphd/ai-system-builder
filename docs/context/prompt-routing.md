@@ -22,6 +22,17 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | documentation updates, canonical-vs-context discipline, doc governance | `docs/context/packs/docs-standards.pack.md` |
 | structured logging behavior, diagnosability, log field/level discipline | `docs/context/packs/logging.pack.md` |
 | test strategy, regression coverage, layered testing expectations | `docs/context/packs/testing.pack.md` |
+| debugging, error diagnosis, failure lifecycle analysis, bug-fix prompts | `docs/context/packs/debugging-error-handling.pack.md` |
+
+## Debugging/Error Routing (Explicit)
+
+For prompts containing debugging/failure language (for example: `error`, `bug`, `broken`, `failed`, `fails`, `exception`, `stack trace`, `traceback`, `diagnose`, `debug`, `fix this issue`, `fetch failed`, `hangs`, `timeout`, `progress not updating`, `background task`, `runtime keeps running`, `transport disconnect`, `IPC failure`, `preload failure`, `worker failure`, `Python runtime failure`):
+
+- Always include `docs/context/packs/debugging-error-handling.pack.md`.
+- If the failure touches runtime/Python/worker/background-task behavior, also include `docs/context/packs/runtime.pack.md`.
+- If the failure touches IPC/preload/desktop transport boundaries, also include `docs/context/packs/desktop-host.pack.md` (and `docs/context/packs/server-host.pack.md` when server transport boundaries are involved).
+- If the failure touches renderer/UI state or progress display, also include `docs/context/packs/desktop-implementation.pack.md` (and `docs/context/packs/desktop-styling.pack.md` only when styling behavior is part of the defect).
+- Keep routing minimum-sufficient; do not include unrelated packs or full-repo context by default.
 
 ## Selection Rules
 
