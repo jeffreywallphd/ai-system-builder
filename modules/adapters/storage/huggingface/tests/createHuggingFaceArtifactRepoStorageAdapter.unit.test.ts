@@ -260,6 +260,89 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     expect(result.error.details?.contentSizeBytes).toBe(3);
   });
 
+  it("creates dataset repository and retries upload when store fails with provider 404", async () => {
+    const hubClient = createHubClientDouble();
+    let uploadAttempt = 0;
+    hubClient.uploadFile = testDouble.fn(async () => {
+      uploadAttempt += 1;
+      if (uploadAttempt === 1) {
+        throw {
+          statusCode: 404,
+          message: "Repository not found",
+        };
+      }
+    });
+    const fetchImplementation = testDouble.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })) as unknown as HuggingFaceFetchImplementation;
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient,
+      fetchImplementation,
+      accessToken: "hf_test",
+    });
+
+    const result = await adapter.storeArtifactInRepo(
+      createStoreArtifactInRepoRequest(new Uint8Array([1, 2, 3]), {
+        target: {
+          provider: "huggingface",
+          repository: "OpenFinAL/ai-system-builder-test-2",
+          revision: "main",
+          path: "dataset/train.parquet",
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(hubClient.uploadFile).toHaveBeenCalledTimes(2);
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://huggingface.co/api/repos/create",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer hf_test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "ai-system-builder-test-2",
+          organization: "OpenFinAL",
+          type: "dataset",
+        }),
+      },
+    );
+  });
+
+  it("continues store retry flow when repository create returns already-exists 409", async () => {
+    const hubClient = createHubClientDouble();
+    let uploadAttempt = 0;
+    hubClient.uploadFile = testDouble.fn(async () => {
+      uploadAttempt += 1;
+      if (uploadAttempt === 1) {
+        throw {
+          statusCode: 404,
+          message: "Repository not found",
+        };
+      }
+    });
+    const fetchImplementation = testDouble.fn(async () => new Response(null, { status: 409 })) as unknown as HuggingFaceFetchImplementation;
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient,
+      fetchImplementation,
+      accessToken: "hf_test",
+    });
+
+    const result = await adapter.storeArtifactInRepo(
+      createStoreArtifactInRepoRequest(new Uint8Array([5]), {
+        target: {
+          provider: "huggingface",
+          repository: "OpenFinAL/ai-system-builder-test-2",
+          revision: "main",
+          path: "dataset/eval.parquet",
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(hubClient.uploadFile).toHaveBeenCalledTimes(2);
+  });
+
   it("maps provider 401 without token to clear auth-required unavailable failure", async () => {
     const hubClient = createHubClientDouble();
     hubClient.fileExists = testDouble.fn(async () => {
