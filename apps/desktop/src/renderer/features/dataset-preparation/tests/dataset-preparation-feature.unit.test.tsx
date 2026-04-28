@@ -458,6 +458,80 @@ describe("DatasetPreparationFeature", () => {
   });
 
   it("keeps loading status when transport fails but runtime task is still active", async () => {
+    vi.useFakeTimers();
+    try {
+      let readCount = 0;
+      const runtimeStatusClient = {
+        readStatus: vi.fn().mockImplementation(async () => {
+          readCount += 1;
+          const activeTaskCount = readCount < 4 ? 1 : 0;
+          const processedChunkCount = readCount < 3 ? 4 : 5;
+          return {
+            supervisorStatus: "ready",
+            healthy: true,
+            runtimeStatus: "ready",
+            capabilities: ["prepare-training-dataset"],
+            loadedModels: [],
+            activeTaskCount,
+            logs: activeTaskCount > 0 ? [{
+              timestamp: new Date(Date.now() + readCount * 1000).toISOString(),
+              level: "info" as const,
+              message: JSON.stringify({
+                event: "runtime.dataset_preparation.generation.progress",
+                processedChunkCount,
+                totalChunkCount: 162,
+              }),
+            }] : [],
+          };
+        }),
+        controlRuntime: vi.fn(),
+      };
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+      await act(async () => {
+        root?.render(
+          <DatasetPreparationFeature
+            runtimeStatusClient={runtimeStatusClient}
+            client={{
+              browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+              prepareTrainingDatasetFromArtifacts: async () => {
+                throw new Error("fetch failed");
+              },
+            }}
+          />,
+        );
+        await Promise.resolve();
+      });
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).not.toContain("fetch failed");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+
+      expect(container.textContent).toContain("Dataset preparation completed in Python runtime after reconnecting");
+      expect(runtimeStatusClient.readStatus.mock.calls.length).toBeGreaterThan(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows non-transient transport errors as failures", async () => {
     const runtimeStatusClient = {
       readStatus: vi.fn().mockResolvedValue({
         supervisorStatus: "ready",
@@ -482,7 +556,7 @@ describe("DatasetPreparationFeature", () => {
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts: async () => {
-              throw new Error("fetch failed");
+              throw new Error("permission denied");
             },
           }}
         />,
@@ -501,8 +575,7 @@ describe("DatasetPreparationFeature", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("still running in the background");
-    expect(container.textContent).toContain("Tracking Python runtime progress");
+    expect(container.textContent).toContain("permission denied");
     expect(container.textContent).not.toContain("fetch failed");
   });
 
