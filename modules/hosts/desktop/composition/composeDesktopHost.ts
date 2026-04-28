@@ -1,3 +1,5 @@
+import { cpus, totalmem, freemem } from "node:os";
+import { spawnSync } from "node:child_process";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
@@ -76,6 +78,69 @@ import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, value));
+}
+
+function readMemoryUsagePercent(): number {
+  const totalMemory = totalmem();
+  if (totalMemory <= 0) {
+    return 0;
+  }
+
+  const usedMemory = totalMemory - freemem();
+  return clampPercent((usedMemory / totalMemory) * 100);
+}
+
+function readCpuUsagePercent(): number {
+  const cpuEntries = cpus();
+  if (cpuEntries.length === 0) {
+    return 0;
+  }
+
+  let idle = 0;
+  let total = 0;
+  for (const entry of cpuEntries) {
+    idle += entry.times.idle;
+    total += entry.times.user + entry.times.nice + entry.times.sys + entry.times.idle + entry.times.irq;
+  }
+
+  if (total <= 0) {
+    return 0;
+  }
+
+  return clampPercent(((total - idle) / total) * 100);
+}
+
+function readGpuUsagePercent(): number {
+  const result = spawnSync(
+    "nvidia-smi",
+    ["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+    { encoding: "utf8", timeout: 800 },
+  );
+  if (result.status !== 0 || !result.stdout) {
+    return 0;
+  }
+
+  const lines = result.stdout.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+  if (lines.length === 0) {
+    return 0;
+  }
+
+  const percentages = lines
+    .map((line) => Number.parseFloat(line))
+    .filter((value) => Number.isFinite(value));
+  if (percentages.length === 0) {
+    return 0;
+  }
+
+  const average = percentages.reduce((sum, value) => sum + value, 0) / percentages.length;
+  return clampPercent(average);
+}
 
 export interface ComposeDesktopHostLoggingOptions {
   verbosity?: string;
@@ -330,6 +395,11 @@ export function composeDesktopHost(
       capabilities,
       loadedModels,
       activeTaskCount,
+      systemResources: {
+        memoryUsagePercent: readMemoryUsagePercent(),
+        cpuUsagePercent: readCpuUsagePercent(),
+        gpuUsagePercent: readGpuUsagePercent(),
+      },
       logs: [...runtimeLogs],
     };
   };

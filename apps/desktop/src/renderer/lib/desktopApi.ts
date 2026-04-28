@@ -268,6 +268,11 @@ export interface DesktopPythonRuntimeStatusSnapshot {
   logs: DesktopPythonRuntimeLogEntry[];
   loadedModels: DesktopPythonRuntimeLoadedModel[];
   activeTaskCount: number;
+  systemResources?: {
+    memoryUsagePercent: number;
+    cpuUsagePercent: number;
+    gpuUsagePercent: number;
+  };
 }
 
 export interface DesktopArtifactUploadApi {

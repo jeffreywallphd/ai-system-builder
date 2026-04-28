@@ -34,6 +34,11 @@ function toStatusSnapshot(value: unknown): DesktopPythonRuntimeStatusSnapshot {
         && (entry?.inferenceMode === "text2text" || entry?.inferenceMode === "causal" || entry?.inferenceMode === "chat"))
       : [],
     activeTaskCount: typeof payload.activeTaskCount === "number" ? payload.activeTaskCount : 0,
+    systemResources: {
+      memoryUsagePercent: typeof payload.systemResources?.memoryUsagePercent === "number" ? payload.systemResources.memoryUsagePercent : 0,
+      cpuUsagePercent: typeof payload.systemResources?.cpuUsagePercent === "number" ? payload.systemResources.cpuUsagePercent : 0,
+      gpuUsagePercent: typeof payload.systemResources?.gpuUsagePercent === "number" ? payload.systemResources.gpuUsagePercent : 0,
+    },
     logs: Array.isArray(payload.logs)
       ? payload.logs.filter((entry): entry is DesktopPythonRuntimeStatusSnapshot["logs"][number] =>
         typeof entry?.timestamp === "string"
