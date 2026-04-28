@@ -13,6 +13,7 @@ import {
   type DesktopHuggingFaceNamespaceDataset,
   type DesktopHuggingFaceDatasetParquetFile,
 } from "../../../lib/desktopApi";
+import { copyArtifactMediaBytesToArrayBuffer } from "../helpers/artifactMediaBytes";
 
 export interface DesktopArtifactBrowserClient {
   getHuggingFaceTokenStatus: () => Promise<DesktopHuggingFaceTokenStatus>;
@@ -261,8 +262,9 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         "Failed to read artifact media.",
       );
 
-      const blobBytes = Uint8Array.from(media.bytes);
-      const blob = new Blob([blobBytes], { type: media.mediaType ?? "application/octet-stream" });
+      const blob = new Blob([copyArtifactMediaBytesToArrayBuffer(media.bytes)], {
+        type: media.mediaType ?? "application/octet-stream",
+      });
       return URL.createObjectURL(blob);
     },
 

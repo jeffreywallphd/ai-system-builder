@@ -232,4 +232,41 @@ describe("desktop webpack typecheck", () => {
       `Expected no TypeScript diagnostics for desktop models renderer surfaces.\n${diagnostics.map(formatDiagnostic).join("\n")}`,
     );
   });
+
+  it("typechecks the desktop artifact browser renderer download and media surfaces under desktop webpack tsconfig", () => {
+    const repoRoot = process.cwd();
+    const configPath = path.resolve(repoRoot, "apps/desktop/tsconfig.webpack.json");
+    const targetFiles = [
+      "apps/desktop/src/renderer/features/artifact-browser/components/ArtifactBrowserFeature.tsx",
+      "apps/desktop/src/renderer/features/artifact-browser/api/desktopArtifactBrowserClient.ts",
+      "apps/desktop/src/renderer/features/artifact-browser/helpers/artifactMediaBytes.ts",
+    ].map((relativePath) => path.resolve(repoRoot, relativePath));
+
+    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (configFile.error) {
+      assert.fail(formatDiagnostic(configFile.error));
+    }
+
+    const parsedConfig = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      path.dirname(configPath),
+      { noEmit: true },
+      configPath,
+    );
+
+    const program = ts.createProgram({
+      rootNames: targetFiles,
+      options: parsedConfig.options,
+    });
+    const diagnostics = ts
+      .getPreEmitDiagnostics(program)
+      .filter((diagnostic) => !diagnostic.file?.fileName.includes(`${path.sep}node_modules${path.sep}`));
+
+    assert.deepEqual(
+      diagnostics,
+      [],
+      `Expected no TypeScript diagnostics for desktop artifact browser renderer media surfaces.\n${diagnostics.map(formatDiagnostic).join("\n")}`,
+    );
+  });
 });
