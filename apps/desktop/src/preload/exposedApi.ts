@@ -469,6 +469,28 @@ function assertDesktopEnvelopeResponse<TResponse extends { operation: string; ch
   return response as TResponse;
 }
 
+const DATASET_PREPARATION_IPC_INVOKE_TIMEOUT_MS = 7 * 60 * 1000;
+
+async function invokeWithTimeout<T>(
+  invoke: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    invoke.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function createDesktopPreloadApi(
   dependencies: CreateDesktopPreloadApiDependencies,
 ): DesktopPreloadApi {
@@ -687,9 +709,13 @@ export function createDesktopPreloadApi(
         },
         context,
       );
-      const response = await dependencies.ipcRenderer.invoke(
-        DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
-        request,
+      const response = await invokeWithTimeout(
+        dependencies.ipcRenderer.invoke(
+          DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
+          request,
+        ),
+        DATASET_PREPARATION_IPC_INVOKE_TIMEOUT_MS,
+        `Dataset preparation request exceeded ${DATASET_PREPARATION_IPC_INVOKE_TIMEOUT_MS}ms while waiting for IPC response.`,
       );
 
       return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetResponse>(response, {

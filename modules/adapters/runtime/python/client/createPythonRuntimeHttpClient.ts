@@ -35,6 +35,7 @@ export interface CreatePythonRuntimeHttpClientOptions {
   baseUrl: string;
   fetchImplementation?: typeof fetch;
   defaultTaskTimeoutMs?: number;
+  transportRequestTimeoutMs?: number;
 }
 
 async function parseJsonResponseSafe(
@@ -115,6 +116,7 @@ export function createPythonRuntimeHttpClient(
   const fetcher = options.fetchImplementation ?? fetch;
   const baseUrl = trimTrailingSlash(options.baseUrl);
   const defaultTaskTimeoutMs = options.defaultTaskTimeoutMs ?? 120_000;
+  const transportRequestTimeoutMs = options.transportRequestTimeoutMs ?? 9 * 60 * 1000;
 
   return {
     async getHealthStatus() {
@@ -168,8 +170,12 @@ export function createPythonRuntimeHttpClient(
 
     async executeTask(request: PythonRuntimeTaskRequest) {
       const timeoutMs = request.timeoutMs ?? defaultTaskTimeoutMs;
+      const effectiveRequestTimeoutMs = Math.min(timeoutMs, transportRequestTimeoutMs);
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(new Error(`Python runtime task timed out after ${timeoutMs}ms.`)), timeoutMs);
+      const timeout = setTimeout(
+        () => controller.abort(new Error(`Python runtime transport request timed out after ${effectiveRequestTimeoutMs}ms.`)),
+        effectiveRequestTimeoutMs,
+      );
       let response: Response;
       try {
         response = await fetcher(`${baseUrl}/tasks/execute`, {
@@ -182,7 +188,7 @@ export function createPythonRuntimeHttpClient(
         });
       } catch (error) {
         if (error instanceof Error && (error.name === "AbortError" || error.message.includes("timed out"))) {
-          throw new Error(`Python runtime task request timed out after ${timeoutMs}ms.`);
+          throw new Error(`Python runtime task request timed out after ${effectiveRequestTimeoutMs}ms.`);
         }
         throw error;
       } finally {
