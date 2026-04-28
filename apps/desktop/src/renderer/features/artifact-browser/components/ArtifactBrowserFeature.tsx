@@ -206,30 +206,32 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
         </label>
       </section>
       {pendingDeleteConfirmation ? (
-        <section className="ui-panel ui-stack ui-stack--sm" role="dialog" aria-label="Delete confirmation">
-          <h3>{pendingDeleteConfirmation.label}</h3>
-          <p>Type <strong>Delete</strong> to confirm this destructive action.</p>
-          <label className="ui-stack ui-stack--sm">
-            <span>Confirmation</span>
-            <input
-              className="ui-input"
-              value={deleteConfirmationInput}
-              onChange={(event) => setDeleteConfirmationInput(event.target.value)}
-              placeholder="Delete"
-            />
-          </label>
-          <div className="ui-grid ui-grid--two">
-            <button
-              className="ui-button ui-button--destructive"
-              type="button"
-              onClick={() => void confirmPendingDelete()}
-              disabled={deleteConfirmationInput !== "Delete"}
-            >
-              Confirm delete
-            </button>
-            <button className="ui-button" type="button" onClick={cancelPendingDelete}>Cancel</button>
-          </div>
-        </section>
+        <div className="ui-modal-overlay" role="presentation">
+          <section className="ui-panel ui-modal-dialog ui-stack ui-stack--sm" role="dialog" aria-label="Delete confirmation" aria-modal="true">
+            <h3>{pendingDeleteConfirmation.label}</h3>
+            <p>Type <strong>Delete</strong> to confirm this destructive action.</p>
+            <label className="ui-stack ui-stack--sm">
+              <span>Confirmation</span>
+              <input
+                className="ui-input"
+                value={deleteConfirmationInput}
+                onChange={(event) => setDeleteConfirmationInput(event.target.value)}
+                placeholder="Delete"
+              />
+            </label>
+            <div className="ui-grid ui-grid--two">
+              <button
+                className="ui-button ui-button--destructive"
+                type="button"
+                onClick={() => void confirmPendingDelete()}
+                disabled={deleteConfirmationInput !== "Delete"}
+              >
+                Confirm delete
+              </button>
+              <button className="ui-button" type="button" onClick={cancelPendingDelete}>Cancel</button>
+            </div>
+          </section>
+        </div>
       ) : null}
       <div className="ui-grid ui-grid--two">
         <div className="ui-stack ui-stack--sm">
