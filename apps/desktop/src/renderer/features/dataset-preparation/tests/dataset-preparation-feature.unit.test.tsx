@@ -615,6 +615,121 @@ describe("DatasetPreparationFeature", () => {
     });
   });
 
+  it("shows reconnecting status after progress poll failure and recovers chunk progress updates", async () => {
+    vi.useFakeTimers();
+    let resolvePreparation: ((value: { ok: true; value: any }) => void) | undefined;
+    const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
+      resolvePreparation = resolve;
+    }));
+    const runtimeStatusClient = {
+      readStatus: vi.fn()
+        .mockResolvedValueOnce({
+          supervisorStatus: "ready",
+          healthy: true,
+          runtimeStatus: "ready",
+          capabilities: ["prepare-training-dataset"],
+          loadedModels: [],
+          activeTaskCount: 0,
+          logs: [],
+        })
+        .mockRejectedValueOnce(new Error("fetch failed"))
+        .mockResolvedValue({
+          supervisorStatus: "ready",
+          healthy: true,
+          runtimeStatus: "ready",
+          capabilities: ["prepare-training-dataset"],
+          loadedModels: [],
+          activeTaskCount: 1,
+          logs: [{
+            timestamp: new Date().toISOString(),
+            level: "info" as const,
+            message: "{\"event\":\"runtime.dataset_preparation.generation.progress\",\"processedChunkCount\":1,\"totalChunkCount\":4}",
+          }],
+        }),
+      controlRuntime: vi.fn(),
+    };
+
+    try {
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      root = createRoot(container);
+
+      await act(async () => {
+        root?.render(
+          <DatasetPreparationFeature
+            runtimeStatusClient={runtimeStatusClient}
+            client={{
+              browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+              prepareTrainingDatasetFromArtifacts,
+            }}
+          />,
+        );
+        await Promise.resolve();
+      });
+
+      const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+      await act(async () => {
+        checkbox.click();
+      });
+      const form = container.querySelector("form") as HTMLFormElement;
+      await act(async () => {
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+      });
+
+      expect(container.textContent).toContain("Reconnecting to progress monitor...");
+
+      await act(async () => {
+        vi.advanceTimersByTime(800);
+        await Promise.resolve();
+      });
+      expect(container.textContent).toContain("Processing chunk 2/4...");
+
+      await act(async () => {
+        resolvePreparation?.({
+          ok: true,
+          value: {
+            outputs: {},
+            provenance: {
+              sourceArtifactIds: ["artifact-1"],
+              recipe: {
+                normalization: { targetFormat: "markdown" },
+                chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+                generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } },
+              },
+              split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
+              output: { format: "parquet" },
+              generationModelId: "google/flan-t5-base",
+              summary: {
+                sourceDocumentCount: 1,
+                normalizedDocumentCount: 1,
+                skippedDocumentCount: 0,
+                chunkCount: 4,
+                generatedExampleCount: 4,
+                datasetRowCount: 4,
+                trainRowCount: 3,
+                testRowCount: 1,
+              },
+            },
+            summary: {
+              sourceDocumentCount: 1,
+              normalizedDocumentCount: 1,
+              skippedDocumentCount: 0,
+              chunkCount: 4,
+              generatedExampleCount: 4,
+              datasetRowCount: 4,
+              trainRowCount: 3,
+              testRowCount: 1,
+            },
+          },
+        });
+        await Promise.resolve();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows unload model when a model is loaded and no training is active", async () => {
     const runtimeStatusClient = {
       readStatus: vi.fn().mockResolvedValue({

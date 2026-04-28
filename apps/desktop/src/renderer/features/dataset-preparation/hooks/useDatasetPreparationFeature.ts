@@ -515,6 +515,7 @@ export function useDatasetPreparationFeature(
     let preparationActive = true;
     let progressReadInFlight = false;
     let runtimeTaskObserved = false;
+    let recoveringProgressMonitor = false;
     const refreshModelDownloadProgress = async () => {
       if (!runtimeStatusClient || progressReadInFlight || !preparationActive) {
         return;
@@ -526,6 +527,7 @@ export function useDatasetPreparationFeature(
         if (!preparationActive) {
           return;
         }
+        recoveringProgressMonitor = false;
 
         if (snapshot.activeTaskCount > 0) {
           runtimeTaskObserved = true;
@@ -565,7 +567,12 @@ export function useDatasetPreparationFeature(
           return;
         }
       } catch {
-        // Progress polling is best-effort; the preparation request owns final success/failure.
+        if (!preparationActive || recoveringProgressMonitor) {
+          return;
+        }
+
+        recoveringProgressMonitor = true;
+        setStatus({ kind: "loading", message: "Reconnecting to progress monitor..." });
       } finally {
         progressReadInFlight = false;
       }
