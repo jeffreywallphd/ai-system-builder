@@ -218,7 +218,7 @@ function appendErrorDetailsMessage(message: string, details: Record<string, unkn
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
 ): UseDatasetPreparationFeatureResult {
-  const recoveryGraceWindowMs = 120_000;
+  const recoveryGraceWindowMs = 600_000;
   const onPrepared = options.onPrepared;
   const datasetClient = useDatasetPreparationClient(options.client);
   const settingsClient = useMemo(() => {
