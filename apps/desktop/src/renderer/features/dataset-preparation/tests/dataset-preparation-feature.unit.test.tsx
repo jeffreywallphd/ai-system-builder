@@ -3,6 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DatasetPreparationFeature } from "../components/DatasetPreparationFeature";
+import { resetDatasetPreparationPageStateForTests } from "../hooks/useDatasetPreparationFeature";
 
 const settingsClient = {
   listDefinitions: vi.fn(),
@@ -33,6 +34,7 @@ describe("DatasetPreparationFeature", () => {
     container?.remove();
     root = undefined;
     container = undefined;
+    resetDatasetPreparationPageStateForTests();
     delete window.desktopApi;
   });
 
@@ -453,6 +455,164 @@ describe("DatasetPreparationFeature", () => {
     });
 
     expect(container.textContent).toContain("Training stopped.");
+  });
+
+  it("keeps loading status when transport fails but runtime task is still active", async () => {
+    const runtimeStatusClient = {
+      readStatus: vi.fn().mockResolvedValue({
+        supervisorStatus: "ready",
+        healthy: true,
+        runtimeStatus: "ready",
+        capabilities: ["prepare-training-dataset"],
+        loadedModels: [],
+        activeTaskCount: 1,
+        logs: [],
+      }),
+      controlRuntime: vi.fn(),
+    };
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          runtimeStatusClient={runtimeStatusClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts: async () => {
+              throw new Error("failed to fetch");
+            },
+          }}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("still running in the background");
+    expect(container.textContent).not.toContain("failed to fetch");
+  });
+
+  it("retains in-progress status and locks form controls across remounts", async () => {
+    let resolvePreparation: ((value: { ok: true; value: any }) => void) | undefined;
+    const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
+      resolvePreparation = resolve;
+    }));
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          settingsClient={settingsClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts,
+          }}
+        />,
+      );
+    });
+
+    const modelOverridesToggle = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Model override defaults")) as HTMLButtonElement;
+    await act(async () => {
+      modelOverridesToggle.click();
+    });
+    expect(container.textContent).toContain("Inference mode");
+
+    const checkbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Stop training");
+    expect(container.querySelector("fieldset")?.hasAttribute("disabled")).toBe(true);
+
+    await act(async () => {
+      root?.unmount();
+    });
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          settingsClient={settingsClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts,
+          }}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Checking model");
+    expect(container.textContent).toContain("Stop training");
+    expect(container.querySelector("fieldset")?.hasAttribute("disabled")).toBe(true);
+
+    await act(async () => {
+      resolvePreparation?.({
+        ok: true,
+        value: {
+          outputs: {
+            local: {
+              dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } },
+            },
+          },
+          provenance: {
+            sourceArtifactIds: ["artifact-1"],
+            recipe: {
+              normalization: { targetFormat: "markdown" },
+              chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+              generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } },
+            },
+            split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
+            output: { format: "parquet" },
+            generationModelId: "google/flan-t5-base",
+            summary: {
+              sourceDocumentCount: 1,
+              normalizedDocumentCount: 1,
+              skippedDocumentCount: 0,
+              chunkCount: 2,
+              generatedExampleCount: 10,
+              datasetRowCount: 10,
+              trainRowCount: 10,
+              testRowCount: 0,
+            },
+          },
+          summary: {
+            sourceDocumentCount: 1,
+            normalizedDocumentCount: 1,
+            skippedDocumentCount: 0,
+            chunkCount: 2,
+            generatedExampleCount: 10,
+            datasetRowCount: 10,
+            trainRowCount: 10,
+            testRowCount: 0,
+          },
+        },
+      });
+      await Promise.resolve();
+    });
   });
 
   it("shows unload model when a model is loaded and no training is active", async () => {

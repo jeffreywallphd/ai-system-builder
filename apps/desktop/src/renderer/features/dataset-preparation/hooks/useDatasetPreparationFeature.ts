@@ -26,6 +26,40 @@ interface DatasetPreparationResultSummary {
   datasetRows: number;
 }
 
+interface DatasetPreparationPageState {
+  selectedArtifactStorageFilter: DatasetPreparationArtifactStorageFilter;
+  selectedArtifactIds: string[];
+  unsupportedDocumentPolicy: "" | "fail" | "skip";
+  normalizationMode: "" | "best-effort" | "strict";
+  chunkSize: string;
+  chunkOverlap: string;
+  preserveDocumentBoundaries: boolean;
+  maxChunkCount: string;
+  modelId: string;
+  modelInferenceMode: ModelDefaultInferenceMode;
+  modelDevice: "" | "auto" | "cpu" | "cuda";
+  modelTorchDtype: "" | "auto" | "float16" | "bfloat16" | "float32";
+  maxExamplesPerChunk: string;
+  batchSize: string;
+  failurePolicy: "" | "fail" | "skip";
+  generationTemperature: string;
+  generationTopP: string;
+  generationMaxNewTokens: string;
+  trainRatio: string;
+  testRatio: string;
+  seed: string;
+  shuffle: boolean;
+  outputFormat: "jsonl" | "json" | "csv" | "parquet";
+  outputBaseName: string;
+  localDestinationEnabled: boolean;
+  huggingFaceDestinationEnabled: boolean;
+  huggingFaceRepository: string;
+  huggingFaceRevision: string;
+  huggingFacePathPrefix: string;
+  status: DatasetPreparationStatus;
+  resultSummary?: DatasetPreparationResultSummary;
+}
+
 export type DatasetPreparationArtifactStorageFilter = "all" | "uploaded" | "generated";
 
 export interface UseDatasetPreparationFeatureResult {
@@ -110,6 +144,46 @@ export interface UseDatasetPreparationFeatureOptions {
   onPrepared?: () => void;
 }
 
+const defaultDatasetPreparationPageState: DatasetPreparationPageState = {
+  selectedArtifactStorageFilter: "all",
+  selectedArtifactIds: [],
+  unsupportedDocumentPolicy: "",
+  normalizationMode: "",
+  chunkSize: "1000",
+  chunkOverlap: "200",
+  preserveDocumentBoundaries: true,
+  maxChunkCount: "",
+  modelId: "",
+  modelInferenceMode: "auto",
+  modelDevice: "auto",
+  modelTorchDtype: "",
+  maxExamplesPerChunk: "4",
+  batchSize: "4",
+  failurePolicy: "skip",
+  generationTemperature: "",
+  generationTopP: "",
+  generationMaxNewTokens: "",
+  trainRatio: "0.8",
+  testRatio: "0.2",
+  seed: "",
+  shuffle: true,
+  outputFormat: "parquet",
+  outputBaseName: "",
+  localDestinationEnabled: true,
+  huggingFaceDestinationEnabled: false,
+  huggingFaceRepository: "",
+  huggingFaceRevision: "",
+  huggingFacePathPrefix: "",
+  status: { kind: "idle" },
+  resultSummary: undefined,
+};
+
+let cachedDatasetPreparationPageState: DatasetPreparationPageState = { ...defaultDatasetPreparationPageState };
+
+export function resetDatasetPreparationPageStateForTests(): void {
+  cachedDatasetPreparationPageState = { ...defaultDatasetPreparationPageState };
+}
+
 function createDatasetPreparationRequestId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `dataset-preparation-${crypto.randomUUID()}`;
@@ -161,43 +235,111 @@ export function useDatasetPreparationFeature(
   }, [options.runtimeStatusClient]);
   const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string; storageKey: string }>>([]);
   const [selectedArtifactStorageFilter, setSelectedArtifactStorageFilter] =
-    useState<DatasetPreparationArtifactStorageFilter>("all");
-  const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
-  const [unsupportedDocumentPolicy, setUnsupportedDocumentPolicy] = useState<"" | "fail" | "skip">("");
-  const [normalizationMode, setNormalizationMode] = useState<"" | "best-effort" | "strict">("");
-  const [chunkSize, setChunkSize] = useState("1000");
-  const [chunkOverlap, setChunkOverlap] = useState("200");
-  const [preserveDocumentBoundaries, setPreserveDocumentBoundaries] = useState(true);
-  const [maxChunkCount, setMaxChunkCount] = useState("");
-  const [modelId, setModelId] = useState("");
-  const [modelInferenceMode, setModelInferenceMode] = useState<ModelDefaultInferenceMode>("auto");
-  const [modelDevice, setModelDevice] = useState<"" | "auto" | "cpu" | "cuda">("auto");
-  const [modelTorchDtype, setModelTorchDtype] = useState<"" | "auto" | "float16" | "bfloat16" | "float32">("");
-  const [maxExamplesPerChunk, setMaxExamplesPerChunk] = useState("4");
-  const [batchSize, setBatchSize] = useState("4");
-  const [failurePolicy, setFailurePolicy] = useState<"" | "fail" | "skip">("skip");
-  const [generationTemperature, setGenerationTemperature] = useState("");
-  const [generationTopP, setGenerationTopP] = useState("");
-  const [generationMaxNewTokens, setGenerationMaxNewTokens] = useState("");
-  const [trainRatio, setTrainRatio] = useState("0.8");
-  const [testRatio, setTestRatio] = useState("0.2");
-  const [seed, setSeed] = useState("");
-  const [shuffle, setShuffle] = useState(true);
-  const [outputFormat, setOutputFormat] = useState<"jsonl" | "json" | "csv" | "parquet">("parquet");
-  const [outputBaseName, setOutputBaseName] = useState("");
-  const [localDestinationEnabled, setLocalDestinationEnabled] = useState(true);
-  const [huggingFaceDestinationEnabled, setHuggingFaceDestinationEnabled] = useState(false);
-  const [huggingFaceRepository, setHuggingFaceRepository] = useState("");
-  const [huggingFaceRevision, setHuggingFaceRevision] = useState("");
-  const [huggingFacePathPrefix, setHuggingFacePathPrefix] = useState("");
-  const [status, setStatus] = useState<DatasetPreparationStatus>({ kind: "idle" });
-  const [resultSummary, setResultSummary] = useState<DatasetPreparationResultSummary>();
+    useState<DatasetPreparationArtifactStorageFilter>(cachedDatasetPreparationPageState.selectedArtifactStorageFilter);
+  const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>(cachedDatasetPreparationPageState.selectedArtifactIds);
+  const [unsupportedDocumentPolicy, setUnsupportedDocumentPolicy] = useState<"" | "fail" | "skip">(cachedDatasetPreparationPageState.unsupportedDocumentPolicy);
+  const [normalizationMode, setNormalizationMode] = useState<"" | "best-effort" | "strict">(cachedDatasetPreparationPageState.normalizationMode);
+  const [chunkSize, setChunkSize] = useState(cachedDatasetPreparationPageState.chunkSize);
+  const [chunkOverlap, setChunkOverlap] = useState(cachedDatasetPreparationPageState.chunkOverlap);
+  const [preserveDocumentBoundaries, setPreserveDocumentBoundaries] = useState(cachedDatasetPreparationPageState.preserveDocumentBoundaries);
+  const [maxChunkCount, setMaxChunkCount] = useState(cachedDatasetPreparationPageState.maxChunkCount);
+  const [modelId, setModelId] = useState(cachedDatasetPreparationPageState.modelId);
+  const [modelInferenceMode, setModelInferenceMode] = useState<ModelDefaultInferenceMode>(cachedDatasetPreparationPageState.modelInferenceMode);
+  const [modelDevice, setModelDevice] = useState<"" | "auto" | "cpu" | "cuda">(cachedDatasetPreparationPageState.modelDevice);
+  const [modelTorchDtype, setModelTorchDtype] = useState<"" | "auto" | "float16" | "bfloat16" | "float32">(cachedDatasetPreparationPageState.modelTorchDtype);
+  const [maxExamplesPerChunk, setMaxExamplesPerChunk] = useState(cachedDatasetPreparationPageState.maxExamplesPerChunk);
+  const [batchSize, setBatchSize] = useState(cachedDatasetPreparationPageState.batchSize);
+  const [failurePolicy, setFailurePolicy] = useState<"" | "fail" | "skip">(cachedDatasetPreparationPageState.failurePolicy);
+  const [generationTemperature, setGenerationTemperature] = useState(cachedDatasetPreparationPageState.generationTemperature);
+  const [generationTopP, setGenerationTopP] = useState(cachedDatasetPreparationPageState.generationTopP);
+  const [generationMaxNewTokens, setGenerationMaxNewTokens] = useState(cachedDatasetPreparationPageState.generationMaxNewTokens);
+  const [trainRatio, setTrainRatio] = useState(cachedDatasetPreparationPageState.trainRatio);
+  const [testRatio, setTestRatio] = useState(cachedDatasetPreparationPageState.testRatio);
+  const [seed, setSeed] = useState(cachedDatasetPreparationPageState.seed);
+  const [shuffle, setShuffle] = useState(cachedDatasetPreparationPageState.shuffle);
+  const [outputFormat, setOutputFormat] = useState<"jsonl" | "json" | "csv" | "parquet">(cachedDatasetPreparationPageState.outputFormat);
+  const [outputBaseName, setOutputBaseName] = useState(cachedDatasetPreparationPageState.outputBaseName);
+  const [localDestinationEnabled, setLocalDestinationEnabled] = useState(cachedDatasetPreparationPageState.localDestinationEnabled);
+  const [huggingFaceDestinationEnabled, setHuggingFaceDestinationEnabled] = useState(cachedDatasetPreparationPageState.huggingFaceDestinationEnabled);
+  const [huggingFaceRepository, setHuggingFaceRepository] = useState(cachedDatasetPreparationPageState.huggingFaceRepository);
+  const [huggingFaceRevision, setHuggingFaceRevision] = useState(cachedDatasetPreparationPageState.huggingFaceRevision);
+  const [huggingFacePathPrefix, setHuggingFacePathPrefix] = useState(cachedDatasetPreparationPageState.huggingFacePathPrefix);
+  const [status, setStatus] = useState<DatasetPreparationStatus>(cachedDatasetPreparationPageState.status);
+  const [resultSummary, setResultSummary] = useState<DatasetPreparationResultSummary | undefined>(cachedDatasetPreparationPageState.resultSummary);
   const [defaultHuggingFaceNamespace, setDefaultHuggingFaceNamespace] = useState<string | undefined>(undefined);
   const [loadedModelCount, setLoadedModelCount] = useState(0);
   const [runtimeActiveTaskCount, setRuntimeActiveTaskCount] = useState(0);
   const [stopTrainingInFlight, setStopTrainingInFlight] = useState(false);
   const [unloadModelInFlight, setUnloadModelInFlight] = useState(false);
   const stopTrainingRequestedRef = useRef(false);
+
+  useEffect(() => {
+    cachedDatasetPreparationPageState = {
+      selectedArtifactStorageFilter,
+      selectedArtifactIds,
+      unsupportedDocumentPolicy,
+      normalizationMode,
+      chunkSize,
+      chunkOverlap,
+      preserveDocumentBoundaries,
+      maxChunkCount,
+      modelId,
+      modelInferenceMode,
+      modelDevice,
+      modelTorchDtype,
+      maxExamplesPerChunk,
+      batchSize,
+      failurePolicy,
+      generationTemperature,
+      generationTopP,
+      generationMaxNewTokens,
+      trainRatio,
+      testRatio,
+      seed,
+      shuffle,
+      outputFormat,
+      outputBaseName,
+      localDestinationEnabled,
+      huggingFaceDestinationEnabled,
+      huggingFaceRepository,
+      huggingFaceRevision,
+      huggingFacePathPrefix,
+      status,
+      resultSummary,
+    };
+  }, [
+    selectedArtifactStorageFilter,
+    selectedArtifactIds,
+    unsupportedDocumentPolicy,
+    normalizationMode,
+    chunkSize,
+    chunkOverlap,
+    preserveDocumentBoundaries,
+    maxChunkCount,
+    modelId,
+    modelInferenceMode,
+    modelDevice,
+    modelTorchDtype,
+    maxExamplesPerChunk,
+    batchSize,
+    failurePolicy,
+    generationTemperature,
+    generationTopP,
+    generationMaxNewTokens,
+    trainRatio,
+    testRatio,
+    seed,
+    shuffle,
+    outputFormat,
+    outputBaseName,
+    localDestinationEnabled,
+    huggingFaceDestinationEnabled,
+    huggingFaceRepository,
+    huggingFaceRevision,
+    huggingFacePathPrefix,
+    status,
+    resultSummary,
+  ]);
 
   const setStatusWarningMessage = useCallback((warningMessage: string) => {
     setStatus((current) => {
@@ -445,6 +587,17 @@ export function useDatasetPreparationFeature(
     } catch (error) {
       if (stopTrainingRequestedRef.current) {
         setStatus({ kind: "idle", message: "Training stopped." });
+      } else if (runtimeStatusClient && error instanceof Error && error.message.toLowerCase().includes("failed to fetch")) {
+        try {
+          const snapshot = await runtimeStatusClient.readStatus();
+          if (snapshot.activeTaskCount > 0) {
+            setStatus({ kind: "loading", message: "Dataset preparation is still running in the background…" });
+            return;
+          }
+        } catch {
+          // Runtime status probe is best-effort when the request transport fails.
+        }
+        setStatus({ kind: "error", message: error.message });
       } else {
         setStatus({ kind: "error", message: error instanceof Error ? error.message : "Dataset preparation failed." });
       }
