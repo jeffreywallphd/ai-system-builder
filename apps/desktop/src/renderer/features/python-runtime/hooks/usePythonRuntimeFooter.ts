@@ -18,6 +18,9 @@ export interface UsePythonRuntimeFooterResult {
   onStop: () => Promise<void>;
   onRestart: () => Promise<void>;
   onRefresh: () => Promise<void>;
+  onClearLogs: () => Promise<void>;
+  logsExpanded: boolean;
+  setLogsExpanded: (expanded: boolean) => void;
 }
 
 export function usePythonRuntimeFooter(options: UsePythonRuntimeFooterOptions): UsePythonRuntimeFooterResult {
@@ -31,6 +34,7 @@ export function usePythonRuntimeFooter(options: UsePythonRuntimeFooterOptions): 
   const [logs, setLogs] = useState<Array<{ timestamp: string; level: "info" | "warn" | "error"; message: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
+  const [logsExpanded, setLogsExpanded] = useState(false);
   const inFlightRefresh = useRef(false);
   const lastSnapshotSignature = useRef<string | undefined>(undefined);
 
@@ -90,7 +94,7 @@ export function usePythonRuntimeFooter(options: UsePythonRuntimeFooterOptions): 
     await runRefresh(false);
   }, [runRefresh]);
 
-  const runControl = useCallback(async (action: "start" | "stop" | "restart") => {
+  const runControl = useCallback(async (action: "start" | "stop" | "restart" | "clear-logs") => {
     setLoading(true);
     try {
       const snapshot = await client.controlRuntime(action);
@@ -118,6 +122,21 @@ export function usePythonRuntimeFooter(options: UsePythonRuntimeFooterOptions): 
     };
   }, [options.enabled, runRefresh]);
 
+  useEffect(() => {
+    if (!options.enabled) {
+      return;
+    }
+
+    const onDatasetPreparationTrainingStarted = () => {
+      setLogsExpanded(true);
+    };
+
+    window.addEventListener("dataset-preparation-training-started", onDatasetPreparationTrainingStarted);
+    return () => {
+      window.removeEventListener("dataset-preparation-training-started", onDatasetPreparationTrainingStarted);
+    };
+  }, [options.enabled]);
+
   return {
     statusLabel,
     healthLabel,
@@ -129,5 +148,8 @@ export function usePythonRuntimeFooter(options: UsePythonRuntimeFooterOptions): 
     onStop: () => runControl("stop"),
     onRestart: () => runControl("restart"),
     onRefresh,
+    onClearLogs: () => runControl("clear-logs"),
+    logsExpanded,
+    setLogsExpanded,
   };
 }

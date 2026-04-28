@@ -15,6 +15,9 @@ export function PythonRuntimeFooter({ enabled, client }: PythonRuntimeFooterProp
     onStop,
     onRestart,
     onRefresh,
+    onClearLogs,
+    logsExpanded,
+    setLogsExpanded,
   } = usePythonRuntimeFooter({
     enabled,
     client,
@@ -39,8 +42,11 @@ export function PythonRuntimeFooter({ enabled, client }: PythonRuntimeFooterProp
         Status: <strong>{statusLabel}</strong> | Health: <strong>{healthLabel}</strong> | Capabilities: {capabilitiesLabel}
       </p>
       {error ? <p role="alert">{error}</p> : null}
-      <details className="ui-python-runtime-footer__logs">
+      <details className="ui-python-runtime-footer__logs" open={logsExpanded} onToggle={(event) => setLogsExpanded(event.currentTarget.open)}>
         <summary>Runtime activity log</summary>
+        <div className="ui-python-runtime-footer__actions">
+          <button className="ui-button" type="button" onClick={() => void onClearLogs()} disabled={loading}>Clear log</button>
+        </div>
         {logs.length === 0 ? <p>No runtime activity recorded yet.</p> : (
           <ul className="ui-python-runtime-footer__log-list">
             {logs.map((entry, index) => (

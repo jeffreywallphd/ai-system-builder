@@ -114,6 +114,7 @@ export interface DesktopHostComposition {
   stopPythonRuntime: () => Promise<void>;
   restartPythonRuntime: () => Promise<void>;
   unloadPythonRuntimeModel: () => Promise<void>;
+  clearPythonRuntimeLogs: () => Promise<void>;
   readPythonRuntimeStatus: () => Promise<DesktopPythonRuntimeStatusPayload>;
   getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
@@ -426,6 +427,13 @@ export function composeDesktopHost(
         message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.`,
       });
     },
+    async clearPythonRuntimeLogs() {
+      runtimeLogs.splice(0, runtimeLogs.length);
+      recordRuntimeLog({
+        level: "info",
+        message: "Cleared Python runtime activity log.",
+      });
+    },
     async readPythonRuntimeStatus() {
       return readPythonRuntimeStatus();
     },
@@ -703,6 +711,13 @@ export function composeDesktopHost(
             recordRuntimeLog({
               level: "info",
               message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.`,
+            });
+          },
+          clearPythonRuntimeLogs: async () => {
+            runtimeLogs.splice(0, runtimeLogs.length);
+            recordRuntimeLog({
+              level: "info",
+              message: "Cleared Python runtime activity log.",
             });
           },
           readPythonRuntimeStatus,

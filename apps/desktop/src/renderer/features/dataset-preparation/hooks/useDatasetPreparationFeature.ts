@@ -8,7 +8,12 @@ import { buildDatasetPreparationRequest } from "./datasetPreparationRequestBuild
 import {
   validateAndParseDatasetPreparationInputs,
 } from "./datasetPreparationRequestValidation";
-import { resolveLatestModelDownloadProgress } from "./modelDownloadProgress";
+import {
+  resolveLatestDatasetPreparationChunkProgress,
+  resolveLatestModelDownloadProgress,
+  resolveModelInMemoryLoadMessage,
+  sawPythonRuntimeStartup,
+} from "./modelDownloadProgress";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 
 interface DatasetPreparationStatus {
@@ -351,6 +356,7 @@ export function useDatasetPreparationFeature(
     const progressStartedAtMs = Date.now();
     let preparationActive = true;
     let progressReadInFlight = false;
+    let runtimeTaskObserved = false;
     const refreshModelDownloadProgress = async () => {
       if (!runtimeStatusClient || progressReadInFlight || !preparationActive) {
         return;
@@ -362,11 +368,43 @@ export function useDatasetPreparationFeature(
         if (!preparationActive) {
           return;
         }
-        const progress = resolveLatestModelDownloadProgress(snapshot, generationModelId, {
+
+        if (snapshot.activeTaskCount > 0) {
+          runtimeTaskObserved = true;
+        }
+
+        const chunkProgress = resolveLatestDatasetPreparationChunkProgress(snapshot, {
           sinceEpochMs: progressStartedAtMs,
         });
-        if (progress) {
-          setStatus({ kind: "loading", message: progress.message });
+        if (chunkProgress) {
+          setStatus({ kind: "loading", message: chunkProgress.message });
+          return;
+        }
+
+        const downloadProgress = resolveLatestModelDownloadProgress(snapshot, generationModelId, {
+          sinceEpochMs: progressStartedAtMs,
+        });
+        if (downloadProgress) {
+          setStatus({ kind: "loading", message: downloadProgress.message });
+          return;
+        }
+
+        const modelInMemoryMessage = resolveModelInMemoryLoadMessage(snapshot, generationModelId, {
+          sinceEpochMs: progressStartedAtMs,
+        });
+        if (modelInMemoryMessage) {
+          setStatus({ kind: "loading", message: modelInMemoryMessage });
+          return;
+        }
+
+        if ((snapshot.supervisorStatus === "starting" || sawPythonRuntimeStartup(snapshot, { sinceEpochMs: progressStartedAtMs }))) {
+          setStatus({ kind: "loading", message: "Starting Python runtime environment..." });
+          return;
+        }
+
+        if (huggingFaceDestinationEnabled && runtimeTaskObserved && snapshot.activeTaskCount === 0) {
+          setStatus({ kind: "loading", message: "Publishing to HuggingFace..." });
+          return;
         }
       } catch {
         // Progress polling is best-effort; the preparation request owns final success/failure.
@@ -375,6 +413,7 @@ export function useDatasetPreparationFeature(
       }
     };
 
+    window.dispatchEvent(new CustomEvent("dataset-preparation-training-started"));
     setStatus({ kind: "loading", message: `Checking model ${generationModelId} before dataset preparation...` });
     void refreshModelDownloadProgress();
     const progressTimer = window.setInterval(() => {

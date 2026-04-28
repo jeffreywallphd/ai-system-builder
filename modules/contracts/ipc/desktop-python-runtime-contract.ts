@@ -70,7 +70,7 @@ export interface DesktopPythonRuntimeStatusReadRequestPayload {
 }
 
 export interface DesktopPythonRuntimeControlRequestPayload {
-  action: "start" | "stop" | "restart" | "unload-model";
+  action: "start" | "stop" | "restart" | "unload-model" | "clear-logs";
   boundary: DesktopPythonRuntimeBoundaryContext;
 }
 

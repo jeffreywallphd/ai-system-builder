@@ -297,7 +297,7 @@ export interface DesktopPreloadApi {
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
   controlPythonRuntime: (
-    input: { action: "start" | "stop" | "restart" | "unload-model" },
+    input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeControlResponse>;
   browseArtifacts: (

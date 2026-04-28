@@ -79,7 +79,7 @@ describe("usePythonRuntimeFooter", () => {
       await Promise.resolve();
     });
 
-    expect(client.readStatus).toHaveBeenCalledTimes(4);
+    expect(client.readStatus).toHaveBeenCalledTimes(2);
     expect(container.querySelector("[data-testid='loading']")?.textContent).toBe("idle");
   });
 
