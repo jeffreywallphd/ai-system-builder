@@ -473,18 +473,34 @@ export function composeDesktopHost(
     executeTask: async (request) => {
       recordRuntimeLog({
         level: "info",
-        message: "Preparing dataset in Python runtime.",
+        message: JSON.stringify({
+          event: "runtime.dataset_preparation.task.started",
+          requestId: request.requestId,
+          taskType: request.taskType,
+        }),
       });
       const result = await pythonRuntimeFoundation.runtimePort.executeTask(request);
       if (result.success) {
         recordRuntimeLog({
           level: "info",
-          message: "Dataset preparation finished successfully.",
+          message: JSON.stringify({
+            event: "runtime.dataset_preparation.task.succeeded",
+            requestId: request.requestId,
+            taskType: request.taskType,
+          }),
         });
       } else {
+        const wasCancelled = result.error?.code === "task_cancelled" || result.error?.code === "cancelled";
         recordRuntimeLog({
-          level: "error",
-          message: `Dataset preparation failed: ${result.error?.message ?? "Unknown runtime error."}`,
+          level: wasCancelled ? "warn" : "error",
+          message: JSON.stringify({
+            event: wasCancelled ? "runtime.dataset_preparation.task.cancelled" : "runtime.dataset_preparation.task.failed",
+            requestId: request.requestId,
+            taskType: request.taskType,
+            status: wasCancelled ? "cancelled" : "failed",
+            message: result.error?.message,
+            error: result.error,
+          }),
         });
       }
 

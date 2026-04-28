@@ -14,6 +14,10 @@ import {
   resolveModelInMemoryLoadMessage,
   sawPythonRuntimeStartup,
 } from "./modelDownloadProgress";
+import {
+  classifyRecoveredDatasetPreparationCompletion,
+  identifyMatchingDatasetPreparationTask,
+} from "./datasetPreparationRecovery";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 import {
   isTransientDatasetPreparationTransportError,
@@ -517,18 +521,22 @@ export function useDatasetPreparationFeature(
     const progressStartedAtMs = Date.now();
     let preparationActive = true;
     let progressReadInFlight = false;
-    let runtimeTaskObserved = false;
     let recoveringProgressMonitor = false;
     let progressTimer: number | undefined;
+
+    const stopProgressInterval = () => {
+      if (typeof progressTimer === "number") {
+        window.clearInterval(progressTimer);
+        progressTimer = undefined;
+      }
+    };
 
     const stopProgressMonitoring = () => {
       if (!preparationActive) {
         return;
       }
       preparationActive = false;
-      if (typeof progressTimer === "number") {
-        window.clearInterval(progressTimer);
-      }
+      stopProgressInterval();
       void refreshRuntimeModelStatus();
     };
 
@@ -540,11 +548,13 @@ export function useDatasetPreparationFeature(
       }
 
       recoveringProgressMonitor = false;
-      if (snapshot.activeTaskCount > 0) {
-        runtimeTaskObserved = true;
-      }
+      const matchingTask = identifyMatchingDatasetPreparationTask(snapshot, {
+        requestId,
+        sinceEpochMs: progressStartedAtMs,
+      });
 
       const chunkProgress = resolveLatestDatasetPreparationChunkProgress(snapshot, {
+        requestId,
         sinceEpochMs: progressStartedAtMs,
       });
       if (chunkProgress) {
@@ -573,7 +583,7 @@ export function useDatasetPreparationFeature(
         return;
       }
 
-      if (huggingFaceDestinationEnabled && runtimeTaskObserved && snapshot.activeTaskCount === 0) {
+      if (huggingFaceDestinationEnabled && matchingTask.matchingTaskObserved && matchingTask.matchingTaskActive === false) {
         setStatus({ kind: "loading", message: "Publishing to HuggingFace..." });
       }
     };
@@ -624,8 +634,20 @@ export function useDatasetPreparationFeature(
           const snapshot = await runtimeStatusClient.readStatus();
           consecutiveReadFailures = 0;
           applyRuntimeProgressSnapshot(snapshot);
+          const matchingTask = identifyMatchingDatasetPreparationTask(snapshot, {
+            requestId,
+            sinceEpochMs: progressStartedAtMs,
+          });
+          const completion = classifyRecoveredDatasetPreparationCompletion(matchingTask);
 
-          if (runtimeTaskObserved && snapshot.activeTaskCount === 0) {
+          if (completion === "still-running") {
+            await new Promise<void>((resolve) => {
+              window.setTimeout(resolve, 750);
+            });
+            continue;
+          }
+
+          if (completion === "succeeded") {
             stopProgressMonitoring();
             try {
               await refreshArtifacts();
@@ -641,6 +663,30 @@ export function useDatasetPreparationFeature(
                 message: "Dataset preparation completed in Python runtime, but result transport was interrupted. Refresh artifacts to view the output.",
               });
             }
+            return;
+          }
+
+          if (completion === "failed") {
+            stopProgressMonitoring();
+            setStatus({
+              kind: "error",
+              message: matchingTask.terminalMessage?.trim() || "Dataset preparation failed in Python runtime after transport disconnect.",
+            });
+            return;
+          }
+
+          if (completion === "stopped") {
+            stopProgressMonitoring();
+            setStatus({ kind: "idle", message: "Training stopped." });
+            return;
+          }
+
+          if (completion === "unknown" || completion === "unrelated-runtime-task") {
+            stopProgressMonitoring();
+            setStatus({
+              kind: "error",
+              message: "Connection was interrupted and final task state is unknown. Refresh artifacts to confirm dataset outputs.",
+            });
             return;
           }
         } catch {
@@ -673,18 +719,22 @@ export function useDatasetPreparationFeature(
         setStatus({ kind: "idle", message: "Training stopped." });
         stopProgressMonitoring();
       } else if (runtimeStatusClient && isTransientDatasetPreparationTransportError(error)) {
+        stopProgressInterval();
         setStatus({
           kind: "loading",
           message: "Connection to dataset preparation was interrupted. Reconnecting to runtime progress...",
         });
         try {
           const snapshot = await runtimeStatusClient.readStatus();
-          if (snapshot.activeTaskCount > 0) {
+          const matchingTask = identifyMatchingDatasetPreparationTask(snapshot, {
+            requestId,
+            sinceEpochMs: progressStartedAtMs,
+          });
+          if (matchingTask.matchingTaskActive || matchingTask.terminalState) {
             setStatus({
               kind: "loading",
               message: "Dataset preparation is still running in the background. Tracking Python runtime progress...",
             });
-            runtimeTaskObserved = true;
             await monitorRuntimeTaskRecovery();
             return;
           }

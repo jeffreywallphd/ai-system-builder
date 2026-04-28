@@ -16,6 +16,10 @@ export class PythonDatasetPreparationError extends Error {
 
 export interface PythonDatasetPreparationPort {
   prepareTrainingDataset(
-    request: PrepareTrainingDatasetRequest
+    request: PrepareTrainingDatasetRequest,
+    context?: {
+      requestId?: string;
+      correlationId?: string;
+    },
   ): Promise<PrepareTrainingDatasetResult>;
 }

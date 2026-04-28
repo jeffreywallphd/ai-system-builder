@@ -94,7 +94,7 @@ function parseJsonLogLine(line: string): unknown | undefined {
 
 export function resolveLatestDatasetPreparationChunkProgress(
   snapshot: Pick<DesktopPythonRuntimeStatusSnapshot, "logs">,
-  options: { sinceEpochMs?: number } = {},
+  options: { requestId?: string; sinceEpochMs?: number } = {},
 ): DatasetPreparationChunkProgress | undefined {
   for (const log of [...snapshot.logs].reverse()) {
     if (typeof options.sinceEpochMs === "number") {
@@ -111,6 +111,9 @@ export function resolveLatestDatasetPreparationChunkProgress(
         totalChunkCount?: number;
       } | undefined;
       if (payload?.event !== "runtime.dataset_preparation.generation.progress") {
+        continue;
+      }
+      if (options.requestId && payload.requestId !== options.requestId) {
         continue;
       }
 

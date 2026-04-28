@@ -365,7 +365,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         });
       }
 
-      const prepared = await this.datasetPreparation.prepareTrainingDataset(runtimeRequest);
+      const prepared = await this.datasetPreparation.prepareTrainingDataset(runtimeRequest, context);
       const datasetOutput = prepared.outputs.find((output) => output.role === "dataset")
         ?? prepared.outputs.find((output) => output.role === "artifact");
 

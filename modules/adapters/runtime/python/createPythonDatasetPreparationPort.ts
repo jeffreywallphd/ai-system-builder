@@ -167,7 +167,10 @@ export function createPythonDatasetPreparationPort(
   };
 
   return {
-    async prepareTrainingDataset(request: PrepareTrainingDatasetRequest): Promise<PrepareTrainingDatasetResult> {
+    async prepareTrainingDataset(
+      request: PrepareTrainingDatasetRequest,
+      context?: { requestId?: string; correlationId?: string },
+    ): Promise<PrepareTrainingDatasetResult> {
       if (ensureRuntimeReady) {
         await ensureRuntimeReady();
       }
@@ -178,7 +181,7 @@ export function createPythonDatasetPreparationPort(
       });
 
       const taskResult = await runtimePort.executeTask({
-        requestId: nextRequestId(),
+        requestId: context?.requestId?.trim() || nextRequestId(),
         taskType: "prepare-training-dataset",
         payload: request,
         timeoutMs: taskTimeoutMs,
