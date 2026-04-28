@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import platform
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
@@ -239,9 +240,22 @@ def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
             payload = PrepareTrainingDatasetRequest.model_validate(request.payload)
             last_progress_time_seconds = time.monotonic()
 
-            def on_generation_progress(_progress: dict[str, int]) -> None:
+            def on_generation_progress(progress: dict[str, int]) -> None:
                 nonlocal last_progress_time_seconds
                 last_progress_time_seconds = time.monotonic()
+                print(
+                    json.dumps(
+                        {
+                            "event": "runtime.dataset_preparation.generation.progress",
+                            "requestId": request.requestId,
+                            "totalChunkCount": progress.get("totalChunkCount"),
+                            "processedChunkCount": progress.get("processedChunkCount"),
+                            "generatedRowCount": progress.get("generatedRowCount"),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
 
             def run_prepare_training_dataset() -> object:
                 _mark_task_active(request.requestId)

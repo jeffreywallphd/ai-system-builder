@@ -57,7 +57,7 @@ function unwrap(response: unknown, fallbackMessage: string): unknown {
 
 export interface DesktopPythonRuntimeClient {
   readStatus: () => Promise<DesktopPythonRuntimeStatusSnapshot>;
-  controlRuntime: (action: "start" | "stop" | "restart" | "unload-model") => Promise<DesktopPythonRuntimeStatusSnapshot>;
+  controlRuntime: (action: "start" | "stop" | "restart" | "unload-model" | "clear-logs") => Promise<DesktopPythonRuntimeStatusSnapshot>;
 }
 
 export function createDesktopPythonRuntimeClient(): DesktopPythonRuntimeClient {

@@ -298,7 +298,7 @@ export interface DesktopDatasetPreparationApi {
 
 export interface DesktopPythonRuntimeApi {
   readPythonRuntimeStatus: () => Promise<unknown>;
-  controlPythonRuntime: (input: { action: "start" | "stop" | "restart" | "unload-model" }) => Promise<unknown>;
+  controlPythonRuntime: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
 }
 
 interface DesktopApiBridge {
@@ -320,7 +320,7 @@ interface DesktopApiBridge {
   }) => Promise<unknown>;
   prepareTrainingDatasetFromArtifacts?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
-  controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" }) => Promise<unknown>;
+  controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;

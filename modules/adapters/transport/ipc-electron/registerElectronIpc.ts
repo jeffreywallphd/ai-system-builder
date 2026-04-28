@@ -139,6 +139,7 @@ export function registerElectronIpc(
     stopPythonRuntime: dependencies.pythonRuntime.stopPythonRuntime,
     restartPythonRuntime: dependencies.pythonRuntime.restartPythonRuntime,
     unloadPythonRuntimeModel: dependencies.pythonRuntime.unloadPythonRuntimeModel,
+    clearPythonRuntimeLogs: dependencies.pythonRuntime.clearPythonRuntimeLogs,
     readPythonRuntimeStatus: dependencies.pythonRuntime.readPythonRuntimeStatus,
   });
 }
