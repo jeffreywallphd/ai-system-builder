@@ -26,7 +26,8 @@ describe("datasetPreparationRecovery", () => {
       { requestId: "request-1" },
     );
 
-    expect(classifyRecoveredDatasetPreparationCompletion(match)).toBe("unrelated-runtime-task");
+    expect(classifyRecoveredDatasetPreparationCompletion(match, { withinGracePeriod: true })).toBe("waiting-for-matching-task");
+    expect(classifyRecoveredDatasetPreparationCompletion(match, { withinGracePeriod: false })).toBe("unrelated-runtime-task");
   });
 
   it("detects matching active task", () => {
@@ -86,6 +87,18 @@ describe("datasetPreparationRecovery", () => {
       { requestId: "request-1" },
     );
 
-    expect(classifyRecoveredDatasetPreparationCompletion(match)).toBe("unknown");
+    expect(classifyRecoveredDatasetPreparationCompletion(match)).toBe("still-running");
+  });
+
+  it("classifies observed non-terminal diagnostics as unknown when grace has expired", () => {
+    const match = identifyMatchingDatasetPreparationTask(
+      createSnapshot({
+        activeTaskCount: 0,
+        logs: [JSON.stringify({ event: "runtime.dataset_preparation.generation.chunk_failed", requestId: "request-1" })],
+      }),
+      { requestId: "request-1" },
+    );
+
+    expect(classifyRecoveredDatasetPreparationCompletion(match, { withinGracePeriod: false })).toBe("unknown");
   });
 });

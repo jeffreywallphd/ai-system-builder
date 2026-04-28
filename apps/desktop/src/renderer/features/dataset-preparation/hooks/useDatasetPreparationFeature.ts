@@ -218,6 +218,7 @@ function appendErrorDetailsMessage(message: string, details: Record<string, unkn
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
 ): UseDatasetPreparationFeatureResult {
+  const recoveryGraceWindowMs = 120_000;
   const onPrepared = options.onPrepared;
   const datasetClient = useDatasetPreparationClient(options.client);
   const settingsClient = useMemo(() => {
@@ -623,6 +624,7 @@ export function useDatasetPreparationFeature(
       }
 
       let consecutiveReadFailures = 0;
+      const recoveryStartedAtMs = Date.now();
       while (preparationActive) {
         if (stopTrainingRequestedRef.current) {
           setStatus({ kind: "idle", message: "Training stopped." });
@@ -638,9 +640,22 @@ export function useDatasetPreparationFeature(
             requestId,
             sinceEpochMs: progressStartedAtMs,
           });
-          const completion = classifyRecoveredDatasetPreparationCompletion(matchingTask);
+          const withinGracePeriod = (Date.now() - recoveryStartedAtMs) < recoveryGraceWindowMs;
+          const completion = classifyRecoveredDatasetPreparationCompletion(matchingTask, {
+            withinGracePeriod,
+          });
 
           if (completion === "still-running") {
+            await new Promise<void>((resolve) => {
+              window.setTimeout(resolve, 750);
+            });
+            continue;
+          }
+          if (completion === "waiting-for-matching-task") {
+            setStatus({
+              kind: "loading",
+              message: "Connection to dataset preparation was interrupted. Reconnecting to runtime progress...",
+            });
             await new Promise<void>((resolve) => {
               window.setTimeout(resolve, 750);
             });
@@ -685,7 +700,9 @@ export function useDatasetPreparationFeature(
             stopProgressMonitoring();
             setStatus({
               kind: "error",
-              message: "Connection was interrupted and final task state is unknown. Refresh artifacts to confirm dataset outputs.",
+              message: completion === "unknown"
+                ? "Connection was interrupted and final task state is unknown. Refresh artifacts to confirm dataset outputs."
+                : "Connection was interrupted and runtime progress for this request could not be recovered. Refresh artifacts to confirm whether output was produced.",
             });
             return;
           }
@@ -724,25 +741,7 @@ export function useDatasetPreparationFeature(
           kind: "loading",
           message: "Connection to dataset preparation was interrupted. Reconnecting to runtime progress...",
         });
-        try {
-          const snapshot = await runtimeStatusClient.readStatus();
-          const matchingTask = identifyMatchingDatasetPreparationTask(snapshot, {
-            requestId,
-            sinceEpochMs: progressStartedAtMs,
-          });
-          if (matchingTask.matchingTaskActive || matchingTask.terminalState) {
-            setStatus({
-              kind: "loading",
-              message: "Dataset preparation is still running in the background. Tracking Python runtime progress...",
-            });
-            await monitorRuntimeTaskRecovery();
-            return;
-          }
-        } catch {
-          // Runtime status probe is best-effort when the request transport fails.
-        }
-        setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
-        stopProgressMonitoring();
+        await monitorRuntimeTaskRecovery();
       } else {
         setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
         stopProgressMonitoring();
@@ -803,6 +802,7 @@ export function useDatasetPreparationFeature(
     refreshArtifacts,
     refreshRuntimeModelStatus,
     onPrepared,
+    recoveryGraceWindowMs,
   ]);
 
   const onStopTraining = useCallback(async () => {
