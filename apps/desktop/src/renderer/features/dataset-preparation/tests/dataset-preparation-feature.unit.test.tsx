@@ -482,7 +482,7 @@ describe("DatasetPreparationFeature", () => {
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
             prepareTrainingDatasetFromArtifacts: async () => {
-              throw new Error("failed to fetch");
+              throw new Error("fetch failed");
             },
           }}
         />,
@@ -502,7 +502,8 @@ describe("DatasetPreparationFeature", () => {
     });
 
     expect(container.textContent).toContain("still running in the background");
-    expect(container.textContent).not.toContain("failed to fetch");
+    expect(container.textContent).toContain("Tracking Python runtime progress");
+    expect(container.textContent).not.toContain("fetch failed");
   });
 
   it("retains in-progress status and locks form controls across remounts", async () => {

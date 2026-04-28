@@ -207,6 +207,28 @@ function appendErrorDetailsMessage(message: string, details: Record<string, unkn
   return suffix ? `${message} Details: ${suffix}.` : message;
 }
 
+function isTransientTransportDisconnectMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  return normalized === "failed to fetch"
+    || normalized === "fetch failed"
+    || normalized.includes("networkerror")
+    || normalized.includes("network request failed")
+    || normalized.includes("load failed");
+}
+
+function resolveUserFacingDatasetPreparationErrorMessage(error: unknown): string {
+  const fallbackMessage = "We lost connection while preparing the dataset. Re-run preparation if this persists.";
+  if (!(error instanceof Error)) {
+    return "Dataset preparation failed.";
+  }
+
+  if (isTransientTransportDisconnectMessage(error.message)) {
+    return fallbackMessage;
+  }
+
+  return error.message;
+}
+
 
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
@@ -594,19 +616,26 @@ export function useDatasetPreparationFeature(
     } catch (error) {
       if (stopTrainingRequestedRef.current) {
         setStatus({ kind: "idle", message: "Training stopped." });
-      } else if (runtimeStatusClient && error instanceof Error && error.message.toLowerCase().includes("failed to fetch")) {
+      } else if (runtimeStatusClient && error instanceof Error && isTransientTransportDisconnectMessage(error.message)) {
+        setStatus({
+          kind: "loading",
+          message: "Connection to dataset preparation was interrupted. Reconnecting to runtime progress...",
+        });
         try {
           const snapshot = await runtimeStatusClient.readStatus();
           if (snapshot.activeTaskCount > 0) {
-            setStatus({ kind: "loading", message: "Dataset preparation is still running in the background…" });
+            setStatus({
+              kind: "loading",
+              message: "Dataset preparation is still running in the background. Tracking Python runtime progress...",
+            });
             return;
           }
         } catch {
           // Runtime status probe is best-effort when the request transport fails.
         }
-        setStatus({ kind: "error", message: error.message });
+        setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
       } else {
-        setStatus({ kind: "error", message: error instanceof Error ? error.message : "Dataset preparation failed." });
+        setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
       }
       return;
     } finally {
