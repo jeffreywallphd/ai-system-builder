@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
+import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   normalizeModelInventoryRecord,
@@ -25,6 +26,8 @@ interface ModelRegistryFileShape {
   models?: ModelInventoryRecord[];
   [key: string]: unknown;
 }
+
+type DirectoryEntry = Dirent<string>;
 
 export interface LocalModelRegistryAdapterOptions {
   filePath: string;
@@ -151,12 +154,12 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
 
     const hfHome = normalizeOptionalPath(environment.HF_HOME);
     if (hfHome) {
-      roots.add(`${hfHome}/hub`);
-      roots.add(`${hfHome}/models`);
+      roots.add(join(hfHome, "hub"));
+      roots.add(join(hfHome, "models"));
     }
 
-    roots.add(`${homeDirectory}/.cache/huggingface/hub`);
-    roots.add(`${homeDirectory}/.cache/huggingface/models`);
+    roots.add(join(homeDirectory, ".cache", "huggingface", "hub"));
+    roots.add(join(homeDirectory, ".cache", "huggingface", "models"));
     return [...roots];
   }
 
@@ -174,7 +177,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
   }
 
   async function newestDirectory(path: string): Promise<string | undefined> {
-    let entries: Awaited<ReturnType<typeof readdir>>;
+    let entries: DirectoryEntry[];
     try {
       entries = await readdir(path, { withFileTypes: true });
     } catch (error) {
@@ -189,7 +192,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     const directories = entries.filter((entry) => entry.isDirectory());
     let newest: { path: string; modifiedAtMs: number } | undefined;
     for (const entry of directories) {
-      const candidatePath = `${path}/${entry.name}`;
+      const candidatePath = join(path, entry.name);
       let stats: Awaited<ReturnType<typeof stat>>;
       try {
         stats = await stat(candidatePath);
@@ -216,7 +219,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     const seenDiscoveredPaths = new Set<string>();
 
     for (const cacheRoot of resolveDiscoveryRoots()) {
-      let rootEntries: Awaited<ReturnType<typeof readdir>>;
+      let rootEntries: DirectoryEntry[];
       try {
         rootEntries = await readdir(cacheRoot, { withFileTypes: true });
       } catch (error) {
@@ -238,8 +241,8 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
           continue;
         }
 
-        const repoRoot = `${cacheRoot}/${entry.name}`;
-        const snapshotRoot = await newestDirectory(`${repoRoot}/snapshots`);
+        const repoRoot = join(cacheRoot, entry.name);
+        const snapshotRoot = await newestDirectory(join(repoRoot, "snapshots"));
         const localPath = snapshotRoot ?? repoRoot;
         if (knownPaths.has(localPath) || seenDiscoveredPaths.has(localPath)) {
           continue;
