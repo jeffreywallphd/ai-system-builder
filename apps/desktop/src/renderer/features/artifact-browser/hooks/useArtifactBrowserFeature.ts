@@ -68,7 +68,12 @@ export interface UseArtifactBrowserFeatureResult {
   setSelectedArtifactFamily: (value: DesktopArtifactFamily | "all") => void;
   selectedStorageFilter: "all" | "uploaded" | "generated";
   setSelectedStorageFilter: (value: "all" | "uploaded" | "generated") => void;
-  publishArtifactToHuggingFace: () => Promise<void>;
+  publishArtifactToHuggingFace: (input?: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<void>;
   registerArtifactFromHuggingFace: (input?: {
     repository?: string;
     pathInRepo?: string;
@@ -159,8 +164,13 @@ export function useArtifactBrowserFeature(
     });
   }, [artifactClient, artifacts.refreshArtifacts]);
 
-  async function publishArtifactToHuggingFace(): Promise<void> {
-    await publishLogic.publishArtifactToHuggingFace();
+  async function publishArtifactToHuggingFace(input?: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }): Promise<void> {
+    await publishLogic.publishArtifactToHuggingFace(input);
     await artifacts.refreshArtifacts();
   }
 
