@@ -1,4 +1,4 @@
-import { Fragment, useEffect } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   deriveArtifactBackingState,
@@ -15,6 +15,8 @@ import { SettingsPanel, useApplicationSettings } from "../../settings";
 export interface ArtifactBrowserFeatureProps {
   client?: DesktopArtifactBrowserClient;
 }
+
+const HUGGING_FACE_SETTINGS_KEYS = ["huggingface.token", "huggingface.defaultNamespace"] as const;
 
 function PublishedBackingPanel(
   props: {
@@ -49,7 +51,10 @@ function PublishedBackingPanel(
 }
 
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
-  const settings = useApplicationSettings({ keys: ["huggingface.defaultNamespace"] });
+  const settings = useApplicationSettings({ keys: useMemo(() => ["huggingface.defaultNamespace"], []) });
+  const [downloadState, setDownloadState] = useState<{ status: "idle" | "error"; message?: string }>({
+    status: "idle",
+  });
   const {
     uploadedItems,
     generatedItems,
@@ -89,6 +94,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     setRevision,
     setMediaType,
     togglePublishForm,
+    readArtifactMedia,
   } = useArtifactBrowserFeature(client);
   const backingState = deriveArtifactBackingState(detail, content);
   const defaultNamespace = settings.valuesByKey.get("huggingface.defaultNamespace")?.value;
@@ -103,6 +109,38 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       setRepository(`${defaultNamespace.trim()}/`);
     }
   }, [defaultNamespace, publishForm.repository, publishForm.showPublishForm, setRepository]);
+
+  const onDownloadSelectedArtifact = useCallback(async () => {
+    if (!detail) {
+      return;
+    }
+
+    if (content?.availability !== "available") {
+      setDownloadState({ status: "error", message: "Artifact bytes are unavailable for download." });
+      return;
+    }
+
+    try {
+      const media = await readArtifactMedia(detail.locator.storageKey);
+
+      const blob = new Blob([media.bytes], { type: media.mediaType ?? detail.mediaType ?? "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = detail.originalName?.trim() || detail.locator.storageKey.split("/").pop() || "artifact";
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setDownloadState({ status: "idle" });
+    } catch (error) {
+      setDownloadState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to download artifact.",
+      });
+    }
+  }, [content?.availability, detail, readArtifactMedia]);
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -283,7 +321,16 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
 
           {detail ? (
             <section className="ui-stack ui-stack--sm">
+              <button
+                className="ui-button"
+                type="button"
+                onClick={() => void onDownloadSelectedArtifact()}
+                disabled={content?.availability !== "available"}
+              >
+                Download artifact
+              </button>
               <button className="ui-button ui-button--destructive" type="button" onClick={() => requestDeleteRegisteredArtifact(detail.locator.storageKey)}>Delete registered artifact</button>
+              {downloadState.message ? <p role="alert">{downloadState.message}</p> : null}
               <h3>Local Object State</h3>
               <dl className="ui-grid ui-grid--two">
                 <dt>Local object availability</dt>
@@ -363,7 +410,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               <SettingsPanel
                 compact
                 title="Hugging Face defaults"
-                keys={["huggingface.token", "huggingface.defaultNamespace"]}
+                keys={HUGGING_FACE_SETTINGS_KEYS.slice()}
               />
               {backingState.hasLocalObjectAvailable ? (
                 <>

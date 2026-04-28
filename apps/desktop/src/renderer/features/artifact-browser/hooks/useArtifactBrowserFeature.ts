@@ -90,6 +90,7 @@ export interface UseArtifactBrowserFeatureResult {
   setRevision: (value: string) => void;
   setMediaType: (value: string) => void;
   togglePublishForm: () => void;
+  readArtifactMedia: (storageKey: string) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
   setRegisterRepository: (value: string) => void;
   setRegisterNamespace: (value: string) => void;
   setRegisterPathInRepo: (value: string) => void;
@@ -221,6 +222,7 @@ export function useArtifactBrowserFeature(
     setRevision: publishLogic.setRevision,
     setMediaType: publishLogic.setMediaType,
     togglePublishForm: publishLogic.togglePublishForm,
+    readArtifactMedia: (storageKey: string) => artifactClient.readArtifactMedia({ storageKey }),
     setRegisterRepository: huggingFace.setRegisterRepository,
     setRegisterNamespace: huggingFace.setRegisterNamespace,
     setRegisterPathInRepo: huggingFace.setRegisterPathInRepo,
