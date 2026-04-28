@@ -1,15 +1,44 @@
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import ts from "typescript";
 
 import { describe, expect, it } from "../../../../testing/node-test";
 import { createLocalModelRegistryAdapter } from "../createLocalModelRegistryAdapter";
 
+function createTestAdapterOptions(filePath: string) {
+  return {
+    filePath,
+    now: () => "2026-04-27T00:00:00.000Z",
+    discovery: { enabled: false },
+  };
+}
+
 describe("createLocalModelRegistryAdapter", () => {
+  it("type-checks with Node readdir directory-entry overloads", () => {
+    const program = ts.createProgram(["modules/adapters/persistence/model/createLocalModelRegistryAdapter.ts"], {
+      strict: true,
+      noEmit: true,
+      moduleResolution: ts.ModuleResolutionKind.Node10,
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2021,
+      skipLibCheck: true,
+      types: ["node"],
+    });
+    const diagnostics = ts.getPreEmitDiagnostics(program);
+    const formattedDiagnostics = ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+      getCanonicalFileName: (fileName) => fileName,
+      getCurrentDirectory: () => process.cwd(),
+      getNewLine: () => "\n",
+    });
+
+    expect(formattedDiagnostics).toBe("");
+  });
+
   it("creates and saves remote model references", async () => {
     const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
     const filePath = join(dir, "models.json");
-    const adapter = createLocalModelRegistryAdapter({ filePath, now: () => "2026-04-27T00:00:00.000Z" });
+    const adapter = createLocalModelRegistryAdapter(createTestAdapterOptions(filePath));
 
     const saved = await adapter.saveModelReference({
       provider: "huggingface",
@@ -27,7 +56,7 @@ describe("createLocalModelRegistryAdapter", () => {
   it("lists with filter/search and updates/deletes records", async () => {
     const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
     const filePath = join(dir, "models.json");
-    const adapter = createLocalModelRegistryAdapter({ filePath, now: () => "2026-04-27T00:00:00.000Z" });
+    const adapter = createLocalModelRegistryAdapter(createTestAdapterOptions(filePath));
 
     await adapter.registerDownloadedModel({
       modelRecordId: "m1",
@@ -71,7 +100,7 @@ describe("createLocalModelRegistryAdapter", () => {
     const filePath = join(dir, "models.json");
     await writeFile(filePath, JSON.stringify({ schemaVersion: 3, models: [] }), "utf8");
 
-    const adapter = createLocalModelRegistryAdapter({ filePath, now: () => "2026-04-27T00:00:00.000Z" });
+    const adapter = createLocalModelRegistryAdapter(createTestAdapterOptions(filePath));
     await adapter.saveModelReference({ provider: "huggingface", modelId: "org/demo", displayName: "Demo" });
 
     const document = JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>;
