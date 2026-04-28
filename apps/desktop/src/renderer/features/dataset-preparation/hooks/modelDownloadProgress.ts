@@ -13,6 +13,13 @@ export interface DatasetPreparationChunkProgress {
   totalChunkCount: number;
 }
 
+interface ParsedDatasetPreparationGenerationProgressEvent {
+  event?: string;
+  requestId?: string;
+  processedChunkCount?: number;
+  totalChunkCount?: number;
+}
+
 const HUGGING_FACE_FETCHING_PATTERN = /Fetching\s+(\d+)\s+files:\s+(\d+)%\|.*?\|\s+(\d+)\/(\d+)/i;
 const HUGGING_FACE_FETCHING_PERCENT_PATTERN = /Fetching\s+(\d+)\s+files:\s+(\d+)%/i;
 const MODEL_LOAD_PATTERN = /Generation model\s+(.+?)\s+will be loaded from/i;
@@ -105,11 +112,7 @@ export function resolveLatestDatasetPreparationChunkProgress(
     }
 
     for (const line of splitLogMessage(log.message).reverse()) {
-      const payload = parseJsonLogLine(line) as {
-        event?: string;
-        processedChunkCount?: number;
-        totalChunkCount?: number;
-      } | undefined;
+      const payload = parseJsonLogLine(line) as ParsedDatasetPreparationGenerationProgressEvent | undefined;
       if (payload?.event !== "runtime.dataset_preparation.generation.progress") {
         continue;
       }
