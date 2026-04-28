@@ -183,4 +183,41 @@ describe("desktop dataset preparation client", () => {
       "Artifact browse item is missing storageKey.",
     );
   });
+
+  it("normalizes transient transport errors from preload requests", async () => {
+    const hostWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
+    hostWindow.window ??= {} as Window & typeof globalThis;
+    hostWindow.window.desktopApi = {
+      uploadArtifact: async () => ({ ok: false }),
+      getArtifactUploadPolicy: async () => ({ ok: false }),
+      browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+      readArtifactDetail: async () => ({ ok: false }),
+      readArtifactContentDescriptor: async () => ({ ok: false }),
+      readArtifactViewerMedia: async () => ({ ok: false }),
+      publishArtifactToRepo: async () => ({ ok: false }),
+      verifyPublishedArtifactBacking: async () => ({ ok: false }),
+      registerArtifactFromRepo: async () => ({ ok: false }),
+      localizeArtifactFromRepo: async () => ({ ok: false }),
+      prepareTrainingDatasetFromArtifacts: async () => {
+        throw new TypeError("Failed to fetch");
+      },
+    };
+
+    const client = createDesktopDatasetPreparationClient();
+
+    await expect(client.prepareTrainingDatasetFromArtifacts({
+      sourceArtifactIds: ["artifact-1"],
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+        generation: {
+          mode: "qa",
+          model: { provider: "transformers", modelId: "google/flan-t5-base" },
+          promptTemplate: "Prompt: {{text}}",
+        },
+      },
+      split: { trainRatio: 0.8, testRatio: 0.2 },
+      output: { format: "jsonl" },
+    })).rejects.toThrow("fetch failed");
+  });
 });

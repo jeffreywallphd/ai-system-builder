@@ -4,6 +4,7 @@ import {
   type DesktopPreparedTrainingDatasetResult,
   type DesktopArtifactBrowseItem,
 } from "../../../lib/desktopApi";
+import { normalizeDatasetPreparationTransportError } from "../hooks/datasetPreparationTransport";
 
 interface PreloadResponseEnvelope {
   ok: boolean;
@@ -97,7 +98,12 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         };
       }
 
-      const response = await desktopApi.prepareTrainingDatasetFromArtifacts(input, context);
+      let response: unknown;
+      try {
+        response = await desktopApi.prepareTrainingDatasetFromArtifacts(input, context);
+      } catch (error) {
+        throw normalizeDatasetPreparationTransportError(error);
+      }
       if (!isPreloadResponseEnvelope(response)) {
         return {
           ok: false,

@@ -15,6 +15,10 @@ import {
   sawPythonRuntimeStartup,
 } from "./modelDownloadProgress";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
+import {
+  isTransientDatasetPreparationTransportError,
+  resolveUserFacingDatasetPreparationErrorMessage,
+} from "./datasetPreparationTransport";
 
 interface DatasetPreparationStatus {
   kind: "idle" | "loading" | "success" | "error";
@@ -206,29 +210,6 @@ function appendErrorDetailsMessage(message: string, details: Record<string, unkn
     .join(" | ");
   return suffix ? `${message} Details: ${suffix}.` : message;
 }
-
-function isTransientTransportDisconnectMessage(message: string): boolean {
-  const normalized = message.trim().toLowerCase();
-  return normalized === "failed to fetch"
-    || normalized === "fetch failed"
-    || normalized.includes("networkerror")
-    || normalized.includes("network request failed")
-    || normalized.includes("load failed");
-}
-
-function resolveUserFacingDatasetPreparationErrorMessage(error: unknown): string {
-  const fallbackMessage = "We lost connection while preparing the dataset. Re-run preparation if this persists.";
-  if (!(error instanceof Error)) {
-    return "Dataset preparation failed.";
-  }
-
-  if (isTransientTransportDisconnectMessage(error.message)) {
-    return fallbackMessage;
-  }
-
-  return error.message;
-}
-
 
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
@@ -538,6 +519,65 @@ export function useDatasetPreparationFeature(
     let progressReadInFlight = false;
     let runtimeTaskObserved = false;
     let recoveringProgressMonitor = false;
+    let progressTimer: number | undefined;
+
+    const stopProgressMonitoring = () => {
+      if (!preparationActive) {
+        return;
+      }
+      preparationActive = false;
+      if (typeof progressTimer === "number") {
+        window.clearInterval(progressTimer);
+      }
+      void refreshRuntimeModelStatus();
+    };
+
+    const applyRuntimeProgressSnapshot = (
+      snapshot: Awaited<ReturnType<NonNullable<typeof runtimeStatusClient>["readStatus"]>>,
+    ): void => {
+      if (!preparationActive) {
+        return;
+      }
+
+      recoveringProgressMonitor = false;
+      if (snapshot.activeTaskCount > 0) {
+        runtimeTaskObserved = true;
+      }
+
+      const chunkProgress = resolveLatestDatasetPreparationChunkProgress(snapshot, {
+        sinceEpochMs: progressStartedAtMs,
+      });
+      if (chunkProgress) {
+        setStatus({ kind: "loading", message: chunkProgress.message });
+        return;
+      }
+
+      const downloadProgress = resolveLatestModelDownloadProgress(snapshot, generationModelId, {
+        sinceEpochMs: progressStartedAtMs,
+      });
+      if (downloadProgress) {
+        setStatus({ kind: "loading", message: downloadProgress.message });
+        return;
+      }
+
+      const modelInMemoryMessage = resolveModelInMemoryLoadMessage(snapshot, generationModelId, {
+        sinceEpochMs: progressStartedAtMs,
+      });
+      if (modelInMemoryMessage) {
+        setStatus({ kind: "loading", message: modelInMemoryMessage });
+        return;
+      }
+
+      if ((snapshot.supervisorStatus === "starting" || sawPythonRuntimeStartup(snapshot, { sinceEpochMs: progressStartedAtMs }))) {
+        setStatus({ kind: "loading", message: "Starting Python runtime environment..." });
+        return;
+      }
+
+      if (huggingFaceDestinationEnabled && runtimeTaskObserved && snapshot.activeTaskCount === 0) {
+        setStatus({ kind: "loading", message: "Publishing to HuggingFace..." });
+      }
+    };
+
     const refreshModelDownloadProgress = async () => {
       if (!runtimeStatusClient || progressReadInFlight || !preparationActive) {
         return;
@@ -546,48 +586,7 @@ export function useDatasetPreparationFeature(
       progressReadInFlight = true;
       try {
         const snapshot = await runtimeStatusClient.readStatus();
-        if (!preparationActive) {
-          return;
-        }
-        recoveringProgressMonitor = false;
-
-        if (snapshot.activeTaskCount > 0) {
-          runtimeTaskObserved = true;
-        }
-
-        const chunkProgress = resolveLatestDatasetPreparationChunkProgress(snapshot, {
-          sinceEpochMs: progressStartedAtMs,
-        });
-        if (chunkProgress) {
-          setStatus({ kind: "loading", message: chunkProgress.message });
-          return;
-        }
-
-        const downloadProgress = resolveLatestModelDownloadProgress(snapshot, generationModelId, {
-          sinceEpochMs: progressStartedAtMs,
-        });
-        if (downloadProgress) {
-          setStatus({ kind: "loading", message: downloadProgress.message });
-          return;
-        }
-
-        const modelInMemoryMessage = resolveModelInMemoryLoadMessage(snapshot, generationModelId, {
-          sinceEpochMs: progressStartedAtMs,
-        });
-        if (modelInMemoryMessage) {
-          setStatus({ kind: "loading", message: modelInMemoryMessage });
-          return;
-        }
-
-        if ((snapshot.supervisorStatus === "starting" || sawPythonRuntimeStartup(snapshot, { sinceEpochMs: progressStartedAtMs }))) {
-          setStatus({ kind: "loading", message: "Starting Python runtime environment..." });
-          return;
-        }
-
-        if (huggingFaceDestinationEnabled && runtimeTaskObserved && snapshot.activeTaskCount === 0) {
-          setStatus({ kind: "loading", message: "Publishing to HuggingFace..." });
-          return;
-        }
+        applyRuntimeProgressSnapshot(snapshot);
       } catch {
         if (!preparationActive || recoveringProgressMonitor) {
           return;
@@ -603,9 +602,65 @@ export function useDatasetPreparationFeature(
     window.dispatchEvent(new CustomEvent("dataset-preparation-training-started"));
     setStatus({ kind: "loading", message: `Checking model ${generationModelId} before dataset preparation...` });
     void refreshModelDownloadProgress();
-    const progressTimer = window.setInterval(() => {
+    progressTimer = window.setInterval(() => {
       void refreshModelDownloadProgress();
     }, 750);
+
+    const monitorRuntimeTaskRecovery = async () => {
+      if (!runtimeStatusClient) {
+        stopProgressMonitoring();
+        return;
+      }
+
+      let consecutiveReadFailures = 0;
+      while (preparationActive) {
+        if (stopTrainingRequestedRef.current) {
+          setStatus({ kind: "idle", message: "Training stopped." });
+          stopProgressMonitoring();
+          return;
+        }
+
+        try {
+          const snapshot = await runtimeStatusClient.readStatus();
+          consecutiveReadFailures = 0;
+          applyRuntimeProgressSnapshot(snapshot);
+
+          if (runtimeTaskObserved && snapshot.activeTaskCount === 0) {
+            stopProgressMonitoring();
+            try {
+              await refreshArtifacts();
+              await refreshRuntimeModelStatus();
+              setStatus({
+                kind: "success",
+                message: "Dataset preparation completed in Python runtime after reconnecting. Artifacts were refreshed.",
+              });
+              onPrepared?.();
+            } catch {
+              setStatus({
+                kind: "success",
+                message: "Dataset preparation completed in Python runtime, but result transport was interrupted. Refresh artifacts to view the output.",
+              });
+            }
+            return;
+          }
+        } catch {
+          consecutiveReadFailures += 1;
+          setStatus({ kind: "loading", message: "Reconnecting to runtime progress monitor..." });
+          if (consecutiveReadFailures >= 5) {
+            stopProgressMonitoring();
+            setStatus({
+              kind: "error",
+              message: "Lost connection to dataset preparation progress. Task may still be running; refresh artifacts in a moment.",
+            });
+            return;
+          }
+        }
+
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 750);
+        });
+      }
+    };
 
     let response: Awaited<ReturnType<DesktopDatasetPreparationClient["prepareTrainingDatasetFromArtifacts"]>>;
     try {
@@ -616,7 +671,8 @@ export function useDatasetPreparationFeature(
     } catch (error) {
       if (stopTrainingRequestedRef.current) {
         setStatus({ kind: "idle", message: "Training stopped." });
-      } else if (runtimeStatusClient && error instanceof Error && isTransientTransportDisconnectMessage(error.message)) {
+        stopProgressMonitoring();
+      } else if (runtimeStatusClient && isTransientDatasetPreparationTransportError(error)) {
         setStatus({
           kind: "loading",
           message: "Connection to dataset preparation was interrupted. Reconnecting to runtime progress...",
@@ -628,21 +684,22 @@ export function useDatasetPreparationFeature(
               kind: "loading",
               message: "Dataset preparation is still running in the background. Tracking Python runtime progress...",
             });
+            runtimeTaskObserved = true;
+            await monitorRuntimeTaskRecovery();
             return;
           }
         } catch {
           // Runtime status probe is best-effort when the request transport fails.
         }
         setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
+        stopProgressMonitoring();
       } else {
         setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
+        stopProgressMonitoring();
       }
       return;
-    } finally {
-      preparationActive = false;
-      window.clearInterval(progressTimer);
-      void refreshRuntimeModelStatus();
     }
+    stopProgressMonitoring();
 
     if (response.ok === false) {
       setStatus(stopTrainingRequestedRef.current
