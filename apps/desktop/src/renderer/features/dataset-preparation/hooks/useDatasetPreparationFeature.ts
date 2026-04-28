@@ -118,6 +118,21 @@ function createDatasetPreparationRequestId(): string {
   return `dataset-preparation-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function appendErrorDetailsMessage(message: string, details: Record<string, unknown> | undefined): string {
+  if (!details) {
+    return message;
+  }
+
+  const reason = typeof details.reason === "string" ? details.reason : undefined;
+  const status = typeof details.providerStatusCode === "number" ? details.providerStatusCode : undefined;
+  const repository = typeof details.repository === "string" ? details.repository : undefined;
+  const pathInRepo = typeof details.pathInRepo === "string" ? details.pathInRepo : undefined;
+  const suffix = [reason, status ? `status ${status}` : undefined, repository, pathInRepo]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .join(" | ");
+  return suffix ? `${message} Details: ${suffix}.` : message;
+}
+
 
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
@@ -231,7 +246,6 @@ export function useDatasetPreparationFeature(
       const namespace = result.values.find((value) => value.key === "huggingface.defaultNamespace")?.value;
       if (typeof namespace === "string" && namespace.trim().length > 0) {
         setDefaultHuggingFaceNamespace(namespace.trim());
-        setHuggingFaceRepository((current) => (current.trim().length === 0 ? `${namespace.trim()}/` : current));
       }
     }).catch(() => {
       setStatusWarningMessage("Hugging Face namespace default could not be loaded.");
@@ -308,6 +322,7 @@ export function useDatasetPreparationFeature(
       localDestinationEnabled,
       huggingFaceDestinationEnabled,
       huggingFaceRepository,
+      defaultHuggingFaceNamespace,
     });
 
     if (validationResult.ok === false) {
@@ -348,6 +363,7 @@ export function useDatasetPreparationFeature(
       huggingFaceRepository,
       huggingFaceRevision,
       huggingFacePathPrefix,
+      defaultHuggingFaceNamespace,
       parsed: validationResult.parsed,
       resolvedDefault,
     });
@@ -442,7 +458,7 @@ export function useDatasetPreparationFeature(
     if (response.ok === false) {
       setStatus(stopTrainingRequestedRef.current
         ? { kind: "idle", message: "Training stopped." }
-        : { kind: "error", message: response.error.message });
+        : { kind: "error", message: appendErrorDetailsMessage(response.error.message, response.error.details) });
       return;
     }
 
@@ -482,6 +498,7 @@ export function useDatasetPreparationFeature(
     localDestinationEnabled,
     huggingFaceDestinationEnabled,
     huggingFaceRepository,
+    defaultHuggingFaceNamespace,
     huggingFaceRevision,
     huggingFacePathPrefix,
     datasetClient,

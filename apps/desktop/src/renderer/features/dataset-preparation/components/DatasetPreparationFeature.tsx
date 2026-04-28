@@ -368,13 +368,20 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
           {huggingFaceDestinationEnabled ? (
             <div className="ui-grid ui-grid--two">
               <label className="ui-stack ui-stack--sm">
-                <span>Hugging Face repository</span>
+                <span>Dataset repository name</span>
                 <input
                   className="ui-input"
                   value={huggingFaceRepository}
                   onChange={(event) => setHuggingFaceRepository(event.target.value)}
-                  placeholder={defaultHuggingFaceNamespace ? `${defaultHuggingFaceNamespace}/your-dataset-repo` : "owner/repository"}
+                  placeholder={defaultHuggingFaceNamespace ? "your-dataset-repo" : "owner/repository"}
                 />
+                {defaultHuggingFaceNamespace ? (
+                  <small className="ui-text-muted">
+                    Namespace: {defaultHuggingFaceNamespace} (publishes to {defaultHuggingFaceNamespace}/{huggingFaceRepository.trim() || "your-dataset-repo"}).
+                  </small>
+                ) : (
+                  <small className="ui-text-muted">Format: owner/repository.</small>
+                )}
               </label>
               <label className="ui-stack ui-stack--sm">
                 <span>Revision (optional)</span>

@@ -11,6 +11,7 @@ interface PreloadResponseEnvelope {
   error?: {
     code?: string;
     message?: string;
+    details?: Record<string, unknown>;
   };
 }
 
@@ -20,7 +21,7 @@ function isPreloadResponseEnvelope(value: unknown): value is PreloadResponseEnve
 
 export type DesktopDatasetPreparationResult =
   | { ok: true; value: DesktopPreparedTrainingDatasetResult }
-  | { ok: false; error: { code: string; message: string } };
+  | { ok: false; error: { code: string; message: string; details?: Record<string, unknown> } };
 
 export interface DesktopDatasetPreparationRequestContext {
   requestId?: string;
@@ -113,6 +114,7 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
           error: {
             code: response.error?.code ?? "internal",
             message: response.error?.message ?? "Dataset preparation failed.",
+            details: response.error?.details,
           },
         };
       }

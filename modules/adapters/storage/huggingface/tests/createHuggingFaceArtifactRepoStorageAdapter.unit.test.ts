@@ -222,6 +222,38 @@ describe("createHuggingFaceArtifactRepoStorageAdapter", () => {
     expect(unavailable.error.code).toBe("unavailable");
   });
 
+  it("includes publication diagnostics when storeArtifactInRepo fails unexpectedly", async () => {
+    const hubClient = createHubClientDouble();
+    hubClient.uploadFile = testDouble.fn(async () => {
+      throw new Error("socket timeout");
+    });
+
+    const adapter = createHuggingFaceArtifactRepoStorageAdapter({
+      hubClient,
+      accessToken: "token",
+    });
+
+    const result = await adapter.storeArtifactInRepo(
+      createStoreArtifactInRepoRequest(new Uint8Array([1, 2, 3]), {
+        target: {
+          provider: "huggingface",
+          repository: "OpenFinAL/AISysBuilderTest",
+          revision: "main",
+          path: "dataset.parquet",
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected failure.");
+    }
+    expect(result.error.details?.repository).toBe("OpenFinAL/AISysBuilderTest");
+    expect(result.error.details?.pathInRepo).toBe("dataset.parquet");
+    expect(result.error.details?.hasAccessToken).toBe(true);
+    expect(result.error.details?.contentSizeBytes).toBe(3);
+  });
+
   it("maps provider 401 without token to clear auth-required unavailable failure", async () => {
     const hubClient = createHubClientDouble();
     hubClient.fileExists = testDouble.fn(async () => {
