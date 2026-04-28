@@ -50,6 +50,12 @@ export interface DesktopPythonRuntimeLoadedModel {
   localPath?: string;
 }
 
+export interface DesktopSystemResourceUsage {
+  memoryUsagePercent: number;
+  cpuUsagePercent: number;
+  gpuUsagePercent: number;
+}
+
 export interface DesktopPythonRuntimeStatusPayload {
   supervisorStatus: DesktopPythonRuntimeSupervisorStatus;
   healthy: boolean;
@@ -58,6 +64,7 @@ export interface DesktopPythonRuntimeStatusPayload {
   logs: DesktopPythonRuntimeLogEntry[];
   loadedModels?: DesktopPythonRuntimeLoadedModel[];
   activeTaskCount?: number;
+  systemResources?: DesktopSystemResourceUsage;
 }
 
 export interface DesktopPythonRuntimeBoundaryContext {
@@ -125,6 +132,18 @@ function normalizeBoundary(
 function normalizeStatusPayload(
   payload: DesktopPythonRuntimeStatusPayload,
 ): DesktopPythonRuntimeStatusPayload {
+  const normalizedSystemResources = payload.systemResources
+    ? {
+      memoryUsagePercent: Number.isFinite(payload.systemResources.memoryUsagePercent) ? payload.systemResources.memoryUsagePercent : 0,
+      cpuUsagePercent: Number.isFinite(payload.systemResources.cpuUsagePercent) ? payload.systemResources.cpuUsagePercent : 0,
+      gpuUsagePercent: Number.isFinite(payload.systemResources.gpuUsagePercent) ? payload.systemResources.gpuUsagePercent : 0,
+    }
+    : {
+      memoryUsagePercent: 0,
+      cpuUsagePercent: 0,
+      gpuUsagePercent: 0,
+    };
+
   return {
     supervisorStatus: payload.supervisorStatus,
     healthy: payload.healthy,
@@ -144,6 +163,7 @@ function normalizeStatusPayload(
       localPath: model.localPath?.trim(),
     })),
     activeTaskCount: payload.activeTaskCount ?? 0,
+    systemResources: normalizedSystemResources,
   };
 }
 

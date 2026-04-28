@@ -8,6 +8,7 @@ export function PythonRuntimeFooter({ enabled, client }: PythonRuntimeFooterProp
     statusLabel,
     healthLabel,
     capabilitiesLabel,
+    systemResources,
     logs,
     loading,
     error,
@@ -41,6 +42,14 @@ export function PythonRuntimeFooter({ enabled, client }: PythonRuntimeFooterProp
       <p>
         Status: <strong>{statusLabel}</strong> | Health: <strong>{healthLabel}</strong> | Capabilities: {capabilitiesLabel}
       </p>
+      <section className="ui-python-runtime-footer__resources" aria-label="System resource tracker">
+        <h4 className="ui-python-runtime-footer__resources-title">System resources</h4>
+        <ul className="ui-python-runtime-footer__resource-list">
+          <li>Memory: <strong>{systemResources.memoryUsagePercent.toFixed(1)}%</strong></li>
+          <li>CPU: <strong>{systemResources.cpuUsagePercent.toFixed(1)}%</strong></li>
+          <li>GPU: <strong>{systemResources.gpuUsagePercent.toFixed(1)}%</strong></li>
+        </ul>
+      </section>
       {error ? <p role="alert">{error}</p> : null}
       <details className="ui-python-runtime-footer__logs" open={logsExpanded} onToggle={(event) => setLogsExpanded(event.currentTarget.open)}>
         <summary>Runtime activity log</summary>
