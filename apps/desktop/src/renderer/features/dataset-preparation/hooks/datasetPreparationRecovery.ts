@@ -12,6 +12,7 @@ interface ParsedRuntimeEvent {
 
 export interface MatchingDatasetPreparationTaskSnapshot {
   matchingTaskObserved: boolean;
+  matchingTaskProgressObserved: boolean;
   matchingTaskActive: boolean;
   terminalState?: RecoveryTerminalState;
   terminalMessage?: string;
@@ -57,8 +58,10 @@ export function identifyMatchingDatasetPreparationTask(
   options: { requestId: string; sinceEpochMs?: number },
 ): MatchingDatasetPreparationTaskSnapshot {
   let matchingTaskObserved = false;
+  let matchingTaskProgressObserved = false;
   let terminalState: RecoveryTerminalState | undefined;
   let terminalMessage: string | undefined;
+  let sawMatchingTaskStarted = false;
 
   for (const log of snapshot.logs) {
     if (typeof options.sinceEpochMs === "number") {
@@ -80,6 +83,12 @@ export function identifyMatchingDatasetPreparationTask(
       }
 
       matchingTaskObserved = true;
+      if (payload.event === "runtime.dataset_preparation.generation.progress") {
+        matchingTaskProgressObserved = true;
+      }
+      if (payload.event === "runtime.dataset_preparation.task.started") {
+        sawMatchingTaskStarted = true;
+      }
       const terminal = parseTerminalStateFromEvent(payload);
       if (terminal.state) {
         terminalState = terminal.state;
@@ -88,9 +97,14 @@ export function identifyMatchingDatasetPreparationTask(
     }
   }
 
-  const matchingTaskActive = matchingTaskObserved && !terminalState && snapshot.activeTaskCount > 0;
+  const matchingTaskActive = !terminalState && (
+    (matchingTaskObserved && snapshot.activeTaskCount > 0)
+    || matchingTaskProgressObserved
+    || sawMatchingTaskStarted
+  );
   return {
     matchingTaskObserved,
+    matchingTaskProgressObserved,
     matchingTaskActive,
     terminalState,
     terminalMessage,
@@ -99,12 +113,16 @@ export function identifyMatchingDatasetPreparationTask(
 
 export function classifyRecoveredDatasetPreparationCompletion(
   match: MatchingDatasetPreparationTaskSnapshot,
-): "succeeded" | "failed" | "stopped" | "unknown" | "still-running" | "unrelated-runtime-task" {
+  options: { withinGracePeriod?: boolean } = {},
+): "succeeded" | "failed" | "stopped" | "unknown" | "still-running" | "waiting-for-matching-task" | "unrelated-runtime-task" {
   if (match.terminalState) {
     return match.terminalState;
   }
   if (match.matchingTaskActive) {
     return "still-running";
+  }
+  if (options.withinGracePeriod) {
+    return "waiting-for-matching-task";
   }
   if (match.matchingTaskObserved) {
     return "unknown";
