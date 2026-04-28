@@ -192,6 +192,98 @@ describe("DatasetPreparationFeature", () => {
     expect(container.textContent).toContain("failed");
   });
 
+  it("uses default Hugging Face namespace when only dataset repository name is provided", async () => {
+    settingsClient.readSettings.mockResolvedValueOnce({
+      values: [{ key: "huggingface.defaultNamespace", value: "OpenFinAL" }],
+    });
+    const prepareTrainingDatasetFromArtifacts = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        outputs: {},
+        provenance: {
+          sourceArtifactIds: ["artifact-1"],
+          recipe: {
+            normalization: { targetFormat: "markdown" },
+            chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+            generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } },
+          },
+          split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true },
+          output: { format: "parquet" },
+          generationModelId: "google/flan-t5-base",
+          summary: {
+            sourceDocumentCount: 1,
+            normalizedDocumentCount: 1,
+            skippedDocumentCount: 0,
+            chunkCount: 1,
+            generatedExampleCount: 1,
+            datasetRowCount: 1,
+            trainRowCount: 1,
+            testRowCount: 0,
+          },
+        },
+        summary: {
+          sourceDocumentCount: 1,
+          normalizedDocumentCount: 1,
+          skippedDocumentCount: 0,
+          chunkCount: 1,
+          generatedExampleCount: 1,
+          datasetRowCount: 1,
+          trainRowCount: 1,
+          testRowCount: 0,
+        },
+      },
+    });
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          settingsClient={settingsClient}
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+            prepareTrainingDatasetFromArtifacts,
+          }}
+        />,
+      );
+    });
+
+    const sourceCheckbox = container.querySelector("input[type='checkbox']") as HTMLInputElement;
+    await act(async () => {
+      sourceCheckbox.click();
+    });
+
+    const publishCheckbox = Array.from(container.querySelectorAll("input[type='checkbox']"))
+      .find((input) => (input.parentElement?.textContent ?? "").includes("Publish to Hugging Face")) as HTMLInputElement;
+    await act(async () => {
+      publishCheckbox.click();
+    });
+
+    const repositoryInput = container.querySelector("input[placeholder='your-dataset-repo']") as HTMLInputElement;
+    await act(async () => {
+      repositoryInput.value = "AISysBuilderTest";
+      repositoryInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const form = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(container.textContent).toContain("Namespace: OpenFinAL");
+    expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.objectContaining({
+      output: expect.objectContaining({
+        destinations: expect.objectContaining({
+          huggingFace: expect.objectContaining({
+            repository: "OpenFinAL/AISysBuilderTest",
+          }),
+        }),
+      }),
+    }), expect.any(Object));
+  });
+
   it("shows model download progress from Python runtime logs while preparation is running", async () => {
     let resolvePreparation: ((value: { ok: true; value: any }) => void) | undefined;
     const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {

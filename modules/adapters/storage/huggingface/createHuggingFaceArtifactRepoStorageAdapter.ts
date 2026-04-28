@@ -387,10 +387,12 @@ function mapUnexpectedHubError(
   operation: HuggingFaceOperation,
   error: unknown,
   accessToken: string | undefined,
+  diagnostics?: Record<string, unknown>,
 ) {
   if (error instanceof HuggingFaceHubClientUnavailableError) {
     return createContractError("unavailable", error.message, {
       details: {
+        ...diagnostics,
         reason: error.message,
       },
     });
@@ -399,6 +401,7 @@ function mapUnexpectedHubError(
   if (error instanceof HuggingFaceAdapterValidationError) {
     return createContractError("validation", `Hugging Face ${operation} failed unexpectedly.`, {
       details: {
+        ...diagnostics,
         reason: error.message,
       },
     });
@@ -434,6 +437,7 @@ function mapUnexpectedHubError(
 
   return createContractError("internal", `Hugging Face ${operation} failed unexpectedly.`, {
     details: {
+      ...diagnostics,
       reason: error instanceof Error ? error.message : String(error),
     },
   });
@@ -617,7 +621,18 @@ export function createHuggingFaceArtifactRepoStorageAdapter(
       );
     } catch (error) {
       return createStoreArtifactInRepoFailureResult(
-        mapUnexpectedHubError("storeArtifactInRepo", error, getAccessToken()),
+        mapUnexpectedHubError(
+          "storeArtifactInRepo",
+          error,
+          getAccessToken(),
+          {
+            repository: request.target.repository,
+            pathInRepo: request.target.path,
+            revision: request.target.revision,
+            hasAccessToken: Boolean(getAccessToken()?.trim()),
+            contentSizeBytes: request.content.byteLength,
+          },
+        ),
         requestContext,
       );
     }
