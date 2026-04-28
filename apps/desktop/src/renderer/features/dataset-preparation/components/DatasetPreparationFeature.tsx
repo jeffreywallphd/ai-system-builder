@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   type DesktopDatasetPreparationClient,
@@ -97,14 +97,23 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
   });
   const [showModelOverrides, setShowModelOverrides] = useState(false);
   const [showHuggingFaceDefaults, setShowHuggingFaceDefaults] = useState(false);
+  const formLocked = status.kind === "loading";
   const showUploadedArtifacts = selectedArtifactStorageFilter !== "generated";
   const showGeneratedArtifacts = selectedArtifactStorageFilter !== "uploaded";
+
+  useEffect(() => {
+    if (formLocked) {
+      setShowModelOverrides(false);
+      setShowHuggingFaceDefaults(false);
+    }
+  }, [formLocked]);
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <h2 className="ui-panel__title">Dataset Preparation</h2>
       <p>Prepare training datasets from selected artifacts.</p>
       <form className="ui-stack ui-stack--sm" onSubmit={(event) => void onSubmit(event)}>
+        <fieldset className="ui-stack ui-stack--sm" disabled={formLocked}>
         <section className="ui-stack ui-stack--sm">
           <h3>Source artifacts</h3>
           <label className="ui-stack ui-stack--sm">
@@ -398,6 +407,7 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
         <button className="ui-button" type="submit" disabled={selectedArtifactIds.length === 0 || status.kind === "loading"}>
           {status.kind === "loading" ? "Preparing..." : "Prepare training dataset"}
         </button>
+        </fieldset>
         {status.kind === "loading" ? (
           <button className="ui-button" type="button" onClick={() => void onStopTraining()} disabled={stopTrainingInFlight}>
             {stopTrainingInFlight ? "Stopping training..." : "Stop training"}
