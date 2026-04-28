@@ -102,18 +102,39 @@ function readCpuUsagePercent(): number {
     return 0;
   }
 
-  let idle = 0;
-  let total = 0;
+  let idleTotal = 0;
+  let activeTotal = 0;
   for (const entry of cpuEntries) {
-    idle += entry.times.idle;
-    total += entry.times.user + entry.times.nice + entry.times.sys + entry.times.idle + entry.times.irq;
+    const entryIdle = entry.times.idle;
+    const entryActive = entry.times.user + entry.times.nice + entry.times.sys + entry.times.irq;
+    idleTotal += entryIdle;
+    activeTotal += entryActive;
   }
 
+  const total = idleTotal + activeTotal;
   if (total <= 0) {
     return 0;
   }
 
-  return clampPercent(((total - idle) / total) * 100);
+  const previous = (readCpuUsagePercent as typeof readCpuUsagePercent & {
+    previousSample?: { idleTotal: number; activeTotal: number };
+  }).previousSample;
+  (readCpuUsagePercent as typeof readCpuUsagePercent & {
+    previousSample?: { idleTotal: number; activeTotal: number };
+  }).previousSample = { idleTotal, activeTotal };
+
+  if (!previous) {
+    return clampPercent((activeTotal / total) * 100);
+  }
+
+  const idleDelta = idleTotal - previous.idleTotal;
+  const activeDelta = activeTotal - previous.activeTotal;
+  const totalDelta = idleDelta + activeDelta;
+  if (totalDelta <= 0) {
+    return 0;
+  }
+
+  return clampPercent((activeDelta / totalDelta) * 100);
 }
 
 function readGpuUsagePercent(): number {
@@ -132,7 +153,7 @@ function readGpuUsagePercent(): number {
   }
 
   const percentages = lines
-    .map((line) => Number.parseFloat(line))
+    .map((line) => Number.parseFloat(line.replace("%", "").trim()))
     .filter((value) => Number.isFinite(value));
   if (percentages.length === 0) {
     return 0;
