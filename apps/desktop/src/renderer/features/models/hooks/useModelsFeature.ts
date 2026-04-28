@@ -74,6 +74,25 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     }
   }, [browseLimit, browseQuery, browseTaskTag, modelClient]);
 
+  const loadPopularModels = useCallback(async () => {
+    setBrowseState({ status: "loading", message: "Loading popular models..." });
+    try {
+      const result = await modelClient.browseModels({
+        provider: "huggingface",
+        limit: normalizeOptionalNumber(browseLimit),
+        sort: "downloads",
+        direction: "desc",
+      });
+      setBrowseItems(result.models);
+      setSelectedBrowseModel(undefined);
+      setSelectedBrowseModelDetails(undefined);
+      setDetailsState({ status: "idle" });
+      setBrowseState({ status: "success", message: result.models.length > 0 ? "Loaded popular models." : "No popular models available right now." });
+    } catch (error) {
+      setBrowseState({ status: "error", message: error instanceof Error ? error.message : "Failed to load popular models." });
+    }
+  }, [browseLimit, modelClient]);
+
   const selectBrowseModel = useCallback(async (model: DesktopModelBrowseItem) => {
     setSelectedBrowseModel(model);
     setSelectedBrowseModelDetails(undefined);
@@ -136,6 +155,10 @@ export function useModelsFeature(client?: DesktopModelsClient) {
   useEffect(() => {
     void refreshModels();
   }, [refreshModels]);
+
+  useEffect(() => {
+    void loadPopularModels();
+  }, [loadPopularModels]);
 
   const downloadModel = useCallback(async (model?: DesktopModelBrowseItem) => {
     const modelToDownload = model ?? selectedBrowseModel;
