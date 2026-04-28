@@ -160,6 +160,13 @@ describe("ModelsFeature", () => {
       await flushUi();
     });
 
+    expect(client.browseModels).toHaveBeenCalledWith({
+      provider: "huggingface",
+      limit: 25,
+      sort: "downloads",
+      direction: "desc",
+    });
+
     const searchButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Search Models") as HTMLButtonElement;
     await act(async () => {
       searchButton.dispatchEvent(new Event("click", { bubbles: true }));
@@ -198,7 +205,7 @@ describe("ModelsFeature", () => {
       await flushUi();
     });
 
-    expect(client.browseModels).toHaveBeenCalledTimes(2);
+    expect(client.browseModels).toHaveBeenCalledTimes(3);
   });
 
   it("renders train form content through dedicated training flow", async () => {
