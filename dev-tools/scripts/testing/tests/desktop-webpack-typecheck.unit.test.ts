@@ -269,4 +269,40 @@ describe("desktop webpack typecheck", () => {
       `Expected no TypeScript diagnostics for desktop artifact browser renderer media surfaces.\n${diagnostics.map(formatDiagnostic).join("\n")}`,
     );
   });
+
+  it("typechecks the desktop dataset preparation progress hook under desktop webpack tsconfig", () => {
+    const repoRoot = process.cwd();
+    const configPath = path.resolve(repoRoot, "apps/desktop/tsconfig.webpack.json");
+    const targetFile = path.resolve(
+      repoRoot,
+      "apps/desktop/src/renderer/features/dataset-preparation/hooks/modelDownloadProgress.ts",
+    );
+
+    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (configFile.error) {
+      assert.fail(formatDiagnostic(configFile.error));
+    }
+
+    const parsedConfig = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      path.dirname(configPath),
+      { noEmit: true },
+      configPath,
+    );
+
+    const program = ts.createProgram({
+      rootNames: [targetFile],
+      options: parsedConfig.options,
+    });
+    const diagnostics = ts
+      .getPreEmitDiagnostics(program)
+      .filter((diagnostic) => diagnostic.file?.fileName === targetFile);
+
+    assert.deepEqual(
+      diagnostics,
+      [],
+      `Expected no TypeScript diagnostics for desktop dataset preparation progress hook.\n${diagnostics.map(formatDiagnostic).join("\n")}`,
+    );
+  });
 });
