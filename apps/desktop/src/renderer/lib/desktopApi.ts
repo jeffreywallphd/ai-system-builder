@@ -303,6 +303,10 @@ export interface DesktopDatasetPreparationApi {
     input: { requestId: string },
     context?: DesktopBridgeRequestContext,
   ) => Promise<unknown>;
+  cancelPrepareTrainingDatasetTask?: (
+    input: { requestId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
 }
 
 export interface DesktopPythonRuntimeApi {
@@ -329,6 +333,7 @@ interface DesktopApiBridge {
   }) => Promise<unknown>;
   startPrepareTrainingDataset?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
