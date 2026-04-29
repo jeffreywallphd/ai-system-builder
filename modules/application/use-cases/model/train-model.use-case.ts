@@ -66,23 +66,22 @@ export class TrainModelUseCase {
     } catch {
       // Power blocker startup failures must not fail model training.
     }
-    let lifecycleRequestId = tentativeRunId;
+    const blockerRequestId = tentativeRunId;
     let terminalStatus: ModelTrainingResult["status"] | undefined;
     let trainingResult: ModelTrainingResult;
     try {
       trainingResult = normalizeModelTrainingResult(await this.dependencies.modelTraining.trainModel(normalizedRequest));
-      lifecycleRequestId = trainingResult.runId || tentativeRunId;
       terminalStatus = trainingResult.status;
     } finally {
       if (terminalStatus === "succeeded" || terminalStatus === "failed" || terminalStatus === "cancelled") {
         try {
-          await this.dependencies.taskPowerLifecycle.completeTask(lifecycleRequestId, terminalStatus);
+          await this.dependencies.taskPowerLifecycle.completeTask(blockerRequestId, terminalStatus);
         } catch {
           // Power blocker teardown failures must not fail model training.
         }
       } else {
         try {
-          await this.dependencies.taskPowerLifecycle.completeTask(lifecycleRequestId, "unknown");
+          await this.dependencies.taskPowerLifecycle.completeTask(blockerRequestId, "unknown");
         } catch {
           // Power blocker teardown failures must not fail model training.
         }

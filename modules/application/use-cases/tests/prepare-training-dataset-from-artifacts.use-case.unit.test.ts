@@ -68,4 +68,41 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     await useCase.readPrepareTrainingDataset("r1");
     expect(lifecycle.completeTask).toHaveBeenCalledWith("r1", "failed");
   });
+
+  it("returns success when lifecycle start fails and keeps runtime dir until terminal cleanup", async () => {
+    const lifecycle: TaskPowerLifecyclePort = {
+      startTask: testDouble.fn(async () => { throw new Error("no blocker"); }),
+      completeTask: testDouble.fn(async () => undefined),
+    };
+    const outputDir = await mkdtemp(join(tmpdir(), "tmp-"));
+    const outputPath = join(outputDir, "d.jsonl");
+    await writeFile(outputPath, `{"x":1}\n`);
+    let runtimeDir = "";
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: {
+        startPrepareTrainingDataset: testDouble.fn(async (req: any) => {
+          runtimeDir = req.runtime.runtimeWorkingDirectory;
+          return { requestId: "r1", taskType: "prepare-training-dataset", accepted: true, status: "queued" };
+        }),
+        readPrepareTrainingDatasetStatus: testDouble.fn(async () => ({
+          requestId: "r1",
+          taskType: "prepare-training-dataset",
+          status: "failed",
+          error: { code: "failed", message: "boom" },
+        })),
+      },
+      storageBindings: { readArtifactStorageBindings: testDouble.fn(async () => ({ ok: true, value: { bindings: [] } })), upsertArtifactStorageBinding: testDouble.fn(), deleteArtifactStorageBindings: testDouble.fn() },
+      storage: { retrieveArtifact: testDouble.fn(async () => ({ ok: true, value: { descriptor: { key: "a1", mediaType: "text/markdown", metadata: {} }, content: new TextEncoder().encode("hi") } })), storeArtifact: testDouble.fn(), hasArtifact: testDouble.fn(), deleteArtifact: testDouble.fn() },
+      taskPowerLifecycle: lifecycle,
+    });
+
+    const started = await useCase.startPrepareTrainingDataset(command);
+    expect(started.ok).toBe(true);
+    expect(await exists(runtimeDir)).toBe(true);
+
+    const status = await useCase.readPrepareTrainingDataset("r1");
+    expect(status.ok).toBe(true);
+    expect(await exists(runtimeDir)).toBe(false);
+    await rm(outputDir, { recursive: true, force: true });
+  });
 });

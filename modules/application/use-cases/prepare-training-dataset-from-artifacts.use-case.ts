@@ -368,7 +368,11 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       }
       this.runtimeWorkingDirsByRequestId.set(started.requestId, staged.value.runtimeWorkingDir);
       this.commandByRequestId.set(started.requestId, command);
-      await this.taskPowerLifecycle.startTask(started.requestId, TaskType.DATASET_PREPARATION);
+      try {
+        await this.taskPowerLifecycle.startTask(started.requestId, TaskType.DATASET_PREPARATION);
+      } catch {
+        // Blocker startup failures must not fail dataset preparation.
+      }
       return createSuccessResult(started, context);
     } catch (error) {
       await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
