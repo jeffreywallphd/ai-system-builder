@@ -98,3 +98,9 @@ Python never writes directly to the artifact catalog.
 - distributed execution
 - batching
 - streaming outputs
+
+## Runtime Task Lifecycle Update (2026-04-29)
+
+- Long-running Python runtime operations must use a **start + poll** lifecycle (`startTask`, `readTaskStatus`, `cancelTask`) instead of holding a single HTTP request open until completion.
+- Long-held HTTP responses are unsafe for dataset preparation/model-training durations because transport intermediaries and host request chains can disconnect before work finishes.
+- The async task lifecycle is being introduced incrementally: this step adds contract and TypeScript runtime-client/protocol support before worker and UI migration.

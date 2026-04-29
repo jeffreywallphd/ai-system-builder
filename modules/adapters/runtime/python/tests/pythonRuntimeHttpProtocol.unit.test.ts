@@ -1,8 +1,12 @@
 import { describe, expect, it } from "../../../../testing/node-test";
 
 import {
+  mapCancelTaskResponse,
   mapCapabilitiesResponseFromHttpPayload,
   mapHealthResponseFromHttpPayload,
+  mapStartTaskRequest,
+  mapStartTaskResponse,
+  mapTaskStatusResponse,
   mapTaskRequestToHttpPayload,
   mapTaskResponseFromHttpPayload,
 } from "../protocol/pythonRuntimeHttpProtocol";
@@ -91,5 +95,49 @@ describe("pythonRuntimeHttpProtocol", () => {
     expect(() => mapTaskResponseFromHttpPayload({ requestId: "id", taskType: "t", success: true, metadata: [] })).toThrow(
       "metadata: expected object payload",
     );
+  });
+
+  it("maps async start-task request/response payloads", () => {
+    const mappedRequest = mapStartTaskRequest({
+      requestId: "task-1",
+      taskType: "prepare-training-dataset",
+      payload: { source: "a" },
+      metadata: { source: "desktop" },
+    });
+    expect(mappedRequest.requestId).toBe("task-1");
+
+    const result = mapStartTaskResponse({
+      requestId: "task-1",
+      taskType: "prepare-training-dataset",
+      status: "running",
+    });
+    expect(result.accepted).toBe(true);
+    expect(result.status).toBe("running");
+  });
+
+  it("maps task status payloads for running/succeeded/failed states", () => {
+    expect(mapTaskStatusResponse({ requestId: "task-1", status: "running" }).status).toBe("running");
+    expect(mapTaskStatusResponse({ requestId: "task-1", status: "succeeded", data: { rows: 10 } }).status).toBe("succeeded");
+    const failed = mapTaskStatusResponse({
+      requestId: "task-1",
+      status: "failed",
+      error: { code: "runtime_failed", message: "boom" },
+    });
+    expect(failed.status).toBe("failed");
+    expect(failed.error?.code).toBe("runtime_failed");
+  });
+
+  it("maps cancel payloads and normalizes invalid statuses to unknown", () => {
+    const result = mapCancelTaskResponse({
+      requestId: "task-1",
+      status: "cancelled",
+      cancelled: true,
+      message: "Cancelled.",
+    });
+    expect(result.cancelled).toBe(true);
+    expect(result.status).toBe("cancelled");
+
+    const normalized = mapTaskStatusResponse({ requestId: "task-1", status: 123 });
+    expect(normalized.status).toBe("unknown");
   });
 });

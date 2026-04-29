@@ -555,3 +555,45 @@ describe("train-model runtime contracts", () => {
     expect(result.error?.code).toBe("unsupported_method");
   });
 });
+
+describe("python runtime async task contracts", () => {
+  it("defines start-task request/result and status/cancel result shapes", () => {
+    const startRequest: import(".").StartPythonRuntimeTaskRequest = {
+      requestId: "task-1",
+      taskType: "prepare-training-dataset",
+      payload: { sourceArtifactId: "artifact-1" },
+      metadata: { source: "desktop" },
+      timeoutMs: 30_000,
+    };
+    const startResult: import(".").StartPythonRuntimeTaskResult = {
+      requestId: "task-1",
+      taskType: "prepare-training-dataset",
+      accepted: true,
+      status: "queued",
+    };
+    const statusResult: import(".").PythonRuntimeTaskStatusResult = {
+      requestId: "task-1",
+      status: "running",
+      progress: { completedSteps: 1 },
+    };
+    const cancelResult: import(".").CancelPythonRuntimeTaskResult = {
+      requestId: "task-1",
+      status: "cancelled",
+      cancelled: true,
+    };
+
+    expect(startRequest.requestId).toBe("task-1");
+    expect(startResult.accepted).toBe(true);
+    expect(statusResult.status).toBe("running");
+    expect(cancelResult.cancelled).toBe(true);
+  });
+
+  it("enforces required async contract fields at compile time", () => {
+    // @ts-expect-error requestId is required.
+    const invalidStartRequest: import(".").StartPythonRuntimeTaskRequest = { taskType: "x", payload: {} };
+    // @ts-expect-error cancelled is required.
+    const invalidCancelResult: import(".").CancelPythonRuntimeTaskResult = { requestId: "x", status: "unknown" };
+    expect(invalidStartRequest).toBeDefined();
+    expect(invalidCancelResult).toBeDefined();
+  });
+});

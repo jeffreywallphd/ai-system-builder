@@ -1,16 +1,24 @@
 import type {
+  CancelPythonRuntimeTaskResult,
+  PythonRuntimeTaskStatusResult,
   PythonRuntimeCapabilitiesResult,
   PythonRuntimeHealthCheckResult,
   PythonRuntimeModelStatusResult,
+  StartPythonRuntimeTaskRequest,
+  StartPythonRuntimeTaskResult,
   PythonRuntimeTaskRequest,
   PythonRuntimeTaskResult,
   PythonRuntimeUnloadModelsResult,
 } from "../../../../contracts/runtime";
 
 import {
+  mapCancelTaskResponse,
   mapCapabilitiesResponseFromHttpPayload,
   mapHealthResponseFromHttpPayload,
   mapModelStatusResponseFromHttpPayload,
+  mapStartTaskRequest,
+  mapStartTaskResponse,
+  mapTaskStatusResponse,
   mapTaskRequestToHttpPayload,
   mapTaskResponseFromHttpPayload,
   mapUnloadModelsResponseFromHttpPayload,
@@ -28,6 +36,9 @@ export interface PythonRuntimeHttpClient {
   }>;
   getModelStatus(): Promise<PythonRuntimeModelStatusResult>;
   unloadModels(): Promise<PythonRuntimeUnloadModelsResult>;
+  startTask(request: StartPythonRuntimeTaskRequest): Promise<StartPythonRuntimeTaskResult>;
+  readTaskStatus(requestId: string): Promise<PythonRuntimeTaskStatusResult>;
+  cancelTask(requestId: string): Promise<CancelPythonRuntimeTaskResult>;
   executeTask(request: PythonRuntimeTaskRequest): Promise<PythonRuntimeTaskResult>;
 }
 
@@ -166,6 +177,32 @@ export function createPythonRuntimeHttpClient(
       }
 
       return mapRuntimeResponsePayload("/models/unload", response, payload, mapUnloadModelsResponseFromHttpPayload);
+    },
+    async startTask(request: StartPythonRuntimeTaskRequest) {
+      const response = await fetcher(`${baseUrl}/tasks/start`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(mapStartTaskRequest(request)),
+      });
+      const payload = await parseJsonResponseSafe(response);
+      return mapRuntimeResponsePayload("/tasks/start", response, payload, mapStartTaskResponse);
+    },
+    async readTaskStatus(requestId: string) {
+      const response = await fetcher(`${baseUrl}/tasks/${encodeURIComponent(requestId)}`, { method: "GET" });
+      const payload = await parseJsonResponseSafe(response);
+      return mapRuntimeResponsePayload(`/tasks/${requestId}`, response, payload, mapTaskStatusResponse);
+    },
+    async cancelTask(requestId: string) {
+      const response = await fetcher(`${baseUrl}/tasks/${encodeURIComponent(requestId)}/cancel`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+      const payload = await parseJsonResponseSafe(response);
+      return mapRuntimeResponsePayload(`/tasks/${requestId}/cancel`, response, payload, mapCancelTaskResponse);
     },
 
     async executeTask(request: PythonRuntimeTaskRequest) {

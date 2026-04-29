@@ -59,6 +59,66 @@ describe("createPythonRuntimeHttpClient", () => {
     expect(fetchImplementation).toHaveBeenCalledTimes(3);
   });
 
+  it("supports async task lifecycle endpoints over local HTTP", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/tasks/start")) {
+        expect(init?.method).toBe("POST");
+        expect(init?.headers).toMatchObject({ "content-type": "application/json" });
+        return new Response(JSON.stringify({
+          requestId: "task-async-1",
+          taskType: "prepare-training-dataset",
+          status: "queued",
+        }), { status: 202 });
+      }
+      if (url.endsWith("/tasks/task-async-1")) {
+        expect(init?.method).toBe("GET");
+        return new Response(JSON.stringify({
+          requestId: "task-async-1",
+          status: "running",
+          progress: { completedSteps: 1 },
+        }), { status: 200 });
+      }
+      expect(url.endsWith("/tasks/task-async-1/cancel")).toBe(true);
+      expect(init?.method).toBe("POST");
+      return new Response(JSON.stringify({
+        requestId: "task-async-1",
+        status: "cancelled",
+        cancelled: true,
+      }), { status: 200 });
+    });
+
+    const client = createPythonRuntimeHttpClient({ baseUrl: "http://127.0.0.1:43111", fetchImplementation });
+    const started = await client.startTask({
+      requestId: "task-async-1",
+      taskType: "prepare-training-dataset",
+      payload: {},
+    });
+    const status = await client.readTaskStatus("task-async-1");
+    const cancelled = await client.cancelTask("task-async-1");
+
+    expect(started.status).toBe("queued");
+    expect(status.status).toBe("running");
+    expect(cancelled.cancelled).toBe(true);
+    expect(fetchImplementation).toHaveBeenCalledTimes(3);
+  });
+
+  it("preserves error handling for async lifecycle endpoints", async () => {
+    const fetchImplementation = testDouble.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/tasks/start")) {
+        return new Response("bad gateway", { status: 502 });
+      }
+      if (url.endsWith("/tasks/missing")) {
+        return new Response(JSON.stringify({ foo: "bar" }), { status: 404 });
+      }
+      return new Response(JSON.stringify({ requestId: "x", status: "running" }), { status: 200 });
+    });
+    const client = createPythonRuntimeHttpClient({ baseUrl: "http://127.0.0.1:43111", fetchImplementation });
+    await expect(client.startTask({ requestId: "x", taskType: "t", payload: {} })).rejects.toThrow("invalid JSON response body");
+    await expect(client.readTaskStatus("missing")).rejects.toThrow("invalid structured payload");
+  });
+
   it("supports ensure-model-downloaded endpoint over local HTTP", async () => {
     const fetchImplementation = testDouble.fn<typeof fetch>(async (input, init) => {
       const url = String(input);
