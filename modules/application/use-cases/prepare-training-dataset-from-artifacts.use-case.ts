@@ -18,6 +18,7 @@ import type {
   DatasetPreparationSummary,
   DatasetPreparationWarning,
   PrepareTrainingDatasetRequest,
+  PythonRuntimeTaskStatusResult,
 } from "../../contracts/runtime";
 
 import type { ApplicationRequestContext } from "../ports";
@@ -296,6 +297,39 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     this.artifactRepoStorage = dependencies.artifactRepoStorage;
     this.artifactCatalog = dependencies.artifactCatalog;
     this.now = dependencies.now ?? (() => new Date().toISOString());
+  }
+
+  public async startPrepareTrainingDataset(
+    command: PrepareTrainingDatasetFromArtifactsCommand,
+    context?: ApplicationRequestContext,
+  ): Promise<ContractResult<{ requestId: string }>> {
+    const runtimeRequest: PrepareTrainingDatasetRequest = {
+      sourceInputs: [],
+      recipe: command.recipe,
+      split: command.split,
+      output: command.output,
+    };
+
+    const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
+    return createSuccessResult(started, context);
+  }
+
+  public async readPrepareTrainingDataset(
+    requestId: string,
+    context?: ApplicationRequestContext,
+  ): Promise<ContractResult<PythonRuntimeTaskStatusResult>> {
+    try {
+      const status = await this.datasetPreparation.readPrepareTrainingDatasetStatus(requestId);
+      return createSuccessResult(status, context);
+    } catch (error) {
+      if (error instanceof PythonDatasetPreparationError) {
+        return createFailureResult(error.contractError, context);
+      }
+      return createFailureResult(
+        createContractError("internal", error instanceof Error ? error.message : "Failed to read dataset preparation status."),
+        context,
+      );
+    }
   }
 
   public async execute(

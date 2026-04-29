@@ -33,6 +33,9 @@ describe("createPythonDatasetPreparationPort", () => {
 
     const adapter = createPythonDatasetPreparationPort({
       executeTask,
+      startTask: async () => ({ requestId: "req", accepted: true, status: "queued" }),
+      readTaskStatus: async () => ({ requestId: "req", status: "running" }),
+      cancelTask: async () => ({ requestId: "req", status: "running", cancelled: false }),
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded,
@@ -103,6 +106,9 @@ describe("createPythonDatasetPreparationPort", () => {
     }));
     const adapter = createPythonDatasetPreparationPort({
       executeTask,
+      startTask: async () => ({ requestId: "req", accepted: true, status: "queued" }),
+      readTaskStatus: async () => ({ requestId: "req", status: "running" }),
+      cancelTask: async () => ({ requestId: "req", status: "running", cancelled: false }),
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
@@ -165,6 +171,9 @@ describe("createPythonDatasetPreparationPort", () => {
 
     const adapter = createPythonDatasetPreparationPort({
       executeTask,
+      startTask: async () => ({ requestId: "req", accepted: true, status: "queued" }),
+      readTaskStatus: async () => ({ requestId: "req", status: "running" }),
+      cancelTask: async () => ({ requestId: "req", status: "running", cancelled: false }),
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded,
@@ -255,6 +264,9 @@ describe("createPythonDatasetPreparationPort", () => {
     }));
     const adapter = createPythonDatasetPreparationPort({
       executeTask,
+      startTask: async () => ({ requestId: "req", accepted: true, status: "queued" }),
+      readTaskStatus: async () => ({ requestId: "req", status: "running" }),
+      cancelTask: async () => ({ requestId: "req", status: "running", cancelled: false }),
       getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
       getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
       ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "test-model", downloaded: false, fromCache: true }),
@@ -393,4 +405,22 @@ describe("createPythonDatasetPreparationPort", () => {
       output: { format: "jsonl" },
     })).rejects.toThrow("outputs must include a dataset output");
   });
+});
+
+it("starts dataset preparation via runtime startTask", async () => {
+  const startTask = testDouble.fn(async (request) => ({ requestId: request.requestId, taskType: request.taskType, accepted: true, status: "queued" }));
+  const adapter = createPythonDatasetPreparationPort({
+    executeTask: async () => ({ requestId: "x", taskType: "prepare-training-dataset", success: true, data: {} }),
+    startTask,
+    readTaskStatus: async () => ({ requestId: "x", status: "running" }),
+    cancelTask: async () => ({ requestId: "x", status: "running", cancelled: false }),
+    getHealthStatus: async () => ({ healthy: true, status: { runtimeId: "py", status: "ready" } }),
+    getCapabilities: async () => ({ runtimeId: "py", capabilities: ["prepare-training-dataset"] }),
+    ensureModelDownloaded: async () => ({ provider: "transformers", modelId: "m", downloaded: false, fromCache: true }),
+    getModelStatus: async () => ({ loadedModels: [], activeTaskCount: 0 }),
+    unloadModels: async () => ({ unloadedModels: [], activeTaskCount: 0 }),
+  });
+  const started = await adapter.startPrepareTrainingDataset({ sourceInputs: [], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1, chunkOverlap: 0 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "m" } } }, split: { trainRatio: 0.8, testRatio: 0.2 }, output: { format: "jsonl" } });
+  expect(startTask).toHaveBeenCalledOnce();
+  expect(started.requestId).toBeTruthy();
 });

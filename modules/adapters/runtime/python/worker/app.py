@@ -128,7 +128,7 @@ def _run_task(request: StartPythonRuntimeTaskRequest) -> Any:
                     "totalChunkCount": total,
                     "processedChunkCount": processed,
                     "generatedRowCount": progress.get("generatedRowCount") or 0,
-                    "message": f"Processing chunk {processed}/{total}...",
+                    "message": f"Processing chunk {min(processed + 1, total)}/{total}...",
                 },
             )
             print(json.dumps({"event": "runtime.dataset_preparation.generation.progress", "requestId": request.requestId, **progress}, ensure_ascii=False), flush=True)
@@ -166,7 +166,11 @@ def _run_task(request: StartPythonRuntimeTaskRequest) -> Any:
 
 def _start_async_task(request: StartPythonRuntimeTaskRequest) -> StartPythonRuntimeTaskResult:
     with TASK_REGISTRY_LOCK:
-        TASK_REGISTRY[request.requestId] = _create_task_record(request.requestId, request.taskType, request.metadata)
+        existing = TASK_REGISTRY.get(request.requestId)
+        if existing and existing.get("status") in {"queued", "running"}:
+            raise RuntimeError(f"Task requestId '{request.requestId}' is already active.")
+        if not existing:
+            TASK_REGISTRY[request.requestId] = _create_task_record(request.requestId, request.taskType, request.metadata)
 
     def task_wrapper() -> None:
         _update_task(request.requestId, status="running")

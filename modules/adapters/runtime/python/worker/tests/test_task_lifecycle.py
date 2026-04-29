@@ -60,6 +60,17 @@ class TaskLifecycleTests(unittest.TestCase):
             status = worker_app.read_task_status("r4")
             self.assertIsNotNone(status.progress)
             self.assertEqual(status.progress["processedChunkCount"], 1)
+            self.assertEqual(status.progress["message"], "Processing chunk 2/2...")
+
+    def test_duplicate_request_id_is_rejected(self) -> None:
+        def slow_train(_payload):
+            time.sleep(0.2)
+            return type("R", (), {"model_dump": lambda self, mode: {"runId": "dup"}})()
+
+        with patch("modules.adapters.runtime.python.worker.app.train_model", side_effect=slow_train):
+            worker_app.start_task(StartPythonRuntimeTaskRequest(requestId="dup", taskType="train-model", payload={"baseModel": {}, "datasets": [], "method": "lora", "output": {}}))
+            with self.assertRaises(RuntimeError):
+                worker_app.start_task(StartPythonRuntimeTaskRequest(requestId="dup", taskType="train-model", payload={"baseModel": {}, "datasets": [], "method": "lora", "output": {}}))
 
     def test_cancel_running_does_not_claim_killed(self) -> None:
         def slow_train(_payload):
