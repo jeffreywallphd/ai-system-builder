@@ -532,4 +532,47 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     expect(result.error.details).toMatchObject({ stage: "generation", runtimeErrorCode: "runtime_timeout" });
     await rm(runtimeDataset, { force: true });
   });
+
+  it("keeps runtime working dir until terminal status then cleans on succeeded", async () => {
+    const deps = createDeps("/tmp/unused");
+    let stagedPath = "";
+    const startPrepareTrainingDataset = testDouble.fn(async (request: { sourceInputs: Array<{ localPath: string }> }) => {
+      stagedPath = request.sourceInputs[0]?.localPath ?? "";
+      return { requestId: "req-success", taskType: "prepare-training-dataset", accepted: true as const, status: "queued" as const };
+    });
+    const readPrepareTrainingDatasetStatus = testDouble.fn()
+      .mockResolvedValueOnce({ status: "running", progress: { message: "running" } })
+      .mockResolvedValueOnce({ status: "succeeded", data: { outputs: [], summary: { sourceDocumentCount: 0, normalizedDocumentCount: 0, skippedDocumentCount: 0, chunkCount: 0, generatedExampleCount: 0, datasetRowCount: 0, trainRowCount: 0, testRowCount: 0 } } });
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { startPrepareTrainingDataset, readPrepareTrainingDatasetStatus },
+      storageBindings: { readArtifactStorageBindings: deps.readArtifactStorageBindings, upsertArtifactStorageBinding: testDouble.fn(), deleteArtifactStorageBindings: testDouble.fn() },
+      storage: { retrieveArtifact: deps.retrieveArtifact, storeArtifact: deps.storeArtifact, hasArtifact: testDouble.fn(), deleteArtifact: testDouble.fn() },
+    });
+    await useCase.startPrepareTrainingDataset({ sourceArtifactIds: ["artifact-1"], recipe, split, output: { format: "jsonl" } });
+    const runtimeDir = stagedPath.slice(0, stagedPath.lastIndexOf("/"));
+    await access(runtimeDir);
+    await useCase.readPrepareTrainingDataset("req-success");
+    await access(runtimeDir);
+    await useCase.readPrepareTrainingDataset("req-success");
+    await expectFileMissing(runtimeDir);
+  });
+
+  it("cleans runtime working dir on failed terminal status", async () => {
+    const deps = createDeps("/tmp/unused");
+    let stagedPath = "";
+    const startPrepareTrainingDataset = testDouble.fn(async (request: { sourceInputs: Array<{ localPath: string }> }) => {
+      stagedPath = request.sourceInputs[0]?.localPath ?? "";
+      return { requestId: "req-fail", taskType: "prepare-training-dataset", accepted: true as const, status: "queued" as const };
+    });
+    const readPrepareTrainingDatasetStatus = testDouble.fn().mockResolvedValue({ status: "failed", error: { message: "failed" } });
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: { startPrepareTrainingDataset, readPrepareTrainingDatasetStatus },
+      storageBindings: { readArtifactStorageBindings: deps.readArtifactStorageBindings, upsertArtifactStorageBinding: testDouble.fn(), deleteArtifactStorageBindings: testDouble.fn() },
+      storage: { retrieveArtifact: deps.retrieveArtifact, storeArtifact: deps.storeArtifact, hasArtifact: testDouble.fn(), deleteArtifact: testDouble.fn() },
+    });
+    await useCase.startPrepareTrainingDataset({ sourceArtifactIds: ["artifact-1"], recipe, split, output: { format: "jsonl" } });
+    const runtimeDir = stagedPath.slice(0, stagedPath.lastIndexOf("/"));
+    await useCase.readPrepareTrainingDataset("req-fail");
+    await expectFileMissing(runtimeDir);
+  });
 });

@@ -226,4 +226,27 @@ describe("desktop dataset preparation client", () => {
       output: { format: "jsonl" },
     })).rejects.toThrow("fetch failed");
   });
+
+  it("maps task read statuses with discriminated status values", async () => {
+    const hostWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
+    hostWindow.window ??= {} as Window & typeof globalThis;
+    const readPrepareTrainingDatasetTask = vi.fn()
+      .mockResolvedValueOnce({ ok: true, value: { status: "running", progress: { message: "step", processed: 1, total: 2 } } })
+      .mockResolvedValueOnce({ ok: true, value: { status: "cancelled" } })
+      .mockResolvedValueOnce({ ok: true, value: { status: "unknown" } })
+      .mockResolvedValueOnce({ ok: true, value: { status: "failed", error: { message: "boom" } } });
+    hostWindow.window.desktopApi = {
+      uploadArtifact: async () => ({ ok: false }), getArtifactUploadPolicy: async () => ({ ok: false }),
+      browseArtifacts: async () => ({ ok: true, value: { items: [] } }), readArtifactDetail: async () => ({ ok: false }),
+      readArtifactContentDescriptor: async () => ({ ok: false }), readArtifactViewerMedia: async () => ({ ok: false }),
+      publishArtifactToRepo: async () => ({ ok: false }), verifyPublishedArtifactBacking: async () => ({ ok: false }),
+      registerArtifactFromRepo: async () => ({ ok: false }), localizeArtifactFromRepo: async () => ({ ok: false }),
+      startPrepareTrainingDataset: async () => ({ ok: true, value: { requestId: "req" } }), readPrepareTrainingDatasetTask,
+    };
+    const client = createDesktopDatasetPreparationClient();
+    await expect(client.readPrepareTrainingDatasetTask("req")).resolves.toMatchObject({ ok: true, status: "running" });
+    await expect(client.readPrepareTrainingDatasetTask("req")).resolves.toMatchObject({ ok: true, status: "cancelled" });
+    await expect(client.readPrepareTrainingDatasetTask("req")).resolves.toMatchObject({ ok: true, status: "unknown" });
+    await expect(client.readPrepareTrainingDatasetTask("req")).resolves.toMatchObject({ ok: false, error: { code: "failed", message: "boom" } });
+  });
 });

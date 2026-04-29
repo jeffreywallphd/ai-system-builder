@@ -289,6 +289,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly artifactRepoStorage?: ArtifactRepoStoragePort;
   private readonly artifactCatalog?: ArtifactCatalogReadPort;
   private readonly now: () => string;
+  private readonly runtimeWorkingDirsByRequestId = new Map<string, string>();
 
   public constructor(dependencies: PrepareTrainingDatasetFromArtifactsUseCaseDependencies) {
     this.datasetPreparation = dependencies.datasetPreparation;
@@ -320,6 +321,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     };
 
     const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
+    this.runtimeWorkingDirsByRequestId.set(started.requestId, staged.value.runtimeWorkingDir);
     return createSuccessResult(started, context);
   }
 
@@ -329,6 +331,9 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   ): Promise<ContractResult<PythonRuntimeTaskStatusResult>> {
     try {
       const status = await this.datasetPreparation.readPrepareTrainingDatasetStatus(requestId);
+      if (status.status === "succeeded" || status.status === "failed" || status.status === "cancelled" || status.status === "unknown") {
+        await this.cleanupRuntimeWorkingDir(requestId);
+      }
       return createSuccessResult(status, context);
     } catch (error) {
       if (error instanceof PythonDatasetPreparationError) {
@@ -339,6 +344,15 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         context,
       );
     }
+  }
+
+  private async cleanupRuntimeWorkingDir(requestId: string): Promise<void> {
+    const runtimeWorkingDir = this.runtimeWorkingDirsByRequestId.get(requestId);
+    if (!runtimeWorkingDir) {
+      return;
+    }
+    this.runtimeWorkingDirsByRequestId.delete(requestId);
+    await rm(runtimeWorkingDir, { recursive: true, force: true });
   }
 
   public async execute(
