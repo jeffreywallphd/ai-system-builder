@@ -258,7 +258,8 @@ describe("composeDesktopHost", () => {
     const source = readFileSync(sourcePath, "utf8");
 
     expect(source).toContain("createPythonRuntimeAdapterFoundation");
-    expect(source).toContain("createPythonDatasetPreparationPort");
+    expect(source).toContain("createPythonRuntimeTaskRegistryAdapter");
+    expect(source).not.toContain("createPythonDatasetPreparationPort");
     expect(source).toContain("ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start()");
     expect(source).toContain("requiredCapabilities: PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES");
     expect(source).toContain("HF_HUB_DISABLE_XET");

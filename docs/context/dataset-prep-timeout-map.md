@@ -15,3 +15,9 @@
 - Async polling (`read*` task status) remains the transport-timeout-safe lifecycle mechanism.
 - For async task flows today, blocker teardown is triggered when terminal status is observed on lifecycle reads.
 - Future improvement: add event-driven task completion cleanup so blocker release does not rely on polling.
+
+
+## Runtime Adapter Path
+
+- Production dataset preparation path: UI/IPC -> `PrepareTrainingDatasetFromArtifactsUseCase` -> `RuntimeTaskRegistryPort` -> Python runtime task-registry adapter -> `/tasks/start` and `/tasks/{requestId}`.
+- Dataset preparation no longer composes or calls `PythonDatasetPreparationPort` / `createPythonDatasetPreparationPort`.

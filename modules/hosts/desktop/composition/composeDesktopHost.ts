@@ -47,7 +47,6 @@ import {
   createArtifactRepoStorageAdapter,
 } from "../../../adapters/storage/artifact-repo";
 import {
-  createPythonDatasetPreparationPort,
   createPythonRuntimeAdapterFoundation,
   ensurePythonRuntimeWorkerDependencies,
   createPythonModelTrainingPort,
@@ -472,60 +471,6 @@ export function composeDesktopHost(
   };
   const modelDefaultResolver = new DefaultModelDefaultResolver({
     settings: applicationSettings,
-  });
-
-  const datasetPreparationPort = createPythonDatasetPreparationPort({
-    ...pythonRuntimeFoundation.runtimePort,
-    executeTask: async (request) => {
-      recordRuntimeLog({
-        level: "info",
-        message: JSON.stringify({
-          event: "runtime.dataset_preparation.task.started",
-          requestId: request.requestId,
-          taskType: request.taskType,
-        }),
-      });
-      const result = await pythonRuntimeFoundation.runtimePort.executeTask(request);
-      if (result.success) {
-        recordRuntimeLog({
-          level: "info",
-          message: JSON.stringify({
-            event: "runtime.dataset_preparation.task.succeeded",
-            requestId: request.requestId,
-            taskType: request.taskType,
-          }),
-        });
-      } else {
-        const wasCancelled = result.error?.code === "task_cancelled" || result.error?.code === "cancelled";
-        recordRuntimeLog({
-          level: wasCancelled ? "warn" : "error",
-          message: JSON.stringify({
-            event: wasCancelled ? "runtime.dataset_preparation.task.cancelled" : "runtime.dataset_preparation.task.failed",
-            requestId: request.requestId,
-            taskType: request.taskType,
-            status: wasCancelled ? "cancelled" : "failed",
-            message: result.error?.message,
-            error: result.error,
-          }),
-        });
-      }
-
-      return result;
-    },
-    async ensureModelDownloaded(request) {
-      const availability = await pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
-      recordRuntimeLog({
-        level: "info",
-        message: availability.localPath
-          ? `Generation model ${request.modelId} will be loaded from ${availability.localPath}.`
-          : `Generation model ${request.modelId} will be loaded from the configured Transformers model reference.`,
-      });
-      return availability;
-    },
-  }, {
-    taskTimeoutMs: DATASET_PREPARATION_TASK_TIMEOUT_MS,
-    inactivityTimeoutMs: DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS,
-    ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
