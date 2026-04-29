@@ -199,7 +199,5 @@ export function createPythonRuntimeHttpClient(
       const payload = await parseJsonResponseSafe(response);
       return mapRuntimeResponsePayload(`/tasks/${requestId}/cancel`, response, payload, mapCancelTaskResponse);
     },
-
-,
   };
 }

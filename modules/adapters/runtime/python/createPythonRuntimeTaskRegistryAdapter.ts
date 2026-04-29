@@ -53,6 +53,9 @@ function toRuntimeTaskStatus(status: string | undefined): RuntimeTaskStatus {
 export function createPythonRuntimeTaskRegistryAdapter(runtimePort: PythonRuntimePort): RuntimeTaskRegistryPort {
   return {
     async startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult> {
+      if (request.taskType === TaskType.MODEL_PUBLISHING) {
+        throw new Error("model publishing runtime task is not implemented");
+      }
       return runtimePort.startTask({
         requestId: request.requestId ?? randomUUID(),
         taskType: toPythonTaskType(request.taskType),

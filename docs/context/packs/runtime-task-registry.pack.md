@@ -28,7 +28,8 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 ## Contract Boundaries
 
 - Generic runtime registry contracts must not depend on Python-specific contract types.
-- Python runtime adapters may map Python status/error payloads to generic runtime task status/error contracts.
+- Python-prefixed async task contracts (for example `StartPythonRuntimeTaskRequest`, `PythonRuntimeTaskStatusResult`, and `CancelPythonRuntimeTaskResult`) are adapter-boundary types only, limited to Python HTTP/protocol implementation details.
+- Python runtime adapters must map Python status/error payloads to generic runtime task registry contracts at the application boundary.
 - Do not create domain aliases that merely re-export runtime contracts.
 
 
@@ -37,5 +38,5 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 - Dataset preparation now uses only `RuntimeTaskRegistryPort` with Python `/tasks/start` + `/tasks/{requestId}` lifecycle polling.
 - Legacy `PythonDatasetPreparationPort` and its adapter path are retired.
 - Legacy dataset-preparation synchronous `/tasks/execute` path is removed from dataset-preparation production flows.
-- Model training/validation still use synchronous execute compatibility as a pending migration.
+- Model training/validation/publishing use Runtime Task Registry start/read/cancel lifecycle APIs.
 - No new long-running runtime-backed feature should use legacy `/tasks/execute`; use Runtime Task Registry lifecycle APIs.

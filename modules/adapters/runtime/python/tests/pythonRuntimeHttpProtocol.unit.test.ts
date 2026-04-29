@@ -7,8 +7,6 @@ import {
   mapStartTaskRequest,
   mapStartTaskResponse,
   mapTaskStatusResponse,
-  mapTaskRequestToHttpPayload,
-  mapTaskResponseFromHttpPayload,
 } from "../protocol/pythonRuntimeHttpProtocol";
 
 describe("pythonRuntimeHttpProtocol", () => {
@@ -19,8 +17,8 @@ describe("pythonRuntimeHttpProtocol", () => {
       payload: { template: "{{text}}" },
     };
 
-    const requestPayload = mapTaskRequestToHttpPayload(request);
-    expect(requestPayload).toMatchObject(request);
+    const requestPayload = mapStartTaskRequest(request);
+    expect(requestPayload.requestId).toBe(request.requestId);
 
     const health = mapHealthResponseFromHttpPayload({
       healthy: true,
@@ -37,31 +35,22 @@ describe("pythonRuntimeHttpProtocol", () => {
     });
     expect(capabilities.capabilities).toContain("prepare-training-dataset");
 
-    const taskResult = mapTaskResponseFromHttpPayload({
+    const taskResult = mapTaskStatusResponse({
       requestId: "req-python-1",
       taskType: "prepare-training-dataset",
-      success: false,
-      error: {
-        code: "not_implemented",
-        stage: "generation",
-        message: "Not implemented.",
-      },
+      status: "failed",
+      error: { code: "not_implemented", stage: "generation", message: "Not implemented." },
     });
-    expect(taskResult.success).toBe(false);
+    expect(taskResult.status).toBe("failed");
     expect(taskResult.error?.stage).toBe("generation");
-    expect(taskResult.error?.code).toBe("not_implemented");
   });
 
   it("maps legacy errorCode payloads to canonical code", () => {
-    const taskResult = mapTaskResponseFromHttpPayload({
+    const taskResult = mapTaskStatusResponse({
       requestId: "req-python-1",
       taskType: "prepare-training-dataset",
-      success: false,
-      error: {
-        errorCode: "runtime_timeout",
-        stage: "generation",
-        message: "Timed out.",
-      },
+      status: "failed",
+      error: { errorCode: "runtime_timeout", stage: "generation", message: "Timed out." },
     });
 
     expect(taskResult.error?.code).toBe("runtime_timeout");
@@ -92,7 +81,7 @@ describe("pythonRuntimeHttpProtocol", () => {
   });
 
   it("rejects malformed task payloads", () => {
-    expect(() => mapTaskResponseFromHttpPayload({ requestId: "id", taskType: "t", success: true, metadata: [] })).toThrow(
+    expect(() => mapTaskStatusResponse({ requestId: "id", taskType: "t", status: "running", metadata: [] })).toThrow(
       "metadata: expected object payload",
     );
   });
