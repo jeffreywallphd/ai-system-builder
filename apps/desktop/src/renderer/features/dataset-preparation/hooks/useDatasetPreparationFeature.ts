@@ -202,6 +202,14 @@ function appendErrorDetailsMessage(message: string, details: Record<string, unkn
   return suffix ? `${message} Details: ${suffix}.` : message;
 }
 
+function isTransientPollReadFailure(message: string, details?: Record<string, unknown>): boolean {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("fetch failed") || normalized.includes("network") || normalized.includes("transport")) {
+    return true;
+  }
+  return typeof details?.retryable === "boolean" ? details.retryable : false;
+}
+
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
 ): UseDatasetPreparationFeatureResult {
@@ -521,6 +529,15 @@ export function useDatasetPreparationFeature(
       try {
         const pollResponse = await datasetClient.readPrepareTrainingDatasetTask(started.requestId);
         if (pollResponse.ok === false) {
+          if (!pollRecoveryStartedAtMs) {
+            pollRecoveryStartedAtMs = Date.now();
+          }
+          if (isTransientPollReadFailure(pollResponse.error.message, pollResponse.error.details)
+            && (Date.now() - pollRecoveryStartedAtMs) < pollingRecoveryGraceWindowMs) {
+            setStatus({ kind: "loading", message: "Reconnecting to dataset preparation task..." });
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+            continue;
+          }
           setStatus({ kind: "error", message: appendErrorDetailsMessage(pollResponse.error.message, pollResponse.error.details) });
           return;
         }

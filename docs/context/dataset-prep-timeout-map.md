@@ -132,3 +132,10 @@
 - Async dataset-preparation UI migration is active; follow-up cleanup is still required before legacy sync APIs are removed.
 - Source artifacts must be staged to runtime-local files before async `start` is invoked, and `sourceInputs` must not be empty for real runs.
 - Legacy sync `execute` remains temporarily for compatibility and must be removed in Prompt 4 after callers are fully migrated.
+
+## Migration cleanup status (Prompt 4, 2026-04-29)
+
+- Desktop dataset-preparation UI flow uses async `start` + short-interval `read` polling as the primary path.
+- Long-held request recovery is obsolete for normal dataset preparation and should be treated as legacy-only compatibility behavior.
+- Short status-poll reads may transiently fail; renderer keeps loading with `Reconnecting to dataset preparation task...` during a short grace window before surfacing a terminal error.
+- Runtime source staging directories created for async start are cleaned by application-layer status reads when terminal task states are observed (`succeeded`, `failed`, `cancelled`, `unknown`).

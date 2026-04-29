@@ -37,12 +37,12 @@ export interface DesktopDatasetPreparationClient {
   ) => Promise<{ requestId: string } | { error: { code: string; message: string; details?: Record<string, unknown> } }>;
   readPrepareTrainingDatasetTask: (
     requestId: string,
-  ) => Promise<
-    | DesktopDatasetPreparationResult
-    | { ok: true; status: "pending" | "running"; progress?: { message?: string; processed?: number; total?: number } }
-    | { ok: true; status: "cancelled" | "unknown"; progress?: { message?: string; processed?: number; total?: number } }
-  >;
+  ) => Promise<DesktopDatasetPreparationTaskReadResult>;
 }
+export type DesktopDatasetPreparationTaskReadResult =
+  | DesktopDatasetPreparationResult
+  | { ok: true; status: "pending" | "running"; progress?: { message?: string; processed?: number; total?: number } }
+  | { ok: true; status: "cancelled" | "unknown"; progress?: { message?: string; processed?: number; total?: number } };
 
 function ensureSuccessEnvelope(response: unknown, fallbackMessage: string): { value?: unknown } {
   if (!isPreloadResponseEnvelope(response)) {
