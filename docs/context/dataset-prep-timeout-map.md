@@ -114,6 +114,10 @@
 **Hypothesis:** A **transport/intermediary timeout around 300 seconds** is severing the long-held submit HTTP response channel, while the Python worker keeps running and emitting logs/status independently.  
 **Confidence:** **0.78 (High-leaning)** based on mismatch between observed ~5m cutoff and app-configured 12h/20m timeouts.
 
+## Implementation note (Prompt 2, 2026-04-29)
+
+- Python worker async lifecycle endpoints are now implemented (`/tasks/start`, `/tasks/{requestId}`, `/tasks/{requestId}/cancel`), but the dataset-preparation UI caller migration off `/tasks/execute` is still pending Prompt 3.
+
 ---
 
 ## Primary-source references to validate defaults (external)
