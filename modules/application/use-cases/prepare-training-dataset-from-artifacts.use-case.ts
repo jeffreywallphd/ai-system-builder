@@ -320,9 +320,20 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       },
     };
 
-    const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
-    this.runtimeWorkingDirsByRequestId.set(started.requestId, staged.value.runtimeWorkingDir);
-    return createSuccessResult(started, context);
+    try {
+      const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
+      this.runtimeWorkingDirsByRequestId.set(started.requestId, staged.value.runtimeWorkingDir);
+      return createSuccessResult(started, context);
+    } catch (error) {
+      await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
+      if (error instanceof PythonDatasetPreparationError) {
+        return createFailureResult(error.contractError, context);
+      }
+      return createFailureResult(
+        createContractError("internal", error instanceof Error ? error.message : "Failed to start dataset preparation."),
+        context,
+      );
+    }
   }
 
   public async readPrepareTrainingDataset(
@@ -353,188 +364,6 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     }
     this.runtimeWorkingDirsByRequestId.delete(requestId);
     await rm(runtimeWorkingDir, { recursive: true, force: true });
-  }
-
-  public async execute(
-    command: PrepareTrainingDatasetFromArtifactsCommand,
-    context?: ApplicationRequestContext,
-  ): Promise<PrepareTrainingDatasetFromArtifactsResult> {
-    const staged = await this.stageRuntimeInputs(command, context);
-    if (!staged.ok) {
-      return staged;
-    }
-    const runtimeWorkingDir = staged.value.runtimeWorkingDir;
-    try {
-      const destinations = resolveOutputDestinations(command.output);
-      const runtimeRequest: PrepareTrainingDatasetRequest = {
-        sourceInputs: staged.value.sourceInputs,
-        recipe: command.recipe,
-        split: command.split,
-        output: command.output,
-        runtime: {
-          ...(command.output.runtime ?? {}),
-          runtimeWorkingDirectory: runtimeWorkingDir,
-        },
-      };
-
-      const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
-      let prepared;
-      while (true) {
-        const status = await this.datasetPreparation.readPrepareTrainingDatasetStatus(started.requestId);
-        if (status.status === "succeeded" && status.data !== undefined) {
-          prepared = status.data;
-          break;
-        }
-        if (status.status === "failed") {
-          throw new PythonDatasetPreparationError(createContractError("internal", status.error?.message ?? "Python runtime dataset preparation failed."));
-        }
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
-      const datasetOutput = prepared.outputs.find((output) => output.role === "dataset")
-        ?? prepared.outputs.find((output) => output.role === "artifact");
-
-      if (!datasetOutput) {
-        return createFailureResult(
-          createContractError("internal", "Runtime did not return a dataset output."),
-          context,
-        );
-      }
-
-      let datasetBytes: Buffer;
-      try {
-        await validateDatasetOutput(datasetOutput.tempPath, command.output.format);
-        datasetBytes = await readFile(datasetOutput.tempPath);
-      } finally {
-        await rm(datasetOutput.tempPath, { force: true });
-      }
-
-      let localOutputs: PrepareTrainingDatasetFromArtifactsValue["outputs"]["local"];
-      if (destinations.local) {
-        const generatedStorageKey = buildGeneratedDatasetStorageKey(
-          datasetOutput.name,
-          command.output.format,
-          this.now(),
-        );
-        const storedDataset = await this.storage.storeArtifact(createStoreArtifactRequest(datasetBytes, {
-          descriptor: {
-            key: generatedStorageKey,
-            mediaType: datasetOutput.mediaType,
-            metadata: {
-              originalFileName: `${datasetOutput.name}.${command.output.format}`,
-              runtimeRole: "dataset",
-              ...buildDatasetMetadata(command, prepared.summary, { provider: "local" }, datasetOutput.metadata),
-            },
-          },
-        }), context);
-
-        if (!storedDataset.ok) {
-          return createFailureResult(storedDataset.error, context);
-        }
-
-        localOutputs = {
-          dataset: createStagedArtifactDescriptorFromStorageObjectDescriptor(storedDataset.value, {
-            sourceKind: "runtime",
-            originalName: `${datasetOutput.name}.${command.output.format}`,
-          }),
-        };
-      }
-
-      let huggingFaceOutputs: PrepareTrainingDatasetFromArtifactsValue["outputs"]["huggingFace"];
-      if (destinations.huggingFace) {
-        const artifactRepoStorage = this.artifactRepoStorage;
-        if (!artifactRepoStorage) {
-          return createFailureResult(
-            createContractError("internal", "Artifact repo storage is required for Hugging Face output."),
-            context,
-          );
-        }
-
-        const datasetPath = joinRepoPath(
-          destinations.huggingFace.pathPrefix,
-          `${datasetOutput.name}.${command.output.format}`,
-        );
-        const target = {
-          provider: destinations.huggingFace.provider,
-          repository: destinations.huggingFace.repository,
-          revision: destinations.huggingFace.revision,
-        };
-
-        const publishDataset = await artifactRepoStorage.storeArtifactInRepo(
-          createStoreArtifactInRepoRequest(new Uint8Array(datasetBytes), {
-            target: { ...target, path: datasetPath },
-            mediaType: datasetOutput.mediaType,
-            metadata: {
-              runtimeRole: "dataset",
-              ...buildDatasetMetadata(command, prepared.summary, {
-                provider: "huggingface",
-                publication: {
-                  repository: target.repository,
-                  path: datasetPath,
-                  revision: target.revision,
-                },
-              }, datasetOutput.metadata),
-            },
-          }),
-          context,
-        );
-
-        if (!publishDataset.ok) {
-          return createFailureResult(publishDataset.error, context);
-        }
-
-        const verifyDataset = await artifactRepoStorage.hasArtifactInRepo(
-          createHasArtifactInRepoRequest({ ...target, path: datasetPath }),
-          context,
-        );
-
-        if (!verifyDataset.ok) {
-          return createFailureResult(verifyDataset.error, context);
-        }
-
-        const verifiedAt = this.now();
-        const publishDatasetTarget = publishDataset.value.descriptor.target;
-        huggingFaceOutputs = {
-          dataset: {
-            provider: "huggingface",
-            repository: publishDatasetTarget.repository,
-            path: publishDatasetTarget.path ?? datasetPath,
-            revision: publishDatasetTarget.revision,
-            exists: verifyDataset.value.exists,
-            verifiedAt,
-          },
-        };
-      }
-
-      return createSuccessResult({
-        outputs: {
-          local: localOutputs,
-          huggingFace: huggingFaceOutputs,
-        },
-        provenance: {
-          sourceArtifactIds: command.sourceArtifactIds,
-          recipe: command.recipe,
-          split: command.split,
-          output: command.output,
-          generationModelId: command.recipe.generation.model.modelId,
-          summary: prepared.summary,
-        },
-        summary: prepared.summary,
-        warnings: prepared.warnings,
-      }, context);
-    } catch (error) {
-      if (error instanceof PythonDatasetPreparationError) {
-        return createFailureResult(error.contractError, context);
-      }
-      return createFailureResult(
-        createContractError(
-          "internal",
-          error instanceof Error ? error.message : "Dataset preparation failed unexpectedly.",
-        ),
-        context,
-      );
-    } finally {
-      await rm(runtimeWorkingDir, { recursive: true, force: true });
-    }
   }
 
   private async stageRuntimeInputs(

@@ -109,7 +109,7 @@ describe("desktop dataset preparation client", () => {
       verifyPublishedArtifactBacking: async () => ({ ok: false }),
       registerArtifactFromRepo: async () => ({ ok: false }),
       localizeArtifactFromRepo: async () => ({ ok: false }),
-      prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "validation", message: "bad input" } }),
+      startPrepareTrainingDataset: async () => ({ ok: false, error: { code: "validation", message: "bad input" } }),
     };
 
     const client = createDesktopDatasetPreparationClient();
@@ -128,12 +128,7 @@ describe("desktop dataset preparation client", () => {
       output: { format: "jsonl" },
     });
 
-    expect(started).toEqual({
-      error: {
-        code: "validation",
-        message: "bad input",
-      },
-    });
+    expect(started).toEqual({ error: { code: "validation", message: "bad input" } });
   });
 
   it("does not fall back to storageKey when artifactId is missing from browse items", async () => {
@@ -153,7 +148,7 @@ describe("desktop dataset preparation client", () => {
       verifyPublishedArtifactBacking: async () => ({ ok: false }),
       registerArtifactFromRepo: async () => ({ ok: false }),
       localizeArtifactFromRepo: async () => ({ ok: false }),
-      prepareTrainingDatasetFromArtifacts: async () => ({ ok: false }),
+      startPrepareTrainingDataset: async () => ({ ok: false }),
     };
 
     const client = createDesktopDatasetPreparationClient();
@@ -180,7 +175,7 @@ describe("desktop dataset preparation client", () => {
       verifyPublishedArtifactBacking: async () => ({ ok: false }),
       registerArtifactFromRepo: async () => ({ ok: false }),
       localizeArtifactFromRepo: async () => ({ ok: false }),
-      prepareTrainingDatasetFromArtifacts: async () => ({ ok: false }),
+      startPrepareTrainingDataset: async () => ({ ok: false }),
     };
 
     const client = createDesktopDatasetPreparationClient();
@@ -204,7 +199,7 @@ describe("desktop dataset preparation client", () => {
       verifyPublishedArtifactBacking: async () => ({ ok: false }),
       registerArtifactFromRepo: async () => ({ ok: false }),
       localizeArtifactFromRepo: async () => ({ ok: false }),
-      prepareTrainingDatasetFromArtifacts: async () => {
+      startPrepareTrainingDataset: async () => {
         throw new TypeError("Failed to fetch");
       },
     };

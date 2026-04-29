@@ -554,15 +554,22 @@ export function useDatasetPreparationFeature(
           setStatus({ kind: "idle", message: "Training stopped." });
           return;
         }
-
-        setStatus({ kind: "success", message: "Training dataset is ready." });
-        setResultSummary({
-          datasetKey: pollResponse.value.outputs.local?.dataset.storage.key ?? "(not produced locally)",
-          datasetRows: pollResponse.value.summary.datasetRowCount ?? pollResponse.value.summary.generatedExampleCount,
-        });
-        await refreshArtifacts();
-        await refreshRuntimeModelStatus();
-        onPrepared?.();
+        if ("status" in pollResponse && pollResponse.status === "unknown") {
+          setStatus({ kind: "error", message: "Dataset preparation task could not be found or is no longer available." });
+          return;
+        }
+        if ("status" in pollResponse && pollResponse.status === "succeeded") {
+          setStatus({ kind: "success", message: "Training dataset is ready." });
+          setResultSummary({
+            datasetKey: pollResponse.value.outputs.local?.dataset.storage.key ?? "(not produced locally)",
+            datasetRows: pollResponse.value.summary.datasetRowCount ?? pollResponse.value.summary.generatedExampleCount,
+          });
+          await refreshArtifacts();
+          await refreshRuntimeModelStatus();
+          onPrepared?.();
+          return;
+        }
+        setStatus({ kind: "error", message: "Dataset preparation task returned an invalid status." });
         return;
       } catch (error) {
         if (!pollRecoveryStartedAtMs) {

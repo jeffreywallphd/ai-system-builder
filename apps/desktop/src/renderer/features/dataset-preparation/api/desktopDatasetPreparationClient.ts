@@ -40,9 +40,11 @@ export interface DesktopDatasetPreparationClient {
   ) => Promise<DesktopDatasetPreparationTaskReadResult>;
 }
 export type DesktopDatasetPreparationTaskReadResult =
-  | DesktopDatasetPreparationResult
   | { ok: true; status: "pending" | "running"; progress?: { message?: string; processed?: number; total?: number } }
-  | { ok: true; status: "cancelled" | "unknown"; progress?: { message?: string; processed?: number; total?: number } };
+  | { ok: true; status: "succeeded"; value: DesktopPreparedTrainingDatasetResult }
+  | { ok: true; status: "cancelled" }
+  | { ok: true; status: "unknown"; message?: string }
+  | { ok: false; error: { code: string; message: string; details?: Record<string, unknown> } };
 
 function ensureSuccessEnvelope(response: unknown, fallbackMessage: string): { value?: unknown } {
   if (!isPreloadResponseEnvelope(response)) {
@@ -95,7 +97,7 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
       input: DesktopPrepareTrainingDatasetInput,
       context?: DesktopDatasetPreparationRequestContext,
     ) {
-      if (!desktopApi.startPrepareTrainingDataset && !desktopApi.prepareTrainingDatasetFromArtifacts) {
+      if (!desktopApi.startPrepareTrainingDataset) {
         return {
           error: {
             code: "unavailable",
@@ -105,9 +107,7 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
       }
 
       try {
-        const response = desktopApi.startPrepareTrainingDataset
-          ? await desktopApi.startPrepareTrainingDataset(input, context)
-          : await desktopApi.prepareTrainingDatasetFromArtifacts!(input, context);
+        const response = await desktopApi.startPrepareTrainingDataset(input, context);
         if (!isPreloadResponseEnvelope(response)) {
           return { error: { code: "internal", message: "Dataset preparation failed to start." } };
         }
@@ -148,13 +148,16 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         }
         const value = response.value as { status?: string; progress?: { message?: string; processed?: number; total?: number }; result?: DesktopPreparedTrainingDatasetResult; error?: { message?: string } } | undefined;
         if (value?.status === "succeeded" && value.result) {
-          return { ok: true, value: value.result };
+          return { ok: true, status: "succeeded", value: value.result };
         }
         if (value?.status === "failed") {
           return { ok: false, error: { code: "failed", message: value.error?.message ?? "Dataset preparation failed." } };
         }
-        if (value?.status === "cancelled" || value?.status === "unknown") {
-          return { ok: true, status: value.status, progress: value?.progress };
+        if (value?.status === "cancelled") {
+          return { ok: true, status: "cancelled" };
+        }
+        if (value?.status === "unknown") {
+          return { ok: true, status: "unknown", message: value.error?.message ?? value.progress?.message };
         }
         return { ok: true, status: value?.status === "running" ? "running" : "pending", progress: value?.progress };
       } catch (error) {
