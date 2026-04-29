@@ -52,6 +52,7 @@ import {
   ensurePythonRuntimeWorkerDependencies,
   createPythonModelTrainingPort,
   createPythonModelValidationPort,
+  createPythonRuntimeTaskRegistryAdapter,
 } from "../../../adapters/runtime/python";
 import { createElectronPowerSuspensionBlocker } from "../../../adapters/runtime/electron";
 import {
@@ -529,6 +530,7 @@ export function composeDesktopHost(
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
   const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
+  const runtimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter(pythonRuntimeFoundation.runtimePort);
 
   return {
     loggingPort,
@@ -715,6 +717,7 @@ export function composeDesktopHost(
       });
       const prepareTrainingDatasetFromArtifactsUseCase = new PrepareTrainingDatasetFromArtifactsUseCase({
         datasetPreparation: datasetPreparationPort,
+        runtimeTaskRegistry,
         storageBindings: artifactBindings,
         storage,
         artifactRepoStorage,

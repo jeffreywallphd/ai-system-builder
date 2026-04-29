@@ -24,6 +24,7 @@ import type {
 
 import type { ApplicationRequestContext } from "../ports";
 import { PythonDatasetPreparationError, type PythonDatasetPreparationPort } from "../ports/runtime";
+import type { RuntimeTaskRegistryPort } from "../ports/runtime";
 import type { ArtifactCatalogReadPort } from "../ports/artifact-catalog";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRepoStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
@@ -69,6 +70,7 @@ export type PrepareTrainingDatasetFromArtifactsResult = ContractResult<PrepareTr
 
 export interface PrepareTrainingDatasetFromArtifactsUseCaseDependencies {
   datasetPreparation: PythonDatasetPreparationPort;
+  runtimeTaskRegistry: RuntimeTaskRegistryPort;
   storageBindings: ArtifactStorageBindingPort;
   storage: ArtifactObjectStoragePort;
   artifactRepoStorage?: ArtifactRepoStoragePort;
@@ -318,6 +320,7 @@ function isPrepareTrainingDatasetResult(value: unknown): value is PrepareTrainin
 
 export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly datasetPreparation: PythonDatasetPreparationPort;
+  private readonly runtimeTaskRegistry: RuntimeTaskRegistryPort;
   private readonly storageBindings: ArtifactStorageBindingPort;
   private readonly storage: ArtifactObjectStoragePort;
   private readonly artifactRepoStorage?: ArtifactRepoStoragePort;
@@ -330,6 +333,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
 
   public constructor(dependencies: PrepareTrainingDatasetFromArtifactsUseCaseDependencies) {
     this.datasetPreparation = dependencies.datasetPreparation;
+    this.runtimeTaskRegistry = dependencies.runtimeTaskRegistry;
     this.storageBindings = dependencies.storageBindings;
     this.storage = dependencies.storage;
     this.artifactRepoStorage = dependencies.artifactRepoStorage;
@@ -360,7 +364,11 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     };
 
     try {
-      const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
+      const started = await this.runtimeTaskRegistry.startTask({
+        requestId: context?.requestId,
+        taskType: TaskType.DATASET_PREPARATION,
+        payload: runtimeRequest,
+      });
       if (typeof started.requestId !== "string" || started.requestId.trim().length === 0) {
         await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
         return createFailureResult(
@@ -375,7 +383,12 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       } catch {
         // Blocker startup failures must not fail dataset preparation.
       }
-      return createSuccessResult(started, context);
+      return createSuccessResult({
+        requestId: started.requestId,
+        taskType: "prepare-training-dataset",
+        accepted: true,
+        status: "queued",
+      }, context);
     } catch (error) {
       await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
       if (error instanceof PythonDatasetPreparationError) {
@@ -397,7 +410,18 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       if (cached) {
         return createSuccessResult({ requestId, taskType: "prepare-training-dataset", status: "succeeded", result: cached }, context);
       }
-      const status = await this.datasetPreparation.readPrepareTrainingDatasetStatus(requestId);
+      const statusRecord = await this.runtimeTaskRegistry.getTaskStatus(requestId);
+      const status: PythonRuntimeTaskStatusResult = {
+        requestId: statusRecord.requestId,
+        taskType: "prepare-training-dataset",
+        status: statusRecord.status,
+        progress: statusRecord.progress as Record<string, unknown> | undefined,
+        data: statusRecord.data as PythonRuntimeTaskStatusResult["data"],
+        error: statusRecord.error as PythonRuntimeTaskStatusResult["error"],
+        metadata: statusRecord.metadata,
+        startedAt: statusRecord.startedAt,
+        updatedAt: statusRecord.updatedAt,
+      };
       if (status.status === "succeeded" && status.data) {
         let terminalStatus: PythonRuntimeTaskStatusResult["status"] = status.status;
         try {
