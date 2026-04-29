@@ -5,6 +5,7 @@ import {
   type ModelTrainingResult,
 } from "../../../contracts/model";
 import type { ModelRegistryPort, ModelTrainingPort } from "../../ports/model";
+import type { PowerSuspensionBlockerPort } from "../../ports/desktop";
 
 function ensureBaseModelSelection(request: ModelTrainingRequest): void {
   if (!request.baseModel.modelRecordId && !request.baseModel.modelId && !request.baseModel.localPath) {
@@ -29,8 +30,11 @@ export class TrainModelUseCase {
     private readonly dependencies: {
       modelTraining: ModelTrainingPort;
       modelRegistry: ModelRegistryPort;
+      powerSuspension: PowerSuspensionBlockerPort;
     },
   ) {}
+
+  private readonly blockerIdsByRunId = new Map<string, string>();
 
   public async execute(request: ModelTrainingRequest): Promise<ModelTrainingResult> {
     const normalizedRequest = normalizeModelTrainingRequest(request);
@@ -57,6 +61,10 @@ export class TrainModelUseCase {
     }
 
     const trainingResult = normalizeModelTrainingResult(await this.dependencies.modelTraining.trainModel(normalizedRequest));
+    await this.startBlocker(trainingResult.runId);
+    if (trainingResult.status === "succeeded" || trainingResult.status === "failed" || trainingResult.status === "cancelled") {
+      await this.stopBlocker(trainingResult.runId);
+    }
 
     if (trainingResult.status !== "succeeded" || !trainingResult.generatedModelCandidate) {
       return trainingResult;
@@ -98,5 +106,33 @@ export class TrainModelUseCase {
       ...trainingResult,
       outputModel: registered.model,
     };
+  }
+
+  private async startBlocker(runId: string): Promise<void> {
+    if (!runId || this.blockerIdsByRunId.has(runId)) {
+      return;
+    }
+    try {
+      const blocker = await this.dependencies.powerSuspension.startBlocker("model-training", {
+        requestId: runId,
+        taskType: "model-training",
+      });
+      this.blockerIdsByRunId.set(runId, blocker.blockerId);
+    } catch {
+      // Blocker startup failures must not fail training.
+    }
+  }
+
+  private async stopBlocker(runId: string): Promise<void> {
+    const blockerId = this.blockerIdsByRunId.get(runId);
+    if (!blockerId) {
+      return;
+    }
+    this.blockerIdsByRunId.delete(runId);
+    try {
+      await this.dependencies.powerSuspension.stopBlocker(blockerId);
+    } catch {
+      // Blocker teardown failures must not fail training.
+    }
   }
 }
