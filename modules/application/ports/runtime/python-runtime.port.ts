@@ -1,18 +1,18 @@
 import {
-  CancelPythonRuntimeTaskResult,
+  CancelRuntimeTaskResult,
   PythonRuntimeCapabilitiesResult,
   PythonRuntimeHealthCheckResult,
   PythonRuntimeModelStatusResult,
-  PythonRuntimeTaskStatusResult,
-  StartPythonRuntimeTaskRequest,
-  StartPythonRuntimeTaskResult,
+  RuntimeTaskRecord,
+  StartRuntimeTaskRequest,
+  StartRuntimeTaskResult,
   PythonRuntimeUnloadModelsResult
 } from "../../../contracts/runtime";
 
 export interface PythonRuntimePort {
-  startTask(request: StartPythonRuntimeTaskRequest): Promise<StartPythonRuntimeTaskResult>;
-  readTaskStatus(requestId: string): Promise<PythonRuntimeTaskStatusResult>;
-  cancelTask(requestId: string): Promise<CancelPythonRuntimeTaskResult>;
+  startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult>;
+  readTaskStatus(requestId: string): Promise<RuntimeTaskRecord>;
+  cancelTask(requestId: string): Promise<CancelRuntimeTaskResult>;
   getHealthStatus(): Promise<PythonRuntimeHealthCheckResult>;
   getCapabilities(): Promise<PythonRuntimeCapabilitiesResult>;
   ensureModelDownloaded(request: { provider: "transformers"; modelId: string }): Promise<{

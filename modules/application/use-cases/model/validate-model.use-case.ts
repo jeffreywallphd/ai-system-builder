@@ -4,6 +4,9 @@ import type { ModelRegistryPort } from "../../ports/model";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 
 export class ValidateModelUseCase {
+  private readonly requestContext = new Map<string, { request: ValidateModelRequest; modelRecordId: string }>();
+  private readonly finalizedResults = new Map<string, ValidateModelResult>();
+
   public constructor(
     private readonly dependencies: {
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
@@ -25,17 +28,27 @@ export class ValidateModelUseCase {
         validationStrictness: request.validationStrictness ?? "normal",
       },
     });
-
+    this.requestContext.set(started.requestId, { request, modelRecordId: request.modelRecordId });
     return { modelRecordId: request.modelRecordId, status: "unknown", requestId: started.requestId } as ValidateModelResult;
   }
 
   public async read(requestId: string): Promise<ValidateModelResult> {
+    const cached = this.finalizedResults.get(requestId);
+    if (cached) {
+      return cached;
+    }
+    const context = this.requestContext.get(requestId);
     const status = await this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
     if (status.status === "running" || status.status === "queued") {
-      return { modelRecordId: "", status: "unknown", requestId } as ValidateModelResult;
+      return { modelRecordId: context?.modelRecordId ?? status.requestId, status: "unknown", requestId } as ValidateModelResult;
     }
     if (status.status === "failed" || status.status === "cancelled" || status.status === "unknown") {
-      return { modelRecordId: "", status: "invalid", errors: [status.error?.message ?? "Validation task failed."], requestId } as ValidateModelResult;
+      return {
+        modelRecordId: context?.modelRecordId ?? status.requestId,
+        status: "invalid",
+        errors: [status.error?.message ?? "Validation task failed."],
+        requestId,
+      } as ValidateModelResult;
     }
     return this.resolveSucceeded(status, requestId);
   }
@@ -51,6 +64,8 @@ export class ValidateModelUseCase {
     }
     const nextLifecycleStatus = result.status === "valid" ? "validated" : (result.status === "invalid" ? "invalid" : model.lifecycleStatus);
     await this.dependencies.modelRegistry.updateModelRecord({ modelRecordId: result.modelRecordId, patch: { validationStatus: result.status, validationReportPath: result.reportPath, serializationFormat: result.serializationFormat, lifecycleStatus: nextLifecycleStatus, metadata: { ...(model.metadata ?? {}), validationDiffPath: result.diffPath, validationWarnings: result.warnings, validationErrors: result.errors, shardCount: result.shardCount, validatedModelPath: result.validatedModelPath, validatedAt: result.validatedAt, validationStrictness: result.validationStrictness, tensorChecksCompleted: result.tensorChecksCompleted } } });
-    return { ...result, requestId } as ValidateModelResult;
+    const finalized = { ...result, requestId } as ValidateModelResult;
+    this.finalizedResults.set(requestId, finalized);
+    return finalized;
   }
 }
