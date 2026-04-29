@@ -108,3 +108,6 @@ Python never writes directly to the artifact catalog.
 
 - Desktop host runtime can also use Electron `powerSaveBlocker` (`prevent-app-suspension`) for long-running local tasks to reduce OS sleep/suspension risk.
 - This suspension blocker complements async start/poll/cancel lifecycle management and does not replace task polling or resolve transport/request timeouts from long-held requests.
+- Long-running tasks follow async lifecycle rules: start task, poll status, optional cancel, then terminal completion.
+- During active long-running local tasks, desktop application/use-cases acquire per-task power suspension blockers and release them on terminal states.
+- No long-lived transport requests should be used as a substitute for async lifecycle polling.

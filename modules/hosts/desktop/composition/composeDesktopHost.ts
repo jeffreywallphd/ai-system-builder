@@ -634,6 +634,7 @@ export function composeDesktopHost(
         storage,
         logging: loggingPort,
         now: options.now,
+        powerSuspension: powerSuspensionBlocker,
       });
 
       const browseArtifacts = new BrowseArtifactsUseCase({
@@ -717,6 +718,7 @@ export function composeDesktopHost(
         artifactRepoStorage,
         artifactCatalog,
         now: options.now,
+        powerSuspension: powerSuspensionBlocker,
       });
       const listSettingsDefinitions = new ListSettingsDefinitionsUseCase({
         settings: applicationSettings,
@@ -825,6 +827,7 @@ export function composeDesktopHost(
       const trainModel = new TrainModelUseCase({
         modelTraining: modelTrainingPort,
         modelRegistry,
+        powerSuspension: powerSuspensionBlocker,
       });
       const validateModel = new ValidateModelUseCase({
         modelValidation: modelValidationPort,
