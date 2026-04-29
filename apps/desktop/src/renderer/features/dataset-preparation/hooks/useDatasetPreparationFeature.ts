@@ -53,6 +53,9 @@ interface DatasetPreparationPageState {
   huggingFacePathPrefix: string;
   status: DatasetPreparationStatus;
   resultSummary?: DatasetPreparationResultSummary;
+  activeTaskRequestId?: string;
+  activeTaskType?: "dataset-preparation";
+  activeTaskStartedAt?: string;
 }
 
 export type DatasetPreparationArtifactStorageFilter = "all" | "uploaded" | "generated";
@@ -171,6 +174,9 @@ const defaultDatasetPreparationPageState: DatasetPreparationPageState = {
   huggingFacePathPrefix: "",
   status: { kind: "idle" },
   resultSummary: undefined,
+  activeTaskRequestId: undefined,
+  activeTaskType: undefined,
+  activeTaskStartedAt: undefined,
 };
 
 let cachedDatasetPreparationPageState: DatasetPreparationPageState = { ...defaultDatasetPreparationPageState };
@@ -270,11 +276,14 @@ export function useDatasetPreparationFeature(
   const [status, setStatus] = useState<DatasetPreparationStatus>(cachedDatasetPreparationPageState.status);
   const [resultSummary, setResultSummary] = useState<DatasetPreparationResultSummary | undefined>(cachedDatasetPreparationPageState.resultSummary);
   const [defaultHuggingFaceNamespace, setDefaultHuggingFaceNamespace] = useState<string | undefined>(undefined);
+  const [activeTaskRequestId, setActiveTaskRequestId] = useState<string | undefined>(cachedDatasetPreparationPageState.activeTaskRequestId);
+  const [activeTaskStartedAt, setActiveTaskStartedAt] = useState<string | undefined>(cachedDatasetPreparationPageState.activeTaskStartedAt);
   const [loadedModelCount, setLoadedModelCount] = useState(0);
   const [runtimeActiveTaskCount, setRuntimeActiveTaskCount] = useState(0);
   const [stopTrainingInFlight, setStopTrainingInFlight] = useState(false);
   const [unloadModelInFlight, setUnloadModelInFlight] = useState(false);
   const stopTrainingRequestedRef = useRef(false);
+  const activePollingRequestIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     cachedDatasetPreparationPageState = {
@@ -309,6 +318,9 @@ export function useDatasetPreparationFeature(
       huggingFacePathPrefix,
       status,
       resultSummary,
+      activeTaskRequestId,
+      activeTaskType: activeTaskRequestId ? "dataset-preparation" : undefined,
+      activeTaskStartedAt,
     };
   }, [
     selectedArtifactStorageFilter,
@@ -342,6 +354,8 @@ export function useDatasetPreparationFeature(
     huggingFacePathPrefix,
     status,
     resultSummary,
+    activeTaskRequestId,
+    activeTaskStartedAt,
   ]);
 
   const setStatusWarningMessage = useCallback((warningMessage: string) => {
@@ -353,6 +367,70 @@ export function useDatasetPreparationFeature(
       return { kind: current.kind, message: nextMessage };
     });
   }, []);
+
+  const clearActiveTask = useCallback(() => {
+    setActiveTaskRequestId(undefined);
+    setActiveTaskStartedAt(undefined);
+    activePollingRequestIdRef.current = undefined;
+  }, []);
+
+  const pollDatasetPreparationTask = useCallback(async (requestId: string) => {
+    if (activePollingRequestIdRef.current === requestId) return;
+    activePollingRequestIdRef.current = requestId;
+    let pollRecoveryStartedAtMs: number | undefined;
+    while (!stopTrainingRequestedRef.current && activePollingRequestIdRef.current === requestId) {
+      try {
+        const pollResponse = await datasetClient.readPrepareTrainingDatasetTask(requestId);
+        if (pollResponse.ok === false) {
+          if (!pollRecoveryStartedAtMs) pollRecoveryStartedAtMs = Date.now();
+          if (isTransientPollReadFailure(pollResponse.error.message, pollResponse.error.details)
+            && (Date.now() - pollRecoveryStartedAtMs) < pollingRecoveryGraceWindowMs) {
+            setStatus({ kind: "loading", message: "Reconnecting to dataset preparation task..." });
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+            continue;
+          }
+          clearActiveTask();
+          setStatus({ kind: "error", message: appendErrorDetailsMessage(pollResponse.error.message, pollResponse.error.details) });
+          return;
+        }
+        if (pollResponse.status === "pending" || pollResponse.status === "running") {
+          const processed = pollResponse.progress?.processed;
+          const total = pollResponse.progress?.total;
+          const suffix = typeof processed === "number" && typeof total === "number" ? ` (${processed}/${total})` : "";
+          setStatus({ kind: "loading", message: `${pollResponse.progress?.message ?? "Preparing training dataset..."}${suffix}` });
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+          continue;
+        }
+        if (pollResponse.status === "cancelled") {
+          clearActiveTask(); setStatus({ kind: "idle", message: "Training stopped." }); return;
+        }
+        if (pollResponse.status === "unknown") {
+          clearActiveTask(); setStatus({ kind: "error", message: "Dataset preparation task could not be found or is no longer available." }); return;
+        }
+        if (pollResponse.status === "succeeded") {
+          clearActiveTask();
+          setStatus({ kind: "success", message: "Training dataset is ready." });
+          setResultSummary({ datasetKey: pollResponse.value.outputs.local?.dataset.storage.key ?? "(not produced locally)", datasetRows: pollResponse.value.summary.datasetRowCount ?? pollResponse.value.summary.generatedExampleCount });
+          await refreshArtifacts(); await refreshRuntimeModelStatus(); onPrepared?.(); return;
+        }
+        clearActiveTask(); setStatus({ kind: "error", message: "Dataset preparation task returned an invalid status." }); return;
+      } catch (error) {
+        if (!pollRecoveryStartedAtMs) pollRecoveryStartedAtMs = Date.now();
+        if ((Date.now() - pollRecoveryStartedAtMs) < pollingRecoveryGraceWindowMs) {
+          setStatus({ kind: "loading", message: "Reconnecting to dataset preparation task..." });
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+          continue;
+        }
+        clearActiveTask(); setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) }); return;
+      }
+    }
+    clearActiveTask();
+    setStatus({ kind: "idle", message: "Training stopped." });
+  }, [clearActiveTask, datasetClient, onPrepared, pollingRecoveryGraceWindowMs, refreshArtifacts, refreshRuntimeModelStatus]);
+
+  useEffect(() => {
+    if (status.kind === "loading" && activeTaskRequestId) void pollDatasetPreparationTask(activeTaskRequestId);
+  }, [activeTaskRequestId, pollDatasetPreparationTask, status.kind]);
 
   const refreshArtifacts = useCallback(async () => {
     const sourceArtifacts = await datasetClient.browseSourceArtifacts();
@@ -524,68 +602,9 @@ export function useDatasetPreparationFeature(
       return;
     }
 
-    let pollRecoveryStartedAtMs: number | undefined;
-    while (!stopTrainingRequestedRef.current) {
-      try {
-        const pollResponse = await datasetClient.readPrepareTrainingDatasetTask(started.requestId);
-        if (pollResponse.ok === false) {
-          if (!pollRecoveryStartedAtMs) {
-            pollRecoveryStartedAtMs = Date.now();
-          }
-          if (isTransientPollReadFailure(pollResponse.error.message, pollResponse.error.details)
-            && (Date.now() - pollRecoveryStartedAtMs) < pollingRecoveryGraceWindowMs) {
-            setStatus({ kind: "loading", message: "Reconnecting to dataset preparation task..." });
-            await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
-            continue;
-          }
-          setStatus({ kind: "error", message: appendErrorDetailsMessage(pollResponse.error.message, pollResponse.error.details) });
-          return;
-        }
-        if ("status" in pollResponse && (pollResponse.status === "pending" || pollResponse.status === "running")) {
-          const progressMessage = pollResponse.progress?.message ?? "Preparing training dataset...";
-          const processed = pollResponse.progress?.processed;
-          const total = pollResponse.progress?.total;
-          const suffix = typeof processed === "number" && typeof total === "number" ? ` (${processed}/${total})` : "";
-          setStatus({ kind: "loading", message: `${progressMessage}${suffix}` });
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
-          continue;
-        }
-        if ("status" in pollResponse && pollResponse.status === "cancelled") {
-          setStatus({ kind: "idle", message: "Training stopped." });
-          return;
-        }
-        if ("status" in pollResponse && pollResponse.status === "unknown") {
-          setStatus({ kind: "error", message: "Dataset preparation task could not be found or is no longer available." });
-          return;
-        }
-        if ("status" in pollResponse && pollResponse.status === "succeeded") {
-          setStatus({ kind: "success", message: "Training dataset is ready." });
-          setResultSummary({
-            datasetKey: pollResponse.value.outputs.local?.dataset.storage.key ?? "(not produced locally)",
-            datasetRows: pollResponse.value.summary.datasetRowCount ?? pollResponse.value.summary.generatedExampleCount,
-          });
-          await refreshArtifacts();
-          await refreshRuntimeModelStatus();
-          onPrepared?.();
-          return;
-        }
-        setStatus({ kind: "error", message: "Dataset preparation task returned an invalid status." });
-        return;
-      } catch (error) {
-        if (!pollRecoveryStartedAtMs) {
-          pollRecoveryStartedAtMs = Date.now();
-        }
-        if ((Date.now() - pollRecoveryStartedAtMs) < pollingRecoveryGraceWindowMs) {
-          setStatus({ kind: "loading", message: "Reconnecting to dataset preparation task..." });
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
-          continue;
-        }
-        setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
-        return;
-      }
-    }
-
-    setStatus({ kind: "idle", message: "Training stopped." });
+    setActiveTaskRequestId(started.requestId);
+    setActiveTaskStartedAt(new Date().toISOString());
+    await pollDatasetPreparationTask(started.requestId);
   }, [
     selectedArtifactIds,
     unsupportedDocumentPolicy,
@@ -618,10 +637,7 @@ export function useDatasetPreparationFeature(
     huggingFacePathPrefix,
     datasetClient,
     settingsClient,
-    refreshArtifacts,
-    refreshRuntimeModelStatus,
-    onPrepared,
-    pollingRecoveryGraceWindowMs,
+    pollDatasetPreparationTask,
   ]);
 
   const onStopTraining = useCallback(async () => {

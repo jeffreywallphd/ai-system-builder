@@ -50,6 +50,21 @@ function toRuntimeTaskStatus(status: string | undefined): RuntimeTaskStatus {
   return "unknown";
 }
 
+function mapProgress(progress: Record<string, unknown> | undefined): RuntimeTaskRecord["progress"] {
+  if (!progress) {
+    return undefined;
+  }
+  const processedChunkCount = typeof progress.processedChunkCount === "number" ? progress.processedChunkCount : undefined;
+  const totalChunkCount = typeof progress.totalChunkCount === "number" ? progress.totalChunkCount : undefined;
+  return {
+    message: typeof progress.message === "string" ? progress.message : undefined,
+    current: processedChunkCount,
+    total: totalChunkCount,
+    unit: typeof processedChunkCount === "number" || typeof totalChunkCount === "number" ? "chunk" : undefined,
+    details: progress,
+  };
+}
+
 export function createPythonRuntimeTaskRegistryAdapter(runtimePort: PythonRuntimePort): RuntimeTaskRegistryPort {
   return {
     async startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult> {
@@ -70,7 +85,7 @@ export function createPythonRuntimeTaskRegistryAdapter(runtimePort: PythonRuntim
         taskType: toGenericTaskType(status.taskType),
         status: status.status,
         concurrencyClass: "unknown",
-        progress: status.progress,
+        progress: mapProgress(status.progress),
         data: status.data,
         error: status.error,
         metadata: status.metadata,

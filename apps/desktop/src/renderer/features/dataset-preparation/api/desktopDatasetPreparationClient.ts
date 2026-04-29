@@ -46,6 +46,21 @@ export type DesktopDatasetPreparationTaskReadResult =
   | { ok: true; status: "unknown"; message?: string }
   | { ok: false; error: { code: string; message: string; details?: Record<string, unknown> } };
 
+function mapDatasetProgress(progress: { message?: string; processed?: number; total?: number; details?: Record<string, unknown> } | undefined) {
+  if (!progress) {
+    return undefined;
+  }
+  return {
+    message: progress.message,
+    processed: typeof progress.processed === "number"
+      ? progress.processed
+      : (typeof progress.details?.processedChunkCount === "number" ? progress.details.processedChunkCount : undefined),
+    total: typeof progress.total === "number"
+      ? progress.total
+      : (typeof progress.details?.totalChunkCount === "number" ? progress.details.totalChunkCount : undefined),
+  };
+}
+
 function ensureSuccessEnvelope(response: unknown, fallbackMessage: string): { value?: unknown } {
   if (!isPreloadResponseEnvelope(response)) {
     throw new Error(fallbackMessage);
@@ -146,7 +161,7 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         if (!response.ok) {
           return { ok: false, error: { code: response.error?.code ?? "internal", message: response.error?.message ?? "Dataset preparation failed.", details: response.error?.details } };
         }
-        const value = response.value as { status?: string; progress?: { message?: string; processed?: number; total?: number }; result?: DesktopPreparedTrainingDatasetResult; error?: { message?: string } } | undefined;
+        const value = response.value as { status?: string; progress?: { message?: string; processed?: number; total?: number; details?: Record<string, unknown> }; result?: DesktopPreparedTrainingDatasetResult; error?: { message?: string } } | undefined;
         if (value?.status === "succeeded" && value.result) {
           return { ok: true, status: "succeeded", value: value.result };
         }
@@ -159,7 +174,7 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         if (value?.status === "unknown") {
           return { ok: true, status: "unknown", message: value.error?.message ?? value.progress?.message };
         }
-        return { ok: true, status: value?.status === "running" ? "running" : "pending", progress: value?.progress };
+        return { ok: true, status: value?.status === "running" ? "running" : "pending", progress: mapDatasetProgress(value?.progress) };
       } catch (error) {
         throw normalizeDatasetPreparationTransportError(error);
       }
