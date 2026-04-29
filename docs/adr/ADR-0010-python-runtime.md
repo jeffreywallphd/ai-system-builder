@@ -111,3 +111,5 @@ Python never writes directly to the artifact catalog.
 - Long-running tasks follow async lifecycle rules: start task, poll status, optional cancel, then terminal completion.
 - During active long-running local tasks, desktop application/use-cases acquire per-task power suspension blockers and release them on terminal states.
 - No long-lived transport requests should be used as a substitute for async lifecycle polling.
+- Current async cleanup behavior releases blockers when terminal lifecycle status is read in application polling paths.
+- Future improvement: event-driven completion cleanup should release blockers without polling dependencies.

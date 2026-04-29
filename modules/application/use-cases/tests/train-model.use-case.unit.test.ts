@@ -1,28 +1,9 @@
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
 import { TaskType } from "../../../contracts/runtime";
-import type { PowerSuspensionBlockerPort } from "../../ports/desktop";
-import { TaskPowerLifecycleService } from "../../services/runtime";
+import type { TaskPowerLifecyclePort } from "../../services/runtime";
 import type { ModelRegistryPort, ModelTrainingPort } from "../../ports/model";
 import { TrainModelUseCase } from "../model/train-model.use-case";
-
-function createPowerSuspensionMock(): PowerSuspensionBlockerPort {
-  const active = new Map<string, { reason: string; requestId?: string; taskType?: string }>();
-  let seq = 0;
-  return {
-    startBlocker: testDouble.fn(async (reason, context) => {
-      seq += 1;
-      const blockerId = `b-${seq}`;
-      active.set(blockerId, { reason, requestId: context?.requestId, taskType: context?.taskType });
-      return { blockerId, active: true };
-    }),
-    stopBlocker: testDouble.fn(async (blockerId) => {
-      active.delete(blockerId);
-      return { blockerId, active: false };
-    }),
-    listBlockers: testDouble.fn(async () => [...active.entries()].map(([blockerId, value]) => ({ blockerId, active: true, ...value }))),
-  };
-}
 
 describe("TrainModelUseCase", () => {
   const baseRequest = { baseModel: { modelRecordId: "base-1" }, datasets: [{ artifactId: "dataset-1", splitRole: "train" as const }], method: "lora" as const, commonParameters: {}, output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } }, registration: { displayName: "Demo Adapter", artifactForm: "adapter" as const } } };
@@ -30,12 +11,53 @@ describe("TrainModelUseCase", () => {
     listModels: async () => ({ models: [] }), getModelRecord: async () => ({ modelRecordId: "base-1", displayName: "Base", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", modelId: "org/base", createdAt: "2026-04-27T00:00:00.000Z" }), saveModelReference: async () => { throw new Error("not used"); }, registerDownloadedModel: async () => { throw new Error("not used"); }, updateModelRecord: async () => { throw new Error("not used"); }, deleteModelRecord: async () => { throw new Error("not used"); },
   };
 
-  it("starts and stops blocker for terminal states", async () => {
-    const powerSuspension = createPowerSuspensionMock();
-    const useCase = new TrainModelUseCase({ modelTraining: { trainModel: testDouble.fn<ModelTrainingPort["trainModel"]>().mockResolvedValue({ runId: "run-1", status: "failed", error: { code: "failed", message: "boom" } }) }, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: new TaskPowerLifecycleService(powerSuspension) });
+  const createLifecycleFake = (): TaskPowerLifecyclePort => ({
+    startTask: testDouble.fn(async () => undefined),
+    completeTask: testDouble.fn(async () => undefined),
+  });
+
+  it("starts blocker before training resolves and completes with terminal status", async () => {
+    let resolveTraining: ((value: Awaited<ReturnType<ModelTrainingPort["trainModel"]>>) => void) | undefined;
+    const modelTraining = {
+      trainModel: testDouble.fn<ModelTrainingPort["trainModel"]>(async () => await new Promise((resolve) => {
+        resolveTraining = resolve;
+      })),
+    };
+    const lifecycle = createLifecycleFake();
+    const useCase = new TrainModelUseCase({ modelTraining, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: lifecycle });
+
+    const pending = useCase.execute(baseRequest);
+    await Promise.resolve();
+
+    expect(lifecycle.startTask).toHaveBeenCalledTimes(1);
+    expect(modelTraining.trainModel).toHaveBeenCalledTimes(1);
+
+    resolveTraining?.({ runId: "run-1", status: "failed", error: { code: "failed", message: "boom" } });
+    await pending;
+
+    expect(lifecycle.completeTask).toHaveBeenCalledWith("run-1", "failed");
+  });
+
+  it.each(["succeeded", "failed", "cancelled"] as const)("completes blocker for %s", async (status) => {
+    const lifecycle = createLifecycleFake();
+    const useCase = new TrainModelUseCase({ modelTraining: { trainModel: testDouble.fn<ModelTrainingPort["trainModel"]>().mockResolvedValue({ runId: "run-1", status, ...(status === "failed" ? { error: { code: "failed", message: "boom" } } : {}) }) }, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: lifecycle });
     await useCase.execute(baseRequest);
-    expect(powerSuspension.startBlocker).toHaveBeenCalledWith(TaskType.MODEL_TRAINING, { requestId: "run-1", taskType: TaskType.MODEL_TRAINING });
-    expect(powerSuspension.stopBlocker).toHaveBeenCalledTimes(1);
-    expect((await powerSuspension.listBlockers()).find((entry) => entry.requestId === "run-1")).toBeUndefined();
+    expect(lifecycle.completeTask).toHaveBeenCalledWith("run-1", status);
+  });
+
+  it("completes blocker when training throws", async () => {
+    const lifecycle = createLifecycleFake();
+    const useCase = new TrainModelUseCase({ modelTraining: { trainModel: testDouble.fn<ModelTrainingPort["trainModel"]>().mockRejectedValue(new Error("boom")) }, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: lifecycle });
+    await expect(useCase.execute(baseRequest)).rejects.toThrow("boom");
+    expect(lifecycle.completeTask).toHaveBeenCalledWith(expect.any(String), "unknown");
+  });
+
+  it("blocker start failure does not fail training", async () => {
+    const lifecycle: TaskPowerLifecyclePort = {
+      startTask: testDouble.fn(async () => { throw new Error("no blocker"); }),
+      completeTask: testDouble.fn(async () => undefined),
+    };
+    const useCase = new TrainModelUseCase({ modelTraining: { trainModel: testDouble.fn<ModelTrainingPort["trainModel"]>().mockResolvedValue({ runId: "run-1", status: "failed", error: { code: "failed", message: "boom" } }) }, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: lifecycle });
+    await expect(useCase.execute(baseRequest)).resolves.toBeDefined();
   });
 });

@@ -6,7 +6,8 @@ import {
 } from "../../../contracts/model";
 import { TaskType } from "../../../contracts/runtime";
 import type { ModelRegistryPort, ModelTrainingPort } from "../../ports/model";
-import { TaskPowerLifecycleService } from "../../services/runtime";
+import type { TaskPowerLifecyclePort } from "../../services/runtime";
+import { randomUUID } from "node:crypto";
 
 function ensureBaseModelSelection(request: ModelTrainingRequest): void {
   if (!request.baseModel.modelRecordId && !request.baseModel.modelId && !request.baseModel.localPath) {
@@ -31,7 +32,7 @@ export class TrainModelUseCase {
     private readonly dependencies: {
       modelTraining: ModelTrainingPort;
       modelRegistry: ModelRegistryPort;
-      taskPowerLifecycle: TaskPowerLifecycleService;
+      taskPowerLifecycle: TaskPowerLifecyclePort;
     },
   ) {}
 
@@ -59,10 +60,33 @@ export class TrainModelUseCase {
       };
     }
 
-    const trainingResult = normalizeModelTrainingResult(await this.dependencies.modelTraining.trainModel(normalizedRequest));
-    await this.dependencies.taskPowerLifecycle.startTask(trainingResult.runId, TaskType.MODEL_TRAINING);
-    if (trainingResult.status === "succeeded" || trainingResult.status === "failed" || trainingResult.status === "cancelled") {
-      await this.dependencies.taskPowerLifecycle.completeTask(trainingResult.runId, trainingResult.status);
+    const tentativeRunId = randomUUID();
+    try {
+      await this.dependencies.taskPowerLifecycle.startTask(tentativeRunId, TaskType.MODEL_TRAINING);
+    } catch {
+      // Power blocker startup failures must not fail model training.
+    }
+    let lifecycleRequestId = tentativeRunId;
+    let terminalStatus: ModelTrainingResult["status"] | undefined;
+    let trainingResult: ModelTrainingResult;
+    try {
+      trainingResult = normalizeModelTrainingResult(await this.dependencies.modelTraining.trainModel(normalizedRequest));
+      lifecycleRequestId = trainingResult.runId || tentativeRunId;
+      terminalStatus = trainingResult.status;
+    } finally {
+      if (terminalStatus === "succeeded" || terminalStatus === "failed" || terminalStatus === "cancelled") {
+        try {
+          await this.dependencies.taskPowerLifecycle.completeTask(lifecycleRequestId, terminalStatus);
+        } catch {
+          // Power blocker teardown failures must not fail model training.
+        }
+      } else {
+        try {
+          await this.dependencies.taskPowerLifecycle.completeTask(lifecycleRequestId, "unknown");
+        } catch {
+          // Power blocker teardown failures must not fail model training.
+        }
+      }
     }
 
     if (trainingResult.status !== "succeeded" || !trainingResult.generatedModelCandidate) {
