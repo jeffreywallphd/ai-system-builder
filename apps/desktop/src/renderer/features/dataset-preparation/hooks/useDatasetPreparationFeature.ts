@@ -14,10 +14,6 @@ import {
   resolveModelInMemoryLoadMessage,
   sawPythonRuntimeStartup,
 } from "./modelDownloadProgress";
-import {
-  classifyRecoveredDatasetPreparationCompletion,
-  identifyMatchingDatasetPreparationTask,
-} from "./datasetPreparationRecovery";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 import {
   isTransientDatasetPreparationTransportError,
@@ -612,161 +608,54 @@ export function useDatasetPreparationFeature(
 
     window.dispatchEvent(new CustomEvent("dataset-preparation-training-started"));
     setStatus({ kind: "loading", message: `Checking model ${generationModelId} before dataset preparation...` });
-    void refreshModelDownloadProgress();
-    progressTimer = window.setInterval(() => {
-      void refreshModelDownloadProgress();
-    }, 750);
 
-    const monitorRuntimeTaskRecovery = async () => {
-      if (!runtimeStatusClient) {
-        stopProgressMonitoring();
-        return;
-      }
+    const started = await datasetClient.startPrepareTrainingDataset(request, { requestId });
+    if ("error" in started) {
+      setStatus({ kind: "error", message: appendErrorDetailsMessage(started.error.message, started.error.details) });
+      return;
+    }
 
-      let consecutiveReadFailures = 0;
-      const recoveryStartedAtMs = Date.now();
-      while (preparationActive) {
-        if (stopTrainingRequestedRef.current) {
-          setStatus({ kind: "idle", message: "Training stopped." });
-          stopProgressMonitoring();
+    const reconnectDeadlineMs = Date.now() + 5_000;
+    while (!stopTrainingRequestedRef.current) {
+      try {
+        const pollResponse = await datasetClient.readPrepareTrainingDatasetTask(started.requestId);
+        if (pollResponse.ok === false) {
+          setStatus({ kind: "error", message: appendErrorDetailsMessage(pollResponse.error.message, pollResponse.error.details) });
           return;
         }
-
-        try {
-          const snapshot = await runtimeStatusClient.readStatus();
-          consecutiveReadFailures = 0;
-          applyRuntimeProgressSnapshot(snapshot);
-          const matchingTask = identifyMatchingDatasetPreparationTask(snapshot, {
-            requestId,
-            sinceEpochMs: progressStartedAtMs,
-          });
-          const withinGracePeriod = (Date.now() - recoveryStartedAtMs) < recoveryGraceWindowMs;
-          const completion = classifyRecoveredDatasetPreparationCompletion(matchingTask, {
-            withinGracePeriod,
-          });
-
-          if (completion === "still-running") {
-            await new Promise<void>((resolve) => {
-              window.setTimeout(resolve, 750);
-            });
-            continue;
-          }
-          if (completion === "waiting-for-matching-task") {
-            setStatus({
-              kind: "loading",
-              message: "Connection to dataset preparation was interrupted. Reconnecting to runtime progress...",
-            });
-            await new Promise<void>((resolve) => {
-              window.setTimeout(resolve, 750);
-            });
-            continue;
-          }
-
-          if (completion === "succeeded") {
-            stopProgressMonitoring();
-            try {
-              await refreshArtifacts();
-              await refreshRuntimeModelStatus();
-              setStatus({
-                kind: "success",
-                message: "Dataset preparation completed in Python runtime after reconnecting. Artifacts were refreshed.",
-              });
-              onPrepared?.();
-            } catch {
-              setStatus({
-                kind: "success",
-                message: "Dataset preparation completed in Python runtime, but result transport was interrupted. Refresh artifacts to view the output.",
-              });
-            }
-            return;
-          }
-
-          if (completion === "failed") {
-            stopProgressMonitoring();
-            setStatus({
-              kind: "error",
-              message: matchingTask.terminalMessage?.trim() || "Dataset preparation failed in Python runtime after transport disconnect.",
-            });
-            return;
-          }
-
-          if (completion === "stopped") {
-            stopProgressMonitoring();
-            setStatus({ kind: "idle", message: "Training stopped." });
-            return;
-          }
-
-          if (completion === "unknown" || completion === "unrelated-runtime-task") {
-            stopProgressMonitoring();
-            setStatus({
-              kind: "error",
-              message: completion === "unknown"
-                ? "Connection was interrupted and final task state is unknown. Refresh artifacts to confirm dataset outputs."
-                : "Connection was interrupted and runtime progress for this request could not be recovered. Refresh artifacts to confirm whether output was produced.",
-            });
-            return;
-          }
-        } catch {
-          consecutiveReadFailures += 1;
-          setStatus({ kind: "loading", message: "Reconnecting to runtime progress monitor..." });
-          if (consecutiveReadFailures >= 5) {
-            stopProgressMonitoring();
-            setStatus({
-              kind: "error",
-              message: "Lost connection to dataset preparation progress. Task may still be running; refresh artifacts in a moment.",
-            });
-            return;
-          }
+        if ("pending" in pollResponse && pollResponse.pending) {
+          const progressMessage = pollResponse.progress?.message ?? "Preparing training dataset...";
+          const processed = pollResponse.progress?.processed;
+          const total = pollResponse.progress?.total;
+          const suffix = typeof processed === "number" && typeof total === "number" ? ` (${processed}/${total})` : "";
+          setStatus({ kind: "loading", message: `${progressMessage}${suffix}` });
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+          continue;
         }
 
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, 750);
+        setStatus({ kind: "success", message: "Training dataset is ready." });
+        setResultSummary({
+          datasetKey: pollResponse.value.outputs.local?.dataset.storage.key ?? "(not produced locally)",
+          datasetRows: pollResponse.value.summary.datasetRowCount ?? pollResponse.value.summary.generatedExampleCount,
         });
-      }
-    };
-
-    let response: Awaited<ReturnType<DesktopDatasetPreparationClient["prepareTrainingDatasetFromArtifacts"]>>;
-    try {
-      response = await datasetClient.prepareTrainingDatasetFromArtifacts(
-        request,
-        { requestId },
-      );
-    } catch (error) {
-      if (stopTrainingRequestedRef.current) {
-        setStatus({ kind: "idle", message: "Training stopped." });
-        stopProgressMonitoring();
-      } else if (runtimeStatusClient && isTransientDatasetPreparationTransportError(error)) {
-        stopProgressInterval();
-        setStatus({
-          kind: "loading",
-          message: "Connection to dataset preparation was interrupted. Reconnecting to runtime progress...",
-        });
-        await monitorRuntimeTaskRecovery();
-      } else {
+        await refreshArtifacts();
+        await refreshRuntimeModelStatus();
+        onPrepared?.();
+        return;
+      } catch (error) {
+        if (isTransientDatasetPreparationTransportError(error) && Date.now() < reconnectDeadlineMs) {
+          setStatus({ kind: "loading", message: "Reconnecting to task..." });
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+          continue;
+        }
         setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
-        stopProgressMonitoring();
+        return;
       }
-      return;
-    }
-    stopProgressMonitoring();
-
-    if (response.ok === false) {
-      setStatus(stopTrainingRequestedRef.current
-        ? { kind: "idle", message: "Training stopped." }
-        : { kind: "error", message: appendErrorDetailsMessage(response.error.message, response.error.details) });
-      return;
     }
 
-    setStatus({ kind: "success", message: "Training dataset is ready." });
-    setResultSummary({
-      datasetKey: response.value.outputs.local?.dataset.storage.key ?? "(not produced locally)",
-      datasetRows: response.value.summary.datasetRowCount ?? response.value.summary.generatedExampleCount,
-    });
-
-    await refreshArtifacts();
-    await refreshRuntimeModelStatus();
-    onPrepared?.();
+    setStatus({ kind: "idle", message: "Training stopped." });
   }, [
+    selectedArtifactIds,  }, [
     selectedArtifactIds,
     unsupportedDocumentPolicy,
     normalizationMode,

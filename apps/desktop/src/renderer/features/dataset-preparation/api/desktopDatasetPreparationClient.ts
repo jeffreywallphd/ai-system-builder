@@ -31,10 +31,13 @@ export interface DesktopDatasetPreparationRequestContext {
 
 export interface DesktopDatasetPreparationClient {
   browseSourceArtifacts: () => Promise<Array<{ artifactId: string; label: string; storageKey: string }>>;
-  prepareTrainingDatasetFromArtifacts: (
+  startPrepareTrainingDataset: (
     input: DesktopPrepareTrainingDatasetInput,
     context?: DesktopDatasetPreparationRequestContext,
-  ) => Promise<DesktopDatasetPreparationResult>;
+  ) => Promise<{ requestId: string } | { error: { code: string; message: string; details?: Record<string, unknown> } }>;
+  readPrepareTrainingDatasetTask: (
+    requestId: string,
+  ) => Promise<DesktopDatasetPreparationResult | { ok: true; pending: true; progress?: { message?: string; processed?: number; total?: number } }>;
 }
 
 function ensureSuccessEnvelope(response: unknown, fallbackMessage: string): { value?: unknown } {
@@ -84,13 +87,12 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
       });
     },
 
-    async prepareTrainingDatasetFromArtifacts(
+    async startPrepareTrainingDataset(
       input: DesktopPrepareTrainingDatasetInput,
       context?: DesktopDatasetPreparationRequestContext,
-    ): Promise<DesktopDatasetPreparationResult> {
-      if (!desktopApi.prepareTrainingDatasetFromArtifacts) {
+    ) {
+      if (!desktopApi.startPrepareTrainingDataset) {
         return {
-          ok: false,
           error: {
             code: "unavailable",
             message: "Dataset preparation is unavailable.",
@@ -98,48 +100,45 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         };
       }
 
-      let response: unknown;
       try {
-        response = await desktopApi.prepareTrainingDatasetFromArtifacts(input, context);
+        const response = await desktopApi.startPrepareTrainingDataset(input, context);
+        const payload = ensureSuccessEnvelope(response, "Dataset preparation failed to start.");
+        const requestId = (payload.value as { requestId?: string } | undefined)?.requestId;
+        if (typeof requestId !== "string" || requestId.trim().length === 0) {
+          return {
+            error: { code: "internal", message: "Dataset preparation start response missing requestId." },
+          };
+        }
+        return { requestId };
       } catch (error) {
         throw normalizeDatasetPreparationTransportError(error);
       }
-      if (!isPreloadResponseEnvelope(response)) {
-        return {
-          ok: false,
-          error: {
-            code: "internal",
-            message: "Dataset preparation failed.",
-          },
-        };
+    },
+
+    async readPrepareTrainingDatasetTask(requestId: string) {
+      if (!desktopApi.readPrepareTrainingDatasetTask) {
+        return { ok: false, error: { code: "unavailable", message: "Dataset preparation is unavailable." } };
       }
 
-      if (!response.ok) {
-        return {
-          ok: false,
-          error: {
-            code: response.error?.code ?? "internal",
-            message: response.error?.message ?? "Dataset preparation failed.",
-            details: response.error?.details,
-          },
-        };
+      try {
+        const response = await desktopApi.readPrepareTrainingDatasetTask({ requestId });
+        if (!isPreloadResponseEnvelope(response)) {
+          return { ok: false, error: { code: "internal", message: "Dataset preparation task read failed." } };
+        }
+        if (!response.ok) {
+          return { ok: false, error: { code: response.error?.code ?? "internal", message: response.error?.message ?? "Dataset preparation failed.", details: response.error?.details } };
+        }
+        const value = response.value as { status?: string; progress?: { message?: string; processed?: number; total?: number }; result?: DesktopPreparedTrainingDatasetResult; error?: { message?: string } } | undefined;
+        if (value?.status === "succeeded" && value.result) {
+          return { ok: true, value: value.result };
+        }
+        if (value?.status === "failed") {
+          return { ok: false, error: { code: "failed", message: value.error?.message ?? "Dataset preparation failed." } };
+        }
+        return { ok: true, pending: true as const, progress: value?.progress };
+      } catch (error) {
+        throw normalizeDatasetPreparationTransportError(error);
       }
-
-      const result = (response.value as { result?: DesktopPreparedTrainingDatasetResult } | undefined)?.result;
-      if (!result) {
-        return {
-          ok: false,
-          error: {
-            code: "internal",
-            message: "Dataset preparation response missing result payload.",
-          },
-        };
-      }
-
-      return {
-        ok: true,
-        value: result,
-      };
     },
   };
 }
