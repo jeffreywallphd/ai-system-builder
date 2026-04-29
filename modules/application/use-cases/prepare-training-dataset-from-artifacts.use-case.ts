@@ -19,17 +19,16 @@ import type {
   DatasetPreparationWarning,
   PrepareTrainingDatasetRequest,
   PrepareTrainingDatasetResult,
-  PythonRuntimeTaskStatusResult,
 } from "../../contracts/runtime";
 
 import type { ApplicationRequestContext } from "../ports";
-import { PythonDatasetPreparationError, type PythonDatasetPreparationPort } from "../ports/runtime";
 import type { RuntimeTaskRegistryPort } from "../ports/runtime";
 import type { ArtifactCatalogReadPort } from "../ports/artifact-catalog";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRepoStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
 import { TaskType } from "../../contracts/runtime";
 import type { TaskPowerLifecyclePort } from "../services/runtime";
+import type { RuntimeTaskRecord, RuntimeTaskStatus } from "../../contracts/runtime";
 
 export interface PrepareTrainingDatasetFromArtifactsCommand {
   sourceArtifactIds: string[];
@@ -69,7 +68,6 @@ export interface PrepareTrainingDatasetFromArtifactsValue {
 export type PrepareTrainingDatasetFromArtifactsResult = ContractResult<PrepareTrainingDatasetFromArtifactsValue>;
 
 export interface PrepareTrainingDatasetFromArtifactsUseCaseDependencies {
-  datasetPreparation: PythonDatasetPreparationPort;
   runtimeTaskRegistry: RuntimeTaskRegistryPort;
   storageBindings: ArtifactStorageBindingPort;
   storage: ArtifactObjectStoragePort;
@@ -319,7 +317,6 @@ function isPrepareTrainingDatasetResult(value: unknown): value is PrepareTrainin
 }
 
 export class PrepareTrainingDatasetFromArtifactsUseCase {
-  private readonly datasetPreparation: PythonDatasetPreparationPort;
   private readonly runtimeTaskRegistry: RuntimeTaskRegistryPort;
   private readonly storageBindings: ArtifactStorageBindingPort;
   private readonly storage: ArtifactObjectStoragePort;
@@ -332,7 +329,6 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly materializedResultsByRequestId = new Map<string, PrepareTrainingDatasetFromArtifactsValue>();
 
   public constructor(dependencies: PrepareTrainingDatasetFromArtifactsUseCaseDependencies) {
-    this.datasetPreparation = dependencies.datasetPreparation;
     this.runtimeTaskRegistry = dependencies.runtimeTaskRegistry;
     this.storageBindings = dependencies.storageBindings;
     this.storage = dependencies.storage;
@@ -351,8 +347,6 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       return staged;
     }
 
-    // TODO(runtime-task-registry):
-    // Replace direct runtime execution with startTask + polling
     const runtimeRequest: PrepareTrainingDatasetRequest = {
       sourceInputs: staged.value.sourceInputs,
       recipe: command.recipe,
@@ -391,9 +385,6 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       }, context);
     } catch (error) {
       await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
-      if (error instanceof PythonDatasetPreparationError) {
-        return createFailureResult(error.contractError, context);
-      }
       return createFailureResult(
         createContractError("internal", error instanceof Error ? error.message : "Failed to start dataset preparation."),
         context,
@@ -404,37 +395,26 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   public async readPrepareTrainingDataset(
     requestId: string,
     context?: ApplicationRequestContext,
-  ): Promise<ContractResult<PythonRuntimeTaskStatusResult | { requestId: string; taskType: string; status: "succeeded"; result: PrepareTrainingDatasetFromArtifactsValue }>> {
+  ): Promise<ContractResult<RuntimeTaskRecord | { requestId: string; taskType: string; status: "succeeded"; result: PrepareTrainingDatasetFromArtifactsValue }>> {
     try {
       const cached = this.materializedResultsByRequestId.get(requestId);
       if (cached) {
         return createSuccessResult({ requestId, taskType: "prepare-training-dataset", status: "succeeded", result: cached }, context);
       }
       const statusRecord = await this.runtimeTaskRegistry.getTaskStatus(requestId);
-      const status: PythonRuntimeTaskStatusResult = {
-        requestId: statusRecord.requestId,
-        taskType: "prepare-training-dataset",
-        status: statusRecord.status,
-        progress: statusRecord.progress as Record<string, unknown> | undefined,
-        data: statusRecord.data as PythonRuntimeTaskStatusResult["data"],
-        error: statusRecord.error as PythonRuntimeTaskStatusResult["error"],
-        metadata: statusRecord.metadata,
-        startedAt: statusRecord.startedAt,
-        updatedAt: statusRecord.updatedAt,
-      };
-      if (status.status === "succeeded" && status.data) {
-        let terminalStatus: PythonRuntimeTaskStatusResult["status"] = status.status;
+      if (statusRecord.status === "succeeded" && statusRecord.data) {
+        let terminalStatus: RuntimeTaskStatus = statusRecord.status;
         try {
           const command = this.commandByRequestId.get(requestId);
           if (!command) {
             throw new Error(`Dataset preparation command context missing for request '${requestId}'.`);
           }
-          if (!isPrepareTrainingDatasetResult(status.data)) {
+          if (!isPrepareTrainingDatasetResult(statusRecord.data)) {
             throw new Error(`Dataset preparation runtime result is invalid for request '${requestId}'.`);
           }
-          const materialized = await this.materializeRuntimeResult(command, status.data, context);
+          const materialized = await this.materializeRuntimeResult(command, statusRecord.data, context);
           this.materializedResultsByRequestId.set(requestId, materialized);
-          return createSuccessResult({ ...status, result: materialized }, context);
+          return createSuccessResult({ requestId: statusRecord.requestId, taskType: "prepare-training-dataset", status: "succeeded", result: materialized }, context);
         } catch (error) {
           terminalStatus = "failed";
           throw error;
@@ -443,15 +423,12 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           await this.cleanupRuntimeWorkingDir(requestId);
         }
       }
-      if (status.status === "succeeded" || status.status === "failed" || status.status === "cancelled" || status.status === "unknown") {
-        await this.taskPowerLifecycle.completeTask(requestId, status.status);
+      if (statusRecord.status === "succeeded" || statusRecord.status === "failed" || statusRecord.status === "cancelled" || statusRecord.status === "unknown") {
+        await this.taskPowerLifecycle.completeTask(requestId, statusRecord.status);
         await this.cleanupRuntimeWorkingDir(requestId);
       }
-      return createSuccessResult(status, context);
+      return createSuccessResult(statusRecord, context);
     } catch (error) {
-      if (error instanceof PythonDatasetPreparationError) {
-        return createFailureResult(error.contractError, context);
-      }
       return createFailureResult(
         createContractError("internal", error instanceof Error ? error.message : "Failed to read dataset preparation status."),
         context,

@@ -716,7 +716,6 @@ export function composeDesktopHost(
         ingestWebsitePage,
       });
       const prepareTrainingDatasetFromArtifactsUseCase = new PrepareTrainingDatasetFromArtifactsUseCase({
-        datasetPreparation: datasetPreparationPort,
         runtimeTaskRegistry,
         storageBindings: artifactBindings,
         storage,
