@@ -22,6 +22,9 @@ import {
   type RuntimeTaskError,
   type RuntimeTaskStatus,
   type RuntimeTaskConcurrencyClass,
+  type StartRuntimeTaskRequest,
+  type StartRuntimeTaskResult,
+  type CancelRuntimeTaskResult,
   type RuntimeTaskListRequest,
   type RuntimeTaskListResult,
   type RuntimeTaskRecord,
@@ -677,5 +680,25 @@ describe("runtime task registry contracts", () => {
     expect(Array.isArray(listResult.tasks)).toBe(true);
     expect(retention.maxCompletedTasks).toBe(1_000);
     expect(genericError.message).toBe("failed");
+  });
+
+  it("defines generic runtime task start and cancel contracts", () => {
+    const startRequest: StartRuntimeTaskRequest = {
+      taskType: TaskType.DATASET_PREPARATION,
+      concurrencyClass: "cpu-heavy",
+      payload: { sourceIds: ["a1"] },
+      metadata: { caller: "test" },
+    };
+
+    const started: StartRuntimeTaskResult = { requestId: "req-start-1" };
+    const cancelled: CancelRuntimeTaskResult = {
+      requestId: started.requestId,
+      status: "cancelled",
+      cancelled: true,
+    };
+
+    expect(startRequest.taskType).toBe(TaskType.DATASET_PREPARATION);
+    expect(started.requestId).toBe("req-start-1");
+    expect(cancelled.cancelled).toBe(true);
   });
 });
