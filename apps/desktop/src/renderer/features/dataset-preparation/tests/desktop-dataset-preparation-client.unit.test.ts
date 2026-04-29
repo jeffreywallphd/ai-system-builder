@@ -6,7 +6,8 @@ describe("desktop dataset preparation client", () => {
   it("maps success response from preload bridge", async () => {
     const hostWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
     hostWindow.window ??= {} as Window & typeof globalThis;
-    const prepareTrainingDatasetFromArtifacts = vi.fn().mockResolvedValue({
+    const startPrepareTrainingDataset = vi.fn().mockResolvedValue({ ok: true, value: { requestId: "req-123" } });
+    const readPrepareTrainingDatasetTask = vi.fn().mockResolvedValue({
       ok: true,
       value: {
         result: {
@@ -64,12 +65,13 @@ describe("desktop dataset preparation client", () => {
       verifyPublishedArtifactBacking: async () => ({ ok: false }),
       registerArtifactFromRepo: async () => ({ ok: false }),
       localizeArtifactFromRepo: async () => ({ ok: false }),
-      prepareTrainingDatasetFromArtifacts,
+      startPrepareTrainingDataset,
+      readPrepareTrainingDatasetTask,
     };
 
     const client = createDesktopDatasetPreparationClient();
     const browseResult = await client.browseSourceArtifacts();
-    const response = await client.prepareTrainingDatasetFromArtifacts({
+    const started = await client.startPrepareTrainingDataset({
       sourceArtifactIds: ["artifact-1"],
       recipe: {
         normalization: { targetFormat: "markdown" },
@@ -87,8 +89,10 @@ describe("desktop dataset preparation client", () => {
     });
 
     expect(browseResult).toEqual([{ artifactId: "artifact-1", label: "stored/a1.jsonl", storageKey: "stored/a1.jsonl" }]);
+    expect(started).toEqual({ requestId: "req-123" });
+    const response = await client.readPrepareTrainingDatasetTask("req-123");
     expect(response.ok).toBe(true);
-    expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.any(Object), { requestId: "req-123" });
+    expect(startPrepareTrainingDataset).toHaveBeenCalledWith(expect.any(Object), { requestId: "req-123" });
   });
 
   it("maps failure response from preload bridge", async () => {
@@ -109,7 +113,7 @@ describe("desktop dataset preparation client", () => {
     };
 
     const client = createDesktopDatasetPreparationClient();
-    const response = await client.prepareTrainingDatasetFromArtifacts({
+    const started = await client.startPrepareTrainingDataset({
       sourceArtifactIds: [],
       recipe: {
         normalization: { targetFormat: "markdown" },
@@ -205,7 +209,7 @@ describe("desktop dataset preparation client", () => {
 
     const client = createDesktopDatasetPreparationClient();
 
-    await expect(client.prepareTrainingDatasetFromArtifacts({
+    await expect(client.startPrepareTrainingDataset({
       sourceArtifactIds: ["artifact-1"],
       recipe: {
         normalization: { targetFormat: "markdown" },

@@ -39,7 +39,7 @@ describe("DatasetPreparationFeature", () => {
   });
 
   it("constructs request, shows loading, and renders success output summary", async () => {
-    const prepareTrainingDatasetFromArtifacts = vi.fn().mockImplementation(async () => {
+    const startPrepareTrainingDataset = vi.fn().mockImplementation(async () => {
       await Promise.resolve();
       return {
         ok: true,
@@ -94,7 +94,12 @@ describe("DatasetPreparationFeature", () => {
           settingsClient={settingsClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts,
+            startPrepareTrainingDataset,
+            readPrepareTrainingDatasetTask: async () => ({ ok: true, value: {
+              outputs: { local: { dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } } } },
+              provenance: { sourceArtifactIds: ["artifact-1"], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 200 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } } }, split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true }, output: { format: "parquet" }, generationModelId: "google/flan-t5-base", summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } },
+              summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 },
+            } }),
           }}
         />,
       );
@@ -117,7 +122,7 @@ describe("DatasetPreparationFeature", () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledWith(expect.objectContaining({
+    expect(startPrepareTrainingDataset).toHaveBeenCalledWith(expect.objectContaining({
       sourceArtifactIds: ["artifact-1"],
       recipe: {
         normalization: {
@@ -176,7 +181,7 @@ describe("DatasetPreparationFeature", () => {
         <DatasetPreparationFeature
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+            startPrepareTrainingDataset: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
       );
@@ -198,7 +203,7 @@ describe("DatasetPreparationFeature", () => {
     settingsClient.readSettings.mockResolvedValueOnce({
       values: [{ key: "huggingface.defaultNamespace", value: "OpenFinAL" }],
     });
-    const prepareTrainingDatasetFromArtifacts = vi.fn().mockResolvedValue({
+    const startPrepareTrainingDataset = vi.fn().mockResolvedValue({
       ok: true,
       value: {
         outputs: {},
@@ -246,7 +251,12 @@ describe("DatasetPreparationFeature", () => {
           settingsClient={settingsClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts,
+            startPrepareTrainingDataset,
+            readPrepareTrainingDatasetTask: async () => ({ ok: true, value: {
+              outputs: { local: { dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } } } },
+              provenance: { sourceArtifactIds: ["artifact-1"], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 200 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } } }, split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true }, output: { format: "parquet" }, generationModelId: "google/flan-t5-base", summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } },
+              summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 },
+            } }),
           }}
         />,
       );
@@ -279,7 +289,7 @@ describe("DatasetPreparationFeature", () => {
 
   it("shows model download progress from Python runtime logs while preparation is running", async () => {
     let resolvePreparation: ((value: { ok: true; value: any }) => void) | undefined;
-    const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
+    const startPrepareTrainingDataset = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
       resolvePreparation = resolve;
     }));
     const runtimeStatusClient = {
@@ -310,7 +320,12 @@ describe("DatasetPreparationFeature", () => {
           runtimeStatusClient={runtimeStatusClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts,
+            startPrepareTrainingDataset,
+            readPrepareTrainingDatasetTask: async () => ({ ok: true, value: {
+              outputs: { local: { dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } } } },
+              provenance: { sourceArtifactIds: ["artifact-1"], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 200 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } } }, split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true }, output: { format: "parquet" }, generationModelId: "google/flan-t5-base", summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } },
+              summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 },
+            } }),
           }}
         />,
       );
@@ -377,7 +392,7 @@ describe("DatasetPreparationFeature", () => {
 
   it("shows stop training while preparation is active and stops the Python runtime", async () => {
     let rejectPreparation: ((error: Error) => void) | undefined;
-    const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<any>((_resolve, reject) => {
+    const startPrepareTrainingDataset = vi.fn(() => new Promise<any>((_resolve, reject) => {
       rejectPreparation = reject;
     }));
     const runtimeStatusClient = {
@@ -412,7 +427,12 @@ describe("DatasetPreparationFeature", () => {
           runtimeStatusClient={runtimeStatusClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts,
+            startPrepareTrainingDataset,
+            readPrepareTrainingDatasetTask: async () => ({ ok: true, value: {
+              outputs: { local: { dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } } } },
+              provenance: { sourceArtifactIds: ["artifact-1"], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 200 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } } }, split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true }, output: { format: "parquet" }, generationModelId: "google/flan-t5-base", summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } },
+              summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 },
+            } }),
           }}
         />,
       );
@@ -506,7 +526,7 @@ describe("DatasetPreparationFeature", () => {
             runtimeStatusClient={runtimeStatusClient}
             client={{
               browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async (_input, context) => {
+            startPrepareTrainingDataset: async (_input, context) => {
               requestId = context?.requestId;
               throw new Error("fetch failed");
             },
@@ -593,7 +613,7 @@ describe("DatasetPreparationFeature", () => {
             runtimeStatusClient={runtimeStatusClient}
             client={{
               browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-              prepareTrainingDatasetFromArtifacts: async (_input, context) => {
+              startPrepareTrainingDataset: async (_input, context) => {
                 requestId = context?.requestId;
                 throw new Error("fetch failed");
               },
@@ -659,7 +679,7 @@ describe("DatasetPreparationFeature", () => {
           runtimeStatusClient={runtimeStatusClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async () => {
+            startPrepareTrainingDataset: async () => {
               throw new Error("fetch failed");
             },
           }}
@@ -729,7 +749,7 @@ describe("DatasetPreparationFeature", () => {
           runtimeStatusClient={runtimeStatusClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async (_input, context) => {
+            startPrepareTrainingDataset: async (_input, context) => {
               capturedRequestId = context?.requestId;
               throw new Error("fetch failed");
             },
@@ -793,7 +813,7 @@ describe("DatasetPreparationFeature", () => {
           runtimeStatusClient={runtimeStatusClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async (_input, context) => {
+            startPrepareTrainingDataset: async (_input, context) => {
               capturedRequestId = context?.requestId;
               throw new Error("fetch failed");
             },
@@ -840,7 +860,7 @@ describe("DatasetPreparationFeature", () => {
           runtimeStatusClient={runtimeStatusClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async () => {
+            startPrepareTrainingDataset: async () => {
               throw new Error("permission denied");
             },
           }}
@@ -890,7 +910,7 @@ describe("DatasetPreparationFeature", () => {
             runtimeStatusClient={runtimeStatusClient}
             client={{
               browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-              prepareTrainingDatasetFromArtifacts: async () => {
+              startPrepareTrainingDataset: async () => {
                 throw new Error("fetch failed");
               },
             }}
@@ -921,7 +941,7 @@ describe("DatasetPreparationFeature", () => {
 
   it("retains in-progress status and locks form controls across remounts", async () => {
     let resolvePreparation: ((value: { ok: true; value: any }) => void) | undefined;
-    const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
+    const startPrepareTrainingDataset = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
       resolvePreparation = resolve;
     }));
 
@@ -935,7 +955,12 @@ describe("DatasetPreparationFeature", () => {
           settingsClient={settingsClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts,
+            startPrepareTrainingDataset,
+            readPrepareTrainingDatasetTask: async () => ({ ok: true, value: {
+              outputs: { local: { dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } } } },
+              provenance: { sourceArtifactIds: ["artifact-1"], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 200 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } } }, split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true }, output: { format: "parquet" }, generationModelId: "google/flan-t5-base", summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } },
+              summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 },
+            } }),
           }}
         />,
       );
@@ -972,7 +997,12 @@ describe("DatasetPreparationFeature", () => {
           settingsClient={settingsClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts,
+            startPrepareTrainingDataset,
+            readPrepareTrainingDatasetTask: async () => ({ ok: true, value: {
+              outputs: { local: { dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } } } },
+              provenance: { sourceArtifactIds: ["artifact-1"], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 200 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } } }, split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true }, output: { format: "parquet" }, generationModelId: "google/flan-t5-base", summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } },
+              summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 },
+            } }),
           }}
         />,
       );
@@ -1033,7 +1063,7 @@ describe("DatasetPreparationFeature", () => {
     vi.useFakeTimers();
     let resolvePreparation: ((value: { ok: true; value: any }) => void) | undefined;
     let requestId: string | undefined;
-    const prepareTrainingDatasetFromArtifacts = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
+    const startPrepareTrainingDataset = vi.fn(() => new Promise<{ ok: true; value: any }>((resolve) => {
       resolvePreparation = resolve;
     }));
     const runtimeStatusClient = {
@@ -1080,9 +1110,9 @@ describe("DatasetPreparationFeature", () => {
             runtimeStatusClient={runtimeStatusClient}
             client={{
               browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-              prepareTrainingDatasetFromArtifacts: async (input, context) => {
+              startPrepareTrainingDataset: async (input, context) => {
                 requestId = context?.requestId;
-                return prepareTrainingDatasetFromArtifacts(input, context);
+                return startPrepareTrainingDataset(input, context);
               },
             }}
           />,
@@ -1189,7 +1219,7 @@ describe("DatasetPreparationFeature", () => {
             runtimeStatusClient={runtimeStatusClient}
             client={{
               browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-              prepareTrainingDatasetFromArtifacts: async (_input, context) => {
+              startPrepareTrainingDataset: async (_input, context) => {
                 capturedRequestId = context?.requestId;
                 throw new Error("fetch failed");
               },
@@ -1258,7 +1288,7 @@ describe("DatasetPreparationFeature", () => {
           runtimeStatusClient={runtimeStatusClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+            startPrepareTrainingDataset: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
       );
@@ -1292,7 +1322,7 @@ describe("DatasetPreparationFeature", () => {
           }}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+            startPrepareTrainingDataset: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
       );
@@ -1315,7 +1345,7 @@ describe("DatasetPreparationFeature", () => {
           }}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+            startPrepareTrainingDataset: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
           }}
         />,
       );
@@ -1325,7 +1355,7 @@ describe("DatasetPreparationFeature", () => {
   });
 
   it("keeps submit behavior stable when rerendered with a new options object shape", async () => {
-    const prepareTrainingDatasetFromArtifacts = vi.fn().mockResolvedValue({
+    const startPrepareTrainingDataset = vi.fn().mockResolvedValue({
       ok: true,
       value: {
           outputs: {
@@ -1379,7 +1409,12 @@ describe("DatasetPreparationFeature", () => {
           settingsClient={settingsClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts,
+            startPrepareTrainingDataset,
+            readPrepareTrainingDatasetTask: async () => ({ ok: true, value: {
+              outputs: { local: { dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } } } },
+              provenance: { sourceArtifactIds: ["artifact-1"], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 200 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } } }, split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true }, output: { format: "parquet" }, generationModelId: "google/flan-t5-base", summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } },
+              summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 },
+            } }),
           }}
         />,
       );
@@ -1392,7 +1427,12 @@ describe("DatasetPreparationFeature", () => {
           settingsClient={settingsClient}
           client={{
             browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
-            prepareTrainingDatasetFromArtifacts,
+            startPrepareTrainingDataset,
+            readPrepareTrainingDatasetTask: async () => ({ ok: true, value: {
+              outputs: { local: { dataset: { sourceKind: "runtime", storage: { key: "stored-dataset", mediaType: "application/x-ndjson", sizeBytes: 10 } } } },
+              provenance: { sourceArtifactIds: ["artifact-1"], recipe: { normalization: { targetFormat: "markdown" }, chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 200 }, generation: { mode: "qa", model: { provider: "transformers", modelId: "google/flan-t5-base" } } }, split: { trainRatio: 0.8, testRatio: 0.2, shuffle: true }, output: { format: "parquet" }, generationModelId: "google/flan-t5-base", summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } },
+              summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 },
+            } }),
           }}
         />,
       );
@@ -1407,7 +1447,7 @@ describe("DatasetPreparationFeature", () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(prepareTrainingDatasetFromArtifacts).toHaveBeenCalledTimes(1);
+    expect(startPrepareTrainingDataset).toHaveBeenCalledTimes(1);
     expect(onPrepared).toHaveBeenCalledTimes(1);
   });
 });

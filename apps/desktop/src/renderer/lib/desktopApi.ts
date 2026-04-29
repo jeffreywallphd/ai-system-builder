@@ -295,7 +295,15 @@ export interface DesktopBridgeRequestContext {
 }
 
 export interface DesktopDatasetPreparationApi {
-  prepareTrainingDatasetFromArtifacts: (
+  startPrepareTrainingDataset?: (
+    input: DesktopPrepareTrainingDatasetInput,
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  readPrepareTrainingDatasetTask?: (
+    input: { requestId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  prepareTrainingDatasetFromArtifacts?: (
     input: DesktopPrepareTrainingDatasetInput,
     context?: DesktopBridgeRequestContext,
   ) => Promise<unknown>;
@@ -323,6 +331,8 @@ interface DesktopApiBridge {
     targets: DesktopWebsiteIngestionTarget[];
     mode?: "automatic" | "rendered";
   }) => Promise<unknown>;
+  startPrepareTrainingDataset?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   prepareTrainingDatasetFromArtifacts?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
