@@ -11,7 +11,22 @@ import type {
 } from "../../../contracts/runtime";
 import { TaskType } from "../../../contracts/runtime";
 
-function mapTaskType(taskType: string): RuntimeTaskRecord["taskType"] {
+const genericToPythonTaskTypeMap: Record<TaskType, string> = {
+  [TaskType.DATASET_PREPARATION]: "prepare-training-dataset",
+  [TaskType.MODEL_TRAINING]: "train-model",
+  [TaskType.MODEL_VALIDATION]: "validate-model",
+  [TaskType.MODEL_PUBLISHING]: "publish-model",
+};
+
+function toPythonTaskType(taskType: TaskType): string {
+  const mapped = genericToPythonTaskTypeMap[taskType];
+  if (!mapped) {
+    throw new Error(`Unsupported runtime task type '${taskType}'.`);
+  }
+  return mapped;
+}
+
+function toGenericTaskType(taskType: string | undefined): RuntimeTaskRecord["taskType"] {
   if (taskType === "prepare-training-dataset") {
     return TaskType.DATASET_PREPARATION;
   }
@@ -21,7 +36,17 @@ function mapTaskType(taskType: string): RuntimeTaskRecord["taskType"] {
   if (taskType === "validate-model") {
     return TaskType.MODEL_VALIDATION;
   }
-  return TaskType.MODEL_PUBLISHING;
+  if (taskType === "publish-model") {
+    return TaskType.MODEL_PUBLISHING;
+  }
+  throw new Error(`Unknown python runtime task type '${taskType ?? "undefined"}'.`);
+}
+
+function toRuntimeTaskStatus(status: string | undefined): RuntimeTaskStatus {
+  if (status === "queued" || status === "running" || status === "succeeded" || status === "failed" || status === "cancelled" || status === "unknown") {
+    return status;
+  }
+  return "unknown";
 }
 
 export function createPythonRuntimeTaskRegistryAdapter(runtimePort: PythonRuntimePort): RuntimeTaskRegistryPort {
@@ -29,7 +54,7 @@ export function createPythonRuntimeTaskRegistryAdapter(runtimePort: PythonRuntim
     async startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult> {
       return runtimePort.startTask({
         requestId: request.requestId ?? `runtime-task-${Date.now()}`,
-        taskType: request.taskType,
+        taskType: toPythonTaskType(request.taskType),
         payload: request.payload,
         metadata: request.metadata,
       });
@@ -38,7 +63,7 @@ export function createPythonRuntimeTaskRegistryAdapter(runtimePort: PythonRuntim
       const status = await runtimePort.readTaskStatus(requestId);
       return {
         requestId: status.requestId,
-        taskType: mapTaskType(status.taskType ?? "prepare-training-dataset"),
+        taskType: toGenericTaskType(status.taskType),
         status: status.status,
         concurrencyClass: "unknown",
         progress: status.progress,
@@ -54,7 +79,8 @@ export function createPythonRuntimeTaskRegistryAdapter(runtimePort: PythonRuntim
       return {
         requestId: result.requestId,
         cancelled: result.cancelled,
-        status: result.cancelled ? "cancelled" : "unknown",
+        status: toRuntimeTaskStatus(result.status),
+        message: result.message,
       };
     },
     async listTasks(_request: RuntimeTaskListRequest): Promise<RuntimeTaskListResult> {

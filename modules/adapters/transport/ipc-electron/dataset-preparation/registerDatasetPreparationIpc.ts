@@ -2,7 +2,7 @@ import type {
   PrepareTrainingDatasetFromArtifactsCommand,
 } from "../../../../application/use-cases";
 import type { ContractResult } from "../../../../contracts/shared";
-import type { PythonRuntimeTaskStatusResult } from "../../../../contracts/runtime";
+import type { RuntimeTaskRecord } from "../../../../contracts/runtime";
 import {
   DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
   DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL,
@@ -27,9 +27,8 @@ import {
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 type StartResultValue = { requestId: string; taskType: string; accepted: true; status: "queued" | "running"; startedAt?: string; updatedAt?: string; metadata?: Record<string, unknown> };
-type RuntimeTaskStatusReadResult = Omit<PythonRuntimeTaskStatusResult, "progress"> & {
+type RuntimeTaskStatusReadResult = RuntimeTaskRecord & {
   message?: string;
-  progress?: Record<string, unknown>;
 };
 type ReadResultValue = RuntimeTaskStatusReadResult | { requestId: string; taskType: string; status: "succeeded"; result: DesktopPrepareTrainingDatasetFinalResult; startedAt?: string; updatedAt?: string; completedAt?: string };
 type CancelResultValue = { requestId: string; cancelled: boolean; status: "cancelled" | "running" | "unknown" };
