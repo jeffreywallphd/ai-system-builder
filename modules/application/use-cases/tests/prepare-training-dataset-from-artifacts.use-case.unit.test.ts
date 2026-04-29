@@ -57,7 +57,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase async start cleanup", () =>
     });
 
     await useCase.startPrepareTrainingDataset(command);
-    await useCase.readPrepareTrainingDataset("r1");
+    const read = await useCase.readPrepareTrainingDataset("r1");
 
     const request = storeArtifact.mock.calls[0][0];
     expect(Array.from(request.content)).toEqual(Array.from(bytes));
@@ -65,6 +65,15 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase async start cleanup", () =>
     expect(request.descriptor.mediaType).toBe("application/x-ndjson");
     expect(request.descriptor.metadata.originalFileName).toBe("d.jsonl");
     expect(request.descriptor.metadata.runtimeRole).toBe("dataset");
+
+    expect(read.ok).toBe(true);
+    if (read.ok && read.value.status === "succeeded") {
+      const local = read.value.result.outputs.local?.dataset;
+      expect(local?.sourceKind).toBe("runtime");
+      expect(local?.originalName).toBe("d.jsonl");
+      expect(local?.storage.key).toBe(request.descriptor.key);
+      expect(local?.storage.mediaType).toBe("application/x-ndjson");
+    }
   });
 
 });

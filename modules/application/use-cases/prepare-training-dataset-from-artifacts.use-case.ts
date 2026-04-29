@@ -414,11 +414,13 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       if (!storeDataset.ok) {
         throw new Error(storeDataset.error.message);
       }
-      resultOutputs.local = { dataset: {
-        ...createStagedArtifactDescriptorFromStorageObjectDescriptor(storeDataset.value.descriptor),
-        sourceKind: "runtime",
-        originalName: originalFileName,
-      } };
+      resultOutputs.local = { dataset: createStagedArtifactDescriptorFromStorageObjectDescriptor(
+        storeDataset.value.descriptor,
+        {
+          sourceKind: "runtime",
+          originalName: originalFileName,
+        },
+      ) };
     }
 
     if (outputDestinations.huggingFace) {
