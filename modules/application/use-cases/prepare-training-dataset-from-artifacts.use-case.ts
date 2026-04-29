@@ -27,7 +27,8 @@ import { PythonDatasetPreparationError, type PythonDatasetPreparationPort } from
 import type { ArtifactCatalogReadPort } from "../ports/artifact-catalog";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRepoStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
-import type { PowerSuspensionBlockerPort } from "../ports/desktop";
+import { TaskType } from "../../contracts/runtime";
+import { TaskPowerLifecycleService } from "../services/runtime";
 
 export interface PrepareTrainingDatasetFromArtifactsCommand {
   sourceArtifactIds: string[];
@@ -72,7 +73,7 @@ export interface PrepareTrainingDatasetFromArtifactsUseCaseDependencies {
   storage: ArtifactObjectStoragePort;
   artifactRepoStorage?: ArtifactRepoStoragePort;
   artifactCatalog?: ArtifactCatalogReadPort;
-  powerSuspension: PowerSuspensionBlockerPort;
+  taskPowerLifecycle: TaskPowerLifecycleService;
   now?: () => string;
 }
 
@@ -321,12 +322,11 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly storage: ArtifactObjectStoragePort;
   private readonly artifactRepoStorage?: ArtifactRepoStoragePort;
   private readonly artifactCatalog?: ArtifactCatalogReadPort;
-  private readonly powerSuspension: PowerSuspensionBlockerPort;
+  private readonly taskPowerLifecycle: TaskPowerLifecycleService;
   private readonly now: () => string;
   private readonly runtimeWorkingDirsByRequestId = new Map<string, string>();
   private readonly commandByRequestId = new Map<string, PrepareTrainingDatasetFromArtifactsCommand>();
   private readonly materializedResultsByRequestId = new Map<string, PrepareTrainingDatasetFromArtifactsValue>();
-  private readonly blockerIdsByRequestId = new Map<string, string>();
 
   public constructor(dependencies: PrepareTrainingDatasetFromArtifactsUseCaseDependencies) {
     this.datasetPreparation = dependencies.datasetPreparation;
@@ -334,7 +334,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     this.storage = dependencies.storage;
     this.artifactRepoStorage = dependencies.artifactRepoStorage;
     this.artifactCatalog = dependencies.artifactCatalog;
-    this.powerSuspension = dependencies.powerSuspension;
+    this.taskPowerLifecycle = dependencies.taskPowerLifecycle;
     this.now = dependencies.now ?? (() => new Date().toISOString());
   }
 
@@ -368,15 +368,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       }
       this.runtimeWorkingDirsByRequestId.set(started.requestId, staged.value.runtimeWorkingDir);
       this.commandByRequestId.set(started.requestId, command);
-      try {
-        const blocker = await this.powerSuspension.startBlocker("dataset-preparation", {
-          requestId: started.requestId,
-          taskType: "dataset-preparation",
-        });
-        this.blockerIdsByRequestId.set(started.requestId, blocker.blockerId);
-      } catch {
-        // Power suspension blocker failures should not fail task startup.
-      }
+      await this.taskPowerLifecycle.startTask(started.requestId, TaskType.DATASET_PREPARATION);
       return createSuccessResult(started, context);
     } catch (error) {
       await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
@@ -411,6 +403,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           }
           const materialized = await this.materializeRuntimeResult(command, status.data, context);
           this.materializedResultsByRequestId.set(requestId, materialized);
+          await this.taskPowerLifecycle.completeTask(requestId, status.status);
           await this.cleanupRuntimeWorkingDir(requestId);
           return createSuccessResult({ ...status, result: materialized }, context);
         } catch (error) {
@@ -419,7 +412,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         }
       }
       if (status.status === "succeeded" || status.status === "failed" || status.status === "cancelled" || status.status === "unknown") {
-        await this.stopBlockerForRequest(requestId);
+        await this.taskPowerLifecycle.completeTask(requestId, status.status);
         await this.cleanupRuntimeWorkingDir(requestId);
       }
       return createSuccessResult(status, context);
@@ -433,20 +426,6 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       );
     }
   }
-
-  private async stopBlockerForRequest(requestId: string): Promise<void> {
-    const blockerId = this.blockerIdsByRequestId.get(requestId);
-    if (!blockerId) {
-      return;
-    }
-    this.blockerIdsByRequestId.delete(requestId);
-    try {
-      await this.powerSuspension.stopBlocker(blockerId);
-    } catch {
-      // Stop failures should not break lifecycle polling.
-    }
-  }
-
 
   private async materializeRuntimeResult(
     command: PrepareTrainingDatasetFromArtifactsCommand,
