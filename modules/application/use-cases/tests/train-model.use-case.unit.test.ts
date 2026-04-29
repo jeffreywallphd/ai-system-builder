@@ -1,6 +1,8 @@
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
+import { TaskType } from "../../../contracts/runtime";
 import type { PowerSuspensionBlockerPort } from "../../ports/desktop";
+import { TaskPowerLifecycleService } from "../../services/runtime";
 import type { ModelRegistryPort, ModelTrainingPort } from "../../ports/model";
 import { TrainModelUseCase } from "../model/train-model.use-case";
 
@@ -30,9 +32,9 @@ describe("TrainModelUseCase", () => {
 
   it("starts and stops blocker for terminal states", async () => {
     const powerSuspension = createPowerSuspensionMock();
-    const useCase = new TrainModelUseCase({ modelTraining: { trainModel: testDouble.fn<ModelTrainingPort["trainModel"]>().mockResolvedValue({ runId: "run-1", status: "failed", error: { code: "failed", message: "boom" } }) }, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, powerSuspension });
+    const useCase = new TrainModelUseCase({ modelTraining: { trainModel: testDouble.fn<ModelTrainingPort["trainModel"]>().mockResolvedValue({ runId: "run-1", status: "failed", error: { code: "failed", message: "boom" } }) }, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: new TaskPowerLifecycleService(powerSuspension) });
     await useCase.execute(baseRequest);
-    expect(powerSuspension.startBlocker).toHaveBeenCalledWith("model-training", { requestId: "run-1", taskType: "model-training" });
+    expect(powerSuspension.startBlocker).toHaveBeenCalledWith(TaskType.MODEL_TRAINING, { requestId: "run-1", taskType: TaskType.MODEL_TRAINING });
     expect(powerSuspension.stopBlocker).toHaveBeenCalledTimes(1);
     expect((await powerSuspension.listBlockers()).find((entry) => entry.requestId === "run-1")).toBeUndefined();
   });

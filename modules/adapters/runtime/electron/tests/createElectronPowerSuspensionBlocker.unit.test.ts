@@ -1,5 +1,6 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
+import { TaskType } from "../../../../contracts/runtime";
 import { createElectronPowerSuspensionBlocker } from "../createElectronPowerSuspensionBlocker";
 
 describe("createElectronPowerSuspensionBlocker", () => {
@@ -27,7 +28,7 @@ describe("createElectronPowerSuspensionBlocker", () => {
       createBlockerId: () => "blocker-1",
     });
 
-    const started = await port.startBlocker("dataset preparation", { requestId: "req-1", taskType: "prepare-dataset" });
+    const started = await port.startBlocker("dataset preparation", { requestId: "req-1", taskType: TaskType.DATASET_PREPARATION });
 
     expect(fake.start).toHaveBeenCalledWith("prevent-app-suspension");
     expect(started).toEqual({ blockerId: "blocker-1", active: true });
@@ -36,7 +37,7 @@ describe("createElectronPowerSuspensionBlocker", () => {
         blockerId: "blocker-1",
         reason: "dataset preparation",
         requestId: "req-1",
-        taskType: "prepare-dataset",
+        taskType: TaskType.DATASET_PREPARATION,
         active: true,
       },
     ]);
@@ -88,6 +89,30 @@ describe("createElectronPowerSuspensionBlocker", () => {
     const active = await port.listBlockers();
     expect(active.map((entry) => entry.blockerId)).toEqual(["one", "three"]);
     expect(fake.stop).toHaveBeenCalledWith(2);
+  });
+
+
+  it("stopping non-existent blocker does not throw", async () => {
+    const fake = createFakePowerSaveBlocker();
+    const port = createElectronPowerSuspensionBlocker({ powerSaveBlocker: fake });
+    expect(await port.stopBlocker("missing")).toEqual({ blockerId: "missing", active: false });
+  });
+
+  it("stopping already stopped blocker remains idempotent", async () => {
+    const fake = createFakePowerSaveBlocker();
+    const port = createElectronPowerSuspensionBlocker({ powerSaveBlocker: fake, createBlockerId: () => "one" });
+    await port.startBlocker("task");
+    await port.stopBlocker("one");
+    expect(await port.stopBlocker("one")).toEqual({ blockerId: "one", active: false });
+    expect(fake.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("listBlockers reflects powerSaveBlocker.isStarted state", async () => {
+    const fake = createFakePowerSaveBlocker();
+    const port = createElectronPowerSuspensionBlocker({ powerSaveBlocker: fake, createBlockerId: () => "one" });
+    await port.startBlocker("task");
+    fake.stop(1);
+    expect(await port.listBlockers()).toEqual([]);
   });
 
   it("throws clear error when powerSaveBlocker is unavailable", async () => {
