@@ -92,6 +92,11 @@ Power-suspension blockers should attach to runtime task lifecycle activity where
 - No renderer-owned task lifecycle orchestration.
 - No fallback to long-held HTTP/IPC request completion semantics.
 
+## Contract Boundary Decision
+
+- Generic runtime task registry contracts use `RuntimeTaskStatus` and `RuntimeTaskError`.
+- Python-specific contracts remain adapter-focused and may map to/from the generic runtime task contracts.
+
 ## Domain Modeling Decision
 
-Runtime domain value objects are added for identity/status/concurrency class because existing domain structure uses small value-object modules and explicit export surfaces. They remain adapter-agnostic and minimal.
+No domain runtime value objects are introduced initially; runtime task registry contracts are sufficient until domain behavior emerges.

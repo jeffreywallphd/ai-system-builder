@@ -15,6 +15,8 @@ export * from "./python-runtime-output-descriptor";
 export * from "./python-runtime-task-request";
 export * from "./python-runtime-task-result";
 export * from "./python-runtime-task-status";
+export * from "./runtime-task-status";
+export * from "./runtime-task-error";
 export * from "./runtime-task-concurrency-class";
 export * from "./runtime-task-progress";
 export * from "./runtime-task-record";
@@ -29,8 +31,6 @@ export * from "./prepare-training-dataset-request";
 export * from "./prepare-training-dataset-result";
 export * from "./train-model-task-request";
 export * from "./train-model-task-result";
-
 export * from "./validate-model-task-request";
 export * from "./validate-model-task-result";
-
 export * from "./task-type";
