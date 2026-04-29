@@ -18,6 +18,7 @@ import type {
   DatasetPreparationSummary,
   DatasetPreparationWarning,
   PrepareTrainingDatasetRequest,
+  PrepareTrainingDatasetResult,
   PythonRuntimeTaskStatusResult,
 } from "../../contracts/runtime";
 
@@ -282,6 +283,36 @@ async function validateDatasetOutput(tempPath: string, format: PrepareTrainingDa
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function isDatasetPreparationSummary(value: unknown): value is DatasetPreparationSummary {
+  return isRecord(value)
+    && typeof value.sourceDocumentCount === "number"
+    && typeof value.normalizedDocumentCount === "number"
+    && typeof value.skippedDocumentCount === "number"
+    && typeof value.chunkCount === "number"
+    && typeof value.generatedExampleCount === "number"
+    && typeof value.datasetRowCount === "number"
+    && typeof value.trainRowCount === "number"
+    && typeof value.testRowCount === "number";
+}
+
+function isPrepareTrainingDatasetResult(value: unknown): value is PrepareTrainingDatasetResult {
+  if (!isRecord(value) || !Array.isArray(value.outputs) || !isDatasetPreparationSummary(value.summary)) {
+    return false;
+  }
+
+  return value.outputs.every((output) =>
+    isRecord(output)
+    && typeof output.name === "string"
+    && typeof output.tempPath === "string"
+    && typeof output.mediaType === "string"
+    && (output.role === undefined || typeof output.role === "string")
+    && (output.metadata === undefined || isRecord(output.metadata)));
+}
+
 export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly datasetPreparation: PythonDatasetPreparationPort;
   private readonly storageBindings: ArtifactStorageBindingPort;
@@ -317,7 +348,6 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       split: command.split,
       output: command.output,
       runtime: {
-        ...(command.output.runtime ?? {}),
         runtimeWorkingDirectory: staged.value.runtimeWorkingDir,
       },
     };
@@ -357,14 +387,22 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       }
       const status = await this.datasetPreparation.readPrepareTrainingDatasetStatus(requestId);
       if (status.status === "succeeded" && status.data) {
-        const command = this.commandByRequestId.get(requestId);
-        if (!command) {
-          throw new Error(`Dataset preparation command context missing for request '${requestId}'.`);
+        try {
+          const command = this.commandByRequestId.get(requestId);
+          if (!command) {
+            throw new Error(`Dataset preparation command context missing for request '${requestId}'.`);
+          }
+          if (!isPrepareTrainingDatasetResult(status.data)) {
+            throw new Error(`Dataset preparation runtime result is invalid for request '${requestId}'.`);
+          }
+          const materialized = await this.materializeRuntimeResult(command, status.data, context);
+          this.materializedResultsByRequestId.set(requestId, materialized);
+          await this.cleanupRuntimeWorkingDir(requestId);
+          return createSuccessResult({ ...status, result: materialized }, context);
+        } catch (error) {
+          await this.cleanupRuntimeWorkingDir(requestId);
+          throw error;
         }
-        const materialized = await this.materializeRuntimeResult(command, status.data, context);
-        this.materializedResultsByRequestId.set(requestId, materialized);
-        await this.cleanupRuntimeWorkingDir(requestId);
-        return createSuccessResult({ ...status, result: materialized }, context);
       }
       if (status.status === "succeeded" || status.status === "failed" || status.status === "cancelled" || status.status === "unknown") {
         await this.cleanupRuntimeWorkingDir(requestId);
@@ -384,7 +422,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
 
   private async materializeRuntimeResult(
     command: PrepareTrainingDatasetFromArtifactsCommand,
-    runtimeResult: { outputs: Array<{ name: string; role?: string; tempPath: string; mediaType: string; metadata?: Record<string, unknown> }>; summary: DatasetPreparationSummary; warnings?: DatasetPreparationWarning[] },
+    runtimeResult: PrepareTrainingDatasetResult,
     context?: ApplicationRequestContext,
   ): Promise<PrepareTrainingDatasetFromArtifactsValue> {
     const datasetOutput = runtimeResult.outputs.find((output) => output.role === "dataset" || output.role === "artifact");
@@ -415,7 +453,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         throw new Error(storeDataset.error.message);
       }
       resultOutputs.local = { dataset: createStagedArtifactDescriptorFromStorageObjectDescriptor(
-        storeDataset.value.descriptor,
+        storeDataset.value,
         {
           sourceKind: "runtime",
           originalName: originalFileName,

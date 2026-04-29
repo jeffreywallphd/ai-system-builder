@@ -32,7 +32,10 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase async start cleanup", () =>
 
   it("keeps staged dir until terminal read then cleans", async () => {
     let stagedDir = "";
-    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ datasetPreparation:{ startPrepareTrainingDataset:testDouble.fn(async(req:any)=>{ stagedDir=req.runtime.runtimeWorkingDirectory; return {requestId:"r1",taskType:"prepare-training-dataset",accepted:true,status:"queued"}; }), readPrepareTrainingDatasetStatus:testDouble.fn(async()=>({requestId:"r1",taskType:"prepare-training-dataset",status:"succeeded",data:{outputs:[{name:"d",role:"dataset",tempPath:join(await mkdtemp(join(tmpdir(),"tmp-")),"d.jsonl"),mediaType:"application/x-ndjson"}],summary:{sourceDocumentCount:1,normalizedDocumentCount:1,skippedDocumentCount:0,chunkCount:1,generatedExampleCount:1,datasetRowCount:1,trainRowCount:1,testRowCount:0}}})) }, storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() } });
+    const outputDir = await mkdtemp(join(tmpdir(), "tmp-"));
+    const outputPath = join(outputDir, "d.jsonl");
+    await writeFile(outputPath, `{"x":1}\n`);
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ datasetPreparation:{ startPrepareTrainingDataset:testDouble.fn(async(req:any)=>{ stagedDir=req.runtime.runtimeWorkingDirectory; return {requestId:"r1",taskType:"prepare-training-dataset",accepted:true,status:"queued"}; }), readPrepareTrainingDatasetStatus:testDouble.fn(async()=>({requestId:"r1",taskType:"prepare-training-dataset",status:"succeeded",data:{outputs:[{name:"d",role:"dataset",tempPath:outputPath,mediaType:"application/x-ndjson"}],summary:{sourceDocumentCount:1,normalizedDocumentCount:1,skippedDocumentCount:0,chunkCount:1,generatedExampleCount:1,datasetRowCount:1,trainRowCount:1,testRowCount:0}}})) }, storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(async(request:any)=>({ok:true,value:request.descriptor})), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() } });
     const started=await useCase.startPrepareTrainingDataset(command);
     expect(started.ok).toBe(true);
     expect(await exists(stagedDir)).toBe(true);
@@ -41,7 +44,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase async start cleanup", () =>
   });
 
   it("stores materialized dataset with descriptor content contract shape", async () => {
-    const storeArtifact = testDouble.fn(async (request: any) => ({ ok: true, value: { descriptor: request.descriptor } }));
+    const storeArtifact = testDouble.fn(async (request: any) => ({ ok: true, value: request.descriptor }));
     const outputDir = await mkdtemp(join(tmpdir(), "tmp-"));
     const outputPath = join(outputDir, "d.jsonl");
     const bytes = new TextEncoder().encode(`{"x":1}\n`);
