@@ -349,7 +349,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   public async readPrepareTrainingDataset(
     requestId: string,
     context?: ApplicationRequestContext,
-  ): Promise<ContractResult<PythonRuntimeTaskStatusResult>> {
+  ): Promise<ContractResult<PythonRuntimeTaskStatusResult | { requestId: string; taskType: string; status: "succeeded"; result: PrepareTrainingDatasetFromArtifactsValue }>> {
     try {
       const cached = this.materializedResultsByRequestId.get(requestId);
       if (cached) {
@@ -399,16 +399,26 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
 
     if (outputDestinations.local) {
       const storageKey = buildGeneratedDatasetStorageKey(datasetOutput.name, command.output.format, this.now());
-      const storeDataset = await this.storage.storeArtifact(createStoreArtifactRequest({
-        key: storageKey,
-        mediaType: datasetOutput.mediaType,
-        data: datasetBytes,
-        metadata: buildDatasetMetadata(command, runtimeResult.summary, { provider: "local" }, datasetOutput.metadata),
+      const originalFileName = `${datasetOutput.name}.${command.output.format}`;
+      const storeDataset = await this.storage.storeArtifact(createStoreArtifactRequest(datasetBytes, {
+        descriptor: {
+          key: storageKey,
+          mediaType: datasetOutput.mediaType,
+          metadata: {
+            originalFileName,
+            runtimeRole: "dataset",
+            ...buildDatasetMetadata(command, runtimeResult.summary, { provider: "local" }, datasetOutput.metadata),
+          },
+        },
       }), context);
       if (!storeDataset.ok) {
         throw new Error(storeDataset.error.message);
       }
-      resultOutputs.local = { dataset: createStagedArtifactDescriptorFromStorageObjectDescriptor(storeDataset.value.descriptor) };
+      resultOutputs.local = { dataset: {
+        ...createStagedArtifactDescriptorFromStorageObjectDescriptor(storeDataset.value.descriptor),
+        sourceKind: "runtime",
+        originalName: originalFileName,
+      } };
     }
 
     if (outputDestinations.huggingFace) {

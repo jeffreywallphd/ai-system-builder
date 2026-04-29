@@ -52,7 +52,7 @@ export interface RegisterElectronIpcDependencies {
   localizeArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["localizeArtifactFromRepoUseCase"];
   ingestWebsitePageUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePageUseCase"];
   ingestWebsitePagesBatchUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePagesBatchUseCase"];
-  prepareTrainingDatasetFromArtifactsUseCase: RegisterDatasetPreparationIpcDependencies["prepareTrainingDatasetFromArtifactsUseCase"];
+  prepareTrainingDatasetUseCase: RegisterDatasetPreparationIpcDependencies["prepareTrainingDatasetUseCase"];
   listSettingsDefinitionsUseCase: RegisterApplicationSettingsIpcDependencies["listSettingsDefinitionsUseCase"];
   readSettingsUseCase: RegisterApplicationSettingsIpcDependencies["readSettingsUseCase"];
   updateSettingUseCase: RegisterApplicationSettingsIpcDependencies["updateSettingUseCase"];
@@ -108,7 +108,7 @@ export function registerElectronIpc(
 
   registerDatasetPreparationIpc({
     ipcMain: dependencies.ipcMain,
-    prepareTrainingDatasetFromArtifactsUseCase: dependencies.prepareTrainingDatasetFromArtifactsUseCase,
+    prepareTrainingDatasetUseCase: dependencies.prepareTrainingDatasetUseCase,
   });
 
   registerApplicationSettingsIpc({

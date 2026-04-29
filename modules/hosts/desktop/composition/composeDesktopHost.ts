@@ -708,7 +708,7 @@ export function composeDesktopHost(
       const ingestWebsitePagesBatch = new IngestWebsitePagesBatchUseCase({
         ingestWebsitePage,
       });
-      const prepareTrainingDatasetFromArtifacts = new PrepareTrainingDatasetFromArtifactsUseCase({
+      const prepareTrainingDatasetUseCase = new PrepareTrainingDatasetFromArtifactsUseCase({
         datasetPreparation: datasetPreparationPort,
         storageBindings: artifactBindings,
         storage,
@@ -889,7 +889,7 @@ export function composeDesktopHost(
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
         ingestWebsitePageUseCase: ingestWebsitePage,
         ingestWebsitePagesBatchUseCase: ingestWebsitePagesBatch,
-        prepareTrainingDatasetFromArtifactsUseCase: prepareTrainingDatasetFromArtifacts,
+        prepareTrainingDatasetUseCase: prepareTrainingDatasetUseCase,
         listSettingsDefinitionsUseCase: listSettingsDefinitions,
         readSettingsUseCase: readSettings,
         updateSettingUseCase: updateSetting,
