@@ -1,5 +1,5 @@
 import { createTransportOperation } from "../transport";
-import { createIpcChannel, type IpcChannel } from "./ipc-channel";
+import { createIpcChannel } from "./ipc-channel";
 import { createIpcRequest, type IpcRequest } from "./ipc-request";
 import { createIpcSuccessResponse, type IpcResponse } from "./ipc-response";
 import type { DatasetPreparationSummary, DatasetPreparationWarning, PrepareTrainingDatasetRequest } from "../runtime";
@@ -62,6 +62,14 @@ export type DesktopPrepareTrainingDatasetTaskReadResponse = IpcResponse<DesktopP
 export type DesktopPrepareTrainingDatasetTaskCancelRequest = IpcRequest<DesktopPrepareTrainingDatasetTaskCancelRequestPayload, typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_OPERATION, Record<string, never>, typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL.value>;
 export type DesktopPrepareTrainingDatasetTaskCancelResponse = IpcResponse<DesktopPrepareTrainingDatasetTaskCancelSuccessValue, Record<string, unknown>, typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_OPERATION, Record<string, never>, typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_RESPONSE_CHANNEL.value>;
 
+type DesktopPrepareTrainingDatasetChannel =
+  | typeof DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL
+  | typeof DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL
+  | typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL
+  | typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL
+  | typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL
+  | typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_RESPONSE_CHANNEL;
+
 const norm = (v: string, f: string) => { const n = v.trim(); if (!n) throw new Error(`${f} must be a non-empty, trimmed string.`); return n; };
 const b = (boundary: DesktopDatasetPreparationBoundaryContext) => ({ host: "desktop" as const, source: norm(boundary.source, "boundary.source") });
 const assertNever = (value: never): never => { throw new Error(`Unhandled channel kind: ${String(value)}`); };
@@ -79,7 +87,7 @@ export function getDesktopPrepareTrainingDatasetChannel(kind: "task-read-request
 export function getDesktopPrepareTrainingDatasetChannel(kind: "task-read-response"): typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL;
 export function getDesktopPrepareTrainingDatasetChannel(kind: "task-cancel-request"): typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL;
 export function getDesktopPrepareTrainingDatasetChannel(kind: "task-cancel-response"): typeof DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_RESPONSE_CHANNEL;
-export function getDesktopPrepareTrainingDatasetChannel(kind: "start-request" | "start-response" | "task-read-request" | "task-read-response" | "task-cancel-request" | "task-cancel-response"): IpcChannel<string, string, string> {
+export function getDesktopPrepareTrainingDatasetChannel(kind: "start-request" | "start-response" | "task-read-request" | "task-read-response" | "task-cancel-request" | "task-cancel-response"): DesktopPrepareTrainingDatasetChannel {
   switch (kind) {
     case "start-request": return DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL;
     case "start-response": return DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL;
