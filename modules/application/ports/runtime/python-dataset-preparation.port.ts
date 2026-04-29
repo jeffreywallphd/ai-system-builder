@@ -1,7 +1,6 @@
 import {
   PythonRuntimeTaskStatusResult,
   PrepareTrainingDatasetRequest,
-  PrepareTrainingDatasetResult,
 } from "../../../contracts/runtime";
 import type { ContractError } from "../../../contracts/shared";
 
@@ -25,11 +24,4 @@ export interface PythonDatasetPreparationPort {
   ): Promise<{ requestId: string }>;
   readPrepareTrainingDatasetStatus(requestId: string): Promise<PythonRuntimeTaskStatusResult>;
   cancelPrepareTrainingDataset?(requestId: string): Promise<boolean>;
-  prepareTrainingDataset(
-    request: PrepareTrainingDatasetRequest,
-    context?: {
-      requestId?: string;
-      correlationId?: string;
-    },
-  ): Promise<PrepareTrainingDatasetResult>;
 }

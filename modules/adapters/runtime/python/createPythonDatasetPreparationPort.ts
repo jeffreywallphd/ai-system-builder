@@ -211,34 +211,5 @@ export function createPythonDatasetPreparationPort(
       return result.cancelled;
     },
 
-    async prepareTrainingDataset(
-      request: PrepareTrainingDatasetRequest,
-      context?: { requestId?: string; correlationId?: string },
-    ): Promise<PrepareTrainingDatasetResult> {
-      if (ensureRuntimeReady) {
-        await ensureRuntimeReady();
-      }
-
-      await runtimePort.ensureModelDownloaded({
-        provider: request.recipe.generation.model.provider,
-        modelId: request.recipe.generation.model.modelId,
-      });
-
-      const taskResult = await runtimePort.executeTask({
-        requestId: context?.requestId?.trim() || nextRequestId(),
-        taskType: "prepare-training-dataset",
-        payload: request,
-        timeoutMs: taskTimeoutMs,
-        metadata: inactivityTimeoutMs !== undefined
-          ? { datasetPreparationInactivityTimeoutMs: inactivityTimeoutMs }
-          : undefined,
-      });
-
-      if (!taskResult.success) {
-        throw new PythonDatasetPreparationError(mapRuntimeErrorToContractError(taskResult.error));
-      }
-
-      return mapRuntimeDataToResult(taskResult.data);
-    },
   };
 }
