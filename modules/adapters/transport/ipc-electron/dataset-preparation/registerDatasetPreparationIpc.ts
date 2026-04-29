@@ -1,82 +1,39 @@
-import type {
-  PrepareTrainingDatasetFromArtifactsCommand,
-  PrepareTrainingDatasetFromArtifactsResult,
-} from "../../../../application/use-cases";
+import type { PrepareTrainingDatasetFromArtifactsCommand } from "../../../../application/use-cases";
 import {
-  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
-  DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
-  createDesktopPrepareTrainingDatasetSuccessResponse,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL,
+  createDesktopPrepareTrainingDatasetStartSuccessResponse,
+  createDesktopPrepareTrainingDatasetTaskReadSuccessResponse,
   createIpcError,
   createIpcFailureResponse,
-  type DesktopPrepareTrainingDatasetRequest,
-  type DesktopPrepareTrainingDatasetResponse,
+  type DesktopPrepareTrainingDatasetStartRequest,
+  type DesktopPrepareTrainingDatasetStartResponse,
+  type DesktopPrepareTrainingDatasetTaskReadRequest,
+  type DesktopPrepareTrainingDatasetTaskReadResponse,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 export interface PrepareTrainingDatasetFromArtifactsUseCasePort {
-  execute: (
-    command: PrepareTrainingDatasetFromArtifactsCommand,
-    context?: {
-      requestId?: string;
-      correlationId?: string;
-    },
-  ) => Promise<PrepareTrainingDatasetFromArtifactsResult>;
+  startPrepareTrainingDataset: (command: PrepareTrainingDatasetFromArtifactsCommand, context?: { requestId?: string; correlationId?: string }) => Promise<any>;
+  readPrepareTrainingDataset: (requestId: string, context?: { requestId?: string; correlationId?: string }) => Promise<any>;
 }
+export interface RegisterDatasetPreparationIpcDependencies { ipcMain: IpcMainHandlePort; prepareTrainingDatasetFromArtifactsUseCase: PrepareTrainingDatasetFromArtifactsUseCasePort; }
 
-export interface RegisterDatasetPreparationIpcDependencies {
-  ipcMain: IpcMainHandlePort;
-  prepareTrainingDatasetFromArtifactsUseCase: PrepareTrainingDatasetFromArtifactsUseCasePort;
-}
+export const createDesktopPrepareTrainingDatasetStartIpcHandler = (useCase: PrepareTrainingDatasetFromArtifactsUseCasePort) => async (_e:unknown, request: DesktopPrepareTrainingDatasetStartRequest): Promise<DesktopPrepareTrainingDatasetStartResponse> => {
+  const result = await useCase.startPrepareTrainingDataset(request.payload.command,{requestId:request.requestId,correlationId:request.correlationId});
+  if (result.ok) return createDesktopPrepareTrainingDatasetStartSuccessResponse(result.value,{requestId:result.requestId??request.requestId,correlationId:result.correlationId??request.correlationId});
+  return createIpcFailureResponse(createIpcError(DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL,result.error.code,result.error.message,{details:result.error.details,requestId:result.requestId??request.requestId,correlationId:result.correlationId??request.correlationId}));
+};
 
-function mapPrepareTrainingDatasetResultToIpcResponse(
-  result: PrepareTrainingDatasetFromArtifactsResult,
-  request: DesktopPrepareTrainingDatasetRequest,
-): DesktopPrepareTrainingDatasetResponse {
-  if (result.ok) {
-    return createDesktopPrepareTrainingDatasetSuccessResponse(result.value, {
-      requestId: result.requestId ?? request.requestId,
-      correlationId: result.correlationId ?? request.correlationId,
-    });
-  }
+export const createDesktopPrepareTrainingDatasetTaskReadIpcHandler = (useCase: PrepareTrainingDatasetFromArtifactsUseCasePort) => async (_e:unknown, request: DesktopPrepareTrainingDatasetTaskReadRequest): Promise<DesktopPrepareTrainingDatasetTaskReadResponse> => {
+  const result = await useCase.readPrepareTrainingDataset(request.payload.requestId,{requestId:request.requestId,correlationId:request.correlationId});
+  if (result.ok) return createDesktopPrepareTrainingDatasetTaskReadSuccessResponse(result.value,{requestId:result.requestId??request.requestId,correlationId:result.correlationId??request.correlationId});
+  return createIpcFailureResponse(createIpcError(DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL,result.error.code,result.error.message,{details:result.error.details,requestId:result.requestId??request.requestId,correlationId:result.correlationId??request.correlationId}));
+};
 
-  return createIpcFailureResponse(
-    createIpcError(
-      DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
-      result.error.code,
-      result.error.message,
-      {
-        details: result.error.details,
-        requestId: result.requestId ?? request.requestId,
-        correlationId: result.correlationId ?? request.correlationId,
-      },
-    ),
-  );
-}
-
-export function createDesktopPrepareTrainingDatasetIpcHandler(
-  useCase: PrepareTrainingDatasetFromArtifactsUseCasePort,
-) {
-  return async (
-    _event: unknown,
-    request: DesktopPrepareTrainingDatasetRequest,
-  ): Promise<DesktopPrepareTrainingDatasetResponse> => {
-    const result = await useCase.execute(
-      request.payload.command,
-      {
-        requestId: request.requestId,
-        correlationId: request.correlationId,
-      },
-    );
-
-    return mapPrepareTrainingDatasetResultToIpcResponse(result, request);
-  };
-}
-
-export function registerDatasetPreparationIpc(
-  dependencies: RegisterDatasetPreparationIpcDependencies,
-): void {
-  dependencies.ipcMain.handle(
-    DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
-    createDesktopPrepareTrainingDatasetIpcHandler(dependencies.prepareTrainingDatasetFromArtifactsUseCase),
-  );
+export function registerDatasetPreparationIpc(dependencies: RegisterDatasetPreparationIpcDependencies): void {
+  dependencies.ipcMain.handle(DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL.value,createDesktopPrepareTrainingDatasetStartIpcHandler(dependencies.prepareTrainingDatasetFromArtifactsUseCase));
+  dependencies.ipcMain.handle(DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL.value,createDesktopPrepareTrainingDatasetTaskReadIpcHandler(dependencies.prepareTrainingDatasetFromArtifactsUseCase));
 }

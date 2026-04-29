@@ -121,20 +121,26 @@ import {
   type DesktopIngestWebsitePageResponse,
   type DesktopIngestWebsitePagesBatchRequest,
   type DesktopIngestWebsitePagesBatchResponse,
-  DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
-  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
-  DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_OPERATION,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_OPERATION,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_OPERATION,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
-  createDesktopPrepareTrainingDatasetRequest,
+  createDesktopPrepareTrainingDatasetStartRequest,
+  createDesktopPrepareTrainingDatasetTaskReadRequest,
   createDesktopPythonRuntimeControlRequest,
   createDesktopPythonRuntimeStatusReadRequest,
-  type DesktopPrepareTrainingDatasetRequest,
-  type DesktopPrepareTrainingDatasetResponse,
+  type DesktopPrepareTrainingDatasetStartRequest,
+  type DesktopPrepareTrainingDatasetStartResponse,
+  type DesktopPrepareTrainingDatasetTaskReadRequest,
+  type DesktopPrepareTrainingDatasetTaskReadResponse,
   type DesktopPythonRuntimeControlResponse,
   type DesktopPythonRuntimeStatusReadResponse,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_OPERATION,
@@ -284,15 +290,19 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopIngestWebsitePagesBatchResponse>;
-  prepareTrainingDatasetFromArtifacts: (
+  startPrepareTrainingDataset: (
     input: {
       sourceArtifactIds: string[];
-      recipe: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["recipe"];
-      split: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["split"];
-      output: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["output"];
+      recipe: DesktopPrepareTrainingDatasetStartRequest["payload"]["command"]["recipe"];
+      split: DesktopPrepareTrainingDatasetStartRequest["payload"]["command"]["split"];
+      output: DesktopPrepareTrainingDatasetStartRequest["payload"]["command"]["output"];
     },
     context?: DesktopArtifactUploadBridgeContext,
-  ) => Promise<DesktopPrepareTrainingDatasetResponse>;
+  ) => Promise<DesktopPrepareTrainingDatasetStartResponse>;
+  readPrepareTrainingDatasetTask: (
+    input: { requestId: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopPrepareTrainingDatasetTaskReadResponse>;
   readPythonRuntimeStatus: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
@@ -693,8 +703,8 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async prepareTrainingDatasetFromArtifacts(input, context = {}) {
-      const request: DesktopPrepareTrainingDatasetRequest = createDesktopPrepareTrainingDatasetRequest(
+    async startPrepareTrainingDataset(input, context = {}) {
+      const request: DesktopPrepareTrainingDatasetStartRequest = createDesktopPrepareTrainingDatasetStartRequest(
         {
           command: {
             sourceArtifactIds: input.sourceArtifactIds,
@@ -711,17 +721,40 @@ export function createDesktopPreloadApi(
       );
       const response = await invokeWithTimeout(
         dependencies.ipcRenderer.invoke(
-          DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
+          DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL.value,
           request,
         ),
         DATASET_PREPARATION_IPC_INVOKE_TIMEOUT_MS,
-        `Dataset preparation request exceeded ${DATASET_PREPARATION_IPC_INVOKE_TIMEOUT_MS}ms while waiting for IPC response.`,
+        `Dataset preparation start request exceeded ${DATASET_PREPARATION_IPC_INVOKE_TIMEOUT_MS}ms while waiting for IPC response.`,
       );
 
-      return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetResponse>(response, {
-        operation: DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
-        channel: DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL.value,
-        message: "Received invalid desktop dataset preparation IPC response envelope.",
+      return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetStartResponse>(response, {
+        operation: DESKTOP_DATASET_PREPARE_TRAINING_START_OPERATION,
+        channel: DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop dataset preparation start IPC response envelope.",
+      });
+    },
+
+    async readPrepareTrainingDatasetTask(input, context = {}) {
+      const request: DesktopPrepareTrainingDatasetTaskReadRequest = createDesktopPrepareTrainingDatasetTaskReadRequest(
+        {
+          requestId: input.requestId,
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.dataset-preparation",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetTaskReadResponse>(response, {
+        operation: DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_OPERATION,
+        channel: DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop dataset preparation task-read IPC response envelope.",
       });
     },
 
