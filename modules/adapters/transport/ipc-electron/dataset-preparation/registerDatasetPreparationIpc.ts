@@ -45,10 +45,17 @@ function mapTaskProgress(progress: Record<string, unknown> | undefined): { messa
     return undefined;
   }
 
+  const details = (typeof progress.details === "object" && progress.details !== null)
+    ? progress.details as Record<string, unknown>
+    : undefined;
   return {
     message: typeof progress.message === "string" ? progress.message : undefined,
-    processed: typeof progress.processed === "number" ? progress.processed : undefined,
-    total: typeof progress.total === "number" ? progress.total : undefined,
+    processed: typeof progress.current === "number"
+      ? progress.current
+      : (typeof details?.processedChunkCount === "number" ? details.processedChunkCount : undefined),
+    total: typeof progress.total === "number"
+      ? progress.total
+      : (typeof details?.totalChunkCount === "number" ? details.totalChunkCount : undefined),
   };
 }
 

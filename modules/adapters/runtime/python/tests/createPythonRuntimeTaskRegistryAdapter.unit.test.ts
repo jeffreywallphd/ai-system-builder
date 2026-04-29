@@ -45,6 +45,13 @@ it("generates non-timestamp request ids when caller does not provide one", async
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
     await expect(adapter.getTaskStatus("req-1")).rejects.toThrow("Unknown python runtime task type");
   });
+  it("maps python chunk progress into generic runtime progress fields", async () => {
+    const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(async () => ({ requestId: "req-1", taskType: "prepare-training-dataset", status: "running", progress: { message: "Processing chunk 2/8...", processedChunkCount: 2, totalChunkCount: 8, generatedRowCount: 40 } })), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
+    const record = await adapter.getTaskStatus("req-1");
+    expect(record.progress).toMatchObject({ message: "Processing chunk 2/8...", current: 2, total: 8, unit: "chunk" });
+    expect(record.progress?.details).toMatchObject({ generatedRowCount: 40 });
+  });
 
   it("maps cancel status and preserves message", async () => {
     const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(async () => ({ requestId: "req-1", cancelled: false, status: "running", message: "Task is already running." })), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
