@@ -1,9 +1,9 @@
-import type { PrepareTrainingDatasetRequest } from "../runtime";
 import { createTransportOperation } from "../transport";
 import { createIpcChannel, type IpcChannel } from "./ipc-channel";
 import { createIpcRequest, type IpcRequest } from "./ipc-request";
 import { createIpcSuccessResponse, type IpcResponse } from "./ipc-response";
-import type { PrepareTrainingDatasetFromArtifactsValue } from "../../application/use-cases/prepare-training-dataset-from-artifacts.use-case";
+import type { DatasetPreparationSummary, DatasetPreparationWarning, PrepareTrainingDatasetRequest } from "../runtime";
+import type { StagedArtifactDescriptor } from "../ingestion";
 
 export const DESKTOP_DATASET_PREPARE_TRAINING_START_OPERATION = createTransportOperation("artifact", "prepare-training-dataset.start");
 export const DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_OPERATION = createTransportOperation("artifact", "prepare-training-dataset.read-task");
@@ -21,7 +21,33 @@ export interface DesktopPrepareTrainingDatasetStartRequestPayload { command: { s
 export interface DesktopPrepareTrainingDatasetTaskReadRequestPayload { requestId: string; boundary: DesktopDatasetPreparationBoundaryContext; }
 export interface DesktopPrepareTrainingDatasetTaskCancelRequestPayload { requestId: string; boundary: DesktopDatasetPreparationBoundaryContext; }
 export interface DesktopPrepareTrainingDatasetStartSuccessValue { requestId: string; taskType: string; accepted: true; status: "queued" | "running"; }
-export type DesktopPrepareTrainingDatasetFinalResult = PrepareTrainingDatasetFromArtifactsValue;
+export interface DesktopPrepareTrainingDatasetFinalResult {
+  outputs: {
+    local?: {
+      dataset: StagedArtifactDescriptor;
+    };
+    huggingFace?: {
+      dataset: {
+        provider: "huggingface";
+        repository: string;
+        path: string;
+        revision?: string;
+        exists: boolean;
+        verifiedAt: string;
+      };
+    };
+  };
+  provenance: {
+    sourceArtifactIds: string[];
+    recipe: PrepareTrainingDatasetRequest["recipe"];
+    split: PrepareTrainingDatasetRequest["split"];
+    output: PrepareTrainingDatasetRequest["output"];
+    generationModelId: string;
+    summary: DatasetPreparationSummary;
+  };
+  summary: DatasetPreparationSummary;
+  warnings?: DatasetPreparationWarning[];
+}
 export type DesktopPrepareTrainingDatasetTaskReadSuccessValue =
   | { status: "queued" | "running"; requestId: string; taskType?: string; progress?: { message?: string; processed?: number; total?: number }; startedAt?: string; updatedAt?: string }
   | { status: "succeeded"; requestId: string; taskType?: string; result: DesktopPrepareTrainingDatasetFinalResult; startedAt?: string; updatedAt?: string; completedAt?: string }

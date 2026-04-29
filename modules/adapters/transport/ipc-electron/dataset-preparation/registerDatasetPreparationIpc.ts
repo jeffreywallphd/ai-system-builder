@@ -1,6 +1,5 @@
 import type {
   PrepareTrainingDatasetFromArtifactsCommand,
-  PrepareTrainingDatasetFromArtifactsValue,
 } from "../../../../application/use-cases";
 import type { ContractResult } from "../../../../contracts/shared";
 import type { PythonRuntimeTaskStatusResult } from "../../../../contracts/runtime";
@@ -23,11 +22,12 @@ import {
   type DesktopPrepareTrainingDatasetTaskCancelRequest,
   type DesktopPrepareTrainingDatasetTaskCancelResponse,
   type DesktopPrepareTrainingDatasetTaskReadSuccessValue,
+  type DesktopPrepareTrainingDatasetFinalResult,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 type StartResultValue = { requestId: string; taskType: string; accepted: true; status: "queued" | "running"; startedAt?: string; updatedAt?: string; metadata?: Record<string, unknown> };
-type ReadResultValue = PythonRuntimeTaskStatusResult | { requestId: string; taskType: string; status: "succeeded"; result: PrepareTrainingDatasetFromArtifactsValue; startedAt?: string; updatedAt?: string; completedAt?: string };
+type ReadResultValue = PythonRuntimeTaskStatusResult | { requestId: string; taskType: string; status: "succeeded"; result: DesktopPrepareTrainingDatasetFinalResult; startedAt?: string; updatedAt?: string; completedAt?: string };
 type CancelResultValue = { requestId: string; cancelled: boolean; status: "cancelled" | "running" | "unknown" };
 
 export interface PrepareTrainingDatasetFromArtifactsUseCasePort {
