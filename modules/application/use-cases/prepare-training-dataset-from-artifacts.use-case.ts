@@ -28,7 +28,7 @@ import type { ArtifactCatalogReadPort } from "../ports/artifact-catalog";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRepoStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
 import { TaskType } from "../../contracts/runtime";
-import { TaskPowerLifecycleService } from "../services/runtime";
+import type { TaskPowerLifecyclePort } from "../services/runtime";
 
 export interface PrepareTrainingDatasetFromArtifactsCommand {
   sourceArtifactIds: string[];
@@ -73,7 +73,7 @@ export interface PrepareTrainingDatasetFromArtifactsUseCaseDependencies {
   storage: ArtifactObjectStoragePort;
   artifactRepoStorage?: ArtifactRepoStoragePort;
   artifactCatalog?: ArtifactCatalogReadPort;
-  taskPowerLifecycle: TaskPowerLifecycleService;
+  taskPowerLifecycle: TaskPowerLifecyclePort;
   now?: () => string;
 }
 
@@ -322,7 +322,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly storage: ArtifactObjectStoragePort;
   private readonly artifactRepoStorage?: ArtifactRepoStoragePort;
   private readonly artifactCatalog?: ArtifactCatalogReadPort;
-  private readonly taskPowerLifecycle: TaskPowerLifecycleService;
+  private readonly taskPowerLifecycle: TaskPowerLifecyclePort;
   private readonly now: () => string;
   private readonly runtimeWorkingDirsByRequestId = new Map<string, string>();
   private readonly commandByRequestId = new Map<string, PrepareTrainingDatasetFromArtifactsCommand>();
@@ -393,6 +393,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       }
       const status = await this.datasetPreparation.readPrepareTrainingDatasetStatus(requestId);
       if (status.status === "succeeded" && status.data) {
+        let terminalStatus: PythonRuntimeTaskStatusResult["status"] = status.status;
         try {
           const command = this.commandByRequestId.get(requestId);
           if (!command) {
@@ -403,12 +404,13 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           }
           const materialized = await this.materializeRuntimeResult(command, status.data, context);
           this.materializedResultsByRequestId.set(requestId, materialized);
-          await this.taskPowerLifecycle.completeTask(requestId, status.status);
-          await this.cleanupRuntimeWorkingDir(requestId);
           return createSuccessResult({ ...status, result: materialized }, context);
         } catch (error) {
-          await this.cleanupRuntimeWorkingDir(requestId);
+          terminalStatus = "failed";
           throw error;
+        } finally {
+          await this.taskPowerLifecycle.completeTask(requestId, terminalStatus);
+          await this.cleanupRuntimeWorkingDir(requestId);
         }
       }
       if (status.status === "succeeded" || status.status === "failed" || status.status === "cancelled" || status.status === "unknown") {
@@ -538,18 +540,22 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     const runtimeWorkingDir = await mkdtemp(join(tmpdir(), "ai-system-builder-runtime-"));
     const sourceInputs: PrepareTrainingDatasetRequest["sourceInputs"] = [];
     try {
+      const failAndCleanup = async (error: ReturnType<typeof createContractError>) => {
+        await rm(runtimeWorkingDir, { recursive: true, force: true });
+        return createFailureResult(error, context);
+      };
       for (const [sourceIndex, artifactId] of command.sourceArtifactIds.entries()) {
         const bindingsResult = resolveArtifactBindingsReadFailureAsEmpty(await this.storageBindings.readArtifactStorageBindings({ artifactId }, context));
         if (!bindingsResult.ok) {
-          return createFailureResult(bindingsResult.error, context);
+          return failAndCleanup(bindingsResult.error);
         }
         const storageKey = resolveLocalStorageKeyForArtifact(artifactId, bindingsResult.value.bindings);
         if (!storageKey.trim()) {
-          return createFailureResult(createContractError("not-found", `Storage locator missing for artifact '${artifactId}'.`), context);
+          return failAndCleanup(createContractError("not-found", `Storage locator missing for artifact '${artifactId}'.`));
         }
         const retrieveResult = await this.storage.retrieveArtifact(createRetrieveArtifactRequest(storageKey), context);
         if (!retrieveResult.ok) {
-          return createFailureResult(retrieveResult.error, context);
+          return failAndCleanup(retrieveResult.error);
         }
         const mediaType = retrieveResult.value.descriptor.mediaType ?? "application/json";
         const descriptorMetadata = retrieveResult.value.descriptor.metadata;

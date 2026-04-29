@@ -8,7 +8,12 @@ const TERMINAL_STATUSES: ReadonlySet<PythonRuntimeTaskStatus> = new Set([
   "unknown",
 ]);
 
-export class TaskPowerLifecycleService {
+export interface TaskPowerLifecyclePort {
+  startTask(requestId: string, taskType: TaskType, reason?: string): Promise<void>;
+  completeTask(requestId: string, status: PythonRuntimeTaskStatus): Promise<void>;
+}
+
+export class TaskPowerLifecycleService implements TaskPowerLifecyclePort {
   private readonly blockerIdsByRequestId = new Map<string, string>();
 
   public constructor(private readonly powerSuspension: PowerSuspensionBlockerPort) {}

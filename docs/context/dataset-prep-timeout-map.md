@@ -12,4 +12,6 @@
 
 - Power suspension lifecycle must not depend on UI polling.
 - Blockers are managed centrally through `TaskPowerLifecycleService`.
-- Async polling (`read*` task status) exists for UI updates only, not lifecycle correctness.
+- Async polling (`read*` task status) remains the transport-timeout-safe lifecycle mechanism.
+- For async task flows today, blocker teardown is triggered when terminal status is observed on lifecycle reads.
+- Future improvement: add event-driven task completion cleanup so blocker release does not rely on polling.
