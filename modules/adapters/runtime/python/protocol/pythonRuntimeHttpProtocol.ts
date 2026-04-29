@@ -306,12 +306,19 @@ export function mapTaskResponseFromHttpPayload(
 
 export function mapStartTaskResponse(payload: unknown): StartPythonRuntimeTaskResult {
   const response = asObject(payload, "start task response");
+  const accepted = asBoolean(response.accepted, "accepted");
+  if (!accepted) {
+    throw new Error("Invalid python runtime payload: accepted must be true.");
+  }
   const status = asPythonRuntimeTaskStatus(response.status, "status");
+  if (status !== "queued" && status !== "running") {
+    throw new Error("Invalid python runtime payload: start status must be queued or running.");
+  }
   return {
     requestId: asString(response.requestId, "requestId"),
     taskType: asString(response.taskType, "taskType"),
-    accepted: true,
-    status: status === "running" ? "running" : "queued",
+    accepted,
+    status,
     startedAt: asOptionalString(response.startedAt, "startedAt"),
     updatedAt: asOptionalString(response.updatedAt, "updatedAt"),
     metadata: asOptionalRecord(response.metadata, "metadata"),

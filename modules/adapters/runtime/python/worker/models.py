@@ -84,6 +84,56 @@ class PythonRuntimeTaskResult(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+PythonRuntimeTaskStatus = Literal[
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "cancelled",
+    "unknown",
+]
+
+
+class StartPythonRuntimeTaskRequest(BaseModel):
+    requestId: str
+    taskType: str
+    payload: Any
+    timeoutMs: int | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class StartPythonRuntimeTaskResult(BaseModel):
+    requestId: str
+    taskType: str
+    accepted: bool
+    status: Literal["queued", "running"]
+    startedAt: str | None = None
+    updatedAt: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class PythonRuntimeTaskStatusResult(BaseModel):
+    requestId: str
+    taskType: str | None = None
+    status: PythonRuntimeTaskStatus
+    progress: dict[str, Any] | None = None
+    data: Any | None = None
+    error: PythonRuntimeError | None = None
+    startedAt: str | None = None
+    updatedAt: str | None = None
+    completedAt: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class CancelPythonRuntimeTaskResult(BaseModel):
+    requestId: str
+    taskType: str | None = None
+    status: PythonRuntimeTaskStatus
+    cancelled: bool
+    message: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
 class DatasetPreparationSourceInput(BaseModel):
     artifactId: str
     localPath: str

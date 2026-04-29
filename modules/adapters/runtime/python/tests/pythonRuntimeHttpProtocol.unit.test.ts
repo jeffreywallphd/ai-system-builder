@@ -109,10 +109,33 @@ describe("pythonRuntimeHttpProtocol", () => {
     const result = mapStartTaskResponse({
       requestId: "task-1",
       taskType: "prepare-training-dataset",
+      accepted: true,
       status: "running",
     });
     expect(result.accepted).toBe(true);
     expect(result.status).toBe("running");
+  });
+
+  it("rejects async start payloads when accepted is false", () => {
+    expect(() =>
+      mapStartTaskResponse({
+        requestId: "task-1",
+        taskType: "prepare-training-dataset",
+        accepted: false,
+        status: "queued",
+      }),
+    ).toThrow("accepted must be true");
+  });
+
+  it("rejects async start payloads with non-start statuses", () => {
+    expect(() =>
+      mapStartTaskResponse({
+        requestId: "task-1",
+        taskType: "prepare-training-dataset",
+        accepted: true,
+        status: "failed",
+      }),
+    ).toThrow("start status must be queued or running");
   });
 
   it("maps task status payloads for running/succeeded/failed states", () => {
