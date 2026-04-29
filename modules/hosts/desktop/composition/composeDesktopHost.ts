@@ -49,8 +49,6 @@ import {
 import {
   createPythonRuntimeAdapterFoundation,
   ensurePythonRuntimeWorkerDependencies,
-  createPythonModelTrainingPort,
-  createPythonModelValidationPort,
   createPythonRuntimeTaskRegistryAdapter,
 } from "../../../adapters/runtime/python";
 import { createElectronPowerSuspensionBlocker } from "../../../adapters/runtime/electron";
@@ -706,37 +704,6 @@ export function composeDesktopHost(
       });
       const listModels = new ListModelsUseCase({
         modelRegistry,
-      });
-            const modelTrainingPort = createPythonModelTrainingPort({
-        ...pythonRuntimeFoundation.runtimePort,
-        executeTask: async (request) => {
-          recordRuntimeLog({
-            level: "info",
-            message: "Executing model training in Python runtime.",
-          });
-          const result = await pythonRuntimeFoundation.runtimePort.executeTask(request);
-          if (result.success) {
-            recordRuntimeLog({
-              level: "info",
-              message: "Model training completed in Python runtime.",
-            });
-          } else {
-            recordRuntimeLog({
-              level: "error",
-              message: `Model training failed: ${result.error?.message ?? "Unknown runtime error."}`,
-            });
-          }
-          return result;
-        },
-      }, {
-        ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
-      });
-      // TODO(prompt-7): remove legacy modelValidationPort once executeTask is fully removed.
-      const modelValidationPort = createPythonModelValidationPort({
-        ...pythonRuntimeFoundation.runtimePort,
-        executeTask: (request) => pythonRuntimeFoundation.runtimePort.executeTask(request),
-      }, {
-        ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
       });
       const modelPublisher = createHuggingFaceModelPublisherAdapter({
         tokenProvider: () => tokenConfigStore.getToken(),

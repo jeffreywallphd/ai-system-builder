@@ -11,8 +11,6 @@ import type {
   StartPythonRuntimeTaskRequest,
   StartPythonRuntimeTaskResult,
   PythonRuntimeStatus,
-  PythonRuntimeTaskRequest,
-  PythonRuntimeTaskResult,
   PythonRuntimeUnloadModelsResult,
 } from "../../../../contracts/runtime";
 
@@ -243,17 +241,6 @@ function parseCapabilities(value: unknown): string[] {
   return value.map((entry, index) => asString(entry, `capabilities[${index}]`));
 }
 
-export function mapTaskRequestToHttpPayload(
-  request: PythonRuntimeTaskRequest,
-): PythonRuntimeTaskRequest {
-  return {
-    requestId: asString(request.requestId, "request.requestId"),
-    taskType: asString(request.taskType, "request.taskType"),
-    payload: request.payload,
-    timeoutMs: request.timeoutMs,
-    metadata: request.metadata,
-  };
-}
 
 export function mapStartTaskRequest(
   request: StartPythonRuntimeTaskRequest,
@@ -289,20 +276,6 @@ export function mapCapabilitiesResponseFromHttpPayload(
   };
 }
 
-export function mapTaskResponseFromHttpPayload(
-  payload: unknown,
-): PythonRuntimeTaskResult {
-  const response = asObject(payload, "task response");
-
-  return {
-    requestId: asString(response.requestId, "requestId"),
-    taskType: asString(response.taskType, "taskType"),
-    success: asBoolean(response.success, "success"),
-    data: response.data,
-    error: parseRuntimeError(response.error, "error"),
-    metadata: asOptionalRecord(response.metadata, "metadata"),
-  };
-}
 
 export function mapStartTaskResponse(payload: unknown): StartPythonRuntimeTaskResult {
   const response = asObject(payload, "start task response");

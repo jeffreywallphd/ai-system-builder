@@ -3,7 +3,5 @@ export * from "./supervisor/createPythonRuntimeSupervisor";
 export * from "./protocol/pythonRuntimeHttpProtocol";
 export * from "./createPythonRuntimePort";
 export * from "./ensurePythonRuntimeWorkerDependencies";
-export * from "./createPythonModelTrainingPort";
 export * from "./createPythonRuntimeTaskRegistryAdapter";
 
-export * from "./createPythonModelValidationPort";
