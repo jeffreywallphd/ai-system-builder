@@ -32,6 +32,7 @@
   - cancellation/stop flow
   - stale async state
 - Treat long-running work carefully:
+  - for desktop long-running tasks, combine async task lifecycle (start/poll/cancel) with Electron power-suspension blocking instead of relying on long-held transport requests
   - transport failure does not necessarily mean task failure
   - background task can continue after request disconnect
   - `finally` teardown can incorrectly kill active progress monitoring
