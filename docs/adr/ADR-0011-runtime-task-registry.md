@@ -100,3 +100,10 @@ Power-suspension blockers should attach to runtime task lifecycle activity where
 ## Domain Modeling Decision
 
 No domain runtime value objects are introduced initially; runtime task registry contracts are sufficient until domain behavior emerges.
+
+
+## Migration Update (2026-04-29)
+
+- Dataset preparation has completed migration to Runtime Task Registry lifecycle APIs.
+- Legacy dataset-preparation-specific runtime port/adapter path has been removed.
+- Remaining synchronous runtime execute compatibility is scoped to non-dataset-preparation tasks until those flows migrate.
