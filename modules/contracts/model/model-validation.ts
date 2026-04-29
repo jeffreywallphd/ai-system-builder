@@ -31,6 +31,7 @@ export interface ValidateModelRequest {
 }
 
 export interface ValidateModelResult {
+  requestId?: string;
   modelRecordId: string;
   status: ModelValidationStatus;
   reportPath?: string;

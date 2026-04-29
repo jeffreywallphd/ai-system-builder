@@ -1,5 +1,5 @@
-import { TaskType } from "../../../contracts/runtime";
-import { describe, expect, it, testDouble } from "../../../testing/node-test";
+import { TaskType } from "../../../../contracts/runtime";
+import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { createPythonRuntimeTaskRegistryAdapter } from "../createPythonRuntimeTaskRegistryAdapter";
 
 describe("createPythonRuntimeTaskRegistryAdapter", () => {
@@ -17,7 +17,16 @@ describe("createPythonRuntimeTaskRegistryAdapter", () => {
     expect(runtimePort.startTask).toHaveBeenCalledWith({ requestId: "req-2", taskType: "train-model", payload: {}, metadata: undefined });
   });
 
-  it("generates non-timestamp request ids when caller does not provide one", async () => {
+  
+  it("maps MODEL_VALIDATION and MODEL_PUBLISHING startTask types", async () => {
+    const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), executeTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
+    await adapter.startTask({ requestId: "req-v", taskType: TaskType.MODEL_VALIDATION, payload: { hello: 1 } });
+    await adapter.startTask({ requestId: "req-p", taskType: TaskType.MODEL_PUBLISHING, payload: { world: 2 } });
+    expect(runtimePort.startTask.mock.calls[0]?.[0]?.taskType).toBe("validate-model");
+    expect(runtimePort.startTask.mock.calls[1]?.[0]?.taskType).toBe("publish-model");
+  });
+it("generates non-timestamp request ids when caller does not provide one", async () => {
     const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), executeTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
     await adapter.startTask({ taskType: TaskType.MODEL_TRAINING, payload: {} });

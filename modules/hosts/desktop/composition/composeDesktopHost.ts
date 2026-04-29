@@ -475,7 +475,7 @@ export function composeDesktopHost(
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
   const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
-  const runtimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter(pythonRuntimeFoundation.runtimePort);
+  const runtimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort });
 
   return {
     loggingPort,
@@ -707,8 +707,7 @@ export function composeDesktopHost(
       const listModels = new ListModelsUseCase({
         modelRegistry,
       });
-      // TODO(runtime-task-registry): Model training still uses legacy executeTask and must migrate to RuntimeTaskRegistryPort next.
-      const modelTrainingPort = createPythonModelTrainingPort({
+            const modelTrainingPort = createPythonModelTrainingPort({
         ...pythonRuntimeFoundation.runtimePort,
         executeTask: async (request) => {
           recordRuntimeLog({
@@ -732,7 +731,7 @@ export function composeDesktopHost(
       }, {
         ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
       });
-      // TODO(runtime-task-registry): Model validation still uses legacy executeTask and must migrate to RuntimeTaskRegistryPort.
+      // TODO(prompt-7): remove legacy modelValidationPort once executeTask is fully removed.
       const modelValidationPort = createPythonModelValidationPort({
         ...pythonRuntimeFoundation.runtimePort,
         executeTask: (request) => pythonRuntimeFoundation.runtimePort.executeTask(request),
@@ -781,13 +780,13 @@ export function composeDesktopHost(
         taskPowerLifecycle,
       });
       const validateModel = new ValidateModelUseCase({
-        modelValidation: modelValidationPort,
+        runtimeTaskRegistry,
         modelRegistry,
       });
+      // TODO(prompt-7): remove legacy modelPublisher/modelValidationPort wiring after executeTask deprecation cleanup.
       const publishModel = new PublishModelUseCase({
         modelRegistry,
-        modelValidation: modelValidationPort,
-        modelPublisher,
+        runtimeTaskRegistry,
       });
 
       registerElectronIpc({

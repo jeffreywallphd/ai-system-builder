@@ -16,6 +16,7 @@ export interface PublishModelRequest {
 }
 
 export interface PublishModelResult {
+  requestId?: string;
   modelRecordId: string;
   published: boolean;
   provider: "huggingface";
