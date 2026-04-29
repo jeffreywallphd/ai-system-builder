@@ -15,10 +15,7 @@ import {
   sawPythonRuntimeStartup,
 } from "./modelDownloadProgress";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
-import {
-  isTransientDatasetPreparationTransportError,
-  resolveUserFacingDatasetPreparationErrorMessage,
-} from "./datasetPreparationTransport";
+import { resolveUserFacingDatasetPreparationErrorMessage } from "./datasetPreparationTransport";
 
 interface DatasetPreparationStatus {
   kind: "idle" | "loading" | "success" | "error";
@@ -615,7 +612,6 @@ export function useDatasetPreparationFeature(
       return;
     }
 
-    const reconnectDeadlineMs = Date.now() + 5_000;
     while (!stopTrainingRequestedRef.current) {
       try {
         const pollResponse = await datasetClient.readPrepareTrainingDatasetTask(started.requestId);
@@ -643,11 +639,6 @@ export function useDatasetPreparationFeature(
         onPrepared?.();
         return;
       } catch (error) {
-        if (isTransientDatasetPreparationTransportError(error) && Date.now() < reconnectDeadlineMs) {
-          setStatus({ kind: "loading", message: "Reconnecting to task..." });
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
-          continue;
-        }
         setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
         return;
       }
@@ -655,7 +646,6 @@ export function useDatasetPreparationFeature(
 
     setStatus({ kind: "idle", message: "Training stopped." });
   }, [
-    selectedArtifactIds,  }, [
     selectedArtifactIds,
     unsupportedDocumentPolicy,
     normalizationMode,

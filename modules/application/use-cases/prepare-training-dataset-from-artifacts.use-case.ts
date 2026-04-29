@@ -399,7 +399,18 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         });
       }
 
-      const prepared = await this.datasetPreparation.prepareTrainingDataset(runtimeRequest, context);
+      const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
+      let prepared;
+      while (true) {
+        const status = await this.datasetPreparation.readPrepareTrainingDatasetStatus(started.requestId);
+        if (status.status === "succeeded" && status.data !== undefined) {
+          prepared = status.data;
+          break;
+        }
+        if (status.status === "failed") {
+          throw new PythonDatasetPreparationError(createContractError("internal", status.error?.message ?? "Python runtime dataset preparation failed."));
+        }
+      }
       const datasetOutput = prepared.outputs.find((output) => output.role === "dataset")
         ?? prepared.outputs.find((output) => output.role === "artifact");
 
