@@ -39,4 +39,32 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase async start cleanup", () =>
     await useCase.readPrepareTrainingDataset("r1");
     expect(await exists(stagedDir)).toBe(false);
   });
+
+  it("stores materialized dataset with descriptor content contract shape", async () => {
+    const storeArtifact = testDouble.fn(async (request: any) => ({ ok: true, value: { descriptor: request.descriptor } }));
+    const outputDir = await mkdtemp(join(tmpdir(), "tmp-"));
+    const outputPath = join(outputDir, "d.jsonl");
+    const bytes = new TextEncoder().encode(`{"x":1}\n`);
+    await writeFile(outputPath, bytes);
+
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      datasetPreparation: {
+        startPrepareTrainingDataset: testDouble.fn(async () => ({ requestId: "r1", taskType: "prepare-training-dataset", accepted: true, status: "queued" })),
+        readPrepareTrainingDatasetStatus: testDouble.fn(async () => ({ requestId: "r1", taskType: "prepare-training-dataset", status: "succeeded", data: { outputs: [{ name: "d", role: "dataset", tempPath: outputPath, mediaType: "application/x-ndjson" }], summary: { sourceDocumentCount: 1, normalizedDocumentCount: 1, skippedDocumentCount: 0, chunkCount: 1, generatedExampleCount: 1, datasetRowCount: 1, trainRowCount: 1, testRowCount: 0 } } })),
+      },
+      storageBindings: { readArtifactStorageBindings: testDouble.fn(async () => ({ ok: true, value: { bindings: [] } })), upsertArtifactStorageBinding: testDouble.fn(), deleteArtifactStorageBindings: testDouble.fn() },
+      storage: { retrieveArtifact: testDouble.fn(async () => ({ ok: true, value: { descriptor: { key: "a1", mediaType: "text/markdown", metadata: {} }, content: new TextEncoder().encode("hi") } })), storeArtifact, hasArtifact: testDouble.fn(), deleteArtifact: testDouble.fn() },
+    });
+
+    await useCase.startPrepareTrainingDataset(command);
+    await useCase.readPrepareTrainingDataset("r1");
+
+    const request = storeArtifact.mock.calls[0][0];
+    expect(Array.from(request.content)).toEqual(Array.from(bytes));
+    expect(request.descriptor.key).toContain("generated/");
+    expect(request.descriptor.mediaType).toBe("application/x-ndjson");
+    expect(request.descriptor.metadata.originalFileName).toBe("d.jsonl");
+    expect(request.descriptor.metadata.runtimeRole).toBe("dataset");
+  });
+
 });
