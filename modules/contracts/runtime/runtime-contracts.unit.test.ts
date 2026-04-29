@@ -19,6 +19,8 @@ import {
   type PythonRuntimeTaskRequest,
   type PythonRuntimeTaskResult,
   type PythonRuntimeTaskStatus,
+  type RuntimeTaskError,
+  type RuntimeTaskStatus,
   type RuntimeTaskConcurrencyClass,
   type RuntimeTaskListRequest,
   type RuntimeTaskListResult,
@@ -615,7 +617,7 @@ describe("runtime task registry contracts", () => {
       "model-publishing",
     ]);
 
-    const statuses: PythonRuntimeTaskStatus[] = [
+    const statuses: RuntimeTaskStatus[] = [
       "queued",
       "running",
       "succeeded",
@@ -624,6 +626,8 @@ describe("runtime task registry contracts", () => {
       "unknown",
     ];
     expect(statuses).toContain("succeeded");
+    const pythonStatuses: PythonRuntimeTaskStatus[] = statuses;
+    expect(pythonStatuses).toContain("queued");
   });
 
   it("defines runtime task concurrency classes and task record shape", () => {
@@ -635,6 +639,7 @@ describe("runtime task registry contracts", () => {
       status: "running",
       concurrencyClass,
       progress: { message: "step", current: 1, total: 4, unit: "step", percent: 25 },
+      error: { code: "transient", message: "retry later", retryable: true, stage: "dispatch" },
       metadata: { source: "desktop" },
       queuedAt: "2026-04-29T00:00:00.000Z",
       startedAt: "2026-04-29T00:00:05.000Z",
@@ -643,6 +648,9 @@ describe("runtime task registry contracts", () => {
 
     expect(record.concurrencyClass).toBe("cpu-heavy");
     expect(record.progress?.percent).toBe(25);
+    expect((record.progress?.percent ?? -1) >= 0).toBe(true);
+    expect((record.progress?.percent ?? 101) <= 100).toBe(true);
+    expect(record.error?.code).toBe("transient");
   });
 
   it("defines task listing and retention policy contracts", () => {
@@ -657,6 +665,8 @@ describe("runtime task registry contracts", () => {
       tasks: [],
     };
 
+    const genericError: RuntimeTaskError = { code: "runtime_failed", message: "failed" };
+
     const retention: RuntimeTaskRetentionPolicy = {
       completedTaskTtlMs: 600_000,
       maxCompletedTasks: 1_000,
@@ -666,5 +676,6 @@ describe("runtime task registry contracts", () => {
     expect(listRequest.limit).toBe(50);
     expect(Array.isArray(listResult.tasks)).toBe(true);
     expect(retention.maxCompletedTasks).toBe(1_000);
+    expect(genericError.message).toBe("failed");
   });
 });

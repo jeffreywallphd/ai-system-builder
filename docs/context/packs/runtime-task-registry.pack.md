@@ -24,3 +24,9 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 
 - Power suspension blockers should attach to runtime task lifecycle activity.
 - Power blockers complement but do not replace async task lifecycle polling.
+
+## Contract Boundaries
+
+- Generic runtime registry contracts must not depend on Python-specific contract types.
+- Python runtime adapters may map Python status/error payloads to generic runtime task status/error contracts.
+- Do not create domain aliases that merely re-export runtime contracts.
