@@ -139,3 +139,12 @@
 - Long-held request recovery is obsolete for normal dataset preparation and should be treated as legacy-only compatibility behavior.
 - Short status-poll reads may transiently fail; renderer keeps loading with `Reconnecting to dataset preparation task...` during a short grace window before surfacing a terminal error.
 - Runtime source staging directories created for async start are cleaned by application-layer status reads when terminal task states are observed (`succeeded`, `failed`, `cancelled`, `unknown`).
+
+
+## Async cleanup status (Prompt 5, 2026-04-29)
+
+- The renderer fallback to legacy long-running `prepareTrainingDatasetFromArtifacts` has been removed.
+- Desktop dataset preparation now uses async `startPrepareTrainingDataset` + `readPrepareTrainingDatasetTask` polling only (with cancellation when available).
+- Staged runtime input directories are cleaned on terminal task status reads (`succeeded`, `failed`, `cancelled`, `unknown`).
+- If async start fails before request tracking, the staged runtime working directory is now cleaned immediately.
+- Current limitation: cleanup tracking is in-process and currently depends on reading a terminal status; durable cross-process cleanup can be added later if required.
