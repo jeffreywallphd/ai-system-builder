@@ -302,12 +302,21 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   public async startPrepareTrainingDataset(
     command: PrepareTrainingDatasetFromArtifactsCommand,
     context?: ApplicationRequestContext,
-  ): Promise<ContractResult<{ requestId: string }>> {
+  ): Promise<ContractResult<{ requestId: string; taskType: string; accepted: true; status: "queued" | "running"; startedAt?: string; updatedAt?: string; metadata?: Record<string, unknown> }>> {
+    const staged = await this.stageRuntimeInputs(command, context);
+    if (!staged.ok) {
+      return staged;
+    }
+
     const runtimeRequest: PrepareTrainingDatasetRequest = {
-      sourceInputs: [],
+      sourceInputs: staged.value.sourceInputs,
       recipe: command.recipe,
       split: command.split,
       output: command.output,
+      runtime: {
+        ...(command.output.runtime ?? {}),
+        runtimeWorkingDirectory: staged.value.runtimeWorkingDir,
+      },
     };
 
     const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
@@ -336,68 +345,23 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     command: PrepareTrainingDatasetFromArtifactsCommand,
     context?: ApplicationRequestContext,
   ): Promise<PrepareTrainingDatasetFromArtifactsResult> {
-    const runtimeWorkingDir = await mkdtemp(join(tmpdir(), "ai-system-builder-runtime-"));
-
+    const staged = await this.stageRuntimeInputs(command, context);
+    if (!staged.ok) {
+      return staged;
+    }
+    const runtimeWorkingDir = staged.value.runtimeWorkingDir;
     try {
       const destinations = resolveOutputDestinations(command.output);
       const runtimeRequest: PrepareTrainingDatasetRequest = {
-        sourceInputs: [],
+        sourceInputs: staged.value.sourceInputs,
         recipe: command.recipe,
         split: command.split,
         output: command.output,
+        runtime: {
+          ...(command.output.runtime ?? {}),
+          runtimeWorkingDirectory: runtimeWorkingDir,
+        },
       };
-
-      for (const [sourceIndex, artifactId] of command.sourceArtifactIds.entries()) {
-        const bindingsResult = resolveArtifactBindingsReadFailureAsEmpty(
-          await this.storageBindings.readArtifactStorageBindings({ artifactId }, context),
-        );
-        if (!bindingsResult.ok) {
-          return createFailureResult(bindingsResult.error, context);
-        }
-
-        const storageKey = resolveLocalStorageKeyForArtifact(artifactId, bindingsResult.value.bindings);
-        if (!storageKey.trim()) {
-          return createFailureResult(
-            createContractError("not-found", `Storage locator missing for artifact '${artifactId}'.`),
-            context,
-          );
-        }
-
-        const retrieveResult = await this.storage.retrieveArtifact(createRetrieveArtifactRequest(storageKey), context);
-        if (!retrieveResult.ok) {
-          return createFailureResult(retrieveResult.error, context);
-        }
-
-        const mediaType = retrieveResult.value.descriptor.mediaType ?? "application/json";
-        const descriptorMetadata = retrieveResult.value.descriptor.metadata;
-        const metadataOriginalName = descriptorMetadata
-          && typeof descriptorMetadata === "object"
-          && !Array.isArray(descriptorMetadata)
-          && typeof (descriptorMetadata as { originalName?: unknown }).originalName === "string"
-          ? (descriptorMetadata as { originalName: string }).originalName
-          : undefined;
-        const artifactCatalog = this.artifactCatalog;
-        const catalogOriginalName = artifactCatalog
-          ? await artifactCatalog.readArtifactCatalogRecord({ storageKey }, context)
-            .then((result) => (result.ok ? result.value.record.originalName : undefined))
-          : undefined;
-        const resolvedOriginalName = metadataOriginalName ?? catalogOriginalName;
-        const localPath = buildRuntimeSourceInputPath(
-          runtimeWorkingDir,
-          artifactId,
-          mediaType,
-          resolvedOriginalName,
-          sourceIndex,
-        );
-        await writeFile(localPath, Buffer.from(retrieveResult.value.content as Uint8Array));
-
-        runtimeRequest.sourceInputs.push({
-          artifactId,
-          localPath,
-          mediaType,
-          originalName: resolvedOriginalName,
-        });
-      }
 
       const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
       let prepared;
@@ -410,6 +374,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         if (status.status === "failed") {
           throw new PythonDatasetPreparationError(createContractError("internal", status.error?.message ?? "Python runtime dataset preparation failed."));
         }
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
       const datasetOutput = prepared.outputs.find((output) => output.role === "dataset")
         ?? prepared.outputs.find((output) => output.role === "artifact");
@@ -555,6 +520,46 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       );
     } finally {
       await rm(runtimeWorkingDir, { recursive: true, force: true });
+    }
+  }
+
+  private async stageRuntimeInputs(
+    command: PrepareTrainingDatasetFromArtifactsCommand,
+    context?: ApplicationRequestContext,
+  ): Promise<ContractResult<{ runtimeWorkingDir: string; sourceInputs: PrepareTrainingDatasetRequest["sourceInputs"] }>> {
+    const runtimeWorkingDir = await mkdtemp(join(tmpdir(), "ai-system-builder-runtime-"));
+    const sourceInputs: PrepareTrainingDatasetRequest["sourceInputs"] = [];
+    try {
+      for (const [sourceIndex, artifactId] of command.sourceArtifactIds.entries()) {
+        const bindingsResult = resolveArtifactBindingsReadFailureAsEmpty(await this.storageBindings.readArtifactStorageBindings({ artifactId }, context));
+        if (!bindingsResult.ok) {
+          return createFailureResult(bindingsResult.error, context);
+        }
+        const storageKey = resolveLocalStorageKeyForArtifact(artifactId, bindingsResult.value.bindings);
+        if (!storageKey.trim()) {
+          return createFailureResult(createContractError("not-found", `Storage locator missing for artifact '${artifactId}'.`), context);
+        }
+        const retrieveResult = await this.storage.retrieveArtifact(createRetrieveArtifactRequest(storageKey), context);
+        if (!retrieveResult.ok) {
+          return createFailureResult(retrieveResult.error, context);
+        }
+        const mediaType = retrieveResult.value.descriptor.mediaType ?? "application/json";
+        const descriptorMetadata = retrieveResult.value.descriptor.metadata;
+        const metadataOriginalName = descriptorMetadata && typeof descriptorMetadata === "object" && !Array.isArray(descriptorMetadata) && typeof (descriptorMetadata as { originalName?: unknown }).originalName === "string"
+          ? (descriptorMetadata as { originalName: string }).originalName
+          : undefined;
+        const catalogOriginalName = this.artifactCatalog
+          ? await this.artifactCatalog.readArtifactCatalogRecord({ storageKey }, context).then((result) => (result.ok ? result.value.record.originalName : undefined))
+          : undefined;
+        const resolvedOriginalName = metadataOriginalName ?? catalogOriginalName;
+        const localPath = buildRuntimeSourceInputPath(runtimeWorkingDir, artifactId, mediaType, resolvedOriginalName, sourceIndex);
+        await writeFile(localPath, Buffer.from(retrieveResult.value.content as Uint8Array));
+        sourceInputs.push({ artifactId, localPath, mediaType, originalName: resolvedOriginalName });
+      }
+      return createSuccessResult({ runtimeWorkingDir, sourceInputs }, context);
+    } catch (error) {
+      await rm(runtimeWorkingDir, { recursive: true, force: true });
+      return createFailureResult(createContractError("internal", error instanceof Error ? error.message : "Failed to stage runtime dataset preparation source inputs."), context);
     }
   }
 }

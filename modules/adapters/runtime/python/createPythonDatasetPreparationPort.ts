@@ -170,7 +170,7 @@ export function createPythonDatasetPreparationPort(
     async startPrepareTrainingDataset(
       request: PrepareTrainingDatasetRequest,
       context?: { requestId?: string; correlationId?: string },
-    ): Promise<{ requestId: string }> {
+    ) {
       if (ensureRuntimeReady) {
         await ensureRuntimeReady();
       }
@@ -181,7 +181,7 @@ export function createPythonDatasetPreparationPort(
       });
 
       const requestId = context?.requestId?.trim() || nextRequestId();
-      await runtimePort.startTask({
+      return runtimePort.startTask({
         requestId,
         taskType: "prepare-training-dataset",
         payload: request,
@@ -191,7 +191,6 @@ export function createPythonDatasetPreparationPort(
           : undefined,
       });
 
-      return { requestId };
     },
 
     async readPrepareTrainingDatasetStatus(requestId: string) {

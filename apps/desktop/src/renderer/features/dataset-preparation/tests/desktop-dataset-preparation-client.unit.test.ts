@@ -128,9 +128,11 @@ describe("desktop dataset preparation client", () => {
       output: { format: "jsonl" },
     });
 
-    expect(response).toEqual({
-      ok: false,
-      error: { code: "validation", message: "bad input" },
+    expect(started).toEqual({
+      error: {
+        code: "validation",
+        message: "bad input",
+      },
     });
   });
 

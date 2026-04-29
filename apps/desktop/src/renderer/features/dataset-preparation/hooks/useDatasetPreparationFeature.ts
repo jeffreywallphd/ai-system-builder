@@ -8,12 +8,6 @@ import { buildDatasetPreparationRequest } from "./datasetPreparationRequestBuild
 import {
   validateAndParseDatasetPreparationInputs,
 } from "./datasetPreparationRequestValidation";
-import {
-  resolveLatestDatasetPreparationChunkProgress,
-  resolveLatestModelDownloadProgress,
-  resolveModelInMemoryLoadMessage,
-  sawPythonRuntimeStartup,
-} from "./modelDownloadProgress";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 import { resolveUserFacingDatasetPreparationErrorMessage } from "./datasetPreparationTransport";
 
@@ -211,7 +205,7 @@ function appendErrorDetailsMessage(message: string, details: Record<string, unkn
 export function useDatasetPreparationFeature(
   options: UseDatasetPreparationFeatureOptions = {},
 ): UseDatasetPreparationFeatureResult {
-  const recoveryGraceWindowMs = 600_000;
+  const pollingRecoveryGraceWindowMs = 30_000;
   const onPrepared = options.onPrepared;
   const datasetClient = useDatasetPreparationClient(options.client);
   const settingsClient = useMemo(() => {
@@ -512,96 +506,6 @@ export function useDatasetPreparationFeature(
     });
     const generationModelId = request.recipe.generation.model.modelId;
     const requestId = createDatasetPreparationRequestId();
-    const progressStartedAtMs = Date.now();
-    let preparationActive = true;
-    let progressReadInFlight = false;
-    let recoveringProgressMonitor = false;
-    let progressTimer: number | undefined;
-
-    const stopProgressInterval = () => {
-      if (typeof progressTimer === "number") {
-        window.clearInterval(progressTimer);
-        progressTimer = undefined;
-      }
-    };
-
-    const stopProgressMonitoring = () => {
-      if (!preparationActive) {
-        return;
-      }
-      preparationActive = false;
-      stopProgressInterval();
-      void refreshRuntimeModelStatus();
-    };
-
-    const applyRuntimeProgressSnapshot = (
-      snapshot: Awaited<ReturnType<NonNullable<typeof runtimeStatusClient>["readStatus"]>>,
-    ): void => {
-      if (!preparationActive) {
-        return;
-      }
-
-      recoveringProgressMonitor = false;
-      const matchingTask = identifyMatchingDatasetPreparationTask(snapshot, {
-        requestId,
-        sinceEpochMs: progressStartedAtMs,
-      });
-
-      const chunkProgress = resolveLatestDatasetPreparationChunkProgress(snapshot, {
-        requestId,
-        sinceEpochMs: progressStartedAtMs,
-      });
-      if (chunkProgress) {
-        setStatus({ kind: "loading", message: chunkProgress.message });
-        return;
-      }
-
-      const downloadProgress = resolveLatestModelDownloadProgress(snapshot, generationModelId, {
-        sinceEpochMs: progressStartedAtMs,
-      });
-      if (downloadProgress) {
-        setStatus({ kind: "loading", message: downloadProgress.message });
-        return;
-      }
-
-      const modelInMemoryMessage = resolveModelInMemoryLoadMessage(snapshot, generationModelId, {
-        sinceEpochMs: progressStartedAtMs,
-      });
-      if (modelInMemoryMessage) {
-        setStatus({ kind: "loading", message: modelInMemoryMessage });
-        return;
-      }
-
-      if ((snapshot.supervisorStatus === "starting" || sawPythonRuntimeStartup(snapshot, { sinceEpochMs: progressStartedAtMs }))) {
-        setStatus({ kind: "loading", message: "Starting Python runtime environment..." });
-        return;
-      }
-
-      if (huggingFaceDestinationEnabled && matchingTask.matchingTaskObserved && matchingTask.matchingTaskActive === false) {
-        setStatus({ kind: "loading", message: "Publishing to HuggingFace..." });
-      }
-    };
-
-    const refreshModelDownloadProgress = async () => {
-      if (!runtimeStatusClient || progressReadInFlight || !preparationActive) {
-        return;
-      }
-
-      progressReadInFlight = true;
-      try {
-        const snapshot = await runtimeStatusClient.readStatus();
-        applyRuntimeProgressSnapshot(snapshot);
-      } catch {
-        if (!preparationActive || recoveringProgressMonitor) {
-          return;
-        }
-
-        recoveringProgressMonitor = true;
-        setStatus({ kind: "loading", message: "Reconnecting to progress monitor..." });
-      } finally {
-        progressReadInFlight = false;
-      }
-    };
 
     window.dispatchEvent(new CustomEvent("dataset-preparation-training-started"));
     setStatus({ kind: "loading", message: `Checking model ${generationModelId} before dataset preparation...` });
@@ -612,6 +516,7 @@ export function useDatasetPreparationFeature(
       return;
     }
 
+    let pollRecoveryStartedAtMs: number | undefined;
     while (!stopTrainingRequestedRef.current) {
       try {
         const pollResponse = await datasetClient.readPrepareTrainingDatasetTask(started.requestId);
@@ -619,7 +524,7 @@ export function useDatasetPreparationFeature(
           setStatus({ kind: "error", message: appendErrorDetailsMessage(pollResponse.error.message, pollResponse.error.details) });
           return;
         }
-        if ("pending" in pollResponse && pollResponse.pending) {
+        if ("status" in pollResponse && (pollResponse.status === "pending" || pollResponse.status === "running")) {
           const progressMessage = pollResponse.progress?.message ?? "Preparing training dataset...";
           const processed = pollResponse.progress?.processed;
           const total = pollResponse.progress?.total;
@@ -627,6 +532,10 @@ export function useDatasetPreparationFeature(
           setStatus({ kind: "loading", message: `${progressMessage}${suffix}` });
           await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
           continue;
+        }
+        if ("status" in pollResponse && pollResponse.status === "cancelled") {
+          setStatus({ kind: "idle", message: "Training stopped." });
+          return;
         }
 
         setStatus({ kind: "success", message: "Training dataset is ready." });
@@ -639,6 +548,14 @@ export function useDatasetPreparationFeature(
         onPrepared?.();
         return;
       } catch (error) {
+        if (!pollRecoveryStartedAtMs) {
+          pollRecoveryStartedAtMs = Date.now();
+        }
+        if ((Date.now() - pollRecoveryStartedAtMs) < pollingRecoveryGraceWindowMs) {
+          setStatus({ kind: "loading", message: "Reconnecting to dataset preparation task..." });
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+          continue;
+        }
         setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) });
         return;
       }
@@ -677,11 +594,10 @@ export function useDatasetPreparationFeature(
     huggingFacePathPrefix,
     datasetClient,
     settingsClient,
-    runtimeStatusClient,
     refreshArtifacts,
     refreshRuntimeModelStatus,
     onPrepared,
-    recoveryGraceWindowMs,
+    pollingRecoveryGraceWindowMs,
   ]);
 
   const onStopTraining = useCallback(async () => {
