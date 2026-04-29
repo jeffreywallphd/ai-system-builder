@@ -4,10 +4,10 @@ import {
   type ModelTrainingRequest,
   type ModelTrainingResult,
 } from "../../../contracts/model";
-import { TaskType } from "../../../contracts/runtime";
-import type { ModelRegistryPort, ModelTrainingPort } from "../../ports/model";
+import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
+import type { ModelRegistryPort } from "../../ports/model";
+import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 import type { TaskPowerLifecyclePort } from "../../services/runtime";
-import { randomUUID } from "node:crypto";
 
 function ensureBaseModelSelection(request: ModelTrainingRequest): void {
   if (!request.baseModel.modelRecordId && !request.baseModel.modelId && !request.baseModel.localPath) {
@@ -28,9 +28,12 @@ function ensureDatasetSelections(request: ModelTrainingRequest): void {
 }
 
 export class TrainModelUseCase {
+  private readonly registeredResultsByRequestId = new Map<string, ModelTrainingResult>();
+  private readonly requestContextByRequestId = new Map<string, { normalizedRequest: ModelTrainingRequest; baseModelRecordId?: string }>();
+
   public constructor(
     private readonly dependencies: {
-      modelTraining: ModelTrainingPort;
+      runtimeTaskRegistry: RuntimeTaskRegistryPort;
       modelRegistry: ModelRegistryPort;
       taskPowerLifecycle: TaskPowerLifecyclePort;
     },
@@ -60,40 +63,72 @@ export class TrainModelUseCase {
       };
     }
 
-    // TODO(runtime-task-registry):
-    // Replace direct runtime execution with startTask + polling
-    const tentativeRunId = randomUUID();
+    const started = await this.dependencies.runtimeTaskRegistry.startTask({
+      taskType: TaskType.MODEL_TRAINING,
+      payload: normalizedRequest,
+    });
+
+    if (typeof started.requestId !== "string" || started.requestId.trim().length === 0) {
+      throw new Error("Model training start response missing requestId.");
+    }
+
+    this.requestContextByRequestId.set(started.requestId, { normalizedRequest, baseModelRecordId });
     try {
-      await this.dependencies.taskPowerLifecycle.startTask(tentativeRunId, TaskType.MODEL_TRAINING);
+      await this.dependencies.taskPowerLifecycle.startTask(started.requestId, TaskType.MODEL_TRAINING);
     } catch {
       // Power blocker startup failures must not fail model training.
     }
-    const blockerRequestId = tentativeRunId;
-    let terminalStatus: ModelTrainingResult["status"] | undefined;
-    let trainingResult: ModelTrainingResult;
-    try {
-      trainingResult = normalizeModelTrainingResult(await this.dependencies.modelTraining.trainModel(normalizedRequest));
-      terminalStatus = trainingResult.status;
-    } finally {
-      if (terminalStatus === "succeeded" || terminalStatus === "failed" || terminalStatus === "cancelled") {
-        try {
-          await this.dependencies.taskPowerLifecycle.completeTask(blockerRequestId, terminalStatus);
-        } catch {
-          // Power blocker teardown failures must not fail model training.
-        }
-      } else {
-        try {
-          await this.dependencies.taskPowerLifecycle.completeTask(blockerRequestId, "unknown");
-        } catch {
-          // Power blocker teardown failures must not fail model training.
-        }
-      }
+
+    return {
+      runId: started.requestId,
+      status: "queued",
+    };
+  }
+
+  public async read(requestId: string): Promise<ModelTrainingResult> {
+    const cached = this.registeredResultsByRequestId.get(requestId);
+    if (cached) {
+      return cached;
     }
 
+    const statusRecord = await this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
+    if (statusRecord.status === "succeeded") {
+      return this.resolveSucceededResult(statusRecord);
+    }
+
+    if (statusRecord.status === "failed" || statusRecord.status === "cancelled" || statusRecord.status === "unknown") {
+      await this.completePowerLifecycle(requestId, statusRecord.status);
+      return normalizeModelTrainingResult({
+        runId: requestId,
+        status: statusRecord.status === "unknown" ? "failed" : statusRecord.status,
+        ...(statusRecord.error ? { error: statusRecord.error } : {}),
+      });
+    }
+
+    return normalizeModelTrainingResult({
+      runId: requestId,
+      status: statusRecord.status,
+    });
+  }
+
+  private async resolveSucceededResult(statusRecord: RuntimeTaskRecord): Promise<ModelTrainingResult> {
+    if (!statusRecord.data || typeof statusRecord.data !== "object") {
+      throw new Error(`Model training runtime result missing for request '${statusRecord.requestId}'.`);
+    }
+
+    const trainingResult = normalizeModelTrainingResult(statusRecord.data as ModelTrainingResult);
+
     if (trainingResult.status !== "succeeded" || !trainingResult.generatedModelCandidate) {
+      await this.completePowerLifecycle(statusRecord.requestId, "unknown");
       return trainingResult;
     }
 
+    const requestContext = this.requestContextByRequestId.get(statusRecord.requestId);
+    if (!requestContext) {
+      throw new Error(`Model training request context missing for request '${statusRecord.requestId}'.`);
+    }
+
+    const { normalizedRequest, baseModelRecordId } = requestContext;
     const generated = trainingResult.generatedModelCandidate;
     const registration = normalizedRequest.output.registration;
     const trainingValidation = generated.metadata && typeof generated.metadata["validation"] === "object"
@@ -126,10 +161,20 @@ export class TrainModelUseCase {
           : (typeof trainingValidation?.["validationReportPath"] === "string" ? trainingValidation["validationReportPath"] : undefined),
     });
 
-    return {
+    const result = {
       ...trainingResult,
       outputModel: registered.model,
     };
+    this.registeredResultsByRequestId.set(statusRecord.requestId, result);
+    await this.completePowerLifecycle(statusRecord.requestId, "succeeded");
+    return result;
   }
 
+  private async completePowerLifecycle(requestId: string, status: "succeeded" | "failed" | "cancelled" | "unknown"): Promise<void> {
+    try {
+      await this.dependencies.taskPowerLifecycle.completeTask(requestId, status);
+    } catch {
+      // Power blocker teardown failures must not fail model training.
+    }
+  }
 }

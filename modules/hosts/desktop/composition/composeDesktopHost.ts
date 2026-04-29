@@ -776,7 +776,7 @@ export function composeDesktopHost(
         artifactCatalogDeletePort: artifactCatalog,
       });
       const trainModel = new TrainModelUseCase({
-        modelTraining: modelTrainingPort,
+        runtimeTaskRegistry,
         modelRegistry,
         taskPowerLifecycle,
       });
