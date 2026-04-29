@@ -290,6 +290,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly artifactCatalog?: ArtifactCatalogReadPort;
   private readonly now: () => string;
   private readonly runtimeWorkingDirsByRequestId = new Map<string, string>();
+  private readonly commandByRequestId = new Map<string, PrepareTrainingDatasetFromArtifactsCommand>();
+  private readonly materializedResultsByRequestId = new Map<string, PrepareTrainingDatasetFromArtifactsValue>();
 
   public constructor(dependencies: PrepareTrainingDatasetFromArtifactsUseCaseDependencies) {
     this.datasetPreparation = dependencies.datasetPreparation;
@@ -330,6 +332,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         );
       }
       this.runtimeWorkingDirsByRequestId.set(started.requestId, staged.value.runtimeWorkingDir);
+      this.commandByRequestId.set(started.requestId, command);
       return createSuccessResult(started, context);
     } catch (error) {
       await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
@@ -348,7 +351,21 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     context?: ApplicationRequestContext,
   ): Promise<ContractResult<PythonRuntimeTaskStatusResult>> {
     try {
+      const cached = this.materializedResultsByRequestId.get(requestId);
+      if (cached) {
+        return createSuccessResult({ requestId, taskType: "prepare-training-dataset", status: "succeeded", result: cached }, context);
+      }
       const status = await this.datasetPreparation.readPrepareTrainingDatasetStatus(requestId);
+      if (status.status === "succeeded" && status.data) {
+        const command = this.commandByRequestId.get(requestId);
+        if (!command) {
+          throw new Error(`Dataset preparation command context missing for request '${requestId}'.`);
+        }
+        const materialized = await this.materializeRuntimeResult(command, status.data, context);
+        this.materializedResultsByRequestId.set(requestId, materialized);
+        await this.cleanupRuntimeWorkingDir(requestId);
+        return createSuccessResult({ ...status, result: materialized }, context);
+      }
       if (status.status === "succeeded" || status.status === "failed" || status.status === "cancelled" || status.status === "unknown") {
         await this.cleanupRuntimeWorkingDir(requestId);
       }
@@ -364,12 +381,96 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     }
   }
 
+
+  private async materializeRuntimeResult(
+    command: PrepareTrainingDatasetFromArtifactsCommand,
+    runtimeResult: { outputs: Array<{ name: string; role?: string; tempPath: string; mediaType: string; metadata?: Record<string, unknown> }>; summary: DatasetPreparationSummary; warnings?: DatasetPreparationWarning[] },
+    context?: ApplicationRequestContext,
+  ): Promise<PrepareTrainingDatasetFromArtifactsValue> {
+    const datasetOutput = runtimeResult.outputs.find((output) => output.role === "dataset" || output.role === "artifact");
+    if (!datasetOutput) {
+      throw new Error("Dataset preparation runtime result is missing a dataset output.");
+    }
+
+    await validateDatasetOutput(datasetOutput.tempPath, command.output.format);
+    const datasetBytes = new Uint8Array(await readFile(datasetOutput.tempPath));
+    const outputDestinations = resolveOutputDestinations(command.output);
+    const resultOutputs: PrepareTrainingDatasetFromArtifactsValue["outputs"] = {};
+
+    if (outputDestinations.local) {
+      const storageKey = buildGeneratedDatasetStorageKey(datasetOutput.name, command.output.format, this.now());
+      const storeDataset = await this.storage.storeArtifact(createStoreArtifactRequest({
+        key: storageKey,
+        mediaType: datasetOutput.mediaType,
+        data: datasetBytes,
+        metadata: buildDatasetMetadata(command, runtimeResult.summary, { provider: "local" }, datasetOutput.metadata),
+      }), context);
+      if (!storeDataset.ok) {
+        throw new Error(storeDataset.error.message);
+      }
+      resultOutputs.local = { dataset: createStagedArtifactDescriptorFromStorageObjectDescriptor(storeDataset.value.descriptor) };
+    }
+
+    if (outputDestinations.huggingFace) {
+      const artifactRepoStorage = this.artifactRepoStorage;
+      if (!artifactRepoStorage) {
+        throw new Error("Hugging Face output requested but artifact repository storage is unavailable.");
+      }
+      const datasetPath = joinRepoPath(outputDestinations.huggingFace.pathPrefix, `${datasetOutput.name}.${command.output.format}`);
+      const publishDataset = await artifactRepoStorage.storeArtifactInRepo(createStoreArtifactInRepoRequest(datasetBytes, {
+        target: {
+          provider: outputDestinations.huggingFace.provider,
+          repository: outputDestinations.huggingFace.repository,
+          revision: outputDestinations.huggingFace.revision,
+          path: datasetPath,
+        },
+        mediaType: datasetOutput.mediaType,
+        metadata: buildDatasetMetadata(command, runtimeResult.summary, {
+          provider: "huggingface",
+          publication: { repository: outputDestinations.huggingFace.repository, path: datasetPath, revision: outputDestinations.huggingFace.revision },
+        }, datasetOutput.metadata),
+      }), context);
+      if (!publishDataset.ok) {
+        throw new Error(publishDataset.error.message);
+      }
+      const publishDatasetTarget = publishDataset.value.descriptor.target;
+      const verifyPublishedDataset = await artifactRepoStorage.hasArtifactInRepo(createHasArtifactInRepoRequest(publishDatasetTarget), context);
+      if (!verifyPublishedDataset.ok) {
+        throw new Error(verifyPublishedDataset.error.message);
+      }
+      resultOutputs.huggingFace = { dataset: {
+        provider: "huggingface",
+        repository: publishDatasetTarget.repository,
+        path: publishDatasetTarget.path ?? datasetPath,
+        revision: publishDatasetTarget.revision,
+        exists: verifyPublishedDataset.value.exists,
+        verifiedAt: this.now(),
+      } };
+    }
+
+    await rm(datasetOutput.tempPath, { force: true });
+    return {
+      outputs: resultOutputs,
+      provenance: {
+        sourceArtifactIds: command.sourceArtifactIds,
+        recipe: command.recipe,
+        split: command.split,
+        output: command.output,
+        generationModelId: command.recipe.generation.model.modelId,
+        summary: runtimeResult.summary,
+      },
+      summary: runtimeResult.summary,
+      warnings: runtimeResult.warnings,
+    };
+  }
+
   private async cleanupRuntimeWorkingDir(requestId: string): Promise<void> {
     const runtimeWorkingDir = this.runtimeWorkingDirsByRequestId.get(requestId);
     if (!runtimeWorkingDir) {
       return;
     }
     this.runtimeWorkingDirsByRequestId.delete(requestId);
+    this.commandByRequestId.delete(requestId);
     await rm(runtimeWorkingDir, { recursive: true, force: true });
   }
 
@@ -398,8 +499,9 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         const metadataOriginalName = descriptorMetadata && typeof descriptorMetadata === "object" && !Array.isArray(descriptorMetadata) && typeof (descriptorMetadata as { originalName?: unknown }).originalName === "string"
           ? (descriptorMetadata as { originalName: string }).originalName
           : undefined;
-        const catalogOriginalName = this.artifactCatalog
-          ? await this.artifactCatalog.readArtifactCatalogRecord({ storageKey }, context).then((result) => (result.ok ? result.value.record.originalName : undefined))
+        const artifactCatalog = this.artifactCatalog;
+        const catalogOriginalName = artifactCatalog
+          ? await artifactCatalog.readArtifactCatalogRecord({ storageKey }, context).then((result) => (result.ok ? result.value.record.originalName : undefined))
           : undefined;
         const resolvedOriginalName = metadataOriginalName ?? catalogOriginalName;
         const localPath = buildRuntimeSourceInputPath(runtimeWorkingDir, artifactId, mediaType, resolvedOriginalName, sourceIndex);

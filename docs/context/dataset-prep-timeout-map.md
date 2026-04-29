@@ -4,8 +4,8 @@
 
 ### A1) Current request path model (from this repo)
 
-1. **Renderer feature starts dataset prep call** via `desktopApi.prepareTrainingDatasetFromArtifacts(...)` in the dataset-preparation transport/client path.  
-2. **Preload bridge forwards to Electron IPC** using `ipcRenderer.invoke(...)` on `desktop.dataset.prepareTrainingDatasetFromArtifacts.request`.  
+1. **Renderer feature starts dataset prep call** via `desktopApi.startPrepareTrainingDataset(...) followed by readPrepareTrainingDatasetTask polling` in the dataset-preparation transport/client path.  
+2. **Preload bridge forwards to Electron IPC** using `ipcRenderer.invoke(...)` on `desktop.dataset.prepare-training-dataset.start.request`.  
 3. **Main process IPC handler** maps the request into `PrepareTrainingDatasetFromArtifactsUseCase` via desktop host composition and transport registration.  
 4. **Use case invokes Python dataset prep port**, which creates/uses a runtime request id and forwards timeout metadata.  
 5. **Runtime HTTP client sends `POST /tasks/execute`** to Python worker with an AbortController-backed timeout (`timeoutMs`).  
@@ -148,3 +148,11 @@
 - Staged runtime input directories are cleaned on terminal task status reads (`succeeded`, `failed`, `cancelled`, `unknown`).
 - If async start fails before request tracking, the staged runtime working directory is now cleaned immediately.
 - Current limitation: cleanup tracking is in-process and currently depends on reading a terminal status; durable cross-process cleanup can be added later if required.
+
+
+## Finalization status (Prompt 6, 2026-04-29)
+
+- Async desktop dataset preparation IPC now uses start/read handlers only; legacy sync operation path has been removed.
+- No long-held dataset preparation IPC invoke timeout wrapper remains in preload start; start invoke is short-lived.
+- Final dataset output materialization occurs on succeeded task reads before UI success is returned.
+- Runtime staging/temp cleanup runs on terminal reads and successful materialization.

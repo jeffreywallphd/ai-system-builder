@@ -1,6 +1,6 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
-import { DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL, DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL, createDesktopPrepareTrainingDatasetStartRequest, createDesktopPrepareTrainingDatasetTaskReadRequest } from "../../../../contracts/ipc";
-import { createDesktopPrepareTrainingDatasetStartIpcHandler, createDesktopPrepareTrainingDatasetTaskReadIpcHandler, registerDatasetPreparationIpc } from "../dataset-preparation/registerDatasetPreparationIpc";
+import { DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL, DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL, DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL, createDesktopPrepareTrainingDatasetStartRequest, createDesktopPrepareTrainingDatasetTaskReadRequest, createDesktopPrepareTrainingDatasetTaskCancelRequest } from "../../../../contracts/ipc";
+import { createDesktopPrepareTrainingDatasetStartIpcHandler, createDesktopPrepareTrainingDatasetTaskReadIpcHandler, createDesktopPrepareTrainingDatasetTaskCancelIpcHandler, registerDatasetPreparationIpc } from "../dataset-preparation/registerDatasetPreparationIpc";
 
 describe("registerDatasetPreparationIpc",()=>{
  it("start handler calls start use-case", async()=>{
@@ -16,8 +16,14 @@ describe("registerDatasetPreparationIpc",()=>{
   const response=await handler({},createDesktopPrepareTrainingDatasetTaskReadRequest({requestId:"r1",boundary:{host:"desktop",source:"x"}}));
   expect(readPrepareTrainingDataset).toHaveBeenCalledWith("r1", expect.any(Object)); expect(response.ok).toBe(true);
  });
+ it("cancel handler calls cancel use-case when available", async()=>{
+  const cancelPrepareTrainingDataset=testDouble.fn().mockResolvedValue({ok:true,value:{requestId:"r1",cancelled:true,status:"cancelled"}});
+  const handler=createDesktopPrepareTrainingDatasetTaskCancelIpcHandler({startPrepareTrainingDataset:testDouble.fn(),readPrepareTrainingDataset:testDouble.fn(),cancelPrepareTrainingDataset});
+  const response=await handler({},createDesktopPrepareTrainingDatasetTaskCancelRequest({requestId:"r1",boundary:{host:"desktop",source:"x"}}));
+  expect(cancelPrepareTrainingDataset).toHaveBeenCalledWith("r1", expect.any(Object)); expect(response.ok).toBe(true);
+ });
  it("registers start/read channels",()=>{
-  const channels:string[]=[]; registerDatasetPreparationIpc({ipcMain:{handle:testDouble.fn((c:string)=>channels.push(c))},prepareTrainingDatasetFromArtifactsUseCase:{startPrepareTrainingDataset:testDouble.fn(),readPrepareTrainingDataset:testDouble.fn()}});
-  expect(channels).toEqual([DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL.value,DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL.value]);
+  const channels:string[]=[]; registerDatasetPreparationIpc({ipcMain:{handle:testDouble.fn((c:string)=>channels.push(c))},prepareTrainingDatasetFromArtifactsUseCase:{startPrepareTrainingDataset:testDouble.fn(),readPrepareTrainingDataset:testDouble.fn(),cancelPrepareTrainingDataset:testDouble.fn()}});
+  expect(channels).toEqual([DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL.value,DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL.value,DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL.value]);
  });
 });
