@@ -5,6 +5,7 @@ export * from "./persistence";
 export * from "./logging";
 export * from "./observability";
 export * from "./host";
+export * from "./desktop";
 
 export * from "./artifact-browser";
 export * from "./artifact-catalog";

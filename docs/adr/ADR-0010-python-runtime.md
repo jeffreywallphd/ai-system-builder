@@ -105,3 +105,6 @@ Python never writes directly to the artifact catalog.
 - Long-held HTTP responses are unsafe for dataset preparation/model-training durations because transport intermediaries and host request chains can disconnect before work finishes.
 - The async task lifecycle is being introduced incrementally: this step adds contract and TypeScript runtime-client/protocol support before worker and UI migration.
 - Worker support now includes `POST /tasks/start`, `GET /tasks/{requestId}`, and `POST /tasks/{requestId}/cancel` for start/poll/cancel task lifecycle flows; legacy `POST /tasks/execute` remains for compatibility while callers migrate.
+
+- Desktop host runtime can also use Electron `powerSaveBlocker` (`prevent-app-suspension`) for long-running local tasks to reduce OS sleep/suspension risk.
+- This suspension blocker complements async start/poll/cancel lifecycle management and does not replace task polling or resolve transport/request timeouts from long-held requests.

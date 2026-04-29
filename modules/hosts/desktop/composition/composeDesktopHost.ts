@@ -52,6 +52,7 @@ import {
   createPythonModelTrainingPort,
   createPythonModelValidationPort,
 } from "../../../adapters/runtime/python";
+import { createElectronPowerSuspensionBlocker } from "../../../adapters/runtime/electron";
 import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
@@ -75,6 +76,7 @@ import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import { PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES } from "../../../contracts/runtime";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
+import type { PowerSuspensionBlockerPort } from "../../../application/ports/desktop";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
@@ -205,6 +207,7 @@ export interface DesktopHostComposition {
   clearPythonRuntimeLogs: () => Promise<void>;
   readPythonRuntimeStatus: () => Promise<DesktopPythonRuntimeStatusPayload>;
   getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
+  powerSuspensionBlocker: PowerSuspensionBlockerPort;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
 }
 
@@ -522,6 +525,8 @@ export function composeDesktopHost(
     inactivityTimeoutMs: DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS,
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
+
+  const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
 
   return {
     loggingPort,
