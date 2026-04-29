@@ -6,6 +6,7 @@ import {
 } from "../../../contracts/model";
 import { TaskType } from "../../../contracts/runtime";
 import type { ModelRegistryPort, ModelTrainingPort } from "../../ports/model";
+import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 import type { TaskPowerLifecyclePort } from "../../services/runtime";
 import { randomUUID } from "node:crypto";
 
@@ -33,6 +34,7 @@ export class TrainModelUseCase {
       modelTraining: ModelTrainingPort;
       modelRegistry: ModelRegistryPort;
       taskPowerLifecycle: TaskPowerLifecyclePort;
+      runtimeTaskRegistry?: RuntimeTaskRegistryPort;
     },
   ) {}
 
@@ -60,6 +62,8 @@ export class TrainModelUseCase {
       };
     }
 
+    // TODO(runtime-task-registry):
+    // Replace direct runtime execution with startTask + polling
     const tentativeRunId = randomUUID();
     try {
       await this.dependencies.taskPowerLifecycle.startTask(tentativeRunId, TaskType.MODEL_TRAINING);

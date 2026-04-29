@@ -1,7 +1,7 @@
-import type { PythonRuntimeTaskStatus, TaskType } from "../../../contracts/runtime";
+import type { RuntimeTaskStatus, TaskType } from "../../../contracts/runtime";
 import type { PowerSuspensionBlockerPort } from "../../ports/desktop";
 
-const TERMINAL_STATUSES: ReadonlySet<PythonRuntimeTaskStatus> = new Set([
+const TERMINAL_STATUSES: ReadonlySet<RuntimeTaskStatus> = new Set([
   "succeeded",
   "failed",
   "cancelled",
@@ -10,7 +10,7 @@ const TERMINAL_STATUSES: ReadonlySet<PythonRuntimeTaskStatus> = new Set([
 
 export interface TaskPowerLifecyclePort {
   startTask(requestId: string, taskType: TaskType, reason?: string): Promise<void>;
-  completeTask(requestId: string, status: PythonRuntimeTaskStatus): Promise<void>;
+  completeTask(requestId: string, status: RuntimeTaskStatus): Promise<void>;
 }
 
 export class TaskPowerLifecycleService implements TaskPowerLifecyclePort {
@@ -33,7 +33,7 @@ export class TaskPowerLifecycleService implements TaskPowerLifecyclePort {
     }
   }
 
-  public async completeTask(requestId: string, status: PythonRuntimeTaskStatus): Promise<void> {
+  public async completeTask(requestId: string, status: RuntimeTaskStatus): Promise<void> {
     if (!requestId || !TERMINAL_STATUSES.has(status)) {
       return;
     }
