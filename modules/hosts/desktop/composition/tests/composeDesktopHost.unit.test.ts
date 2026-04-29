@@ -262,6 +262,21 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
   });
 
+  it("preserves the full Python runtime port when adding desktop composition logging wrappers", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+    const runtimePortSpreadCount = source.match(/\.\.\.pythonRuntimeFoundation\.runtimePort/g)?.length ?? 0;
+
+    expect(runtimePortSpreadCount >= 3).toBe(true);
+    expect(source).not.toContain("getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus()");
+    expect(source).not.toContain("getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities()");
+    expect(source).not.toContain("unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels()");
+  });
+
   it("derives the Python runtime client URL from host and port when no base URL is configured", () => {
     expect(resolvePythonRuntimeBaseUrl({ PYTHON_RUNTIME_PORT: "45123" })).toBe("http://127.0.0.1:45123");
     expect(resolvePythonRuntimeBaseUrl({

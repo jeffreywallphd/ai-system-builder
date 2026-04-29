@@ -27,7 +27,11 @@ import {
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 type StartResultValue = { requestId: string; taskType: string; accepted: true; status: "queued" | "running"; startedAt?: string; updatedAt?: string; metadata?: Record<string, unknown> };
-type ReadResultValue = PythonRuntimeTaskStatusResult | { requestId: string; taskType: string; status: "succeeded"; result: DesktopPrepareTrainingDatasetFinalResult; startedAt?: string; updatedAt?: string; completedAt?: string };
+type RuntimeTaskStatusReadResult = Omit<PythonRuntimeTaskStatusResult, "progress"> & {
+  message?: string;
+  progress?: Record<string, unknown>;
+};
+type ReadResultValue = RuntimeTaskStatusReadResult | { requestId: string; taskType: string; status: "succeeded"; result: DesktopPrepareTrainingDatasetFinalResult; startedAt?: string; updatedAt?: string; completedAt?: string };
 type CancelResultValue = { requestId: string; cancelled: boolean; status: "cancelled" | "running" | "unknown" };
 
 export interface PrepareTrainingDatasetFromArtifactsUseCasePort {
@@ -37,6 +41,34 @@ export interface PrepareTrainingDatasetFromArtifactsUseCasePort {
 }
 export interface RegisterDatasetPreparationIpcDependencies { ipcMain: IpcMainHandlePort; prepareTrainingDatasetUseCase: PrepareTrainingDatasetFromArtifactsUseCasePort; }
 
+function mapTaskProgress(progress: Record<string, unknown> | undefined): { message?: string; processed?: number; total?: number } | undefined {
+  if (!progress) {
+    return undefined;
+  }
+
+  return {
+    message: typeof progress.message === "string" ? progress.message : undefined,
+    processed: typeof progress.processed === "number" ? progress.processed : undefined,
+    total: typeof progress.total === "number" ? progress.total : undefined,
+  };
+}
+
+function mapTaskMessage(value: RuntimeTaskStatusReadResult): string | undefined {
+  if (typeof value.message === "string") {
+    return value.message;
+  }
+
+  return typeof value.progress?.message === "string" ? value.progress.message : undefined;
+}
+
+function mapTaskError(value: RuntimeTaskStatusReadResult): { code?: string; message: string; details?: Record<string, unknown> } {
+  return {
+    code: value.error?.code,
+    message: value.error?.message ?? mapTaskMessage(value) ?? "Dataset preparation task failed.",
+    details: value.error?.details,
+  };
+}
+
 function mapPrepareTrainingDatasetTaskStatusToIpcValue(value: ReadResultValue): DesktopPrepareTrainingDatasetTaskReadSuccessValue {
   const shared = { requestId: value.requestId, taskType: value.taskType, startedAt: value.startedAt, updatedAt: value.updatedAt };
   if (value.status === "succeeded") {
@@ -45,10 +77,10 @@ function mapPrepareTrainingDatasetTaskStatusToIpcValue(value: ReadResultValue): 
     }
     return { ...shared, status: "unknown", message: "Dataset preparation succeeded without materialized result.", completedAt: value.completedAt };
   }
-  if (value.status === "failed") return { ...shared, status: "failed", error: value.error, completedAt: value.completedAt };
-  if (value.status === "cancelled") return { ...shared, status: "cancelled", message: value.message, progress: value.progress, completedAt: value.completedAt };
-  if (value.status === "unknown") return { ...shared, status: "unknown", message: value.message, progress: value.progress, completedAt: value.completedAt };
-  return { ...shared, status: value.status, progress: value.progress };
+  if (value.status === "failed") return { ...shared, status: "failed", error: mapTaskError(value), completedAt: value.completedAt };
+  if (value.status === "cancelled") return { ...shared, status: "cancelled", message: mapTaskMessage(value), progress: mapTaskProgress(value.progress), completedAt: value.completedAt };
+  if (value.status === "unknown") return { ...shared, status: "unknown", message: mapTaskMessage(value), progress: mapTaskProgress(value.progress), completedAt: value.completedAt };
+  return { ...shared, status: value.status, progress: mapTaskProgress(value.progress) };
 }
 
 export const createDesktopPrepareTrainingDatasetStartIpcHandler = (useCase: PrepareTrainingDatasetFromArtifactsUseCasePort) => async (_e: unknown, request: DesktopPrepareTrainingDatasetStartRequest): Promise<DesktopPrepareTrainingDatasetStartResponse> => {
