@@ -31,6 +31,23 @@ describe("registerDatasetPreparationIpc", () => {
     expect((failed as any).value.error.message).toBe("boom"); expect((unknown as any).value.status).toBe("unknown");
   });
 
+  it("maps runtime task failures without assuming optional error/message fields exist", async () => {
+    const readPrepareTrainingDataset = testDouble.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        requestId: "r1",
+        status: "failed",
+        completedAt: "2026-04-29T12:00:00.000Z",
+      },
+    });
+    const handler = createDesktopPrepareTrainingDatasetTaskReadIpcHandler({ startPrepareTrainingDataset: testDouble.fn(), readPrepareTrainingDataset });
+    const response = await handler({}, createDesktopPrepareTrainingDatasetTaskReadRequest({ requestId: "r1", boundary: { host: "desktop", source: "x" } }));
+
+    expect((response as any).value.status).toBe("failed");
+    expect((response as any).value.error.message).toBe("Dataset preparation task failed.");
+    expect((response as any).value.completedAt).toBe("2026-04-29T12:00:00.000Z");
+  });
+
   it("registers start/read/cancel channels", () => {
     const channels: string[] = []; registerDatasetPreparationIpc({ ipcMain: { handle: testDouble.fn((c: string) => channels.push(c)) }, prepareTrainingDatasetUseCase: { startPrepareTrainingDataset: testDouble.fn(), readPrepareTrainingDataset: testDouble.fn(), cancelPrepareTrainingDataset: testDouble.fn() } });
     expect(channels).toEqual([DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL.value, DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL.value, DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL.value]);

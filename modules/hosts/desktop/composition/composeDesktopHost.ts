@@ -470,6 +470,7 @@ export function composeDesktopHost(
   });
 
   const datasetPreparationPort = createPythonDatasetPreparationPort({
+    ...pythonRuntimeFoundation.runtimePort,
     executeTask: async (request) => {
       recordRuntimeLog({
         level: "info",
@@ -506,9 +507,7 @@ export function composeDesktopHost(
 
       return result;
     },
-    getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
-    getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
-    ensureModelDownloaded: async (request) => {
+    async ensureModelDownloaded(request) {
       const availability = await pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
       recordRuntimeLog({
         level: "info",
@@ -518,8 +517,6 @@ export function composeDesktopHost(
       });
       return availability;
     },
-    getModelStatus: () => pythonRuntimeFoundation.runtimePort.getModelStatus(),
-    unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels(),
   }, {
     taskTimeoutMs: DATASET_PREPARATION_TASK_TIMEOUT_MS,
     inactivityTimeoutMs: DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS,
@@ -755,6 +752,7 @@ export function composeDesktopHost(
         modelRegistry,
       });
       const modelTrainingPort = createPythonModelTrainingPort({
+        ...pythonRuntimeFoundation.runtimePort,
         executeTask: async (request) => {
           recordRuntimeLog({
             level: "info",
@@ -774,21 +772,12 @@ export function composeDesktopHost(
           }
           return result;
         },
-        getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
-        getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
-        ensureModelDownloaded: (request) => pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request),
-        getModelStatus: () => pythonRuntimeFoundation.runtimePort.getModelStatus(),
-        unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels(),
       }, {
         ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
       });
       const modelValidationPort = createPythonModelValidationPort({
+        ...pythonRuntimeFoundation.runtimePort,
         executeTask: (request) => pythonRuntimeFoundation.runtimePort.executeTask(request),
-        getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
-        getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
-        ensureModelDownloaded: (request) => pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request),
-        getModelStatus: () => pythonRuntimeFoundation.runtimePort.getModelStatus(),
-        unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels(),
       }, {
         ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
       });
