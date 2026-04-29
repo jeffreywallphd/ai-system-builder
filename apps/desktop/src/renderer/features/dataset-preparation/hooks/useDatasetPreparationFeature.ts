@@ -284,6 +284,16 @@ export function useDatasetPreparationFeature(
   const [unloadModelInFlight, setUnloadModelInFlight] = useState(false);
   const stopTrainingRequestedRef = useRef(false);
   const activePollingRequestIdRef = useRef<string | undefined>(undefined);
+  const isMountedRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      stopTrainingRequestedRef.current = true;
+      activePollingRequestIdRef.current = undefined;
+    };
+  }, []);
 
   useEffect(() => {
     cachedDatasetPreparationPageState = {
@@ -372,13 +382,48 @@ export function useDatasetPreparationFeature(
     setActiveTaskRequestId(undefined);
     setActiveTaskStartedAt(undefined);
     activePollingRequestIdRef.current = undefined;
+    cachedDatasetPreparationPageState.activeTaskRequestId = undefined;
+    cachedDatasetPreparationPageState.activeTaskType = undefined;
+    cachedDatasetPreparationPageState.activeTaskStartedAt = undefined;
   }, []);
+
+  const setActiveDatasetPreparationTask = useCallback((requestId: string) => {
+    const startedAt = new Date().toISOString();
+    setActiveTaskRequestId(requestId);
+    setActiveTaskStartedAt(startedAt);
+    cachedDatasetPreparationPageState.activeTaskRequestId = requestId;
+    cachedDatasetPreparationPageState.activeTaskType = "dataset-preparation";
+    cachedDatasetPreparationPageState.activeTaskStartedAt = startedAt;
+  }, []);
+
+  const refreshArtifacts = useCallback(async () => {
+    const sourceArtifacts = await datasetClient.browseSourceArtifacts();
+    setArtifacts(sourceArtifacts);
+    setSelectedArtifactIds((current) => {
+      const validArtifactIds = new Set(sourceArtifacts.map((artifact) => artifact.artifactId));
+      return current.filter((artifactId) => validArtifactIds.has(artifactId));
+    });
+  }, [datasetClient]);
+
+  const refreshRuntimeModelStatus = useCallback(async () => {
+    if (!runtimeStatusClient) {
+      return;
+    }
+
+    try {
+      const snapshot = await runtimeStatusClient.readStatus();
+      setLoadedModelCount(snapshot.loadedModels.length);
+      setRuntimeActiveTaskCount(snapshot.activeTaskCount);
+    } catch {
+      // Runtime status is best-effort for model lifecycle controls.
+    }
+  }, [runtimeStatusClient]);
 
   const pollDatasetPreparationTask = useCallback(async (requestId: string) => {
     if (activePollingRequestIdRef.current === requestId) return;
     activePollingRequestIdRef.current = requestId;
     let pollRecoveryStartedAtMs: number | undefined;
-    while (!stopTrainingRequestedRef.current && activePollingRequestIdRef.current === requestId) {
+    while (!stopTrainingRequestedRef.current && isMountedRef.current && activePollingRequestIdRef.current === requestId) {
       try {
         const pollResponse = await datasetClient.readPrepareTrainingDatasetTask(requestId);
         if (pollResponse.ok === false) {
@@ -424,6 +469,9 @@ export function useDatasetPreparationFeature(
         clearActiveTask(); setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) }); return;
       }
     }
+    if (!isMountedRef.current) {
+      return;
+    }
     clearActiveTask();
     setStatus({ kind: "idle", message: "Training stopped." });
   }, [clearActiveTask, datasetClient, onPrepared, pollingRecoveryGraceWindowMs, refreshArtifacts, refreshRuntimeModelStatus]);
@@ -431,15 +479,6 @@ export function useDatasetPreparationFeature(
   useEffect(() => {
     if (status.kind === "loading" && activeTaskRequestId) void pollDatasetPreparationTask(activeTaskRequestId);
   }, [activeTaskRequestId, pollDatasetPreparationTask, status.kind]);
-
-  const refreshArtifacts = useCallback(async () => {
-    const sourceArtifacts = await datasetClient.browseSourceArtifacts();
-    setArtifacts(sourceArtifacts);
-    setSelectedArtifactIds((current) => {
-      const validArtifactIds = new Set(sourceArtifacts.map((artifact) => artifact.artifactId));
-      return current.filter((artifactId) => validArtifactIds.has(artifactId));
-    });
-  }, [datasetClient]);
 
   useEffect(() => {
     void refreshArtifacts().catch((error) => {
@@ -474,20 +513,6 @@ export function useDatasetPreparationFeature(
       setStatusWarningMessage("Hugging Face namespace default could not be loaded.");
     });
   }, [settingsClient, setStatusWarningMessage]);
-
-  const refreshRuntimeModelStatus = useCallback(async () => {
-    if (!runtimeStatusClient) {
-      return;
-    }
-
-    try {
-      const snapshot = await runtimeStatusClient.readStatus();
-      setLoadedModelCount(snapshot.loadedModels.length);
-      setRuntimeActiveTaskCount(snapshot.activeTaskCount);
-    } catch {
-      // Runtime status is best-effort for model lifecycle controls.
-    }
-  }, [runtimeStatusClient]);
 
   useEffect(() => {
     void refreshRuntimeModelStatus();
@@ -602,8 +627,7 @@ export function useDatasetPreparationFeature(
       return;
     }
 
-    setActiveTaskRequestId(started.requestId);
-    setActiveTaskStartedAt(new Date().toISOString());
+    setActiveDatasetPreparationTask(started.requestId);
     await pollDatasetPreparationTask(started.requestId);
   }, [
     selectedArtifactIds,
@@ -638,28 +662,29 @@ export function useDatasetPreparationFeature(
     datasetClient,
     settingsClient,
     pollDatasetPreparationTask,
+    setActiveDatasetPreparationTask,
   ]);
 
   const onStopTraining = useCallback(async () => {
-    if (!runtimeStatusClient?.controlRuntime || status.kind !== "loading") {
+    if (!activeTaskRequestId || status.kind !== "loading") {
       return;
     }
 
     stopTrainingRequestedRef.current = true;
     setStopTrainingInFlight(true);
-    setStatus({ kind: "loading", message: "Stopping training..." });
+    setStatus({ kind: "loading", message: "Stopping dataset preparation..." });
     try {
-      const snapshot = await runtimeStatusClient.controlRuntime("stop");
-      setLoadedModelCount(snapshot.loadedModels.length);
-      setRuntimeActiveTaskCount(snapshot.activeTaskCount);
-      setStatus({ kind: "idle", message: "Training stopped." });
+      const response = await datasetClient.cancelPrepareTrainingDatasetTask(activeTaskRequestId);
+      if (response.ok === false) {
+        setStatus({ kind: "error", message: appendErrorDetailsMessage(response.error.message, response.error.details) });
+      }
     } catch (error) {
       setStatus({ kind: "error", message: error instanceof Error ? error.message : "Failed to stop training." });
     } finally {
       setStopTrainingInFlight(false);
       void refreshRuntimeModelStatus();
     }
-  }, [refreshRuntimeModelStatus, runtimeStatusClient, status.kind]);
+  }, [activeTaskRequestId, datasetClient, refreshRuntimeModelStatus, status.kind]);
 
   const onUnloadModel = useCallback(async () => {
     if (!runtimeStatusClient?.controlRuntime || status.kind === "loading") {

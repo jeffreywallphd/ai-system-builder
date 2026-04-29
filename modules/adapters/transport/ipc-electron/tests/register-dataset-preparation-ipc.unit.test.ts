@@ -4,7 +4,7 @@ import { createDesktopPrepareTrainingDatasetStartIpcHandler, createDesktopPrepar
 
 describe("registerDatasetPreparationIpc", () => {
   it("maps running read status", async () => {
-    const readPrepareTrainingDataset = testDouble.fn().mockResolvedValue({ ok: true, value: { requestId: "r1", taskType: "prepare-training-dataset", status: "running", progress: { processed: 1, total: 3 } } });
+    const readPrepareTrainingDataset = testDouble.fn().mockResolvedValue({ ok: true, value: { requestId: "r1", taskType: "prepare-training-dataset", status: "running", progress: { current: 1, total: 3 } } });
     const handler = createDesktopPrepareTrainingDatasetTaskReadIpcHandler({ startPrepareTrainingDataset: testDouble.fn(), readPrepareTrainingDataset });
     const response = await handler({}, createDesktopPrepareTrainingDatasetTaskReadRequest({ requestId: "r1", boundary: { host: "desktop", source: "x" } }));
     expect(response.ok).toBe(true); expect((response as any).value.result).toBeUndefined(); expect((response as any).value.progress.processed).toBe(1);

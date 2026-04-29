@@ -38,6 +38,9 @@ export interface DesktopDatasetPreparationClient {
   readPrepareTrainingDatasetTask: (
     requestId: string,
   ) => Promise<DesktopDatasetPreparationTaskReadResult>;
+  cancelPrepareTrainingDatasetTask: (
+    requestId: string,
+  ) => Promise<{ ok: true } | { ok: false; error: { code: string; message: string; details?: Record<string, unknown> } }>;
 }
 export type DesktopDatasetPreparationTaskReadResult =
   | { ok: true; status: "pending" | "running"; progress?: { message?: string; processed?: number; total?: number } }
@@ -175,6 +178,23 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
           return { ok: true, status: "unknown", message: value.error?.message ?? value.progress?.message };
         }
         return { ok: true, status: value?.status === "running" ? "running" : "pending", progress: mapDatasetProgress(value?.progress) };
+      } catch (error) {
+        throw normalizeDatasetPreparationTransportError(error);
+      }
+    },
+    async cancelPrepareTrainingDatasetTask(requestId: string) {
+      if (!desktopApi.cancelPrepareTrainingDatasetTask) {
+        return { ok: false, error: { code: "unavailable", message: "Dataset preparation cancellation is unavailable." } };
+      }
+      try {
+        const response = await desktopApi.cancelPrepareTrainingDatasetTask({ requestId });
+        if (!isPreloadResponseEnvelope(response)) {
+          return { ok: false, error: { code: "internal", message: "Dataset preparation task cancel failed." } };
+        }
+        if (!response.ok) {
+          return { ok: false, error: { code: response.error?.code ?? "internal", message: response.error?.message ?? "Dataset preparation task cancel failed.", details: response.error?.details } };
+        }
+        return { ok: true };
       } catch (error) {
         throw normalizeDatasetPreparationTransportError(error);
       }
