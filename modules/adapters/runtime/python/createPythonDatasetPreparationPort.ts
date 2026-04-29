@@ -167,6 +167,50 @@ export function createPythonDatasetPreparationPort(
   };
 
   return {
+    async startPrepareTrainingDataset(
+      request: PrepareTrainingDatasetRequest,
+      context?: { requestId?: string; correlationId?: string },
+    ): Promise<{ requestId: string }> {
+      if (ensureRuntimeReady) {
+        await ensureRuntimeReady();
+      }
+
+      await runtimePort.ensureModelDownloaded({
+        provider: request.recipe.generation.model.provider,
+        modelId: request.recipe.generation.model.modelId,
+      });
+
+      const requestId = context?.requestId?.trim() || nextRequestId();
+      await runtimePort.startTask({
+        requestId,
+        taskType: "prepare-training-dataset",
+        payload: request,
+        timeoutMs: taskTimeoutMs,
+        metadata: inactivityTimeoutMs !== undefined
+          ? { datasetPreparationInactivityTimeoutMs: inactivityTimeoutMs }
+          : undefined,
+      });
+
+      return { requestId };
+    },
+
+    async readPrepareTrainingDatasetStatus(requestId: string) {
+      const status = await runtimePort.readTaskStatus(requestId);
+      if (status.status === "succeeded" && status.data !== undefined) {
+        return {
+          ...status,
+          data: mapRuntimeDataToResult(status.data),
+        };
+      }
+
+      return status;
+    },
+
+    async cancelPrepareTrainingDataset(requestId: string): Promise<boolean> {
+      const result = await runtimePort.cancelTask(requestId);
+      return result.cancelled;
+    },
+
     async prepareTrainingDataset(
       request: PrepareTrainingDatasetRequest,
       context?: { requestId?: string; correlationId?: string },

@@ -1,4 +1,5 @@
 import {
+  PythonRuntimeTaskStatusResult,
   PrepareTrainingDatasetRequest,
   PrepareTrainingDatasetResult,
 } from "../../../contracts/runtime";
@@ -15,6 +16,15 @@ export class PythonDatasetPreparationError extends Error {
 }
 
 export interface PythonDatasetPreparationPort {
+  startPrepareTrainingDataset(
+    request: PrepareTrainingDatasetRequest,
+    context?: {
+      requestId?: string;
+      correlationId?: string;
+    },
+  ): Promise<{ requestId: string }>;
+  readPrepareTrainingDatasetStatus(requestId: string): Promise<PythonRuntimeTaskStatusResult>;
+  cancelPrepareTrainingDataset?(requestId: string): Promise<boolean>;
   prepareTrainingDataset(
     request: PrepareTrainingDatasetRequest,
     context?: {
