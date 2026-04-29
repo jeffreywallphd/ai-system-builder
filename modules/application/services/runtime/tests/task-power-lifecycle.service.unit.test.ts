@@ -71,5 +71,16 @@ describe("TaskPowerLifecycleService", () => {
     const service = new TaskPowerLifecycleService(power);
     await service.startTask("r1", TaskType.MODEL_TRAINING);
     await expect(service.completeTask("r1", "unknown")).resolves.toBeUndefined();
+    await expect(service.completeTask("r1", "unknown")).resolves.toBeUndefined();
+    expect(power.stopBlocker).toHaveBeenCalledTimes(1);
+  });
+
+  it("starting same request id completes old blocker before starting replacement", async () => {
+    const power = createPowerSuspensionMock();
+    const service = new TaskPowerLifecycleService(power);
+    await service.startTask("r1", TaskType.MODEL_TRAINING);
+    await service.startTask("r1", TaskType.MODEL_TRAINING);
+    expect(power.stopBlocker).toHaveBeenCalledTimes(1);
+    expect(power.startBlocker).toHaveBeenCalledTimes(2);
   });
 });
