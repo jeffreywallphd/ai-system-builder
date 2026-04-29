@@ -1,0 +1,26 @@
+# Runtime Task Registry Pack
+
+Use this pack when prompt scope includes long-running runtime-backed tasks (dataset preparation, model training, validation, publishing, or future runtime handlers).
+
+## Required Lifecycle
+
+- Long-running work must use Runtime Task Registry async lifecycle: **start / read(status) / cancel**.
+- UI and callers must poll status by `requestId` until terminal state.
+- Do not use long-held HTTP/IPC requests to wait for completion.
+- Do not solve timeout/disconnect issues by stretching fetch/IPC timeouts.
+
+## Shared vs Feature-Specific Responsibilities
+
+- Registry lifecycle/state/progress/retention concerns are shared across runtime tasks.
+- Task handlers remain feature-specific.
+- Do not introduce feature-specific task queues for dataset/model/etc.
+
+## Progress + Status Source of Truth
+
+- Use structured task status/progress from registry contracts.
+- Logs remain useful diagnostics but should not be primary UI state source.
+
+## Power Lifecycle
+
+- Power suspension blockers should attach to runtime task lifecycle activity.
+- Power blockers complement but do not replace async task lifecycle polling.

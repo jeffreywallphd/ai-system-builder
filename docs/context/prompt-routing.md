@@ -14,6 +14,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | repo layout, module placement, dependency direction at a repo level | `docs/context/packs/repository-overview.pack.md` |
 | cross-layer architecture or boundary decisions | `docs/context/packs/architecture.pack.md` |
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
+| runtime task registry lifecycle for long-running runtime tasks (start/read/cancel, shared lifecycle/progress/retention semantics) | `docs/context/packs/runtime-task-registry.pack.md` |
 | Electron/desktop host lifecycle, IPC/preload boundaries, desktop composition | `docs/context/packs/desktop-host.pack.md` |
 | desktop renderer structure, page/feature/component boundaries, renderer API-client usage | `docs/context/packs/desktop-implementation.pack.md` |
 | desktop renderer CSS/style architecture, shared style layering, token-first styling decisions | `docs/context/packs/desktop-styling.pack.md` |

@@ -18,6 +18,13 @@ import {
   type PythonRuntimeOutputDescriptor,
   type PythonRuntimeTaskRequest,
   type PythonRuntimeTaskResult,
+  type PythonRuntimeTaskStatus,
+  type RuntimeTaskConcurrencyClass,
+  type RuntimeTaskListRequest,
+  type RuntimeTaskListResult,
+  type RuntimeTaskRecord,
+  type RuntimeTaskRetentionPolicy,
+  TaskType,
   createRuntimeOperation,
   createRuntimeExecutionDiagnostic,
   createRuntimeExecutionError,
@@ -595,5 +602,69 @@ describe("python runtime async task contracts", () => {
     const invalidCancelResult: import(".").CancelPythonRuntimeTaskResult = { requestId: "x", status: "unknown" };
     expect(invalidStartRequest).toBeDefined();
     expect(invalidCancelResult).toBeDefined();
+  });
+});
+
+describe("runtime task registry contracts", () => {
+  it("defines shared runtime task type and lifecycle status literals", () => {
+    const taskTypes = Object.values(TaskType);
+    expect(taskTypes).toEqual([
+      "dataset-preparation",
+      "model-training",
+      "model-validation",
+      "model-publishing",
+    ]);
+
+    const statuses: PythonRuntimeTaskStatus[] = [
+      "queued",
+      "running",
+      "succeeded",
+      "failed",
+      "cancelled",
+      "unknown",
+    ];
+    expect(statuses).toContain("succeeded");
+  });
+
+  it("defines runtime task concurrency classes and task record shape", () => {
+    const concurrencyClass: RuntimeTaskConcurrencyClass = "cpu-heavy";
+
+    const record: RuntimeTaskRecord = {
+      requestId: "req-rt-1",
+      taskType: TaskType.MODEL_TRAINING,
+      status: "running",
+      concurrencyClass,
+      progress: { message: "step", current: 1, total: 4, unit: "step", percent: 25 },
+      metadata: { source: "desktop" },
+      queuedAt: "2026-04-29T00:00:00.000Z",
+      startedAt: "2026-04-29T00:00:05.000Z",
+      updatedAt: "2026-04-29T00:00:10.000Z",
+    };
+
+    expect(record.concurrencyClass).toBe("cpu-heavy");
+    expect(record.progress?.percent).toBe(25);
+  });
+
+  it("defines task listing and retention policy contracts", () => {
+    const listRequest: RuntimeTaskListRequest = {
+      statuses: ["queued", "running"],
+      taskTypes: [TaskType.DATASET_PREPARATION],
+      includeCompleted: false,
+      limit: 50,
+    };
+
+    const listResult: RuntimeTaskListResult = {
+      tasks: [],
+    };
+
+    const retention: RuntimeTaskRetentionPolicy = {
+      completedTaskTtlMs: 600_000,
+      maxCompletedTasks: 1_000,
+      cleanupIntervalMs: 30_000,
+    };
+
+    expect(listRequest.limit).toBe(50);
+    expect(Array.isArray(listResult.tasks)).toBe(true);
+    expect(retention.maxCompletedTasks).toBe(1_000);
   });
 });
