@@ -126,3 +126,9 @@
 - Node.js `fetch` / Undici behavior and AbortSignal timeout pattern: https://nodejs.org/api/globals.html#fetch and https://undici.nodejs.org/#/docs/api/Dispatcher?id=parameter-requestoptions  
 - Uvicorn/FastAPI server timeout options (for worker hosting context): https://www.uvicorn.org/settings/  
 - NGINX proxy timeout directives (common 60/300s classes): https://nginx.org/en/docs/http/ngx_http_proxy_module.html  
+
+## Migration cleanup notes (Prompt 3, 2026-04-29)
+
+- Async dataset-preparation UI migration is active; follow-up cleanup is still required before legacy sync APIs are removed.
+- Source artifacts must be staged to runtime-local files before async `start` is invoked, and `sourceInputs` must not be empty for real runs.
+- Legacy sync `execute` remains temporarily for compatibility and must be removed in Prompt 4 after callers are fully migrated.

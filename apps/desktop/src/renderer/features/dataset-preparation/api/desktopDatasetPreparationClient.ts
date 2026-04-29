@@ -37,7 +37,11 @@ export interface DesktopDatasetPreparationClient {
   ) => Promise<{ requestId: string } | { error: { code: string; message: string; details?: Record<string, unknown> } }>;
   readPrepareTrainingDatasetTask: (
     requestId: string,
-  ) => Promise<DesktopDatasetPreparationResult | { ok: true; pending: true; progress?: { message?: string; processed?: number; total?: number } }>;
+  ) => Promise<
+    | DesktopDatasetPreparationResult
+    | { ok: true; status: "pending" | "running"; progress?: { message?: string; processed?: number; total?: number } }
+    | { ok: true; status: "cancelled" | "unknown"; progress?: { message?: string; processed?: number; total?: number } }
+  >;
 }
 
 function ensureSuccessEnvelope(response: unknown, fallbackMessage: string): { value?: unknown } {
@@ -91,7 +95,7 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
       input: DesktopPrepareTrainingDatasetInput,
       context?: DesktopDatasetPreparationRequestContext,
     ) {
-      if (!desktopApi.startPrepareTrainingDataset) {
+      if (!desktopApi.startPrepareTrainingDataset && !desktopApi.prepareTrainingDatasetFromArtifacts) {
         return {
           error: {
             code: "unavailable",
@@ -101,8 +105,22 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
       }
 
       try {
-        const response = await desktopApi.startPrepareTrainingDataset(input, context);
-        const payload = ensureSuccessEnvelope(response, "Dataset preparation failed to start.");
+        const response = desktopApi.startPrepareTrainingDataset
+          ? await desktopApi.startPrepareTrainingDataset(input, context)
+          : await desktopApi.prepareTrainingDatasetFromArtifacts!(input, context);
+        if (!isPreloadResponseEnvelope(response)) {
+          return { error: { code: "internal", message: "Dataset preparation failed to start." } };
+        }
+        if (!response.ok) {
+          return {
+            error: {
+              code: response.error?.code ?? "internal",
+              message: response.error?.message ?? "Dataset preparation failed to start.",
+              details: response.error?.details,
+            },
+          };
+        }
+        const payload = { value: response.value };
         const requestId = (payload.value as { requestId?: string } | undefined)?.requestId;
         if (typeof requestId !== "string" || requestId.trim().length === 0) {
           return {
@@ -135,7 +153,10 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
         if (value?.status === "failed") {
           return { ok: false, error: { code: "failed", message: value.error?.message ?? "Dataset preparation failed." } };
         }
-        return { ok: true, pending: true as const, progress: value?.progress };
+        if (value?.status === "cancelled" || value?.status === "unknown") {
+          return { ok: true, status: value.status, progress: value?.progress };
+        }
+        return { ok: true, status: value?.status === "running" ? "running" : "pending", progress: value?.progress };
       } catch (error) {
         throw normalizeDatasetPreparationTransportError(error);
       }
