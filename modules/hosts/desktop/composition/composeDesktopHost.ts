@@ -1,6 +1,7 @@
 import { cpus, totalmem, freemem } from "node:os";
 import { spawnSync } from "node:child_process";
 import type { LoggingPort } from "../../../application/ports/logging";
+import { TaskPowerLifecycleService } from "../../../application/services/runtime";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
@@ -527,6 +528,7 @@ export function composeDesktopHost(
   });
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
+  const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
 
   return {
     loggingPort,
@@ -534,6 +536,7 @@ export function composeDesktopHost(
     applicationSettings,
     applicationSecrets,
     modelDefaultResolver,
+    powerSuspensionBlocker,
     getHuggingFaceTokenStatus() {
       return tokenConfigStore.getStatus();
     },
@@ -634,7 +637,6 @@ export function composeDesktopHost(
         storage,
         logging: loggingPort,
         now: options.now,
-        powerSuspension: powerSuspensionBlocker,
       });
 
       const browseArtifacts = new BrowseArtifactsUseCase({
@@ -711,14 +713,14 @@ export function composeDesktopHost(
       const ingestWebsitePagesBatch = new IngestWebsitePagesBatchUseCase({
         ingestWebsitePage,
       });
-      const prepareTrainingDatasetUseCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      const prepareTrainingDatasetFromArtifactsUseCase = new PrepareTrainingDatasetFromArtifactsUseCase({
         datasetPreparation: datasetPreparationPort,
         storageBindings: artifactBindings,
         storage,
         artifactRepoStorage,
         artifactCatalog,
         now: options.now,
-        powerSuspension: powerSuspensionBlocker,
+        taskPowerLifecycle,
       });
       const listSettingsDefinitions = new ListSettingsDefinitionsUseCase({
         settings: applicationSettings,
@@ -827,7 +829,7 @@ export function composeDesktopHost(
       const trainModel = new TrainModelUseCase({
         modelTraining: modelTrainingPort,
         modelRegistry,
-        powerSuspension: powerSuspensionBlocker,
+        taskPowerLifecycle,
       });
       const validateModel = new ValidateModelUseCase({
         modelValidation: modelValidationPort,
@@ -886,7 +888,7 @@ export function composeDesktopHost(
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
         ingestWebsitePageUseCase: ingestWebsitePage,
         ingestWebsitePagesBatchUseCase: ingestWebsitePagesBatch,
-        prepareTrainingDatasetUseCase: prepareTrainingDatasetUseCase,
+        prepareTrainingDatasetUseCase: prepareTrainingDatasetFromArtifactsUseCase,
         listSettingsDefinitionsUseCase: listSettingsDefinitions,
         readSettingsUseCase: readSettings,
         updateSettingUseCase: updateSetting,
