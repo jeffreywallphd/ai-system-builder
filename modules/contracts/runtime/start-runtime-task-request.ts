@@ -2,6 +2,11 @@ import type { RuntimeTaskConcurrencyClass } from "./runtime-task-concurrency-cla
 import type { TaskType } from "./task-type";
 
 export interface StartRuntimeTaskRequest {
+  /**
+   * Optional caller-provided request id used for correlation and idempotency.
+   * Implementations may generate a request id when omitted.
+   */
+  requestId?: string;
   taskType: TaskType;
   concurrencyClass?: RuntimeTaskConcurrencyClass;
   payload: unknown;

@@ -6,7 +6,6 @@ import {
 } from "../../../contracts/model";
 import { TaskType } from "../../../contracts/runtime";
 import type { ModelRegistryPort, ModelTrainingPort } from "../../ports/model";
-import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 import type { TaskPowerLifecyclePort } from "../../services/runtime";
 import { randomUUID } from "node:crypto";
 
@@ -34,7 +33,6 @@ export class TrainModelUseCase {
       modelTraining: ModelTrainingPort;
       modelRegistry: ModelRegistryPort;
       taskPowerLifecycle: TaskPowerLifecyclePort;
-      runtimeTaskRegistry?: RuntimeTaskRegistryPort;
     },
   ) {}
 

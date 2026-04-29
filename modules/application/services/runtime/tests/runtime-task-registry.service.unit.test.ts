@@ -52,13 +52,51 @@ describe("RuntimeTaskRegistryService", () => {
     await expect(service.safeCancel("r-1")).resolves.toBeUndefined();
   });
 
-  it("waitForTerminalStatus swallows lifecycle failures", async () => {
+  it("readTaskAndCompleteLifecycleIfTerminal swallows lifecycle failures", async () => {
     const registry = createRegistryPortMock();
     const lifecycle = createLifecycleMock();
     lifecycle.completeTask = testDouble.fn(async () => { throw new Error("boom"); });
     const service = new RuntimeTaskRegistryService(registry, lifecycle);
 
-    const record = await service.waitForTerminalStatus("r-1");
+    const record = await service.readTaskAndCompleteLifecycleIfTerminal("r-1");
     expect(record.status).toBe("succeeded");
+  });
+
+  it("calls onTerminal when read result is terminal", async () => {
+    const registry = createRegistryPortMock();
+    const lifecycle = createLifecycleMock();
+    const onTerminal = testDouble.fn(async () => undefined);
+    const service = new RuntimeTaskRegistryService(registry, lifecycle);
+
+    await service.readTaskAndCompleteLifecycleIfTerminal("r-1", { onTerminal });
+    expect(onTerminal).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onTerminal when read result is non-terminal", async () => {
+    const registry = createRegistryPortMock();
+    registry.getTaskStatus = testDouble.fn(async (): Promise<RuntimeTaskRecord> => ({
+      requestId: "r-1",
+      taskType: TaskType.MODEL_TRAINING,
+      status: "running",
+      concurrencyClass: "gpu-exclusive",
+    }));
+    const lifecycle = createLifecycleMock();
+    const onTerminal = testDouble.fn(async () => undefined);
+    const service = new RuntimeTaskRegistryService(registry, lifecycle);
+
+    await service.readTaskAndCompleteLifecycleIfTerminal("r-1", { onTerminal });
+    expect(onTerminal).toHaveBeenCalledTimes(0);
+  });
+
+  it("swallows onTerminal hook failures during terminal reads", async () => {
+    const registry = createRegistryPortMock();
+    const lifecycle = createLifecycleMock();
+    const onTerminal = testDouble.fn(async () => { throw new Error("boom"); });
+    const service = new RuntimeTaskRegistryService(registry, lifecycle);
+
+    await expect(service.readTaskAndCompleteLifecycleIfTerminal("r-1", { onTerminal })).resolves.toMatchObject({
+      requestId: "r-1",
+      status: "succeeded",
+    });
   });
 });

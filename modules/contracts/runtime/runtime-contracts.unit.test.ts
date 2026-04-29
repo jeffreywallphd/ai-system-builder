@@ -684,6 +684,7 @@ describe("runtime task registry contracts", () => {
 
   it("defines generic runtime task start and cancel contracts", () => {
     const startRequest: StartRuntimeTaskRequest = {
+      requestId: "req-caller-1",
       taskType: TaskType.DATASET_PREPARATION,
       concurrencyClass: "cpu-heavy",
       payload: { sourceIds: ["a1"] },
@@ -697,6 +698,13 @@ describe("runtime task registry contracts", () => {
       cancelled: true,
     };
 
+    const startRequestWithoutRequestId: StartRuntimeTaskRequest = {
+      taskType: TaskType.DATASET_PREPARATION,
+      payload: { sourceIds: ["a1"] },
+    };
+
+    expect(startRequest.requestId).toBe("req-caller-1");
+    expect(startRequestWithoutRequestId.requestId).toBeUndefined();
     expect(startRequest.taskType).toBe(TaskType.DATASET_PREPARATION);
     expect(started.requestId).toBe("req-start-1");
     expect(cancelled.cancelled).toBe(true);

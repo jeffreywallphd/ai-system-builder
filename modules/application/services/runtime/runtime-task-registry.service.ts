@@ -21,6 +21,8 @@ export class RuntimeTaskRegistryService {
     private readonly taskRegistry: RuntimeTaskRegistryPort,
     private readonly taskPowerLifecycle?: TaskPowerLifecyclePort,
   ) {}
+  // This service owns task power lifecycle only for flows migrated to RuntimeTaskRegistryService.
+  // Use cases not yet migrated must continue direct lifecycle handling and must not double-call this helper.
 
   public async startAndAttachLifecycle(
     request: StartRuntimeTaskRequest,
@@ -55,10 +57,18 @@ export class RuntimeTaskRegistryService {
     }
   }
 
-  public async waitForTerminalStatus(requestId: string): Promise<RuntimeTaskRecord> {
+  public async readTaskAndCompleteLifecycleIfTerminal(
+    requestId: string,
+    hooks?: RuntimeTaskRegistryLifecycleHooks,
+  ): Promise<RuntimeTaskRecord> {
     const record = await this.taskRegistry.getTaskStatus(requestId);
     if (TERMINAL_STATUSES.has(record.status)) {
       await this.completeLifecycle(requestId, record.status);
+      try {
+        await hooks?.onTerminal?.(record);
+      } catch {
+        // Hook failures must not fail terminal reads.
+      }
     }
     return record;
   }

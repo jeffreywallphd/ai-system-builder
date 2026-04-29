@@ -28,7 +28,6 @@ import type { ArtifactCatalogReadPort } from "../ports/artifact-catalog";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRepoStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
 import { TaskType } from "../../contracts/runtime";
-import type { RuntimeTaskRegistryPort } from "../ports/runtime";
 import type { TaskPowerLifecyclePort } from "../services/runtime";
 
 export interface PrepareTrainingDatasetFromArtifactsCommand {
@@ -75,7 +74,6 @@ export interface PrepareTrainingDatasetFromArtifactsUseCaseDependencies {
   artifactRepoStorage?: ArtifactRepoStoragePort;
   artifactCatalog?: ArtifactCatalogReadPort;
   taskPowerLifecycle: TaskPowerLifecyclePort;
-  runtimeTaskRegistry?: RuntimeTaskRegistryPort;
   now?: () => string;
 }
 
