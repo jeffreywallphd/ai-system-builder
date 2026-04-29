@@ -6,8 +6,6 @@ import type {
   PythonRuntimeModelStatusResult,
   StartPythonRuntimeTaskRequest,
   StartPythonRuntimeTaskResult,
-  PythonRuntimeTaskRequest,
-  PythonRuntimeTaskResult,
   PythonRuntimeUnloadModelsResult,
 } from "../../../../contracts/runtime";
 
@@ -19,8 +17,6 @@ import {
   mapStartTaskRequest,
   mapStartTaskResponse,
   mapTaskStatusResponse,
-  mapTaskRequestToHttpPayload,
-  mapTaskResponseFromHttpPayload,
   mapUnloadModelsResponseFromHttpPayload,
 } from "../protocol/pythonRuntimeHttpProtocol";
 
@@ -39,7 +35,6 @@ export interface PythonRuntimeHttpClient {
   startTask(request: StartPythonRuntimeTaskRequest): Promise<StartPythonRuntimeTaskResult>;
   readTaskStatus(requestId: string): Promise<PythonRuntimeTaskStatusResult>;
   cancelTask(requestId: string): Promise<CancelPythonRuntimeTaskResult>;
-  executeTask(request: PythonRuntimeTaskRequest): Promise<PythonRuntimeTaskResult>;
 }
 
 export interface CreatePythonRuntimeHttpClientOptions {
@@ -205,35 +200,6 @@ export function createPythonRuntimeHttpClient(
       return mapRuntimeResponsePayload(`/tasks/${requestId}/cancel`, response, payload, mapCancelTaskResponse);
     },
 
-    async executeTask(request: PythonRuntimeTaskRequest) {
-      const timeoutMs = request.timeoutMs ?? defaultTaskTimeoutMs;
-      const effectiveRequestTimeoutMs = Math.min(timeoutMs, transportRequestTimeoutMs);
-      const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(new Error(`Python runtime transport request timed out after ${effectiveRequestTimeoutMs}ms.`)),
-        effectiveRequestTimeoutMs,
-      );
-      let response: Response;
-      try {
-        response = await fetcher(`${baseUrl}/tasks/execute`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(mapTaskRequestToHttpPayload({ ...request, timeoutMs })),
-          signal: controller.signal,
-        });
-      } catch (error) {
-        if (error instanceof Error && (error.name === "AbortError" || error.message.includes("timed out"))) {
-          throw new Error(`Python runtime task request timed out after ${effectiveRequestTimeoutMs}ms.`);
-        }
-        throw error;
-      } finally {
-        clearTimeout(timeout);
-      }
-
-      const payload = await parseJsonResponseSafe(response);
-      return mapRuntimeResponsePayload("/tasks/execute", response, payload, mapTaskResponseFromHttpPayload);
-    },
+,
   };
 }

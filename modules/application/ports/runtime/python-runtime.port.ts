@@ -6,15 +6,10 @@ import {
   PythonRuntimeTaskStatusResult,
   StartPythonRuntimeTaskRequest,
   StartPythonRuntimeTaskResult,
-  PythonRuntimeTaskRequest,
-  PythonRuntimeTaskResult,
   PythonRuntimeUnloadModelsResult
 } from "../../../contracts/runtime";
 
 export interface PythonRuntimePort {
-  executeTask(
-    request: PythonRuntimeTaskRequest
-  ): Promise<PythonRuntimeTaskResult>;
   startTask(request: StartPythonRuntimeTaskRequest): Promise<StartPythonRuntimeTaskResult>;
   readTaskStatus(requestId: string): Promise<PythonRuntimeTaskStatusResult>;
   cancelTask(requestId: string): Promise<CancelPythonRuntimeTaskResult>;

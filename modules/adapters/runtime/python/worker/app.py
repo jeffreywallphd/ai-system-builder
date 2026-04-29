@@ -25,8 +25,6 @@ from .models import (
     PythonRuntimeError,
     PythonRuntimeHealthCheckResult,
     PythonRuntimeHealthStatus,
-    PythonRuntimeTaskRequest,
-    PythonRuntimeTaskResult,
     PythonRuntimeTaskStatusResult,
     StartPythonRuntimeTaskRequest,
     StartPythonRuntimeTaskResult,
@@ -62,7 +60,7 @@ def _active_task_count() -> int:
         return sum(1 for task in TASK_REGISTRY.values() if task["status"] == "running")
 
 
-def _resolve_dataset_preparation_inactivity_timeout_ms(request: PythonRuntimeTaskRequest | StartPythonRuntimeTaskRequest) -> int | None:
+def _resolve_dataset_preparation_inactivity_timeout_ms(request: StartPythonRuntimeTaskRequest) -> int | None:
     if request.metadata and isinstance(request.metadata.get("datasetPreparationInactivityTimeoutMs"), int):
         timeout_ms = int(request.metadata["datasetPreparationInactivityTimeoutMs"])
         if timeout_ms > 0:
@@ -254,20 +252,3 @@ def unload_models() -> UnloadModelsResult | JSONResponse:
     return UnloadModelsResult(unloadedModels=[LoadedModelDescriptor.model_validate(model) for model in unloaded], activeTaskCount=0)
 
 
-@app.post("/tasks/execute", response_model=PythonRuntimeTaskResult)
-def execute_task(request: PythonRuntimeTaskRequest) -> PythonRuntimeTaskResult:
-    # Legacy synchronous endpoint kept for short-task compatibility during Prompt 2.
-    start_request = StartPythonRuntimeTaskRequest.model_validate(request.model_dump(mode="python"))
-    start_result = _start_async_task(start_request)
-    timeout_seconds = (request.timeoutMs / 1000) if request.timeoutMs else None
-    start = time.monotonic()
-    while True:
-        status = read_task_status(request.requestId)
-        if status.status == "succeeded":
-            return PythonRuntimeTaskResult(requestId=request.requestId, taskType=request.taskType, success=True, data=status.data, metadata=status.metadata)
-        if status.status in {"failed", "cancelled"}:
-            return PythonRuntimeTaskResult(requestId=request.requestId, taskType=request.taskType, success=False, error=status.error, metadata=status.metadata)
-        if timeout_seconds is not None and (time.monotonic() - start) > timeout_seconds:
-            cancel_task(request.requestId)
-            return PythonRuntimeTaskResult(requestId=request.requestId, taskType=request.taskType, success=False, error=PythonRuntimeError(code="task_timeout", errorCode="runtime_timeout", stage="generation", message=f"Task timed out after {request.timeoutMs}ms.", retryable=False), metadata={"runtimeId": RUNTIME_ID})
-        time.sleep(TASK_WAIT_POLL_SECONDS)
