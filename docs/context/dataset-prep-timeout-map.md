@@ -131,7 +131,7 @@
 
 - Async dataset-preparation UI migration is active; follow-up cleanup is still required before legacy sync APIs are removed.
 - Source artifacts must be staged to runtime-local files before async `start` is invoked, and `sourceInputs` must not be empty for real runs.
-- Legacy sync `execute` remains temporarily for compatibility and must be removed in Prompt 4 after callers are fully migrated.
+- Legacy sync `execute` has been removed; production dataset preparation flow is async-only (`start`/`read`/`cancel`).
 
 ## Migration cleanup status (Prompt 4, 2026-04-29)
 

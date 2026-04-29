@@ -322,6 +322,13 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
 
     try {
       const started = await this.datasetPreparation.startPrepareTrainingDataset(runtimeRequest, context);
+      if (typeof started.requestId !== "string" || started.requestId.trim().length === 0) {
+        await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
+        return createFailureResult(
+          createContractError("internal", "Dataset preparation start response missing requestId."),
+          context,
+        );
+      }
       this.runtimeWorkingDirsByRequestId.set(started.requestId, staged.value.runtimeWorkingDir);
       return createSuccessResult(started, context);
     } catch (error) {

@@ -11,16 +11,23 @@ const command = { sourceArtifactIds:["a1"], recipe:{ normalization:{targetFormat
 
 describe("PrepareTrainingDatasetFromArtifactsUseCase async start cleanup", () => {
   it("cleans staged dir when runtime start throws", async () => {
-    const start = testDouble.fn(async (request:any) => { throw new Error(request.runtime.runtimeWorkingDirectory); });
+    let stagedDir = "";
+    const start = testDouble.fn(async (request:any) => {
+      stagedDir = request.runtime.runtimeWorkingDirectory;
+      throw new Error("failed");
+    });
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ datasetPreparation:{ startPrepareTrainingDataset:start, readPrepareTrainingDatasetStatus:testDouble.fn() }, storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() } });
     const result = await useCase.startPrepareTrainingDataset(command);
     expect(result.ok).toBe(false);
+    expect(await exists(stagedDir)).toBe(false);
   });
 
-  it("cleans staged dir when runtime start fails with contract error", async () => {
-    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ datasetPreparation:{ startPrepareTrainingDataset:testDouble.fn(async()=>{ throw new Error("failed"); }), readPrepareTrainingDatasetStatus:testDouble.fn() }, storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() } });
+  it("cleans staged dir when runtime start succeeds without request id", async () => {
+    let stagedDir = "";
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ datasetPreparation:{ startPrepareTrainingDataset:testDouble.fn(async(req:any)=>{ stagedDir = req.runtime.runtimeWorkingDirectory; return {requestId:"",taskType:"prepare-training-dataset",accepted:true,status:"queued"}; }), readPrepareTrainingDatasetStatus:testDouble.fn() }, storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() } });
     const result = await useCase.startPrepareTrainingDataset(command);
     expect(result.ok).toBe(false);
+    expect(await exists(stagedDir)).toBe(false);
   });
 
   it("keeps staged dir until terminal read then cleans", async () => {
