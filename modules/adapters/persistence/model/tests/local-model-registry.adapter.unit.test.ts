@@ -141,4 +141,30 @@ describe("createLocalModelRegistryAdapter", () => {
     const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
     expect(persisted.models?.[0]?.modelId).toBe("org/demo-model");
   });
+
+  it("uses isolated temporary files for concurrent discovery persistence", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
+    const filePath = join(dir, "models.json");
+    const cacheRoot = join(dir, "hf-cache");
+    await mkdir(join(cacheRoot, "models--org--demo-model", "snapshots", "bbb"), { recursive: true });
+
+    const adapter = createLocalModelRegistryAdapter({
+      filePath,
+      now: () => "2026-04-27T00:00:00.000Z",
+      discovery: {
+        searchRoots: [cacheRoot],
+        env: {},
+        homeDirectory: join(dir, "home"),
+      },
+    });
+
+    const listed = await Promise.all(
+      Array.from({ length: 20 }, () => adapter.listModels({ limit: 10 })),
+    );
+
+    expect(listed.every((result) => result.models[0]?.modelId === "org/demo-model")).toBe(true);
+
+    const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
+    expect(persisted.models?.[0]?.modelId).toBe("org/demo-model");
+  });
 });
