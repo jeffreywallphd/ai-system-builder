@@ -116,4 +116,31 @@ describe("TrainModelUseCase", () => {
     expect(result.status).toBe(status);
     expect(lifecycle.completeTask).toHaveBeenCalledWith("train-req-1", status);
   });
+
+
+  it("falls back to local artifact-object binding when file binding is unavailable", async () => {
+    const lifecycle = createLifecycleFake();
+    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+    const storageBindings: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings"> = {
+      readArtifactStorageBindings: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          bindings: [{
+            artifactId: "dataset-1",
+            role: "primary",
+            backing: { kind: "artifact-object", provider: "local", locator: "generated/dataset-1.parquet" },
+          }],
+        },
+      })),
+    };
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings, taskPowerLifecycle: lifecycle });
+
+    await useCase.execute(baseRequest);
+
+    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith({
+      taskType: TaskType.MODEL_TRAINING,
+      payload: expect.objectContaining({ datasets: [expect.objectContaining({ artifactId: "dataset-1", path: "generated/dataset-1.parquet" })] }),
+    });
+  });
+
 });
