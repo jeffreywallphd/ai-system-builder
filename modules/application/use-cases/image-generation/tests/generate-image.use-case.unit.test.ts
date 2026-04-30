@@ -2,7 +2,8 @@ import { readFile } from "node:fs/promises";
 
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import type { ImageGenerationRequest } from "../../../../contracts/image-generation";
-import { TaskType, type RuntimeTaskRegistryPort } from "../../../../contracts/runtime";
+import { TaskType } from "../../../../contracts/runtime";
+import type { RuntimeTaskRegistryPort } from "../../../ports/runtime";
 import { GenerateImageUseCase } from "../generate-image.use-case";
 
 function createRuntimeTaskRegistryFake(): RuntimeTaskRegistryPort {
@@ -74,11 +75,19 @@ describe("GenerateImageUseCase", () => {
     expect(result).toEqual({ requestId: "img-req-1", status: "cancelled", cancelled: true });
   });
 
-  it("does not import ComfyUI or register image assets", async () => {
+  it("does not import runtime adapter or image-asset implementation details", async () => {
     const source = await readFile("modules/application/use-cases/image-generation/generate-image.use-case.ts", "utf-8");
 
-    expect(source.includes("comfy")).toBe(false);
-    expect(source.includes("registerImageAsset")).toBe(false);
-    expect(source.includes("ImageAsset")).toBe(false);
+    const forbiddenFragments = [
+      "adapters/runtime/comfyui",
+      "createComfyUi",
+      "ComfyUi",
+      "ImageAsset",
+      "registerImageAsset",
+    ];
+
+    for (const fragment of forbiddenFragments) {
+      expect(source.includes(fragment)).toBe(false);
+    }
   });
 });
