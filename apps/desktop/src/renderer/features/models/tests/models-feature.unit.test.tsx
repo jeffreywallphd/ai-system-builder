@@ -228,9 +228,8 @@ describe("ModelsFeature", () => {
     });
 
     expect(container.textContent).toContain("Current backend support: LoRA, QLoRA, and full fine-tuning");
-    expect(container.textContent).toContain("Dataset artifact IDs");
-
-    expect(container.querySelector("input[placeholder='artifact-1,artifact-2']")).toBeTruthy();
+    expect(container.textContent).toContain("Training datasets (Parquet artifacts)");
+    expect(container.querySelector("select[multiple]")).toBeTruthy();
     expect(container.textContent).toContain("Start Training");
   });
 

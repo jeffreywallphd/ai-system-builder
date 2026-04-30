@@ -23,8 +23,22 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span>Dataset artifact IDs (comma-separated)</span>
-        <input className="ui-input" value={s.datasetArtifactIdsText} onChange={(event) => s.setDatasetArtifactIdsText(event.target.value)} placeholder="artifact-1,artifact-2" />
+        <span>Training datasets (Parquet artifacts)</span>
+        <select
+          className="ui-input"
+          multiple
+          value={s.selectedDatasetArtifactIds}
+          onChange={(event) => {
+            const selectedOptions = Array.from(event.target.selectedOptions).map((option) => option.value);
+            s.setSelectedDatasetArtifactIds(selectedOptions);
+          }}
+        >
+          {s.datasetArtifacts.map((artifact) => (
+            <option key={artifact.artifactId} value={artifact.artifactId}>
+              {artifact.storageKey} ({artifact.artifactId})
+            </option>
+          ))}
+        </select>
       </label>
 
       <label className="ui-stack ui-stack--sm">
