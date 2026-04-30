@@ -7,6 +7,7 @@ import {
 import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
 import type { ModelRegistryPort } from "../../ports/model";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
+import type { ArtifactStorageBindingPort } from "../../ports/storage";
 import type { TaskPowerLifecyclePort } from "../../services/runtime";
 
 function ensureBaseModelSelection(request: ModelTrainingRequest): void {
@@ -35,6 +36,7 @@ export class TrainModelUseCase {
     private readonly dependencies: {
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
       modelRegistry: ModelRegistryPort;
+      storageBindings: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings">;
       taskPowerLifecycle: TaskPowerLifecyclePort;
     },
   ) {}
@@ -65,7 +67,25 @@ export class TrainModelUseCase {
 
     const started = await this.dependencies.runtimeTaskRegistry.startTask({
       taskType: TaskType.MODEL_TRAINING,
-      payload: normalizedRequest,
+      payload: {
+        ...normalizedRequest,
+        datasets: await Promise.all(normalizedRequest.datasets.map(async (dataset) => {
+          if (dataset.path && dataset.path.trim().length > 0) {
+            return dataset;
+          }
+          const bindingsResult = await this.dependencies.storageBindings.readArtifactStorageBindings({ artifactId: dataset.artifactId });
+          if (!bindingsResult.ok) {
+            throw new Error(`Failed to resolve storage binding for dataset artifact '${dataset.artifactId}': ${bindingsResult.error.message}`);
+          }
+          const localBinding = bindingsResult.value.bindings.find(
+            (binding) => binding.backing.provider === "local-filesystem",
+          );
+          if (!localBinding) {
+            throw new Error(`Dataset artifact '${dataset.artifactId}' is missing a local-filesystem file binding.`);
+          }
+          return { ...dataset, path: localBinding.backing.locator };
+        })),
+      },
     });
 
     if (typeof started.requestId !== "string" || started.requestId.trim().length === 0) {
