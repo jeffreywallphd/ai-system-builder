@@ -122,7 +122,11 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
         setModels(refreshed);
       } else if (trainingResult.status === "queued" || trainingResult.status === "running") {
         setStatus("running");
-        setMessage(`Training ${trainingResult.status}. Run ID: ${trainingResult.runId}`);
+        const configuredEpochs = Number.parseInt(numEpochs, 10) || 0;
+        const configuredBatches = Number.parseInt(maxSteps, 10) || 0;
+        setMessage(
+          `Training ${trainingResult.status}. Run ID: ${trainingResult.runId}. Epoch [0]/[${configuredEpochs}], Batch [0]/[${configuredBatches}]`,
+        );
       } else {
         setStatus("failed");
         setMessage(trainingResult.error?.message ?? "Training failed.");
