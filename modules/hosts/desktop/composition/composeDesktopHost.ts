@@ -256,8 +256,11 @@ const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 export function resolveComfyUiInstallRoot(env: NodeJS.ProcessEnv = process.env, storageRootDirectory?: string): string {
   const configured = env.COMFYUI_INSTALL_ROOT?.trim();
   if (configured) return configured;
-  const base = storageRootDirectory?.trim() || env.DESKTOP_STORAGE_ROOT?.trim() || env.APPDATA?.trim() || env.HOME?.trim() || process.cwd();
-  return path.join(base, "runtime-installs", "comfyui");
+  const persistedBase = storageRootDirectory?.trim() || env.DESKTOP_STORAGE_ROOT?.trim() || env.APPDATA?.trim() || env.HOME?.trim();
+  if (!persistedBase) {
+    throw new Error("Unable to resolve ComfyUI install root. Set COMFYUI_INSTALL_ROOT or DESKTOP_STORAGE_ROOT.");
+  }
+  return join(persistedBase, "runtime-installs", "comfyui");
 }
 
 export function resolveDefaultManagedPythonRuntimePort(processId: number = process.pid): string {
