@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { ImageGenerationRequest } from "../../../../../../../modules/contracts/image-generation";
 import type { RuntimeTaskRecord } from "../../../../../../../modules/contracts/runtime";
 import { createDesktopImageGenerationClient } from "../api";
 
@@ -41,16 +42,16 @@ export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageG
 export function useImageGenerationFeature(client = createDesktopImageGenerationClient()) {
   const [form, setForm] = useState<ImageGenerationFormValues>({ prompt: "", negativePrompt: "", seed: "", width: "1024", height: "1024", steps: "30", sampler: "", scheduler: "", model: "", numImages: "1" });
   const [status, setStatus] = useState<ImageGenerationUiStatus>("idle");
-  const [message, setMessage] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [requestId, setRequestId] = useState<string>();
-  const [progress, setProgress] = useState<{ message?: string; current?: number; total?: number }>();
-  const [taskData, setTaskData] = useState<ImageGenerationTaskDataView>();
+  const [message, setMessage] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [requestId, setRequestId] = useState<string | undefined>(undefined);
+  const [progress, setProgress] = useState<{ message?: string; current?: number; total?: number } | undefined>(undefined);
+  const [taskData, setTaskData] = useState<ImageGenerationTaskDataView | undefined>(undefined);
   const [outputs, setOutputs] = useState<ImageGenerationOutputReference[]>([]);
   const [finalizedAssets, setFinalizedAssets] = useState<ImageGenerationFinalizedAssetReference[]>([]);
   const [installStatus, setInstallStatus] = useState<string>("checking");
   const mountedRef = useRef(true);
-  const activePollRef = useRef<string>();
+  const activePollRef = useRef<string | undefined>(undefined);
 
   const isPollingStillActive = useCallback((id: string) => mountedRef.current && activePollRef.current === id, []);
   useEffect(() => () => { mountedRef.current = false; activePollRef.current = undefined; }, []);
@@ -85,7 +86,7 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
       const view: ImageGenerationTaskDataView = { status: read.value.status, progress: read.value.progress ? { message: read.value.progress.message, current: read.value.progress.current, total: read.value.progress.total } : undefined, outputs: normalizeImageGenerationOutputs(read.value) };
       setTaskData(view); setProgress(view.progress); setOutputs(view.outputs);
       const runtimeStatus = read.value.status;
-      if (runtimeStatus === "queued" || runtimeStatus === "pending") { setStatus("queued"); setMessage(view.progress?.message); await sleep(600); if (!isPollingStillActive(id)) return; continue; }
+      if (runtimeStatus === "queued") { setStatus("queued"); setMessage(view.progress?.message); await sleep(600); if (!isPollingStillActive(id)) return; continue; }
       if (runtimeStatus === "running") { setStatus("running"); setMessage(view.progress?.message); await sleep(600); if (!isPollingStillActive(id)) return; continue; }
       if (runtimeStatus === "succeeded") {
         setStatus("finalizing");
@@ -106,7 +107,7 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   const start = useCallback(async () => {
     if (validationError || isStartDisabled) return false;
     setStatus("starting"); setError(undefined); setMessage(undefined); setFinalizedAssets([]); setTaskData(undefined); setOutputs([]);
-    const payload: Record<string, unknown> = { prompt: form.prompt, width: parsePositiveNumber(form.width), height: parsePositiveNumber(form.height), steps: parsePositiveNumber(form.steps), numImages: parsePositiveNumber(form.numImages) };
+    const payload: ImageGenerationRequest = { prompt: form.prompt, width: parsePositiveNumber(form.width), height: parsePositiveNumber(form.height), steps: parsePositiveNumber(form.steps), numImages: parsePositiveNumber(form.numImages) };
     if (form.negativePrompt.trim()) payload.negativePrompt = form.negativePrompt.trim();
     const seed = parseSeed(form.seed);
     if (seed !== undefined) payload.seed = seed;
