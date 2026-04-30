@@ -42,6 +42,7 @@ describe("desktop models client", () => {
         value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] },
       }),
       trainModel: vi.fn().mockResolvedValue({ ok: true, value: { runId: "run-1", status: "succeeded" } }),
+      readModelTrainingStatus: vi.fn().mockResolvedValue({ ok: true, value: { runId: "run-1", status: "running", progress: { batch: 1, totalBatches: 59 } } }),
       validateModel: vi.fn().mockResolvedValue({ ok: true, value: { modelRecordId: "m1", status: "valid" } }),
       publishModel: vi.fn().mockResolvedValue({ ok: true, value: { modelRecordId: "m1", published: true, provider: "huggingface", repository: "owner/repo" } }),
     } as never;
@@ -61,6 +62,7 @@ describe("desktop models client", () => {
       commonParameters: {},
       output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } } },
     });
+    await client.readModelTrainingStatus({ runId: "run-1" });
     await client.validateModel({ modelRecordId: "m1" });
     await client.publishModel({ modelRecordId: "m1", repository: "owner/repo" });
 
@@ -70,6 +72,7 @@ describe("desktop models client", () => {
     expect(window.desktopApi.downloadModel).toHaveBeenCalledWith(expect.objectContaining({ provider: "huggingface", modelId: "org/model" }));
     expect(window.desktopApi.deleteModelRecord).toHaveBeenCalledWith({ modelRecordId: "m1" });
     expect(window.desktopApi.trainModel).toHaveBeenCalled();
+    expect(window.desktopApi.readModelTrainingStatus).toHaveBeenCalledWith({ runId: "run-1" });
     expect(window.desktopApi.validateModel).toHaveBeenCalled();
     expect(window.desktopApi.publishModel).toHaveBeenCalled();
   });

@@ -93,6 +93,7 @@ function createClientDouble() {
         createdAt: "2026-04-27T00:05:00.000Z",
       },
     }),
+    readModelTrainingStatus: vi.fn().mockResolvedValue({ runId: "run-1", status: "succeeded" }),
     validateModel: vi.fn().mockResolvedValue({ modelRecordId: "generated-1", status: "valid", reportPath: "/tmp/report.md" }),
     publishModel: vi.fn().mockResolvedValue({ modelRecordId: "generated-1", published: true, provider: "huggingface", repository: "owner/repo" }),
   };

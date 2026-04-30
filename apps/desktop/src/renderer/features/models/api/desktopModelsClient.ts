@@ -39,6 +39,7 @@ export interface DesktopModelsClient {
   updateModelRecord: (input: { modelRecordId: string; patch: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
   deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean }) => Promise<DesktopDeleteModelRecordResult>;
   trainModel: (input: DesktopModelTrainingRequest) => Promise<DesktopModelTrainingResult>;
+  readModelTrainingStatus: (input: { runId: string }) => Promise<DesktopModelTrainingResult>;
   validateModel: (input: { modelRecordId: string; modelPath?: string; expectedLoRA?: boolean }) => Promise<DesktopValidateModelResult>;
   publishModel: (input: {
     modelRecordId: string;
@@ -146,6 +147,16 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         await desktopApi.trainModel(input),
         (value) => value as DesktopModelTrainingResult,
         "Failed to train model.",
+      );
+    },
+    async readModelTrainingStatus(input) {
+      if (!desktopApi.readModelTrainingStatus) {
+        throw new Error("Desktop preload model training status bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.readModelTrainingStatus(input),
+        (value) => value as DesktopModelTrainingResult,
+        "Failed to read model training status.",
       );
     },
     async validateModel(input) {

@@ -10,13 +10,16 @@ import {
   DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
   DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL,
   DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
   createDesktopModelBrowseRequest,
   createDesktopModelTrainRequest,
+  createDesktopModelTrainStatusRequest,
 } from "../../../../contracts/ipc";
 import {
   createBrowseModelsIpcHandler,
+  createReadModelTrainingStatusIpcHandler,
   createTrainModelIpcHandler,
   registerModelManagementIpc,
 } from "../model/registerModelManagementIpc";
@@ -33,7 +36,7 @@ describe("registerModelManagementIpc", () => {
       downloadModelUseCase: { execute: testDouble.fn() },
       updateModelRecordUseCase: { execute: testDouble.fn() },
       deleteModelRecordUseCase: { execute: testDouble.fn() },
-      trainModelUseCase: { execute: testDouble.fn() },
+      trainModelUseCase: { execute: testDouble.fn(), read: testDouble.fn() },
       validateModelUseCase: { execute: testDouble.fn() },
       publishModelUseCase: { execute: testDouble.fn() },
     });
@@ -47,6 +50,7 @@ describe("registerModelManagementIpc", () => {
       DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
     ]);
@@ -96,5 +100,18 @@ it("maps train handler to use case", async () => {
   }));
 
   expect(execute).toHaveBeenCalled();
+  expect(response.ok).toBe(true);
+});
+
+it("maps train status handler to use case read", async () => {
+  const read = testDouble.fn().mockResolvedValue({
+    runId: "run-1",
+    status: "running",
+    progress: { epoch: 0, totalEpochs: 1, batch: 0, totalBatches: 59 },
+  });
+  const handler = createReadModelTrainingStatusIpcHandler({ read });
+  const response = await handler({}, createDesktopModelTrainStatusRequest({ runId: "run-1" }));
+
+  expect(read).toHaveBeenCalledWith("run-1");
   expect(response.ok).toBe(true);
 });

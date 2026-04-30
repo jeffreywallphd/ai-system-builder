@@ -6,6 +6,36 @@ import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsClient } from "./useModelsClient";
 
 type TrainingStatus = "idle" | "running" | "succeeded" | "failed";
+type PollableTrainingStatus = DesktopModelTrainingResult["status"];
+
+const TRAINING_STATUS_POLL_INTERVAL_MS = 2000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function isTerminalTrainingStatus(status: PollableTrainingStatus): boolean {
+  return status === "succeeded" || status === "failed" || status === "cancelled";
+}
+
+function toTrainingMessage(result: DesktopModelTrainingResult): string {
+  const progress = result.progress;
+  if (progress?.message) {
+    return `Training ${result.status}. Run ID: ${result.runId}. ${progress.message}`;
+  }
+
+  if (progress && (typeof progress.totalEpochs === "number" || typeof progress.totalBatches === "number")) {
+    return (
+      `Training ${result.status}. Run ID: ${result.runId}. `
+      + `Epoch [${progress.epoch ?? 0}]/[${progress.totalEpochs ?? 0}], `
+      + `Batch [${progress.batch ?? 0}]/[${progress.totalBatches ?? 0}]`
+    );
+  }
+
+  return `Training ${result.status}. Run ID: ${result.runId}. Waiting for runtime progress...`;
+}
 
 export function useModelTrainingFeature(client?: DesktopModelsClient) {
   const modelClient = useModelsClient(client);
@@ -115,21 +145,35 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
       });
 
       setResult(trainingResult);
-      if (trainingResult.status === "succeeded") {
+      let latestResult = trainingResult;
+      let consecutivePollFailures = 0;
+
+      while (!isTerminalTrainingStatus(latestResult.status)) {
+        setStatus("running");
+        setMessage(toTrainingMessage(latestResult));
+        await delay(TRAINING_STATUS_POLL_INTERVAL_MS);
+        try {
+          latestResult = await modelClient.readModelTrainingStatus({ runId: latestResult.runId });
+          consecutivePollFailures = 0;
+        } catch (error) {
+          consecutivePollFailures += 1;
+          if (consecutivePollFailures >= 5) {
+            throw error;
+          }
+          setMessage(`Training status temporarily unavailable. Run ID: ${latestResult.runId}. Retrying...`);
+          continue;
+        }
+        setResult(latestResult);
+      }
+
+      if (latestResult.status === "succeeded") {
         setStatus("succeeded");
         setMessage("Training completed.");
         const refreshed = await modelClient.listModels({});
         setModels(refreshed);
-      } else if (trainingResult.status === "queued" || trainingResult.status === "running") {
-        setStatus("running");
-        const configuredEpochs = Number.parseInt(numEpochs, 10) || 0;
-        const configuredBatches = Number.parseInt(maxSteps, 10) || 0;
-        setMessage(
-          `Training ${trainingResult.status}. Run ID: ${trainingResult.runId}. Epoch [0]/[${configuredEpochs}], Batch [0]/[${configuredBatches}]`,
-        );
       } else {
         setStatus("failed");
-        setMessage(trainingResult.error?.message ?? "Training failed.");
+        setMessage(latestResult.error?.message ?? (latestResult.status === "cancelled" ? "Training cancelled." : "Training failed."));
       }
     } catch (error) {
       setStatus("failed");

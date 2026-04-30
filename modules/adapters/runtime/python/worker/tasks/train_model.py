@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 from datetime import datetime, timezone
+from math import ceil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -216,18 +217,31 @@ def _run_trainer(
     except Exception as error:  # pragma: no cover
         raise RuntimeError("transformers Trainer is required for training.") from error
 
+    def gradient_accumulation_steps() -> int:
+        return max(int(getattr(args, "gradient_accumulation_steps", 1) or 1), 1)
+
+    def estimate_total_batches() -> int:
+        max_steps = getattr(args, "max_steps", -1)
+        if isinstance(max_steps, int) and max_steps > 0:
+            return max_steps * gradient_accumulation_steps()
+
+        train_rows = len(dataset["train"])
+        per_device_batch_size = max(int(getattr(args, "per_device_train_batch_size", 1) or 1), 1)
+        epochs = max(int(ceil(float(getattr(args, "num_train_epochs", 1) or 1))), 1)
+        return max(ceil(train_rows / per_device_batch_size), 1) * epochs
+
     class _TrainingProgressCallback(TrainerCallback):
         def on_step_end(self, _args: Any, state: Any, _control: Any, **_kwargs: Any) -> None:
             if on_progress is None:
                 return
-            total_steps = int(state.max_steps) if isinstance(state.max_steps, int) and state.max_steps > 0 else 0
+            total_steps = estimate_total_batches()
             current_step = int(state.global_step) if isinstance(state.global_step, int) else 0
             total_epochs = int(_args.num_train_epochs) if isinstance(_args.num_train_epochs, (int, float)) else 0
             current_epoch = int(state.epoch) + 1 if isinstance(state.epoch, (int, float)) else 1
             on_progress({
                 "epoch": max(current_epoch, 1),
                 "totalEpochs": max(total_epochs, 1),
-                "batch": max(current_step, 0),
+                "batch": min(max(current_step * gradient_accumulation_steps(), 0), total_steps),
                 "totalBatches": max(total_steps, 0),
             })
 
@@ -240,6 +254,14 @@ def _run_trainer(
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
         callbacks=[_TrainingProgressCallback()],
     )
+    if on_progress is not None:
+        total_epochs = int(ceil(float(getattr(args, "num_train_epochs", 1) or 1)))
+        on_progress({
+            "epoch": 0,
+            "totalEpochs": max(total_epochs, 1),
+            "batch": 0,
+            "totalBatches": estimate_total_batches(),
+        })
     train_result = trainer.train()
     metrics: dict[str, float] = {k: float(v) for k, v in train_result.metrics.items() if isinstance(v, (int, float))}
 
@@ -277,6 +299,9 @@ def train_model(
     logs: list[str] = []
 
     try:
+        if on_progress is not None:
+            on_progress({"stage": "initializing", "message": "Loading training datasets and model assets..."})
+
         dataset, eval_dataset = _load_dataset(payload)
         base_model_ref = _resolve_base_model(payload)
 
@@ -300,9 +325,6 @@ def train_model(
             logs.append(message)
             if on_progress is not None:
                 on_progress({**progress, "message": message, "stage": "training"})
-
-        if on_progress is not None:
-            on_progress({"stage": "initializing", "message": "Loading training datasets and model assets..."})
 
         metrics, checkpoints = _run_trainer(model, tokenizer, tokenized, tokenized_eval, train_args, on_progress=on_training_progress)
 

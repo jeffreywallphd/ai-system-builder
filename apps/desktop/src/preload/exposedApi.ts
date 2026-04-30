@@ -197,6 +197,7 @@ import {
   createDesktopModelRecordUpdateRequest,
   createDesktopModelRecordDeleteRequest,
   createDesktopModelTrainRequest,
+  createDesktopModelTrainStatusRequest,
   createDesktopModelValidateRequest,
   createDesktopModelPublishRequest,
   type DesktopModelBrowseResponse,
@@ -207,11 +208,15 @@ import {
   type DesktopModelRecordUpdateResponse,
   type DesktopModelRecordDeleteResponse,
   type DesktopModelTrainResponse,
+  type DesktopModelTrainStatusResponse,
   type DesktopModelValidateResponse,
   type DesktopModelPublishResponse,
   DESKTOP_MODEL_TRAIN_OPERATION,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
   DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_OPERATION,
+  DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_RESPONSE_CHANNEL,
   DESKTOP_MODEL_VALIDATE_OPERATION,
   DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL,
@@ -441,6 +446,10 @@ export interface DesktopPreloadApi {
     input: Parameters<typeof createDesktopModelTrainRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopModelTrainResponse>;
+  readModelTrainingStatus: (
+    input: Parameters<typeof createDesktopModelTrainStatusRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelTrainStatusResponse>;
   validateModel: (
     input: Parameters<typeof createDesktopModelValidateRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
@@ -1225,6 +1234,18 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_MODEL_TRAIN_OPERATION,
         channel: DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop model train IPC response envelope.",
+      });
+    },
+    async readModelTrainingStatus(input, context = {}) {
+      const request = createDesktopModelTrainStatusRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelTrainStatusResponse>(response, {
+        operation: DESKTOP_MODEL_TRAIN_STATUS_OPERATION,
+        channel: DESKTOP_MODEL_TRAIN_STATUS_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model training status IPC response envelope.",
       });
     },
     async validateModel(input, context = {}) {
