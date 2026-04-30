@@ -19,6 +19,9 @@ import type {
   UpdateApplicationSettingRequest,
 } from "../../../../../modules/contracts/settings";
 import type {
+  ImageGenerationRequest,
+} from "../../../../../modules/contracts/image-generation";
+import type {
   BrowseModelsRequest,
   GetModelDetailsRequest,
   ModelBrowseItem,
@@ -310,7 +313,7 @@ export interface DesktopDatasetPreparationApi {
 }
 
 export interface DesktopImageGenerationApi {
-  startImageGeneration?: (input: Record<string, unknown>, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
@@ -345,7 +348,7 @@ interface DesktopApiBridge {
   cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
-  startImageGeneration?: (input: Record<string, unknown>, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
