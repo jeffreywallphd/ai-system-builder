@@ -28,6 +28,8 @@ import {
   type RegisterModelManagementIpcDependencies,
 } from "./model/registerModelManagementIpc";
 import { registerImageGenerationIpc, type RegisterImageGenerationIpcDependencies } from "./image-generation/registerImageGenerationIpc";
+import { registerComfyUiRuntimeIpc } from "./comfyui-runtime/registerComfyUiRuntimeIpc";
+import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
@@ -71,6 +73,8 @@ export interface RegisterElectronIpcDependencies {
   publishModelUseCase: RegisterModelManagementIpcDependencies["publishModelUseCase"];
   generateImageUseCase: RegisterImageGenerationIpcDependencies["generateImageUseCase"];
   imageGenerationFinalizationOrchestrator?: RegisterImageGenerationIpcDependencies["imageGenerationFinalizationOrchestrator"];
+  comfyUiInstaller: RuntimeInstallerPort;
+  comfyUiInstallRoot: string;
 }
 
 export function registerElectronIpc(
@@ -140,6 +144,12 @@ export function registerElectronIpc(
     ipcMain: dependencies.ipcMain,
     generateImageUseCase: dependencies.generateImageUseCase,
     imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
+  });
+
+  registerComfyUiRuntimeIpc({
+    ipcMain: dependencies.ipcMain,
+    installer: dependencies.comfyUiInstaller,
+    installRoot: dependencies.comfyUiInstallRoot,
   });
 
   registerPythonRuntimeIpc({
