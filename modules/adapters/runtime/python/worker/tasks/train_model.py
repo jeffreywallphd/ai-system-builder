@@ -4,7 +4,7 @@ import json
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from ..models import TrainModelTaskRequest, TrainModelTaskResult
 from .model_serialization import DEFAULT_MAX_SHARD_SIZE, save_adapter_pretrained, save_full_model_pretrained, write_serialization_manifest
@@ -256,7 +256,11 @@ def _write_run_metadata(output_path: Path, metadata: dict[str, Any]) -> str:
     return str(run_metadata_path)
 
 
-def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
+def train_model(
+    payload: TrainModelTaskRequest,
+    *,
+    on_progress: Callable[[dict[str, Any]], None] | None = None,
+) -> TrainModelTaskResult:
     _require_non_empty(payload.output.get("outputModelName"), "output.outputModelName")
 
     if payload.method not in SUPPORTED_METHODS:
@@ -289,12 +293,21 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
 
         train_args = _build_training_args(payload, output_path)
         def on_training_progress(progress: dict[str, int]) -> None:
-            logs.append(
+            message = (
                 f"Epoch [{progress.get('epoch', 0)}]/[{progress.get('totalEpochs', 0)}], "
                 f"Batch [{progress.get('batch', 0)}]/[{progress.get('totalBatches', 0)}]"
             )
+            logs.append(message)
+            if on_progress is not None:
+                on_progress({**progress, "message": message, "stage": "training"})
+
+        if on_progress is not None:
+            on_progress({"stage": "initializing", "message": "Loading training datasets and model assets..."})
 
         metrics, checkpoints = _run_trainer(model, tokenizer, tokenized, tokenized_eval, train_args, on_progress=on_training_progress)
+
+        if on_progress is not None:
+            on_progress({"stage": "serializing", "message": "Serializing trained model artifacts..."})
 
         max_shard_size = _parse_max_shard_size(payload)
         if payload.method in {"lora", "qlora"}:
@@ -303,6 +316,9 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
         else:
             serialization = save_full_model_pretrained(model, tokenizer, output_path, max_shard_size=max_shard_size)
             artifact_form = "full-model"
+
+        if on_progress is not None:
+            on_progress({"stage": "validating", "message": "Running post-training validation..."})
 
         validation_config = _to_dict(payload.validation)
         validation_enabled = bool(validation_config.get("enabled", True))
@@ -370,6 +386,9 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
                 "metadata": metadata,
             }
 
+        if on_progress is not None:
+            on_progress({"stage": "completed", "message": "Training task completed."})
+
         return TrainModelTaskResult(
             runId=run_id,
             status=final_status,
@@ -395,6 +414,8 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
             ),
         )
     except Exception as error:
+        if on_progress is not None:
+            on_progress({"stage": "failed", "message": f"Training failed: {error}"})
         return TrainModelTaskResult(
             runId=run_id,
             status="failed",
