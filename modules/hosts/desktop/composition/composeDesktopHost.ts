@@ -1,5 +1,6 @@
 import { cpus, totalmem, freemem } from "node:os";
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { TaskPowerLifecycleService } from "../../../application/services/runtime";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
@@ -513,23 +514,6 @@ export function composeDesktopHost(
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
   const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
-  const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env);
-  const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({});
-  const comfyUiInstaller = createComfyUiRuntimeInstaller({
-    gitInstaller: gitRuntimeInstaller,
-    pythonCommand: process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
-    skipPythonSetup: process.env.COMFYUI_SKIP_PYTHON_SETUP === "1",
-    skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
-  });
-  const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
-    workingDirectory: comfyUiInstallRoot,
-    installer: comfyUiInstaller,
-    installRoot: comfyUiInstallRoot,
-    autoInstall: process.env.COMFYUI_AUTO_INSTALL !== "0",
-    installSourceRef: process.env.COMFYUI_INSTALL_REF,
-  });
-  const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({ client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }), supervisor: comfyUiSupervisor, mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT } });
-  const runtimeTaskRegistry = createRuntimeTaskRegistryRouter({ python: pythonRuntimeTaskRegistry, image: comfyUiRuntimeTaskRegistry });
 
   return {
     loggingPort,
@@ -598,6 +582,28 @@ export function composeDesktopHost(
       };
     },
     registerArtifactUploadIpc(registerOptions) {
+      const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.storageRootDirectory);
+      const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({});
+      const comfyUiInstaller = createComfyUiRuntimeInstaller({
+        gitInstaller: gitRuntimeInstaller,
+        pythonCommand: process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+        skipPythonSetup: process.env.COMFYUI_SKIP_PYTHON_SETUP === "1",
+        skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
+      });
+      const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+        workingDirectory: comfyUiInstallRoot,
+        installer: comfyUiInstaller,
+        installRoot: comfyUiInstallRoot,
+        autoInstall: false,
+        installSourceRef: process.env.COMFYUI_INSTALL_REF,
+      });
+      const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
+        client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
+        supervisor: comfyUiSupervisor,
+        mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
+      });
+      const runtimeTaskRegistry = createRuntimeTaskRegistryRouter({ python: pythonRuntimeTaskRegistry, image: comfyUiRuntimeTaskRegistry });
+
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });

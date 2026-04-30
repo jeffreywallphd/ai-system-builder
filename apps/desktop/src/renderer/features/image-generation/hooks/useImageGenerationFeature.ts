@@ -55,12 +55,15 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   const isPollingStillActive = useCallback((id: string) => mountedRef.current && activePollRef.current === id, []);
   useEffect(() => () => { mountedRef.current = false; activePollRef.current = undefined; }, []);
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       const status = await client.readComfyUiInstallStatus?.({});
+      if (cancelled || !mountedRef.current) return;
       if (!status || !status.ok) { setInstallStatus("unknown"); return; }
-      const raw = (status.value as { status?: string }).status;
+      const raw = status.value.status;
       setInstallStatus(typeof raw === "string" ? raw : "unknown");
     })();
+    return () => { cancelled = true; };
   }, [client]);
 
   const validationError = useMemo(() => {
@@ -126,6 +129,16 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
     setMessage(cancelled.ok ? (cancelled.value.message ?? "Cancellation is not supported for this request.") : cancelled.error.message);
   }, [client, isPollingStillActive, requestId]);
 
-  const repairInstall = async () => { const result = await client.repairComfyUiInstall?.({ allowUpdate: true, forceRepair: true }); if (!result || !result.ok) { setError(result?.error?.message ?? "Failed to repair ComfyUI install."); return; } setInstallStatus("installing"); };
+  const repairInstall = async () => {
+    setInstallStatus("installing");
+    const result = await client.repairComfyUiInstall?.({ allowUpdate: true, forceRepair: true });
+    if (!mountedRef.current) return;
+    if (!result || !result.ok) {
+      setError(result?.error?.message ?? "Failed to repair ComfyUI install.");
+      return;
+    }
+    setInstallStatus(result.value.status);
+    setError(undefined);
+  };
   return { form, setForm, status, message, error, requestId, progress, taskData, outputs, finalizedAssets, installStatus, validationError, isStartDisabled, start, cancel, repairInstall };
 }

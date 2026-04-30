@@ -1,5 +1,6 @@
 import type { ImageGenerationRequest } from "../../../../../../../modules/contracts/image-generation";
 import type { RuntimeTaskRecord } from "../../../../../../../modules/contracts/runtime";
+import type { RuntimeInstallResult, RuntimeInstallStatusResult } from "../../../../../../../modules/contracts/runtime-installer";
 import type { DesktopImageGenerationFinalizeResult } from "../../../../../../../modules/contracts/ipc/desktop-image-generation-contract";
 import { getDesktopApi } from "../../../lib/desktopApi";
 
@@ -31,6 +32,14 @@ export type ImageGenerationCancelResult =
 
 export type ImageGenerationFinalizeResult =
   | { ok: true; value: DesktopImageGenerationFinalizeResult }
+  | { ok: false; error: { code: string; message: string; details?: Record<string, unknown> } };
+
+export type ComfyUiInstallStatusClientResult =
+  | { ok: true; value: RuntimeInstallStatusResult }
+  | { ok: false; error: { code: string; message: string; details?: Record<string, unknown> } };
+
+export type ComfyUiRepairInstallClientResult =
+  | { ok: true; value: RuntimeInstallResult }
   | { ok: false; error: { code: string; message: string; details?: Record<string, unknown> } };
 
 export function createDesktopImageGenerationClient() {
@@ -97,20 +106,26 @@ export function createDesktopImageGenerationClient() {
       return { ok: true, value: response.value as DesktopImageGenerationFinalizeResult };
     },
 
-    async readComfyUiInstallStatus(input: { installRoot?: string } = {}, context?: { requestId?: string; correlationId?: string }) {
+    async readComfyUiInstallStatus(input: { installRoot?: string } = {}, context?: { requestId?: string; correlationId?: string }): Promise<ComfyUiInstallStatusClientResult> {
       if (!api.readComfyUiInstallStatus) return unavailable("readComfyUiInstallStatus");
       const response = await api.readComfyUiInstallStatus(input, context);
       if (!isPreloadResponseEnvelope(response)) return { ok: false, error: { code: "internal", message: "Failed to read ComfyUI install status." } };
       if (!response.ok) return { ok: false, error: { code: response.error?.code ?? "internal", message: response.error?.message ?? "Failed to read ComfyUI install status.", details: response.error?.details } };
-      return { ok: true as const, value: response.value as Record<string, unknown> };
+      if (!response.value || typeof response.value !== "object") {
+        return { ok: false, error: { code: "internal", message: "Malformed ComfyUI install status response." } };
+      }
+      return { ok: true as const, value: response.value as RuntimeInstallStatusResult };
     },
 
-    async repairComfyUiInstall(input: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean } = {}, context?: { requestId?: string; correlationId?: string }) {
+    async repairComfyUiInstall(input: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean } = {}, context?: { requestId?: string; correlationId?: string }): Promise<ComfyUiRepairInstallClientResult> {
       if (!api.repairComfyUiInstall) return unavailable("repairComfyUiInstall");
       const response = await api.repairComfyUiInstall(input, context);
       if (!isPreloadResponseEnvelope(response)) return { ok: false, error: { code: "internal", message: "Failed to repair ComfyUI install." } };
       if (!response.ok) return { ok: false, error: { code: response.error?.code ?? "internal", message: response.error?.message ?? "Failed to repair ComfyUI install.", details: response.error?.details } };
-      return { ok: true as const, value: response.value as Record<string, unknown> };
+      if (!response.value || typeof response.value !== "object") {
+        return { ok: false, error: { code: "internal", message: "Malformed ComfyUI repair install response." } };
+      }
+      return { ok: true as const, value: response.value as RuntimeInstallResult };
     },
 
   };
