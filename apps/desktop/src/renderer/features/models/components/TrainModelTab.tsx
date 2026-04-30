@@ -1,5 +1,14 @@
 import type { useModelTrainingFeature } from "../hooks/useModelTrainingFeature";
 
+function toDatasetOptionLabel(storageKey: string, originalName?: string): string {
+  if (originalName && originalName.trim().length > 0) {
+    return originalName;
+  }
+
+  const storageSegments = storageKey.split("/");
+  return storageSegments[storageSegments.length - 1] ?? storageKey;
+}
+
 type ModelTrainingState = ReturnType<typeof useModelTrainingFeature>;
 
 export function TrainModelTab(props: { state: ModelTrainingState }) {
@@ -35,7 +44,7 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
         >
           {s.datasetArtifacts.map((artifact) => (
             <option key={artifact.artifactId} value={artifact.artifactId}>
-              {artifact.storageKey} ({artifact.artifactId})
+              {toDatasetOptionLabel(artifact.storageKey, artifact.originalName)} ({artifact.artifactId})
             </option>
           ))}
         </select>
