@@ -30,8 +30,17 @@ describe("TrainModelUseCase", () => {
         bindings: [{
           artifactId: "dataset-1",
           role: "primary",
-          backing: { kind: "file", provider: "local-filesystem", locator: "/tmp/dataset-1.parquet" },
+          backing: { kind: "artifact-object", provider: "local-filesystem", locator: "/tmp/dataset-1.parquet" },
         }],
+      },
+    })),
+  });
+  const createStorageFake = () => ({
+    retrieveArtifact: testDouble.fn(async () => ({
+      ok: true,
+      value: {
+        descriptor: { key: "generated/dataset-1.parquet", mediaType: "application/x-parquet" },
+        content: new TextEncoder().encode("dataset-bytes"),
       },
     })),
   });
@@ -39,7 +48,7 @@ describe("TrainModelUseCase", () => {
   it("starts training with runtime task registry", async () => {
     const lifecycle = createLifecycleFake();
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
 
     const result = await useCase.execute(baseRequest);
 
@@ -55,7 +64,7 @@ describe("TrainModelUseCase", () => {
   it("reads running status from runtime task registry", async () => {
     const lifecycle = createLifecycleFake();
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
 
     const result = await useCase.read("train-req-1");
 
@@ -89,7 +98,7 @@ describe("TrainModelUseCase", () => {
         createdAt: "2026-04-29T00:00:00.000Z",
       },
     });
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel }, storageBindings: createStorageBindingsFake(), taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
 
     const first = await useCase.read("train-req-1");
     const second = await useCase.read("train-req-1");
@@ -110,7 +119,7 @@ describe("TrainModelUseCase", () => {
       concurrencyClass: "unknown",
       error: status === "failed" ? { code: "failed", message: "boom" } : undefined,
     });
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
 
     const result = await useCase.read("train-req-1");
     expect(result.status).toBe(status);
@@ -133,13 +142,45 @@ describe("TrainModelUseCase", () => {
         },
       })),
     };
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings, taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings, storage: createStorageFake(), taskPowerLifecycle: lifecycle });
 
     await useCase.execute(baseRequest);
 
     expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith({
       taskType: TaskType.MODEL_TRAINING,
-      payload: expect.objectContaining({ datasets: [expect.objectContaining({ artifactId: "dataset-1", path: "generated/dataset-1.parquet" })] }),
+      payload: expect.objectContaining({ datasets: [expect.objectContaining({ artifactId: "dataset-1", path: expect.stringContaining("dataset-1.parquet") })] }),
+    });
+  });
+
+  it("stages a generated local artifact-object storage key when no binding row exists", async () => {
+    const lifecycle = createLifecycleFake();
+    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+    const storageBindings: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings"> = {
+      readArtifactStorageBindings: testDouble.fn(async () => ({ ok: true, value: { bindings: [] } })),
+    };
+    const storage = createStorageFake();
+    const generatedDatasetRequest = {
+      ...baseRequest,
+      datasets: [{ artifactId: "generated/20260429160945623-2e7fe0660f46449f9ce819d011eb13f9-training-dataset.parquet", splitRole: "train" as const }],
+    };
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings, storage, taskPowerLifecycle: lifecycle });
+
+    await useCase.execute(generatedDatasetRequest);
+
+    expect(storage.retrieveArtifact).toHaveBeenCalledWith({
+      key: "generated/20260429160945623-2e7fe0660f46449f9ce819d011eb13f9-training-dataset.parquet",
+      requestId: undefined,
+      correlationId: undefined,
+    });
+    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith({
+      taskType: TaskType.MODEL_TRAINING,
+      payload: expect.objectContaining({
+        datasets: [expect.objectContaining({
+          artifactId: "generated/20260429160945623-2e7fe0660f46449f9ce819d011eb13f9-training-dataset.parquet",
+          path: expect.stringContaining("training-dataset.parquet"),
+          format: "parquet",
+        })],
+      }),
     });
   });
 

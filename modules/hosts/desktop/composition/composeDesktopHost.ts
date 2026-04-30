@@ -747,6 +747,7 @@ export function composeDesktopHost(
         runtimeTaskRegistry,
         modelRegistry,
         storageBindings: artifactBindings,
+        storage,
         taskPowerLifecycle,
       });
       const validateModel = new ValidateModelUseCase({
