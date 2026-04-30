@@ -65,11 +65,24 @@ function mapProgress(progress: Record<string, unknown> | undefined): RuntimeTask
   };
 }
 
-export function createPythonRuntimeTaskRegistryAdapter(runtimePort: PythonRuntimePort): RuntimeTaskRegistryPort {
+export interface CreatePythonRuntimeTaskRegistryAdapterOptions {
+  ensureRuntimeReady?: () => Promise<void>;
+}
+
+export function createPythonRuntimeTaskRegistryAdapter(
+  runtimePort: PythonRuntimePort,
+  options: CreatePythonRuntimeTaskRegistryAdapterOptions = {},
+): RuntimeTaskRegistryPort {
   return {
     async startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult> {
       if (request.taskType === TaskType.MODEL_PUBLISHING) {
         throw new Error("model publishing runtime task is not implemented");
+      }
+      try {
+        await options.ensureRuntimeReady?.();
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`Python runtime failed to start or become ready before starting task: ${reason}`);
       }
       return runtimePort.startTask({
         requestId: request.requestId ?? randomUUID(),

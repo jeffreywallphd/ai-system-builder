@@ -473,7 +473,9 @@ export function composeDesktopHost(
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
   const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
-  const runtimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort });
+  const runtimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort }, {
+    ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
+  });
 
   return {
     loggingPort,

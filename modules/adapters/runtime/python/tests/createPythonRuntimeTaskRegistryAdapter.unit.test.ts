@@ -15,7 +15,48 @@ describe("createPythonRuntimeTaskRegistryAdapter", () => {
       .toEqualTypeOf<PythonRuntimeTaskStatusResult>();
   });
 
-  it("maps DATASET_PREPARATION startTask to python runtime task type", async () => {
+  
+  it("calls ensureRuntimeReady before startTask", async () => {
+    const callOrder: string[] = [];
+    const runtimePort: any = { startTask: testDouble.fn(async (request) => { callOrder.push("startTask"); return ({ requestId: request.requestId }); }), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const ensureRuntimeReady = testDouble.fn(async () => { callOrder.push("ensureRuntimeReady"); });
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort, { ensureRuntimeReady });
+
+    await adapter.startTask({ requestId: "req-ensure", taskType: TaskType.DATASET_PREPARATION, payload: {} });
+
+    expect(callOrder).toEqual(["ensureRuntimeReady", "startTask"]);
+  });
+
+  it("does not start task when ensureRuntimeReady fails", async () => {
+    const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const ensureRuntimeReady = testDouble.fn(async () => { throw new Error("supervisor unavailable"); });
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort, { ensureRuntimeReady });
+
+    await expect(adapter.startTask({ requestId: "req-fail", taskType: TaskType.DATASET_PREPARATION, payload: {} }))
+      .rejects.toThrow("Python runtime failed to start or become ready");
+    expect(runtimePort.startTask).not.toHaveBeenCalled();
+  });
+
+  it("does not call ensureRuntimeReady when reading task status", async () => {
+    const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(async () => ({ requestId: "req-1", taskType: "prepare-training-dataset", status: "queued" })), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const ensureRuntimeReady = testDouble.fn(async () => undefined);
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort, { ensureRuntimeReady });
+
+    await adapter.getTaskStatus("req-1");
+
+    expect(ensureRuntimeReady).not.toHaveBeenCalled();
+  });
+
+  it("does not call ensureRuntimeReady when cancelling task", async () => {
+    const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(async () => ({ requestId: "req-1", cancelled: true, status: "cancelled" })), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const ensureRuntimeReady = testDouble.fn(async () => undefined);
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort, { ensureRuntimeReady });
+
+    await adapter.cancelTask("req-1");
+
+    expect(ensureRuntimeReady).not.toHaveBeenCalled();
+  });
+it("maps DATASET_PREPARATION startTask to python runtime task type", async () => {
     const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
     await adapter.startTask({ requestId: "req-1", taskType: TaskType.DATASET_PREPARATION, payload: { a: 1 } });

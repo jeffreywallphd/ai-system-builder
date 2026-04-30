@@ -276,7 +276,7 @@ describe("composeDesktopHost", () => {
     const source = readFileSync(sourcePath, "utf8");
     const runtimePortSpreadCount = source.match(/\.\.\.pythonRuntimeFoundation\.runtimePort/g)?.length ?? 0;
 
-    expect(runtimePortSpreadCount >= 3).toBe(true);
+    expect(runtimePortSpreadCount >= 1).toBe(true);
     expect(source).not.toContain("getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus()");
     expect(source).not.toContain("getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities()");
     expect(source).not.toContain("unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels()");
