@@ -1,0 +1,7 @@
+import type { ChangeEvent } from "react";
+import type { ImageGenerationFormValues } from "../hooks/useImageGenerationFeature";
+
+export function ImageGenerationForm({ form, setForm, validationError, onSubmit }: { form: ImageGenerationFormValues; setForm: (v: ImageGenerationFormValues) => void; validationError?: string; onSubmit: () => void; }) {
+  const bind = (key: keyof ImageGenerationFormValues) => ({ value: form[key] as any, onChange: (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: ["width", "height", "steps", "numImages"].includes(key) ? Number(e.target.value) : e.target.value }) });
+  return <section className="ui-panel image-gen__section"><h2>Generate Image</h2><label>Prompt<input data-testid="image-prompt" {...bind("prompt")} /></label><label>Negative Prompt<input {...bind("negativePrompt")} /></label><label>Seed<input {...bind("seed")} /></label><label>Width<input type="number" {...bind("width")} /></label><label>Height<input type="number" {...bind("height")} /></label><label>Steps<input type="number" {...bind("steps")} /></label><label>Sampler<input {...bind("sampler")} /></label><label>Scheduler<input {...bind("scheduler")} /></label><label>Model/Checkpoint<input {...bind("model")} /></label><label>Number of Images<input type="number" {...bind("numImages")} /></label>{validationError ? <p className="ui-feedback ui-feedback--error">{validationError}</p> : null}<button type="button" className="ui-button" onClick={onSubmit}>Start Generation</button></section>;
+}

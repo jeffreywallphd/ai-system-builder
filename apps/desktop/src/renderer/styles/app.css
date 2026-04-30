@@ -18,3 +18,5 @@
 #root {
   min-height: 100vh;
 }
+
+@import "./components/image-generation.css";
