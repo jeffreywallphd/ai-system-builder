@@ -1,10 +1,19 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL, DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL, DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL, createDesktopPrepareTrainingDatasetStartRequest, createDesktopPrepareTrainingDatasetTaskReadRequest, createDesktopPrepareTrainingDatasetTaskCancelRequest } from "../../../../contracts/ipc";
+import type { RuntimeTaskRecord } from "../../../../contracts/runtime";
+import { TaskType } from "../../../../contracts/runtime";
 import { createDesktopPrepareTrainingDatasetStartIpcHandler, createDesktopPrepareTrainingDatasetTaskReadIpcHandler, createDesktopPrepareTrainingDatasetTaskCancelIpcHandler, registerDatasetPreparationIpc } from "../dataset-preparation/registerDatasetPreparationIpc";
 
 describe("registerDatasetPreparationIpc", () => {
   it("maps running read status", async () => {
-    const readPrepareTrainingDataset = testDouble.fn().mockResolvedValue({ ok: true, value: { requestId: "r1", taskType: "prepare-training-dataset", status: "running", progress: { current: 1, total: 3 } } });
+    const runtimeTaskRecord: RuntimeTaskRecord = {
+      requestId: "r1",
+      taskType: TaskType.DATASET_PREPARATION,
+      status: "running",
+      concurrencyClass: "unknown",
+      progress: { current: 1, total: 3 },
+    };
+    const readPrepareTrainingDataset = testDouble.fn().mockResolvedValue({ ok: true, value: runtimeTaskRecord });
     const handler = createDesktopPrepareTrainingDatasetTaskReadIpcHandler({ startPrepareTrainingDataset: testDouble.fn(), readPrepareTrainingDataset });
     const response = await handler({}, createDesktopPrepareTrainingDatasetTaskReadRequest({ requestId: "r1", boundary: { host: "desktop", source: "x" } }));
     expect(response.ok).toBe(true); expect((response as any).value.result).toBeUndefined(); expect((response as any).value.progress.processed).toBe(1);
@@ -22,8 +31,8 @@ describe("registerDatasetPreparationIpc", () => {
     const readPrepareTrainingDataset = testDouble.fn(async () => {
       call += 1;
       return call === 1
-        ? { ok: true, value: { requestId: "r1", status: "failed", error: { message: "boom" } } }
-        : { ok: true, value: { requestId: "r1", status: "unknown", message: "not found" } };
+        ? { ok: true as const, value: { requestId: "r1", taskType: TaskType.DATASET_PREPARATION, status: "failed" as const, concurrencyClass: "unknown" as const, error: { code: "runtime", message: "boom" } } }
+        : { ok: true as const, value: { requestId: "r1", taskType: TaskType.DATASET_PREPARATION, status: "unknown" as const, concurrencyClass: "unknown" as const, message: "not found" } };
     });
     const handler = createDesktopPrepareTrainingDatasetTaskReadIpcHandler({ startPrepareTrainingDataset: testDouble.fn(), readPrepareTrainingDataset });
     const failed = await handler({}, createDesktopPrepareTrainingDatasetTaskReadRequest({ requestId: "r1", boundary: { host: "desktop", source: "x" } }));
@@ -36,7 +45,9 @@ describe("registerDatasetPreparationIpc", () => {
       ok: true,
       value: {
         requestId: "r1",
+        taskType: TaskType.DATASET_PREPARATION,
         status: "failed",
+        concurrencyClass: "unknown",
         completedAt: "2026-04-29T12:00:00.000Z",
       },
     });
