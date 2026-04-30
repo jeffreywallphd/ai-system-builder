@@ -190,16 +190,23 @@ def _apply_lora(model: Any, payload: TrainModelTaskRequest) -> Any:
 
     advanced = _to_dict(payload.advancedParameters)
     lora = _to_dict(advanced.get("lora"))
-    target_modules = lora.get("targetModules") if isinstance(lora.get("targetModules"), list) else ["q_proj", "v_proj"]
-
-    lora_config = LoraConfig(
-        r=int(lora.get("rank", 16)),
-        lora_alpha=int(lora.get("alpha", 32)),
-        lora_dropout=float(lora.get("dropout", 0.05)),
-        target_modules=target_modules,
-        bias="none",
-        task_type=TaskType.CAUSAL_LM,
+    raw_target_modules = lora.get("targetModules")
+    target_modules = (
+        [entry.strip() for entry in raw_target_modules if isinstance(entry, str) and entry.strip()]
+        if isinstance(raw_target_modules, list)
+        else None
     )
+    lora_config_args = {
+        "r": int(lora.get("rank", 16)),
+        "lora_alpha": int(lora.get("alpha", 32)),
+        "lora_dropout": float(lora.get("dropout", 0.05)),
+        "bias": "none",
+        "task_type": TaskType.CAUSAL_LM,
+    }
+    if target_modules:
+        lora_config_args["target_modules"] = target_modules
+
+    lora_config = LoraConfig(**lora_config_args)
     return get_peft_model(model, lora_config)
 
 

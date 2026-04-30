@@ -131,6 +131,61 @@ def test_train_model_qlora_reports_runtime_limitations(monkeypatch, tmp_path: Pa
     assert "qlora requires cuda" in result.error["message"].lower()
 
 
+def test_apply_lora_lets_peft_infer_target_modules_when_not_configured(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeLoraConfig:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    def fake_get_peft_model(model, config):
+        captured["model"] = model
+        captured["config"] = config
+        return "peft-model"
+
+    monkeypatch.setitem(
+        sys.modules,
+        "peft",
+        SimpleNamespace(
+            LoraConfig=_FakeLoraConfig,
+            TaskType=SimpleNamespace(CAUSAL_LM="causal-lm"),
+            get_peft_model=fake_get_peft_model,
+        ),
+    )
+    payload = _request(tmp_path, "lora")
+    payload.advancedParameters = {"lora": {"targetModules": []}}
+
+    result = train_model_module._apply_lora("base-model", payload)
+
+    assert result == "peft-model"
+    assert "target_modules" not in captured
+    assert captured["model"] == "base-model"
+
+
+def test_apply_lora_uses_sanitized_explicit_target_modules(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeLoraConfig:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "peft",
+        SimpleNamespace(
+            LoraConfig=_FakeLoraConfig,
+            TaskType=SimpleNamespace(CAUSAL_LM="causal-lm"),
+            get_peft_model=lambda model, config: model,
+        ),
+    )
+    payload = _request(tmp_path, "lora")
+    payload.advancedParameters = {"lora": {"targetModules": [" q_proj ", "", 42, "v_proj"]}}
+
+    train_model_module._apply_lora("base-model", payload)
+
+    assert captured["target_modules"] == ["q_proj", "v_proj"]
+
+
 def test_run_trainer_reports_estimated_total_batches_before_training(monkeypatch) -> None:
     class _FakeTrainerCallback:
         pass
