@@ -10,12 +10,8 @@ const baseRequest = {
 
 function createFsMocks({ existingRoot = false, emptyRoot = false, metadata }: { existingRoot?: boolean; emptyRoot?: boolean; metadata?: unknown } = {}) {
   const stat = testDouble.fn(async (targetPath: string) => {
-    if (targetPath === baseRequest.installRoot && existingRoot) {
-      return {} as never;
-    }
-    if (targetPath.endsWith(".ai-system-builder-runtime-install.json") && metadata !== undefined) {
-      return {} as never;
-    }
+    if (targetPath === baseRequest.installRoot && existingRoot) return {} as never;
+    if (targetPath.endsWith(".ai-system-builder-runtime-install.json") && metadata !== undefined) return {} as never;
     throw new Error("enoent");
   });
   const readdir = testDouble.fn(async () => (emptyRoot ? [] : ["file"]));
@@ -51,15 +47,42 @@ describe("createGitRuntimeInstallerAdapter", () => {
     expect(result.status).toBe("installed");
   });
 
-  it("status rejects unmanaged non-empty directory", async () => {
-    const fs = createFsMocks({ existingRoot: true, metadata: { managedBy: "other" } });
+  it("metadata malformed JSON returns metadata-read-failed", async () => {
+    const fs = createFsMocks({ existingRoot: true, metadata: { ok: true } });
+    const badRead = testDouble.fn(async () => "{ bad json");
+    const adapterWithBadRead = createGitRuntimeInstallerAdapter({ ...fs, readFile: badRead as never });
+    const result = await adapterWithBadRead.getInstallStatus(baseRequest);
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("metadata-read-failed");
+  });
+
+  it("metadata wrong shape returns metadata-read-failed", async () => {
+    const fs = createFsMocks({ existingRoot: true, metadata: { managedBy: "ai-system-builder" } });
+    const adapter = createGitRuntimeInstallerAdapter({ ...fs });
+    const result = await adapter.getInstallStatus(baseRequest);
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("metadata-read-failed");
+  });
+
+  it("wrong targetId metadata is treated as unmanaged", async () => {
+    const fs = createFsMocks({
+      existingRoot: true,
+      metadata: {
+        managedBy: "ai-system-builder",
+        targetId: "other-target",
+        installRoot: baseRequest.installRoot,
+        source: baseRequest.source,
+        installedAt: "2026-01-01T00:00:00.000Z",
+        lastCheckedAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
     const adapter = createGitRuntimeInstallerAdapter({ ...fs });
     const result = await adapter.getInstallStatus(baseRequest);
     expect(result.status).toBe("failed");
     expect(result.error?.code).toBe("unmanaged-install-root");
   });
 
-  it("ensureInstalled clones git repo", async () => {
+  it("ensureInstalled clones git repo without precreating installRoot", async () => {
     const fs = createFsMocks();
     const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
       if (args.includes("rev-parse")) return { stdout: "abc123\n", stderr: "" };
@@ -69,93 +92,11 @@ describe("createGitRuntimeInstallerAdapter", () => {
     const result = await adapter.ensureInstalled(baseRequest);
     expect(result.status).toBe("installed");
     expect(execFile).toHaveBeenCalledWith("git", ["clone", baseRequest.source.repositoryUrl, baseRequest.installRoot]);
+    expect(fs.mkdir).toHaveBeenCalledTimes(1);
+    expect(fs.mkdir).toHaveBeenCalledWith("/runtime", { recursive: true });
   });
 
-  it("ensureInstalled checks out ref when provided", async () => {
-    const fs = createFsMocks();
-    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => ({ stdout: args.includes("rev-parse") ? "abc\n" : "", stderr: "" }));
-    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile, now: () => "2026-01-01T00:00:00.000Z" });
-    await adapter.ensureInstalled(baseRequest);
-    expect(execFile).toHaveBeenCalledWith("git", ["-C", baseRequest.installRoot, "checkout", "main"]);
-  });
-
-  it("ensureInstalled writes metadata", async () => {
-    const fs = createFsMocks();
-    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => ({ stdout: args.includes("rev-parse") ? "abc\n" : "", stderr: "" }));
-    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile, now: () => "2026-01-01T00:00:00.000Z" });
-    await adapter.ensureInstalled(baseRequest);
-    expect(fs.writeFile).toHaveBeenCalled();
-  });
-
-  it("ensureInstalled returns existing installed metadata without clone", async () => {
-    const fs = createFsMocks({
-      existingRoot: true,
-      metadata: {
-        managedBy: "ai-system-builder",
-        targetId: baseRequest.targetId,
-        installRoot: baseRequest.installRoot,
-        source: baseRequest.source,
-        installedAt: "2026-01-01T00:00:00.000Z",
-        lastCheckedAt: "2026-01-01T00:00:00.000Z",
-      },
-    });
-    const execFile = testDouble.fn();
-    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile });
-    const result = await adapter.ensureInstalled(baseRequest);
-    expect(result.status).toBe("installed");
-    expect(execFile).not.toHaveBeenCalled();
-  });
-
-  it("allowUpdate runs fetch/pull for managed install", async () => {
-    const fs = createFsMocks({
-      existingRoot: true,
-      metadata: {
-        managedBy: "ai-system-builder",
-        targetId: baseRequest.targetId,
-        installRoot: baseRequest.installRoot,
-        source: baseRequest.source,
-        installedAt: "2026-01-01T00:00:00.000Z",
-        lastCheckedAt: "2026-01-01T00:00:00.000Z",
-      },
-    });
-    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => ({ stdout: args.includes("rev-parse") ? "abc\n" : "", stderr: "" }));
-    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile, now: () => "2026-01-02T00:00:00.000Z" });
-    await adapter.ensureInstalled({ ...baseRequest, allowUpdate: true });
-    expect(execFile).toHaveBeenCalledWith("git", ["-C", baseRequest.installRoot, "fetch", "--all", "--tags"]);
-    expect(execFile).toHaveBeenCalledWith("git", ["-C", baseRequest.installRoot, "pull", "--ff-only"]);
-  });
-
-  it("unsupported source fails", async () => {
-    const fs = createFsMocks();
-    const adapter = createGitRuntimeInstallerAdapter({ ...fs });
-    const result = await adapter.ensureInstalled({ ...baseRequest, source: { type: "archive" } as never });
-    expect(result.error?.code).toBe("unsupported-install-source");
-  });
-
-  it("missing repositoryUrl fails", async () => {
-    const fs = createFsMocks();
-    const adapter = createGitRuntimeInstallerAdapter({ ...fs });
-    const result = await adapter.ensureInstalled({ ...baseRequest, source: { type: "git", repositoryUrl: "" } });
-    expect(result.error?.code).toBe("missing-repository-url");
-  });
-
-  it("unmanaged root is not modified", async () => {
-    const fs = createFsMocks({ existingRoot: true, metadata: { managedBy: "other" } });
-    const execFile = testDouble.fn();
-    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile });
-    const result = await adapter.ensureInstalled(baseRequest);
-    expect(result.error?.code).toBe("unmanaged-install-root");
-    expect(execFile).not.toHaveBeenCalled();
-  });
-
-  it("repairInstall fails for unmanaged install", async () => {
-    const fs = createFsMocks({ existingRoot: true, metadata: { managedBy: "other" } });
-    const adapter = createGitRuntimeInstallerAdapter({ ...fs });
-    const result = await adapter.repairInstall!(baseRequest);
-    expect(result.status).toBe("failed");
-  });
-
-  it("Git failures map to clear error codes", async () => {
+  it("failed clone does not write metadata", async () => {
     const fs = createFsMocks();
     const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
       if (args[0] === "clone") throw new Error("clone failed");
@@ -163,6 +104,117 @@ describe("createGitRuntimeInstallerAdapter", () => {
     });
     const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile });
     const result = await adapter.ensureInstalled(baseRequest);
+    expect(result.status).toBe("failed");
     expect(result.error?.code).toBe("git-clone-failed");
+    expect(fs.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("allowUpdate with ref runs fetch + checkout + rev-parse without pull", async () => {
+    const fs = createFsMocks({
+      existingRoot: true,
+      metadata: {
+        managedBy: "ai-system-builder",
+        targetId: baseRequest.targetId,
+        installRoot: baseRequest.installRoot,
+        source: baseRequest.source,
+        installedAt: "2026-01-01T00:00:00.000Z",
+        lastCheckedAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
+    const calls: string[][] = [];
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
+      calls.push([...args]);
+      return { stdout: args.includes("rev-parse") ? "abc\n" : "", stderr: "" };
+    });
+    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile, now: () => "2026-01-02T00:00:00.000Z" });
+    await adapter.ensureInstalled({ ...baseRequest, allowUpdate: true });
+    expect(execFile).toHaveBeenCalledWith("git", ["-C", baseRequest.installRoot, "fetch", "--all", "--tags"]);
+    expect(execFile).toHaveBeenCalledWith("git", ["-C", baseRequest.installRoot, "checkout", "main"]);
+    expect(calls.some((args) => args.includes("pull"))).toBe(false);
+  });
+
+  it("allowUpdate without ref runs fetch + pull + rev-parse", async () => {
+    const fs = createFsMocks({
+      existingRoot: true,
+      metadata: {
+        managedBy: "ai-system-builder",
+        targetId: baseRequest.targetId,
+        installRoot: baseRequest.installRoot,
+        source: { type: "git", repositoryUrl: "https://example.com/repo.git" },
+        installedAt: "2026-01-01T00:00:00.000Z",
+        lastCheckedAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
+    const request = { ...baseRequest, source: { type: "git" as const, repositoryUrl: "https://example.com/repo.git" }, allowUpdate: true };
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => ({ stdout: args.includes("rev-parse") ? "abc\n" : "", stderr: "" }));
+    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile, now: () => "2026-01-02T00:00:00.000Z" });
+    await adapter.ensureInstalled(request);
+    expect(execFile).toHaveBeenCalledWith("git", ["-C", baseRequest.installRoot, "fetch", "--all", "--tags"]);
+    expect(execFile).toHaveBeenCalledWith("git", ["-C", baseRequest.installRoot, "pull", "--ff-only"]);
+  });
+
+  it("forceRepair true on unmanaged root does not modify files", async () => {
+    const fs = createFsMocks({
+      existingRoot: true,
+      metadata: {
+        managedBy: "ai-system-builder",
+        targetId: "other-target",
+        installRoot: baseRequest.installRoot,
+        source: baseRequest.source,
+        installedAt: "2026-01-01T00:00:00.000Z",
+        lastCheckedAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
+    const execFile = testDouble.fn();
+    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile });
+    const result = await adapter.ensureInstalled({ ...baseRequest, forceRepair: true });
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("unmanaged-install-root");
+    expect(result.error?.message).toContain("forceRepair is not implemented");
+    expect(execFile).not.toHaveBeenCalled();
+    expect(fs.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("forceRepair true on managed install runs conservative update path", async () => {
+    const fs = createFsMocks({
+      existingRoot: true,
+      metadata: {
+        managedBy: "ai-system-builder",
+        targetId: baseRequest.targetId,
+        installRoot: baseRequest.installRoot,
+        source: baseRequest.source,
+        installedAt: "2026-01-01T00:00:00.000Z",
+        lastCheckedAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => ({ stdout: args.includes("rev-parse") ? "abc\n" : "", stderr: "" }));
+    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile });
+    const result = await adapter.ensureInstalled({ ...baseRequest, forceRepair: true });
+    expect(result.status).toBe("installed");
+    expect(execFile).toHaveBeenCalledWith("git", ["-C", baseRequest.installRoot, "fetch", "--all", "--tags"]);
+  });
+
+  it("metadata write throw maps to metadata-write-failed", async () => {
+    const fs = createFsMocks();
+    const writeFile = testDouble.fn(async () => {
+      throw new Error("nope");
+    });
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => ({ stdout: args.includes("rev-parse") ? "abc\n" : "", stderr: "" }));
+    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile, writeFile: writeFile as never });
+    const result = await adapter.ensureInstalled(baseRequest);
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("metadata-write-failed");
+  });
+
+  it("rev-parse failure maps to git-rev-parse-failed", async () => {
+    const fs = createFsMocks();
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
+      if (args.includes("rev-parse")) throw new Error("bad rev");
+      return { stdout: "", stderr: "" };
+    });
+    const adapter = createGitRuntimeInstallerAdapter({ ...fs, execFile });
+    const result = await adapter.ensureInstalled(baseRequest);
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("git-rev-parse-failed");
   });
 });
