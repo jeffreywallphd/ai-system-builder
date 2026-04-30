@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import type { DesktopArtifactBrowseItem } from "../../../lib/desktopApi";
 import type { DesktopModelInventoryRecord, DesktopModelTrainingResult } from "../../../lib/desktopApi";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsClient } from "./useModelsClient";
@@ -10,10 +11,11 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
   const modelClient = useModelsClient(client);
 
   const [models, setModels] = useState<DesktopModelInventoryRecord[]>([]);
+  const [datasetArtifacts, setDatasetArtifacts] = useState<DesktopArtifactBrowseItem[]>([]);
   const [baseModelRecordId, setBaseModelRecordId] = useState("");
-  const [datasetArtifactIdsText, setDatasetArtifactIdsText] = useState("");
+  const [selectedDatasetArtifactIds, setSelectedDatasetArtifactIds] = useState<string[]>([]);
   const [method, setMethod] = useState<"lora" | "qlora" | "full-finetune">("lora");
-  const [numEpochs, setNumEpochs] = useState("3");
+  const [numEpochs, setNumEpochs] = useState("2");
   const [maxSteps, setMaxSteps] = useState("");
   const [batchSize, setBatchSize] = useState("2");
   const [learningRate, setLearningRate] = useState("0.0002");
@@ -39,15 +41,22 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
 
   const isMethodSupported = true;
 
-  const datasetArtifactIds = useMemo(
-    () => datasetArtifactIdsText.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0),
-    [datasetArtifactIdsText],
-  );
+  const datasetArtifactIds = useMemo(() => selectedDatasetArtifactIds, [selectedDatasetArtifactIds]);
 
   useEffect(() => {
     const load = async () => {
       const listed = await modelClient.listModels({});
+      let artifacts: DesktopArtifactBrowseItem[] = [];
+      try {
+        const { createDesktopArtifactBrowserClient } = await import("../../artifact-browser/api/desktopArtifactBrowserClient");
+        artifacts = await createDesktopArtifactBrowserClient().browseArtifacts({});
+      } catch {
+        artifacts = [];
+      }
       setModels(listed);
+      setDatasetArtifacts(
+        artifacts.filter((artifact) => artifact.mediaType === "application/x-parquet" || artifact.storageKey.toLowerCase().endsWith(".parquet")),
+      );
       if (!baseModelRecordId && listed.length > 0) {
         setBaseModelRecordId(listed[0]?.modelRecordId ?? "");
       }
@@ -118,10 +127,11 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
 
   return {
     models,
+    datasetArtifacts,
     baseModelRecordId,
     setBaseModelRecordId,
-    datasetArtifactIdsText,
-    setDatasetArtifactIdsText,
+    selectedDatasetArtifactIds,
+    setSelectedDatasetArtifactIds,
     method,
     setMethod,
     numEpochs,
