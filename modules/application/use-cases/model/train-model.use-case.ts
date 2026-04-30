@@ -1,3 +1,7 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, join, parse } from "node:path";
+
 import {
   normalizeModelTrainingRequest,
   normalizeModelTrainingResult,
@@ -5,9 +9,10 @@ import {
   type ModelTrainingResult,
 } from "../../../contracts/model";
 import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
+import { createRetrieveArtifactRequest } from "../../../contracts/storage";
 import type { ModelRegistryPort } from "../../ports/model";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
-import type { ArtifactStorageBindingPort } from "../../ports/storage";
+import type { ArtifactObjectStoragePort, ArtifactStorageBindingPort } from "../../ports/storage";
 import type { TaskPowerLifecyclePort } from "../../services/runtime";
 
 function ensureBaseModelSelection(request: ModelTrainingRequest): void {
@@ -28,15 +33,60 @@ function ensureDatasetSelections(request: ModelTrainingRequest): void {
   });
 }
 
+function extensionForMediaType(mediaType: string | undefined): string {
+  if (mediaType === "application/x-parquet" || mediaType === "application/vnd.apache.parquet") {
+    return ".parquet";
+  }
+
+  if (mediaType === "application/x-ndjson" || mediaType === "application/jsonl") {
+    return ".jsonl";
+  }
+
+  if (mediaType === "application/json" || mediaType === "text/json") {
+    return ".json";
+  }
+
+  if (mediaType === "text/csv" || mediaType === "application/csv") {
+    return ".csv";
+  }
+
+  return ".parquet";
+}
+
+function sanitizeRuntimeDatasetFileSegment(value: string): string {
+  const normalized = value
+    .trim()
+    .replace(/[\\/]+/g, "-")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized.length > 0 ? normalized : "dataset";
+}
+
+function buildRuntimeDatasetPath(
+  runtimeDatasetDir: string,
+  artifactId: string,
+  mediaType: string | undefined,
+  datasetIndex: number,
+): string {
+  const sourceName = basename(artifactId);
+  const stem = sanitizeRuntimeDatasetFileSegment(parse(sourceName).name || sourceName);
+  const extension = parse(sourceName).ext || extensionForMediaType(mediaType);
+  const prefix = `${String(datasetIndex + 1).padStart(4, "0")}-${stem}`;
+  return join(runtimeDatasetDir, `${prefix}${extension}`);
+}
+
 export class TrainModelUseCase {
   private readonly registeredResultsByRequestId = new Map<string, ModelTrainingResult>();
   private readonly requestContextByRequestId = new Map<string, { normalizedRequest: ModelTrainingRequest; baseModelRecordId?: string }>();
+  private readonly runtimeDatasetDirsByRequestId = new Map<string, string>();
 
   public constructor(
     private readonly dependencies: {
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
       modelRegistry: ModelRegistryPort;
       storageBindings: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings">;
+      storage: Pick<ArtifactObjectStoragePort, "retrieveArtifact">;
       taskPowerLifecycle: TaskPowerLifecyclePort;
     },
   ) {}
@@ -65,54 +115,46 @@ export class TrainModelUseCase {
       };
     }
 
-    const started = await this.dependencies.runtimeTaskRegistry.startTask({
-      taskType: TaskType.MODEL_TRAINING,
-      payload: {
-        ...normalizedRequest,
-        datasets: await Promise.all(normalizedRequest.datasets.map(async (dataset) => {
-          if (dataset.path && dataset.path.trim().length > 0) {
-            return dataset;
-          }
-          const bindingsResult = await this.dependencies.storageBindings.readArtifactStorageBindings({ artifactId: dataset.artifactId });
-          if (!bindingsResult.ok) {
-            throw new Error(`Failed to resolve storage binding for dataset artifact '${dataset.artifactId}': ${bindingsResult.error.message}`);
-          }
-          const localBinding = bindingsResult.value.bindings.find((binding) =>
-            binding.backing.provider === "local-filesystem" || binding.backing.provider === "local",
-          );
-          if (localBinding) {
-            return { ...dataset, path: localBinding.backing.locator };
-          }
-
-          const localObjectBinding = bindingsResult.value.bindings.find((binding) =>
-            binding.backing.kind === "artifact-object"
-            && binding.backing.provider === "local"
-            && binding.backing.locator.trim().length > 0,
-          );
-          if (localObjectBinding) {
-            return { ...dataset, path: localObjectBinding.backing.locator };
-          }
-
-          throw new Error(`Dataset artifact '${dataset.artifactId}' is missing a local dataset binding (file or artifact-object).`);
-        })),
-      },
-    });
-
-    if (typeof started.requestId !== "string" || started.requestId.trim().length === 0) {
-      throw new Error("Model training start response missing requestId.");
-    }
-
-    this.requestContextByRequestId.set(started.requestId, { normalizedRequest, baseModelRecordId });
+    let runtimeDatasetDir: string | undefined;
     try {
-      await this.dependencies.taskPowerLifecycle.startTask(started.requestId, TaskType.MODEL_TRAINING);
-    } catch {
-      // Power blocker startup failures must not fail model training.
-    }
+      const resolvedDatasets = [];
+      for (const [datasetIndex, dataset] of normalizedRequest.datasets.entries()) {
+        const resolved = await this.resolveDatasetForRuntime(dataset, datasetIndex, () => runtimeDatasetDir, (value) => { runtimeDatasetDir = value; });
+        resolvedDatasets.push(resolved);
+      }
 
-    return {
-      runId: started.requestId,
-      status: "queued",
-    };
+      const started = await this.dependencies.runtimeTaskRegistry.startTask({
+        taskType: TaskType.MODEL_TRAINING,
+        payload: {
+          ...normalizedRequest,
+          datasets: resolvedDatasets,
+        },
+      });
+
+      if (typeof started.requestId !== "string" || started.requestId.trim().length === 0) {
+        throw new Error("Model training start response missing requestId.");
+      }
+
+      this.requestContextByRequestId.set(started.requestId, { normalizedRequest, baseModelRecordId });
+      if (runtimeDatasetDir) {
+        this.runtimeDatasetDirsByRequestId.set(started.requestId, runtimeDatasetDir);
+      }
+      try {
+        await this.dependencies.taskPowerLifecycle.startTask(started.requestId, TaskType.MODEL_TRAINING);
+      } catch {
+        // Power blocker startup failures must not fail model training.
+      }
+
+      return {
+        runId: started.requestId,
+        status: "queued",
+      };
+    } catch (error) {
+      if (runtimeDatasetDir) {
+        await rm(runtimeDatasetDir, { recursive: true, force: true });
+      }
+      throw error;
+    }
   }
 
   public async read(requestId: string): Promise<ModelTrainingResult> {
@@ -128,6 +170,7 @@ export class TrainModelUseCase {
 
     if (statusRecord.status === "failed" || statusRecord.status === "cancelled" || statusRecord.status === "unknown") {
       await this.completePowerLifecycle(requestId, statusRecord.status);
+      await this.cleanupRuntimeDatasetDir(requestId);
       return normalizeModelTrainingResult({
         runId: requestId,
         status: statusRecord.status === "unknown" ? "failed" : statusRecord.status,
@@ -150,6 +193,7 @@ export class TrainModelUseCase {
 
     if (trainingResult.status !== "succeeded" || !trainingResult.generatedModelCandidate) {
       await this.completePowerLifecycle(statusRecord.requestId, "unknown");
+      await this.cleanupRuntimeDatasetDir(statusRecord.requestId);
       return trainingResult;
     }
 
@@ -197,7 +241,56 @@ export class TrainModelUseCase {
     };
     this.registeredResultsByRequestId.set(statusRecord.requestId, result);
     await this.completePowerLifecycle(statusRecord.requestId, "succeeded");
+    await this.cleanupRuntimeDatasetDir(statusRecord.requestId);
     return result;
+  }
+
+  private async resolveDatasetForRuntime(
+    dataset: ModelTrainingRequest["datasets"][number],
+    datasetIndex: number,
+    getRuntimeDatasetDir: () => string | undefined,
+    setRuntimeDatasetDir: (value: string) => void,
+  ): Promise<ModelTrainingRequest["datasets"][number]> {
+    if (dataset.path && dataset.path.trim().length > 0) {
+      return dataset;
+    }
+
+    const bindingsResult = await this.dependencies.storageBindings.readArtifactStorageBindings({ artifactId: dataset.artifactId });
+    if (!bindingsResult.ok) {
+      throw new Error(`Failed to resolve storage binding for dataset artifact '${dataset.artifactId}': ${bindingsResult.error.message}`);
+    }
+
+    const localFilesystemBinding = bindingsResult.value.bindings.find((binding) =>
+      binding.backing.provider === "local-filesystem"
+      && binding.backing.locator.trim().length > 0,
+    );
+    if (localFilesystemBinding) {
+      return { ...dataset, path: localFilesystemBinding.backing.locator };
+    }
+
+    const localObjectBinding = bindingsResult.value.bindings.find((binding) =>
+      binding.backing.kind === "artifact-object"
+      && binding.backing.provider === "local"
+      && binding.backing.locator.trim().length > 0,
+    );
+    const storageKey = localObjectBinding?.backing.locator ?? dataset.artifactId;
+    const retrieved = await this.dependencies.storage.retrieveArtifact(createRetrieveArtifactRequest(storageKey));
+    if (!retrieved.ok) {
+      throw new Error(`Failed to retrieve local dataset artifact '${dataset.artifactId}' from artifact-object storage key '${storageKey}': ${retrieved.error.message}`);
+    }
+
+    let runtimeDatasetDir = getRuntimeDatasetDir();
+    if (!runtimeDatasetDir) {
+      runtimeDatasetDir = await mkdtemp(join(tmpdir(), "ai-system-builder-training-datasets-"));
+      setRuntimeDatasetDir(runtimeDatasetDir);
+    }
+    const localPath = buildRuntimeDatasetPath(runtimeDatasetDir, dataset.artifactId, retrieved.value.descriptor.mediaType, datasetIndex);
+    await writeFile(localPath, Buffer.from(retrieved.value.content as Uint8Array));
+    return {
+      ...dataset,
+      path: localPath,
+      format: dataset.format ?? parse(localPath).ext.replace(/^\./, ""),
+    };
   }
 
   private async completePowerLifecycle(requestId: string, status: "succeeded" | "failed" | "cancelled" | "unknown"): Promise<void> {
@@ -206,5 +299,15 @@ export class TrainModelUseCase {
     } catch {
       // Power blocker teardown failures must not fail model training.
     }
+  }
+
+  private async cleanupRuntimeDatasetDir(requestId: string): Promise<void> {
+    const runtimeDatasetDir = this.runtimeDatasetDirsByRequestId.get(requestId);
+    if (!runtimeDatasetDir) {
+      return;
+    }
+
+    this.runtimeDatasetDirsByRequestId.delete(requestId);
+    await rm(runtimeDatasetDir, { recursive: true, force: true });
   }
 }
