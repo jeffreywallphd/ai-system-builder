@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
-import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -64,6 +64,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
   const discoveryEnabled = options.discovery?.enabled !== false;
   const environment = options.discovery?.env ?? process.env;
   const homeDirectory = options.discovery?.homeDirectory ?? homedir();
+  let registryWriteQueue: Promise<void> = Promise.resolve();
 
   async function readDocument(): Promise<ModelRegistryFileShape> {
     try {
@@ -87,11 +88,25 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     }
   }
 
-  async function writeDocument(document: ModelRegistryFileShape): Promise<void> {
+  async function writeDocumentNow(document: ModelRegistryFileShape): Promise<void> {
     await mkdir(dirname(options.filePath), { recursive: true });
-    const temporaryPath = `${options.filePath}.tmp`;
-    await writeFile(temporaryPath, JSON.stringify(document, null, 2), "utf8");
-    await rename(temporaryPath, options.filePath);
+    const temporaryPath = `${options.filePath}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporaryPath, JSON.stringify(document, null, 2), "utf8");
+      await rename(temporaryPath, options.filePath);
+    } catch (error) {
+      await unlink(temporaryPath).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async function writeDocument(document: ModelRegistryFileShape): Promise<void> {
+    const writeOperation = registryWriteQueue.then(
+      () => writeDocumentNow(document),
+      () => writeDocumentNow(document),
+    );
+    registryWriteQueue = writeOperation.catch(() => undefined);
+    await writeOperation;
   }
 
   function matchesFilters(record: ModelInventoryRecord, request: ListModelsRequest): boolean {
