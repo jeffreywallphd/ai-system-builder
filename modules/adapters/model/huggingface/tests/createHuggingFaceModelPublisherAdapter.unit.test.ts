@@ -87,4 +87,46 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
     const uploadedPaths = uploadFile.mock.calls.map((call) => call[0].path).sort();
     expect(uploadedPaths).toEqual(["adapter_config.json", "adapter_model.safetensors", "tokenizer.json"]);
   });
+
+  it("creates missing model repository and retries upload on provider 404", async () => {
+    const root = join(tmpdir(), `hf-publish-create-repo-${Date.now()}`);
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "config.json"), "{}", "utf8");
+    await writeFile(join(root, "model.safetensors"), "tensor", "utf8");
+
+    let uploadAttempt = 0;
+    const uploadFile = testDouble.fn(async () => {
+      uploadAttempt += 1;
+      if (uploadAttempt === 1) {
+        throw { statusCode: 404, message: "Repository not found" };
+      }
+    });
+    const fetchImplementation = testDouble.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile }, fetchImplementation });
+
+    const result = await adapter.publishModel({
+      modelRecordId: "m1",
+      modelPath: root,
+      repository: "OpenFinAL/ai-system-builder-model",
+      token: "hf_test",
+    });
+
+    expect(result.published).toBe(true);
+    expect(uploadFile).toHaveBeenCalledTimes(3);
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://huggingface.co/api/repos/create",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer hf_test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "ai-system-builder-model",
+          organization: "OpenFinAL",
+          type: "model",
+        }),
+      },
+    );
+  });
 });
