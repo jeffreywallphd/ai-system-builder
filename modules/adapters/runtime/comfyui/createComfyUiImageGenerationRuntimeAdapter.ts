@@ -41,7 +41,7 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
       const historyRecord = history[tracked.promptId] as Record<string, unknown> | undefined;
       if (historyRecord) {
         const outputsRecord = (historyRecord.outputs ?? {}) as Record<string, { images?: Array<Record<string, unknown>> }>;
-        const outputs = Object.values(outputsRecord).flatMap((n) => (n.images ?? []).map((image) => ({ fileName: String(image.filename ?? ""), subfolder: image.subfolder ? String(image.subfolder) : undefined, type: image.type ? String(image.type) : undefined, comfyUiPromptId: tracked.promptId, engine: "comfyui" })));
+        const outputs = Object.values(outputsRecord).flatMap((n) => (n.images ?? []).map((image) => ({ fileName: String(image.filename ?? ""), subfolder: image.subfolder ? String(image.subfolder) : undefined, promptId: tracked.promptId, engine: "comfyui", type: "image" })));
         const status: RuntimeTaskStatus = outputs.length > 0 ? "succeeded" : "failed";
         const record: RuntimeTaskRecord = { requestId, taskType: TaskType.IMAGE_GENERATION, status, concurrencyClass: "gpu-exclusive", data: status === "succeeded" ? { outputs } : undefined, error: status === "failed" ? { code: "comfyui_failed", message: "ComfyUI history entry did not contain image outputs." } : undefined, completedAt: now(), updatedAt: now(), metadata: { engine: "comfyui", comfyUiPromptId: tracked.promptId } };
         finalResults.set(requestId, record);

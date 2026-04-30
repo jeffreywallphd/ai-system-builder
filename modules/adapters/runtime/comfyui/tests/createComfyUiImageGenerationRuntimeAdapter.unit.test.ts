@@ -41,7 +41,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
     await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     const record = await adapter.getTaskStatus("r1");
     expect(record.status).toBe("succeeded");
-    expect(record.data).toEqual({ outputs: [{ fileName: "x.png", subfolder: undefined, type: "output", comfyUiPromptId: "p1", engine: "comfyui" }] });
+    expect(record.data).toEqual({ outputs: [{ fileName: "x.png", subfolder: undefined, type: "image", promptId: "p1", engine: "comfyui" }] });
     const unknown = await adapter.getTaskStatus("nope");
     expect(unknown.status).toBe("unknown");
   });
