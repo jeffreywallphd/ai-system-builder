@@ -41,3 +41,10 @@ Include this pack when prompts involve:
 
 - `docs/adr/ADR-0013-runtime-installer.md`
 - `docs/adr/ADR-0012-image-generation-runtime.md`
+
+## Metadata and Safety
+
+- Runtime installers should write install metadata under the install root or a target-specific metadata file.
+- Metadata should include source, requested ref, resolved ref/commit SHA, installedAt, lastCheckedAt, and an ownership/managed marker.
+- The managed marker is required before repair/update modifies an existing non-empty directory.
+- Prompt 2 can choose the exact metadata filename; suggested: `.ai-system-builder-runtime-install.json`.
