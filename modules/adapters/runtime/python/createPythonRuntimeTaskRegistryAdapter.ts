@@ -17,6 +17,7 @@ const genericToPythonTaskTypeMap: Record<TaskType, string> = {
   [TaskType.MODEL_TRAINING]: "train-model",
   [TaskType.MODEL_VALIDATION]: "validate-model",
   [TaskType.MODEL_PUBLISHING]: "publish-model",
+  [TaskType.IMAGE_GENERATION]: "generate-image",
 };
 
 function toPythonTaskType(taskType: TaskType): string {
@@ -39,6 +40,9 @@ function toGenericTaskType(taskType: string | undefined): RuntimeTaskRecord["tas
   }
   if (taskType === "publish-model") {
     return TaskType.MODEL_PUBLISHING;
+  }
+  if (taskType === "generate-image") {
+    return TaskType.IMAGE_GENERATION;
   }
   throw new Error(`Unknown python runtime task type '${taskType ?? "undefined"}'.`);
 }

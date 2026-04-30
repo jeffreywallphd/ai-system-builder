@@ -618,6 +618,7 @@ describe("runtime task registry contracts", () => {
       "model-training",
       "model-validation",
       "model-publishing",
+      "image-generation",
     ]);
 
     const statuses: RuntimeTaskStatus[] = [
