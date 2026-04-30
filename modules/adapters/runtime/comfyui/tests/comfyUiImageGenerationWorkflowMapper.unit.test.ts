@@ -20,4 +20,11 @@ describe("comfyUiImageGenerationWorkflowMapper", () => {
   it("throws a clear configuration error when checkpoint is missing", () => {
     expect(() => mapImageGenerationRequestToComfyUiPrompt({ prompt: "x" }, {})).toThrow("requires a model checkpoint");
   });
+
+  it("preserves explicit seed and randomizes when missing", () => {
+    const explicit = mapImageGenerationRequestToComfyUiPrompt({ prompt: "seeded", seed: 42 }, { defaultCheckpoint: "sdxl.safetensors" });
+    const implicit = mapImageGenerationRequestToComfyUiPrompt({ prompt: "random" }, { defaultCheckpoint: "sdxl.safetensors" });
+    expect(explicit.prompt["5"].inputs.seed).toBe(42);
+    expect(implicit.prompt["5"].inputs.seed).not.toBe(0);
+  });
 });
