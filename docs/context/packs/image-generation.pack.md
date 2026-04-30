@@ -37,3 +37,9 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - Contracts are engine-agnostic and capture intent rather than sidecar-specific payload shapes.
 - Runtime task registry is the execution path for image generation workloads.
 - Assets are created post-execution in the application layer, not in the runtime layer.
+
+## Prompt 4/7 Application Layer Notes
+
+- Application image generation use cases must depend on `RuntimeTaskRegistryPort` for task lifecycle orchestration.
+- ComfyUI integration remains adapter-only and must not leak into contracts or application use-case imports.
+- Image asset registration for generated outputs is intentionally deferred to the next prompt.
