@@ -55,7 +55,7 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
   const [loraRank, setLoraRank] = useState("16");
   const [loraAlpha, setLoraAlpha] = useState("32");
   const [loraDropout, setLoraDropout] = useState("0.05");
-  const [loraTargetModules, setLoraTargetModules] = useState("q_proj,v_proj");
+  const [loraTargetModules, setLoraTargetModules] = useState("");
   const [gradientAccumulationSteps, setGradientAccumulationSteps] = useState("8");
   const [checkpointIntervalSteps, setCheckpointIntervalSteps] = useState("100");
   const [evalIntervalSteps, setEvalIntervalSteps] = useState("100");
@@ -108,6 +108,7 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
     setResult(undefined);
 
     try {
+      const targetModules = loraTargetModules.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
       const trainingResult = await modelClient.trainModel({
         baseModel: { modelRecordId: baseModelRecordId },
         datasets: datasetArtifactIds.map((artifactId, index) => ({ artifactId, splitRole: index === 0 ? "train" : "validation" })),
@@ -128,7 +129,7 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
             rank: Number.parseInt(loraRank, 10) || undefined,
             alpha: Number.parseInt(loraAlpha, 10) || undefined,
             dropout: Number.parseFloat(loraDropout) || undefined,
-            targetModules: loraTargetModules.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0),
+            targetModules: targetModules.length > 0 ? targetModules : undefined,
           },
         },
         output: {
