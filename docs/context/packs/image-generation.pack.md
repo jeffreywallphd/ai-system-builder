@@ -50,3 +50,7 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - ComfyUI may be auto-installed through the Runtime Installer abstraction.
 - ComfyUI supervisor should call installer-before-start in a later prompt, not in this contract/architecture step.
 - Installation is separate from image generation contracts and application use cases.
+
+
+- ComfyUI may require Python dependencies at install time.
+- The runtime installer handles base dependency setup only; full environment optimization is out of scope for now.

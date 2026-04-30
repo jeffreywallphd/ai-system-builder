@@ -60,3 +60,10 @@ Include this pack when prompts involve:
 - Managed metadata must be valid before an install root is considered managed.
 - Update semantics are conservative: fetch always runs, pinned refs/tags/SHAs are checked out and recorded, and pull is only used when no ref is pinned.
 - ComfyUI-specific defaults/composition are deferred to Prompt 3.
+
+## ComfyUI Installer Composition
+
+- ComfyUI installer is a thin adapter that composes the generic Git runtime installer.
+- Python dependency installation is best-effort and non-destructive.
+- Virtual environment management is not implemented yet.
+- GPU/Torch installation is not implemented yet.
