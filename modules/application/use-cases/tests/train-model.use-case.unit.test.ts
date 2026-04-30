@@ -3,6 +3,7 @@ import { describe, expect, it, testDouble } from "../../../testing/node-test";
 import { TaskType, type RuntimeTaskRegistryPort } from "../../../contracts/runtime";
 import type { TaskPowerLifecyclePort } from "../../services/runtime";
 import type { ModelRegistryPort } from "../../ports/model";
+import type { ArtifactStorageBindingPort } from "../../ports/storage";
 import { TrainModelUseCase } from "../model/train-model.use-case";
 
 describe("TrainModelUseCase", () => {
@@ -22,16 +23,31 @@ describe("TrainModelUseCase", () => {
     cancelTask: testDouble.fn(async () => ({ requestId: "train-req-1", cancelled: false, status: "running" })),
     listTasks: testDouble.fn(async () => ({ tasks: [] })),
   });
+  const createStorageBindingsFake = (): Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings"> => ({
+    readArtifactStorageBindings: testDouble.fn(async () => ({
+      ok: true,
+      value: {
+        bindings: [{
+          artifactId: "dataset-1",
+          role: "primary",
+          backing: { kind: "file", provider: "local-filesystem", locator: "/tmp/dataset-1.parquet" },
+        }],
+      },
+    })),
+  });
 
   it("starts training with runtime task registry", async () => {
     const lifecycle = createLifecycleFake();
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), taskPowerLifecycle: lifecycle });
 
     const result = await useCase.execute(baseRequest);
 
     expect(runtimeTaskRegistry.startTask).toHaveBeenCalledTimes(1);
-    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith({ taskType: TaskType.MODEL_TRAINING, payload: expect.any(Object) });
+    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith({
+      taskType: TaskType.MODEL_TRAINING,
+      payload: expect.objectContaining({ datasets: [expect.objectContaining({ artifactId: "dataset-1", path: "/tmp/dataset-1.parquet" })] }),
+    });
     expect(lifecycle.startTask).toHaveBeenCalledWith("train-req-1", TaskType.MODEL_TRAINING);
     expect(result).toEqual({ runId: "train-req-1", status: "queued" });
   });
@@ -39,7 +55,7 @@ describe("TrainModelUseCase", () => {
   it("reads running status from runtime task registry", async () => {
     const lifecycle = createLifecycleFake();
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), taskPowerLifecycle: lifecycle });
 
     const result = await useCase.read("train-req-1");
 
@@ -73,7 +89,7 @@ describe("TrainModelUseCase", () => {
         createdAt: "2026-04-29T00:00:00.000Z",
       },
     });
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel }, taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel }, storageBindings: createStorageBindingsFake(), taskPowerLifecycle: lifecycle });
 
     const first = await useCase.read("train-req-1");
     const second = await useCase.read("train-req-1");
@@ -94,7 +110,7 @@ describe("TrainModelUseCase", () => {
       concurrencyClass: "unknown",
       error: status === "failed" ? { code: "failed", message: "boom" } : undefined,
     });
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), taskPowerLifecycle: lifecycle });
 
     const result = await useCase.read("train-req-1");
     expect(result.status).toBe(status);
