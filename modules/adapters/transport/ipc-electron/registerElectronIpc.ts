@@ -27,6 +27,7 @@ import {
   registerModelManagementIpc,
   type RegisterModelManagementIpcDependencies,
 } from "./model/registerModelManagementIpc";
+import { registerImageGenerationIpc, type RegisterImageGenerationIpcDependencies } from "./image-generation/registerImageGenerationIpc";
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
@@ -68,6 +69,8 @@ export interface RegisterElectronIpcDependencies {
   trainModelUseCase: RegisterModelManagementIpcDependencies["trainModelUseCase"];
   validateModelUseCase: RegisterModelManagementIpcDependencies["validateModelUseCase"];
   publishModelUseCase: RegisterModelManagementIpcDependencies["publishModelUseCase"];
+  generateImageUseCase: RegisterImageGenerationIpcDependencies["generateImageUseCase"];
+  imageGenerationFinalizationOrchestrator?: RegisterImageGenerationIpcDependencies["imageGenerationFinalizationOrchestrator"];
 }
 
 export function registerElectronIpc(
@@ -131,6 +134,12 @@ export function registerElectronIpc(
     trainModelUseCase: dependencies.trainModelUseCase,
     validateModelUseCase: dependencies.validateModelUseCase,
     publishModelUseCase: dependencies.publishModelUseCase,
+  });
+
+  registerImageGenerationIpc({
+    ipcMain: dependencies.ipcMain,
+    generateImageUseCase: dependencies.generateImageUseCase,
+    imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
   });
 
   registerPythonRuntimeIpc({

@@ -38,6 +38,9 @@ import {
   ValidateModelUseCase,
   PublishModelUseCase,
 } from "../../../application/use-cases";
+import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
+import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
+import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { DefaultModelDefaultResolver } from "../../../application/services/settings";
@@ -51,6 +54,8 @@ import {
   ensurePythonRuntimeWorkerDependencies,
   createPythonRuntimeTaskRegistryAdapter,
 } from "../../../adapters/runtime/python";
+import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
+import { createRuntimeTaskRegistryRouter } from "../../../adapters/runtime/createRuntimeTaskRegistryRouter";
 import { createElectronPowerSuspensionBlocker } from "../../../adapters/runtime/electron";
 import {
   createFilesystemArtifactBrowserReadAdapter,
@@ -494,9 +499,14 @@ export function composeDesktopHost(
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
   const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
-  const runtimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort }, {
+  const pythonRuntimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort }, {
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
+  const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
+  const comfyUiWorkingDirectory = process.env.COMFYUI_WORKING_DIRECTORY?.trim() || ".";
+  const comfyUiSupervisor = createComfyUiRuntimeSupervisor({ workingDirectory: comfyUiWorkingDirectory });
+  const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({ client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }), supervisor: comfyUiSupervisor, mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT } });
+  const runtimeTaskRegistry = createRuntimeTaskRegistryRouter({ python: pythonRuntimeTaskRegistry, image: comfyUiRuntimeTaskRegistry });
 
   return {
     loggingPort,
@@ -784,6 +794,9 @@ export function composeDesktopHost(
         modelRegistry,
         runtimeTaskRegistry,
       });
+      const generateImageUseCase = new GenerateImageUseCase({ runtimeTaskRegistry });
+      const finalizeImageGenerationService = new FinalizeImageGenerationService({ storage, artifactCatalogAppend: artifactCatalog, now: options.now });
+      const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({ runtimeTaskRegistry, finalizeImageGenerationService });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -848,6 +861,8 @@ export function composeDesktopHost(
         trainModelUseCase: trainModel,
         validateModelUseCase: validateModel,
         publishModelUseCase: publishModel,
+        generateImageUseCase,
+        imageGenerationFinalizationOrchestrator,
       });
     },
   };
