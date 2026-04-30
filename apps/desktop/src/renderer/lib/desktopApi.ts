@@ -388,6 +388,7 @@ interface DesktopApiBridge {
   updateModelRecord?: (input: DesktopUpdateModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   deleteModelRecord?: (input: DesktopDeleteModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   trainModel?: (input: DesktopModelTrainingRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readModelTrainingStatus?: (input: { runId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   validateModel?: (input: DesktopValidateModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   publishModel?: (input: DesktopPublishModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
 }

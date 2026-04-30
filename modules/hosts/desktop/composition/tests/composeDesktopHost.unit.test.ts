@@ -50,6 +50,7 @@ import {
   DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL,
   DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
@@ -128,7 +129,7 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: join(tmpdir(), `desktop-artifact-upload-test-${Date.now()}`),
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(42);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(43);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -169,6 +170,7 @@ describe("composeDesktopHost", () => {
       DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,

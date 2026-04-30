@@ -53,10 +53,9 @@ describe("TrainModelUseCase", () => {
     const result = await useCase.execute(baseRequest);
 
     expect(runtimeTaskRegistry.startTask).toHaveBeenCalledTimes(1);
-    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith({
-      taskType: TaskType.MODEL_TRAINING,
-      payload: expect.objectContaining({ datasets: [expect.objectContaining({ artifactId: "dataset-1", path: "/tmp/dataset-1.parquet" })] }),
-    });
+    const startRequest = (runtimeTaskRegistry.startTask as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
+    expect(startRequest.taskType).toBe(TaskType.MODEL_TRAINING);
+    expect(startRequest.payload.datasets[0]).toMatchObject({ artifactId: "dataset-1", path: "/tmp/dataset-1.parquet" });
     expect(lifecycle.startTask).toHaveBeenCalledWith("train-req-1", TaskType.MODEL_TRAINING);
     expect(result).toEqual({ runId: "train-req-1", status: "queued" });
   });
@@ -69,7 +68,38 @@ describe("TrainModelUseCase", () => {
     const result = await useCase.read("train-req-1");
 
     expect(runtimeTaskRegistry.getTaskStatus).toHaveBeenCalledWith("train-req-1");
-    expect(result).toEqual({ runId: "train-req-1", status: "running" });
+    expect(result.runId).toBe("train-req-1");
+    expect(result.status).toBe("running");
+  });
+
+  it("maps runtime training progress into model training status reads", async () => {
+    const lifecycle = createLifecycleFake();
+    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+    (runtimeTaskRegistry.getTaskStatus as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+      requestId: "train-req-1",
+      taskType: TaskType.MODEL_TRAINING,
+      status: "running",
+      concurrencyClass: "unknown",
+      progress: {
+        message: "Epoch [0]/[1], Batch [0]/[59]",
+        current: 0,
+        total: 59,
+        unit: "batch",
+        details: { stage: "training", epoch: 0, totalEpochs: 1, batch: 0, totalBatches: 59 },
+      },
+    });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
+
+    const result = await useCase.read("train-req-1");
+
+    expect(result.progress).toEqual({
+      stage: "training",
+      message: "Epoch [0]/[1], Batch [0]/[59]",
+      epoch: 0,
+      totalEpochs: 1,
+      batch: 0,
+      totalBatches: 59,
+    });
   });
 
   it("registers generated model on succeeded status only once", async () => {
@@ -100,6 +130,7 @@ describe("TrainModelUseCase", () => {
     });
     const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
 
+    await useCase.execute(baseRequest);
     const first = await useCase.read("train-req-1");
     const second = await useCase.read("train-req-1");
 
@@ -109,22 +140,24 @@ describe("TrainModelUseCase", () => {
     expect(lifecycle.completeTask).toHaveBeenCalledWith("train-req-1", "succeeded");
   });
 
-  it.each(["failed", "cancelled"] as const)("completes lifecycle for terminal status %s", async (status) => {
-    const lifecycle = createLifecycleFake();
-    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
-    (runtimeTaskRegistry.getTaskStatus as ReturnType<typeof testDouble.fn>).mockResolvedValue({
-      requestId: "train-req-1",
-      taskType: TaskType.MODEL_TRAINING,
-      status,
-      concurrencyClass: "unknown",
-      error: status === "failed" ? { code: "failed", message: "boom" } : undefined,
-    });
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
+  for (const terminalStatus of ["failed", "cancelled"] as const) {
+    it(`completes lifecycle for terminal status ${terminalStatus}`, async () => {
+      const lifecycle = createLifecycleFake();
+      const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+      (runtimeTaskRegistry.getTaskStatus as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+        requestId: "train-req-1",
+        taskType: TaskType.MODEL_TRAINING,
+        status: terminalStatus,
+        concurrencyClass: "unknown",
+        error: terminalStatus === "failed" ? { code: "failed", message: "boom" } : undefined,
+      });
+      const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
 
-    const result = await useCase.read("train-req-1");
-    expect(result.status).toBe(status);
-    expect(lifecycle.completeTask).toHaveBeenCalledWith("train-req-1", status);
-  });
+      const result = await useCase.read("train-req-1");
+      expect(result.status).toBe(terminalStatus);
+      expect(lifecycle.completeTask).toHaveBeenCalledWith("train-req-1", terminalStatus);
+    });
+  }
 
 
   it("falls back to local artifact-object binding when file binding is unavailable", async () => {
@@ -146,10 +179,10 @@ describe("TrainModelUseCase", () => {
 
     await useCase.execute(baseRequest);
 
-    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith({
-      taskType: TaskType.MODEL_TRAINING,
-      payload: expect.objectContaining({ datasets: [expect.objectContaining({ artifactId: "dataset-1", path: expect.stringContaining("dataset-1.parquet") })] }),
-    });
+    const startRequest = (runtimeTaskRegistry.startTask as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
+    expect(startRequest.taskType).toBe(TaskType.MODEL_TRAINING);
+    expect(startRequest.payload.datasets[0].artifactId).toBe("dataset-1");
+    expect(startRequest.payload.datasets[0].path).toContain("dataset-1.parquet");
   });
 
   it("stages a generated local artifact-object storage key when no binding row exists", async () => {
@@ -172,16 +205,11 @@ describe("TrainModelUseCase", () => {
       requestId: undefined,
       correlationId: undefined,
     });
-    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith({
-      taskType: TaskType.MODEL_TRAINING,
-      payload: expect.objectContaining({
-        datasets: [expect.objectContaining({
-          artifactId: "generated/20260429160945623-2e7fe0660f46449f9ce819d011eb13f9-training-dataset.parquet",
-          path: expect.stringContaining("training-dataset.parquet"),
-          format: "parquet",
-        })],
-      }),
-    });
+    const startRequest = (runtimeTaskRegistry.startTask as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
+    expect(startRequest.taskType).toBe(TaskType.MODEL_TRAINING);
+    expect(startRequest.payload.datasets[0].artifactId).toBe("generated/20260429160945623-2e7fe0660f46449f9ce819d011eb13f9-training-dataset.parquet");
+    expect(startRequest.payload.datasets[0].path).toContain("training-dataset.parquet");
+    expect(startRequest.payload.datasets[0].format).toBe("parquet");
   });
 
 });

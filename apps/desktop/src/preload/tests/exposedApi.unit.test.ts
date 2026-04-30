@@ -47,6 +47,7 @@ import {
   DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL,
   createDesktopModelBrowseSuccessResponse,
   createDesktopModelDetailsReadSuccessResponse,
   createDesktopModelListSuccessResponse,
@@ -54,6 +55,8 @@ import {
   createDesktopModelDownloadSuccessResponse,
   createDesktopModelRecordUpdateSuccessResponse,
   createDesktopModelRecordDeleteSuccessResponse,
+  createDesktopModelTrainSuccessResponse,
+  createDesktopModelTrainStatusSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
@@ -535,12 +538,8 @@ it("maps model management bridge calls to dedicated model channels", async () =>
       deletedLocalFiles: false,
       deletedBackingArtifactIds: [],
     }),
-    {
-      ok: true,
-      operation: "model.train",
-      channel: "ipc.model.train.response",
-      value: { runId: "run-1", status: "succeeded" },
-    },
+    createDesktopModelTrainSuccessResponse({ runId: "run-1", status: "queued" }),
+    createDesktopModelTrainStatusSuccessResponse({ runId: "run-1", status: "running", progress: { epoch: 0, totalEpochs: 1, batch: 0, totalBatches: 59 } }),
   ];
   let index = 0;
   const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
@@ -564,6 +563,7 @@ it("maps model management bridge calls to dedicated model channels", async () =>
     commonParameters: {},
     output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } } },
   });
+  await api.readModelTrainingStatus({ runId: "run-1" });
 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value);
@@ -573,4 +573,5 @@ it("maps model management bridge calls to dedicated model channels", async () =>
   expect(invoke.mock.calls[5]?.[0]).toBe(DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[6]?.[0]).toBe(DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[7]?.[0]).toBe("ipc.model.train.request");
+  expect(invoke.mock.calls[8]?.[0]).toBe(DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value);
 });

@@ -7,6 +7,7 @@ import {
   normalizeModelTrainingResult,
   type ModelTrainingRequest,
   type ModelTrainingResult,
+  type ModelTrainingProgress,
 } from "../../../contracts/model";
 import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
 import { createRetrieveArtifactRequest } from "../../../contracts/storage";
@@ -181,6 +182,7 @@ export class TrainModelUseCase {
     return normalizeModelTrainingResult({
       runId: requestId,
       status: statusRecord.status,
+      progress: this.mapTrainingProgress(statusRecord),
     });
   }
 
@@ -243,6 +245,22 @@ export class TrainModelUseCase {
     await this.completePowerLifecycle(statusRecord.requestId, "succeeded");
     await this.cleanupRuntimeDatasetDir(statusRecord.requestId);
     return result;
+  }
+
+  private mapTrainingProgress(statusRecord: RuntimeTaskRecord): ModelTrainingProgress | undefined {
+    const details = statusRecord.progress?.details;
+    if (!details || typeof details !== "object") {
+      return statusRecord.progress?.message ? { message: statusRecord.progress.message } : undefined;
+    }
+
+    return {
+      stage: typeof details.stage === "string" ? details.stage : undefined,
+      message: typeof details.message === "string" ? details.message : statusRecord.progress?.message,
+      epoch: typeof details.epoch === "number" ? details.epoch : undefined,
+      totalEpochs: typeof details.totalEpochs === "number" ? details.totalEpochs : undefined,
+      batch: typeof details.batch === "number" ? details.batch : undefined,
+      totalBatches: typeof details.totalBatches === "number" ? details.totalBatches : undefined,
+    };
   }
 
   private async resolveDatasetForRuntime(

@@ -112,6 +112,19 @@ export interface ModelTrainingRequest {
   runtimeMetadata?: Record<string, unknown>;
 }
 
+export interface ModelTrainingStatusRequest {
+  runId: string;
+}
+
+export interface ModelTrainingProgress {
+  stage?: string;
+  message?: string;
+  epoch?: number;
+  totalEpochs?: number;
+  batch?: number;
+  totalBatches?: number;
+}
+
 export interface ModelTrainingGeneratedModelCandidate {
   displayName: string;
   provider?: ModelBrowseProvider;
@@ -138,6 +151,7 @@ export interface ModelTrainingCheckpointSummary {
 export interface ModelTrainingResult {
   runId: string;
   status: ModelTrainingStatus;
+  progress?: ModelTrainingProgress;
   outputDirectory?: string;
   outputModelName?: string;
   outputModel?: ModelInventoryRecord;
@@ -338,6 +352,16 @@ export function normalizeModelTrainingResult(result: ModelTrainingResult): Model
     ...result,
     runId: normalizeRequiredText(result.runId, "runId"),
     status: normalizeTrainingStatus(result.status),
+    progress: result.progress
+      ? {
+          stage: normalizeOptionalText(result.progress.stage),
+          message: normalizeOptionalText(result.progress.message),
+          epoch: normalizeOptionalInteger(result.progress.epoch),
+          totalEpochs: normalizeOptionalInteger(result.progress.totalEpochs),
+          batch: normalizeOptionalInteger(result.progress.batch),
+          totalBatches: normalizeOptionalInteger(result.progress.totalBatches),
+        }
+      : undefined,
     outputDirectory: normalizeOptionalText(result.outputDirectory),
     outputModelName: normalizeOptionalText(result.outputModelName),
     outputModel: result.outputModel ? normalizeModelInventoryRecord(result.outputModel) : undefined,
