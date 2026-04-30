@@ -145,6 +145,14 @@ import {
   DESKTOP_IMAGE_GENERATION_FINALIZE_OPERATION,
   DESKTOP_IMAGE_GENERATION_FINALIZE_REQUEST_CHANNEL,
   DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL,
+  DESKTOP_COMFYUI_INSTALL_STATUS_READ_OPERATION,
+  DESKTOP_COMFYUI_INSTALL_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_COMFYUI_INSTALL_STATUS_READ_RESPONSE_CHANNEL,
+  DESKTOP_COMFYUI_INSTALL_REPAIR_OPERATION,
+  DESKTOP_COMFYUI_INSTALL_REPAIR_REQUEST_CHANNEL,
+  DESKTOP_COMFYUI_INSTALL_REPAIR_RESPONSE_CHANNEL,
+  createDesktopComfyUiInstallStatusRequest,
+  createDesktopComfyUiRepairInstallRequest,
   createDesktopPrepareTrainingDatasetStartRequest,
   createDesktopPrepareTrainingDatasetTaskReadRequest,
   createDesktopPythonRuntimeControlRequest,
@@ -343,6 +351,8 @@ export interface DesktopPreloadApi {
   readImageGeneration: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationReadResponse>;
   cancelImageGeneration: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationCancelResponse>;
   finalizeImageGenerationIfCompleted: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationFinalizeResponse>;
+  readComfyUiInstallStatus: (input?: { installRoot?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<any>;
+  repairComfyUiInstall: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<any>;
   browseArtifacts: (
     input?: { artifactFamily?: ArtifactFamily },
     context?: DesktopArtifactUploadBridgeContext,
@@ -833,6 +843,16 @@ export function createDesktopPreloadApi(
       const request = createDesktopImageGenerationFinalizeRequest(input, context);
       const response = await dependencies.ipcRenderer.invoke(DESKTOP_IMAGE_GENERATION_FINALIZE_REQUEST_CHANNEL.value, request);
       return assertDesktopEnvelopeResponse<DesktopImageGenerationFinalizeResponse>(response, { operation: DESKTOP_IMAGE_GENERATION_FINALIZE_OPERATION, channel: DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL.value, message: "Received invalid desktop image generation finalization IPC response envelope." });
+    },
+    async readComfyUiInstallStatus(input = {}, context = {}) {
+      const request = createDesktopComfyUiInstallStatusRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_COMFYUI_INSTALL_STATUS_READ_REQUEST_CHANNEL.value, request);
+      return assertDesktopEnvelopeResponse(response, { operation: DESKTOP_COMFYUI_INSTALL_STATUS_READ_OPERATION, channel: DESKTOP_COMFYUI_INSTALL_STATUS_READ_RESPONSE_CHANNEL.value, message: "Received invalid desktop ComfyUI install status IPC response envelope." });
+    },
+    async repairComfyUiInstall(input = {}, context = {}) {
+      const request = createDesktopComfyUiRepairInstallRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_COMFYUI_INSTALL_REPAIR_REQUEST_CHANNEL.value, request);
+      return assertDesktopEnvelopeResponse(response, { operation: DESKTOP_COMFYUI_INSTALL_REPAIR_OPERATION, channel: DESKTOP_COMFYUI_INSTALL_REPAIR_RESPONSE_CHANNEL.value, message: "Received invalid desktop ComfyUI repair IPC response envelope." });
     },
 
     async browseArtifacts(input = {}, context = {}) {

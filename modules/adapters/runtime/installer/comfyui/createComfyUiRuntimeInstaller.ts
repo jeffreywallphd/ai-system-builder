@@ -24,6 +24,8 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   stat?: typeof nodeStat;
 }
 
+export const DEFAULT_COMFYUI_REPOSITORY_URL = "https://github.com/Comfy-Org/ComfyUI";
+
 interface BuildComfyUiInstallRequestInput {
   installRoot: string;
   source?: RuntimeInstallRequest["source"];
@@ -45,7 +47,7 @@ export function buildComfyUiInstallRequest(input: BuildComfyUiInstallRequestInpu
     installRoot: input.installRoot,
     source: {
       type: "git",
-      repositoryUrl: "https://github.com/Comfy-Org/ComfyUI",
+      repositoryUrl: DEFAULT_COMFYUI_REPOSITORY_URL,
       ref: readGitRef(input.source),
     },
     metadata: input.metadata,

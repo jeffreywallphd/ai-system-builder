@@ -4,7 +4,6 @@ import type { RuntimeInstallerPort } from "../../../application/ports/runtime-in
 import { createComfyUiHttpClient, type ComfyUiHttpClient } from "./createComfyUiHttpClient";
 import type { ComfyUiRuntimeHealth } from "./comfyUiRuntimeHealth";
 
-const COMFYUI_REPOSITORY_URL = "https://github.com/Comfy-Org/ComfyUI";
 
 export interface CreateComfyUiRuntimeSupervisorOptions {
   workingDirectory: string;
@@ -19,8 +18,6 @@ export interface CreateComfyUiRuntimeSupervisorOptions {
   installRoot?: string;
   installSourceRef?: string;
   autoInstall?: boolean;
-  skipPythonSetup?: boolean;
-  skipPythonValidation?: boolean;
 }
 
 export interface ComfyUiRuntimeSupervisor {
@@ -67,15 +64,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         const installResult = await options.installer.ensureInstalled({
           targetId: "comfyui",
           installRoot: options.installRoot,
-          source: {
-            type: "git",
-            repositoryUrl: COMFYUI_REPOSITORY_URL,
-            ref: options.installSourceRef,
-          },
-          metadata: {
-            skipPythonSetup: options.skipPythonSetup,
-            skipPythonValidation: options.skipPythonValidation,
-          },
+          source: { type: "git", ref: options.installSourceRef },
         });
 
         if (installResult.status !== "installed") {

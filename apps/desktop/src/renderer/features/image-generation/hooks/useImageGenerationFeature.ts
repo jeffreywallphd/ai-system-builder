@@ -48,11 +48,20 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   const [taskData, setTaskData] = useState<ImageGenerationTaskDataView>();
   const [outputs, setOutputs] = useState<ImageGenerationOutputReference[]>([]);
   const [finalizedAssets, setFinalizedAssets] = useState<ImageGenerationFinalizedAssetReference[]>([]);
+  const [installStatus, setInstallStatus] = useState<string>("checking");
   const mountedRef = useRef(true);
   const activePollRef = useRef<string>();
 
   const isPollingStillActive = useCallback((id: string) => mountedRef.current && activePollRef.current === id, []);
   useEffect(() => () => { mountedRef.current = false; activePollRef.current = undefined; }, []);
+  useEffect(() => {
+    void (async () => {
+      const status = await client.readComfyUiInstallStatus?.({});
+      if (!status || !status.ok) { setInstallStatus("unknown"); return; }
+      const raw = (status.value as { status?: string }).status;
+      setInstallStatus(typeof raw === "string" ? raw : "unknown");
+    })();
+  }, [client]);
 
   const validationError = useMemo(() => {
     if (!form.prompt.trim()) return "Prompt is required.";
@@ -117,5 +126,6 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
     setMessage(cancelled.ok ? (cancelled.value.message ?? "Cancellation is not supported for this request.") : cancelled.error.message);
   }, [client, isPollingStillActive, requestId]);
 
-  return { form, setForm, status, message, error, requestId, progress, taskData, outputs, finalizedAssets, validationError, isStartDisabled, start, cancel };
+  const repairInstall = async () => { const result = await client.repairComfyUiInstall?.({ allowUpdate: true, forceRepair: true }); if (!result || !result.ok) { setError(result?.error?.message ?? "Failed to repair ComfyUI install."); return; } setInstallStatus("installing"); };
+  return { form, setForm, status, message, error, requestId, progress, taskData, outputs, finalizedAssets, installStatus, validationError, isStartDisabled, start, cancel, repairInstall };
 }

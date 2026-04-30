@@ -314,6 +314,8 @@ export interface DesktopImageGenerationApi {
   readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readComfyUiInstallStatus?: (input?: { installRoot?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  repairComfyUiInstall?: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
 }
 
 export interface DesktopPythonRuntimeApi {
@@ -347,6 +349,8 @@ interface DesktopApiBridge {
   readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readComfyUiInstallStatus?: (input?: { installRoot?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  repairComfyUiInstall?: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;

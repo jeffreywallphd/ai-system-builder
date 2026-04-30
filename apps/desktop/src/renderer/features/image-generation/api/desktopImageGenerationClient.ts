@@ -13,8 +13,8 @@ function isPreloadResponseEnvelope(value: unknown): value is PreloadResponseEnve
   return typeof value === "object" && value !== null && "ok" in value;
 }
 
-function unavailable() {
-  return { ok: false as const, error: { code: "unavailable", message: "Desktop image generation API is unavailable." } };
+function unavailable(method: string) {
+  return { ok: false as const, error: { code: "unavailable", message: `Desktop API method ${method} is unavailable.` } };
 }
 
 export type ImageGenerationStartResult =
@@ -39,7 +39,7 @@ export function createDesktopImageGenerationClient() {
   return {
     async startImageGeneration(input: ImageGenerationRequest, context?: { requestId?: string; correlationId?: string }): Promise<ImageGenerationStartResult> {
       if (!api.startImageGeneration) {
-        return unavailable();
+        return unavailable("startImageGeneration");
       }
       const response = await api.startImageGeneration(input, context);
       if (!isPreloadResponseEnvelope(response)) {
@@ -57,7 +57,7 @@ export function createDesktopImageGenerationClient() {
 
     async readImageGeneration(input: { requestId: string }, context?: { requestId?: string; correlationId?: string }): Promise<ImageGenerationReadResult> {
       if (!api.readImageGeneration) {
-        return unavailable();
+        return unavailable("readImageGeneration");
       }
       const response = await api.readImageGeneration(input, context);
       if (!isPreloadResponseEnvelope(response)) {
@@ -71,7 +71,7 @@ export function createDesktopImageGenerationClient() {
 
     async cancelImageGeneration(input: { requestId: string }, context?: { requestId?: string; correlationId?: string }): Promise<ImageGenerationCancelResult> {
       if (!api.cancelImageGeneration) {
-        return unavailable();
+        return unavailable("cancelImageGeneration");
       }
       const response = await api.cancelImageGeneration(input, context);
       if (!isPreloadResponseEnvelope(response)) {
@@ -85,7 +85,7 @@ export function createDesktopImageGenerationClient() {
 
     async finalizeImageGenerationIfCompleted(input: { requestId: string }, context?: { requestId?: string; correlationId?: string }): Promise<ImageGenerationFinalizeResult> {
       if (!api.finalizeImageGenerationIfCompleted) {
-        return unavailable();
+        return unavailable("finalizeImageGenerationIfCompleted");
       }
       const response = await api.finalizeImageGenerationIfCompleted(input, context);
       if (!isPreloadResponseEnvelope(response)) {
@@ -96,5 +96,22 @@ export function createDesktopImageGenerationClient() {
       }
       return { ok: true, value: response.value as DesktopImageGenerationFinalizeResult };
     },
+
+    async readComfyUiInstallStatus(input: { installRoot?: string } = {}, context?: { requestId?: string; correlationId?: string }) {
+      if (!api.readComfyUiInstallStatus) return unavailable("readComfyUiInstallStatus");
+      const response = await api.readComfyUiInstallStatus(input, context);
+      if (!isPreloadResponseEnvelope(response)) return { ok: false, error: { code: "internal", message: "Failed to read ComfyUI install status." } };
+      if (!response.ok) return { ok: false, error: { code: response.error?.code ?? "internal", message: response.error?.message ?? "Failed to read ComfyUI install status.", details: response.error?.details } };
+      return { ok: true as const, value: response.value as Record<string, unknown> };
+    },
+
+    async repairComfyUiInstall(input: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean } = {}, context?: { requestId?: string; correlationId?: string }) {
+      if (!api.repairComfyUiInstall) return unavailable("repairComfyUiInstall");
+      const response = await api.repairComfyUiInstall(input, context);
+      if (!isPreloadResponseEnvelope(response)) return { ok: false, error: { code: "internal", message: "Failed to repair ComfyUI install." } };
+      if (!response.ok) return { ok: false, error: { code: response.error?.code ?? "internal", message: response.error?.message ?? "Failed to repair ComfyUI install.", details: response.error?.details } };
+      return { ok: true as const, value: response.value as Record<string, unknown> };
+    },
+
   };
 }
