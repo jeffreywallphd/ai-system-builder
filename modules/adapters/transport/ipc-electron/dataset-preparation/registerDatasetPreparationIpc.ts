@@ -40,7 +40,7 @@ export interface PrepareTrainingDatasetFromArtifactsUseCasePort {
 }
 export interface RegisterDatasetPreparationIpcDependencies { ipcMain: IpcMainHandlePort; prepareTrainingDatasetUseCase: PrepareTrainingDatasetFromArtifactsUseCasePort; }
 
-function mapTaskProgress(progress: Record<string, unknown> | undefined): { message?: string; processed?: number; total?: number } | undefined {
+function mapTaskProgress(progress: RuntimeTaskRecord["progress"]): { message?: string; processed?: number; total?: number } | undefined {
   if (!progress) {
     return undefined;
   }

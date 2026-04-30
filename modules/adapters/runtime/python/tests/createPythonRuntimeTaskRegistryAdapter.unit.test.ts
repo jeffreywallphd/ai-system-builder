@@ -1,8 +1,20 @@
+import type { PythonRuntimePort } from "../../../../application/ports/runtime";
+import type {
+  PythonRuntimeTaskStatusResult,
+  StartPythonRuntimeTaskRequest,
+} from "../../../../contracts/runtime";
 import { TaskType } from "../../../../contracts/runtime";
-import { describe, expect, it, testDouble } from "../../../../testing/node-test";
+import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 import { createPythonRuntimeTaskRegistryAdapter } from "../createPythonRuntimeTaskRegistryAdapter";
 
 describe("createPythonRuntimeTaskRegistryAdapter", () => {
+  it("keeps the python runtime port on python-specific task contracts", () => {
+    expectTypeOf<Parameters<PythonRuntimePort["startTask"]>[0]>()
+      .toEqualTypeOf<StartPythonRuntimeTaskRequest>();
+    expectTypeOf<Awaited<ReturnType<PythonRuntimePort["readTaskStatus"]>>>()
+      .toEqualTypeOf<PythonRuntimeTaskStatusResult>();
+  });
+
   it("maps DATASET_PREPARATION startTask to python runtime task type", async () => {
     const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
