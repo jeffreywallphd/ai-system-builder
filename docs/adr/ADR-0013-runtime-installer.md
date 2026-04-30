@@ -80,6 +80,7 @@ Installer request/result/status flows may include:
 - Do not delete user files.
 - Installer operations must be idempotent.
 - Repair/update behavior must be explicit (opt-in), not implicit.
+- Force-repair for unmanaged non-empty directories must remain non-destructive and may fail safely until an explicit safe strategy is designed.
 
 ## Non-Goals (Prompt 1/4)
 
@@ -92,4 +93,6 @@ Installer request/result/status flows may include:
 - Runtime installers should persist install metadata under the install root or in a target-specific metadata file.
 - Metadata should record source, requested ref, resolved ref/commit SHA, installedAt, lastCheckedAt, and an ownership/managed marker.
 - A managed marker is required before repair/update modifies an existing non-empty directory.
+- Managed metadata must be validated (shape + required ownership/source fields) before an install is treated as managed.
 - Exact metadata filename is implementation-defined in Prompt 2; suggested default: `.ai-system-builder-runtime-install.json`.
+- For Git sources: fetch should run before update checks; pinned refs/tags/SHAs should be checked out and recorded without implicit pull, while unpinned sources may use fast-forward pull.

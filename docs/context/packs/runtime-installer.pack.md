@@ -55,4 +55,8 @@ Include this pack when prompts involve:
 - The Git installer is generic and not ComfyUI-specific.
 - The installer writes managed install metadata (`.ai-system-builder-runtime-install.json` by default).
 - The installer refuses to mutate non-empty unmanaged install directories.
+- The installer never performs destructive cleanup/repair for unmanaged non-empty directories.
+- `forceRepair` is conservative: it reuses managed update/repair flow only and does not permit destructive unmanaged repair.
+- Managed metadata must be valid before an install root is considered managed.
+- Update semantics are conservative: fetch always runs, pinned refs/tags/SHAs are checked out and recorded, and pull is only used when no ref is pinned.
 - ComfyUI-specific defaults/composition are deferred to Prompt 3.
