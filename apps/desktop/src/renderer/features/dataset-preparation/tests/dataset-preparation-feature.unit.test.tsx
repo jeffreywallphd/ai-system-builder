@@ -1450,4 +1450,67 @@ describe("DatasetPreparationFeature", () => {
     expect(startPrepareTrainingDataset).toHaveBeenCalledTimes(1);
     expect(onPrepared).toHaveBeenCalledTimes(1);
   });
+
+  it("does not continue polling updates after unmount during in-flight task read", async () => {
+    let resolveRead: ((value: unknown) => void) | undefined;
+    const readPrepareTrainingDatasetTask = vi.fn(() => new Promise((resolve) => {
+      resolveRead = resolve;
+    }));
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+            startPrepareTrainingDataset: async (_input, context) => ({ ok: true, value: { requestId: context?.requestId ?? "req-1", acceptedAt: new Date().toISOString() } }),
+            readPrepareTrainingDatasetTask: readPrepareTrainingDatasetTask as never,
+          }}
+        />,
+      );
+    });
+    await act(async () => { (container?.querySelector("input[type='checkbox']") as HTMLInputElement).click(); });
+    await act(async () => { (container?.querySelector("form") as HTMLFormElement).dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+    expect(readPrepareTrainingDatasetTask).toHaveBeenCalledTimes(1);
+    await act(async () => { root?.unmount(); });
+    await act(async () => {
+      resolveRead?.({ ok: true, status: "running", progress: { message: "still running", processed: 1, total: 4 } });
+      await Promise.resolve();
+    });
+  });
+
+  it("does not clear cached active request id when unmounting during reconnect sleep", async () => {
+    vi.useFakeTimers();
+    try {
+      const readPrepareTrainingDatasetTask = vi.fn().mockResolvedValue({ ok: false, error: { message: "fetch failed" } });
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      root = createRoot(container);
+      await act(async () => {
+        root?.render(<DatasetPreparationFeature client={{
+          browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+          startPrepareTrainingDataset: async (_input, context) => ({ ok: true, value: { requestId: context?.requestId ?? "req-1", acceptedAt: new Date().toISOString() } }),
+          readPrepareTrainingDatasetTask,
+        }} />);
+      });
+      await act(async () => { (container?.querySelector("input[type='checkbox']") as HTMLInputElement).click(); });
+      await act(async () => { (container?.querySelector("form") as HTMLFormElement).dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+      expect(container?.textContent).toContain("Reconnecting to dataset preparation task...");
+      await act(async () => { root?.unmount(); });
+      root = createRoot(container as HTMLDivElement);
+      await act(async () => {
+        root?.render(<DatasetPreparationFeature client={{
+          browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+          startPrepareTrainingDataset: async () => ({ ok: false, error: { code: "internal", message: "unused" } }),
+          readPrepareTrainingDatasetTask: async () => ({ ok: true, status: "running", progress: { message: "running" } }),
+        }} />);
+      });
+      expect(container?.textContent).toContain("Stop training");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

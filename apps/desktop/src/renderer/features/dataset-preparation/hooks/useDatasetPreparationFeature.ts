@@ -419,19 +419,27 @@ export function useDatasetPreparationFeature(
     }
   }, [runtimeStatusClient]);
 
+  const isPollingStillActive = useCallback((requestId: string): boolean => {
+    return isMountedRef.current
+      && activePollingRequestIdRef.current === requestId
+      && !stopTrainingRequestedRef.current;
+  }, []);
+
   const pollDatasetPreparationTask = useCallback(async (requestId: string) => {
     if (activePollingRequestIdRef.current === requestId) return;
     activePollingRequestIdRef.current = requestId;
     let pollRecoveryStartedAtMs: number | undefined;
-    while (!stopTrainingRequestedRef.current && isMountedRef.current && activePollingRequestIdRef.current === requestId) {
+    while (isPollingStillActive(requestId)) {
       try {
         const pollResponse = await datasetClient.readPrepareTrainingDatasetTask(requestId);
+        if (!isPollingStillActive(requestId)) return;
         if (pollResponse.ok === false) {
           if (!pollRecoveryStartedAtMs) pollRecoveryStartedAtMs = Date.now();
           if (isTransientPollReadFailure(pollResponse.error.message, pollResponse.error.details)
             && (Date.now() - pollRecoveryStartedAtMs) < pollingRecoveryGraceWindowMs) {
             setStatus({ kind: "loading", message: "Reconnecting to dataset preparation task..." });
             await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+            if (!isPollingStillActive(requestId)) return;
             continue;
           }
           clearActiveTask();
@@ -444,6 +452,7 @@ export function useDatasetPreparationFeature(
           const suffix = typeof processed === "number" && typeof total === "number" ? ` (${processed}/${total})` : "";
           setStatus({ kind: "loading", message: `${pollResponse.progress?.message ?? "Preparing training dataset..."}${suffix}` });
           await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+          if (!isPollingStillActive(requestId)) return;
           continue;
         }
         if (pollResponse.status === "cancelled") {
@@ -456,7 +465,11 @@ export function useDatasetPreparationFeature(
           clearActiveTask();
           setStatus({ kind: "success", message: "Training dataset is ready." });
           setResultSummary({ datasetKey: pollResponse.value.outputs.local?.dataset.storage.key ?? "(not produced locally)", datasetRows: pollResponse.value.summary.datasetRowCount ?? pollResponse.value.summary.generatedExampleCount });
-          await refreshArtifacts(); await refreshRuntimeModelStatus(); onPrepared?.(); return;
+          await refreshArtifacts();
+          if (!isPollingStillActive(requestId)) return;
+          await refreshRuntimeModelStatus();
+          if (!isPollingStillActive(requestId)) return;
+          onPrepared?.(); return;
         }
         clearActiveTask(); setStatus({ kind: "error", message: "Dataset preparation task returned an invalid status." }); return;
       } catch (error) {
@@ -464,6 +477,7 @@ export function useDatasetPreparationFeature(
         if ((Date.now() - pollRecoveryStartedAtMs) < pollingRecoveryGraceWindowMs) {
           setStatus({ kind: "loading", message: "Reconnecting to dataset preparation task..." });
           await new Promise<void>((resolve) => window.setTimeout(resolve, 750));
+          if (!isPollingStillActive(requestId)) return;
           continue;
         }
         clearActiveTask(); setStatus({ kind: "error", message: resolveUserFacingDatasetPreparationErrorMessage(error) }); return;
@@ -474,7 +488,7 @@ export function useDatasetPreparationFeature(
     }
     clearActiveTask();
     setStatus({ kind: "idle", message: "Training stopped." });
-  }, [clearActiveTask, datasetClient, onPrepared, pollingRecoveryGraceWindowMs, refreshArtifacts, refreshRuntimeModelStatus]);
+  }, [clearActiveTask, datasetClient, isPollingStillActive, onPrepared, pollingRecoveryGraceWindowMs, refreshArtifacts, refreshRuntimeModelStatus]);
 
   useEffect(() => {
     if (status.kind === "loading" && activeTaskRequestId) void pollDatasetPreparationTask(activeTaskRequestId);
