@@ -109,3 +109,9 @@ Clarifications:
 - Runtime payload mapping is performed in adapters at execution boundaries.
 - `ImageGenerationRequest` is not equivalent to a ComfyUI workflow definition.
 - Asset registration occurs after runtime completion in the application layer, not in the runtime adapter layer.
+
+## Runtime Installer Alignment (Prompt 1/4)
+
+- ComfyUI may be auto-installed through the Runtime Installer abstraction before runtime startup, based on host/runtime configuration.
+- ComfyUI supervisor integration with installer pre-start checks is deferred to a later prompt.
+- Installation concerns remain separate from image generation contracts and use-case orchestration.

@@ -43,3 +43,10 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - Application image generation use cases must depend on `RuntimeTaskRegistryPort` for task lifecycle orchestration.
 - ComfyUI integration remains adapter-only and must not leak into contracts or application use-case imports.
 - Image asset registration for generated outputs is intentionally deferred to the next prompt.
+
+
+## Runtime Installer Alignment
+
+- ComfyUI may be auto-installed through the Runtime Installer abstraction.
+- ComfyUI supervisor should call installer-before-start in a later prompt, not in this contract/architecture step.
+- Installation is separate from image generation contracts and application use cases.
