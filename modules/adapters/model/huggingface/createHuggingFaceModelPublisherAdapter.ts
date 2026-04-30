@@ -15,9 +15,26 @@ interface HuggingFaceUploadClient {
   }): Promise<void>;
 }
 
+interface HuggingFaceCreateRepoResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+}
+
+type HuggingFaceFetchImplementation = (
+  input: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  },
+) => Promise<HuggingFaceCreateRepoResponse>;
+
 export interface CreateHuggingFaceModelPublisherAdapterOptions {
   client: HuggingFaceUploadClient;
   tokenProvider?: () => string | undefined;
+  fetchImplementation?: HuggingFaceFetchImplementation;
+  hubBaseUrl?: string;
 }
 
 async function collectFiles(root: string, current: string, output: string[] = []): Promise<string[]> {
@@ -103,9 +120,58 @@ function mapError(error: unknown): Error {
   return new Error(`Hugging Face publish failed: ${value.message ?? String(error)}`);
 }
 
+function isRepositoryMissingStatus(error: unknown): boolean {
+  const value = error as { statusCode?: number; status?: number };
+  const status = value.statusCode ?? value.status;
+  return status === 404;
+}
+
+function resolveRepositoryIdentity(repository: string): { namespace: string; name: string } {
+  const [namespace, ...nameSegments] = repository.split("/");
+  const name = nameSegments.join("/");
+  if (!namespace?.trim() || !name.trim()) {
+    throw new Error("Hugging Face publish failed: repository must include namespace and name (owner/repo).");
+  }
+  return {
+    namespace: namespace.trim(),
+    name: name.trim(),
+  };
+}
+
+async function createModelRepositoryIfMissing(
+  repository: string,
+  token: string,
+  fetchImplementation: HuggingFaceFetchImplementation,
+  hubBaseUrl: string,
+): Promise<void> {
+  const identity = resolveRepositoryIdentity(repository);
+  const response = await fetchImplementation(`${hubBaseUrl}/api/repos/create`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      name: identity.name,
+      organization: identity.namespace,
+      type: "model",
+    }),
+  });
+
+  if (response.ok || response.status === 409) {
+    return;
+  }
+
+  throw mapError({ status: response.status, message: response.statusText });
+}
+
 export function createHuggingFaceModelPublisherAdapter(
   options: CreateHuggingFaceModelPublisherAdapterOptions,
 ): ModelPublisherPort {
+  const hubBaseUrl = options.hubBaseUrl?.replace(/\/$/, "") ?? "https://huggingface.co";
+  const maybeFetchImplementation = options.fetchImplementation
+    ?? (globalThis as { fetch?: HuggingFaceFetchImplementation }).fetch;
+
   return {
     async publishModel(request: PublishModelRequest & { modelPath: string }): Promise<PublishModelResult> {
       const token = request.token ?? options.tokenProvider?.();
@@ -136,6 +202,24 @@ export function createHuggingFaceModelPublisherAdapter(
             private: request.private,
           });
         } catch (error) {
+          if (isRepositoryMissingStatus(error)) {
+            if (!token?.trim()) {
+              throw new Error("Hugging Face publish failed: repository not found and no token available for repository creation.");
+            }
+            if (!maybeFetchImplementation) {
+              throw new Error("Hugging Face publish failed: repository not found and fetch implementation is unavailable.");
+            }
+            await createModelRepositoryIfMissing(request.repository, token.trim(), maybeFetchImplementation, hubBaseUrl);
+            await options.client.uploadFile({
+              repo: request.repository,
+              path: remotePath,
+              content,
+              token,
+              revision: request.revision,
+              private: request.private,
+            });
+            continue;
+          }
           throw mapError(error);
         }
       }
