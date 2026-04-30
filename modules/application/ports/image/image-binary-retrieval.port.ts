@@ -1,3 +1,5 @@
+import type { ImageGenerationOutput } from "../../../contracts/image-generation";
+
 export interface ImageBinaryRetrievalPort {
-  getImageBinary(outputRef: unknown): Promise<Uint8Array>;
+  getImageBinary(output: ImageGenerationOutput): Promise<Uint8Array>;
 }

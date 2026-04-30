@@ -6,7 +6,6 @@ import {
   type StartRuntimeTaskResult,
 } from "../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
-import type { FinalizeImageGenerationService } from "../../services/image/finalize-image-generation.service";
 
 import type { ApplicationRequestContext } from "../../ports";
 
@@ -20,7 +19,6 @@ export class GenerateImageUseCase {
   public constructor(
     private readonly dependencies: {
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
-      finalizeImageGenerationService: FinalizeImageGenerationService;
     },
   ) {}
 
@@ -40,20 +38,7 @@ export class GenerateImageUseCase {
   }
 
   public async readImageGeneration(requestId: string, _context?: ApplicationRequestContext): Promise<RuntimeTaskRecord> {
-    const task = await this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
-
-    if (task.status !== "succeeded") {
-      return task;
-    }
-
-    const { assets } = await this.dependencies.finalizeImageGenerationService.finalizeCompletedTask(task);
-    return {
-      ...task,
-      data: {
-        ...(typeof task.data === "object" && task.data !== null ? (task.data as Record<string, unknown>) : {}),
-        assets,
-      },
-    };
+    return this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
   }
 
   public async cancelImageGeneration(requestId: string, _context?: ApplicationRequestContext): Promise<CancelRuntimeTaskResult> {
