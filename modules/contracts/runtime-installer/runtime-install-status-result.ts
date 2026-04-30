@@ -14,5 +14,6 @@ export interface RuntimeInstallStatusResult {
   installedAt?: string;
   lastCheckedAt?: string;
   warnings?: string[];
+  metadata?: Record<string, unknown>;
   error?: RuntimeInstallError;
 }

@@ -67,3 +67,9 @@ Include this pack when prompts involve:
 - Python dependency installation is best-effort and non-destructive.
 - Virtual environment management is not implemented yet.
 - GPU/Torch installation is not implemented yet.
+
+
+- `skipPythonSetup` skips Python dependency installation only (requirements/pip), not entrypoint checks.
+- `skipPythonValidation` skips running `python main.py --help` validation.
+- Entrypoint existence (`main.py`) remains a lightweight validation check even when Python validation is skipped.
+- ComfyUI `repairInstall` runs the same post-install dependency + validation checks as `ensureInstalled` when Git repair reports installed.
