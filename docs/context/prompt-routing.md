@@ -16,6 +16,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
 | runtime task registry lifecycle for long-running runtime tasks (start/read/cancel, shared lifecycle/progress/retention semantics) | `docs/context/packs/runtime-task-registry.pack.md` |
 | image generation feature architecture/contracts, ComfyUI runtime-sidecar concerns, image asset modeling | `docs/context/packs/image-generation.pack.md` |
+| runtime installer architecture, installer contracts/ports, install-state modeling | `docs/context/packs/runtime-installer.pack.md` |
 | Electron/desktop host lifecycle, IPC/preload boundaries, desktop composition | `docs/context/packs/desktop-host.pack.md` |
 | desktop renderer structure, page/feature/component boundaries, renderer API-client usage | `docs/context/packs/desktop-implementation.pack.md` |
 | desktop renderer CSS/style architecture, shared style layering, token-first styling decisions | `docs/context/packs/desktop-styling.pack.md` |
@@ -38,6 +39,7 @@ For prompts containing debugging/failure language (for example: `error`, `bug`, 
 Routing rule for feature prompts:
 
 - If the task relates to image generation, ComfyUI, or image assets, include `docs/context/packs/image-generation.pack.md`.
+- If the task relates to runtime installer, auto install, ComfyUI install, sidecar install, or Git runtime install, include `docs/context/packs/runtime-installer.pack.md`.
 - Keep routing minimum-sufficient; do not include unrelated packs or full-repo context by default.
 
 ## Selection Rules
