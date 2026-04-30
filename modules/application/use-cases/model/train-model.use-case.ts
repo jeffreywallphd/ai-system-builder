@@ -77,13 +77,23 @@ export class TrainModelUseCase {
           if (!bindingsResult.ok) {
             throw new Error(`Failed to resolve storage binding for dataset artifact '${dataset.artifactId}': ${bindingsResult.error.message}`);
           }
-          const localBinding = bindingsResult.value.bindings.find(
-            (binding) => binding.backing.provider === "local-filesystem",
+          const localBinding = bindingsResult.value.bindings.find((binding) =>
+            binding.backing.provider === "local-filesystem" || binding.backing.provider === "local",
           );
-          if (!localBinding) {
-            throw new Error(`Dataset artifact '${dataset.artifactId}' is missing a local-filesystem file binding.`);
+          if (localBinding) {
+            return { ...dataset, path: localBinding.backing.locator };
           }
-          return { ...dataset, path: localBinding.backing.locator };
+
+          const localObjectBinding = bindingsResult.value.bindings.find((binding) =>
+            binding.backing.kind === "artifact-object"
+            && binding.backing.provider === "local"
+            && binding.backing.locator.trim().length > 0,
+          );
+          if (localObjectBinding) {
+            return { ...dataset, path: localObjectBinding.backing.locator };
+          }
+
+          throw new Error(`Dataset artifact '${dataset.artifactId}' is missing a local dataset binding (file or artifact-object).`);
         })),
       },
     });
