@@ -11,20 +11,21 @@ export class ImageGenerationFinalizationOrchestratorService {
     },
   ) {}
 
-  public async finalizeIfCompleted(requestId: string): Promise<void> {
-    if (this.finalizedRequests.has(requestId)) return;
+  public async finalizeIfCompleted(requestId: string): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string }>; reason?: string }> {
+    if (this.finalizedRequests.has(requestId)) return { finalized: true };
 
     const task = await this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
-    if (task.status !== "succeeded") return;
+    if (task.status !== "succeeded") return { finalized: false, reason: "task not completed" };
 
     const outputs = this.readOutputs(task.data);
     if (outputs.some((output) => this.hasArtifactId(output))) {
       this.finalizedRequests.add(requestId);
-      return;
+      return { finalized: true };
     }
 
-    await this.dependencies.finalizeImageGenerationService.finalizeCompletedTask(task);
+    const result = await this.dependencies.finalizeImageGenerationService.finalizeCompletedTask(task);
     this.finalizedRequests.add(requestId);
+    return { finalized: true, assets: result.assets };
   }
 
   private readOutputs(data: unknown): Array<Record<string, unknown>> {

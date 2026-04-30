@@ -19,8 +19,8 @@ export function registerImageGenerationIpc(dependencies: RegisterImageGeneration
     catch (error) { return createIpcFailureResponse(createIpcError(DESKTOP_IMAGE_GENERATION_CANCEL_RESPONSE_CHANNEL, "image_generation_cancel_failed", (error as Error).message, { requestId: request.requestId, correlationId: request.correlationId })); }
   });
   dependencies.ipcMain.handle(DESKTOP_IMAGE_GENERATION_FINALIZE_REQUEST_CHANNEL.value, async (_e, request: DesktopImageGenerationFinalizeRequest) => {
-    if (!dependencies.imageGenerationFinalizationOrchestrator) return createDesktopImageGenerationFinalizeSuccessResponse({ finalized: false }, { requestId: request.requestId, correlationId: request.correlationId });
-    try { await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(request.payload.requestId); return createDesktopImageGenerationFinalizeSuccessResponse({ finalized: true }, { requestId: request.requestId, correlationId: request.correlationId }); }
+    if (!dependencies.imageGenerationFinalizationOrchestrator) return createDesktopImageGenerationFinalizeSuccessResponse({ finalized: false, reason: "image generation finalization is unavailable" }, { requestId: request.requestId, correlationId: request.correlationId });
+    try { const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(request.payload.requestId); return createDesktopImageGenerationFinalizeSuccessResponse(value, { requestId: request.requestId, correlationId: request.correlationId }); }
     catch (error) { return createIpcFailureResponse(createIpcError(DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL, "image_generation_finalize_failed", (error as Error).message, { requestId: request.requestId, correlationId: request.correlationId })); }
   });
 }
