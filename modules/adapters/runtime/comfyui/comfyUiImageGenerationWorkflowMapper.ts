@@ -27,6 +27,7 @@ export function mapImageGenerationRequestToComfyUiPrompt(
   const steps = request.steps ?? options.defaultSteps ?? 30;
   const sampler = request.sampler ?? options.defaultSampler ?? "euler";
   const scheduler = request.scheduler ?? options.defaultScheduler ?? "normal";
+  const seed = request.seed ?? (Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) + 1);
 
   return {
     prompt: {
@@ -37,7 +38,7 @@ export function mapImageGenerationRequestToComfyUiPrompt(
       "5": {
         class_type: "KSampler",
         inputs: {
-          seed: request.seed ?? 0,
+          seed,
           steps,
           cfg: 8,
           sampler_name: sampler,
