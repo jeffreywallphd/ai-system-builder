@@ -26,3 +26,5 @@ export * from "./desktop-dataset-preparation-contract";
 export * from "./desktop-python-runtime-contract";
 export * from "./desktop-application-settings-contract";
 export * from "./desktop-model-management-contract";
+
+export * from "./desktop-image-generation-contract";
