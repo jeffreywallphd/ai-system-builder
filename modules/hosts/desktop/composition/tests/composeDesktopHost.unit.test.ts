@@ -59,6 +59,7 @@ import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-elect
 import {
   classifyPythonRuntimeStdioLogLevel,
   composeDesktopHost,
+  resolveComfyUiInstallRoot,
   resolveDefaultManagedPythonRuntimePort,
   resolvePythonRuntimeBaseUrl,
   type ComposeDesktopHostOptions,
@@ -66,6 +67,20 @@ import {
 } from "../composeDesktopHost";
 
 describe("composeDesktopHost", () => {
+  it("resolves ComfyUI install root with COMFYUI_INSTALL_ROOT override", () => {
+    expect(resolveComfyUiInstallRoot({ COMFYUI_INSTALL_ROOT: "/tmp/comfy" } as NodeJS.ProcessEnv, "/storage")).toBe("/tmp/comfy");
+  });
+
+  it("resolves ComfyUI install root from storage root directory by default", () => {
+    expect(resolveComfyUiInstallRoot({} as NodeJS.ProcessEnv, "/storage")).toBe(join("/storage", "runtime-installs", "comfyui"));
+  });
+
+  it("does not fall back to process cwd when ComfyUI root is unavailable", () => {
+    expect(() => resolveComfyUiInstallRoot({} as NodeJS.ProcessEnv)).toThrow(
+      "Unable to resolve ComfyUI install root. Set COMFYUI_INSTALL_ROOT or DESKTOP_STORAGE_ROOT.",
+    );
+  });
+
   it("uses the canonical ipc-main handle port type for registration options", () => {
     expectTypeOf<RegisterDesktopArtifactUploadIpcOptions["ipcMain"]>().toEqualTypeOf<IpcMainHandlePort>();
   });
@@ -137,7 +152,7 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: join(tmpdir(), `desktop-artifact-upload-test-${Date.now()}`),
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(43);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(49);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -181,6 +196,12 @@ describe("composeDesktopHost", () => {
       DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
       DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
+      "ipc.image-generation.start.request",
+      "ipc.image-generation.read.request",
+      "ipc.image-generation.cancel.request",
+      "ipc.image-generation.finalize-if-completed.request",
+      "ipc.comfyui-runtime.read-install-status.request",
+      "ipc.comfyui-runtime.repair-install.request",
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
