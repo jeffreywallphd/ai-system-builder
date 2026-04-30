@@ -4,6 +4,14 @@ export interface PythonRuntimeFooterProps extends UsePythonRuntimeFooterOptions 
 }
 
 export function PythonRuntimeFooter({ enabled, client }: PythonRuntimeFooterProps) {
+  if (!enabled) {
+    return null;
+  }
+
+  return <PythonRuntimeFooterBody enabled={enabled} client={client} />;
+}
+
+function PythonRuntimeFooterBody({ enabled, client }: PythonRuntimeFooterProps) {
   const {
     statusLabel,
     healthLabel,
@@ -23,10 +31,6 @@ export function PythonRuntimeFooter({ enabled, client }: PythonRuntimeFooterProp
     enabled,
     client,
   });
-
-  if (!enabled) {
-    return null;
-  }
 
   return (
     <footer className="ui-python-runtime-footer ui-panel ui-stack ui-stack--sm" aria-label="Python runtime controls">

@@ -115,10 +115,18 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
       });
 
       setResult(trainingResult);
-      setStatus(trainingResult.status === "succeeded" ? "succeeded" : "failed");
-      setMessage(trainingResult.status === "succeeded" ? "Training completed." : trainingResult.error?.message ?? "Training failed.");
-      const refreshed = await modelClient.listModels({});
-      setModels(refreshed);
+      if (trainingResult.status === "succeeded") {
+        setStatus("succeeded");
+        setMessage("Training completed.");
+        const refreshed = await modelClient.listModels({});
+        setModels(refreshed);
+      } else if (trainingResult.status === "queued" || trainingResult.status === "running") {
+        setStatus("running");
+        setMessage(`Training ${trainingResult.status}. Run ID: ${trainingResult.runId}`);
+      } else {
+        setStatus("failed");
+        setMessage(trainingResult.error?.message ?? "Training failed.");
+      }
     } catch (error) {
       setStatus("failed");
       setMessage(error instanceof Error ? error.message : "Training failed.");
