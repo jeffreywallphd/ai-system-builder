@@ -3,6 +3,7 @@ import { describe, expectTypeOf, it } from "../../../../testing/node-test";
 import type {
   RuntimeInstallRequest,
   RuntimeInstallResult,
+  RuntimeInstallStatusRequest,
   RuntimeInstallStatusResult,
 } from "../../../../contracts/runtime-installer";
 import type { RuntimeInstallerPort } from "..";
@@ -13,7 +14,7 @@ describe("RuntimeInstallerPort", () => {
       "getInstallStatus" | "ensureInstalled" | "repairInstall"
     >();
 
-    expectTypeOf<Parameters<RuntimeInstallerPort["getInstallStatus"]>[0]>().toEqualTypeOf<string>();
+    expectTypeOf<Parameters<RuntimeInstallerPort["getInstallStatus"]>[0]>().toEqualTypeOf<RuntimeInstallStatusRequest>();
     expectTypeOf<Awaited<ReturnType<RuntimeInstallerPort["getInstallStatus"]>>>().toEqualTypeOf<RuntimeInstallStatusResult>();
 
     expectTypeOf<Parameters<RuntimeInstallerPort["ensureInstalled"]>[0]>().toExtend<RuntimeInstallRequest>();

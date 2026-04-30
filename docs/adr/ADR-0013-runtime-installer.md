@@ -55,6 +55,7 @@ Installer status model:
 
 - `not-installed`
 - `installing`
+- `checking`
 - `installed`
 - `update-available`
 - `failed`
@@ -85,3 +86,10 @@ Installer request/result/status flows may include:
 - No Git clone/fetch/reset implementation.
 - No ComfyUI install implementation.
 - No UI implementation for install flows.
+
+## Metadata Persistence
+
+- Runtime installers should persist install metadata under the install root or in a target-specific metadata file.
+- Metadata should record source, requested ref, resolved ref/commit SHA, installedAt, lastCheckedAt, and an ownership/managed marker.
+- A managed marker is required before repair/update modifies an existing non-empty directory.
+- Exact metadata filename is implementation-defined in Prompt 2; suggested default: `.ai-system-builder-runtime-install.json`.

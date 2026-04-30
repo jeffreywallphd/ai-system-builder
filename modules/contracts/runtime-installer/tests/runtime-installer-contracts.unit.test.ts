@@ -6,6 +6,7 @@ import {
   type RuntimeInstallResult,
   type RuntimeInstallSource,
   type RuntimeInstallStatus,
+  type RuntimeInstallStatusRequest,
   type RuntimeInstallStatusResult,
 } from "..";
 
@@ -14,6 +15,7 @@ describe("runtime installer contracts", () => {
     const statuses: RuntimeInstallStatus[] = [
       "not-installed",
       "installing",
+      "checking",
       "installed",
       "update-available",
       "failed",
@@ -21,6 +23,7 @@ describe("runtime installer contracts", () => {
     ];
 
     expect(statuses).toContain("installed");
+    expect(statuses).toContain("checking");
     expect(statuses).toContain("update-available");
   });
 
@@ -36,6 +39,15 @@ describe("runtime installer contracts", () => {
       installRoot: "/tmp/runtime/comfyui",
       source,
       allowUpdate: true,
+      metadata: {
+        initiatedBy: "desktop-host",
+      },
+    };
+
+    const statusRequest: RuntimeInstallStatusRequest = {
+      targetId: request.targetId,
+      installRoot: request.installRoot,
+      source,
       metadata: {
         initiatedBy: "desktop-host",
       },
@@ -66,17 +78,19 @@ describe("runtime installer contracts", () => {
       lastCheckedAt: result.lastCheckedAt,
     };
 
-    expect(request.targetId).toBe("comfyui");
+    expect(statusRequest.targetId).toBe("comfyui");
     expect(result.status).toBe("installed");
     expect(statusResult.commitSha).toBe("abc123");
   });
 
-  it("allows forward-compatible unknown source types", () => {
+  it("accepts git source shape and rejects unsupported source literals at type level", () => {
     const source: RuntimeInstallSource = {
-      type: "archive",
-      archiveUrl: "https://example.test/runtime.tar.gz",
+      type: "git",
+      repositoryUrl: "https://example.test/runtime.git",
     };
 
-    expect(source.type).toBe("archive");
+    expect(source.type).toBe("git");
+
+    expectTypeOf<RuntimeInstallSource["type"]>().toEqualTypeOf<"git">();
   });
 });

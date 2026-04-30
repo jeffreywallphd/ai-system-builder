@@ -4,9 +4,4 @@ export interface RuntimeInstallGitSource {
   ref?: string;
 }
 
-export interface RuntimeInstallUnknownSource {
-  type: string;
-  [key: string]: unknown;
-}
-
-export type RuntimeInstallSource = RuntimeInstallGitSource | RuntimeInstallUnknownSource;
+export type RuntimeInstallSource = RuntimeInstallGitSource;
