@@ -121,20 +121,26 @@ import {
   type DesktopIngestWebsitePageResponse,
   type DesktopIngestWebsitePagesBatchRequest,
   type DesktopIngestWebsitePagesBatchResponse,
-  DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
-  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
-  DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_OPERATION,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_OPERATION,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_OPERATION,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
-  createDesktopPrepareTrainingDatasetRequest,
+  createDesktopPrepareTrainingDatasetStartRequest,
+  createDesktopPrepareTrainingDatasetTaskReadRequest,
   createDesktopPythonRuntimeControlRequest,
   createDesktopPythonRuntimeStatusReadRequest,
-  type DesktopPrepareTrainingDatasetRequest,
-  type DesktopPrepareTrainingDatasetResponse,
+  type DesktopPrepareTrainingDatasetStartRequest,
+  type DesktopPrepareTrainingDatasetStartResponse,
+  type DesktopPrepareTrainingDatasetTaskReadRequest,
+  type DesktopPrepareTrainingDatasetTaskReadResponse,
   type DesktopPythonRuntimeControlResponse,
   type DesktopPythonRuntimeStatusReadResponse,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_OPERATION,
@@ -162,6 +168,56 @@ import {
   type DesktopApplicationSettingsUpdateResponse,
   type DesktopApplicationSettingsClearResponse,
   type DesktopApplicationSettingsResolveModelDefaultResponse,
+  DESKTOP_MODEL_BROWSE_OPERATION,
+  DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_DETAILS_READ_OPERATION,
+  DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DETAILS_READ_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_LIST_OPERATION,
+  DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
+  DESKTOP_MODEL_LIST_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_REFERENCE_SAVE_OPERATION,
+  DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_DOWNLOAD_OPERATION,
+  DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DOWNLOAD_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_RECORD_UPDATE_OPERATION,
+  DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_RECORD_DELETE_OPERATION,
+  DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL,
+  createDesktopModelBrowseRequest,
+  createDesktopModelDetailsReadRequest,
+  createDesktopModelListRequest,
+  createDesktopModelReferenceSaveRequest,
+  createDesktopModelDownloadRequest,
+  createDesktopModelRecordUpdateRequest,
+  createDesktopModelRecordDeleteRequest,
+  createDesktopModelTrainRequest,
+  createDesktopModelValidateRequest,
+  createDesktopModelPublishRequest,
+  type DesktopModelBrowseResponse,
+  type DesktopModelDetailsReadResponse,
+  type DesktopModelListResponse,
+  type DesktopModelReferenceSaveResponse,
+  type DesktopModelDownloadResponse,
+  type DesktopModelRecordUpdateResponse,
+  type DesktopModelRecordDeleteResponse,
+  type DesktopModelTrainResponse,
+  type DesktopModelValidateResponse,
+  type DesktopModelPublishResponse,
+  DESKTOP_MODEL_TRAIN_OPERATION,
+  DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_OPERATION,
+  DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_OPERATION,
+  DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 import type {
@@ -234,20 +290,24 @@ export interface DesktopPreloadApi {
     },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopIngestWebsitePagesBatchResponse>;
-  prepareTrainingDatasetFromArtifacts: (
+  startPrepareTrainingDataset: (
     input: {
       sourceArtifactIds: string[];
-      recipe: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["recipe"];
-      split: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["split"];
-      output: DesktopPrepareTrainingDatasetRequest["payload"]["command"]["output"];
+      recipe: DesktopPrepareTrainingDatasetStartRequest["payload"]["command"]["recipe"];
+      split: DesktopPrepareTrainingDatasetStartRequest["payload"]["command"]["split"];
+      output: DesktopPrepareTrainingDatasetStartRequest["payload"]["command"]["output"];
     },
     context?: DesktopArtifactUploadBridgeContext,
-  ) => Promise<DesktopPrepareTrainingDatasetResponse>;
+  ) => Promise<DesktopPrepareTrainingDatasetStartResponse>;
+  readPrepareTrainingDatasetTask: (
+    input: { requestId: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopPrepareTrainingDatasetTaskReadResponse>;
   readPythonRuntimeStatus: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
   controlPythonRuntime: (
-    input: { action: "start" | "stop" | "restart" | "unload-model" },
+    input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeControlResponse>;
   browseArtifacts: (
@@ -349,6 +409,46 @@ export interface DesktopPreloadApi {
     input: ResolveModelDefaultRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
+  browseModels: (
+    input: Parameters<typeof createDesktopModelBrowseRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelBrowseResponse>;
+  getModelDetails: (
+    input: Parameters<typeof createDesktopModelDetailsReadRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelDetailsReadResponse>;
+  listModels: (
+    input?: Parameters<typeof createDesktopModelListRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelListResponse>;
+  saveModelReference: (
+    input: Parameters<typeof createDesktopModelReferenceSaveRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelReferenceSaveResponse>;
+  downloadModel: (
+    input: Parameters<typeof createDesktopModelDownloadRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelDownloadResponse>;
+  updateModelRecord: (
+    input: Parameters<typeof createDesktopModelRecordUpdateRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelRecordUpdateResponse>;
+  deleteModelRecord: (
+    input: Parameters<typeof createDesktopModelRecordDeleteRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelRecordDeleteResponse>;
+  trainModel: (
+    input: Parameters<typeof createDesktopModelTrainRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelTrainResponse>;
+  validateModel: (
+    input: Parameters<typeof createDesktopModelValidateRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelValidateResponse>;
+  publishModel: (
+    input: Parameters<typeof createDesktopModelPublishRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelPublishResponse>;
 }
 
 export interface CreateDesktopPreloadApiDependencies {
@@ -378,6 +478,7 @@ function assertDesktopEnvelopeResponse<TResponse extends { operation: string; ch
 
   return response as TResponse;
 }
+
 
 export function createDesktopPreloadApi(
   dependencies: CreateDesktopPreloadApiDependencies,
@@ -581,8 +682,8 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async prepareTrainingDatasetFromArtifacts(input, context = {}) {
-      const request: DesktopPrepareTrainingDatasetRequest = createDesktopPrepareTrainingDatasetRequest(
+    async startPrepareTrainingDataset(input, context = {}) {
+      const request: DesktopPrepareTrainingDatasetStartRequest = createDesktopPrepareTrainingDatasetStartRequest(
         {
           command: {
             sourceArtifactIds: input.sourceArtifactIds,
@@ -598,14 +699,37 @@ export function createDesktopPreloadApi(
         context,
       );
       const response = await dependencies.ipcRenderer.invoke(
-        DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
+        DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL.value,
         request,
       );
 
-      return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetResponse>(response, {
-        operation: DESKTOP_DATASET_PREPARE_TRAINING_OPERATION,
-        channel: DESKTOP_DATASET_PREPARE_TRAINING_RESPONSE_CHANNEL.value,
-        message: "Received invalid desktop dataset preparation IPC response envelope.",
+      return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetStartResponse>(response, {
+        operation: DESKTOP_DATASET_PREPARE_TRAINING_START_OPERATION,
+        channel: DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop dataset preparation start IPC response envelope.",
+      });
+    },
+
+    async readPrepareTrainingDatasetTask(input, context = {}) {
+      const request: DesktopPrepareTrainingDatasetTaskReadRequest = createDesktopPrepareTrainingDatasetTaskReadRequest(
+        {
+          requestId: input.requestId,
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.dataset-preparation",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopPrepareTrainingDatasetTaskReadResponse>(response, {
+        operation: DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_OPERATION,
+        channel: DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop dataset preparation task-read IPC response envelope.",
       });
     },
 
@@ -1006,6 +1130,126 @@ export function createDesktopPreloadApi(
     },
     async resolveModelDefault(input, context = {}) {
       return this.resolveApplicationModelDefault(input, context);
+    },
+    async browseModels(input, context = {}) {
+      const request = createDesktopModelBrowseRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelBrowseResponse>(response, {
+        operation: DESKTOP_MODEL_BROWSE_OPERATION,
+        channel: DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model browse IPC response envelope.",
+      });
+    },
+    async getModelDetails(input, context = {}) {
+      const request = createDesktopModelDetailsReadRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelDetailsReadResponse>(response, {
+        operation: DESKTOP_MODEL_DETAILS_READ_OPERATION,
+        channel: DESKTOP_MODEL_DETAILS_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model details IPC response envelope.",
+      });
+    },
+    async listModels(input = {}, context = {}) {
+      const request = createDesktopModelListRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_LIST_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelListResponse>(response, {
+        operation: DESKTOP_MODEL_LIST_OPERATION,
+        channel: DESKTOP_MODEL_LIST_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model list IPC response envelope.",
+      });
+    },
+    async saveModelReference(input, context = {}) {
+      const request = createDesktopModelReferenceSaveRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelReferenceSaveResponse>(response, {
+        operation: DESKTOP_MODEL_REFERENCE_SAVE_OPERATION,
+        channel: DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model reference-save IPC response envelope.",
+      });
+    },
+    async downloadModel(input, context = {}) {
+      const request = createDesktopModelDownloadRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelDownloadResponse>(response, {
+        operation: DESKTOP_MODEL_DOWNLOAD_OPERATION,
+        channel: DESKTOP_MODEL_DOWNLOAD_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model download IPC response envelope.",
+      });
+    },
+    async updateModelRecord(input, context = {}) {
+      const request = createDesktopModelRecordUpdateRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelRecordUpdateResponse>(response, {
+        operation: DESKTOP_MODEL_RECORD_UPDATE_OPERATION,
+        channel: DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model record-update IPC response envelope.",
+      });
+    },
+    async deleteModelRecord(input, context = {}) {
+      const request = createDesktopModelRecordDeleteRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelRecordDeleteResponse>(response, {
+        operation: DESKTOP_MODEL_RECORD_DELETE_OPERATION,
+        channel: DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model record-delete IPC response envelope.",
+      });
+    },
+    async trainModel(input, context = {}) {
+      const request = createDesktopModelTrainRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelTrainResponse>(response, {
+        operation: DESKTOP_MODEL_TRAIN_OPERATION,
+        channel: DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model train IPC response envelope.",
+      });
+    },
+    async validateModel(input, context = {}) {
+      const request = createDesktopModelValidateRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelValidateResponse>(response, {
+        operation: DESKTOP_MODEL_VALIDATE_OPERATION,
+        channel: DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model validate IPC response envelope.",
+      });
+    },
+    async publishModel(input, context = {}) {
+      const request = createDesktopModelPublishRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelPublishResponse>(response, {
+        operation: DESKTOP_MODEL_PUBLISH_OPERATION,
+        channel: DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model publish IPC response envelope.",
+      });
     },
   };
 }

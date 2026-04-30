@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
@@ -26,7 +27,9 @@ import {
   DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL,
   DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
   DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL,
-  DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
@@ -39,6 +42,16 @@ import {
   DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL,
+  DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL,
+  DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
+  DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
@@ -104,14 +117,18 @@ describe("composeDesktopHost", () => {
     const ipcMain = {
       handle: testDouble.fn(),
     };
-    const host = composeDesktopHost();
+    const host = composeDesktopHost({
+      artifactRepo: {
+        huggingFaceTokenConfigFilePath: join(tmpdir(), `desktop-host-token-${Date.now()}.json`),
+      },
+    });
 
     host.registerArtifactUploadIpc({
       ipcMain,
-      storageRootDirectory: "/tmp/desktop-artifact-upload-test",
+      storageRootDirectory: join(tmpdir(), `desktop-artifact-upload-test-${Date.now()}`),
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(30);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(42);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -136,12 +153,24 @@ describe("composeDesktopHost", () => {
       DESKTOP_ARTIFACT_LOCALIZE_FROM_REPO_REQUEST_CHANNEL.value,
       DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value,
       DESKTOP_INGEST_WEBSITE_PAGES_BATCH_REQUEST_CHANNEL.value,
-      DESKTOP_DATASET_PREPARE_TRAINING_REQUEST_CHANNEL.value,
+      DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL.value,
+      DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL.value,
+      DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL.value,
       DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL.value,
       DESKTOP_APPLICATION_SETTINGS_READ_REQUEST_CHANNEL.value,
       DESKTOP_APPLICATION_SETTINGS_UPDATE_REQUEST_CHANNEL.value,
       DESKTOP_APPLICATION_SETTINGS_CLEAR_REQUEST_CHANNEL.value,
       DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_DETAILS_READ_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_REFERENCE_SAVE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_RECORD_UPDATE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,
+      DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
@@ -229,12 +258,28 @@ describe("composeDesktopHost", () => {
     const source = readFileSync(sourcePath, "utf8");
 
     expect(source).toContain("createPythonRuntimeAdapterFoundation");
-    expect(source).toContain("createPythonDatasetPreparationPort");
+    expect(source).toContain("createPythonRuntimeTaskRegistryAdapter");
+    expect(source).not.toContain("createPythonDatasetPreparationPort");
     expect(source).toContain("ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start()");
     expect(source).toContain("requiredCapabilities: PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES");
     expect(source).toContain("HF_HUB_DISABLE_XET");
     expect(source).toContain("PrepareTrainingDatasetFromArtifactsUseCase");
     expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
+  });
+
+  it("preserves the full Python runtime port when adding desktop composition logging wrappers", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+    const runtimePortSpreadCount = source.match(/\.\.\.pythonRuntimeFoundation\.runtimePort/g)?.length ?? 0;
+
+    expect(runtimePortSpreadCount >= 1).toBe(true);
+    expect(source).not.toContain("getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus()");
+    expect(source).not.toContain("getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities()");
+    expect(source).not.toContain("unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels()");
   });
 
   it("derives the Python runtime client URL from host and port when no base URL is configured", () => {
@@ -269,8 +314,25 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port");
   });
 
+  it("configures Python runtime startup timeout for slower cold starts", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000");
+    expect(source).toContain("Number(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS)");
+    expect(source).toContain("startupTimeoutMs: pythonRuntimeStartupTimeoutMs");
+  });
+
   it("stores and exposes desktop Hugging Face token status", () => {
-    const host = composeDesktopHost();
+    const host = composeDesktopHost({
+      artifactRepo: {
+        huggingFaceTokenConfigFilePath: join(tmpdir(), `desktop-host-token-${Date.now()}.json`),
+      },
+    });
     expect(host.getHuggingFaceTokenStatus().configured).toBe(false);
     const saved = host.setHuggingFaceToken("hf_desktop_token");
     expect(saved.configured).toBe(true);
@@ -337,4 +399,3 @@ describe("composeDesktopHost", () => {
     expect(healthTransitionLogsSecondRead.length).toBe(1);
   });
 });
-

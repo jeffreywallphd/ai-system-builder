@@ -18,6 +18,26 @@ import type {
   ResolvedModelDefault,
   UpdateApplicationSettingRequest,
 } from "../../../../../modules/contracts/settings";
+import type {
+  BrowseModelsRequest,
+  GetModelDetailsRequest,
+  ModelBrowseItem,
+  ModelDetails,
+  ModelInventoryRecord,
+  DeleteModelRecordRequest,
+  DeleteModelRecordResult,
+  DownloadModelRequest,
+  DownloadModelResult,
+  ListModelsRequest,
+  ModelTrainingRequest,
+  ModelTrainingResult,
+  SaveModelReferenceRequest,
+  UpdateModelRecordRequest,
+  ValidateModelRequest,
+  ValidateModelResult,
+  PublishModelRequest,
+  PublishModelResult,
+} from "../../../../../modules/contracts/model";
 
 export interface DesktopArtifactUploadInput {
   fileName: string;
@@ -248,6 +268,11 @@ export interface DesktopPythonRuntimeStatusSnapshot {
   logs: DesktopPythonRuntimeLogEntry[];
   loadedModels: DesktopPythonRuntimeLoadedModel[];
   activeTaskCount: number;
+  systemResources?: {
+    memoryUsagePercent: number;
+    cpuUsagePercent: number;
+    gpuUsagePercent: number;
+  };
 }
 
 export interface DesktopArtifactUploadApi {
@@ -270,15 +295,23 @@ export interface DesktopBridgeRequestContext {
 }
 
 export interface DesktopDatasetPreparationApi {
-  prepareTrainingDatasetFromArtifacts: (
+  startPrepareTrainingDataset?: (
     input: DesktopPrepareTrainingDatasetInput,
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  readPrepareTrainingDatasetTask?: (
+    input: { requestId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  cancelPrepareTrainingDatasetTask?: (
+    input: { requestId: string },
     context?: DesktopBridgeRequestContext,
   ) => Promise<unknown>;
 }
 
 export interface DesktopPythonRuntimeApi {
   readPythonRuntimeStatus: () => Promise<unknown>;
-  controlPythonRuntime: (input: { action: "start" | "stop" | "restart" | "unload-model" }) => Promise<unknown>;
+  controlPythonRuntime: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
 }
 
 interface DesktopApiBridge {
@@ -298,9 +331,11 @@ interface DesktopApiBridge {
     targets: DesktopWebsiteIngestionTarget[];
     mode?: "automatic" | "rendered";
   }) => Promise<unknown>;
-  prepareTrainingDatasetFromArtifacts?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  startPrepareTrainingDataset?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
-  controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" }) => Promise<unknown>;
+  controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
@@ -345,6 +380,16 @@ interface DesktopApiBridge {
   clearApplicationSetting?: (input: { key: string }) => Promise<unknown>;
   resolveApplicationModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
   resolveModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
+  browseModels?: (input: DesktopModelBrowseRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  getModelDetails?: (input: DesktopModelDetailsRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  listModels?: (input?: DesktopModelListRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  saveModelReference?: (input: DesktopSaveModelReferenceRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  downloadModel?: (input: DesktopDownloadModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  updateModelRecord?: (input: DesktopUpdateModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  deleteModelRecord?: (input: DesktopDeleteModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  trainModel?: (input: DesktopModelTrainingRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  validateModel?: (input: DesktopValidateModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  publishModel?: (input: DesktopPublishModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
 }
 
 declare global {
@@ -426,3 +471,40 @@ export interface DesktopApplicationSettingUpdateResult {
 export interface DesktopResolvedModelDefaultResult {
   resolved: ResolvedModelDefault;
 }
+
+export type DesktopModelBrowseRequest = BrowseModelsRequest;
+export type DesktopModelBrowseItem = ModelBrowseItem;
+export interface DesktopModelBrowseResult {
+  models: ModelBrowseItem[];
+  nextCursor?: string;
+}
+export type DesktopModelDetailsRequest = GetModelDetailsRequest;
+export interface DesktopModelDetailsResult {
+  model: ModelDetails;
+}
+export type DesktopModelListRequest = ListModelsRequest;
+export type DesktopModelInventoryRecord = ModelInventoryRecord;
+export interface DesktopModelListResult {
+  models: ModelInventoryRecord[];
+  nextCursor?: string;
+}
+export type DesktopSaveModelReferenceRequest = SaveModelReferenceRequest;
+export interface DesktopSaveModelReferenceResult {
+  model: ModelInventoryRecord;
+}
+export type DesktopDownloadModelRequest = DownloadModelRequest;
+export type DesktopDownloadModelResult = DownloadModelResult;
+export type DesktopUpdateModelRecordRequest = UpdateModelRecordRequest;
+export interface DesktopUpdateModelRecordResult {
+  model: ModelInventoryRecord;
+}
+export type DesktopDeleteModelRecordRequest = DeleteModelRecordRequest;
+export type DesktopDeleteModelRecordResult = DeleteModelRecordResult;
+
+
+export type DesktopModelTrainingRequest = ModelTrainingRequest;
+export type DesktopModelTrainingResult = ModelTrainingResult;
+export type DesktopValidateModelRequest = ValidateModelRequest;
+export type DesktopValidateModelResult = ValidateModelResult;
+export type DesktopPublishModelRequest = PublishModelRequest;
+export type DesktopPublishModelResult = PublishModelResult;

@@ -1,4 +1,7 @@
+import { cpus, totalmem, freemem } from "node:os";
+import { spawnSync } from "node:child_process";
 import type { LoggingPort } from "../../../application/ports/logging";
+import { TaskPowerLifecycleService } from "../../../application/services/runtime";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
@@ -24,6 +27,16 @@ import {
   UpdateSettingUseCase,
   ClearSettingUseCase,
   ResolveModelDefaultUseCase,
+  BrowseModelsUseCase,
+  GetModelDetailsUseCase,
+  ListModelsUseCase,
+  SaveModelReferenceUseCase,
+  DownloadModelUseCase,
+  UpdateModelRecordUseCase,
+  DeleteModelRecordUseCase,
+  TrainModelUseCase,
+  ValidateModelUseCase,
+  PublishModelUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
@@ -34,10 +47,11 @@ import {
   createArtifactRepoStorageAdapter,
 } from "../../../adapters/storage/artifact-repo";
 import {
-  createPythonDatasetPreparationPort,
   createPythonRuntimeAdapterFoundation,
   ensurePythonRuntimeWorkerDependencies,
+  createPythonRuntimeTaskRegistryAdapter,
 } from "../../../adapters/runtime/python";
+import { createElectronPowerSuspensionBlocker } from "../../../adapters/runtime/electron";
 import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
@@ -47,6 +61,9 @@ import {
 } from "../../../adapters/storage/filesystem";
 import { createHuggingFaceArtifactRepoStorageAdapter } from "../../../adapters/storage/huggingface";
 import type { HuggingFaceFetchImplementation } from "../../../adapters/storage/huggingface";
+import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
+import { createHuggingFaceModelPublisherAdapter } from "../../../adapters/model/huggingface";
+import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import {
   createHuggingFaceTokenConfigStore,
   type HuggingFaceTokenStatus,
@@ -58,7 +75,94 @@ import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import { PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES } from "../../../contracts/runtime";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
+import type { PowerSuspensionBlockerPort } from "../../../application/ports/desktop";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
+
+const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, value));
+}
+
+function readMemoryUsagePercent(): number {
+  const totalMemory = totalmem();
+  if (totalMemory <= 0) {
+    return 0;
+  }
+
+  const usedMemory = totalMemory - freemem();
+  return clampPercent((usedMemory / totalMemory) * 100);
+}
+
+function readCpuUsagePercent(): number {
+  const cpuEntries = cpus();
+  if (cpuEntries.length === 0) {
+    return 0;
+  }
+
+  let idleTotal = 0;
+  let activeTotal = 0;
+  for (const entry of cpuEntries) {
+    const entryIdle = entry.times.idle;
+    const entryActive = entry.times.user + entry.times.nice + entry.times.sys + entry.times.irq;
+    idleTotal += entryIdle;
+    activeTotal += entryActive;
+  }
+
+  const total = idleTotal + activeTotal;
+  if (total <= 0) {
+    return 0;
+  }
+
+  const previous = (readCpuUsagePercent as typeof readCpuUsagePercent & {
+    previousSample?: { idleTotal: number; activeTotal: number };
+  }).previousSample;
+  (readCpuUsagePercent as typeof readCpuUsagePercent & {
+    previousSample?: { idleTotal: number; activeTotal: number };
+  }).previousSample = { idleTotal, activeTotal };
+
+  if (!previous) {
+    return clampPercent((activeTotal / total) * 100);
+  }
+
+  const idleDelta = idleTotal - previous.idleTotal;
+  const activeDelta = activeTotal - previous.activeTotal;
+  const totalDelta = idleDelta + activeDelta;
+  if (totalDelta <= 0) {
+    return 0;
+  }
+
+  return clampPercent((activeDelta / totalDelta) * 100);
+}
+
+function readGpuUsagePercent(): number {
+  const result = spawnSync(
+    "nvidia-smi",
+    ["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+    { encoding: "utf8", timeout: 800 },
+  );
+  if (result.status !== 0 || !result.stdout) {
+    return 0;
+  }
+
+  const lines = result.stdout.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+  if (lines.length === 0) {
+    return 0;
+  }
+
+  const percentages = lines
+    .map((line) => Number.parseFloat(line.replace("%", "").trim()))
+    .filter((value) => Number.isFinite(value));
+  if (percentages.length === 0) {
+    return 0;
+  }
+
+  const average = percentages.reduce((sum, value) => sum + value, 0) / percentages.length;
+  return clampPercent(average);
+}
 
 export interface ComposeDesktopHostLoggingOptions {
   verbosity?: string;
@@ -99,8 +203,10 @@ export interface DesktopHostComposition {
   stopPythonRuntime: () => Promise<void>;
   restartPythonRuntime: () => Promise<void>;
   unloadPythonRuntimeModel: () => Promise<void>;
+  clearPythonRuntimeLogs: () => Promise<void>;
   readPythonRuntimeStatus: () => Promise<DesktopPythonRuntimeStatusPayload>;
   getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
+  powerSuspensionBlocker: PowerSuspensionBlockerPort;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
 }
 
@@ -117,6 +223,9 @@ export function resolvePythonRuntimeBaseUrl(env: NodeJS.ProcessEnv = process.env
 
 const PYTHON_RUNTIME_MANAGED_BASE_PORT = 43111;
 const PYTHON_RUNTIME_MANAGED_PORT_SPAN = 10_000;
+const PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000;
+const DATASET_PREPARATION_TASK_TIMEOUT_MS = 12 * 60 * 60 * 1000;
+const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 
 export function resolveDefaultManagedPythonRuntimePort(processId: number = process.pid): string {
   const processPortOffset = Math.abs(processId) % PYTHON_RUNTIME_MANAGED_PORT_SPAN;
@@ -200,6 +309,11 @@ export function composeDesktopHost(
   });
   const pythonRuntimeEndpoint = resolvePythonRuntimeHostAndPort();
   const pythonRuntimeBaseUrl = resolvePythonRuntimeBaseUrl();
+  const configuredPythonRuntimeStartupTimeoutMs = Number(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS);
+  const pythonRuntimeStartupTimeoutMs =
+    Number.isFinite(configuredPythonRuntimeStartupTimeoutMs) && configuredPythonRuntimeStartupTimeoutMs > 0
+      ? configuredPythonRuntimeStartupTimeoutMs
+      : PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT;
   const pythonRuntimeEnvironment = {
     ...process.env,
     PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.host,
@@ -216,6 +330,7 @@ export function composeDesktopHost(
       args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
       cwd: process.env.PYTHON_RUNTIME_WORKER_DIR ?? "modules/adapters/runtime/python/worker",
       env: pythonRuntimeEnvironment,
+      startupTimeoutMs: pythonRuntimeStartupTimeoutMs,
       requiredCapabilities: PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES,
       prepareRuntimeEnvironment(context) {
         ensurePythonRuntimeWorkerDependencies({
@@ -303,53 +418,62 @@ export function composeDesktopHost(
       capabilities,
       loadedModels,
       activeTaskCount,
+      systemResources: {
+        memoryUsagePercent: readMemoryUsagePercent(),
+        cpuUsagePercent: readCpuUsagePercent(),
+        gpuUsagePercent: readGpuUsagePercent(),
+      },
       logs: [...runtimeLogs],
     };
   };
   const applicationSettings = createLocalApplicationSettingsAdapter({
     filePath: options.settings?.localSettingsFilePath ?? "/tmp/ai-system-builder/desktop/application-settings.json",
   });
-  const applicationSecrets = createInMemorySecretsAdapter();
+  const baseApplicationSecrets = createInMemorySecretsAdapter();
+  const applicationSecrets: ApplicationSecretsPort = {
+    async setSecret(key, value) {
+      await baseApplicationSecrets.setSecret(key, value);
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
+        tokenConfigStore.setToken(value);
+      }
+    },
+    async getSecret(key) {
+      const inMemorySecret = await baseApplicationSecrets.getSecret(key);
+      if (inMemorySecret?.trim()) {
+        return inMemorySecret;
+      }
+
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
+        return tokenConfigStore.getToken();
+      }
+
+      return undefined;
+    },
+    async clearSecret(key) {
+      await baseApplicationSecrets.clearSecret(key);
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
+        tokenConfigStore.clearToken();
+      }
+    },
+    async hasSecret(key) {
+      if (await baseApplicationSecrets.hasSecret(key)) {
+        return true;
+      }
+
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
+        return Boolean(tokenConfigStore.getToken()?.trim());
+      }
+
+      return false;
+    },
+  };
   const modelDefaultResolver = new DefaultModelDefaultResolver({
     settings: applicationSettings,
   });
 
-  const datasetPreparationPort = createPythonDatasetPreparationPort({
-    executeTask: async (request) => {
-      recordRuntimeLog({
-        level: "info",
-        message: "Preparing dataset in Python runtime.",
-      });
-      const result = await pythonRuntimeFoundation.runtimePort.executeTask(request);
-      if (result.success) {
-        recordRuntimeLog({
-          level: "info",
-          message: "Dataset preparation finished successfully.",
-        });
-      } else {
-        recordRuntimeLog({
-          level: "error",
-          message: `Dataset preparation failed: ${result.error?.message ?? "Unknown runtime error."}`,
-        });
-      }
-
-      return result;
-    },
-    getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus(),
-    getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities(),
-    ensureModelDownloaded: async (request) => {
-      const availability = await pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
-      recordRuntimeLog({
-        level: "info",
-        message: availability.localPath
-          ? `Generation model ${request.modelId} will be loaded from ${availability.localPath}.`
-          : `Generation model ${request.modelId} will be loaded from the configured Transformers model reference.`,
-      });
-      return availability;
-    },
-    getModelStatus: () => pythonRuntimeFoundation.runtimePort.getModelStatus(),
-    unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels(),
-  }, {
+  const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
+  const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
+  const runtimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort }, {
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
 
@@ -359,6 +483,7 @@ export function composeDesktopHost(
     applicationSettings,
     applicationSecrets,
     modelDefaultResolver,
+    powerSuspensionBlocker,
     getHuggingFaceTokenStatus() {
       return tokenConfigStore.getStatus();
     },
@@ -398,6 +523,13 @@ export function composeDesktopHost(
       recordRuntimeLog({
         level: "info",
         message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.`,
+      });
+    },
+    async clearPythonRuntimeLogs() {
+      runtimeLogs.splice(0, runtimeLogs.length);
+      recordRuntimeLog({
+        level: "info",
+        message: "Cleared Python runtime activity log.",
       });
     },
     async readPythonRuntimeStatus() {
@@ -528,13 +660,14 @@ export function composeDesktopHost(
       const ingestWebsitePagesBatch = new IngestWebsitePagesBatchUseCase({
         ingestWebsitePage,
       });
-      const prepareTrainingDatasetFromArtifacts = new PrepareTrainingDatasetFromArtifactsUseCase({
-        datasetPreparation: datasetPreparationPort,
+      const prepareTrainingDatasetFromArtifactsUseCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+        runtimeTaskRegistry,
         storageBindings: artifactBindings,
         storage,
         artifactRepoStorage,
         artifactCatalog,
         now: options.now,
+        taskPowerLifecycle,
       });
       const listSettingsDefinitions = new ListSettingsDefinitionsUseCase({
         settings: applicationSettings,
@@ -554,6 +687,76 @@ export function composeDesktopHost(
       const resolveModelDefault = new ResolveModelDefaultUseCase({
         modelDefaultResolver,
       });
+      const modelRegistry = createLocalModelRegistryAdapter({
+        filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
+        now,
+      });
+      const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
+        accessTokenProvider: () => tokenConfigStore.getToken(),
+      });
+      const browseModels = new BrowseModelsUseCase({
+        providers: {
+          huggingface: huggingFaceModelBrowseDetails,
+        },
+      });
+      const getModelDetails = new GetModelDetailsUseCase({
+        providers: {
+          huggingface: huggingFaceModelBrowseDetails,
+        },
+      });
+      const listModels = new ListModelsUseCase({
+        modelRegistry,
+      });
+      const modelPublisher = createHuggingFaceModelPublisherAdapter({
+        tokenProvider: () => tokenConfigStore.getToken(),
+        client: {
+          async uploadFile(params) {
+            const hub = await import("@huggingface/hub");
+            await hub.uploadFile({
+              repo: { type: "model", name: params.repo },
+              file: {
+                path: params.path,
+                content: new Blob([new Uint8Array(params.content)]),
+              },
+              branch: params.revision,
+              accessToken: params.token,
+            });
+          },
+        },
+      });
+      const saveModelReference = new SaveModelReferenceUseCase({
+        modelRegistry,
+      });
+      const downloadModel = new DownloadModelUseCase({
+        modelRegistry,
+        modelDownloader: {
+          ensureModelDownloaded: async (request) => {
+            await pythonRuntimeFoundation.supervisor.start();
+            return pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+          },
+        },
+      });
+      const updateModelRecord = new UpdateModelRecordUseCase({
+        modelRegistry,
+      });
+      const deleteModelRecord = new DeleteModelRecordUseCase({
+        modelRegistry,
+        artifactCatalogDeletePort: artifactCatalog,
+      });
+      const trainModel = new TrainModelUseCase({
+        runtimeTaskRegistry,
+        modelRegistry,
+        taskPowerLifecycle,
+      });
+      const validateModel = new ValidateModelUseCase({
+        runtimeTaskRegistry,
+        modelRegistry,
+      });
+      // TODO(prompt-7): remove legacy modelPublisher/modelValidationPort wiring after executeTask deprecation cleanup.
+      const publishModel = new PublishModelUseCase({
+        modelRegistry,
+        runtimeTaskRegistry,
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -570,6 +773,13 @@ export function composeDesktopHost(
             recordRuntimeLog({
               level: "info",
               message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.`,
+            });
+          },
+          clearPythonRuntimeLogs: async () => {
+            runtimeLogs.splice(0, runtimeLogs.length);
+            recordRuntimeLog({
+              level: "info",
+              message: "Cleared Python runtime activity log.",
             });
           },
           readPythonRuntimeStatus,
@@ -595,12 +805,22 @@ export function composeDesktopHost(
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
         ingestWebsitePageUseCase: ingestWebsitePage,
         ingestWebsitePagesBatchUseCase: ingestWebsitePagesBatch,
-        prepareTrainingDatasetFromArtifactsUseCase: prepareTrainingDatasetFromArtifacts,
+        prepareTrainingDatasetUseCase: prepareTrainingDatasetFromArtifactsUseCase,
         listSettingsDefinitionsUseCase: listSettingsDefinitions,
         readSettingsUseCase: readSettings,
         updateSettingUseCase: updateSetting,
         clearSettingUseCase: clearSetting,
         resolveModelDefaultUseCase: resolveModelDefault,
+        browseModelsUseCase: browseModels,
+        getModelDetailsUseCase: getModelDetails,
+        listModelsUseCase: listModels,
+        saveModelReferenceUseCase: saveModelReference,
+        downloadModelUseCase: downloadModel,
+        updateModelRecordUseCase: updateModelRecord,
+        deleteModelRecordUseCase: deleteModelRecord,
+        trainModelUseCase: trainModel,
+        validateModelUseCase: validateModel,
+        publishModelUseCase: publishModel,
       });
     },
   };
