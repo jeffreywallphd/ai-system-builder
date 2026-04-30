@@ -49,7 +49,7 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
   const [maxSteps, setMaxSteps] = useState("");
   const [batchSize, setBatchSize] = useState("2");
   const [learningRate, setLearningRate] = useState("0.0002");
-  const [maxSequenceLength, setMaxSequenceLength] = useState("2048");
+  const [maxSequenceLength, setMaxSequenceLength] = useState("512");
   const [seed, setSeed] = useState("42");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [loraRank, setLoraRank] = useState("16");

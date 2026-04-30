@@ -41,6 +41,51 @@ class _FakeTokenizer:
         (out / "tokenizer.json").write_text("{}", encoding="utf-8")
 
 
+def test_resolve_effective_sequence_length_clamps_to_model_context_window() -> None:
+    model = SimpleNamespace(config=SimpleNamespace(n_positions=1024))
+    tokenizer = SimpleNamespace(model_max_length=2048)
+
+    length, warning = train_model_module._resolve_effective_sequence_length(model, tokenizer, 2048)
+
+    assert length == 1024
+    assert warning is not None
+    assert "position embedding overflow" in warning
+
+
+def test_resolve_effective_sequence_length_ignores_transformers_sentinel_tokenizer_limit() -> None:
+    model = SimpleNamespace(config=SimpleNamespace())
+    tokenizer = SimpleNamespace(model_max_length=1000000000000000019884624838656)
+
+    length, warning = train_model_module._resolve_effective_sequence_length(model, tokenizer, 2048)
+
+    assert length == 2048
+    assert warning is None
+
+
+def test_synchronize_model_token_embeddings_resizes_when_tokenizer_has_added_tokens() -> None:
+    class _Embedding:
+        num_embeddings = 10
+
+    class _TokenizerWithAddedTokens:
+        def __len__(self):
+            return 12
+
+    class _ResizableModel:
+        resized_to: int | None = None
+
+        def get_input_embeddings(self):
+            return _Embedding()
+
+        def resize_token_embeddings(self, size: int) -> None:
+            self.resized_to = size
+
+    model = _ResizableModel()
+
+    train_model_module._synchronize_model_token_embeddings(model, _TokenizerWithAddedTokens())
+
+    assert model.resized_to == 12
+
+
 def test_train_model_validates_required_inputs(tmp_path: Path) -> None:
     payload = _request(tmp_path)
     payload.datasets = []
