@@ -1513,4 +1513,60 @@ describe("DatasetPreparationFeature", () => {
       vi.useRealTimers();
     }
   });
+
+  it("resumes active dataset preparation progress after page remount", async () => {
+    vi.useFakeTimers();
+    try {
+      const readPrepareTrainingDatasetTask = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: "running",
+          progress: { message: "Processing chunk", processed: 1, total: 4 },
+        })
+        .mockResolvedValue({
+          ok: true,
+          status: "running",
+          progress: { message: "Processing chunk", processed: 2, total: 4 },
+        });
+
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      root = createRoot(container);
+
+      await act(async () => {
+        root?.render(<DatasetPreparationFeature client={{
+          browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+          startPrepareTrainingDataset: async (_input, context) => ({ requestId: context?.requestId ?? "req-1" }),
+          readPrepareTrainingDatasetTask,
+          cancelPrepareTrainingDatasetTask: async () => ({ ok: true }),
+        }} />);
+      });
+
+      await act(async () => { (container?.querySelector("input[type='checkbox']") as HTMLInputElement).click(); });
+      await act(async () => {
+        (container?.querySelector("form") as HTMLFormElement).dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+      });
+
+      expect(container?.textContent).toContain("Processing chunk (1/4)");
+
+      await act(async () => { root?.unmount(); });
+      root = createRoot(container as HTMLDivElement);
+      await act(async () => {
+        root?.render(<DatasetPreparationFeature client={{
+          browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl" }],
+          startPrepareTrainingDataset: async () => ({ error: { code: "unused", message: "unused" } }),
+          readPrepareTrainingDatasetTask,
+          cancelPrepareTrainingDatasetTask: async () => ({ ok: true }),
+        }} />);
+        await Promise.resolve();
+      });
+
+      expect(container?.textContent).toContain("Processing chunk (2/4)");
+      expect(container?.textContent).not.toContain("Training stopped.");
+      expect(readPrepareTrainingDatasetTask).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
