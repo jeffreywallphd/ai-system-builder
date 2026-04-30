@@ -64,6 +64,7 @@ describe("runtime installer contracts", () => {
       installedAt: "2026-04-30T00:00:00.000Z",
       lastCheckedAt: "2026-04-30T00:01:00.000Z",
       warnings: [],
+      metadata: { adapter: "git" },
     };
 
     const statusResult: RuntimeInstallStatusResult = {
@@ -76,6 +77,7 @@ describe("runtime installer contracts", () => {
       commitSha: "abc123",
       installedAt: result.installedAt,
       lastCheckedAt: result.lastCheckedAt,
+      metadata: { adapter: "git" },
     };
 
     expect(statusRequest.targetId).toBe("comfyui");

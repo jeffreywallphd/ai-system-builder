@@ -19,16 +19,24 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   now?: () => string;
   metadataFileName?: string;
   skipPythonSetup?: boolean;
+  skipPythonValidation?: boolean;
   requirementsFileName?: string;
   stat?: typeof nodeStat;
 }
 
 interface BuildComfyUiInstallRequestInput {
   installRoot: string;
-  source?: { ref?: string };
+  source?: RuntimeInstallRequest["source"];
   metadata?: Record<string, unknown>;
   allowUpdate?: boolean;
   forceRepair?: boolean;
+}
+
+function readGitRef(source: RuntimeInstallRequest["source"] | undefined): string | undefined {
+  if (!source || source.type !== "git") {
+    return undefined;
+  }
+  return source.ref;
 }
 
 export function buildComfyUiInstallRequest(input: BuildComfyUiInstallRequestInput): RuntimeInstallRequest {
@@ -38,12 +46,22 @@ export function buildComfyUiInstallRequest(input: BuildComfyUiInstallRequestInpu
     source: {
       type: "git",
       repositoryUrl: "https://github.com/Comfy-Org/ComfyUI",
-      ref: input.source?.ref,
+      ref: readGitRef(input.source),
     },
     metadata: input.metadata,
     allowUpdate: input.allowUpdate,
     forceRepair: input.forceRepair,
   };
+}
+
+function normalizeComfyUiInstallRequest(request: RuntimeInstallRequest): RuntimeInstallRequest {
+  return buildComfyUiInstallRequest({
+    installRoot: request.installRoot ?? "",
+    source: request.source,
+    metadata: request.metadata,
+    allowUpdate: request.allowUpdate,
+    forceRepair: request.forceRepair,
+  });
 }
 
 export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInstallerOptions): RuntimeInstallerPort {
@@ -103,7 +121,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       return { error: makeError("comfyui-missing-entrypoint", "ComfyUI entrypoint main.py is missing", { entrypointPath }) };
     }
 
-    if (options.execFile && !options.skipPythonSetup) {
+    if (options.execFile && !options.skipPythonValidation) {
       try {
         await options.execFile(pythonCommand, [entrypointPath, "--help"]);
       } catch (error) {
@@ -121,20 +139,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     return { checkedAt: now() };
   }
 
-  async function ensureInstalled(request: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
-    const normalizedRequest = buildComfyUiInstallRequest({
-      installRoot: request.installRoot ?? "",
-      source: { ref: request.source?.ref },
-      metadata: request.metadata,
-      allowUpdate: request.allowUpdate,
-      forceRepair: request.forceRepair,
-    });
-
-    const installResult = await options.gitInstaller.ensureInstalled(normalizedRequest);
-    if (installResult.status !== "installed") {
-      return installResult;
-    }
-
+  async function finalizeComfyUiInstall(installResult: RuntimeInstallResult, normalizedRequest: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
     const warnings = [...(installResult.warnings ?? [])];
 
     let pythonDependenciesInstalledAt: string | undefined;
@@ -156,36 +161,64 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       ...installResult,
       warnings,
       metadata: {
-        ...(installResult as RuntimeInstallResult & { metadata?: Record<string, unknown> }).metadata,
+        ...(installResult.metadata ?? {}),
         extra: {
           pythonDependenciesInstalledAt,
           validationCheckedAt: validation.checkedAt,
         },
-      } as unknown as Record<string, unknown>,
-    } as RuntimeInstallResult;
+      },
+    };
+  }
+
+  async function ensureInstalled(request: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
+    const normalizedRequest = normalizeComfyUiInstallRequest(request);
+    if (!normalizedRequest.installRoot) {
+      return {
+        targetId: normalizedRequest.targetId,
+        status: "failed",
+        installRoot: normalizedRequest.installRoot,
+        source: normalizedRequest.source,
+        error: makeError("missing-install-root", "installRoot is required"),
+      };
+    }
+
+    const installResult = await options.gitInstaller.ensureInstalled(normalizedRequest);
+    if (installResult.status !== "installed") {
+      return installResult;
+    }
+
+    return finalizeComfyUiInstall(installResult, normalizedRequest);
   }
 
   async function getInstallStatus(request: RuntimeInstallStatusRequest): Promise<RuntimeInstallStatusResult> {
     return options.gitInstaller.getInstallStatus(buildComfyUiInstallRequest({
       installRoot: request.installRoot ?? "",
-      source: { ref: request.source?.ref },
+      source: request.source,
       metadata: request.metadata,
     }));
   }
 
   async function repairInstall(request: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
-    if (!options.gitInstaller.repairInstall) {
-      return ensureInstalled({ ...request, allowUpdate: true });
+    const normalizedRequest = normalizeComfyUiInstallRequest(request);
+    if (!normalizedRequest.installRoot) {
+      return {
+        targetId: normalizedRequest.targetId,
+        status: "failed",
+        installRoot: normalizedRequest.installRoot,
+        source: normalizedRequest.source,
+        error: makeError("missing-install-root", "installRoot is required"),
+      };
     }
-    return options.gitInstaller.repairInstall({
-      ...buildComfyUiInstallRequest({
-        installRoot: request.installRoot,
-        source: { ref: request.source.ref },
-        metadata: request.metadata,
-        forceRepair: request.forceRepair,
-      }),
-      allowUpdate: true,
-    });
+
+    if (!options.gitInstaller.repairInstall) {
+      return ensureInstalled({ ...normalizedRequest, allowUpdate: true });
+    }
+
+    const repairResult = await options.gitInstaller.repairInstall({ ...normalizedRequest, allowUpdate: true });
+    if (repairResult.status !== "installed") {
+      return repairResult;
+    }
+    return finalizeComfyUiInstall(repairResult, normalizedRequest);
   }
 
   return { ensureInstalled, getInstallStatus, repairInstall };
