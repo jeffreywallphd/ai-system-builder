@@ -156,10 +156,12 @@ def _build_training_args(payload: TrainModelTaskRequest, output_dir: Path) -> An
 
     common = _to_dict(payload.commonParameters)
     advanced = _to_dict(payload.advancedParameters)
+    common_max_steps = common.get("maxSteps")
+    normalized_max_steps = int(common_max_steps) if isinstance(common_max_steps, (int, float)) else -1
     return TrainingArguments(
         output_dir=str(output_dir / "checkpoints"),
         num_train_epochs=float(common.get("numEpochs", 1)),
-        max_steps=int(common.get("maxSteps", -1)),
+        max_steps=normalized_max_steps,
         per_device_train_batch_size=int(common.get("batchSize", 1)),
         per_device_eval_batch_size=int(common.get("batchSize", 1)),
         learning_rate=float(common.get("learningRate", 5e-5)),
@@ -200,11 +202,34 @@ def _apply_lora(model: Any, payload: TrainModelTaskRequest) -> Any:
     return get_peft_model(model, lora_config)
 
 
-def _run_trainer(model: Any, tokenizer: Any, dataset: Any, eval_dataset: Any | None, args: Any) -> tuple[dict[str, float], list[dict[str, Any]]]:
+def _run_trainer(
+    model: Any,
+    tokenizer: Any,
+    dataset: Any,
+    eval_dataset: Any | None,
+    args: Any,
+    *,
+    on_progress: Callable[[dict[str, int]], None] | None = None,
+) -> tuple[dict[str, float], list[dict[str, Any]]]:
     try:
-        from transformers import DataCollatorForLanguageModeling, Trainer
+        from transformers import DataCollatorForLanguageModeling, Trainer, TrainerCallback
     except Exception as error:  # pragma: no cover
         raise RuntimeError("transformers Trainer is required for training.") from error
+
+    class _TrainingProgressCallback(TrainerCallback):
+        def on_step_end(self, _args: Any, state: Any, _control: Any, **_kwargs: Any) -> None:
+            if on_progress is None:
+                return
+            total_steps = int(state.max_steps) if isinstance(state.max_steps, int) and state.max_steps > 0 else 0
+            current_step = int(state.global_step) if isinstance(state.global_step, int) else 0
+            total_epochs = int(_args.num_train_epochs) if isinstance(_args.num_train_epochs, (int, float)) else 0
+            current_epoch = int(state.epoch) + 1 if isinstance(state.epoch, (int, float)) else 1
+            on_progress({
+                "epoch": max(current_epoch, 1),
+                "totalEpochs": max(total_epochs, 1),
+                "batch": max(current_step, 0),
+                "totalBatches": max(total_steps, 0),
+            })
 
     trainer = Trainer(
         model=model,
@@ -213,6 +238,7 @@ def _run_trainer(model: Any, tokenizer: Any, dataset: Any, eval_dataset: Any | N
         eval_dataset=eval_dataset,
         tokenizer=tokenizer,
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+        callbacks=[_TrainingProgressCallback()],
     )
     train_result = trainer.train()
     metrics: dict[str, float] = {k: float(v) for k, v in train_result.metrics.items() if isinstance(v, (int, float))}
@@ -262,7 +288,13 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
             logs.append(f"Applied {payload.method.upper()} adapter config.")
 
         train_args = _build_training_args(payload, output_path)
-        metrics, checkpoints = _run_trainer(model, tokenizer, tokenized, tokenized_eval, train_args)
+        def on_training_progress(progress: dict[str, int]) -> None:
+            logs.append(
+                f"Epoch [{progress.get('epoch', 0)}]/[{progress.get('totalEpochs', 0)}], "
+                f"Batch [{progress.get('batch', 0)}]/[{progress.get('totalBatches', 0)}]"
+            )
+
+        metrics, checkpoints = _run_trainer(model, tokenizer, tokenized, tokenized_eval, train_args, on_progress=on_training_progress)
 
         max_shard_size = _parse_max_shard_size(payload)
         if payload.method in {"lora", "qlora"}:
