@@ -1,6 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, parse } from "node:path";
+import { basename, join, parse, relative, resolve } from "node:path";
 
 import {
   normalizeModelTrainingRequest,
@@ -11,7 +11,7 @@ import {
 } from "../../../contracts/model";
 import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
 import { createRetrieveArtifactRequest } from "../../../contracts/storage";
-import type { ModelRegistryPort } from "../../ports/model";
+import type { GeneratedModelStoragePort, ModelPublisherPort, ModelRegistryPort } from "../../ports/model";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 import type { ArtifactObjectStoragePort, ArtifactStorageBindingPort } from "../../ports/storage";
 import type { TaskPowerLifecyclePort } from "../../services/runtime";
@@ -32,6 +32,18 @@ function ensureDatasetSelections(request: ModelTrainingRequest): void {
       throw new Error(`Model training dataset at index ${index} is missing artifactId.`);
     }
   });
+}
+
+function ensureOutputDestinationSelection(request: ModelTrainingRequest): void {
+  const localEnabled = request.output.destination.local.enabled === true;
+  const huggingFaceEnabled = request.output.destination.huggingFace?.enabled === true;
+  if (!localEnabled && !huggingFaceEnabled) {
+    throw new Error("Model training requires at least one output destination.");
+  }
+
+  if (huggingFaceEnabled && !request.output.destination.huggingFace?.repository) {
+    throw new Error("Publishing trained models to Hugging Face requires a repository.");
+  }
 }
 
 function extensionForMediaType(mediaType: string | undefined): string {
@@ -88,6 +100,8 @@ export class TrainModelUseCase {
       modelRegistry: ModelRegistryPort;
       storageBindings: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings">;
       storage: Pick<ArtifactObjectStoragePort, "retrieveArtifact">;
+      generatedModelStorage?: GeneratedModelStoragePort;
+      modelPublisher?: ModelPublisherPort;
       taskPowerLifecycle: TaskPowerLifecyclePort;
     },
   ) {}
@@ -96,6 +110,7 @@ export class TrainModelUseCase {
     const normalizedRequest = normalizeModelTrainingRequest(request);
     ensureBaseModelSelection(normalizedRequest);
     ensureDatasetSelections(normalizedRequest);
+    ensureOutputDestinationSelection(normalizedRequest);
 
     let baseModelRecordId: string | undefined = normalizedRequest.baseModel.modelRecordId;
 
@@ -207,14 +222,30 @@ export class TrainModelUseCase {
     const { normalizedRequest, baseModelRecordId } = requestContext;
     const generated = trainingResult.generatedModelCandidate;
     const registration = normalizedRequest.output.registration;
+    const destination = normalizedRequest.output.destination;
+    const localStorageResult = destination.local.enabled
+      ? await this.storeGeneratedModelLocally(normalizedRequest, trainingResult, generated)
+      : undefined;
+    const publishedResult = destination.huggingFace?.enabled
+      ? await this.publishGeneratedModel(normalizedRequest, statusRecord.requestId, generated)
+      : undefined;
     const trainingValidation = generated.metadata && typeof generated.metadata["validation"] === "object"
       ? generated.metadata["validation"] as Record<string, unknown>
       : undefined;
+    const runtimeValidationReportPath = typeof trainingResult.validationReportPath === "string"
+      ? trainingResult.validationReportPath
+      : (typeof trainingValidation?.["validationReportPath"] === "string" ? trainingValidation["validationReportPath"] : undefined);
+    const validationReportPath = localStorageResult
+      ? this.resolveStoredOutputPath(runtimeValidationReportPath, generated.localPath, localStorageResult.localPath)
+      : (publishedResult ? undefined : runtimeValidationReportPath);
+    const generatedMetadata = localStorageResult
+      ? this.rewriteGeneratedMetadataPaths(generated.metadata, generated.localPath, localStorageResult.localPath)
+      : (publishedResult ? this.removeGeneratedMetadataOutputPaths(generated.metadata) : generated.metadata);
     const registered = await this.dependencies.modelRegistry.registerGeneratedModel({
       displayName: registration?.displayName ?? generated.displayName,
-      provider: generated.provider,
-      modelId: generated.modelId,
-      localPath: generated.localPath,
+      provider: publishedResult ? "huggingface" : generated.provider,
+      modelId: publishedResult?.repository ?? generated.modelId ?? localStorageResult?.modelId,
+      localPath: localStorageResult?.localPath,
       artifactForm: generated.artifactForm ?? registration?.artifactForm ?? (normalizedRequest.method === "lora" ? "adapter" : "full-model"),
       inferenceMode: generated.inferenceMode ?? registration?.inferenceMode ?? normalizedRequest.baseModel.inferenceMode,
       taskTags: generated.taskTags ?? registration?.taskTags,
@@ -226,25 +257,171 @@ export class TrainModelUseCase {
       metadata: {
         baseModelRecordId,
         ...registration?.metadata,
-        ...generated.metadata,
+        ...generatedMetadata,
+        ...(localStorageResult ? { localStorage: { localPath: localStorageResult.localPath, modelId: localStorageResult.modelId } } : {}),
+        ...(publishedResult ? {
+          published: {
+            provider: publishedResult.provider,
+            repository: publishedResult.repository,
+            revision: publishedResult.revision,
+            url: publishedResult.url,
+          },
+        } : {}),
       },
       validationStatus: typeof trainingValidation?.["status"] === "string"
         ? trainingValidation["status"] as "unknown" | "valid" | "invalid" | "warning"
         : undefined,
       validationReportPath:
-        typeof trainingResult.validationReportPath === "string"
-          ? trainingResult.validationReportPath
-          : (typeof trainingValidation?.["validationReportPath"] === "string" ? trainingValidation["validationReportPath"] : undefined),
+        validationReportPath,
     });
+
+    const outputModel = publishedResult
+      ? (await this.dependencies.modelRegistry.updateModelRecord({
+          modelRecordId: registered.model.modelRecordId,
+          patch: {
+            published: {
+              provider: publishedResult.provider,
+              repository: publishedResult.repository,
+              revision: publishedResult.revision,
+              url: publishedResult.url,
+              publishedAt: new Date().toISOString(),
+            },
+          },
+        })).model
+      : registered.model;
 
     const result = {
       ...trainingResult,
-      outputModel: registered.model,
+      outputDirectory: localStorageResult?.localPath ?? (publishedResult ? undefined : trainingResult.outputDirectory),
+      validationReportPath,
+      generatedModelCandidate: {
+        ...generated,
+        localPath: localStorageResult?.localPath,
+        metadata: generatedMetadata,
+      },
+      outputModel,
     };
     this.registeredResultsByRequestId.set(statusRecord.requestId, result);
     await this.completePowerLifecycle(statusRecord.requestId, "succeeded");
     await this.cleanupRuntimeDatasetDir(statusRecord.requestId);
+    await this.cleanupRuntimeOutputDirectory(generated.localPath, localStorageResult?.localPath);
     return result;
+  }
+
+  private async storeGeneratedModelLocally(
+    request: ModelTrainingRequest,
+    result: ModelTrainingResult,
+    generated: NonNullable<ModelTrainingResult["generatedModelCandidate"]>,
+  ): Promise<{ localPath: string; modelId?: string }> {
+    if (!generated.localPath) {
+      throw new Error("Model training succeeded but did not report a generated model directory to store locally.");
+    }
+
+    if (!this.dependencies.generatedModelStorage) {
+      throw new Error("Local generated model storage is not configured.");
+    }
+
+    return this.dependencies.generatedModelStorage.storeGeneratedModel({
+      sourceDirectory: generated.localPath,
+      outputModelName: result.outputModelName ?? request.output.outputModelName,
+      runId: result.runId,
+      repository: request.output.destination.huggingFace?.repository,
+    });
+  }
+
+  private async publishGeneratedModel(
+    request: ModelTrainingRequest,
+    requestId: string,
+    generated: NonNullable<ModelTrainingResult["generatedModelCandidate"]>,
+  ) {
+    const huggingFace = request.output.destination.huggingFace;
+    if (!huggingFace?.enabled || !huggingFace.repository) {
+      throw new Error("Hugging Face publish destination is incomplete.");
+    }
+
+    if (!generated.localPath) {
+      throw new Error("Model training succeeded but did not report a generated model directory to publish.");
+    }
+
+    if (!this.dependencies.modelPublisher) {
+      throw new Error("Hugging Face model publishing is not configured.");
+    }
+
+    return this.dependencies.modelPublisher.publishModel({
+      modelRecordId: requestId,
+      repository: huggingFace.repository,
+      revision: huggingFace.revision,
+      pathPrefix: huggingFace.pathPrefix,
+      private: huggingFace.private,
+      modelPath: generated.localPath,
+    });
+  }
+
+  private resolveStoredOutputPath(
+    candidatePath: string | undefined,
+    runtimeOutputDirectory: string | undefined,
+    storedLocalDirectory: string | undefined,
+  ): string | undefined {
+    if (!candidatePath || !runtimeOutputDirectory || !storedLocalDirectory) {
+      return candidatePath;
+    }
+
+    const relativePath = relative(resolve(runtimeOutputDirectory), resolve(candidatePath));
+    if (relativePath.startsWith("..") || resolve(relativePath) === relativePath) {
+      return candidatePath;
+    }
+
+    return join(storedLocalDirectory, relativePath);
+  }
+
+  private rewriteGeneratedMetadataPaths(
+    metadata: Record<string, unknown> | undefined,
+    runtimeOutputDirectory: string | undefined,
+    storedLocalDirectory: string | undefined,
+  ): Record<string, unknown> | undefined {
+    if (!metadata) {
+      return metadata;
+    }
+
+    const validation = metadata["validation"];
+    if (!validation || typeof validation !== "object") {
+      return metadata;
+    }
+
+    const validationRecord = validation as Record<string, unknown>;
+    const validationReportPath = typeof validationRecord["validationReportPath"] === "string"
+      ? this.resolveStoredOutputPath(validationRecord["validationReportPath"], runtimeOutputDirectory, storedLocalDirectory)
+      : undefined;
+    if (!validationReportPath || validationReportPath === validationRecord["validationReportPath"]) {
+      return metadata;
+    }
+
+    return {
+      ...metadata,
+      validation: {
+        ...validationRecord,
+        validationReportPath,
+      },
+    };
+  }
+
+  private removeGeneratedMetadataOutputPaths(metadata: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+    if (!metadata) {
+      return metadata;
+    }
+
+    const validation = metadata["validation"];
+    if (!validation || typeof validation !== "object") {
+      return metadata;
+    }
+
+    const validationRecord = { ...(validation as Record<string, unknown>) };
+    delete validationRecord["validationReportPath"];
+
+    return {
+      ...metadata,
+      validation: validationRecord,
+    };
   }
 
   private mapTrainingProgress(statusRecord: RuntimeTaskRecord): ModelTrainingProgress | undefined {
@@ -327,5 +504,17 @@ export class TrainModelUseCase {
 
     this.runtimeDatasetDirsByRequestId.delete(requestId);
     await rm(runtimeDatasetDir, { recursive: true, force: true });
+  }
+
+  private async cleanupRuntimeOutputDirectory(runtimeOutputDirectory: string | undefined, storedLocalDirectory: string | undefined): Promise<void> {
+    if (!runtimeOutputDirectory) {
+      return;
+    }
+
+    if (storedLocalDirectory && resolve(runtimeOutputDirectory) === resolve(storedLocalDirectory)) {
+      return;
+    }
+
+    await rm(runtimeOutputDirectory, { recursive: true, force: true });
   }
 }

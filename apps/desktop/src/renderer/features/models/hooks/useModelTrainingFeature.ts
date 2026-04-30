@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { DesktopArtifactBrowseItem } from "../../../lib/desktopApi";
 import type { DesktopModelInventoryRecord, DesktopModelTrainingResult } from "../../../lib/desktopApi";
+import { createDesktopApplicationSettingsClient } from "../../settings";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsClient } from "./useModelsClient";
 
@@ -37,6 +38,19 @@ function toTrainingMessage(result: DesktopModelTrainingResult): string {
   return `Training ${result.status}. Run ID: ${result.runId}. Waiting for runtime progress...`;
 }
 
+function resolveHuggingFaceRepositoryInput(repository: string, defaultNamespace?: string): string | undefined {
+  const normalizedRepository = repository.trim();
+  if (!normalizedRepository) {
+    return undefined;
+  }
+
+  if (normalizedRepository.includes("/") || !defaultNamespace) {
+    return normalizedRepository;
+  }
+
+  return `${defaultNamespace}/${normalizedRepository}`;
+}
+
 export function useModelTrainingFeature(client?: DesktopModelsClient) {
   const modelClient = useModelsClient(client);
 
@@ -64,6 +78,12 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
   const [generatedDisplayName, setGeneratedDisplayName] = useState("My LoRA Adapter");
   const [maxShardSize, setMaxShardSize] = useState("2GB");
   const [validateAfterTraining, setValidateAfterTraining] = useState(true);
+  const [localDestinationEnabled, setLocalDestinationEnabled] = useState(true);
+  const [huggingFaceDestinationEnabled, setHuggingFaceDestinationEnabled] = useState(false);
+  const [huggingFaceRepository, setHuggingFaceRepository] = useState("");
+  const [huggingFaceRevision, setHuggingFaceRevision] = useState("");
+  const [huggingFacePathPrefix, setHuggingFacePathPrefix] = useState("");
+  const [defaultHuggingFaceNamespace, setDefaultHuggingFaceNamespace] = useState<string | undefined>(undefined);
 
   const [status, setStatus] = useState<TrainingStatus>("idle");
   const [message, setMessage] = useState<string>();
@@ -94,12 +114,47 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
     void load();
   }, [modelClient, baseModelRecordId]);
 
-  const canSubmit = baseModelRecordId.length > 0 && datasetArtifactIds.length > 0 && outputModelName.trim().length > 0 && isMethodSupported && status !== "running";
+  useEffect(() => {
+    try {
+      const settingsClient = createDesktopApplicationSettingsClient();
+      void settingsClient.readSettings({ keys: ["huggingface.defaultNamespace"] }).then((result) => {
+        const namespace = result.values.find((value) => value.key === "huggingface.defaultNamespace")?.value;
+        if (typeof namespace === "string" && namespace.trim().length > 0) {
+          setDefaultHuggingFaceNamespace(namespace.trim());
+        }
+      }).catch(() => {
+        setDefaultHuggingFaceNamespace(undefined);
+      });
+    } catch {
+      setDefaultHuggingFaceNamespace(undefined);
+    }
+  }, []);
+
+  const resolvedHuggingFaceRepository = resolveHuggingFaceRepositoryInput(huggingFaceRepository, defaultHuggingFaceNamespace);
+  const hasOutputDestination = localDestinationEnabled || (huggingFaceDestinationEnabled && Boolean(resolvedHuggingFaceRepository));
+  const canSubmit = baseModelRecordId.length > 0
+    && datasetArtifactIds.length > 0
+    && outputModelName.trim().length > 0
+    && hasOutputDestination
+    && isMethodSupported
+    && status !== "running";
 
   const submitTraining = async () => {
     if (!canSubmit) {
       setStatus("failed");
       setMessage("Training requires base model, dataset artifact IDs, and a supported method.");
+      return;
+    }
+
+    if (!localDestinationEnabled && !huggingFaceDestinationEnabled) {
+      setStatus("failed");
+      setMessage("Choose at least one output destination.");
+      return;
+    }
+
+    if (huggingFaceDestinationEnabled && !resolvedHuggingFaceRepository) {
+      setStatus("failed");
+      setMessage(defaultHuggingFaceNamespace ? "Enter a Hugging Face model repository name." : "Enter a Hugging Face model repository as owner/repository.");
       return;
     }
 
@@ -136,7 +191,18 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
           outputModelName,
           localOutputDirectory: localOutputDirectory.trim() || undefined,
           maxShardSize: maxShardSize.trim() || undefined,
-          destination: { local: { enabled: true } },
+          destination: {
+            local: { enabled: localDestinationEnabled },
+            huggingFace: huggingFaceDestinationEnabled
+              ? {
+                  enabled: true,
+                  provider: "huggingface",
+                  repository: resolvedHuggingFaceRepository,
+                  revision: huggingFaceRevision.trim() || undefined,
+                  pathPrefix: huggingFacePathPrefix.trim() || undefined,
+                }
+              : undefined,
+          },
           registration: {
             displayName: generatedDisplayName.trim() || outputModelName,
             artifactForm: method === "full-finetune" ? "full-model" : "adapter",
@@ -229,6 +295,17 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
     setMaxShardSize,
     validateAfterTraining,
     setValidateAfterTraining,
+    localDestinationEnabled,
+    setLocalDestinationEnabled,
+    huggingFaceDestinationEnabled,
+    setHuggingFaceDestinationEnabled,
+    huggingFaceRepository,
+    setHuggingFaceRepository,
+    huggingFaceRevision,
+    setHuggingFaceRevision,
+    huggingFacePathPrefix,
+    setHuggingFacePathPrefix,
+    defaultHuggingFaceNamespace,
     status,
     message,
     result,

@@ -2,13 +2,13 @@ import { describe, expect, it, testDouble } from "../../../testing/node-test";
 
 import { TaskType, type RuntimeTaskRegistryPort } from "../../../contracts/runtime";
 import type { TaskPowerLifecyclePort } from "../../services/runtime";
-import type { ModelRegistryPort } from "../../ports/model";
-import type { ArtifactStorageBindingPort } from "../../ports/storage";
+import type { GeneratedModelStoragePort, ModelPublisherPort, ModelRegistryPort } from "../../ports/model";
+import type { ArtifactObjectStoragePort, ArtifactStorageBindingPort } from "../../ports/storage";
 import { TrainModelUseCase } from "../model/train-model.use-case";
 
 describe("TrainModelUseCase", () => {
   const baseRequest = { baseModel: { modelRecordId: "base-1" }, datasets: [{ artifactId: "dataset-1", splitRole: "train" as const }], method: "lora" as const, commonParameters: {}, output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } }, registration: { displayName: "Demo Adapter", artifactForm: "adapter" as const } } };
-  const baseRegistry = {
+  const baseRegistry: ModelRegistryPort = {
     listModels: async () => ({ models: [] }), getModelRecord: async () => ({ modelRecordId: "base-1", displayName: "Base", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", modelId: "org/base", createdAt: "2026-04-27T00:00:00.000Z" }), saveModelReference: async () => { throw new Error("not used"); }, registerDownloadedModel: async () => { throw new Error("not used"); }, updateModelRecord: async () => { throw new Error("not used"); }, deleteModelRecord: async () => { throw new Error("not used"); },
   };
 
@@ -25,7 +25,7 @@ describe("TrainModelUseCase", () => {
   });
   const createStorageBindingsFake = (): Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings"> => ({
     readArtifactStorageBindings: testDouble.fn(async () => ({
-      ok: true,
+      ok: true as const,
       value: {
         bindings: [{
           artifactId: "dataset-1",
@@ -35,13 +35,19 @@ describe("TrainModelUseCase", () => {
       },
     })),
   });
-  const createStorageFake = () => ({
+  const createStorageFake = (): Pick<ArtifactObjectStoragePort, "retrieveArtifact"> => ({
     retrieveArtifact: testDouble.fn(async () => ({
-      ok: true,
+      ok: true as const,
       value: {
         descriptor: { key: "generated/dataset-1.parquet", mediaType: "application/x-parquet" },
         content: new TextEncoder().encode("dataset-bytes"),
       },
+    })),
+  });
+  const createGeneratedModelStorageFake = (): GeneratedModelStoragePort => ({
+    storeGeneratedModel: testDouble.fn(async () => ({
+      localPath: "/models/generated/demo-adapter",
+      modelId: "generated/demo-adapter",
     })),
   });
 
@@ -113,7 +119,7 @@ describe("TrainModelUseCase", () => {
       data: {
         runId: "train-req-1",
         status: "succeeded",
-        generatedModelCandidate: { displayName: "Demo Adapter", provider: "huggingface", modelId: "org/demo-adapter" },
+        generatedModelCandidate: { displayName: "Demo Adapter", provider: "huggingface", modelId: "org/demo-adapter", localPath: "/tmp/demo-adapter" },
       },
     });
     const registerGeneratedModel = testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>().mockResolvedValue({
@@ -128,7 +134,7 @@ describe("TrainModelUseCase", () => {
         createdAt: "2026-04-29T00:00:00.000Z",
       },
     });
-    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), taskPowerLifecycle: lifecycle });
+    const useCase = new TrainModelUseCase({ runtimeTaskRegistry, modelRegistry: { ...baseRegistry, registerGeneratedModel }, storageBindings: createStorageBindingsFake(), storage: createStorageFake(), generatedModelStorage: createGeneratedModelStorageFake(), taskPowerLifecycle: lifecycle });
 
     await useCase.execute(baseRequest);
     const first = await useCase.read("train-req-1");
@@ -137,7 +143,91 @@ describe("TrainModelUseCase", () => {
     expect(first.status).toBe("succeeded");
     expect(second.status).toBe("succeeded");
     expect(registerGeneratedModel).toHaveBeenCalledTimes(1);
+    expect(registerGeneratedModel.mock.calls[0]?.[0].localPath).toBe("/models/generated/demo-adapter");
     expect(lifecycle.completeTask).toHaveBeenCalledWith("train-req-1", "succeeded");
+  });
+
+  it("publishes generated model to Hugging Face when selected", async () => {
+    const lifecycle = createLifecycleFake();
+    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+    (runtimeTaskRegistry.getTaskStatus as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+      requestId: "train-req-1",
+      taskType: TaskType.MODEL_TRAINING,
+      status: "succeeded",
+      concurrencyClass: "unknown",
+      data: {
+        runId: "train-req-1",
+        status: "succeeded",
+        outputModelName: "demo-adapter",
+        generatedModelCandidate: { displayName: "Demo Adapter", localPath: "/tmp/demo-adapter", artifactForm: "adapter" },
+      },
+    });
+    const registerGeneratedModel = testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>().mockResolvedValue({
+      model: {
+        modelRecordId: "generated-1",
+        displayName: "Demo Adapter",
+        source: "generated",
+        lifecycleStatus: "generated",
+        artifactForm: "adapter",
+        provider: "huggingface",
+        modelId: "org/demo-adapter",
+        createdAt: "2026-04-29T00:00:00.000Z",
+      },
+    });
+    const updateModelRecord = testDouble.fn<ModelRegistryPort["updateModelRecord"]>().mockResolvedValue({
+      model: {
+        modelRecordId: "generated-1",
+        displayName: "Demo Adapter",
+        source: "generated",
+        lifecycleStatus: "generated",
+        artifactForm: "adapter",
+        provider: "huggingface",
+        modelId: "org/demo-adapter",
+        createdAt: "2026-04-29T00:00:00.000Z",
+        published: { provider: "huggingface", repository: "org/demo-adapter", publishedAt: "2026-04-29T00:00:00.000Z" },
+      },
+    });
+    const modelPublisher: ModelPublisherPort = {
+      publishModel: testDouble.fn(async () => ({
+        modelRecordId: "train-req-1",
+        published: true,
+        provider: "huggingface",
+        repository: "org/demo-adapter",
+        url: "https://huggingface.co/org/demo-adapter",
+      })),
+    };
+    const useCase = new TrainModelUseCase({
+      runtimeTaskRegistry,
+      modelRegistry: { ...baseRegistry, registerGeneratedModel, updateModelRecord },
+      storageBindings: createStorageBindingsFake(),
+      storage: createStorageFake(),
+      generatedModelStorage: createGeneratedModelStorageFake(),
+      modelPublisher,
+      taskPowerLifecycle: lifecycle,
+    });
+
+    await useCase.execute({
+      ...baseRequest,
+      output: {
+        ...baseRequest.output,
+        destination: {
+          local: { enabled: true },
+          huggingFace: { enabled: true, provider: "huggingface", repository: "org/demo-adapter", pathPrefix: "adapters" },
+        },
+      },
+    });
+    const result = await useCase.read("train-req-1");
+
+    expect(modelPublisher.publishModel).toHaveBeenCalledWith({
+      modelRecordId: "train-req-1",
+      repository: "org/demo-adapter",
+      revision: undefined,
+      pathPrefix: "adapters",
+      private: false,
+      modelPath: "/tmp/demo-adapter",
+    });
+    expect(registerGeneratedModel.mock.calls[0]?.[0].modelId).toBe("org/demo-adapter");
+    expect(result.outputModel?.published?.repository).toBe("org/demo-adapter");
   });
 
   for (const terminalStatus of ["failed", "cancelled"] as const) {
@@ -165,7 +255,7 @@ describe("TrainModelUseCase", () => {
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
     const storageBindings: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings"> = {
       readArtifactStorageBindings: testDouble.fn(async () => ({
-        ok: true,
+        ok: true as const,
         value: {
           bindings: [{
             artifactId: "dataset-1",
@@ -189,7 +279,7 @@ describe("TrainModelUseCase", () => {
     const lifecycle = createLifecycleFake();
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
     const storageBindings: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings"> = {
-      readArtifactStorageBindings: testDouble.fn(async () => ({ ok: true, value: { bindings: [] } })),
+      readArtifactStorageBindings: testDouble.fn(async () => ({ ok: true as const, value: { bindings: [] } })),
     };
     const storage = createStorageFake();
     const generatedDatasetRequest = {

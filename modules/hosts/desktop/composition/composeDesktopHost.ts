@@ -63,6 +63,7 @@ import { createHuggingFaceArtifactRepoStorageAdapter } from "../../../adapters/s
 import type { HuggingFaceFetchImplementation } from "../../../adapters/storage/huggingface";
 import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
 import { createHuggingFaceModelPublisherAdapter } from "../../../adapters/model/huggingface";
+import { createLocalGeneratedModelStorageAdapter } from "../../../adapters/model/local";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import {
   createHuggingFaceTokenConfigStore,
@@ -768,6 +769,10 @@ export function composeDesktopHost(
         modelRegistry,
         storageBindings: artifactBindings,
         storage,
+        generatedModelStorage: createLocalGeneratedModelStorageAdapter({
+          env: process.env,
+        }),
+        modelPublisher,
         taskPowerLifecycle,
       });
       const validateModel = new ValidateModelUseCase({
