@@ -106,11 +106,14 @@ it("generates non-timestamp request ids when caller does not provide one", async
     expect(record.progress?.details).toMatchObject({ generatedRowCount: 40 });
   });
 
-  it("maps python training progress into generic runtime batch progress fields", async () => {
+  it("keeps generic progress mapping when chunk fields are not present", async () => {
     const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(async () => ({ requestId: "req-train", taskType: "train-model", status: "running", progress: { stage: "training", message: "Epoch [0]/[1], Batch [0]/[59]", epoch: 0, totalEpochs: 1, batch: 0, totalBatches: 59 } })), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
     const record = await adapter.getTaskStatus("req-train");
-    expect(record.progress).toMatchObject({ message: "Epoch [0]/[1], Batch [0]/[59]", current: 0, total: 59, unit: "batch" });
+    expect(record.progress).toMatchObject({ message: "Epoch [0]/[1], Batch [0]/[59]" });
+    expect(record.progress?.current).toBeUndefined();
+    expect(record.progress?.total).toBeUndefined();
+    expect(record.progress?.unit).toBeUndefined();
     expect(record.progress?.details).toMatchObject({ stage: "training", totalBatches: 59 });
   });
 

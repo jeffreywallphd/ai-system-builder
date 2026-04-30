@@ -29,11 +29,11 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8188;
   const url = `http://${host}:${port}`;
-  const startupTimeoutMs = options.startupTimeoutMs ?? 5_000;
-  const healthCheckIntervalMs = options.healthCheckIntervalMs ?? 100;
+  const startupTimeoutMs = options.startupTimeoutMs ?? 120_000;
+  const healthCheckIntervalMs = options.healthCheckIntervalMs ?? 1_000;
   const spawnImplementation = options.spawnImplementation ?? spawn;
   const pythonExecutable = options.pythonExecutable ?? "python";
-  const client: Pick<ComfyUiHttpClient, "getQueue"> = createComfyUiHttpClient({ baseUrl: url, fetchImplementation: options.fetchImplementation });
+  const client: Pick<ComfyUiHttpClient, "getSystemStats"> = createComfyUiHttpClient({ baseUrl: url, fetchImplementation: options.fetchImplementation });
 
   let processHandle: ChildProcess | undefined;
   let status: ComfyUiRuntimeHealth["status"] = "stopped";
@@ -61,7 +61,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       const timeoutAt = Date.now() + startupTimeoutMs;
       while (Date.now() < timeoutAt) {
         try {
-          await client.getQueue();
+          await client.getSystemStats();
           status = "ready";
           lastCheckAt = Date.now();
           return;
@@ -72,6 +72,8 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         }
       }
 
+      processHandle.kill("SIGTERM");
+      processHandle = undefined;
       status = "unhealthy";
       lastCheckAt = Date.now();
       throw new Error(`ComfyUI runtime failed to become ready within ${startupTimeoutMs}ms.`);
@@ -87,7 +89,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       }
 
       try {
-        await client.getQueue();
+        await client.getSystemStats();
         status = "ready";
       } catch {
         status = status === "starting" ? "starting" : "unhealthy";
