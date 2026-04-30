@@ -54,17 +54,6 @@ function mapProgress(progress: Record<string, unknown> | undefined): RuntimeTask
   if (!progress) {
     return undefined;
   }
-  const batch = typeof progress.batch === "number" ? progress.batch : undefined;
-  const totalBatches = typeof progress.totalBatches === "number" ? progress.totalBatches : undefined;
-  if (typeof batch === "number" || typeof totalBatches === "number") {
-    return {
-      message: typeof progress.message === "string" ? progress.message : undefined,
-      current: batch,
-      total: totalBatches,
-      unit: "batch",
-      details: progress,
-    };
-  }
   const processedChunkCount = typeof progress.processedChunkCount === "number" ? progress.processedChunkCount : undefined;
   const totalChunkCount = typeof progress.totalChunkCount === "number" ? progress.totalChunkCount : undefined;
   return {
