@@ -48,3 +48,11 @@ Include this pack when prompts involve:
 - Metadata should include source, requested ref, resolved ref/commit SHA, installedAt, lastCheckedAt, and an ownership/managed marker.
 - The managed marker is required before repair/update modifies an existing non-empty directory.
 - Prompt 2 can choose the exact metadata filename; suggested: `.ai-system-builder-runtime-install.json`.
+
+## Prompt 2 Progress
+
+- A generic Git runtime installer adapter exists in the adapter layer.
+- The Git installer is generic and not ComfyUI-specific.
+- The installer writes managed install metadata (`.ai-system-builder-runtime-install.json` by default).
+- The installer refuses to mutate non-empty unmanaged install directories.
+- ComfyUI-specific defaults/composition are deferred to Prompt 3.
