@@ -131,6 +131,56 @@ describe("desktop dataset preparation client", () => {
     expect(started).toEqual({ error: { code: "validation", message: "bad input" } });
   });
 
+  it("preserves clear runtime start failure message and details", async () => {
+    const hostWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
+    hostWindow.window ??= {} as Window & typeof globalThis;
+    hostWindow.window.desktopApi = {
+      uploadArtifact: async () => ({ ok: false }),
+      getArtifactUploadPolicy: async () => ({ ok: false }),
+      browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+      readArtifactDetail: async () => ({ ok: false }),
+      readArtifactContentDescriptor: async () => ({ ok: false }),
+      readArtifactViewerMedia: async () => ({ ok: false }),
+      publishArtifactToRepo: async () => ({ ok: false }),
+      verifyPublishedArtifactBacking: async () => ({ ok: false }),
+      registerArtifactFromRepo: async () => ({ ok: false }),
+      localizeArtifactFromRepo: async () => ({ ok: false }),
+      startPrepareTrainingDataset: async () => ({
+        ok: false,
+        error: {
+          code: "internal",
+          message: "Python runtime could not be started before dataset preparation.",
+          details: { cause: "supervisor unavailable" },
+        },
+      }),
+    };
+
+    const client = createDesktopDatasetPreparationClient();
+    const started = await client.startPrepareTrainingDataset({
+      sourceArtifactIds: ["artifact-1"],
+      recipe: {
+        normalization: { targetFormat: "markdown" },
+        chunking: { strategy: "character", chunkSize: 1_000, chunkOverlap: 200 },
+        generation: {
+          mode: "qa",
+          model: { provider: "transformers", modelId: "Qwen/Qwen2.5-1.5B-Instruct" },
+          promptTemplate: "Prompt",
+        },
+      },
+      split: { trainRatio: 0.8, testRatio: 0.2 },
+      output: { format: "jsonl" },
+    });
+
+    expect(started).toEqual({
+      error: {
+        code: "internal",
+        message: "Python runtime could not be started before dataset preparation.",
+        details: { cause: "supervisor unavailable" },
+      },
+    });
+  });
+
+
   it("does not fall back to storageKey when artifactId is missing from browse items", async () => {
     const hostWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
     hostWindow.window ??= {} as Window & typeof globalThis;

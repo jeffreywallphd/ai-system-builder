@@ -385,8 +385,12 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       }, context);
     } catch (error) {
       await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
+      const message = error instanceof Error ? error.message : "Failed to start dataset preparation.";
+      const normalizedMessage = message.includes("Python runtime failed to start or become ready")
+        ? `Python runtime could not be started before dataset preparation. ${message}`
+        : message;
       return createFailureResult(
-        createContractError("internal", error instanceof Error ? error.message : "Failed to start dataset preparation."),
+        createContractError("internal", normalizedMessage),
         context,
       );
     }

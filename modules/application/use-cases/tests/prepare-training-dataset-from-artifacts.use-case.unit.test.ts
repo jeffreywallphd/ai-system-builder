@@ -51,4 +51,27 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     await useCase.readPrepareTrainingDataset("r1");
     expect(await exists(runtimeDir)).toBe(false);
   });
+
+  it("returns clear start failure when python runtime is unavailable", async () => {
+    const lifecycle = createLifecycleFake();
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+      runtimeTaskRegistry: createRegistry({
+        startTask: testDouble.fn(async () => {
+          throw new Error("Python runtime failed to start or become ready before starting task: fetch failed");
+        }),
+      }),
+      storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() },
+      storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() },
+      taskPowerLifecycle: lifecycle,
+    });
+
+    const started = await useCase.startPrepareTrainingDataset(command);
+
+    expect(started.ok).toBe(false);
+    if (!started.ok) {
+      expect(started.error.message).toContain("Python runtime could not be started before dataset preparation.");
+      expect(started.error.message).toContain("Python runtime failed to start or become ready");
+    }
+  });
+
 });
