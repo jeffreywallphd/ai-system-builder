@@ -53,6 +53,8 @@ import {
   createPythonRuntimeTaskRegistryAdapter,
 } from "../../../adapters/runtime/python";
 import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
+import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
+import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
 import { createRuntimeTaskRegistryRouter } from "../../../adapters/runtime/createRuntimeTaskRegistryRouter";
 import { createElectronPowerSuspensionBlocker } from "../../../adapters/runtime/electron";
 import {
@@ -250,6 +252,13 @@ const PYTHON_RUNTIME_MANAGED_PORT_SPAN = 10_000;
 const PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000;
 const DATASET_PREPARATION_TASK_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
+
+export function resolveComfyUiInstallRoot(env: NodeJS.ProcessEnv = process.env, storageRootDirectory?: string): string {
+  const configured = env.COMFYUI_INSTALL_ROOT?.trim();
+  if (configured) return configured;
+  const base = storageRootDirectory?.trim() || env.DESKTOP_STORAGE_ROOT?.trim() || env.APPDATA?.trim() || env.HOME?.trim() || process.cwd();
+  return path.join(base, "runtime-installs", "comfyui");
+}
 
 export function resolveDefaultManagedPythonRuntimePort(processId: number = process.pid): string {
   const processPortOffset = Math.abs(processId) % PYTHON_RUNTIME_MANAGED_PORT_SPAN;
@@ -501,8 +510,21 @@ export function composeDesktopHost(
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
   const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
-  const comfyUiWorkingDirectory = process.env.COMFYUI_WORKING_DIRECTORY?.trim() || ".";
-  const comfyUiSupervisor = createComfyUiRuntimeSupervisor({ workingDirectory: comfyUiWorkingDirectory });
+  const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env);
+  const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({});
+  const comfyUiInstaller = createComfyUiRuntimeInstaller({
+    gitInstaller: gitRuntimeInstaller,
+    pythonCommand: process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+    skipPythonSetup: process.env.COMFYUI_SKIP_PYTHON_SETUP === "1",
+    skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
+  });
+  const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+    workingDirectory: comfyUiInstallRoot,
+    installer: comfyUiInstaller,
+    installRoot: comfyUiInstallRoot,
+    autoInstall: process.env.COMFYUI_AUTO_INSTALL !== "0",
+    installSourceRef: process.env.COMFYUI_INSTALL_REF,
+  });
   const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({ client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }), supervisor: comfyUiSupervisor, mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT } });
   const runtimeTaskRegistry = createRuntimeTaskRegistryRouter({ python: pythonRuntimeTaskRegistry, image: comfyUiRuntimeTaskRegistry });
 

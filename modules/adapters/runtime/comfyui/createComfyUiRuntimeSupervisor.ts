@@ -1,7 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
 
+import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
 import { createComfyUiHttpClient, type ComfyUiHttpClient } from "./createComfyUiHttpClient";
 import type { ComfyUiRuntimeHealth } from "./comfyUiRuntimeHealth";
+
+const COMFYUI_REPOSITORY_URL = "https://github.com/Comfy-Org/ComfyUI";
 
 export interface CreateComfyUiRuntimeSupervisorOptions {
   workingDirectory: string;
@@ -12,6 +15,12 @@ export interface CreateComfyUiRuntimeSupervisorOptions {
   healthCheckIntervalMs?: number;
   fetchImplementation?: typeof fetch;
   spawnImplementation?: typeof spawn;
+  installer?: RuntimeInstallerPort;
+  installRoot?: string;
+  installSourceRef?: string;
+  autoInstall?: boolean;
+  skipPythonSetup?: boolean;
+  skipPythonValidation?: boolean;
 }
 
 export interface ComfyUiRuntimeSupervisor {
@@ -45,10 +54,41 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         return;
       }
 
+      let spawnWorkingDirectory = options.workingDirectory;
+
+      if (options.autoInstall === true) {
+        if (!options.installRoot?.trim()) {
+          throw new Error("ComfyUI install failed: installRoot is required when autoInstall is enabled");
+        }
+        if (!options.installer) {
+          throw new Error("ComfyUI install failed: installer is required when autoInstall is enabled");
+        }
+
+        const installResult = await options.installer.ensureInstalled({
+          targetId: "comfyui",
+          installRoot: options.installRoot,
+          source: {
+            type: "git",
+            repositoryUrl: COMFYUI_REPOSITORY_URL,
+            ref: options.installSourceRef,
+          },
+          metadata: {
+            skipPythonSetup: options.skipPythonSetup,
+            skipPythonValidation: options.skipPythonValidation,
+          },
+        });
+
+        if (installResult.status !== "installed") {
+          throw new Error(`ComfyUI install failed: ${installResult.error?.message ?? "unknown install error"}`);
+        }
+
+        spawnWorkingDirectory = options.installRoot;
+      }
+
       status = "starting";
       lastCheckAt = Date.now();
       processHandle = spawnImplementation(pythonExecutable, ["main.py", "--listen", host, "--port", String(port)], {
-        cwd: options.workingDirectory,
+        cwd: spawnWorkingDirectory,
         stdio: "pipe",
       });
 
