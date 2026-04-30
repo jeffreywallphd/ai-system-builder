@@ -309,6 +309,13 @@ export interface DesktopDatasetPreparationApi {
   ) => Promise<unknown>;
 }
 
+export interface DesktopImageGenerationApi {
+  startImageGeneration?: (input: Record<string, unknown>, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+}
+
 export interface DesktopPythonRuntimeApi {
   readPythonRuntimeStatus: () => Promise<unknown>;
   controlPythonRuntime: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
@@ -336,6 +343,10 @@ interface DesktopApiBridge {
   cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
+  startImageGeneration?: (input: Record<string, unknown>, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;

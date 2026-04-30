@@ -39,8 +39,6 @@ import {
   PublishModelUseCase,
 } from "../../../application/use-cases";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
-import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
-import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { DefaultModelDefaultResolver } from "../../../application/services/settings";
@@ -795,8 +793,6 @@ export function composeDesktopHost(
         runtimeTaskRegistry,
       });
       const generateImageUseCase = new GenerateImageUseCase({ runtimeTaskRegistry });
-      const finalizeImageGenerationService = new FinalizeImageGenerationService({ storage, artifactCatalogAppend: artifactCatalog, now: options.now });
-      const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({ runtimeTaskRegistry, finalizeImageGenerationService });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -862,7 +858,6 @@ export function composeDesktopHost(
         validateModelUseCase: validateModel,
         publishModelUseCase: publishModel,
         generateImageUseCase,
-        imageGenerationFinalizationOrchestrator,
       });
     },
   };
