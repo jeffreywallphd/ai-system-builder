@@ -28,11 +28,20 @@ describe("image generation contracts", () => {
     expect("graph" in request).toBe(false);
   });
 
+  it("allows optional request fields to be omitted", () => {
+    const request: ImageGenerationRequest = {
+      prompt: "minimal prompt",
+    };
+
+    expect(request.prompt).toBe("minimal prompt");
+    expect(request.engineHints).toBeUndefined();
+  });
+
   it("defines a serializable result shape tied to runtime status", () => {
     const result: ImageGenerationResult = {
       requestId: "img-req-1",
       status: "succeeded",
-      outputs: [{ artifactId: "artifact-1", assetId: "asset-1" }],
+      outputs: [{ artifactId: "artifact-1" }],
       warnings: ["scheduler adjusted"],
       errors: [],
     };

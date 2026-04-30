@@ -31,3 +31,9 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 ## Canonical Reference
 
 - See `docs/adr/ADR-0012-image-generation-runtime.md`.
+
+## Separation of Concerns Clarifications
+
+- Contracts are engine-agnostic and capture intent rather than sidecar-specific payload shapes.
+- Runtime task registry is the execution path for image generation workloads.
+- Assets are created post-execution in the application layer, not in the runtime layer.

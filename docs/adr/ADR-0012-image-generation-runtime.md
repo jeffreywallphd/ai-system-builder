@@ -102,3 +102,10 @@ Clarifications:
 
 - Requires adapter mapping work in follow-up prompts.
 - Defers engine-specific power-user features until boundary contracts are stable.
+
+## Separation of Concerns
+
+- Contracts define intent and shared semantics only; they do not encode runtime-specific payloads.
+- Runtime payload mapping is performed in adapters at execution boundaries.
+- `ImageGenerationRequest` is not equivalent to a ComfyUI workflow definition.
+- Asset registration occurs after runtime completion in the application layer, not in the runtime adapter layer.
