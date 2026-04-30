@@ -1,14 +1,13 @@
 import type { ImageGenerationRequest } from "../../../contracts/image-generation";
-import { TaskType, type CancelRuntimeTaskResult, type RuntimeTaskRecord } from "../../../contracts/runtime";
+import {
+  TaskType,
+  type CancelRuntimeTaskResult,
+  type RuntimeTaskRecord,
+  type StartRuntimeTaskResult,
+} from "../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 
 import type { ApplicationRequestContext } from "../../ports";
-
-export interface StartImageGenerationResult {
-  requestId: string;
-  status?: "queued" | "running";
-  metadata?: Record<string, unknown>;
-}
 
 function assertValidPrompt(request: ImageGenerationRequest): void {
   if (typeof request.prompt !== "string" || request.prompt.trim().length === 0) {
@@ -26,7 +25,7 @@ export class GenerateImageUseCase {
   public async startImageGeneration(
     request: ImageGenerationRequest,
     context?: ApplicationRequestContext,
-  ): Promise<StartImageGenerationResult> {
+  ): Promise<StartRuntimeTaskResult> {
     assertValidPrompt(request);
 
     const result = await this.dependencies.runtimeTaskRegistry.startTask({
@@ -35,11 +34,7 @@ export class GenerateImageUseCase {
       requestId: context?.requestId,
     });
 
-    return {
-      requestId: result.requestId,
-      status: result.status,
-      metadata: result.metadata,
-    };
+    return result;
   }
 
   public async readImageGeneration(requestId: string, _context?: ApplicationRequestContext): Promise<RuntimeTaskRecord> {
