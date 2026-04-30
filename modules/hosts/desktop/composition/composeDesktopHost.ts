@@ -210,6 +210,26 @@ export interface DesktopHostComposition {
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
 }
 
+export function classifyPythonRuntimeStdioLogLevel(
+  stream: "stdout" | "stderr",
+  message: string,
+): "info" | "warn" | "error" {
+  if (stream === "stdout") {
+    return "info";
+  }
+
+  const normalizedMessage = message.trim();
+  if (/^(ERROR|CRITICAL):/i.test(normalizedMessage) || normalizedMessage.includes("Traceback (most recent call last)")) {
+    return "error";
+  }
+
+  if (/^WARNING:/i.test(normalizedMessage) || /\b(?:UserWarning|FutureWarning|RuntimeWarning|DeprecationWarning):/.test(normalizedMessage)) {
+    return "warn";
+  }
+
+  return "info";
+}
+
 export function resolvePythonRuntimeBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
   const configuredBaseUrl = env.PYTHON_RUNTIME_BASE_URL?.trim();
   if (configuredBaseUrl) {
@@ -346,7 +366,7 @@ export function composeDesktopHost(
             return;
           }
           const stream = event.data?.source === "stderr" ? "stderr" : "stdout";
-          const level = stream === "stderr" ? "warn" : "info";
+          const level = classifyPythonRuntimeStdioLogLevel(stream, message);
           recordRuntimeLog({
             level,
             message: `Python runtime ${stream}: ${message}`,
@@ -357,7 +377,7 @@ export function composeDesktopHost(
         const message = event.detail ?? `Python runtime event: ${event.type}`;
         const level: "info" | "warn" | "error" = event.type === "process-error" || event.type === "startup-timeout"
           ? "error"
-          : (event.type === "health-probe-failed" || event.type === "process-exit" ? "warn" : "info");
+          : (event.type === "process-exit" ? "warn" : "info");
         recordRuntimeLog({
           level,
           message,

@@ -57,6 +57,7 @@ import {
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
 import {
+  classifyPythonRuntimeStdioLogLevel,
   composeDesktopHost,
   resolveDefaultManagedPythonRuntimePort,
   resolvePythonRuntimeBaseUrl,
@@ -111,6 +112,13 @@ describe("composeDesktopHost", () => {
       component: "store-artifact-upload-use-case",
       useCase: "store-artifact-upload",
     });
+  });
+
+  it("classifies routine Python runtime stderr output without warning noise", () => {
+    expect(classifyPythonRuntimeStdioLogLevel("stderr", "INFO:     Uvicorn running on http://127.0.0.1:47595")).toBe("info");
+    expect(classifyPythonRuntimeStdioLogLevel("stderr", "Map: 100%|##########| 117/117 [00:00<00:00, 1393.06 examples/s]")).toBe("info");
+    expect(classifyPythonRuntimeStdioLogLevel("stderr", "worker.py:1: UserWarning: model warning")).toBe("warn");
+    expect(classifyPythonRuntimeStdioLogLevel("stderr", "Traceback (most recent call last):")).toBe("error");
   });
 
 

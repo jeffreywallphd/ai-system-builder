@@ -231,6 +231,7 @@ describe("ModelsFeature", () => {
     expect(container.textContent).toContain("Current backend support: LoRA, QLoRA, and full fine-tuning");
     expect(container.textContent).toContain("Training datasets (Parquet artifacts)");
     expect(container.querySelector("select[multiple]")).toBeTruthy();
+    expect(Array.from(container.querySelectorAll("input")).some((input) => input.value === "512")).toBe(true);
     expect(container.textContent).toContain("Start Training");
   });
 
