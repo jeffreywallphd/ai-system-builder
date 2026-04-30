@@ -15,6 +15,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | cross-layer architecture or boundary decisions | `docs/context/packs/architecture.pack.md` |
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
 | runtime task registry lifecycle for long-running runtime tasks (start/read/cancel, shared lifecycle/progress/retention semantics) | `docs/context/packs/runtime-task-registry.pack.md` |
+| image generation feature architecture/contracts, ComfyUI runtime-sidecar concerns, image asset modeling | `docs/context/packs/image-generation.pack.md` |
 | Electron/desktop host lifecycle, IPC/preload boundaries, desktop composition | `docs/context/packs/desktop-host.pack.md` |
 | desktop renderer structure, page/feature/component boundaries, renderer API-client usage | `docs/context/packs/desktop-implementation.pack.md` |
 | desktop renderer CSS/style architecture, shared style layering, token-first styling decisions | `docs/context/packs/desktop-styling.pack.md` |
@@ -33,6 +34,10 @@ For prompts containing debugging/failure language (for example: `error`, `bug`, 
 - If the failure touches runtime/Python/worker/background-task behavior, also include `docs/context/packs/runtime.pack.md`.
 - If the failure touches IPC/preload/desktop transport boundaries, also include `docs/context/packs/desktop-host.pack.md` (and `docs/context/packs/server-host.pack.md` when server transport boundaries are involved).
 - If the failure touches renderer/UI state or progress display, also include `docs/context/packs/desktop-implementation.pack.md` (and `docs/context/packs/desktop-styling.pack.md` only when styling behavior is part of the defect).
+
+Routing rule for feature prompts:
+
+- If the task relates to image generation, ComfyUI, or image assets, include `docs/context/packs/image-generation.pack.md`.
 - Keep routing minimum-sufficient; do not include unrelated packs or full-repo context by default.
 
 ## Selection Rules
