@@ -11,6 +11,7 @@ import type {
   RuntimeInstallStatusResult,
 } from "../../../../contracts/runtime-installer";
 import type { RuntimeInstallerPort } from "../../../../application/ports/runtime-installer/runtime-installer.port";
+import type { LoggingPort } from "../../../../application/ports/logging";
 
 type ExecFileLike = (file: string, args?: readonly string[]) => Promise<{ stdout: string; stderr: string }>;
 
@@ -81,6 +82,7 @@ export interface CreateGitRuntimeInstallerAdapterOptions {
   readdir?: typeof nodeReaddir;
   now?: () => string;
   metadataFileName?: string;
+  logging?: LoggingPort;
 }
 
 const defaultExecFile = promisify(nodeExecFile);
@@ -97,6 +99,14 @@ export function createGitRuntimeInstallerAdapter(
   const readdir = options.readdir ?? nodeReaddir;
   const now = options.now ?? (() => new Date().toISOString());
   const metadataFileName = options.metadataFileName ?? ".ai-system-builder-runtime-install.json";
+  const log = (level: "debug" | "info" | "error", message: string, details?: Record<string, unknown>) => {
+    void options.logging?.log({
+      level,
+      message,
+      timestamp: new Date().toISOString(),
+      context: { component: "git-runtime-installer", ...(details ? { details } : {}) },
+    });
+  };
 
   const getMetadataPath = (installRoot: string) => path.join(installRoot, metadataFileName);
 
@@ -202,13 +212,16 @@ export function createGitRuntimeInstallerAdapter(
 
   async function runGit(args: string[], code: string) {
     try {
+      log("debug", "Running git installer command.", { gitCommand, args });
       return await execFile(gitCommand, args);
     } catch (error) {
+      log("error", "Git installer command failed.", { gitCommand, args, error });
       throw makeError(code, `Git command failed: ${args.join(" ")}`, { cause: error });
     }
   }
 
   async function ensureInstalled(request: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
+    log("info", "Ensuring runtime install from git source.", { targetId: request.targetId, installRoot: request.installRoot });
     if (!request.installRoot) {
       return { targetId: request.targetId, status: "failed", installRoot: "", source: request.source, error: makeError("missing-install-root", "installRoot is required") };
     }
@@ -246,7 +259,7 @@ export function createGitRuntimeInstallerAdapter(
         status: "failed",
         installRoot: request.installRoot,
         source: request.source,
-        error: status.error ?? makeError("unmanaged-install-root", forceRepairMessage),
+        error: request.forceRepair === true ? makeError("unmanaged-install-root", forceRepairMessage) : (status.error ?? makeError("unmanaged-install-root", forceRepairMessage)),
       };
     }
 
@@ -283,6 +296,7 @@ export function createGitRuntimeInstallerAdapter(
       lastCheckedAt: installedAt,
     };
       await writeMetadata(metadata);
+      log("info", "Runtime git install succeeded.", { targetId: request.targetId, installRoot: request.installRoot, commitSha });
 
       return {
         targetId: request.targetId,
@@ -296,6 +310,7 @@ export function createGitRuntimeInstallerAdapter(
         lastCheckedAt: installedAt,
       };
     } catch (error) {
+      log("error", "Runtime git install failed.", { targetId: request.targetId, installRoot: request.installRoot, error });
       return {
         targetId: request.targetId,
         status: "failed",

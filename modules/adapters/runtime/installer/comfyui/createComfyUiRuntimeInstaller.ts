@@ -2,6 +2,7 @@ import { stat as nodeStat } from "node:fs/promises";
 import path from "node:path";
 
 import type { RuntimeInstallerPort } from "../../../../application/ports/runtime-installer/runtime-installer.port";
+import type { LoggingPort } from "../../../../application/ports/logging";
 import type {
   RuntimeInstallRequest,
   RuntimeInstallResult,
@@ -22,6 +23,7 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   skipPythonValidation?: boolean;
   requirementsFileName?: string;
   stat?: typeof nodeStat;
+  logging?: LoggingPort;
 }
 
 export const DEFAULT_COMFYUI_REPOSITORY_URL = "https://github.com/Comfy-Org/ComfyUI";
@@ -73,6 +75,14 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   const stat = options.stat ?? nodeStat;
 
   const makeError = (code: string, message: string, details?: Record<string, unknown>) => ({ code, message, details });
+  const log = (level: "debug" | "info" | "error", message: string, details?: Record<string, unknown>) => {
+    void options.logging?.log({
+      level,
+      message,
+      timestamp: new Date().toISOString(),
+      context: { component: "comfyui-runtime-installer", ...(details ? { details } : {}) },
+    });
+  };
 
   async function pathExists(targetPath: string): Promise<boolean> {
     try {
@@ -86,6 +96,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   async function ensurePythonDependencies(installRoot: string): Promise<{ warnings: string[]; installedAt?: string; error?: RuntimeInstallResult["error"] }> {
     const warnings: string[] = [];
     const requirementsPath = path.join(installRoot, requirementsFileName);
+    log("debug", "Checking ComfyUI Python requirements file.", { requirementsPath });
 
     if (!(await pathExists(requirementsPath))) {
       warnings.push(`Skipped Python dependency install: ${requirementsFileName} not found`);
@@ -99,8 +110,10 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
 
     try {
       if (options.pipCommand) {
+        log("info", "Installing ComfyUI Python dependencies with pip command.", { pipCommand: options.pipCommand });
         await options.execFile(options.pipCommand, ["install", "-r", requirementsPath]);
       } else {
+        log("info", "Installing ComfyUI Python dependencies via python -m pip.", { pythonCommand });
         await options.execFile(pythonCommand, ["-m", "pip", "install", "-r", requirementsPath]);
       }
       return { warnings, installedAt: now() };
@@ -125,6 +138,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
 
     if (options.execFile && !options.skipPythonValidation) {
       try {
+        log("debug", "Validating ComfyUI entrypoint.", { entrypointPath, pythonCommand });
         await options.execFile(pythonCommand, [entrypointPath, "--help"]);
       } catch (error) {
         const err = error as { stdout?: string; stderr?: string; message?: string };
@@ -173,6 +187,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   }
 
   async function ensureInstalled(request: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
+    log("info", "Ensuring ComfyUI install.", { installRoot: request.installRoot, targetId: request.targetId });
     const normalizedRequest = normalizeComfyUiInstallRequest(request);
     if (!normalizedRequest.installRoot) {
       return {
@@ -201,6 +216,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   }
 
   async function repairInstall(request: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
+    log("info", "Repairing ComfyUI install.", { installRoot: request.installRoot, targetId: request.targetId });
     const normalizedRequest = normalizeComfyUiInstallRequest(request);
     if (!normalizedRequest.installRoot) {
       return {
