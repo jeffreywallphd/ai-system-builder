@@ -142,7 +142,10 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
       setModelLoadStatus("loading");
       setModelLoadMessage("Loading model inventory...");
       try {
-        const models = await modelInventoryClient.listModels({ limit: IMAGE_GENERATION_MODEL_LIST_LIMIT });
+        const models = await modelInventoryClient.listModels({
+          limit: IMAGE_GENERATION_MODEL_LIST_LIMIT,
+          includeDiscovered: false,
+        });
         if (cancelled || !mountedRef.current) return;
         const optionByValue = new Map<string, ImageGenerationModelOption>();
         for (const model of models) {

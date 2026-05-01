@@ -261,10 +261,12 @@ describe("model contracts", () => {
       artifactForm: "adapter",
       search: " demo ",
       limit: 999,
+      includeDiscovered: false,
     });
 
     expect(list.limit).toBe(MAX_LIST_MODELS_LIMIT);
     expect(list.search).toBe("demo");
+    expect(list.includeDiscovered).toBe(false);
 
     const del = normalizeDeleteModelRecordRequest({
       modelRecordId: " model-1 ",

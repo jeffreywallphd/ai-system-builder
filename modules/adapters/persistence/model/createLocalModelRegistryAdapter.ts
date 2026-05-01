@@ -291,7 +291,9 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       const document = await readDocument();
       const limit = request.limit ?? 50;
       const normalizedModels = (document.models ?? []).map(normalizeModelInventoryRecord);
-      const discovered = await discoverCachedModels(normalizedModels);
+      const discovered = request.includeDiscovered === false
+        ? []
+        : await discoverCachedModels(normalizedModels);
       const allModels = discovered.length > 0 ? [...normalizedModels, ...discovered] : normalizedModels;
       if (discovered.length > 0) {
         await writeDocument({

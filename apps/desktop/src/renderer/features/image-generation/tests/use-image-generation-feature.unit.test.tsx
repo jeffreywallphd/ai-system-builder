@@ -103,7 +103,7 @@ describe("useImageGenerationFeature", () => {
     let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
     await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
     await act(async () => Promise.resolve());
-    expect(listModelsMock).toHaveBeenCalledWith({ limit: 500 });
+    expect(listModelsMock).toHaveBeenCalledWith({ limit: 500, includeDiscovered: false });
     expect(hook.availableModels.map((model) => model.value)).toEqual(["stabilityai/stable-diffusion", "foo/bar"]);
     expect(hook.availableModels[0]?.label).toContain("sd - stabilityai/stable-diffusion - huggingface - downloaded");
     expect(hook.modelLoadStatus).toBe("success");
