@@ -15,6 +15,27 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
   const requestToTaskType = new Map<string, TaskType>();
   const unknown = (requestId: string): RuntimeTaskRecord => ({ requestId, taskType: "unknown" as unknown as TaskType, status: "unknown", concurrencyClass: "unknown" });
 
+  const imageTaskTypes = new Set<TaskType>([TaskType.IMAGE_GENERATION]);
+  const pythonTaskTypes = new Set<TaskType>([
+    TaskType.DATASET_PREPARATION,
+    TaskType.MODEL_TRAINING,
+    TaskType.MODEL_VALIDATION,
+    TaskType.MODEL_PUBLISHING,
+  ]);
+
+  const filterListRequest = (request: RuntimeTaskListRequest, supportedTaskTypes: Set<TaskType>): RuntimeTaskListRequest | undefined => {
+    if (!request.taskTypes || request.taskTypes.length === 0) {
+      return request;
+    }
+
+    const taskTypes = request.taskTypes.filter((taskType) => supportedTaskTypes.has(taskType));
+    if (taskTypes.length === 0) {
+      return undefined;
+    }
+
+    return { ...request, taskTypes };
+  };
+
   return {
     async startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult> {
       const delegate = taskTypeDelegates[request.taskType];
@@ -32,8 +53,14 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
       return taskType ? taskTypeDelegates[taskType].cancelTask(requestId) : { requestId, cancelled: false, status: "unknown" };
     },
     async listTasks(request: RuntimeTaskListRequest): Promise<RuntimeTaskListResult> {
-      if (request.taskType) return taskTypeDelegates[request.taskType].listTasks(request);
-      const [image, python] = await Promise.all([delegates.image.listTasks(request), delegates.python.listTasks(request)]);
+      const imageRequest = filterListRequest(request, imageTaskTypes);
+      const pythonRequest = filterListRequest(request, pythonTaskTypes);
+
+      const [image, python] = await Promise.all([
+        imageRequest ? delegates.image.listTasks(imageRequest) : Promise.resolve({ tasks: [] }),
+        pythonRequest ? delegates.python.listTasks(pythonRequest) : Promise.resolve({ tasks: [] }),
+      ]);
+
       return { tasks: [...image.tasks, ...python.tasks] };
     },
   };

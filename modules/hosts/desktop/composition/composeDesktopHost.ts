@@ -889,6 +889,8 @@ export function composeDesktopHost(
         validateModelUseCase: validateModel,
         publishModelUseCase: publishModel,
         generateImageUseCase,
+        comfyUiInstaller,
+        comfyUiInstallRoot,
       });
     },
   };
