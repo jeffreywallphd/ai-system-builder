@@ -19,10 +19,15 @@ describe("FinalizeImageGenerationService", () => {
   it("returns asset/artifact refs and source generated metadata", async () => {
     const imageAssetRegistry: ImageAssetRegistryPort = { registerImageAsset: testDouble.fn(async () => ({ assetId: "asset-1" })), getImageAsset: testDouble.fn(async () => null) };
     const generatedImagePersistence: GeneratedImagePersistencePort = { persistGeneratedImage: testDouble.fn(async () => ({ artifactId: "generated/images/asset-1/out.png", originalFileName: "out.png" })) };
-    const service = new FinalizeImageGenerationService({ imageAssetRegistry, generatedImagePersistence, nowMs: () => 1234 });
+    const service = new FinalizeImageGenerationService({ imageAssetRegistry, generatedImagePersistence, createAssetId: () => "asset-1", now: () => "2026-05-01T00:00:00.000Z" });
     const result = await service.finalizeCompletedTask(createTask());
     expect(result).toEqual({ assets: [{ assetId: "asset-1", artifactId: "generated/images/asset-1/out.png" }] });
-    expect(imageAssetRegistry.registerImageAsset).toHaveBeenCalledWith(expect.objectContaining({ source: "generated" }));
+    expect(generatedImagePersistence.persistGeneratedImage).toHaveBeenCalledWith({ output: { type: "image", engine: "comfyui", fileName: "out.png", subfolder: "", promptId: "p1", width: 512, height: 768 }, assetId: "asset-1" });
+    expect(imageAssetRegistry.registerImageAsset).toHaveBeenCalledWith({
+      assetId: "asset-1",
+      artifactId: "generated/images/asset-1/out.png",
+      source: "generated",
+    });
   });
 
   it("is idempotent", async () => {

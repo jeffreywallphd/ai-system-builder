@@ -3,6 +3,8 @@ import { execFile as nodeExecFile, spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { LoggingPort } from "../../../application/ports/logging";
+import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
+import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
 import { TaskPowerLifecycleService } from "../../../application/services/runtime";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
@@ -70,6 +72,7 @@ import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactObjectStorageAdapter,
+  createFilesystemGeneratedImagePersistenceAdapter,
   createLocalArtifactCatalogPersistenceAdapter,
   createLocalArtifactStorageBindingAdapter,
 } from "../../../adapters/storage/filesystem";
@@ -79,6 +82,7 @@ import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/mo
 import { createHuggingFaceModelPublisherAdapter } from "../../../adapters/model/huggingface";
 import { createLocalGeneratedModelStorageAdapter, createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
+import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
 import {
   createHuggingFaceTokenConfigStore,
   type HuggingFaceTokenStatus,
@@ -1024,6 +1028,23 @@ export function composeDesktopHost(
           log: (entry) => recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
         }),
       });
+      const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
+        runtimeTaskRegistry,
+        finalizeImageGenerationService: new FinalizeImageGenerationService({
+          imageAssetRegistry: createLocalImageAssetRegistryAdapter({
+            filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
+            now,
+          }),
+          generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
+            comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
+            artifactStorageRoot: registerOptions.storageRootDirectory,
+            artifactCatalogAppend: artifactCatalog,
+            logging: loggingPort,
+            now,
+          }),
+          now,
+        }),
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
@@ -1089,6 +1110,7 @@ export function composeDesktopHost(
         validateModelUseCase: validateModel,
         publishModelUseCase: publishModel,
         generateImageUseCase,
+        imageGenerationFinalizationOrchestrator,
         comfyUiInstaller,
         comfyUiInstallRoot,
       });
