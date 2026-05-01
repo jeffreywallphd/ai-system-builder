@@ -44,7 +44,7 @@ export interface DesktopPythonRuntimeLogEntry {
 export interface DesktopPythonRuntimeLoadedModel {
   provider: "transformers";
   modelId: string;
-  inferenceMode: "text2text" | "causal" | "chat";
+  inferenceMode: "text2text" | "causal" | "chat" | "text-to-image";
   device?: "cpu" | "cuda" | "auto";
   torchDtype?: "auto" | "float16" | "bfloat16" | "float32";
   localPath?: string;

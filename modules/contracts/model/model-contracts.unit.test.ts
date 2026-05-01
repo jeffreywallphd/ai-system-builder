@@ -32,7 +32,7 @@ import {
 describe("model contracts", () => {
   it("defines browse providers and inference modes", () => {
     expect(MODEL_BROWSE_PROVIDERS).toEqual(["huggingface", "unknown"]);
-    expect(MODEL_INFERENCE_MODES).toEqual(["text2text", "causal", "chat"]);
+    expect(MODEL_INFERENCE_MODES).toEqual(["text2text", "causal", "chat", "text-to-image"]);
     expect(normalizeModelInferenceMode(" chat ")).toBe("chat");
     expectTypeOf<ModelInferenceMode>().toExtend<Exclude<NonNullable<LocalModelConfig["inferenceMode"]>, "auto">>();
   });
@@ -94,6 +94,7 @@ describe("model contracts", () => {
     expect(recommendModelInferenceMode({ taskTags: ["question-answering"] })).toBe("text2text");
     expect(recommendModelInferenceMode({ pipelineTag: "text-generation" })).toBe("causal");
     expect(recommendModelInferenceMode({ pipelineTag: "chat" })).toBe("chat");
+    expect(recommendModelInferenceMode({ pipelineTag: "text-to-image" })).toBe("text-to-image");
     expect(recommendModelInferenceMode({ pipelineTag: "unknown-task" })).toBeUndefined();
   });
 

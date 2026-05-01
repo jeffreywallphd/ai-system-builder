@@ -34,8 +34,8 @@ export interface DesktopModelsClient {
   browseModels: (input: DesktopModelBrowseRequest) => Promise<{ models: DesktopModelBrowseItem[]; nextCursor?: string }>;
   getModelDetails: (input: { provider: "huggingface"; modelId: string }) => Promise<DesktopModelDetailsResult["model"]>;
   listModels: (input?: { source?: ModelSource; lifecycleStatus?: ModelLifecycleStatus; artifactForm?: ModelArtifactForm; search?: string }) => Promise<DesktopModelInventoryRecord[]>;
-  saveModelReference: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
-  downloadModel: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopDownloadModelResult>;
+  saveModelReference: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat" | "text-to-image"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
+  downloadModel: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat" | "text-to-image"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopDownloadModelResult>;
   updateModelRecord: (input: { modelRecordId: string; patch: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
   deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean }) => Promise<DesktopDeleteModelRecordResult>;
   trainModel: (input: DesktopModelTrainingRequest) => Promise<DesktopModelTrainingResult>;
