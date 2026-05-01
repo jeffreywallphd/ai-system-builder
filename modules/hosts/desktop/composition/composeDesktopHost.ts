@@ -77,7 +77,7 @@ import { createHuggingFaceArtifactRepoStorageAdapter } from "../../../adapters/s
 import type { HuggingFaceFetchImplementation } from "../../../adapters/storage/huggingface";
 import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
 import { createHuggingFaceModelPublisherAdapter } from "../../../adapters/model/huggingface";
-import { createLocalGeneratedModelStorageAdapter } from "../../../adapters/model/local";
+import { createLocalGeneratedModelStorageAdapter, createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import {
   createHuggingFaceTokenConfigStore,
@@ -953,7 +953,14 @@ export function composeDesktopHost(
         modelRegistry,
         runtimeTaskRegistry,
       });
-      const generateImageUseCase = new GenerateImageUseCase({ runtimeTaskRegistry });
+      const generateImageUseCase = new GenerateImageUseCase({
+        runtimeTaskRegistry,
+        modelCheckpointResolver: createLocalModelCheckpointResolverAdapter({
+          modelRegistry,
+          comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
+          log: (entry) => recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
+        }),
+      });
 
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
