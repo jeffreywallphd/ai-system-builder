@@ -384,7 +384,8 @@ describe("composeDesktopHost", () => {
 
     expect(source).toContain("const comfyUiInstallRoot = resolveComfyUiInstallRoot");
     expect(source).toContain("const comfyUiInstaller = createComfyUiRuntimeInstaller");
-    expect(source).toContain("execFile: (file, args = []) => execFile(file, [...args])");
+    expect(source).toContain("const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS)");
+    expect(source).toContain("execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true })");
     expect(source).toContain("const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode");
     expect(source).toContain("const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode");
     expect(source).toContain("pythonEnvironmentMode: comfyUiPythonEnvironmentMode");

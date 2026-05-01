@@ -261,6 +261,7 @@ export function resolvePythonRuntimeBaseUrl(env: NodeJS.ProcessEnv = process.env
 const PYTHON_RUNTIME_MANAGED_BASE_PORT = 43111;
 const PYTHON_RUNTIME_MANAGED_PORT_SPAN = 10_000;
 const PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000;
+const COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT = 30 * 60 * 1000;
 const DATASET_PREPARATION_TASK_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 
@@ -680,13 +681,18 @@ export function composeDesktopHost(
         skipPythonSetup: comfyUiSkipPythonSetup,
       });
       const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({ env: process.env, hasNvidiaGpu: detectNvidiaGpu() });
+      const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS);
+      const comfyUiInstallCommandTimeoutMs =
+        Number.isFinite(configuredComfyUiInstallCommandTimeoutMs) && configuredComfyUiInstallCommandTimeoutMs > 0
+          ? configuredComfyUiInstallCommandTimeoutMs
+          : COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT;
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: comfyUiBasePythonCommand,
         pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
         runtimeDeviceMode: comfyUiRuntimeDeviceMode,
-        execFile: (file, args = []) => execFile(file, [...args]),
+        execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
         skipPythonSetup: comfyUiSkipPythonSetup,
         skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
         logging: loggingPort,

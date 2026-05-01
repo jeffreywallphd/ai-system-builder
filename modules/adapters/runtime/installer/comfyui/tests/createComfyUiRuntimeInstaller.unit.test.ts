@@ -168,6 +168,47 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, [entrypointPath, "--help"]);
   });
 
+  it("skips dependency and validation commands on later starts when finalization metadata still matches", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [], commitSha: "abc123" })),
+      getInstallStatus: testDouble.fn(),
+    };
+    let finalizationMetadata = "";
+    const execFile = testDouble.fn(async () => ({ stdout: "", stderr: "" }));
+    const stat = testDouble.fn(async (targetPath: string) => {
+      if (String(targetPath).endsWith(".ai-system-builder-comfyui-finalization.json") && !finalizationMetadata) {
+        throw new Error("missing metadata");
+      }
+      return {};
+    });
+    const readFile = testDouble.fn(async () => finalizationMetadata);
+    const writeFile = testDouble.fn(async (_targetPath: string, content: string) => {
+      finalizationMetadata = content;
+    });
+    const log = testDouble.fn();
+    const installer = createComfyUiRuntimeInstaller({
+      gitInstaller,
+      execFile,
+      stat: stat as never,
+      readFile: readFile as never,
+      writeFile: writeFile as never,
+      runtimeDeviceMode: "directml",
+      logging: { log },
+    });
+
+    await installer.ensureInstalled(baseRequest);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "torch-directml"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, [entrypointPath, "--help"]);
+
+    execFile.mockClear();
+    await installer.ensureInstalled(baseRequest);
+
+    expect(execFile).not.toHaveBeenCalled();
+    const messages = log.mock.calls.map((call) => (call[0] as { message: string }).message);
+    expect(messages).toContain("ComfyUI install finalization already completed; skipping dependency and validation commands.");
+  });
+
   it("does not install torch-directml for automatic CUDA-capable ComfyUI startup", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
