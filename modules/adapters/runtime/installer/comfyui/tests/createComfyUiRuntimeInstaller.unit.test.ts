@@ -130,6 +130,31 @@ describe("createComfyUiRuntimeInstaller", () => {
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
     await installer.ensureInstalled(baseRequest);
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-c", "import torchaudio"]);
+  });
+
+  it("repairs torchaudio when import check fails after dependency install", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    let importAttempts = 0;
+    const execFile = testDouble.fn(async (file: string, args: string[]) => {
+      if (file === managedPythonPath && args[0] === "-c" && args[1] === "import torchaudio") {
+        importAttempts += 1;
+        if (importAttempts === 1) {
+          throw new Error("import failed");
+        }
+      }
+      return { stdout: "", stderr: "" };
+    });
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
+
+    await installer.ensureInstalled(baseRequest);
+
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torchaudio"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-c", "import torchaudio"]);
   });
 
   it("creates a managed Python environment before installing ComfyUI dependencies when one is missing", async () => {

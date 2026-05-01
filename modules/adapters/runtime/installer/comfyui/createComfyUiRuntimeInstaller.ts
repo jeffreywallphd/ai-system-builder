@@ -405,6 +405,39 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
+  async function ensureTorchAudioImport(dependencyPythonCommand: string): Promise<{ repairedAt?: string; error?: RuntimeInstallResult["error"] }> {
+    if (!options.execFile) {
+      return {};
+    }
+
+    const importCheckArgs = ["-c", "import torchaudio"];
+    try {
+      await runCommandStage({ stage: "torchaudio-import-check", file: dependencyPythonCommand, args: importCheckArgs });
+      return {};
+    } catch {
+      log("info", "ComfyUI torchaudio import check failed; attempting reinstall.");
+    }
+
+    try {
+      if (options.pipCommand) {
+        await runCommandStage({ stage: "torchaudio-reinstall", file: options.pipCommand, args: ["install", "--force-reinstall", "--no-cache-dir", "torchaudio"] });
+      } else {
+        await runCommandStage({ stage: "torchaudio-reinstall", file: dependencyPythonCommand, args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torchaudio"] });
+      }
+      await runCommandStage({ stage: "torchaudio-import-check", file: dependencyPythonCommand, args: importCheckArgs });
+      return { repairedAt: now() };
+    } catch (error) {
+      const err = error as { stdout?: string; stderr?: string; message?: string };
+      return {
+        error: makeError("torchaudio-import-check-failed", "Failed to load torchaudio after reinstall", {
+          stdout: err?.stdout,
+          stderr: err?.stderr,
+          message: err?.message,
+        }),
+      };
+    }
+  }
+
   async function validateComfyUi(
     installRoot: string,
     validationPythonCommand: string,
@@ -535,6 +568,17 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         return { ...installResult, status: "failed", warnings, error: directMlSetup.error };
       }
       directMlDependenciesInstalledAt = directMlSetup.installedAt;
+
+      const torchaudioImport = await ensureTorchAudioImport(pythonEnvironment.pythonCommand);
+      if (torchaudioImport.error) {
+        log("error", "ComfyUI install finalization failed during torchaudio import stage.", {
+          installRoot: normalizedRequest.installRoot,
+          targetId: normalizedRequest.targetId,
+          durationMs: elapsed(finalizeStartedAt),
+          error: torchaudioImport.error,
+        });
+        return { ...installResult, status: "failed", warnings, error: torchaudioImport.error };
+      }
     } else {
       log("info", "Skipped ComfyUI Python dependency stage by configuration.", {
         installRoot: normalizedRequest.installRoot,
