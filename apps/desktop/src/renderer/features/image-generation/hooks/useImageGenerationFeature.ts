@@ -5,7 +5,7 @@ import type { ModelInventoryRecord } from "../../../../../../../modules/contract
 import type { RuntimeTaskRecord } from "../../../../../../../modules/contracts/runtime";
 import type { RuntimeInstallStatus } from "../../../../../../../modules/contracts/runtime-installer";
 import { createDesktopImageGenerationClient } from "../api";
-import { createDesktopModelsClient } from "../../models/api/desktopModelsClient";
+import { createDesktopModelsClient, type DesktopModelsClient } from "../../models/api/desktopModelsClient";
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
@@ -17,12 +17,21 @@ export interface ImageGenerationFormValues {
   prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; sampler: string; scheduler: string; model: string; numImages: string;
 }
 export type ImageGenerationUiStatus = "idle" | "starting" | "queued" | "running" | "finalizing" | "succeeded" | "failed" | "cancelled" | "unknown";
+export type ImageGenerationModelLoadStatus = "idle" | "loading" | "success" | "error";
+
+export interface ImageGenerationModelOption {
+  value: string;
+  label: string;
+  modelRecordId: string;
+}
 
 const ACTIVE_STATUSES: ImageGenerationUiStatus[] = ["starting", "queued", "running", "finalizing"];
 const INSTALL_STATUSES: RuntimeInstallStatus[] = ["not-installed", "installing", "checking", "installed", "update-available", "failed", "unknown"];
 const SELECTABLE_IMAGE_MODEL_LIFECYCLE_STATUSES = ["downloaded", "generated", "validated"] as const;
 const SELECTABLE_IMAGE_MODEL_ARTIFACT_FORMS = ["full-model", "merged-model", "checkpoint"] as const;
 const IMAGE_GENERATION_MODEL_LIST_LIMIT = 500;
+
+type DesktopImageGenerationClient = ReturnType<typeof createDesktopImageGenerationClient>;
 
 const parsePositiveNumber = (value: string) => {
   if (value.trim() === "") return undefined;
@@ -65,6 +74,25 @@ export function toImageGenerationModelDropdownValue(model: Pick<ModelInventoryRe
   return candidates.find((value) => typeof value === "string" && value.trim().length > 0)?.trim();
 }
 
+export function toImageGenerationModelDropdownOption(
+  model: Pick<ModelInventoryRecord, "artifactForm" | "displayName" | "inferenceMode" | "lifecycleStatus" | "localPath" | "modelId" | "modelRecordId" | "source" | "taskTags">,
+): ImageGenerationModelOption | undefined {
+  if (!isSelectableImageGenerationModel(model)) {
+    return undefined;
+  }
+
+  const value = toImageGenerationModelDropdownValue(model);
+  if (!value) {
+    return undefined;
+  }
+
+  return {
+    value,
+    modelRecordId: model.modelRecordId,
+    label: `${model.displayName} - ${model.modelId ?? model.localPath ?? "n/a"} - ${model.source} - ${model.lifecycleStatus} - ${model.artifactForm} - inference: ${model.inferenceMode ?? "n/a"}`,
+  };
+}
+
 export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageGenerationOutputReference[] {
   const data = task.data as { outputs?: unknown; value?: { outputs?: unknown } } | undefined;
   const rawOutputs = Array.isArray(data?.outputs) ? data.outputs : Array.isArray(data?.value?.outputs) ? data.value.outputs : [];
@@ -73,7 +101,9 @@ export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageG
     .map((o) => ({ fileName: typeof o.fileName === "string" ? o.fileName : undefined, subfolder: typeof o.subfolder === "string" ? o.subfolder : undefined, engine: typeof o.engine === "string" ? o.engine : undefined, promptId: typeof o.promptId === "string" ? o.promptId : undefined }));
 }
 
-export function useImageGenerationFeature(client = createDesktopImageGenerationClient()) {
+export function useImageGenerationFeature(client?: DesktopImageGenerationClient, modelsClient?: DesktopModelsClient) {
+  const imageGenerationClient = useMemo(() => client ?? createDesktopImageGenerationClient(), [client]);
+  const modelInventoryClient = useMemo(() => modelsClient ?? createDesktopModelsClient(), [modelsClient]);
   const [form, setForm] = useState<ImageGenerationFormValues>({ prompt: "", negativePrompt: "", seed: "42", width: "1024", height: "1024", steps: "30", sampler: "euler", scheduler: "normal", model: "", numImages: "1" });
   const [status, setStatus] = useState<ImageGenerationUiStatus>("idle");
   const [message, setMessage] = useState<string | undefined>(undefined);
@@ -85,7 +115,9 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   const [finalizedAssets, setFinalizedAssets] = useState<ImageGenerationFinalizedAssetReference[]>([]);
   const [installStatus, setInstallStatus] = useState<RuntimeInstallStatus>("checking");
 
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableModels, setAvailableModels] = useState<ImageGenerationModelOption[]>([]);
+  const [modelLoadStatus, setModelLoadStatus] = useState<ImageGenerationModelLoadStatus>("idle");
+  const [modelLoadMessage, setModelLoadMessage] = useState<string | undefined>(undefined);
   const mountedRef = useRef(true);
   const activePollRef = useRef<string | undefined>(undefined);
   const installStatusSequenceRef = useRef(0);
@@ -96,34 +128,47 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
     let cancelled = false;
     const sequence = ++installStatusSequenceRef.current;
     void (async () => {
-      const status = await client.readComfyUiInstallStatus?.({});
+      const status = await imageGenerationClient.readComfyUiInstallStatus?.({});
       if (cancelled || !mountedRef.current || installStatusSequenceRef.current !== sequence) return;
       if (!status || !status.ok) { setInstallStatus("unknown"); return; }
       setInstallStatus(normalizeInstallStatus(status.value.status));
     })();
     return () => { cancelled = true; };
-  }, [client]);
+  }, [imageGenerationClient]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      setModelLoadStatus("loading");
+      setModelLoadMessage("Loading model inventory...");
       try {
-        const modelsClient = createDesktopModelsClient();
-        const models = await modelsClient.listModels({ limit: IMAGE_GENERATION_MODEL_LIST_LIMIT });
+        const models = await modelInventoryClient.listModels({ limit: IMAGE_GENERATION_MODEL_LIST_LIMIT });
         if (cancelled || !mountedRef.current) return;
-        const names = models
-          .filter(isSelectableImageGenerationModel)
-          .map(toImageGenerationModelDropdownValue)
-          .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
-        setAvailableModels(Array.from(new Set(names)));
-      } catch {
+        const optionByValue = new Map<string, ImageGenerationModelOption>();
+        for (const model of models) {
+          const option = toImageGenerationModelDropdownOption(model);
+          if (option && !optionByValue.has(option.value)) {
+            optionByValue.set(option.value, option);
+          }
+        }
+        const options = Array.from(optionByValue.values());
+        setAvailableModels(options);
+        setModelLoadStatus("success");
+        setModelLoadMessage(
+          options.length > 0
+            ? `Loaded ${options.length} image generation model${options.length === 1 ? "" : "s"}.`
+            : `Loaded ${models.length} model record${models.length === 1 ? "" : "s"}, but none are downloaded image-generation full models or checkpoints.`,
+        );
+      } catch (error) {
         if (!cancelled && mountedRef.current) {
           setAvailableModels([]);
+          setModelLoadStatus("error");
+          setModelLoadMessage(error instanceof Error ? `Failed to load model inventory for image generation: ${error.message}` : "Failed to load model inventory for image generation.");
         }
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [modelInventoryClient]);
 
   const validationError = useMemo(() => {
     if (!form.prompt.trim()) return "Prompt is required.";
@@ -138,7 +183,7 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
     if (activePollRef.current === id) return;
     activePollRef.current = id;
     while (isPollingStillActive(id)) {
-      const read = await client.readImageGeneration({ requestId: id });
+      const read = await imageGenerationClient.readImageGeneration({ requestId: id });
       if (!isPollingStillActive(id)) return;
       if (!read.ok) { setStatus("failed"); setError(read.error.message ?? "Failed to read image generation status."); return; }
       const view: ImageGenerationTaskDataView = { status: read.value.status, progress: read.value.progress ? { message: read.value.progress.message, current: read.value.progress.current, total: read.value.progress.total } : undefined, outputs: normalizeImageGenerationOutputs(read.value) };
@@ -148,7 +193,7 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
       if (runtimeStatus === "running") { setStatus("running"); setMessage(view.progress?.message); await sleep(600); if (!isPollingStillActive(id)) return; continue; }
       if (runtimeStatus === "succeeded") {
         setStatus("finalizing");
-        const fin = await client.finalizeImageGenerationIfCompleted({ requestId: id });
+        const fin = await imageGenerationClient.finalizeImageGenerationIfCompleted({ requestId: id });
         if (!isPollingStillActive(id)) return;
         if (fin.ok && Array.isArray(fin.value.assets)) {
           setFinalizedAssets(fin.value.assets.filter((a): a is ImageGenerationFinalizedAssetReference => typeof a?.assetId === "string" && typeof a?.artifactId === "string"));
@@ -160,7 +205,7 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
       if (runtimeStatus === "cancelled") { setStatus("cancelled"); return; }
       setStatus("unknown"); return;
     }
-  }, [client, isPollingStillActive]);
+  }, [imageGenerationClient, isPollingStillActive]);
 
   const start = useCallback(async () => {
     if (validationError || isStartDisabled) return false;
@@ -172,27 +217,27 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
     if (form.sampler.trim()) payload.sampler = form.sampler.trim();
     if (form.scheduler.trim()) payload.scheduler = form.scheduler.trim();
     if (form.model.trim()) payload.model = form.model.trim();
-    const started = await client.startImageGeneration(payload);
+    const started = await imageGenerationClient.startImageGeneration(payload);
     if (!started.ok || !started.value.requestId) { setStatus("failed"); setError(started.ok ? "Failed to start image generation." : started.error.message); return false; }
     const id = started.value.requestId;
     setRequestId(id); setStatus("queued");
     void poll(id);
     return true;
-  }, [client, form, isStartDisabled, poll, validationError]);
+  }, [imageGenerationClient, form, isStartDisabled, poll, validationError]);
 
   const cancel = useCallback(async () => {
     if (!requestId) return;
-    const cancelled = await client.cancelImageGeneration({ requestId });
+    const cancelled = await imageGenerationClient.cancelImageGeneration({ requestId });
     if (!isPollingStillActive(requestId)) return;
     if (cancelled.ok && cancelled.value.cancelled === true) { setStatus("cancelled"); setMessage(cancelled.value.message); activePollRef.current = undefined; return; }
     setMessage(cancelled.ok ? (cancelled.value.message ?? "Cancellation is not supported for this request.") : cancelled.error.message);
-  }, [client, isPollingStillActive, requestId]);
+  }, [imageGenerationClient, isPollingStillActive, requestId]);
 
   const repairInstall = async () => {
     const sequence = ++installStatusSequenceRef.current;
     setInstallStatus("installing");
     try {
-      const result = await client.repairComfyUiInstall?.({ allowUpdate: true, forceRepair: true });
+      const result = await imageGenerationClient.repairComfyUiInstall?.({ allowUpdate: true, forceRepair: true });
       if (!mountedRef.current || installStatusSequenceRef.current !== sequence) return;
       if (!result || !result.ok) {
         setInstallStatus("failed");
@@ -207,5 +252,5 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
       setError(error instanceof Error ? error.message : "Failed to repair ComfyUI install.");
     }
   };
-  return { form, setForm, status, message, error, requestId, progress, taskData, outputs, finalizedAssets, installStatus, availableModels, validationError, isStartDisabled, start, cancel, repairInstall };
+  return { form, setForm, status, message, error, requestId, progress, taskData, outputs, finalizedAssets, installStatus, availableModels, modelLoadStatus, modelLoadMessage, validationError, isStartDisabled, start, cancel, repairInstall };
 }
