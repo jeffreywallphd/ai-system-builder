@@ -133,6 +133,32 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-c", "import torchaudio"]);
   });
 
+
+  it("reinstalls torchaudio pinned to torch version when import check fails", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    let importAttempts = 0;
+    const execFile = testDouble.fn(async (file: string, args: string[]) => {
+      if (file === managedPythonPath && args[0] === "-c" && args[1] === "import torchaudio") {
+        importAttempts += 1;
+        if (importAttempts === 1) {
+          throw new Error("import failed");
+        }
+      }
+      if (file === managedPythonPath && args[0] === "-c" && args[1] === "import torch; print(torch.__version__.split('+')[0])") {
+        return { stdout: "2.3.1\n", stderr: "" };
+      }
+      return { stdout: "", stderr: "" };
+    });
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
+
+    await installer.ensureInstalled(baseRequest);
+
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torchaudio==2.3.1"]);
+  });
   it("repairs torchaudio when import check fails after dependency install", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
