@@ -66,6 +66,16 @@ export const INITIAL_APPLICATION_SETTING_DEFINITIONS: ApplicationSettingDefiniti
     scope: "application",
   },
   {
+    key: "runtime.imageGeneration.gpuType",
+    category: "runtime",
+    label: "Image generation GPU type",
+    description: "Preferred GPU type for ComfyUI image generation when auto-detection is unavailable.",
+    valueKind: "select",
+    options: [{ value: "auto" }, { value: "nvidia" }, { value: "amd" }, { value: "intel" }, { value: "cpu" }],
+    defaultValue: "auto",
+    scope: "application",
+  },
+  {
     key: "runtime.python.defaultDevice",
     category: "runtime",
     label: "Default Python runtime device",

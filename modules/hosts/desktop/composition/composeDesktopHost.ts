@@ -326,10 +326,22 @@ export function resolveComfyUiRuntimeDeviceMode(input: {
   env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform;
   hasNvidiaGpu?: boolean;
+  gpuType?: string | undefined;
 } = {}): ComfyUiRuntimeDeviceMode {
   const configured = normalizeComfyUiRuntimeDeviceMode(input.env?.COMFYUI_RUNTIME_DEVICE_MODE ?? input.env?.COMFYUI_ACCELERATOR);
   if (configured) {
     return configured;
+  }
+
+  const configuredGpuType = input.gpuType?.trim().toLowerCase();
+  if (configuredGpuType === "nvidia") {
+    return "cuda";
+  }
+  if (configuredGpuType === "amd" || configuredGpuType === "intel") {
+    return "directml";
+  }
+  if (configuredGpuType === "cpu") {
+    return "cpu";
   }
 
   if ((input.platform ?? process.platform) === "win32" && input.hasNvidiaGpu === false) {
@@ -680,7 +692,11 @@ export function composeDesktopHost(
         pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
         skipPythonSetup: comfyUiSkipPythonSetup,
       });
-      const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({ env: process.env, hasNvidiaGpu: detectNvidiaGpu() });
+      const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({
+        env: process.env,
+        hasNvidiaGpu: detectNvidiaGpu(),
+        gpuType: process.env.COMFYUI_GPU_TYPE,
+      });
       const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS);
       const comfyUiInstallCommandTimeoutMs =
         Number.isFinite(configuredComfyUiInstallCommandTimeoutMs) && configuredComfyUiInstallCommandTimeoutMs > 0
