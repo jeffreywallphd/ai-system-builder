@@ -418,11 +418,25 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       log("info", "ComfyUI torchaudio import check failed; attempting reinstall.");
     }
 
-    try {
+    const pipInstall = async (packages: readonly string[], stage: string) => {
       if (options.pipCommand) {
-        await runCommandStage({ stage: "torchaudio-reinstall", file: options.pipCommand, args: ["install", "--force-reinstall", "--no-cache-dir", "torchaudio"] });
+        await runCommandStage({ stage, file: options.pipCommand, args: ["install", "--force-reinstall", "--no-cache-dir", ...packages] });
       } else {
-        await runCommandStage({ stage: "torchaudio-reinstall", file: dependencyPythonCommand, args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torchaudio"] });
+        await runCommandStage({ stage, file: dependencyPythonCommand, args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", ...packages] });
+      }
+    };
+
+    try {
+      const torchVersionProbe = await runCommandStage({
+        stage: "torchaudio-torch-version-check",
+        file: dependencyPythonCommand,
+        args: ["-c", "import torch; print(torch.__version__.split('+')[0])"],
+      });
+      const torchVersion = torchVersionProbe.stdout.trim();
+      if (torchVersion) {
+        await pipInstall([`torchaudio==${torchVersion}`], "torchaudio-reinstall-version-matched");
+      } else {
+        await pipInstall(["torchaudio"], "torchaudio-reinstall");
       }
       await runCommandStage({ stage: "torchaudio-import-check", file: dependencyPythonCommand, args: importCheckArgs });
       return { repairedAt: now() };
