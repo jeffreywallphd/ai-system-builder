@@ -1,6 +1,7 @@
 import type { ImageAsset } from "../../../contracts/image";
 
 export interface RegisterImageAssetInput {
+  assetId?: string;
   artifactId: string;
   source: "generated" | "uploaded";
   metadata?: {
@@ -12,7 +13,7 @@ export interface RegisterImageAssetInput {
     workflowTemplateId?: string;
     width?: number;
     height?: number;
-    createdAt?: number;
+    createdAt?: string;
   };
 }
 

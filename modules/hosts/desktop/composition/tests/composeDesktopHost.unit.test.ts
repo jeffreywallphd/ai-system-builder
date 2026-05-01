@@ -410,6 +410,20 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("comfyUiInstallRoot,");
   });
 
+  it("wires generated image finalization into desktop image generation IPC", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService");
+    expect(source).toContain("createFilesystemGeneratedImagePersistenceAdapter");
+    expect(source).toContain("artifactCatalogAppend: artifactCatalog");
+    expect(source).toContain("imageGenerationFinalizationOrchestrator,");
+  });
+
   it("derives the Python runtime client URL from host and port when no base URL is configured", () => {
     expect(resolvePythonRuntimeBaseUrl({ PYTHON_RUNTIME_PORT: "45123" })).toBe("http://127.0.0.1:45123");
     expect(resolvePythonRuntimeBaseUrl({

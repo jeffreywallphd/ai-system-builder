@@ -7,7 +7,7 @@ interface FinalizedAssetRef { assetId: string; artifactId: string; }
 export class FinalizeImageGenerationService {
   private readonly finalizedByRequestId = new Map<string, FinalizedAssetRef[]>();
 
-  public constructor(private readonly dependencies: { imageAssetRegistry: ImageAssetRegistryPort; generatedImagePersistence: GeneratedImagePersistencePort; nowMs?: () => number; }) {}
+  public constructor(private readonly dependencies: { imageAssetRegistry: ImageAssetRegistryPort; generatedImagePersistence: GeneratedImagePersistencePort; createAssetId?: () => string; now?: () => string; }) {}
 
   public async finalizeCompletedTask(task: RuntimeTaskRecord): Promise<{ assets: FinalizedAssetRef[] }> {
     const existing = this.finalizedByRequestId.get(task.requestId);
@@ -17,18 +17,20 @@ export class FinalizeImageGenerationService {
     const outputs = this.getOutputs(task.data);
     const assets: FinalizedAssetRef[] = [];
     for (const output of outputs) {
-      const { assetId } = await this.dependencies.imageAssetRegistry.registerImageAsset({
-        artifactId: `pending:${task.requestId}`,
+      const assetId = this.dependencies.createAssetId?.() ?? `generated-${task.requestId}-${assets.length + 1}`;
+      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, assetId });
+      await this.dependencies.imageAssetRegistry.registerImageAsset({
+        assetId,
+        artifactId: persisted.artifactId,
         source: "generated",
         metadata: {
           ...(this.readMetadata(task)?.request ?? {}),
           engine: output.engine,
           width: output.width,
           height: output.height,
-          createdAt: this.dependencies.nowMs?.() ?? Date.now(),
+          createdAt: this.dependencies.now?.() ?? new Date().toISOString(),
         },
       });
-      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, assetId });
       assets.push({ assetId, artifactId: persisted.artifactId });
     }
 
