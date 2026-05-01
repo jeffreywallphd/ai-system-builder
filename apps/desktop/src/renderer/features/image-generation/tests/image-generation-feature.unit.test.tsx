@@ -6,9 +6,9 @@ import { ImageGenerationFeature } from "../components/ImageGenerationFeature";
 
 vi.mock("../hooks/useImageGenerationFeature", () => ({
   useImageGenerationFeature: () => ({
-    form: { prompt: "", negativePrompt: "", seed: "", width: "1024", height: "1024", steps: "30", sampler: "", scheduler: "", model: "", numImages: "1" },
+    form: { prompt: "", negativePrompt: "", seed: "42", width: "1024", height: "1024", steps: "30", sampler: "euler", scheduler: "normal", model: "", numImages: "1" },
     setForm: vi.fn(), status: "running", requestId: "r1", message: "cancel unsupported", progress: { message: "doing work", current: 1, total: 2 }, error: undefined,
-    taskData: { outputs: [{ fileName: "a.png", subfolder: "x", engine: "comfy", promptId: "p1" }] }, outputs: [{ fileName: "a.png", subfolder: "x", engine: "comfy", promptId: "p1" }], finalizedAssets: [{ assetId: "as1", artifactId: "ar1" }], validationError: undefined, isStartDisabled: true, start: vi.fn(), cancel: vi.fn(),
+    taskData: { outputs: [{ fileName: "a.png", subfolder: "x", engine: "comfy", promptId: "p1" }] }, outputs: [{ fileName: "a.png", subfolder: "x", engine: "comfy", promptId: "p1" }], finalizedAssets: [{ assetId: "as1", artifactId: "ar1" }], availableModels: ["runwayml/stable-diffusion-v1-5"], validationError: undefined, isStartDisabled: true, start: vi.fn(), cancel: vi.fn(),
   }),
 }));
 

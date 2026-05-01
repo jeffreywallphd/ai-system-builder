@@ -1,7 +1,29 @@
 import type { ChangeEvent } from "react";
 import type { ImageGenerationFormValues } from "../hooks/useImageGenerationFeature";
 
-export function ImageGenerationForm({ form, setForm, validationError, isStartDisabled, onSubmit }: { form: ImageGenerationFormValues; setForm: (v: ImageGenerationFormValues) => void; validationError?: string; isStartDisabled: boolean; onSubmit: () => void; }) {
+export function ImageGenerationForm({ form, setForm, validationError, isStartDisabled, onSubmit, availableModels }: { form: ImageGenerationFormValues; setForm: (v: ImageGenerationFormValues) => void; validationError?: string; isStartDisabled: boolean; onSubmit: () => void; availableModels: string[]; }) {
   const bindText = (key: keyof ImageGenerationFormValues) => ({ value: form[key], onChange: (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value }) });
-  return <section className="ui-panel image-gen__section"><h2>Generate Image</h2><label>Prompt<input data-testid="image-prompt" {...bindText("prompt")} /></label><label>Negative Prompt<input {...bindText("negativePrompt")} /></label><label>Seed<input {...bindText("seed")} /></label><label>Width<input type="number" {...bindText("width")} /></label><label>Height<input type="number" {...bindText("height")} /></label><label>Steps<input type="number" {...bindText("steps")} /></label><label>Sampler<input {...bindText("sampler")} /></label><label>Scheduler<input {...bindText("scheduler")} /></label><label>Model/Checkpoint<input {...bindText("model")} /></label><label>Number of Images<input type="number" {...bindText("numImages")} /></label>{validationError ? <p className="ui-feedback ui-feedback--error">{validationError}</p> : null}<button type="button" className="ui-button" onClick={onSubmit} disabled={isStartDisabled}>Start Generation</button></section>;
+  return (
+    <section className="ui-panel ui-stack ui-stack--sm">
+      <h2>Generate Image</h2>
+      <label className="ui-stack ui-stack--sm"><span>Prompt</span><input className="ui-input" data-testid="image-prompt" {...bindText("prompt")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>Negative Prompt</span><input className="ui-input" {...bindText("negativePrompt")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>Seed</span><input className="ui-input" {...bindText("seed")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>Width</span><input className="ui-input" type="number" {...bindText("width")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>Height</span><input className="ui-input" type="number" {...bindText("height")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>Steps</span><input className="ui-input" type="number" {...bindText("steps")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>Sampler</span><input className="ui-input" {...bindText("sampler")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>Scheduler</span><input className="ui-input" {...bindText("scheduler")} /></label>
+      <label className="ui-stack ui-stack--sm">
+        <span>Model/Checkpoint</span>
+        <select className="ui-input" value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })}>
+          <option value="">Select a downloaded model</option>
+          {availableModels.map((modelId) => <option key={modelId} value={modelId}>{modelId}</option>)}
+        </select>
+      </label>
+      <label className="ui-stack ui-stack--sm"><span>Number of Images</span><input className="ui-input" type="number" {...bindText("numImages")} /></label>
+      {validationError ? <p className="ui-feedback ui-feedback--error">{validationError}</p> : null}
+      <button type="button" className="ui-button" onClick={onSubmit} disabled={isStartDisabled}>Start Generation</button>
+    </section>
+  );
 }

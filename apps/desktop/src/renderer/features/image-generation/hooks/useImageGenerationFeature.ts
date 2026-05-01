@@ -4,6 +4,7 @@ import type { ImageGenerationRequest } from "../../../../../../../modules/contra
 import type { RuntimeTaskRecord } from "../../../../../../../modules/contracts/runtime";
 import type { RuntimeInstallStatus } from "../../../../../../../modules/contracts/runtime-installer";
 import { createDesktopImageGenerationClient } from "../api";
+import { createDesktopModelsClient } from "../../models/api/desktopModelsClient";
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
@@ -48,7 +49,7 @@ export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageG
 }
 
 export function useImageGenerationFeature(client = createDesktopImageGenerationClient()) {
-  const [form, setForm] = useState<ImageGenerationFormValues>({ prompt: "", negativePrompt: "", seed: "", width: "1024", height: "1024", steps: "30", sampler: "", scheduler: "", model: "", numImages: "1" });
+  const [form, setForm] = useState<ImageGenerationFormValues>({ prompt: "", negativePrompt: "", seed: "42", width: "1024", height: "1024", steps: "30", sampler: "euler", scheduler: "normal", model: "", numImages: "1" });
   const [status, setStatus] = useState<ImageGenerationUiStatus>("idle");
   const [message, setMessage] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -58,6 +59,8 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   const [outputs, setOutputs] = useState<ImageGenerationOutputReference[]>([]);
   const [finalizedAssets, setFinalizedAssets] = useState<ImageGenerationFinalizedAssetReference[]>([]);
   const [installStatus, setInstallStatus] = useState<RuntimeInstallStatus>("checking");
+
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const mountedRef = useRef(true);
   const activePollRef = useRef<string | undefined>(undefined);
   const installStatusSequenceRef = useRef(0);
@@ -75,6 +78,26 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
     })();
     return () => { cancelled = true; };
   }, [client]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const modelsClient = createDesktopModelsClient();
+        const models = await modelsClient.listModels({ lifecycleStatus: "downloaded" });
+        if (cancelled || !mountedRef.current) return;
+        const names = models
+          .map((model) => model.modelId ?? model.displayName ?? model.localPath ?? model.modelRecordId)
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+        setAvailableModels(Array.from(new Set(names)));
+      } catch {
+        if (!cancelled && mountedRef.current) {
+          setAvailableModels([]);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const validationError = useMemo(() => {
     if (!form.prompt.trim()) return "Prompt is required.";
@@ -158,5 +181,5 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
       setError(error instanceof Error ? error.message : "Failed to repair ComfyUI install.");
     }
   };
-  return { form, setForm, status, message, error, requestId, progress, taskData, outputs, finalizedAssets, installStatus, validationError, isStartDisabled, start, cancel, repairInstall };
+  return { form, setForm, status, message, error, requestId, progress, taskData, outputs, finalizedAssets, installStatus, availableModels, validationError, isStartDisabled, start, cancel, repairInstall };
 }
