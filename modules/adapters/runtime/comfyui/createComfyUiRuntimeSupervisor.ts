@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 
 import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
+import type { LoggingPort } from "../../../application/ports/logging";
 import { DEFAULT_COMFYUI_REPOSITORY_URL } from "../installer/comfyui/createComfyUiRuntimeInstaller";
 import { createComfyUiHttpClient, type ComfyUiHttpClient } from "./createComfyUiHttpClient";
 import type { ComfyUiRuntimeHealth } from "./comfyUiRuntimeHealth";
@@ -19,6 +20,7 @@ export interface CreateComfyUiRuntimeSupervisorOptions {
   installRoot?: string;
   installSourceRef?: string;
   autoInstall?: boolean;
+  logging?: LoggingPort;
 }
 
 export interface ComfyUiRuntimeSupervisor {
@@ -46,6 +48,15 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
   let status: ComfyUiRuntimeHealth["status"] = "stopped";
   let lastCheckAt = Date.now();
 
+  const log = (level: "debug" | "info" | "error", message: string, details?: Record<string, unknown>) => {
+    void options.logging?.log({
+      level,
+      message,
+      timestamp: new Date().toISOString(),
+      context: { component: "comfyui-runtime-supervisor", ...(details ? { details } : {}) },
+    });
+  };
+
   return {
     async start() {
       if (processHandle && status !== "stopped") {
@@ -55,6 +66,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       let spawnWorkingDirectory = options.workingDirectory;
 
       if (options.autoInstall === true) {
+        log("info", "Ensuring ComfyUI runtime install before start.", { installRoot: options.installRoot });
         if (!options.installRoot?.trim()) {
           throw new Error("ComfyUI install failed: installRoot is required when autoInstall is enabled");
         }
@@ -73,6 +85,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         });
 
         if (installResult.status !== "installed") {
+          log("error", "ComfyUI auto-install failed.", { installRoot: options.installRoot, error: installResult.error });
           throw new Error(`ComfyUI install failed: ${installResult.error?.message ?? "unknown install error"}`);
         }
 
@@ -81,9 +94,13 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
 
       status = "starting";
       lastCheckAt = Date.now();
+      log("info", "Starting ComfyUI runtime process.", { pythonExecutable, spawnWorkingDirectory, host, port });
       processHandle = spawnImplementation(pythonExecutable, ["main.py", "--listen", host, "--port", String(port)], {
         cwd: spawnWorkingDirectory,
         stdio: "pipe",
+      });
+      processHandle.on("error", (error) => {
+        log("error", "ComfyUI runtime process failed to spawn.", { error: error instanceof Error ? error.message : String(error), pythonExecutable });
       });
 
       processHandle.once("exit", () => {
@@ -98,6 +115,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
           await client.getSystemStats();
           status = "ready";
           lastCheckAt = Date.now();
+          log("info", "ComfyUI runtime is ready.", { url });
           return;
         } catch {
           status = "starting";
@@ -110,6 +128,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       processHandle = undefined;
       status = "unhealthy";
       lastCheckAt = Date.now();
+      log("error", "ComfyUI runtime startup timed out.", { startupTimeoutMs, url });
       throw new Error(`ComfyUI runtime failed to become ready within ${startupTimeoutMs}ms.`);
     },
 

@@ -583,19 +583,23 @@ export function composeDesktopHost(
     },
     registerArtifactUploadIpc(registerOptions) {
       const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.storageRootDirectory);
-      const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({});
+      const comfyUiPythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
+      const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
-        pythonCommand: process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+        pythonCommand: comfyUiPythonCommand,
         skipPythonSetup: process.env.COMFYUI_SKIP_PYTHON_SETUP === "1",
         skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
+        logging: loggingPort,
       });
       const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
         workingDirectory: comfyUiInstallRoot,
+        pythonExecutable: comfyUiPythonCommand,
         installer: comfyUiInstaller,
         installRoot: comfyUiInstallRoot,
-        autoInstall: false,
+        autoInstall: true,
         installSourceRef: process.env.COMFYUI_INSTALL_REF,
+        logging: loggingPort,
       });
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
         client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
