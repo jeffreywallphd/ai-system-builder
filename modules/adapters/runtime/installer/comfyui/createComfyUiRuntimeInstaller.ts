@@ -80,7 +80,11 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       level,
       message,
       timestamp: new Date().toISOString(),
-      context: { component: "comfyui-runtime-installer", ...(details ? { details } : {}) },
+      verbosity: "normal",
+      event: "runtime.comfyui.installer.activity",
+      component: "comfyui-runtime-installer",
+      subsystem: "runtime",
+      data: details,
     });
   };
 

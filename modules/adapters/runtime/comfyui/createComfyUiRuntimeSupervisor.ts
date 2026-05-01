@@ -53,7 +53,11 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       level,
       message,
       timestamp: new Date().toISOString(),
-      context: { component: "comfyui-runtime-supervisor", ...(details ? { details } : {}) },
+      verbosity: "normal",
+      event: "runtime.comfyui.supervisor.activity",
+      component: "comfyui-runtime-supervisor",
+      subsystem: "runtime",
+      data: details,
     });
   };
 

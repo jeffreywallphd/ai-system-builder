@@ -96,6 +96,38 @@ describe("createGitRuntimeInstallerAdapter", () => {
     expect(fs.mkdir).toHaveBeenCalledWith("/runtime", { recursive: true });
   });
 
+  it("emits shared structured git runtime install log events", async () => {
+    const fs = createFsMocks();
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
+      if (args.includes("rev-parse")) return { stdout: "abc123\n", stderr: "" };
+      return { stdout: "", stderr: "" };
+    });
+    const log = testDouble.fn();
+    const adapter = createGitRuntimeInstallerAdapter({
+      ...fs,
+      execFile,
+      now: () => "2026-01-01T00:00:00.000Z",
+      logging: { log },
+    });
+
+    await adapter.ensureInstalled(baseRequest);
+
+    expect(log).toHaveBeenCalled();
+    const event = log.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(event).toMatchObject({
+      level: "info",
+      verbosity: "normal",
+      event: "runtime.git.installer.activity",
+      component: "git-runtime-installer",
+      subsystem: "runtime",
+      data: {
+        targetId: "runtime-a",
+        installRoot: "/runtime/root",
+      },
+    });
+    expect(event.context).toBeUndefined();
+  });
+
   it("failed clone does not write metadata", async () => {
     const fs = createFsMocks();
     const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
