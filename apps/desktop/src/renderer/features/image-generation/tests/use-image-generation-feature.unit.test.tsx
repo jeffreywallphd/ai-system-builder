@@ -3,6 +3,12 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
 
+
+const listModelsMock = vi.fn().mockResolvedValue([]);
+vi.mock("../../models/api/desktopModelsClient", () => ({
+  createDesktopModelsClient: () => ({ listModels: listModelsMock }),
+}));
+
 function Harness({ client, onReady }: { client: ReturnType<typeof makeClient>; onReady: (h: ReturnType<typeof useImageGenerationFeature>) => void }) { onReady(useImageGenerationFeature(client as never)); return null; }
 const makeClient = () => ({ startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn(), readComfyUiInstallStatus: vi.fn().mockResolvedValue({ ok: true, value: { status: "installed" } }), repairComfyUiInstall: vi.fn().mockResolvedValue({ ok: true, value: { status: "installed" } }) });
 
@@ -76,4 +82,19 @@ describe("useImageGenerationFeature", () => {
     expect(hook.installStatus).toBe("installed");
     await act(async () => root.unmount());
   });
+
+  it("lists only text-to-image models in the model dropdown source", async () => {
+    listModelsMock.mockResolvedValueOnce([
+      { modelRecordId: "1", modelId: "stabilityai/stable-diffusion", displayName: "sd", inferenceMode: "text-to-image", taskTags: ["text-to-image"] },
+      { modelRecordId: "2", modelId: "openai/gpt", displayName: "gpt", inferenceMode: "chat", taskTags: ["chat"] },
+      { modelRecordId: "3", modelId: "foo/bar", displayName: "bar", taskTags: ["text-to-image"] },
+    ]);
+    const client = makeClient();
+    let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
+    await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
+    await act(async () => Promise.resolve());
+    expect(hook.availableModels).toEqual(["stabilityai/stable-diffusion", "foo/bar"]);
+    await act(async () => root.unmount());
+  });
+
 });

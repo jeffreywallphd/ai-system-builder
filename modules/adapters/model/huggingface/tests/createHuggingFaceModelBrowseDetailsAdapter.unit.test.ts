@@ -180,3 +180,16 @@ describe("createHuggingFaceModelBrowseDetailsAdapter", () => {
       .toThrow("unauthorized or access denied");
   });
 });
+
+
+it("maps text-to-image task tags to text-to-image inference mode", async () => {
+  const hubClient = createHubClientDouble({
+    listModels: testDouble.fn(async function* () {
+      yield { id: "stabilityai/stable-diffusion-2-1", name: "stabilityai/stable-diffusion-2-1", task: "text-to-image", tags: ["text-to-image"] };
+    }),
+  });
+  const adapter = createHuggingFaceModelBrowseDetailsAdapter({ hubClient });
+  const result = await adapter.browseModels({ provider: "huggingface", query: "stable diffusion", limit: 25 });
+  expect(result.models[0]?.inferenceMode).toBe("text-to-image");
+  expect(result.models[0]?.taskTags).toEqual(["text-to-image"]);
+});

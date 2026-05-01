@@ -61,6 +61,11 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   const [installStatus, setInstallStatus] = useState<RuntimeInstallStatus>("checking");
 
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+
+function isImageGenerationModel(model: { inferenceMode?: string; taskTags?: string[] }): boolean {
+  if (model.inferenceMode === "text-to-image") return true;
+  return (model.taskTags ?? []).some((tag) => tag === "text-to-image");
+}
   const mountedRef = useRef(true);
   const activePollRef = useRef<string | undefined>(undefined);
   const installStatusSequenceRef = useRef(0);
@@ -84,9 +89,10 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
     void (async () => {
       try {
         const modelsClient = createDesktopModelsClient();
-        const models = await modelsClient.listModels({ lifecycleStatus: "downloaded" });
+        const models = await modelsClient.listModels({});
         if (cancelled || !mountedRef.current) return;
         const names = models
+          .filter((model) => isImageGenerationModel({ inferenceMode: model.inferenceMode, taskTags: model.taskTags }))
           .map((model) => model.modelId ?? model.displayName ?? model.localPath ?? model.modelRecordId)
           .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
         setAvailableModels(Array.from(new Set(names)));

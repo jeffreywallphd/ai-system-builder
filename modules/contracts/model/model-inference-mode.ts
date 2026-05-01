@@ -1,6 +1,6 @@
 import type { LocalModelConfig } from "../runtime";
 
-export const MODEL_INFERENCE_MODES = ["text2text", "causal", "chat"] as const;
+export const MODEL_INFERENCE_MODES = ["text2text", "causal", "chat", "text-to-image"] as const;
 
 export type ModelInferenceMode = Exclude<NonNullable<LocalModelConfig["inferenceMode"]>, "auto">;
 
