@@ -115,6 +115,14 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
             engine: "comfyui",
             comfyUiPromptId: tracked.promptId,
             runtimeDeviceMode: deps.supervisor.getRuntimeDeviceMode?.(),
+            request: {
+              prompt: tracked.request.prompt,
+              negativePrompt: tracked.request.negativePrompt,
+              seed: tracked.request.seed,
+              model: tracked.request.model,
+              width: tracked.request.width,
+              height: tracked.request.height,
+            },
             ...(failure?.details ?? {}),
           },
         };
