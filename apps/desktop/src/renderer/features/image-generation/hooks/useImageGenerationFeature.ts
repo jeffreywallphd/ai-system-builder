@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ImageGenerationRequest } from "../../../../../../../modules/contracts/image-generation";
 import type { RuntimeTaskRecord } from "../../../../../../../modules/contracts/runtime";
+import type { RuntimeInstallStatus } from "../../../../../../../modules/contracts/runtime-installer";
 import { createDesktopImageGenerationClient } from "../api";
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
@@ -16,6 +17,7 @@ export interface ImageGenerationFormValues {
 export type ImageGenerationUiStatus = "idle" | "starting" | "queued" | "running" | "finalizing" | "succeeded" | "failed" | "cancelled" | "unknown";
 
 const ACTIVE_STATUSES: ImageGenerationUiStatus[] = ["starting", "queued", "running", "finalizing"];
+const INSTALL_STATUSES: RuntimeInstallStatus[] = ["not-installed", "installing", "checking", "installed", "update-available", "failed", "unknown"];
 
 const parsePositiveNumber = (value: string) => {
   if (value.trim() === "") return undefined;
@@ -30,6 +32,12 @@ const parseSeed = (seed: string): number | undefined => {
   if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return undefined;
   return parsed;
 };
+
+function normalizeInstallStatus(status: unknown): RuntimeInstallStatus {
+  return typeof status === "string" && INSTALL_STATUSES.includes(status as RuntimeInstallStatus)
+    ? status as RuntimeInstallStatus
+    : "unknown";
+}
 
 export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageGenerationOutputReference[] {
   const data = task.data as { outputs?: unknown; value?: { outputs?: unknown } } | undefined;
@@ -49,20 +57,21 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   const [taskData, setTaskData] = useState<ImageGenerationTaskDataView | undefined>(undefined);
   const [outputs, setOutputs] = useState<ImageGenerationOutputReference[]>([]);
   const [finalizedAssets, setFinalizedAssets] = useState<ImageGenerationFinalizedAssetReference[]>([]);
-  const [installStatus, setInstallStatus] = useState<string>("checking");
+  const [installStatus, setInstallStatus] = useState<RuntimeInstallStatus>("checking");
   const mountedRef = useRef(true);
   const activePollRef = useRef<string | undefined>(undefined);
+  const installStatusSequenceRef = useRef(0);
 
   const isPollingStillActive = useCallback((id: string) => mountedRef.current && activePollRef.current === id, []);
   useEffect(() => () => { mountedRef.current = false; activePollRef.current = undefined; }, []);
   useEffect(() => {
     let cancelled = false;
+    const sequence = ++installStatusSequenceRef.current;
     void (async () => {
       const status = await client.readComfyUiInstallStatus?.({});
-      if (cancelled || !mountedRef.current) return;
+      if (cancelled || !mountedRef.current || installStatusSequenceRef.current !== sequence) return;
       if (!status || !status.ok) { setInstallStatus("unknown"); return; }
-      const raw = status.value.status;
-      setInstallStatus(typeof raw === "string" ? raw : "unknown");
+      setInstallStatus(normalizeInstallStatus(status.value.status));
     })();
     return () => { cancelled = true; };
   }, [client]);
@@ -131,15 +140,23 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   }, [client, isPollingStillActive, requestId]);
 
   const repairInstall = async () => {
+    const sequence = ++installStatusSequenceRef.current;
     setInstallStatus("installing");
-    const result = await client.repairComfyUiInstall?.({ allowUpdate: true, forceRepair: true });
-    if (!mountedRef.current) return;
-    if (!result || !result.ok) {
-      setError(result?.error?.message ?? "Failed to repair ComfyUI install.");
-      return;
+    try {
+      const result = await client.repairComfyUiInstall?.({ allowUpdate: true, forceRepair: true });
+      if (!mountedRef.current || installStatusSequenceRef.current !== sequence) return;
+      if (!result || !result.ok) {
+        setInstallStatus("failed");
+        setError(result?.error?.message ?? "Failed to repair ComfyUI install.");
+        return;
+      }
+      setInstallStatus(normalizeInstallStatus(result.value.status));
+      setError(undefined);
+    } catch (error) {
+      if (!mountedRef.current || installStatusSequenceRef.current !== sequence) return;
+      setInstallStatus("failed");
+      setError(error instanceof Error ? error.message : "Failed to repair ComfyUI install.");
     }
-    setInstallStatus(result.value.status);
-    setError(undefined);
   };
   return { form, setForm, status, message, error, requestId, progress, taskData, outputs, finalizedAssets, installStatus, validationError, isStartDisabled, start, cancel, repairInstall };
 }
