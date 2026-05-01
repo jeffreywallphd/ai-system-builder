@@ -108,6 +108,13 @@ describe("composeDesktopHost", () => {
     })).toBe("cuda");
   });
 
+  it("prefers env override over configured gpu type mapping", () => {
+    expect(resolveComfyUiRuntimeDeviceMode({
+      env: { COMFYUI_RUNTIME_DEVICE_MODE: "cpu" } as NodeJS.ProcessEnv,
+      gpuType: "nvidia",
+    })).toBe("cpu");
+  });
+
   it("resolves ComfyUI runtime mode from configured GPU type when env override is not set", () => {
     expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "nvidia" })).toBe("cuda");
     expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "amd" })).toBe("directml");
@@ -393,10 +400,12 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("const comfyUiInstaller = createComfyUiRuntimeInstaller");
     expect(source).toContain("const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS)");
     expect(source).toContain("execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true })");
-    expect(source).toContain("const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode");
+    expect(source).toContain("const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode");
     expect(source).toContain("const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode");
     expect(source).toContain("pythonEnvironmentMode: comfyUiPythonEnvironmentMode");
-    expect(source).toContain("runtimeDeviceMode: comfyUiRuntimeDeviceMode");
+    expect(source).toContain("runtimeDeviceMode: resolvedRuntimeDeviceMode");
+    expect(source).toContain("IMAGE_GENERATION_GPU_TYPE_SETTING_KEY");
+    expect(source).toContain("processReuse: modeChanged ? \"restarted_mode_changed\" : \"reused_or_started\"");
     expect(source).toContain("comfyUiInstaller,");
     expect(source).toContain("comfyUiInstallRoot,");
   });

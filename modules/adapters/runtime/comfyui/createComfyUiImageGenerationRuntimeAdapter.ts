@@ -7,7 +7,69 @@ import type { ComfyUiHttpClient } from "./createComfyUiHttpClient";
 import type { ComfyUiRuntimeSupervisor } from "./createComfyUiRuntimeSupervisor";
 import { mapImageGenerationRequestToComfyUiPrompt, type ComfyUiImageGenerationWorkflowMapperOptions } from "./comfyUiImageGenerationWorkflowMapper";
 
-interface Deps { client: Pick<ComfyUiHttpClient, "submitPrompt" | "getQueue" | "getHistory">; supervisor: Pick<ComfyUiRuntimeSupervisor, "start">; mapperOptions: ComfyUiImageGenerationWorkflowMapperOptions; now?: () => string; }
+interface Deps { client: Pick<ComfyUiHttpClient, "submitPrompt" | "getQueue" | "getHistory">; supervisor: Pick<ComfyUiRuntimeSupervisor, "start" | "getRecentRuntimeOutput" | "getRuntimeDeviceMode">; mapperOptions: ComfyUiImageGenerationWorkflowMapperOptions; now?: () => string; }
+
+const GENERIC_NO_OUTPUT_MESSAGE = "ComfyUI history entry did not contain image outputs.";
+
+function toRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+function toShortTraceback(traceback: unknown): string | undefined {
+  if (!Array.isArray(traceback)) return undefined;
+  const lines = traceback.filter((line): line is string => typeof line === "string").map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) return undefined;
+  return lines.slice(-3).join(" | ").slice(0, 360);
+}
+
+function resolveComfyUiFailure(historyRecord: Record<string, unknown>, runtimeOutput: string[]): { message: string; details?: Record<string, unknown> } {
+  const status = toRecord(historyRecord.status);
+  const statusStr = typeof status?.status_str === "string" ? status.status_str : undefined;
+  const messages = Array.isArray(status?.messages) ? status?.messages : [];
+  const normalizedMessages = messages.map((entry) => {
+    if (!Array.isArray(entry) || entry.length < 2) return undefined;
+    return toRecord(entry[1]);
+  }).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+
+  const firstError = normalizedMessages.find((entry) => typeof entry.exception_message === "string" || typeof entry.error === "string");
+  const exceptionMessage = typeof firstError?.exception_message === "string"
+    ? firstError.exception_message
+    : (typeof firstError?.error === "string" ? firstError.error : undefined);
+  const nodeId = firstError?.node_id;
+  const nodeType = typeof firstError?.node_type === "string" ? firstError.node_type : undefined;
+  const tracebackSummary = toShortTraceback(firstError?.traceback);
+  const statusMessage = normalizedMessages.map((entry) => typeof entry.message === "string" ? entry.message : undefined).find(Boolean);
+  const runtimeSnippet = runtimeOutput.find((line) => /exception during processing|notimplementederror|error/i.test(line));
+
+  const evidence = [statusStr, exceptionMessage, tracebackSummary, statusMessage, runtimeSnippet].filter((value): value is string => Boolean(value));
+  const evidenceJoined = evidence.join(" ").toLowerCase();
+  const isDirectMlFailure = evidenceJoined.includes("cannot access storage of opaquetensorimpl")
+    || evidenceJoined.includes("privateuseone")
+    || evidenceJoined.includes("torch-directml")
+    || evidenceJoined.includes("directml");
+
+  if (isDirectMlFailure && evidenceJoined.includes("cannot access storage of opaquetensorimpl")) {
+    return {
+      message: "ComfyUI failed during DirectML execution: Cannot access storage of OpaqueTensorImpl. This is a PyTorch/DirectML runtime failure, not a checkpoint-resolution failure. Try CPU mode or a smaller SD 1.5 checkpoint.",
+      details: {
+        exceptionMessage: exceptionMessage ?? "Cannot access storage of OpaqueTensorImpl",
+        failedNodeId: nodeId,
+        failedNodeType: nodeType,
+        tracebackSummary,
+      },
+    };
+  }
+
+  const primary = exceptionMessage ?? statusMessage ?? statusStr ?? runtimeSnippet;
+  if (!primary) {
+    return { message: GENERIC_NO_OUTPUT_MESSAGE };
+  }
+
+  return {
+    message: `ComfyUI failed: ${primary}`,
+    details: { exceptionMessage, failedNodeId: nodeId, failedNodeType: nodeType, tracebackSummary },
+  };
+}
 
 export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeTaskRegistryPort {
   const byRequest = new Map<string, { promptId: string; request: ImageGenerationRequest; submittedAt: string }>();
@@ -43,7 +105,19 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
         const outputsRecord = (historyRecord.outputs ?? {}) as Record<string, { images?: Array<Record<string, unknown>> }>;
         const outputs = Object.values(outputsRecord).flatMap((n) => (n.images ?? []).map((image) => ({ fileName: String(image.filename ?? ""), subfolder: image.subfolder ? String(image.subfolder) : undefined, promptId: tracked.promptId, engine: "comfyui", type: "image" })));
         const status: RuntimeTaskStatus = outputs.length > 0 ? "succeeded" : "failed";
-        const record: RuntimeTaskRecord = { requestId, taskType: TaskType.IMAGE_GENERATION, status, concurrencyClass: "gpu-exclusive", data: status === "succeeded" ? { outputs } : undefined, error: status === "failed" ? { code: "comfyui_failed", message: "ComfyUI history entry did not contain image outputs." } : undefined, completedAt: now(), updatedAt: now(), metadata: { engine: "comfyui", comfyUiPromptId: tracked.promptId } };
+        const failure = status === "failed" ? resolveComfyUiFailure(historyRecord, deps.supervisor.getRecentRuntimeOutput?.() ?? []) : undefined;
+        const record: RuntimeTaskRecord = {
+          requestId, taskType: TaskType.IMAGE_GENERATION, status, concurrencyClass: "gpu-exclusive",
+          data: status === "succeeded" ? { outputs } : undefined,
+          error: status === "failed" ? { code: "comfyui_failed", message: failure?.message ?? GENERIC_NO_OUTPUT_MESSAGE, details: failure?.details } : undefined,
+          completedAt: now(), updatedAt: now(),
+          metadata: {
+            engine: "comfyui",
+            comfyUiPromptId: tracked.promptId,
+            runtimeDeviceMode: deps.supervisor.getRuntimeDeviceMode?.(),
+            ...(failure?.details ?? {}),
+          },
+        };
         finalResults.set(requestId, record);
         return record;
       }

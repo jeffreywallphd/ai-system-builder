@@ -29,6 +29,17 @@ describe("createComfyUiRuntimeSupervisor", () => {
     ]);
   });
 
+  it("builds CPU launch arguments when cpu mode is selected", () => {
+    expect(buildComfyUiRuntimeLaunchArguments({ host: "127.0.0.1", port: 8188, runtimeDeviceMode: "cpu" })).toEqual([
+      "main.py",
+      "--cpu",
+      "--listen",
+      "127.0.0.1",
+      "--port",
+      "8188",
+    ]);
+  });
+
   it("start is idempotent and does not spawn multiple processes", async () => {
     const spawnImplementation = testDouble.fn(() => createMockChildProcess() as any);
     const fetchImplementation = testDouble.fn().mockResolvedValue({
