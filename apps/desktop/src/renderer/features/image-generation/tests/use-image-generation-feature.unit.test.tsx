@@ -60,4 +60,20 @@ describe("useImageGenerationFeature", () => {
     expect(hook.error).toBe("repair failed");
     await act(async () => root.unmount());
   });
+
+  it("keeps installed status when an older status read resolves after repair", async () => {
+    let resolveStatus: (value: { ok: boolean; value?: { status: string } }) => void = () => {};
+    const client = makeClient();
+    client.readComfyUiInstallStatus.mockReturnValue(new Promise((resolve) => { resolveStatus = resolve; }));
+    client.repairComfyUiInstall.mockResolvedValueOnce({ ok: true, value: { status: "installed" } });
+    let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
+
+    await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
+    await act(async () => { await hook.repairInstall(); });
+    expect(hook.installStatus).toBe("installed");
+
+    await act(async () => resolveStatus({ ok: true, value: { status: "installing" } }));
+    expect(hook.installStatus).toBe("installed");
+    await act(async () => root.unmount());
+  });
 });
