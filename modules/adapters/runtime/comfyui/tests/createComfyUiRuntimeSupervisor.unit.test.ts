@@ -1,10 +1,17 @@
 import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { createComfyUiRuntimeSupervisor } from "../createComfyUiRuntimeSupervisor";
 
 function createMockChildProcess() {
-  const emitter = new EventEmitter() as EventEmitter & { kill: (signal?: string) => boolean };
+  const emitter = new EventEmitter() as EventEmitter & {
+    kill: (signal?: string) => boolean;
+    stdout: PassThrough;
+    stderr: PassThrough;
+  };
+  emitter.stdout = new PassThrough();
+  emitter.stderr = new PassThrough();
   emitter.kill = testDouble.fn(() => true);
   return emitter;
 }
@@ -111,5 +118,46 @@ describe("createComfyUiRuntimeSupervisor", () => {
     expect(supervisor.isRunning()).toBe(false);
     const health = await supervisor.getHealth();
     expect(health).toMatchObject({ status: "stopped" });
+  });
+
+  it("fails startup without timeout cleanup when the process exits before health checks complete", async () => {
+    const mockChild = createMockChildProcess();
+    const spawnImplementation = testDouble.fn(() => mockChild as any);
+    const fetchImplementation = testDouble.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      throw new Error("still booting");
+    });
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui",
+      spawnImplementation: spawnImplementation as never,
+      fetchImplementation: fetchImplementation as never,
+      healthCheckIntervalMs: 1,
+      startupTimeoutMs: 100,
+    });
+
+    queueMicrotask(() => {
+      mockChild.stderr.write("ModuleNotFoundError: No module named 'torch'");
+      mockChild.emit("exit", 1, null);
+    });
+
+    await expect(supervisor.start()).rejects.toThrow(
+      /ComfyUI runtime exited before health check completed\.[\s\S]*Recent runtime output: ModuleNotFoundError/,
+    );
+    expect(mockChild.kill).not.toHaveBeenCalled();
+  });
+
+  it("fails startup clearly when spawning throws synchronously", async () => {
+    const spawnImplementation = testDouble.fn(() => {
+      throw new Error("spawn EPERM");
+    });
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui",
+      spawnImplementation: spawnImplementation as never,
+      fetchImplementation: testDouble.fn() as never,
+      healthCheckIntervalMs: 1,
+      startupTimeoutMs: 100,
+    });
+
+    await expect(supervisor.start()).rejects.toThrow("ComfyUI runtime failed during startup. ComfyUI runtime process failed to start: spawn EPERM");
   });
 });
