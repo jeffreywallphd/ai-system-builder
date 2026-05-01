@@ -61,3 +61,6 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - Entrypoint existence (`main.py`) remains a lightweight validation check even when Python validation is skipped.
 - ComfyUI `repairInstall` runs the same post-install dependency + validation checks as `ensureInstalled` when Git repair reports installed.
 - ComfyUI runtime startup launches with `PYTHONNOUSERSITE=1`; managed `.venv` startup is the default desktop composition path.
+- On DirectML/Intel GPU paths, ComfyUI startup may fail due to `torch`/`torchaudio` native mismatch signatures (including `WinError 127`).
+- When detected, the supervisor performs one managed dependency repair attempt and retries startup once before surfacing a clear actionable failure.
+- The repair flow is non-destructive: it repairs managed Python dependencies and does not delete models or ComfyUI repo files.

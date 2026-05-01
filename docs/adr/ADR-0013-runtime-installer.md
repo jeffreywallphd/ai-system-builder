@@ -81,6 +81,15 @@ Installer request/result/status flows may include:
 - Installer operations must be idempotent.
 - Repair/update behavior must be explicit (opt-in), not implicit.
 - Force-repair for unmanaged non-empty directories must remain non-destructive and may fail safely until an explicit safe strategy is designed.
+- DirectML dependency repair is scoped to managed Python dependencies; it should not implicitly mutate repository refs or delete runtime/model files.
+
+## ComfyUI DirectML Startup Repair Behavior
+
+- ComfyUI startup can fail on some DirectML/Intel paths with native mismatch signatures (`torchaudio`, `WinError 127`, missing procedure symbols).
+- Supervisor-level startup handling detects those signatures from startup failure output.
+- On detection, supervisor triggers one installer `repairInstall` pass with update disabled, then retries startup once.
+- The flow is bounded (single retry only) to prevent infinite loops.
+- If repair fails, users receive an actionable dependency-repair error; if retry fails, users receive an actionable post-repair startup error.
 
 ## Non-Goals (Prompt 1/4)
 

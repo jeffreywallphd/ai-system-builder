@@ -68,6 +68,10 @@ Include this pack when prompts involve:
 - ComfyUI Python dependencies are installed into a managed `.venv` by default to avoid ambient user-site package contamination.
 - GPU/Torch installation is not implemented yet.
 - DirectML mode installs the DirectML dependency through the same managed Python environment.
+- DirectML/Intel GPU setups can hit native extension mismatches (for example `torchaudio` + `WinError 127`) after upstream package drift.
+- ComfyUI supervisor detects dependency mismatch startup signatures, triggers a single non-destructive managed dependency repair, and retries startup once.
+- Dependency repair does not update git checkout refs by default and never deletes model files or ComfyUI repository files.
+- If repair or retry fails, the runtime returns actionable startup errors that include recent runtime output context.
 
 
 - `skipPythonSetup` skips Python dependency installation only (requirements/pip), not entrypoint checks.
