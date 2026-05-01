@@ -203,13 +203,14 @@ describe("useImageGenerationFeature", () => {
     ]));
   });
 
-  it("normalizes model values to checkpoint filenames only when they are checkpoint-like", () => {
-    expect(resolveModelForGeneration("C:/models/sdxl/model.safetensors")).toBe("model.safetensors");
+  it("keeps selected model identifiers intact (repo id, inventory id, checkpoint filename/path)", () => {
+    expect(resolveModelForGeneration("C:/models/sdxl/model.safetensors")).toBe("C:/models/sdxl/model.safetensors");
     expect(resolveModelForGeneration("stable-diffusion-v1-5.ckpt")).toBe("stable-diffusion-v1-5.ckpt");
-    expect(resolveModelForGeneration("stabilityai/stable-diffusion-xl-base-1.0")).toBeUndefined();
+    expect(resolveModelForGeneration("stabilityai/stable-diffusion-xl-base-1.0")).toBe("stabilityai/stable-diffusion-xl-base-1.0");
+    expect(resolveModelForGeneration("model_record_123")).toBe("model_record_123");
   });
 
-  it("does not send model for non-checkpoint dropdown values", async () => {
+  it("sends selected model for downstream checkpoint resolution", async () => {
     const client = makeClient();
     client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r2" } });
     client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "cancelled", requestId: "r2", taskType: "image-generation", concurrencyClass: "image-generation" } });
@@ -224,7 +225,7 @@ describe("useImageGenerationFeature", () => {
     });
     await act(async () => { await hook.start(); });
 
-    expect(client.startImageGeneration.mock.calls[0][0].model).toBeUndefined();
+    expect(client.startImageGeneration.mock.calls[0][0].model).toBe("stabilityai/stable-diffusion-xl-base-1.0");
     await act(async () => root.unmount());
   });
 

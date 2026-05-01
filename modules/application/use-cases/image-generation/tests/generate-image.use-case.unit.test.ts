@@ -23,6 +23,30 @@ describe("GenerateImageUseCase", () => {
     await expect(useCase.startImageGeneration({ ...validRequest, prompt: "   " })).rejects.toThrow("Image generation requires a non-empty prompt.");
   });
 
+
+
+  it("resolves selected model into checkpoint before runtime submission", async () => {
+    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+    const useCase = new GenerateImageUseCase({
+      runtimeTaskRegistry,
+      modelCheckpointResolver: {
+        resolveCheckpoint: testDouble.fn(async () => ({ checkpoint: "sdxl.safetensors" })),
+      },
+    });
+
+    await useCase.startImageGeneration({ ...validRequest, model: "stabilityai/stable-diffusion-xl-base-1.0" });
+    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ model: "sdxl.safetensors" }) }));
+  });
+
+  it("passes through already-valid checkpoint filenames", async () => {
+    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+    const useCase = new GenerateImageUseCase({
+      runtimeTaskRegistry,
+      modelCheckpointResolver: { resolveCheckpoint: testDouble.fn(async () => ({ checkpoint: "existing.safetensors" })) },
+    });
+    await useCase.startImageGeneration({ ...validRequest, model: "existing.safetensors" });
+    expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ model: "existing.safetensors" }) }));
+  });
   it("read returns runtime task unchanged", async () => {
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
     const useCase = new GenerateImageUseCase({ runtimeTaskRegistry });

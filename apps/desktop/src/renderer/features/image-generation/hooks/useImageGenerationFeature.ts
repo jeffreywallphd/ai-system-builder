@@ -96,12 +96,7 @@ export function toImageGenerationModelDropdownOption(
 
 export function resolveModelForGeneration(model: string): string | undefined {
   const normalized = model.trim();
-  if (normalized.length === 0) return undefined;
-  if (/\.(safetensors|ckpt|pt|pth|bin)$/i.test(normalized)) {
-    const segments = normalized.split(/[\/]/).filter((segment) => segment.length > 0);
-    return segments[segments.length - 1] ?? normalized;
-  }
-  return undefined;
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageGenerationOutputReference[] {
@@ -233,8 +228,7 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
     if (seed !== undefined) payload.seed = seed;
     if (form.sampler.trim()) payload.sampler = form.sampler.trim();
     if (form.scheduler.trim()) payload.scheduler = form.scheduler.trim();
-    const resolvedModel = resolveModelForGeneration(form.model);
-    if (resolvedModel) payload.model = resolvedModel;
+    if (form.model.trim()) payload.model = form.model.trim();
     const started = await imageGenerationClient.startImageGeneration(payload);
     if (!started.ok || !started.value.requestId) { setStatus("failed"); setError(started.ok ? "Failed to start image generation." : started.error.message); return false; }
     const id = started.value.requestId;

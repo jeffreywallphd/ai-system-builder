@@ -6,6 +6,7 @@ import {
   type StartRuntimeTaskResult,
 } from "../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
+import type { ModelCheckpointResolverPort } from "../../ports/model";
 
 import type { ApplicationRequestContext } from "../../ports";
 
@@ -19,6 +20,7 @@ export class GenerateImageUseCase {
   public constructor(
     private readonly dependencies: {
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
+      modelCheckpointResolver?: ModelCheckpointResolverPort;
     },
   ) {}
 
@@ -28,9 +30,17 @@ export class GenerateImageUseCase {
   ): Promise<StartRuntimeTaskResult> {
     assertValidPrompt(request);
 
+    const resolvedModel = await this.dependencies.modelCheckpointResolver?.resolveCheckpoint({
+      selectedModel: request.model,
+      taskTag: "text-to-image",
+    });
+    const payload = resolvedModel?.checkpoint
+      ? { ...request, model: resolvedModel.checkpoint }
+      : request;
+
     const result = await this.dependencies.runtimeTaskRegistry.startTask({
       taskType: TaskType.IMAGE_GENERATION,
-      payload: request,
+      payload,
       requestId: context?.requestId,
     });
 
