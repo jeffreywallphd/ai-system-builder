@@ -145,6 +145,34 @@ describe("createComfyUiRuntimeSupervisor", () => {
     expect(event.context).toBeUndefined();
   });
 
+  it("logs startup health polling details before the runtime becomes ready", async () => {
+    const spawnImplementation = testDouble.fn(() => createMockChildProcess() as any);
+    let call = 0;
+    const fetchImplementation = testDouble.fn(async () => {
+      call += 1;
+      if (call === 1) {
+        throw new Error("not ready");
+      }
+      return { ok: true, status: 200, json: async () => ({ devices: [] }) };
+    });
+    const log = testDouble.fn();
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui",
+      spawnImplementation: spawnImplementation as never,
+      fetchImplementation: fetchImplementation as never,
+      healthCheckIntervalMs: 1,
+      startupTimeoutMs: 200,
+      logging: { log },
+    });
+
+    await supervisor.start();
+
+    const messages = log.mock.calls.map((call) => (call[0] as { message: string }).message);
+    expect(messages).toContain("ComfyUI runtime process spawned; polling health endpoint.");
+    expect(messages).toContain("Waiting for ComfyUI runtime health endpoint.");
+    expect(messages).toContain("ComfyUI runtime is ready.");
+  });
+
   it("kills process and marks unhealthy when startup times out", async () => {
     const mockChild = createMockChildProcess();
     const spawnImplementation = testDouble.fn(() => mockChild as any);

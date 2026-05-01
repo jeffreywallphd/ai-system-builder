@@ -1,4 +1,4 @@
-import { stat as nodeStat } from "node:fs/promises";
+import { readFile as nodeReadFile, stat as nodeStat, writeFile as nodeWriteFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { RuntimeInstallerPort } from "../../../../application/ports/runtime-installer/runtime-installer.port";
@@ -32,6 +32,8 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   directMlPackageName?: string;
   requirementsFileName?: string;
   stat?: typeof nodeStat;
+  readFile?: typeof nodeReadFile;
+  writeFile?: typeof nodeWriteFile;
   logging?: LoggingPort;
 }
 
@@ -50,6 +52,24 @@ function readGitRef(source: RuntimeInstallRequest["source"] | undefined): string
     return undefined;
   }
   return source.ref;
+}
+
+interface ComfyUiFinalizationMetadata {
+  managedBy: "ai-system-builder";
+  targetId: "comfyui";
+  installRoot: string;
+  commitSha?: string;
+  pythonEnvironmentMode: ComfyUiPythonEnvironmentMode;
+  runtimeDeviceMode: ComfyUiRuntimeDeviceMode | "auto";
+  skipPythonSetup: boolean;
+  skipPythonValidation: boolean;
+  requirementsFileName: string;
+  directMlPackageName: string;
+  pythonDependenciesInstalledAt?: string;
+  directMlDependenciesInstalledAt?: string;
+  pythonEnvironmentCreatedAt?: string;
+  validationCheckedAt?: string;
+  finalizedAt: string;
 }
 
 export function buildComfyUiInstallRequest(input: BuildComfyUiInstallRequestInput): RuntimeInstallRequest {
@@ -84,6 +104,9 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   const directMlPackageName = options.directMlPackageName ?? "torch-directml";
   const pythonEnvironmentMode = options.pythonEnvironmentMode ?? "managed-venv";
   const stat = options.stat ?? nodeStat;
+  const readFile = options.readFile ?? nodeReadFile;
+  const writeFile = options.writeFile ?? nodeWriteFile;
+  const finalizationMetadataFileName = options.metadataFileName ?? ".ai-system-builder-comfyui-finalization.json";
 
   const makeError = (code: string, message: string, details?: Record<string, unknown>) => ({ code, message, details });
   const log = (level: "debug" | "info" | "error", message: string, details?: Record<string, unknown>) => {
@@ -99,6 +122,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     });
   };
   const elapsed = (startedAt: number) => Date.now() - startedAt;
+  const getFinalizationMetadataPath = (installRoot: string) => path.join(installRoot, finalizationMetadataFileName);
 
   const logInstallResult = (operation: "ensure" | "repair", result: RuntimeInstallResult, startedAt: number) => {
     log(result.status === "installed" ? "info" : "error", `ComfyUI ${operation} install finished.`, {
@@ -118,6 +142,102 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async function readFinalizationMetadata(installRoot: string): Promise<ComfyUiFinalizationMetadata | undefined> {
+    const metadataPath = getFinalizationMetadataPath(installRoot);
+    if (!(await pathExists(metadataPath))) {
+      return undefined;
+    }
+
+    try {
+      const parsed = JSON.parse(await readFile(metadataPath, "utf-8")) as Partial<ComfyUiFinalizationMetadata>;
+      if (parsed.managedBy !== "ai-system-builder" || parsed.targetId !== "comfyui") {
+        return undefined;
+      }
+      return parsed as ComfyUiFinalizationMetadata;
+    } catch (error) {
+      log("error", "ComfyUI finalization metadata could not be read; dependency stages will be rechecked.", {
+        installRoot,
+        metadataPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
+  async function writeFinalizationMetadata(metadata: ComfyUiFinalizationMetadata): Promise<void> {
+    const metadataPath = getFinalizationMetadataPath(metadata.installRoot);
+    try {
+      await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+    } catch (error) {
+      log("error", "ComfyUI finalization metadata could not be written; dependency stages may run again next start.", {
+        installRoot: metadata.installRoot,
+        metadataPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  function matchesFinalizationMetadata(metadata: ComfyUiFinalizationMetadata | undefined, input: {
+    installRoot: string;
+    commitSha?: string;
+    skipPythonSetup: boolean;
+    skipPythonValidation: boolean;
+  }): metadata is ComfyUiFinalizationMetadata {
+    return metadata?.managedBy === "ai-system-builder"
+      && metadata.targetId === "comfyui"
+      && metadata.installRoot === input.installRoot
+      && metadata.commitSha === input.commitSha
+      && metadata.pythonEnvironmentMode === pythonEnvironmentMode
+      && metadata.runtimeDeviceMode === (options.runtimeDeviceMode ?? "auto")
+      && metadata.skipPythonSetup === input.skipPythonSetup
+      && metadata.skipPythonValidation === input.skipPythonValidation
+      && metadata.requirementsFileName === requirementsFileName
+      && metadata.directMlPackageName === directMlPackageName;
+  }
+
+  async function runCommandStage(input: {
+    stage: string;
+    file: string;
+    args: readonly string[];
+    installRoot?: string;
+  }): Promise<{ stdout: string; stderr: string }> {
+    if (!options.execFile) {
+      throw new Error("No execFile configured");
+    }
+
+    const startedAt = Date.now();
+    log("info", "Starting ComfyUI installer command.", {
+      stage: input.stage,
+      file: input.file,
+      args: input.args,
+      installRoot: input.installRoot,
+    });
+    const heartbeat = setInterval(() => {
+      log("info", "ComfyUI installer command is still running.", {
+        stage: input.stage,
+        file: input.file,
+        durationMs: elapsed(startedAt),
+        installRoot: input.installRoot,
+      });
+    }, 30_000);
+    heartbeat.unref?.();
+
+    try {
+      const result = await options.execFile(input.file, input.args);
+      log("info", "ComfyUI installer command completed.", {
+        stage: input.stage,
+        file: input.file,
+        durationMs: elapsed(startedAt),
+        stdoutBytes: result.stdout.length,
+        stderrBytes: result.stderr.length,
+        installRoot: input.installRoot,
+      });
+      return result;
+    } finally {
+      clearInterval(heartbeat);
     }
   }
 
@@ -144,7 +264,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     log("info", "Creating ComfyUI managed Python environment.", { installRoot, environmentRoot, pythonCommand });
 
     try {
-      await options.execFile(pythonCommand, ["-m", "venv", environmentRoot]);
+      await runCommandStage({ stage: "python-environment", file: pythonCommand, args: ["-m", "venv", environmentRoot], installRoot });
       log("info", "ComfyUI managed Python environment created.", {
         installRoot,
         environmentRoot,
@@ -205,10 +325,10 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     try {
       if (options.pipCommand) {
         log("info", "Installing ComfyUI Python dependencies with pip command.", { pipCommand: options.pipCommand });
-        await options.execFile(options.pipCommand, ["install", "-r", requirementsPath]);
+        await runCommandStage({ stage: "python-dependencies", file: options.pipCommand, args: ["install", "-r", requirementsPath], installRoot });
       } else {
         log("info", "Installing ComfyUI Python dependencies via python -m pip.", { pythonCommand: dependencyPythonCommand });
-        await options.execFile(dependencyPythonCommand, ["-m", "pip", "install", "-r", requirementsPath]);
+        await runCommandStage({ stage: "python-dependencies", file: dependencyPythonCommand, args: ["-m", "pip", "install", "-r", requirementsPath], installRoot });
       }
       log("info", "ComfyUI Python dependency install completed.", {
         installRoot,
@@ -256,10 +376,10 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     try {
       if (options.pipCommand) {
         log("info", "Installing ComfyUI DirectML dependency with pip command.", { pipCommand: options.pipCommand, directMlPackageName });
-        await options.execFile(options.pipCommand, ["install", directMlPackageName]);
+        await runCommandStage({ stage: "directml-dependency", file: options.pipCommand, args: ["install", directMlPackageName] });
       } else {
         log("info", "Installing ComfyUI DirectML dependency via python -m pip.", { pythonCommand: dependencyPythonCommand, directMlPackageName });
-        await options.execFile(dependencyPythonCommand, ["-m", "pip", "install", directMlPackageName]);
+        await runCommandStage({ stage: "directml-dependency", file: dependencyPythonCommand, args: ["-m", "pip", "install", directMlPackageName] });
       }
       log("info", "ComfyUI DirectML dependency install completed.", {
         directMlPackageName,
@@ -304,7 +424,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     if (options.execFile && !options.skipPythonValidation) {
       try {
         log("info", "Validating ComfyUI entrypoint.", { installRoot, entrypointPath, pythonCommand: validationPythonCommand });
-        await options.execFile(validationPythonCommand, [entrypointPath, "--help"]);
+        await runCommandStage({ stage: "validation", file: validationPythonCommand, args: [entrypointPath, "--help"], installRoot });
       } catch (error) {
         const err = error as { stdout?: string; stderr?: string; message?: string };
         log("error", "ComfyUI validation command failed.", {
@@ -337,15 +457,44 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
 
   async function finalizeComfyUiInstall(installResult: RuntimeInstallResult, normalizedRequest: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
     const finalizeStartedAt = Date.now();
+    const skipPythonSetup = options.skipPythonSetup === true;
+    const skipPythonValidation = options.skipPythonValidation === true;
     log("info", "Finalizing ComfyUI install with dependency and validation stages.", {
       installRoot: normalizedRequest.installRoot,
       targetId: normalizedRequest.targetId,
-      skipPythonSetup: options.skipPythonSetup === true,
-      skipPythonValidation: options.skipPythonValidation === true,
+      commitSha: installResult.commitSha,
+      skipPythonSetup,
+      skipPythonValidation,
+      runtimeDeviceMode: options.runtimeDeviceMode ?? "auto",
+      pythonEnvironmentMode,
     });
     const warnings = [...(installResult.warnings ?? [])];
 
-    const shouldUsePythonEnvironment = !options.skipPythonSetup || !options.skipPythonValidation;
+    const finalizationMetadata = await readFinalizationMetadata(normalizedRequest.installRoot);
+    if (matchesFinalizationMetadata(finalizationMetadata, {
+      installRoot: normalizedRequest.installRoot,
+      commitSha: installResult.commitSha,
+      skipPythonSetup,
+      skipPythonValidation,
+    })) {
+      log("info", "ComfyUI install finalization already completed; skipping dependency and validation commands.", {
+        installRoot: normalizedRequest.installRoot,
+        targetId: normalizedRequest.targetId,
+        commitSha: installResult.commitSha,
+        metadataPath: getFinalizationMetadataPath(normalizedRequest.installRoot),
+        durationMs: elapsed(finalizeStartedAt),
+      });
+      return {
+        ...installResult,
+        warnings,
+        metadata: {
+          ...(installResult.metadata ?? {}),
+          extra: finalizationMetadata,
+        },
+      };
+    }
+
+    const shouldUsePythonEnvironment = !skipPythonSetup || !skipPythonValidation;
     const pythonEnvironment = shouldUsePythonEnvironment
       ? await ensurePythonEnvironment(normalizedRequest.installRoot)
       : { pythonCommand };
@@ -361,7 +510,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
 
     let pythonDependenciesInstalledAt: string | undefined;
     let directMlDependenciesInstalledAt: string | undefined;
-    if (!options.skipPythonSetup) {
+    if (!skipPythonSetup) {
       const pythonSetup = await ensurePythonDependencies(normalizedRequest.installRoot, pythonEnvironment.pythonCommand);
       warnings.push(...pythonSetup.warnings);
       if (pythonSetup.error) {
@@ -404,11 +553,31 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       return { ...installResult, status: "failed", warnings, error: validation.error };
     }
 
+    const finalization: ComfyUiFinalizationMetadata = {
+      managedBy: "ai-system-builder",
+      targetId: "comfyui",
+      installRoot: normalizedRequest.installRoot,
+      commitSha: installResult.commitSha,
+      pythonEnvironmentMode,
+      runtimeDeviceMode: options.runtimeDeviceMode ?? "auto",
+      skipPythonSetup,
+      skipPythonValidation,
+      requirementsFileName,
+      directMlPackageName,
+      pythonDependenciesInstalledAt,
+      directMlDependenciesInstalledAt,
+      pythonEnvironmentCreatedAt: pythonEnvironment.createdAt,
+      validationCheckedAt: validation.checkedAt,
+      finalizedAt: now(),
+    };
+    await writeFinalizationMetadata(finalization);
+
     log("info", "ComfyUI install finalization completed.", {
       installRoot: normalizedRequest.installRoot,
       targetId: normalizedRequest.targetId,
       durationMs: elapsed(finalizeStartedAt),
       warningCount: warnings.length,
+      metadataPath: getFinalizationMetadataPath(normalizedRequest.installRoot),
     });
     return {
       ...installResult,
@@ -416,11 +585,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       metadata: {
         ...(installResult.metadata ?? {}),
         extra: {
-          pythonDependenciesInstalledAt,
-          directMlDependenciesInstalledAt,
-          pythonEnvironmentCreatedAt: pythonEnvironment.createdAt,
-          pythonEnvironmentMode,
-          validationCheckedAt: validation.checkedAt,
+          ...finalization,
         },
       },
     };
