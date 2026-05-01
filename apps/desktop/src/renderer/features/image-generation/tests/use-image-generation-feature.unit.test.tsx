@@ -1,7 +1,11 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
+import {
+  isSelectableImageGenerationModel,
+  toImageGenerationModelDropdownValue,
+  useImageGenerationFeature,
+} from "../hooks/useImageGenerationFeature";
 
 
 const listModelsMock = vi.fn().mockResolvedValue([]);
@@ -85,16 +89,31 @@ describe("useImageGenerationFeature", () => {
 
   it("lists only text-to-image models in the model dropdown source", async () => {
     listModelsMock.mockResolvedValueOnce([
-      { modelRecordId: "1", modelId: "stabilityai/stable-diffusion", displayName: "sd", inferenceMode: "text-to-image", taskTags: ["text-to-image"] },
-      { modelRecordId: "2", modelId: "openai/gpt", displayName: "gpt", inferenceMode: "chat", taskTags: ["chat"] },
-      { modelRecordId: "3", modelId: "foo/bar", displayName: "bar", taskTags: ["text-to-image"] },
+      { modelRecordId: "1", modelId: "stabilityai/stable-diffusion", displayName: "sd", lifecycleStatus: "downloaded", artifactForm: "full-model", inferenceMode: "text-to-image", taskTags: ["text-to-image"] },
+      { modelRecordId: "2", modelId: "openai/gpt", displayName: "gpt", lifecycleStatus: "downloaded", artifactForm: "full-model", inferenceMode: "chat", taskTags: ["chat"] },
+      { modelRecordId: "3", modelId: "foo/bar", displayName: "bar", lifecycleStatus: "generated", artifactForm: "checkpoint", taskTags: ["text-to-image"] },
+      { modelRecordId: "4", modelId: "foo/reference", displayName: "reference", lifecycleStatus: "saved-reference", artifactForm: "full-model", inferenceMode: "text-to-image", taskTags: ["text-to-image"] },
     ]);
     const client = makeClient();
     let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
     await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
     await act(async () => Promise.resolve());
+    expect(listModelsMock).toHaveBeenCalledWith({ limit: 500 });
     expect(hook.availableModels).toEqual(["stabilityai/stable-diffusion", "foo/bar"]);
     await act(async () => root.unmount());
   });
 
+  it("accepts downloaded text-to-image full models from model management", () => {
+    const model = {
+      modelRecordId: "sdxl",
+      displayName: "stable-diffusion-xl-base-1.0",
+      lifecycleStatus: "downloaded",
+      artifactForm: "full-model",
+      modelId: "stabilityai/stable-diffusion-xl-base-1.0",
+      inferenceMode: "text-to-image",
+    } as const;
+
+    expect(isSelectableImageGenerationModel(model)).toBe(true);
+    expect(toImageGenerationModelDropdownValue(model)).toBe("stabilityai/stable-diffusion-xl-base-1.0");
+  });
 });
