@@ -69,7 +69,7 @@ export function isSelectableImageGenerationModel(model: Pick<ModelInventoryRecor
 }
 
 export function toImageGenerationModelDropdownValue(model: Pick<ModelInventoryRecord, "displayName" | "localPath" | "modelId" | "modelRecordId">): string | undefined {
-  const candidates = [model.localPath, model.modelId, model.displayName, model.modelRecordId];
+  const candidates = [model.modelId, model.displayName, model.modelRecordId, model.localPath];
   return candidates.find((value) => typeof value === "string" && value.trim().length > 0)?.trim();
 }
 
@@ -90,6 +90,18 @@ export function toImageGenerationModelDropdownOption(
     modelRecordId: model.modelRecordId,
     label: `${model.displayName} - ${model.modelId ?? model.localPath ?? "n/a"} - ${model.source} - ${model.lifecycleStatus} - ${model.artifactForm} - inference: ${model.inferenceMode ?? "n/a"}`,
   };
+}
+
+
+
+export function resolveModelForGeneration(model: string): string | undefined {
+  const normalized = model.trim();
+  if (normalized.length === 0) return undefined;
+  if (/\.(safetensors|ckpt|pt|pth|bin)$/i.test(normalized)) {
+    const segments = normalized.split(/[\/]/).filter((segment) => segment.length > 0);
+    return segments[segments.length - 1] ?? normalized;
+  }
+  return undefined;
 }
 
 export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageGenerationOutputReference[] {
@@ -221,7 +233,8 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
     if (seed !== undefined) payload.seed = seed;
     if (form.sampler.trim()) payload.sampler = form.sampler.trim();
     if (form.scheduler.trim()) payload.scheduler = form.scheduler.trim();
-    if (form.model.trim()) payload.model = form.model.trim();
+    const resolvedModel = resolveModelForGeneration(form.model);
+    if (resolvedModel) payload.model = resolvedModel;
     const started = await imageGenerationClient.startImageGeneration(payload);
     if (!started.ok || !started.value.requestId) { setStatus("failed"); setError(started.ok ? "Failed to start image generation." : started.error.message); return false; }
     const id = started.value.requestId;
