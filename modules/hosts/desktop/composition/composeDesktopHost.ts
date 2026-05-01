@@ -711,6 +711,10 @@ export function composeDesktopHost(
         execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
         skipPythonSetup: comfyUiSkipPythonSetup,
         skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
+        directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
+        directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
+        directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
+        directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
         logging: loggingPort,
       });
       const comfyUiSupervisor = createComfyUiRuntimeSupervisor({

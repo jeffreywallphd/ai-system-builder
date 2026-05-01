@@ -121,6 +121,11 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
 
     return details.length > 0 ? `${base} ${details.join(" ")}` : base;
   };
+  const isDependencyMismatchFailure = () => {
+    const haystack = [startupFailure, ...recentRuntimeOutput].join(" ").toLowerCase();
+    return ["torchaudio", "winerror 127", "specified procedure could not be found", "torch.ops.load_library", "_torchaudio"]
+      .some((signature) => haystack.includes(signature.toLowerCase()));
+  };
 
   const throwStartupFailure = (message: string): never => {
     status = "unhealthy";
