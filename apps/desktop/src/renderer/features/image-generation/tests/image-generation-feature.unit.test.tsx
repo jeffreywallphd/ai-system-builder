@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { ImageGenerationFeature } from "../components/ImageGenerationFeature";
+vi.mock("../../settings/components", () => ({
+  SettingsPanel: () => <div>settings-panel</div>,
+}));
 
 vi.mock("../hooks/useImageGenerationFeature", () => ({
   useImageGenerationFeature: () => ({

@@ -108,6 +108,13 @@ describe("composeDesktopHost", () => {
     })).toBe("cuda");
   });
 
+  it("resolves ComfyUI runtime mode from configured GPU type when env override is not set", () => {
+    expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "nvidia" })).toBe("cuda");
+    expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "amd" })).toBe("directml");
+    expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "intel" })).toBe("directml");
+    expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "cpu" })).toBe("cpu");
+  });
+
   it("rejects unsupported ComfyUI runtime device mode overrides", () => {
     expect(() => resolveComfyUiRuntimeDeviceMode({
       env: { COMFYUI_RUNTIME_DEVICE_MODE: "vulkan" } as NodeJS.ProcessEnv,
