@@ -59,6 +59,7 @@ import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-elect
 import {
   classifyPythonRuntimeStdioLogLevel,
   composeDesktopHost,
+  resolveComfyUiRuntimeDeviceMode,
   resolveComfyUiInstallRoot,
   resolveDefaultManagedPythonRuntimePort,
   resolvePythonRuntimeBaseUrl,
@@ -86,6 +87,31 @@ describe("composeDesktopHost", () => {
     expect(() => resolveComfyUiInstallRoot({} as NodeJS.ProcessEnv)).toThrow(
       "Unable to resolve ComfyUI install root. Set COMFYUI_INSTALL_ROOT or DESKTOP_RUNTIME_ROOT.",
     );
+  });
+
+  it("resolves DirectML for Windows machines without detected Nvidia GPUs", () => {
+    expect(resolveComfyUiRuntimeDeviceMode({ env: {}, platform: "win32", hasNvidiaGpu: false })).toBe("directml");
+  });
+
+  it("honors explicit ComfyUI runtime device mode overrides", () => {
+    expect(resolveComfyUiRuntimeDeviceMode({
+      env: { COMFYUI_RUNTIME_DEVICE_MODE: "cpu" } as NodeJS.ProcessEnv,
+      platform: "win32",
+      hasNvidiaGpu: false,
+    })).toBe("cpu");
+    expect(resolveComfyUiRuntimeDeviceMode({
+      env: { COMFYUI_ACCELERATOR: "cuda" } as NodeJS.ProcessEnv,
+      platform: "win32",
+      hasNvidiaGpu: false,
+    })).toBe("cuda");
+  });
+
+  it("rejects unsupported ComfyUI runtime device mode overrides", () => {
+    expect(() => resolveComfyUiRuntimeDeviceMode({
+      env: { COMFYUI_RUNTIME_DEVICE_MODE: "vulkan" } as NodeJS.ProcessEnv,
+      platform: "win32",
+      hasNvidiaGpu: false,
+    })).toThrow("Unsupported COMFYUI_RUNTIME_DEVICE_MODE value");
   });
 
   it("uses the canonical ipc-main handle port type for registration options", () => {
@@ -331,6 +357,8 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("const comfyUiInstallRoot = resolveComfyUiInstallRoot");
     expect(source).toContain("const comfyUiInstaller = createComfyUiRuntimeInstaller");
     expect(source).toContain("execFile: (file, args = []) => execFile(file, [...args])");
+    expect(source).toContain("const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode");
+    expect(source).toContain("runtimeDeviceMode: comfyUiRuntimeDeviceMode");
     expect(source).toContain("comfyUiInstaller,");
     expect(source).toContain("comfyUiInstallRoot,");
   });

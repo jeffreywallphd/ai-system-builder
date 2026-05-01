@@ -54,7 +54,7 @@ import {
   ensurePythonRuntimeWorkerDependencies,
   createPythonRuntimeTaskRegistryAdapter,
 } from "../../../adapters/runtime/python";
-import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
+import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor, type ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui";
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
 import { createRuntimeTaskRegistryRouter } from "../../../adapters/runtime/createRuntimeTaskRegistryRouter";
@@ -265,6 +265,49 @@ export function resolveComfyUiInstallRoot(env: NodeJS.ProcessEnv = process.env, 
     throw new Error("Unable to resolve ComfyUI install root. Set COMFYUI_INSTALL_ROOT or DESKTOP_RUNTIME_ROOT.");
   }
   return join(persistedBase, "runtime-installs", "comfyui");
+}
+
+function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRuntimeDeviceMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (normalized === "auto" || normalized === "cpu" || normalized === "directml" || normalized === "cuda") {
+    return normalized;
+  }
+
+  throw new Error(`Unsupported COMFYUI_RUNTIME_DEVICE_MODE value "${value}". Use auto, cpu, directml, or cuda.`);
+}
+
+export function resolveComfyUiRuntimeDeviceMode(input: {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  hasNvidiaGpu?: boolean;
+} = {}): ComfyUiRuntimeDeviceMode {
+  const configured = normalizeComfyUiRuntimeDeviceMode(input.env?.COMFYUI_RUNTIME_DEVICE_MODE ?? input.env?.COMFYUI_ACCELERATOR);
+  if (configured) {
+    return configured;
+  }
+
+  if ((input.platform ?? process.platform) === "win32" && input.hasNvidiaGpu === false) {
+    return "directml";
+  }
+
+  return "auto";
+}
+
+export function detectNvidiaGpu(): boolean | undefined {
+  if (process.platform !== "win32") {
+    return undefined;
+  }
+
+  const result = spawnSync("nvidia-smi", ["-L"], { encoding: "utf8", windowsHide: true });
+  if (result.error) {
+    return false;
+  }
+
+  return result.status === 0 && result.stdout.trim().length > 0;
 }
 
 export function resolveDefaultManagedPythonRuntimePort(processId: number = process.pid): string {
@@ -587,10 +630,12 @@ export function composeDesktopHost(
     registerArtifactUploadIpc(registerOptions) {
       const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
       const comfyUiPythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
+      const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({ env: process.env, hasNvidiaGpu: detectNvidiaGpu() });
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: comfyUiPythonCommand,
+        runtimeDeviceMode: comfyUiRuntimeDeviceMode,
         execFile: (file, args = []) => execFile(file, [...args]),
         skipPythonSetup: process.env.COMFYUI_SKIP_PYTHON_SETUP === "1",
         skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
@@ -601,6 +646,7 @@ export function composeDesktopHost(
         pythonExecutable: comfyUiPythonCommand,
         installer: comfyUiInstaller,
         installRoot: comfyUiInstallRoot,
+        runtimeDeviceMode: comfyUiRuntimeDeviceMode,
         autoInstall: true,
         installSourceRef: process.env.COMFYUI_INSTALL_REF,
         logging: loggingPort,

@@ -9,6 +9,7 @@ import type {
   RuntimeInstallStatusRequest,
   RuntimeInstallStatusResult,
 } from "../../../../contracts/runtime-installer";
+import type { ComfyUiRuntimeDeviceMode } from "../../comfyui/createComfyUiRuntimeSupervisor";
 
 type ExecFileLike = (file: string, args?: readonly string[]) => Promise<{ stdout: string; stderr: string }>;
 
@@ -21,6 +22,8 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   metadataFileName?: string;
   skipPythonSetup?: boolean;
   skipPythonValidation?: boolean;
+  runtimeDeviceMode?: ComfyUiRuntimeDeviceMode;
+  directMlPackageName?: string;
   requirementsFileName?: string;
   stat?: typeof nodeStat;
   logging?: LoggingPort;
@@ -72,6 +75,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   const now = options.now ?? (() => new Date().toISOString());
   const pythonCommand = options.pythonCommand ?? "python";
   const requirementsFileName = options.requirementsFileName ?? "requirements.txt";
+  const directMlPackageName = options.directMlPackageName ?? "torch-directml";
   const stat = options.stat ?? nodeStat;
 
   const makeError = (code: string, message: string, details?: Record<string, unknown>) => ({ code, message, details });
@@ -171,6 +175,54 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
+  async function ensureDirectMlDependencies(): Promise<{ installedAt?: string; error?: RuntimeInstallResult["error"] }> {
+    if (options.runtimeDeviceMode !== "directml") {
+      return {};
+    }
+
+    const stageStartedAt = Date.now();
+    log("info", "Checking ComfyUI DirectML dependency stage.", { directMlPackageName });
+
+    if (!options.execFile) {
+      log("error", "ComfyUI DirectML dependency install failed because no command runner is configured.", {
+        directMlPackageName,
+        durationMs: elapsed(stageStartedAt),
+      });
+      return { error: makeError("directml-dependency-install-failed", "Failed to install DirectML dependency", { message: "no execFile configured" }) };
+    }
+
+    try {
+      if (options.pipCommand) {
+        log("info", "Installing ComfyUI DirectML dependency with pip command.", { pipCommand: options.pipCommand, directMlPackageName });
+        await options.execFile(options.pipCommand, ["install", directMlPackageName]);
+      } else {
+        log("info", "Installing ComfyUI DirectML dependency via python -m pip.", { pythonCommand, directMlPackageName });
+        await options.execFile(pythonCommand, ["-m", "pip", "install", directMlPackageName]);
+      }
+      log("info", "ComfyUI DirectML dependency install completed.", {
+        directMlPackageName,
+        durationMs: elapsed(stageStartedAt),
+      });
+      return { installedAt: now() };
+    } catch (error) {
+      const err = error as { stdout?: string; stderr?: string; message?: string };
+      log("error", "ComfyUI DirectML dependency install failed.", {
+        directMlPackageName,
+        durationMs: elapsed(stageStartedAt),
+        message: err?.message,
+        stdout: err?.stdout,
+        stderr: err?.stderr,
+      });
+      return {
+        error: makeError("directml-dependency-install-failed", "Failed to install DirectML dependency", {
+          stdout: err?.stdout,
+          stderr: err?.stderr,
+          message: err?.message,
+        }),
+      };
+    }
+  }
+
   async function validateComfyUi(installRoot: string): Promise<{ checkedAt?: string; error?: RuntimeInstallResult["error"] }> {
     const entrypointPath = path.join(installRoot, "main.py");
     const stageStartedAt = Date.now();
@@ -229,6 +281,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     const warnings = [...(installResult.warnings ?? [])];
 
     let pythonDependenciesInstalledAt: string | undefined;
+    let directMlDependenciesInstalledAt: string | undefined;
     if (!options.skipPythonSetup) {
       const pythonSetup = await ensurePythonDependencies(normalizedRequest.installRoot);
       warnings.push(...pythonSetup.warnings);
@@ -242,6 +295,18 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         return { ...installResult, status: "failed", warnings, error: pythonSetup.error };
       }
       pythonDependenciesInstalledAt = pythonSetup.installedAt;
+
+      const directMlSetup = await ensureDirectMlDependencies();
+      if (directMlSetup.error) {
+        log("error", "ComfyUI install finalization failed during DirectML dependency stage.", {
+          installRoot: normalizedRequest.installRoot,
+          targetId: normalizedRequest.targetId,
+          durationMs: elapsed(finalizeStartedAt),
+          error: directMlSetup.error,
+        });
+        return { ...installResult, status: "failed", warnings, error: directMlSetup.error };
+      }
+      directMlDependenciesInstalledAt = directMlSetup.installedAt;
     } else {
       log("info", "Skipped ComfyUI Python dependency stage by configuration.", {
         installRoot: normalizedRequest.installRoot,
@@ -273,6 +338,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         ...(installResult.metadata ?? {}),
         extra: {
           pythonDependenciesInstalledAt,
+          directMlDependenciesInstalledAt,
           validationCheckedAt: validation.checkedAt,
         },
       },
