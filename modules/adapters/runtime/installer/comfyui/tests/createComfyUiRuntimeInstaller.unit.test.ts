@@ -2,6 +2,10 @@ import path from "node:path";
 
 import { describe, expect, it, testDouble } from "../../../../../testing/node-test";
 
+import {
+  buildComfyUiManagedPythonEnvironmentRoot,
+  buildComfyUiManagedPythonExecutablePath,
+} from "../../../comfyui/comfyUiPythonEnvironment";
 import { buildComfyUiInstallRequest, createComfyUiRuntimeInstaller } from "../createComfyUiRuntimeInstaller";
 
 const baseRequest = {
@@ -11,6 +15,8 @@ const baseRequest = {
 };
 const requirementsPath = path.join(baseRequest.installRoot, "requirements.txt");
 const entrypointPath = path.join(baseRequest.installRoot, "main.py");
+const managedPythonPath = buildComfyUiManagedPythonExecutablePath({ installRoot: baseRequest.installRoot });
+const managedPythonEnvironmentRoot = buildComfyUiManagedPythonEnvironmentRoot(baseRequest.installRoot);
 
 describe("createComfyUiRuntimeInstaller", () => {
   it("builds default install request correctly", () => {
@@ -85,7 +91,7 @@ describe("createComfyUiRuntimeInstaller", () => {
     const stat = testDouble.fn(async () => ({}));
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, skipPythonSetup: true, execFile, stat: stat as never });
     await installer.ensureInstalled(baseRequest);
-    expect(execFile).toHaveBeenCalledWith("python", [entrypointPath, "--help"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, [entrypointPath, "--help"]);
     expect(execFile).toHaveBeenCalledTimes(1);
   });
 
@@ -99,7 +105,7 @@ describe("createComfyUiRuntimeInstaller", () => {
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, skipPythonSetup: false, skipPythonValidation: true, execFile, stat: stat as never });
     await installer.ensureInstalled(baseRequest);
     expect(execFile).toHaveBeenCalledTimes(1);
-    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
   });
 
   it("skip setup and validation makes no execFile calls", async () => {
@@ -123,7 +129,27 @@ describe("createComfyUiRuntimeInstaller", () => {
     const stat = testDouble.fn(async () => ({}));
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
     await installer.ensureInstalled(baseRequest);
-    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
+  });
+
+  it("creates a managed Python environment before installing ComfyUI dependencies when one is missing", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const execFile = testDouble.fn(async () => ({ stdout: "", stderr: "" }));
+    const stat = testDouble.fn(async (targetPath: string) => {
+      if (targetPath === managedPythonPath) {
+        throw new Error("missing");
+      }
+      return {};
+    });
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
+
+    await installer.ensureInstalled(baseRequest);
+
+    expect(execFile).toHaveBeenCalledWith("python", ["-m", "venv", managedPythonEnvironmentRoot]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
   });
 
   it("installs torch-directml when DirectML runtime mode is selected", async () => {
@@ -137,9 +163,9 @@ describe("createComfyUiRuntimeInstaller", () => {
 
     await installer.ensureInstalled(baseRequest);
 
-    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
-    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "torch-directml"]);
-    expect(execFile).toHaveBeenCalledWith("python", [entrypointPath, "--help"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "torch-directml"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, [entrypointPath, "--help"]);
   });
 
   it("does not install torch-directml for automatic CUDA-capable ComfyUI startup", async () => {
@@ -153,7 +179,7 @@ describe("createComfyUiRuntimeInstaller", () => {
 
     await installer.ensureInstalled(baseRequest);
 
-    expect(execFile).not.toHaveBeenCalledWith("python", ["-m", "pip", "install", "torch-directml"]);
+    expect(execFile).not.toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "torch-directml"]);
   });
 
   it("repair runs post-install validation/dependency setup", async () => {
@@ -166,8 +192,8 @@ describe("createComfyUiRuntimeInstaller", () => {
     const stat = testDouble.fn(async () => ({}));
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
     await installer.repairInstall?.(baseRequest);
-    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
-    expect(execFile).toHaveBeenCalledWith("python", [entrypointPath, "--help"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, [entrypointPath, "--help"]);
   });
 
   it("repair performs initial install when ComfyUI is not installed", async () => {

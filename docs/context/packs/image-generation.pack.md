@@ -53,10 +53,11 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 
 
 - ComfyUI may require Python dependencies at install time.
-- The runtime installer handles base dependency setup only; full environment optimization is out of scope for now.
+- The runtime installer installs ComfyUI dependencies into a managed `.venv` by default to keep image generation isolated from ambient Python user-site packages.
 
 
 - `skipPythonSetup` skips Python dependency installation only (requirements/pip), not entrypoint checks.
 - `skipPythonValidation` skips running `python main.py --help` validation.
 - Entrypoint existence (`main.py`) remains a lightweight validation check even when Python validation is skipped.
 - ComfyUI `repairInstall` runs the same post-install dependency + validation checks as `ensureInstalled` when Git repair reports installed.
+- ComfyUI runtime startup launches with `PYTHONNOUSERSITE=1`; managed `.venv` startup is the default desktop composition path.

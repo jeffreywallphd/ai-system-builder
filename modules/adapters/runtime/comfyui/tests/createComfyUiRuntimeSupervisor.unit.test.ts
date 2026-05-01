@@ -3,6 +3,7 @@ import { PassThrough } from "node:stream";
 
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { buildComfyUiRuntimeLaunchArguments, createComfyUiRuntimeSupervisor } from "../createComfyUiRuntimeSupervisor";
+import { buildComfyUiRuntimeEnvironment } from "../comfyUiPythonEnvironment";
 
 function createMockChildProcess() {
   const emitter = new EventEmitter() as EventEmitter & {
@@ -74,7 +75,13 @@ describe("createComfyUiRuntimeSupervisor", () => {
       "127.0.0.1",
       "--port",
       "8188",
-    ], { cwd: "/tmp/comfyui", stdio: "pipe" });
+    ], { cwd: "/tmp/comfyui", env: expect.any(Object), stdio: "pipe" });
+    expect((spawnImplementation.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv }).env?.PYTHONNOUSERSITE).toBe("1");
+  });
+
+  it("builds a runtime environment that ignores incompatible user-site Python packages", () => {
+    expect(buildComfyUiRuntimeEnvironment({ PYTHONNOUSERSITE: "0", KEEP_ME: "1" }).PYTHONNOUSERSITE).toBe("1");
+    expect(buildComfyUiRuntimeEnvironment({ KEEP_ME: "1" }).KEEP_ME).toBe("1");
   });
 
   it("transitions health states", async () => {

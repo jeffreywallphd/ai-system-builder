@@ -65,11 +65,13 @@ Include this pack when prompts involve:
 
 - ComfyUI installer is a thin adapter that composes the generic Git runtime installer.
 - Python dependency installation is best-effort and non-destructive.
-- Virtual environment management is not implemented yet.
+- ComfyUI Python dependencies are installed into a managed `.venv` by default to avoid ambient user-site package contamination.
 - GPU/Torch installation is not implemented yet.
+- DirectML mode installs the DirectML dependency through the same managed Python environment.
 
 
 - `skipPythonSetup` skips Python dependency installation only (requirements/pip), not entrypoint checks.
 - `skipPythonValidation` skips running `python main.py --help` validation.
 - Entrypoint existence (`main.py`) remains a lightweight validation check even when Python validation is skipped.
 - ComfyUI `repairInstall` runs the same post-install dependency + validation checks as `ensureInstalled` when Git repair reports installed.
+- `COMFYUI_PYTHON_ENVIRONMENT_MODE=ambient` opts out of the default managed `.venv` behavior for local troubleshooting.

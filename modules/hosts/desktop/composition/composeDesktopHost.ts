@@ -54,7 +54,14 @@ import {
   ensurePythonRuntimeWorkerDependencies,
   createPythonRuntimeTaskRegistryAdapter,
 } from "../../../adapters/runtime/python";
-import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor, type ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui";
+import {
+  buildComfyUiManagedPythonExecutablePath,
+  createComfyUiHttpClient,
+  createComfyUiImageGenerationRuntimeAdapter,
+  createComfyUiRuntimeSupervisor,
+  type ComfyUiPythonEnvironmentMode,
+  type ComfyUiRuntimeDeviceMode,
+} from "../../../adapters/runtime/comfyui";
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
 import { createRuntimeTaskRegistryRouter } from "../../../adapters/runtime/createRuntimeTaskRegistryRouter";
@@ -278,6 +285,40 @@ function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRu
   }
 
   throw new Error(`Unsupported COMFYUI_RUNTIME_DEVICE_MODE value "${value}". Use auto, cpu, directml, or cuda.`);
+}
+
+function normalizeComfyUiPythonEnvironmentMode(value: string | undefined): ComfyUiPythonEnvironmentMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (normalized === "managed-venv" || normalized === "ambient") {
+    return normalized;
+  }
+
+  throw new Error(`Unsupported COMFYUI_PYTHON_ENVIRONMENT_MODE value "${value}". Use managed-venv or ambient.`);
+}
+
+export function resolveComfyUiPythonEnvironmentMode(env: NodeJS.ProcessEnv = process.env): ComfyUiPythonEnvironmentMode {
+  return normalizeComfyUiPythonEnvironmentMode(env.COMFYUI_PYTHON_ENVIRONMENT_MODE) ?? "managed-venv";
+}
+
+export function resolveComfyUiLaunchPythonExecutable(input: {
+  installRoot: string;
+  basePythonCommand: string;
+  pythonEnvironmentMode?: ComfyUiPythonEnvironmentMode;
+  skipPythonSetup?: boolean;
+  platform?: NodeJS.Platform;
+}): string {
+  if (input.pythonEnvironmentMode === "ambient" || input.skipPythonSetup === true) {
+    return input.basePythonCommand;
+  }
+
+  return buildComfyUiManagedPythonExecutablePath({
+    installRoot: input.installRoot,
+    platform: input.platform,
+  });
 }
 
 export function resolveComfyUiRuntimeDeviceMode(input: {
@@ -629,15 +670,24 @@ export function composeDesktopHost(
     },
     registerArtifactUploadIpc(registerOptions) {
       const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
-      const comfyUiPythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
+      const comfyUiBasePythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
+      const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode(process.env);
+      const comfyUiSkipPythonSetup = process.env.COMFYUI_SKIP_PYTHON_SETUP === "1";
+      const comfyUiPythonCommand = resolveComfyUiLaunchPythonExecutable({
+        installRoot: comfyUiInstallRoot,
+        basePythonCommand: comfyUiBasePythonCommand,
+        pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
+        skipPythonSetup: comfyUiSkipPythonSetup,
+      });
       const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({ env: process.env, hasNvidiaGpu: detectNvidiaGpu() });
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
-        pythonCommand: comfyUiPythonCommand,
+        pythonCommand: comfyUiBasePythonCommand,
+        pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
         runtimeDeviceMode: comfyUiRuntimeDeviceMode,
         execFile: (file, args = []) => execFile(file, [...args]),
-        skipPythonSetup: process.env.COMFYUI_SKIP_PYTHON_SETUP === "1",
+        skipPythonSetup: comfyUiSkipPythonSetup,
         skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
         logging: loggingPort,
       });

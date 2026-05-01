@@ -59,6 +59,8 @@ import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-elect
 import {
   classifyPythonRuntimeStdioLogLevel,
   composeDesktopHost,
+  resolveComfyUiLaunchPythonExecutable,
+  resolveComfyUiPythonEnvironmentMode,
   resolveComfyUiRuntimeDeviceMode,
   resolveComfyUiInstallRoot,
   resolveDefaultManagedPythonRuntimePort,
@@ -112,6 +114,32 @@ describe("composeDesktopHost", () => {
       platform: "win32",
       hasNvidiaGpu: false,
     })).toThrow("Unsupported COMFYUI_RUNTIME_DEVICE_MODE value");
+  });
+
+  it("uses a managed ComfyUI Python environment by default", () => {
+    expect(resolveComfyUiPythonEnvironmentMode({} as NodeJS.ProcessEnv)).toBe("managed-venv");
+    expect(resolveComfyUiLaunchPythonExecutable({
+      installRoot: "/runtime/comfy",
+      basePythonCommand: "python",
+      pythonEnvironmentMode: "managed-venv",
+      platform: "win32",
+    })).toBe(join("/runtime/comfy", ".venv", "Scripts", "python.exe"));
+  });
+
+  it("allows explicit ambient ComfyUI Python environment mode", () => {
+    expect(resolveComfyUiPythonEnvironmentMode({ COMFYUI_PYTHON_ENVIRONMENT_MODE: "ambient" } as NodeJS.ProcessEnv)).toBe("ambient");
+    expect(resolveComfyUiLaunchPythonExecutable({
+      installRoot: "/runtime/comfy",
+      basePythonCommand: "python",
+      pythonEnvironmentMode: "ambient",
+      platform: "win32",
+    })).toBe("python");
+  });
+
+  it("rejects unsupported ComfyUI Python environment modes", () => {
+    expect(() => resolveComfyUiPythonEnvironmentMode({
+      COMFYUI_PYTHON_ENVIRONMENT_MODE: "global",
+    } as NodeJS.ProcessEnv)).toThrow("Unsupported COMFYUI_PYTHON_ENVIRONMENT_MODE value");
   });
 
   it("uses the canonical ipc-main handle port type for registration options", () => {
@@ -358,6 +386,8 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("const comfyUiInstaller = createComfyUiRuntimeInstaller");
     expect(source).toContain("execFile: (file, args = []) => execFile(file, [...args])");
     expect(source).toContain("const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode");
+    expect(source).toContain("const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode");
+    expect(source).toContain("pythonEnvironmentMode: comfyUiPythonEnvironmentMode");
     expect(source).toContain("runtimeDeviceMode: comfyUiRuntimeDeviceMode");
     expect(source).toContain("comfyUiInstaller,");
     expect(source).toContain("comfyUiInstallRoot,");
