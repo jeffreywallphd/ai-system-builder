@@ -39,6 +39,8 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   writeFile?: typeof nodeWriteFile;
   logging?: LoggingPort;
 }
+type RepairReason = "torchaudio" | "torchvision" | "directml" | "unknown";
+type RepairMode = "targeted" | "full";
 
 export const DEFAULT_COMFYUI_REPOSITORY_URL = "https://github.com/Comfy-Org/ComfyUI";
 
@@ -420,6 +422,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         args: ["-c", "import torch; print(torch.__version__.split('+')[0])"],
       });
       const finalTorchVersion = torchVersionResult.stdout.trim();
+      log("info", "[ai-system-builder][comfyui][installer] Probed torch version after torch-directml install.", { finalTorchVersion, runtimeDeviceMode: options.runtimeDeviceMode ?? "auto" });
       const resolvedCompanions = resolveTorchCompanionVersions(finalTorchVersion);
       const resolvedTorchaudioVersion = options.directMlTorchAudioVersion ?? resolvedCompanions.torchaudioVersion;
       const resolvedTorchvisionVersion = options.directMlTorchVisionVersion ?? resolvedCompanions.torchvisionVersion;
@@ -437,6 +440,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
           finalTorchVersion,
         });
       }
+      log("info", "[ai-system-builder][comfyui][installer] Reinstalling DirectML companion packages.", { resolvedTorchaudioVersion, resolvedTorchvisionVersion });
       await runCommandStage({
         stage: "directml-torch-companion-reconcile",
         file: dependencyPythonCommand,
@@ -806,6 +810,10 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
 
     const status = await options.gitInstaller.getInstallStatus(normalizedRequest);
+    const repairReason = (request.metadata?.repairReason as RepairReason | undefined) ?? "unknown";
+    const dependencyPythonCommand = pythonEnvironmentMode === "managed-venv"
+      ? buildComfyUiManagedPythonExecutablePath({ installRoot: normalizedRequest.installRoot })
+      : pythonCommand;
     log("info", "Read ComfyUI install status before repair.", {
       installRoot: normalizedRequest.installRoot,
       targetId: normalizedRequest.targetId,
@@ -827,6 +835,45 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       logInstallResult("repair", result, operationStartedAt);
       return result;
     }
+    async function runTargetedRepair(reason: RepairReason): Promise<{ ok: boolean; error?: RuntimeInstallResult["error"]; mode: RepairMode }> {
+      if (!options.execFile) {
+        return { ok: false, mode: "targeted", error: makeError("repair-targeted-no-exec", "Targeted repair unavailable: no execFile configured") };
+      }
+      try {
+        if (reason === "torchaudio") {
+          const torchVersionResult = await runCommandStage({ stage: "repair-targeted-torch-version-probe", file: dependencyPythonCommand, args: ["-c", "import torch; print(torch.__version__.split('+')[0])"] });
+          const versions = resolveTorchCompanionVersions(torchVersionResult.stdout.trim());
+          log("info", "[ai-system-builder][comfyui][installer] Running targeted torchaudio repair.", { repairMode: "targeted", reason, versionsBeforeAfter: versions });
+          await runCommandStage({ stage: "repair-targeted-torchaudio", file: dependencyPythonCommand, args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", `torchaudio==${versions.torchaudioVersion}`, `torchvision==${versions.torchvisionVersion}`] });
+        } else if (reason === "torchvision") {
+          const torchVersionResult = await runCommandStage({ stage: "repair-targeted-torch-version-probe", file: dependencyPythonCommand, args: ["-c", "import torch; print(torch.__version__.split('+')[0])"] });
+          const versions = resolveTorchCompanionVersions(torchVersionResult.stdout.trim());
+          log("info", "[ai-system-builder][comfyui][installer] Running targeted torchvision repair.", { repairMode: "targeted", reason, chosenTorchvisionVersion: versions.torchvisionVersion });
+          await runCommandStage({ stage: "repair-targeted-torchvision", file: dependencyPythonCommand, args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", `torchvision==${versions.torchvisionVersion}`] });
+        } else if (reason === "directml") {
+          log("info", "[ai-system-builder][comfyui][installer] Running targeted directml repair.", { repairMode: "targeted", reason });
+          const directMl = await ensureDirectMlDependencies(dependencyPythonCommand);
+          if (directMl.error) return { ok: false, mode: "targeted", error: directMl.error };
+        } else {
+          return { ok: false, mode: "targeted", error: makeError("repair-targeted-unknown-reason", "Targeted repair skipped for unknown reason", { reason }) };
+        }
+        const check = await checkPythonRuntimeDependencies(dependencyPythonCommand);
+        return { ok: check.healthy, mode: "targeted", error: check.error };
+      } catch (error) {
+        const err = error as { stderr?: string; message?: string };
+        return { ok: false, mode: "targeted", error: makeError("repair-targeted-failed", "Targeted repair failed", { reason, stderr: err?.stderr, message: err?.message }) };
+      }
+    }
+
+    const targeted = await runTargetedRepair(repairReason);
+    if (targeted.ok) {
+      log("info", "[ai-system-builder][comfyui][installer] Targeted repair succeeded; finalizing install.", { repairMode: "targeted", repairReason });
+      const installResult = await options.gitInstaller.ensureInstalled({ ...normalizedRequest, allowUpdate: true });
+      const result = installResult.status === "installed" ? await finalizeComfyUiInstall(installResult, normalizedRequest) : installResult;
+      logInstallResult("repair", result, operationStartedAt);
+      return result;
+    }
+    log("error", "[ai-system-builder][comfyui][installer] Targeted repair failed; falling back to full repair.", { repairMode: "targeted", repairReason, targetedError: targeted.error });
 
     log("info", "Delegating ComfyUI git repair stage.", {
       installRoot: normalizedRequest.installRoot,
@@ -835,7 +882,15 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     const repairResult = await options.gitInstaller.repairInstall({ ...normalizedRequest, allowUpdate: true });
     if (repairResult.status !== "installed") {
       logInstallResult("repair", repairResult, operationStartedAt);
-      return repairResult;
+      return {
+        ...repairResult,
+        error: makeError("comfyui-repair-full-failed", "ComfyUI dependency repair failed after targeted and full attempts.", {
+          runtimeDeviceMode: options.runtimeDeviceMode ?? "auto",
+          repairReason,
+          targetedError: targeted.error,
+          fullError: repairResult.error,
+        }),
+      };
     }
     const result = await finalizeComfyUiInstall(repairResult, normalizedRequest);
     logInstallResult("repair", result, operationStartedAt);
