@@ -103,7 +103,7 @@ describe("useImageGenerationFeature", () => {
     let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
     await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
     await act(async () => Promise.resolve());
-    expect(listModelsMock).toHaveBeenCalledWith({ limit: 500, includeDiscovered: false });
+    expect(listModelsMock).toHaveBeenCalledWith({});
     expect(hook.availableModels.map((model) => model.value)).toEqual(["stabilityai/stable-diffusion", "foo/bar"]);
     expect(hook.availableModels[0]?.label).toContain("sd - stabilityai/stable-diffusion - huggingface - downloaded");
     expect(hook.modelLoadStatus).toBe("success");
@@ -134,5 +134,71 @@ describe("useImageGenerationFeature", () => {
 
     expect(isSelectableImageGenerationModel(model)).toBe(true);
     expect(toImageGenerationModelDropdownValue(model)).toBe("stabilityai/stable-diffusion-xl-base-1.0");
+  });
+
+  it("prefers localPath for dropdown values and does not remain loading after resolve", async () => {
+    listModelsMock.mockResolvedValueOnce([
+      {
+        modelRecordId: "sdxl-local",
+        displayName: "stable-diffusion-xl-base-1.0",
+        lifecycleStatus: "downloaded",
+        artifactForm: "full-model",
+        modelId: "stabilityai/stable-diffusion-xl-base-1.0",
+        localPath: "/models/sdxl/stable-diffusion-xl-base-1.0.safetensors",
+        source: "huggingface",
+        inferenceMode: "text-to-image",
+        taskTags: ["text-to-image"],
+      },
+      {
+        modelRecordId: "llm",
+        displayName: "llama",
+        lifecycleStatus: "downloaded",
+        artifactForm: "full-model",
+        modelId: "meta-llama/Llama-3",
+        source: "huggingface",
+        inferenceMode: "chat",
+        taskTags: ["chat"],
+      },
+    ]);
+
+    const client = makeClient();
+    let hook!: ReturnType<typeof useImageGenerationFeature>;
+    const c = document.createElement("div");
+    const root = createRoot(c);
+
+    await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
+    await act(async () => Promise.resolve());
+
+    expect(hook.modelLoadStatus).toBe("success");
+    expect(hook.availableModels).toHaveLength(1);
+    expect(hook.availableModels[0]?.value).toBe("/models/sdxl/stable-diffusion-xl-base-1.0.safetensors");
+    expect(hook.modelLoadStatus).not.toBe("loading");
+    await act(async () => root.unmount());
+  });
+
+  it("prevents model state updates after model load effect cancellation", async () => {
+    let resolveModels: (models: unknown[]) => void = () => {};
+    listModelsMock.mockReturnValueOnce(new Promise((resolve) => { resolveModels = resolve; }));
+
+    const client = makeClient();
+    let hook!: ReturnType<typeof useImageGenerationFeature>;
+    const c = document.createElement("div");
+    const root = createRoot(c);
+
+    await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
+    expect(hook.modelLoadStatus).toBe("loading");
+    await act(async () => root.unmount());
+    await act(async () => resolveModels([
+      {
+        modelRecordId: "late",
+        displayName: "late-model",
+        lifecycleStatus: "downloaded",
+        artifactForm: "full-model",
+        modelId: "org/late-model",
+        source: "huggingface",
+        inferenceMode: "text-to-image",
+        taskTags: ["text-to-image"],
+      },
+    ]));
   });
 });
