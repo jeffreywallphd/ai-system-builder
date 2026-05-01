@@ -6,6 +6,7 @@ import type { LoggingPort } from "../../../application/ports/logging";
 import { DEFAULT_COMFYUI_REPOSITORY_URL } from "../installer/comfyui/createComfyUiRuntimeInstaller";
 import { createComfyUiHttpClient, type ComfyUiHttpClient } from "./createComfyUiHttpClient";
 import type { ComfyUiRuntimeHealth } from "./comfyUiRuntimeHealth";
+import { buildComfyUiRuntimeEnvironment } from "./comfyUiPythonEnvironment";
 
 
 export interface CreateComfyUiRuntimeSupervisorOptions {
@@ -186,6 +187,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       try {
         spawnedProcessCandidate = spawnImplementation(pythonExecutable, launchArguments, {
           cwd: spawnWorkingDirectory,
+          env: buildComfyUiRuntimeEnvironment(),
           stdio: "pipe",
         });
       } catch (error) {

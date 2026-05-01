@@ -10,6 +10,11 @@ import type {
   RuntimeInstallStatusResult,
 } from "../../../../contracts/runtime-installer";
 import type { ComfyUiRuntimeDeviceMode } from "../../comfyui/createComfyUiRuntimeSupervisor";
+import {
+  buildComfyUiManagedPythonEnvironmentRoot,
+  buildComfyUiManagedPythonExecutablePath,
+  type ComfyUiPythonEnvironmentMode,
+} from "../../comfyui/comfyUiPythonEnvironment";
 
 type ExecFileLike = (file: string, args?: readonly string[]) => Promise<{ stdout: string; stderr: string }>;
 
@@ -22,6 +27,7 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   metadataFileName?: string;
   skipPythonSetup?: boolean;
   skipPythonValidation?: boolean;
+  pythonEnvironmentMode?: ComfyUiPythonEnvironmentMode;
   runtimeDeviceMode?: ComfyUiRuntimeDeviceMode;
   directMlPackageName?: string;
   requirementsFileName?: string;
@@ -76,6 +82,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   const pythonCommand = options.pythonCommand ?? "python";
   const requirementsFileName = options.requirementsFileName ?? "requirements.txt";
   const directMlPackageName = options.directMlPackageName ?? "torch-directml";
+  const pythonEnvironmentMode = options.pythonEnvironmentMode ?? "managed-venv";
   const stat = options.stat ?? nodeStat;
 
   const makeError = (code: string, message: string, details?: Record<string, unknown>) => ({ code, message, details });
@@ -114,7 +121,62 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
-  async function ensurePythonDependencies(installRoot: string): Promise<{ warnings: string[]; installedAt?: string; error?: RuntimeInstallResult["error"] }> {
+  async function ensurePythonEnvironment(installRoot: string): Promise<{
+    pythonCommand: string;
+    createdAt?: string;
+    error?: RuntimeInstallResult["error"];
+  }> {
+    if (pythonEnvironmentMode === "ambient") {
+      return { pythonCommand };
+    }
+
+    const managedPythonCommand = buildComfyUiManagedPythonExecutablePath({ installRoot });
+    if (await pathExists(managedPythonCommand)) {
+      return { pythonCommand: managedPythonCommand };
+    }
+
+    if (!options.execFile) {
+      return { pythonCommand };
+    }
+
+    const environmentRoot = buildComfyUiManagedPythonEnvironmentRoot(installRoot);
+    const stageStartedAt = Date.now();
+    log("info", "Creating ComfyUI managed Python environment.", { installRoot, environmentRoot, pythonCommand });
+
+    try {
+      await options.execFile(pythonCommand, ["-m", "venv", environmentRoot]);
+      log("info", "ComfyUI managed Python environment created.", {
+        installRoot,
+        environmentRoot,
+        durationMs: elapsed(stageStartedAt),
+      });
+      return { pythonCommand: managedPythonCommand, createdAt: now() };
+    } catch (error) {
+      const err = error as { stdout?: string; stderr?: string; message?: string };
+      log("error", "ComfyUI managed Python environment creation failed.", {
+        installRoot,
+        environmentRoot,
+        durationMs: elapsed(stageStartedAt),
+        message: err?.message,
+        stdout: err?.stdout,
+        stderr: err?.stderr,
+      });
+      return {
+        pythonCommand,
+        error: makeError("python-environment-create-failed", "Failed to create ComfyUI managed Python environment", {
+          stdout: err?.stdout,
+          stderr: err?.stderr,
+          message: err?.message,
+          environmentRoot,
+        }),
+      };
+    }
+  }
+
+  async function ensurePythonDependencies(
+    installRoot: string,
+    dependencyPythonCommand: string,
+  ): Promise<{ warnings: string[]; installedAt?: string; error?: RuntimeInstallResult["error"] }> {
     const warnings: string[] = [];
     const requirementsPath = path.join(installRoot, requirementsFileName);
     const stageStartedAt = Date.now();
@@ -145,8 +207,8 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         log("info", "Installing ComfyUI Python dependencies with pip command.", { pipCommand: options.pipCommand });
         await options.execFile(options.pipCommand, ["install", "-r", requirementsPath]);
       } else {
-        log("info", "Installing ComfyUI Python dependencies via python -m pip.", { pythonCommand });
-        await options.execFile(pythonCommand, ["-m", "pip", "install", "-r", requirementsPath]);
+        log("info", "Installing ComfyUI Python dependencies via python -m pip.", { pythonCommand: dependencyPythonCommand });
+        await options.execFile(dependencyPythonCommand, ["-m", "pip", "install", "-r", requirementsPath]);
       }
       log("info", "ComfyUI Python dependency install completed.", {
         installRoot,
@@ -175,7 +237,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
-  async function ensureDirectMlDependencies(): Promise<{ installedAt?: string; error?: RuntimeInstallResult["error"] }> {
+  async function ensureDirectMlDependencies(dependencyPythonCommand: string): Promise<{ installedAt?: string; error?: RuntimeInstallResult["error"] }> {
     if (options.runtimeDeviceMode !== "directml") {
       return {};
     }
@@ -196,8 +258,8 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         log("info", "Installing ComfyUI DirectML dependency with pip command.", { pipCommand: options.pipCommand, directMlPackageName });
         await options.execFile(options.pipCommand, ["install", directMlPackageName]);
       } else {
-        log("info", "Installing ComfyUI DirectML dependency via python -m pip.", { pythonCommand, directMlPackageName });
-        await options.execFile(pythonCommand, ["-m", "pip", "install", directMlPackageName]);
+        log("info", "Installing ComfyUI DirectML dependency via python -m pip.", { pythonCommand: dependencyPythonCommand, directMlPackageName });
+        await options.execFile(dependencyPythonCommand, ["-m", "pip", "install", directMlPackageName]);
       }
       log("info", "ComfyUI DirectML dependency install completed.", {
         directMlPackageName,
@@ -223,7 +285,10 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
-  async function validateComfyUi(installRoot: string): Promise<{ checkedAt?: string; error?: RuntimeInstallResult["error"] }> {
+  async function validateComfyUi(
+    installRoot: string,
+    validationPythonCommand: string,
+  ): Promise<{ checkedAt?: string; error?: RuntimeInstallResult["error"] }> {
     const entrypointPath = path.join(installRoot, "main.py");
     const stageStartedAt = Date.now();
     log("info", "Checking ComfyUI validation stage.", { installRoot, entrypointPath });
@@ -238,8 +303,8 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
 
     if (options.execFile && !options.skipPythonValidation) {
       try {
-        log("info", "Validating ComfyUI entrypoint.", { installRoot, entrypointPath, pythonCommand });
-        await options.execFile(pythonCommand, [entrypointPath, "--help"]);
+        log("info", "Validating ComfyUI entrypoint.", { installRoot, entrypointPath, pythonCommand: validationPythonCommand });
+        await options.execFile(validationPythonCommand, [entrypointPath, "--help"]);
       } catch (error) {
         const err = error as { stdout?: string; stderr?: string; message?: string };
         log("error", "ComfyUI validation command failed.", {
@@ -280,10 +345,24 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     });
     const warnings = [...(installResult.warnings ?? [])];
 
+    const shouldUsePythonEnvironment = !options.skipPythonSetup || !options.skipPythonValidation;
+    const pythonEnvironment = shouldUsePythonEnvironment
+      ? await ensurePythonEnvironment(normalizedRequest.installRoot)
+      : { pythonCommand };
+    if (pythonEnvironment.error) {
+      log("error", "ComfyUI install finalization failed during Python environment stage.", {
+        installRoot: normalizedRequest.installRoot,
+        targetId: normalizedRequest.targetId,
+        durationMs: elapsed(finalizeStartedAt),
+        error: pythonEnvironment.error,
+      });
+      return { ...installResult, status: "failed", warnings, error: pythonEnvironment.error };
+    }
+
     let pythonDependenciesInstalledAt: string | undefined;
     let directMlDependenciesInstalledAt: string | undefined;
     if (!options.skipPythonSetup) {
-      const pythonSetup = await ensurePythonDependencies(normalizedRequest.installRoot);
+      const pythonSetup = await ensurePythonDependencies(normalizedRequest.installRoot, pythonEnvironment.pythonCommand);
       warnings.push(...pythonSetup.warnings);
       if (pythonSetup.error) {
         log("error", "ComfyUI install finalization failed during Python dependency stage.", {
@@ -296,7 +375,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       }
       pythonDependenciesInstalledAt = pythonSetup.installedAt;
 
-      const directMlSetup = await ensureDirectMlDependencies();
+      const directMlSetup = await ensureDirectMlDependencies(pythonEnvironment.pythonCommand);
       if (directMlSetup.error) {
         log("error", "ComfyUI install finalization failed during DirectML dependency stage.", {
           installRoot: normalizedRequest.installRoot,
@@ -314,7 +393,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       });
     }
 
-    const validation = await validateComfyUi(normalizedRequest.installRoot);
+    const validation = await validateComfyUi(normalizedRequest.installRoot, pythonEnvironment.pythonCommand);
     if (validation.error) {
       log("error", "ComfyUI install finalization failed during validation stage.", {
         installRoot: normalizedRequest.installRoot,
@@ -339,6 +418,8 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         extra: {
           pythonDependenciesInstalledAt,
           directMlDependenciesInstalledAt,
+          pythonEnvironmentCreatedAt: pythonEnvironment.createdAt,
+          pythonEnvironmentMode,
           validationCheckedAt: validation.checkedAt,
         },
       },
