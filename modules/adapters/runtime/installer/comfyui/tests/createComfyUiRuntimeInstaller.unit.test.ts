@@ -129,7 +129,7 @@ describe("createComfyUiRuntimeInstaller", () => {
   it("repair runs post-install validation/dependency setup", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(),
-      getInstallStatus: testDouble.fn(),
+      getInstallStatus: testDouble.fn(async (request) => ({ ...request, status: "installed" as const })),
       repairInstall: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
     };
     const execFile = testDouble.fn(async () => ({ stdout: "", stderr: "" }));
@@ -140,10 +140,36 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(execFile).toHaveBeenCalledWith("python", [entrypointPath, "--help"]);
   });
 
+  it("repair performs initial install when ComfyUI is not installed", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(async (request) => ({ ...request, status: "not-installed" as const })),
+      repairInstall: testDouble.fn(),
+    };
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({
+      gitInstaller,
+      skipPythonSetup: true,
+      skipPythonValidation: true,
+      stat: stat as never,
+    });
+
+    const result = await installer.repairInstall?.(baseRequest);
+
+    expect(result?.status).toBe("installed");
+    expect(gitInstaller.getInstallStatus).toHaveBeenCalled();
+    expect(gitInstaller.ensureInstalled).toHaveBeenCalledWith({
+      installRoot: baseRequest.installRoot,
+      targetId: "comfyui",
+      allowUpdate: true,
+    });
+    expect(gitInstaller.repairInstall).not.toHaveBeenCalled();
+  });
+
   it("repair failure maps dependency errors", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(),
-      getInstallStatus: testDouble.fn(),
+      getInstallStatus: testDouble.fn(async (request) => ({ ...request, status: "installed" as const })),
       repairInstall: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
     };
     const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
@@ -155,6 +181,30 @@ describe("createComfyUiRuntimeInstaller", () => {
     const result = await installer.repairInstall?.(baseRequest);
     expect(result?.status).toBe("failed");
     expect(result?.error?.code).toBe("python-dependency-install-failed");
+  });
+
+  it("repair emits status and final outcome logs for diagnosis", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(async (request) => ({ ...request, status: "not-installed" as const })),
+      repairInstall: testDouble.fn(),
+    };
+    const log = testDouble.fn();
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({
+      gitInstaller,
+      skipPythonSetup: true,
+      skipPythonValidation: true,
+      stat: stat as never,
+      logging: { log },
+    });
+
+    await installer.repairInstall?.(baseRequest);
+
+    const messages = log.mock.calls.map((call) => (call[0] as { message: string }).message);
+    expect(messages).toContain("Read ComfyUI install status before repair.");
+    expect(messages).toContain("ComfyUI install is missing; repair will perform initial install.");
+    expect(messages).toContain("ComfyUI repair install finished.");
   });
 
   it("missing installRoot fails before delegating", async () => {

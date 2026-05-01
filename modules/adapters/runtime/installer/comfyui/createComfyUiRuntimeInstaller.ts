@@ -87,6 +87,19 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       data: details,
     });
   };
+  const elapsed = (startedAt: number) => Date.now() - startedAt;
+
+  const logInstallResult = (operation: "ensure" | "repair", result: RuntimeInstallResult, startedAt: number) => {
+    log(result.status === "installed" ? "info" : "error", `ComfyUI ${operation} install finished.`, {
+      operation,
+      targetId: result.targetId,
+      installRoot: result.installRoot,
+      status: result.status,
+      durationMs: elapsed(startedAt),
+      error: result.error,
+      warningCount: result.warnings?.length ?? 0,
+    });
+  };
 
   async function pathExists(targetPath: string): Promise<boolean> {
     try {
@@ -100,15 +113,26 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   async function ensurePythonDependencies(installRoot: string): Promise<{ warnings: string[]; installedAt?: string; error?: RuntimeInstallResult["error"] }> {
     const warnings: string[] = [];
     const requirementsPath = path.join(installRoot, requirementsFileName);
-    log("debug", "Checking ComfyUI Python requirements file.", { requirementsPath });
+    const stageStartedAt = Date.now();
+    log("info", "Checking ComfyUI Python dependency stage.", { installRoot, requirementsPath });
 
     if (!(await pathExists(requirementsPath))) {
       warnings.push(`Skipped Python dependency install: ${requirementsFileName} not found`);
+      log("info", "Skipped ComfyUI Python dependency install because requirements file is missing.", {
+        installRoot,
+        requirementsPath,
+        durationMs: elapsed(stageStartedAt),
+      });
       return { warnings };
     }
 
     if (!options.execFile) {
       warnings.push("Skipped Python dependency install: no execFile configured");
+      log("info", "Skipped ComfyUI Python dependency install because no command runner is configured.", {
+        installRoot,
+        requirementsPath,
+        durationMs: elapsed(stageStartedAt),
+      });
       return { warnings };
     }
 
@@ -120,9 +144,22 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         log("info", "Installing ComfyUI Python dependencies via python -m pip.", { pythonCommand });
         await options.execFile(pythonCommand, ["-m", "pip", "install", "-r", requirementsPath]);
       }
+      log("info", "ComfyUI Python dependency install completed.", {
+        installRoot,
+        requirementsPath,
+        durationMs: elapsed(stageStartedAt),
+      });
       return { warnings, installedAt: now() };
     } catch (error) {
       const err = error as { stdout?: string; stderr?: string; message?: string };
+      log("error", "ComfyUI Python dependency install failed.", {
+        installRoot,
+        requirementsPath,
+        durationMs: elapsed(stageStartedAt),
+        message: err?.message,
+        stdout: err?.stdout,
+        stderr: err?.stderr,
+      });
       return {
         warnings,
         error: makeError("python-dependency-install-failed", "Failed to install Python dependencies", {
@@ -136,16 +173,31 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
 
   async function validateComfyUi(installRoot: string): Promise<{ checkedAt?: string; error?: RuntimeInstallResult["error"] }> {
     const entrypointPath = path.join(installRoot, "main.py");
+    const stageStartedAt = Date.now();
+    log("info", "Checking ComfyUI validation stage.", { installRoot, entrypointPath });
     if (!(await pathExists(entrypointPath))) {
+      log("error", "ComfyUI validation failed because entrypoint is missing.", {
+        installRoot,
+        entrypointPath,
+        durationMs: elapsed(stageStartedAt),
+      });
       return { error: makeError("comfyui-missing-entrypoint", "ComfyUI entrypoint main.py is missing", { entrypointPath }) };
     }
 
     if (options.execFile && !options.skipPythonValidation) {
       try {
-        log("debug", "Validating ComfyUI entrypoint.", { entrypointPath, pythonCommand });
+        log("info", "Validating ComfyUI entrypoint.", { installRoot, entrypointPath, pythonCommand });
         await options.execFile(pythonCommand, [entrypointPath, "--help"]);
       } catch (error) {
         const err = error as { stdout?: string; stderr?: string; message?: string };
+        log("error", "ComfyUI validation command failed.", {
+          installRoot,
+          entrypointPath,
+          durationMs: elapsed(stageStartedAt),
+          message: err?.message,
+          stdout: err?.stdout,
+          stderr: err?.stderr,
+        });
         return {
           error: makeError("comfyui-validation-failed", "ComfyUI validation command failed", {
             stdout: err?.stdout,
@@ -154,12 +206,26 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
           }),
         };
       }
+    } else if (options.skipPythonValidation) {
+      log("info", "Skipped ComfyUI Python validation command.", { installRoot, entrypointPath });
     }
 
+    log("info", "ComfyUI validation stage completed.", {
+      installRoot,
+      entrypointPath,
+      durationMs: elapsed(stageStartedAt),
+    });
     return { checkedAt: now() };
   }
 
   async function finalizeComfyUiInstall(installResult: RuntimeInstallResult, normalizedRequest: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
+    const finalizeStartedAt = Date.now();
+    log("info", "Finalizing ComfyUI install with dependency and validation stages.", {
+      installRoot: normalizedRequest.installRoot,
+      targetId: normalizedRequest.targetId,
+      skipPythonSetup: options.skipPythonSetup === true,
+      skipPythonValidation: options.skipPythonValidation === true,
+    });
     const warnings = [...(installResult.warnings ?? [])];
 
     let pythonDependenciesInstalledAt: string | undefined;
@@ -167,16 +233,39 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       const pythonSetup = await ensurePythonDependencies(normalizedRequest.installRoot);
       warnings.push(...pythonSetup.warnings);
       if (pythonSetup.error) {
+        log("error", "ComfyUI install finalization failed during Python dependency stage.", {
+          installRoot: normalizedRequest.installRoot,
+          targetId: normalizedRequest.targetId,
+          durationMs: elapsed(finalizeStartedAt),
+          error: pythonSetup.error,
+        });
         return { ...installResult, status: "failed", warnings, error: pythonSetup.error };
       }
       pythonDependenciesInstalledAt = pythonSetup.installedAt;
+    } else {
+      log("info", "Skipped ComfyUI Python dependency stage by configuration.", {
+        installRoot: normalizedRequest.installRoot,
+        targetId: normalizedRequest.targetId,
+      });
     }
 
     const validation = await validateComfyUi(normalizedRequest.installRoot);
     if (validation.error) {
+      log("error", "ComfyUI install finalization failed during validation stage.", {
+        installRoot: normalizedRequest.installRoot,
+        targetId: normalizedRequest.targetId,
+        durationMs: elapsed(finalizeStartedAt),
+        error: validation.error,
+      });
       return { ...installResult, status: "failed", warnings, error: validation.error };
     }
 
+    log("info", "ComfyUI install finalization completed.", {
+      installRoot: normalizedRequest.installRoot,
+      targetId: normalizedRequest.targetId,
+      durationMs: elapsed(finalizeStartedAt),
+      warningCount: warnings.length,
+    });
     return {
       ...installResult,
       warnings,
@@ -191,24 +280,42 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   }
 
   async function ensureInstalled(request: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
+    const operationStartedAt = Date.now();
     log("info", "Ensuring ComfyUI install.", { installRoot: request.installRoot, targetId: request.targetId });
     const normalizedRequest = normalizeComfyUiInstallRequest(request);
+    log("info", "Resolved ComfyUI install request.", {
+      installRoot: normalizedRequest.installRoot,
+      targetId: normalizedRequest.targetId,
+      sourceType: normalizedRequest.source.type,
+      requestedRef: normalizedRequest.source.ref,
+      allowUpdate: normalizedRequest.allowUpdate === true,
+      forceRepair: normalizedRequest.forceRepair === true,
+    });
     if (!normalizedRequest.installRoot) {
-      return {
+      const result = {
         targetId: normalizedRequest.targetId,
         status: "failed",
         installRoot: normalizedRequest.installRoot,
         source: normalizedRequest.source,
         error: makeError("missing-install-root", "installRoot is required"),
-      };
+      } satisfies RuntimeInstallResult;
+      logInstallResult("ensure", result, operationStartedAt);
+      return result;
     }
 
+    log("info", "Delegating ComfyUI git install stage.", {
+      installRoot: normalizedRequest.installRoot,
+      targetId: normalizedRequest.targetId,
+    });
     const installResult = await options.gitInstaller.ensureInstalled(normalizedRequest);
     if (installResult.status !== "installed") {
+      logInstallResult("ensure", installResult, operationStartedAt);
       return installResult;
     }
 
-    return finalizeComfyUiInstall(installResult, normalizedRequest);
+    const result = await finalizeComfyUiInstall(installResult, normalizedRequest);
+    logInstallResult("ensure", result, operationStartedAt);
+    return result;
   }
 
   async function getInstallStatus(request: RuntimeInstallStatusRequest): Promise<RuntimeInstallStatusResult> {
@@ -220,27 +327,74 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   }
 
   async function repairInstall(request: RuntimeInstallRequest): Promise<RuntimeInstallResult> {
+    const operationStartedAt = Date.now();
     log("info", "Repairing ComfyUI install.", { installRoot: request.installRoot, targetId: request.targetId });
     const normalizedRequest = normalizeComfyUiInstallRequest(request);
+    log("info", "Resolved ComfyUI repair request.", {
+      installRoot: normalizedRequest.installRoot,
+      targetId: normalizedRequest.targetId,
+      sourceType: normalizedRequest.source.type,
+      requestedRef: normalizedRequest.source.ref,
+      allowUpdate: true,
+      forceRepair: normalizedRequest.forceRepair === true,
+    });
     if (!normalizedRequest.installRoot) {
-      return {
+      const result = {
         targetId: normalizedRequest.targetId,
         status: "failed",
         installRoot: normalizedRequest.installRoot,
         source: normalizedRequest.source,
         error: makeError("missing-install-root", "installRoot is required"),
-      };
+      } satisfies RuntimeInstallResult;
+      logInstallResult("repair", result, operationStartedAt);
+      return result;
     }
 
     if (!options.gitInstaller.repairInstall) {
-      return ensureInstalled({ ...normalizedRequest, allowUpdate: true });
+      log("info", "Git installer has no repair operation; using ComfyUI ensure install path.", {
+        installRoot: normalizedRequest.installRoot,
+        targetId: normalizedRequest.targetId,
+      });
+      const result = await ensureInstalled({ ...normalizedRequest, allowUpdate: true });
+      logInstallResult("repair", result, operationStartedAt);
+      return result;
     }
 
+    const status = await options.gitInstaller.getInstallStatus(normalizedRequest);
+    log("info", "Read ComfyUI install status before repair.", {
+      installRoot: normalizedRequest.installRoot,
+      targetId: normalizedRequest.targetId,
+      status: status.status,
+      error: status.error,
+    });
+
+    if (status.status === "not-installed") {
+      log("info", "ComfyUI install is missing; repair will perform initial install.", {
+        installRoot: normalizedRequest.installRoot,
+        targetId: normalizedRequest.targetId,
+      });
+      const installResult = await options.gitInstaller.ensureInstalled({ ...normalizedRequest, allowUpdate: true });
+      if (installResult.status !== "installed") {
+        logInstallResult("repair", installResult, operationStartedAt);
+        return installResult;
+      }
+      const result = await finalizeComfyUiInstall(installResult, normalizedRequest);
+      logInstallResult("repair", result, operationStartedAt);
+      return result;
+    }
+
+    log("info", "Delegating ComfyUI git repair stage.", {
+      installRoot: normalizedRequest.installRoot,
+      targetId: normalizedRequest.targetId,
+    });
     const repairResult = await options.gitInstaller.repairInstall({ ...normalizedRequest, allowUpdate: true });
     if (repairResult.status !== "installed") {
+      logInstallResult("repair", repairResult, operationStartedAt);
       return repairResult;
     }
-    return finalizeComfyUiInstall(repairResult, normalizedRequest);
+    const result = await finalizeComfyUiInstall(repairResult, normalizedRequest);
+    logInstallResult("repair", result, operationStartedAt);
+    return result;
   }
 
   return { ensureInstalled, getInstallStatus, repairInstall };
