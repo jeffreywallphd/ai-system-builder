@@ -21,7 +21,7 @@ describe("ImageGenerationFeature", () => {
     const root = createRoot(c);
     await act(async () => { root.render(<ImageGenerationFeature />); });
     expect(c.textContent).toContain("doing work");
-    expect(c.textContent).toContain("as1 / ar1");
+    expect(c.textContent).toContain("Asset ID: as1");
     expect(c.textContent).toContain("cancel unsupported");
     await act(async () => { root.unmount(); });
   });

@@ -14,7 +14,7 @@ vi.mock("../../models/api/desktopModelsClient", () => ({
   createDesktopModelsClient: () => ({ listModels: listModelsMock }),
 }));
 
-function Harness({ client, onReady }: { client: ReturnType<typeof makeClient>; onReady: (h: ReturnType<typeof useImageGenerationFeature>) => void }) { onReady(useImageGenerationFeature(client as never)); return null; }
+function Harness({ client, artifactClient, onReady }: { client: ReturnType<typeof makeClient>; artifactClient?: { createArtifactMediaViewUrl: (locator: { storageKey: string }) => Promise<string> }; onReady: (h: ReturnType<typeof useImageGenerationFeature>) => void }) { onReady(useImageGenerationFeature(client as never, undefined, artifactClient as never)); return null; }
 const makeClient = () => ({ startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn(), readComfyUiInstallStatus: vi.fn().mockResolvedValue({ ok: true, value: { status: "installed" } }), repairComfyUiInstall: vi.fn().mockResolvedValue({ ok: true, value: { status: "installed" } }) });
 
 describe("useImageGenerationFeature", () => {
@@ -226,6 +226,24 @@ describe("useImageGenerationFeature", () => {
     await act(async () => { await hook.start(); });
 
     expect(client.startImageGeneration.mock.calls[0][0].model).toBe("stabilityai/stable-diffusion-xl-base-1.0");
+    await act(async () => root.unmount());
+  });
+
+  it("hydrates finalized asset previews from artifact-backed storage", async () => {
+    const client = makeClient();
+    client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r3" } });
+    client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "succeeded", requestId: "r3", taskType: "image-generation", concurrencyClass: "image-generation", data: { outputs: [{ fileName: "temp.png", subfolder: "output" }] } } });
+    client.finalizeImageGenerationIfCompleted.mockResolvedValue({ ok: true, value: { assets: [{ assetId: "asset-1", artifactId: "generated/images/asset-1/out.png" }] } });
+    const artifactClient = { createArtifactMediaViewUrl: vi.fn(async () => "blob:preview-1") };
+    let hook!: ReturnType<typeof useImageGenerationFeature>;
+    const c = document.createElement("div");
+    const root = createRoot(c);
+    await act(async () => root.render(<Harness client={client} artifactClient={artifactClient} onReady={(h) => { hook = h; }} />));
+    await act(async () => { hook.setForm({ ...hook.form, prompt: "cat" }); await hook.start(); });
+    await act(async () => Promise.resolve());
+    expect(hook.finalizedAssets[0]?.artifactId).toBe("generated/images/asset-1/out.png");
+    expect(hook.finalizedAssets[0]?.previewUrl).toBe("blob:preview-1");
+    expect(artifactClient.createArtifactMediaViewUrl).toHaveBeenCalledWith({ storageKey: "generated/images/asset-1/out.png" });
     await act(async () => root.unmount());
   });
 

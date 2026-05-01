@@ -1,14 +1,13 @@
 import type { ImageGenerationOutput } from "../../../contracts/image-generation";
 import type { RuntimeTaskRecord } from "../../../contracts/runtime";
-import type { ArtifactStoragePort } from "../../ports/storage";
-import type { ImageAssetRegistryPort, ImageBinaryRetrievalPort } from "../../ports/image";
+import type { ImageAssetRegistryPort, GeneratedImagePersistencePort } from "../../ports/image";
 
 interface FinalizedAssetRef { assetId: string; artifactId: string; }
 
 export class FinalizeImageGenerationService {
   private readonly finalizedByRequestId = new Map<string, FinalizedAssetRef[]>();
 
-  public constructor(private readonly dependencies: { artifactStorage: ArtifactStoragePort; imageAssetRegistry: ImageAssetRegistryPort; imageBinaryRetrieval: ImageBinaryRetrievalPort; }) {}
+  public constructor(private readonly dependencies: { imageAssetRegistry: ImageAssetRegistryPort; generatedImagePersistence: GeneratedImagePersistencePort; nowMs?: () => number; }) {}
 
   public async finalizeCompletedTask(task: RuntimeTaskRecord): Promise<{ assets: FinalizedAssetRef[] }> {
     const existing = this.finalizedByRequestId.get(task.requestId);
@@ -18,16 +17,27 @@ export class FinalizeImageGenerationService {
     const outputs = this.getOutputs(task.data);
     const assets: FinalizedAssetRef[] = [];
     for (const output of outputs) {
-      const buffer = await this.dependencies.imageBinaryRetrieval.getImageBinary(output);
-      const stored = await this.dependencies.artifactStorage.storeArtifact({ descriptor: { key: output.fileName, mediaType: "image/png" }, content: buffer });
-      if (!stored.ok) throw new Error(`Failed to persist generated image artifact: ${stored.error.message}`);
-      const artifactId = stored.value.key;
-      const { assetId } = await this.dependencies.imageAssetRegistry.registerImageAsset({ artifactId, source: "generated", metadata: { engine: output.engine, width: output.width, height: output.height, createdAt: Date.now() } });
-      assets.push({ assetId, artifactId });
+      const { assetId } = await this.dependencies.imageAssetRegistry.registerImageAsset({
+        artifactId: `pending:${task.requestId}`,
+        source: "generated",
+        metadata: {
+          ...(this.readMetadata(task)?.request ?? {}),
+          engine: output.engine,
+          width: output.width,
+          height: output.height,
+          createdAt: this.dependencies.nowMs?.() ?? Date.now(),
+        },
+      });
+      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, assetId });
+      assets.push({ assetId, artifactId: persisted.artifactId });
     }
 
     this.finalizedByRequestId.set(task.requestId, assets);
     return { assets };
+  }
+
+  private readMetadata(task: RuntimeTaskRecord): { request?: Record<string, unknown> } | undefined {
+    return typeof task.metadata === "object" && task.metadata !== null ? (task.metadata as { request?: Record<string, unknown> }) : undefined;
   }
 
   private getOutputs(data: unknown): ImageGenerationOutput[] {
