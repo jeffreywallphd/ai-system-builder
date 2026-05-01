@@ -126,6 +126,36 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
   });
 
+  it("installs torch-directml when DirectML runtime mode is selected", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const execFile = testDouble.fn(async () => ({ stdout: "", stderr: "" }));
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, runtimeDeviceMode: "directml" });
+
+    await installer.ensureInstalled(baseRequest);
+
+    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
+    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "torch-directml"]);
+    expect(execFile).toHaveBeenCalledWith("python", [entrypointPath, "--help"]);
+  });
+
+  it("does not install torch-directml for automatic CUDA-capable ComfyUI startup", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const execFile = testDouble.fn(async () => ({ stdout: "", stderr: "" }));
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, runtimeDeviceMode: "auto" });
+
+    await installer.ensureInstalled(baseRequest);
+
+    expect(execFile).not.toHaveBeenCalledWith("python", ["-m", "pip", "install", "torch-directml"]);
+  });
+
   it("repair runs post-install validation/dependency setup", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(),

@@ -11,6 +11,7 @@ import type { ComfyUiRuntimeHealth } from "./comfyUiRuntimeHealth";
 export interface CreateComfyUiRuntimeSupervisorOptions {
   workingDirectory: string;
   pythonExecutable?: string;
+  runtimeDeviceMode?: ComfyUiRuntimeDeviceMode;
   port?: number;
   host?: string;
   startupTimeoutMs?: number;
@@ -23,6 +24,8 @@ export interface CreateComfyUiRuntimeSupervisorOptions {
   autoInstall?: boolean;
   logging?: LoggingPort;
 }
+
+export type ComfyUiRuntimeDeviceMode = "auto" | "cpu" | "directml" | "cuda";
 
 export interface ComfyUiRuntimeSupervisor {
   start(): Promise<void>;
@@ -40,9 +43,26 @@ function normalizeRuntimeOutput(text: string): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
+export function buildComfyUiRuntimeLaunchArguments(input: {
+  host: string;
+  port: number;
+  runtimeDeviceMode?: ComfyUiRuntimeDeviceMode;
+}): string[] {
+  const deviceMode = input.runtimeDeviceMode ?? "auto";
+  const deviceArguments =
+    deviceMode === "directml"
+      ? ["--directml"]
+      : deviceMode === "cpu"
+        ? ["--cpu"]
+        : [];
+
+  return ["main.py", ...deviceArguments, "--listen", input.host, "--port", String(input.port)];
+}
+
 export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupervisorOptions): ComfyUiRuntimeSupervisor {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8188;
+  const runtimeDeviceMode = options.runtimeDeviceMode ?? "auto";
   const url = `http://${host}:${port}`;
   const startupTimeoutMs = options.startupTimeoutMs ?? 120_000;
   const healthCheckIntervalMs = options.healthCheckIntervalMs ?? 1_000;
@@ -160,10 +180,11 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
 
       status = "starting";
       lastCheckAt = Date.now();
-      log("info", "Starting ComfyUI runtime process.", { pythonExecutable, spawnWorkingDirectory, host, port });
+      const launchArguments = buildComfyUiRuntimeLaunchArguments({ host, port, runtimeDeviceMode });
+      log("info", "Starting ComfyUI runtime process.", { pythonExecutable, spawnWorkingDirectory, host, port, runtimeDeviceMode });
       let spawnedProcessCandidate: ChildProcess | undefined;
       try {
-        spawnedProcessCandidate = spawnImplementation(pythonExecutable, ["main.py", "--listen", host, "--port", String(port)], {
+        spawnedProcessCandidate = spawnImplementation(pythonExecutable, launchArguments, {
           cwd: spawnWorkingDirectory,
           stdio: "pipe",
         });

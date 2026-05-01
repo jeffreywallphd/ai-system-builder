@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
-import { createComfyUiRuntimeSupervisor } from "../createComfyUiRuntimeSupervisor";
+import { buildComfyUiRuntimeLaunchArguments, createComfyUiRuntimeSupervisor } from "../createComfyUiRuntimeSupervisor";
 
 function createMockChildProcess() {
   const emitter = new EventEmitter() as EventEmitter & {
@@ -17,6 +17,17 @@ function createMockChildProcess() {
 }
 
 describe("createComfyUiRuntimeSupervisor", () => {
+  it("builds DirectML launch arguments without falling through to CUDA autodetection", () => {
+    expect(buildComfyUiRuntimeLaunchArguments({ host: "127.0.0.1", port: 8188, runtimeDeviceMode: "directml" })).toEqual([
+      "main.py",
+      "--directml",
+      "--listen",
+      "127.0.0.1",
+      "--port",
+      "8188",
+    ]);
+  });
+
   it("start is idempotent and does not spawn multiple processes", async () => {
     const spawnImplementation = testDouble.fn(() => createMockChildProcess() as any);
     const fetchImplementation = testDouble.fn().mockResolvedValue({
@@ -36,6 +47,34 @@ describe("createComfyUiRuntimeSupervisor", () => {
     await supervisor.start();
 
     expect(spawnImplementation).toHaveBeenCalledOnce();
+  });
+
+  it("passes the resolved runtime device mode to the spawned ComfyUI process", async () => {
+    const spawnImplementation = testDouble.fn(() => createMockChildProcess() as any);
+    const fetchImplementation = testDouble.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ devices: [] }),
+    });
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui",
+      runtimeDeviceMode: "directml",
+      spawnImplementation: spawnImplementation as never,
+      fetchImplementation: fetchImplementation as never,
+      healthCheckIntervalMs: 1,
+      startupTimeoutMs: 200,
+    });
+
+    await supervisor.start();
+
+    expect(spawnImplementation).toHaveBeenCalledWith("python", [
+      "main.py",
+      "--directml",
+      "--listen",
+      "127.0.0.1",
+      "--port",
+      "8188",
+    ], { cwd: "/tmp/comfyui", stdio: "pipe" });
   });
 
   it("transitions health states", async () => {
