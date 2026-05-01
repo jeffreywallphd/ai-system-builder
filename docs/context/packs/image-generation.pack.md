@@ -62,5 +62,8 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - ComfyUI `repairInstall` runs the same post-install dependency + validation checks as `ensureInstalled` when Git repair reports installed.
 - ComfyUI runtime startup launches with `PYTHONNOUSERSITE=1`; managed `.venv` startup is the default desktop composition path.
 - On DirectML/Intel GPU paths, ComfyUI startup may fail due to `torch`/`torchaudio` native mismatch signatures (including `WinError 127`).
+- During installer finalization in DirectML mode, `torch-directml` is installed first, the final torch version is probed, and `torchaudio`/`torchvision` are reconciled to that final torch.
+- This DirectML path targets Intel/AMD devices and does not require NVIDIA/CUDA.
+- DirectML override env vars for torch companions are advanced controls and can break compatibility if set incorrectly.
 - When detected, the supervisor performs one managed dependency repair attempt and retries startup once before surfacing a clear actionable failure.
 - The repair flow is non-destructive: it repairs managed Python dependencies and does not delete models or ComfyUI repo files.
