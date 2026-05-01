@@ -71,13 +71,20 @@ describe("composeDesktopHost", () => {
     expect(resolveComfyUiInstallRoot({ COMFYUI_INSTALL_ROOT: "/tmp/comfy" } as NodeJS.ProcessEnv, "/storage")).toBe("/tmp/comfy");
   });
 
-  it("resolves ComfyUI install root from storage root directory by default", () => {
-    expect(resolveComfyUiInstallRoot({} as NodeJS.ProcessEnv, "/storage")).toBe(join("/storage", "runtime-installs", "comfyui"));
+  it("resolves ComfyUI install root from runtime root directory by default", () => {
+    expect(resolveComfyUiInstallRoot({} as NodeJS.ProcessEnv, "/desktop-data")).toBe(join("/desktop-data", "runtime-installs", "comfyui"));
+  });
+
+  it("resolves ComfyUI install root from DESKTOP_RUNTIME_ROOT without using artifact storage root", () => {
+    expect(resolveComfyUiInstallRoot({
+      DESKTOP_RUNTIME_ROOT: "/desktop-data",
+      DESKTOP_STORAGE_ROOT: "/desktop-data/artifacts",
+    } as NodeJS.ProcessEnv)).toBe(join("/desktop-data", "runtime-installs", "comfyui"));
   });
 
   it("does not fall back to process cwd when ComfyUI root is unavailable", () => {
     expect(() => resolveComfyUiInstallRoot({} as NodeJS.ProcessEnv)).toThrow(
-      "Unable to resolve ComfyUI install root. Set COMFYUI_INSTALL_ROOT or DESKTOP_STORAGE_ROOT.",
+      "Unable to resolve ComfyUI install root. Set COMFYUI_INSTALL_ROOT or DESKTOP_RUNTIME_ROOT.",
     );
   });
 

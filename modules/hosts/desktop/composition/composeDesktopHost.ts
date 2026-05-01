@@ -195,6 +195,7 @@ export interface ComposeDesktopHostOptions {
 export interface RegisterDesktopArtifactUploadIpcOptions {
   ipcMain: IpcMainHandlePort;
   storageRootDirectory: string;
+  runtimeRootDirectory?: string;
 }
 
 export interface DesktopHostComposition {
@@ -254,12 +255,12 @@ const PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000;
 const DATASET_PREPARATION_TASK_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 
-export function resolveComfyUiInstallRoot(env: NodeJS.ProcessEnv = process.env, storageRootDirectory?: string): string {
+export function resolveComfyUiInstallRoot(env: NodeJS.ProcessEnv = process.env, runtimeRootDirectory?: string): string {
   const configured = env.COMFYUI_INSTALL_ROOT?.trim();
   if (configured) return configured;
-  const persistedBase = storageRootDirectory?.trim() || env.DESKTOP_STORAGE_ROOT?.trim() || env.APPDATA?.trim() || env.HOME?.trim();
+  const persistedBase = runtimeRootDirectory?.trim() || env.DESKTOP_RUNTIME_ROOT?.trim() || env.APPDATA?.trim() || env.HOME?.trim();
   if (!persistedBase) {
-    throw new Error("Unable to resolve ComfyUI install root. Set COMFYUI_INSTALL_ROOT or DESKTOP_STORAGE_ROOT.");
+    throw new Error("Unable to resolve ComfyUI install root. Set COMFYUI_INSTALL_ROOT or DESKTOP_RUNTIME_ROOT.");
   }
   return join(persistedBase, "runtime-installs", "comfyui");
 }
@@ -582,7 +583,7 @@ export function composeDesktopHost(
       };
     },
     registerArtifactUploadIpc(registerOptions) {
-      const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.storageRootDirectory);
+      const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
       const comfyUiPythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
