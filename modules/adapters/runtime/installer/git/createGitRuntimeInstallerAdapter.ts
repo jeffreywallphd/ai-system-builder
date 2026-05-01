@@ -104,7 +104,11 @@ export function createGitRuntimeInstallerAdapter(
       level,
       message,
       timestamp: new Date().toISOString(),
-      context: { component: "git-runtime-installer", ...(details ? { details } : {}) },
+      verbosity: "normal",
+      event: "runtime.git.installer.activity",
+      component: "git-runtime-installer",
+      subsystem: "runtime",
+      data: details,
     });
   };
 

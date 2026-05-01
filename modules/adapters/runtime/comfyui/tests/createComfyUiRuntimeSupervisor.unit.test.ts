@@ -55,6 +55,43 @@ describe("createComfyUiRuntimeSupervisor", () => {
     expect(fetchImplementation.mock.calls[0]?.[0]).toContain("/system_stats");
   });
 
+  it("emits shared structured runtime log events", async () => {
+    const spawnImplementation = testDouble.fn(() => createMockChildProcess() as any);
+    const fetchImplementation = testDouble.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ devices: [] }),
+    });
+    const log = testDouble.fn();
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui",
+      spawnImplementation: spawnImplementation as never,
+      fetchImplementation: fetchImplementation as never,
+      healthCheckIntervalMs: 1,
+      startupTimeoutMs: 200,
+      logging: { log },
+    });
+
+    await supervisor.start();
+
+    expect(log).toHaveBeenCalled();
+    const event = log.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(event).toMatchObject({
+      level: "info",
+      verbosity: "normal",
+      event: "runtime.comfyui.supervisor.activity",
+      component: "comfyui-runtime-supervisor",
+      subsystem: "runtime",
+      data: {
+        pythonExecutable: "python",
+        spawnWorkingDirectory: "/tmp/comfyui",
+        host: "127.0.0.1",
+        port: 8188,
+      },
+    });
+    expect(event.context).toBeUndefined();
+  });
+
   it("kills process and marks unhealthy when startup times out", async () => {
     const mockChild = createMockChildProcess();
     const spawnImplementation = testDouble.fn(() => mockChild as any);

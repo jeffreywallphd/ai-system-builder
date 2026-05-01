@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { describe, expect, it, testDouble } from "../../../../../testing/node-test";
 
 import { buildComfyUiInstallRequest, createComfyUiRuntimeInstaller } from "../createComfyUiRuntimeInstaller";
@@ -7,6 +9,8 @@ const baseRequest = {
   installRoot: "/runtime/comfy",
   source: { type: "git" as const, repositoryUrl: "https://example.com/ignored.git", ref: "v1.0.0" },
 };
+const requirementsPath = path.join(baseRequest.installRoot, "requirements.txt");
+const entrypointPath = path.join(baseRequest.installRoot, "main.py");
 
 describe("createComfyUiRuntimeInstaller", () => {
   it("builds default install request correctly", () => {
@@ -41,6 +45,37 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(gitInstaller.ensureInstalled).toHaveBeenCalled();
   });
 
+  it("emits shared structured runtime install log events", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const log = testDouble.fn();
+    const installer = createComfyUiRuntimeInstaller({
+      gitInstaller,
+      skipPythonSetup: true,
+      skipPythonValidation: true,
+      logging: { log },
+    });
+
+    await installer.ensureInstalled(baseRequest);
+
+    expect(log).toHaveBeenCalled();
+    const event = log.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(event).toMatchObject({
+      level: "info",
+      verbosity: "normal",
+      event: "runtime.comfyui.installer.activity",
+      component: "comfyui-runtime-installer",
+      subsystem: "runtime",
+      data: {
+        installRoot: "/runtime/comfy",
+        targetId: "custom-target",
+      },
+    });
+    expect(event.context).toBeUndefined();
+  });
+
   it("skipPythonSetup does not run pip install but still validates", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
@@ -50,7 +85,7 @@ describe("createComfyUiRuntimeInstaller", () => {
     const stat = testDouble.fn(async () => ({}));
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, skipPythonSetup: true, execFile, stat: stat as never });
     await installer.ensureInstalled(baseRequest);
-    expect(execFile).toHaveBeenCalledWith("python", ["/runtime/comfy/main.py", "--help"]);
+    expect(execFile).toHaveBeenCalledWith("python", [entrypointPath, "--help"]);
     expect(execFile).toHaveBeenCalledTimes(1);
   });
 
@@ -64,7 +99,7 @@ describe("createComfyUiRuntimeInstaller", () => {
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, skipPythonSetup: false, skipPythonValidation: true, execFile, stat: stat as never });
     await installer.ensureInstalled(baseRequest);
     expect(execFile).toHaveBeenCalledTimes(1);
-    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", "/runtime/comfy/requirements.txt"]);
+    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
   });
 
   it("skip setup and validation makes no execFile calls", async () => {
@@ -88,7 +123,7 @@ describe("createComfyUiRuntimeInstaller", () => {
     const stat = testDouble.fn(async () => ({}));
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
     await installer.ensureInstalled(baseRequest);
-    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", "/runtime/comfy/requirements.txt"]);
+    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
   });
 
   it("repair runs post-install validation/dependency setup", async () => {
@@ -101,8 +136,8 @@ describe("createComfyUiRuntimeInstaller", () => {
     const stat = testDouble.fn(async () => ({}));
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
     await installer.repairInstall?.(baseRequest);
-    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", "/runtime/comfy/requirements.txt"]);
-    expect(execFile).toHaveBeenCalledWith("python", ["/runtime/comfy/main.py", "--help"]);
+    expect(execFile).toHaveBeenCalledWith("python", ["-m", "pip", "install", "-r", requirementsPath]);
+    expect(execFile).toHaveBeenCalledWith("python", [entrypointPath, "--help"]);
   });
 
   it("repair failure maps dependency errors", async () => {
