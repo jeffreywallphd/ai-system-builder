@@ -29,7 +29,6 @@ const ACTIVE_STATUSES: ImageGenerationUiStatus[] = ["starting", "queued", "runni
 const INSTALL_STATUSES: RuntimeInstallStatus[] = ["not-installed", "installing", "checking", "installed", "update-available", "failed", "unknown"];
 const SELECTABLE_IMAGE_MODEL_LIFECYCLE_STATUSES = ["downloaded", "generated", "validated"] as const;
 const SELECTABLE_IMAGE_MODEL_ARTIFACT_FORMS = ["full-model", "merged-model", "checkpoint"] as const;
-const IMAGE_GENERATION_MODEL_LIST_LIMIT = 500;
 
 type DesktopImageGenerationClient = ReturnType<typeof createDesktopImageGenerationClient>;
 
@@ -70,7 +69,7 @@ export function isSelectableImageGenerationModel(model: Pick<ModelInventoryRecor
 }
 
 export function toImageGenerationModelDropdownValue(model: Pick<ModelInventoryRecord, "displayName" | "localPath" | "modelId" | "modelRecordId">): string | undefined {
-  const candidates = [model.modelId, model.localPath, model.displayName, model.modelRecordId];
+  const candidates = [model.localPath, model.modelId, model.displayName, model.modelRecordId];
   return candidates.find((value) => typeof value === "string" && value.trim().length > 0)?.trim();
 }
 
@@ -123,7 +122,13 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
   const installStatusSequenceRef = useRef(0);
 
   const isPollingStillActive = useCallback((id: string) => mountedRef.current && activePollRef.current === id, []);
-  useEffect(() => () => { mountedRef.current = false; activePollRef.current = undefined; }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      activePollRef.current = undefined;
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const sequence = ++installStatusSequenceRef.current;
@@ -142,11 +147,8 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
       setModelLoadStatus("loading");
       setModelLoadMessage("Loading model inventory...");
       try {
-        const models = await modelInventoryClient.listModels({
-          limit: IMAGE_GENERATION_MODEL_LIST_LIMIT,
-          includeDiscovered: false,
-        });
-        if (cancelled || !mountedRef.current) return;
+        const models = await modelInventoryClient.listModels({});
+        if (cancelled) return;
         const optionByValue = new Map<string, ImageGenerationModelOption>();
         for (const model of models) {
           const option = toImageGenerationModelDropdownOption(model);
@@ -160,10 +162,10 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
         setModelLoadMessage(
           options.length > 0
             ? `Loaded ${options.length} image generation model${options.length === 1 ? "" : "s"}.`
-            : `Loaded ${models.length} model record${models.length === 1 ? "" : "s"}, but none are downloaded image-generation full models or checkpoints.`,
+            : `Loaded ${models.length} model record${models.length === 1 ? "" : "s"}; found zero compatible image-generation models.`,
         );
       } catch (error) {
-        if (!cancelled && mountedRef.current) {
+        if (!cancelled) {
           setAvailableModels([]);
           setModelLoadStatus("error");
           setModelLoadMessage(error instanceof Error ? `Failed to load model inventory for image generation: ${error.message}` : "Failed to load model inventory for image generation.");
