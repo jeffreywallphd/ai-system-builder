@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   isSelectableImageGenerationModel,
   toImageGenerationModelDropdownValue,
@@ -17,6 +17,11 @@ function Harness({ client, onReady }: { client: ReturnType<typeof makeClient>; o
 const makeClient = () => ({ startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn(), readComfyUiInstallStatus: vi.fn().mockResolvedValue({ ok: true, value: { status: "installed" } }), repairComfyUiInstall: vi.fn().mockResolvedValue({ ok: true, value: { status: "installed" } }) });
 
 describe("useImageGenerationFeature", () => {
+  beforeEach(() => {
+    listModelsMock.mockReset();
+    listModelsMock.mockResolvedValue([]);
+  });
+
   it("omits empty seed and includes explicit seed", async () => {
     const client = makeClient(); client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r1" } }); client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "cancelled", requestId: "r1", taskType: "image-generation", concurrencyClass: "image-generation" } });
     let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
@@ -89,17 +94,31 @@ describe("useImageGenerationFeature", () => {
 
   it("lists only text-to-image models in the model dropdown source", async () => {
     listModelsMock.mockResolvedValueOnce([
-      { modelRecordId: "1", modelId: "stabilityai/stable-diffusion", displayName: "sd", lifecycleStatus: "downloaded", artifactForm: "full-model", inferenceMode: "text-to-image", taskTags: ["text-to-image"] },
-      { modelRecordId: "2", modelId: "openai/gpt", displayName: "gpt", lifecycleStatus: "downloaded", artifactForm: "full-model", inferenceMode: "chat", taskTags: ["chat"] },
-      { modelRecordId: "3", modelId: "foo/bar", displayName: "bar", lifecycleStatus: "generated", artifactForm: "checkpoint", taskTags: ["text-to-image"] },
-      { modelRecordId: "4", modelId: "foo/reference", displayName: "reference", lifecycleStatus: "saved-reference", artifactForm: "full-model", inferenceMode: "text-to-image", taskTags: ["text-to-image"] },
+      { modelRecordId: "1", modelId: "stabilityai/stable-diffusion", displayName: "sd", source: "huggingface", lifecycleStatus: "downloaded", artifactForm: "full-model", inferenceMode: "text-to-image", taskTags: ["text-to-image"] },
+      { modelRecordId: "2", modelId: "openai/gpt", displayName: "gpt", source: "huggingface", lifecycleStatus: "downloaded", artifactForm: "full-model", inferenceMode: "chat", taskTags: ["chat"] },
+      { modelRecordId: "3", modelId: "foo/bar", displayName: "bar", source: "generated", lifecycleStatus: "generated", artifactForm: "checkpoint", taskTags: ["text-to-image"] },
+      { modelRecordId: "4", modelId: "foo/reference", displayName: "reference", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", inferenceMode: "text-to-image", taskTags: ["text-to-image"] },
     ]);
     const client = makeClient();
     let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
     await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
     await act(async () => Promise.resolve());
     expect(listModelsMock).toHaveBeenCalledWith({ limit: 500 });
-    expect(hook.availableModels).toEqual(["stabilityai/stable-diffusion", "foo/bar"]);
+    expect(hook.availableModels.map((model) => model.value)).toEqual(["stabilityai/stable-diffusion", "foo/bar"]);
+    expect(hook.availableModels[0]?.label).toContain("sd - stabilityai/stable-diffusion - huggingface - downloaded");
+    expect(hook.modelLoadStatus).toBe("success");
+    await act(async () => root.unmount());
+  });
+
+  it("shows a model inventory load error instead of silently emptying the dropdown source", async () => {
+    listModelsMock.mockRejectedValueOnce(new Error("inventory offline"));
+    const client = makeClient();
+    let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
+    await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
+    await act(async () => Promise.resolve());
+    expect(hook.availableModels).toEqual([]);
+    expect(hook.modelLoadStatus).toBe("error");
+    expect(hook.modelLoadMessage).toBe("Failed to load model inventory for image generation: inventory offline");
     await act(async () => root.unmount());
   });
 
