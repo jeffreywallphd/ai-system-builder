@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ImageGenerationRequest } from "../../../../../../../modules/contracts/image-generation";
+import type { ModelInventoryRecord } from "../../../../../../../modules/contracts/model";
 import type { RuntimeTaskRecord } from "../../../../../../../modules/contracts/runtime";
 import type { RuntimeInstallStatus } from "../../../../../../../modules/contracts/runtime-installer";
 import { createDesktopImageGenerationClient } from "../api";
@@ -19,6 +20,9 @@ export type ImageGenerationUiStatus = "idle" | "starting" | "queued" | "running"
 
 const ACTIVE_STATUSES: ImageGenerationUiStatus[] = ["starting", "queued", "running", "finalizing"];
 const INSTALL_STATUSES: RuntimeInstallStatus[] = ["not-installed", "installing", "checking", "installed", "update-available", "failed", "unknown"];
+const SELECTABLE_IMAGE_MODEL_LIFECYCLE_STATUSES = ["downloaded", "generated", "validated"] as const;
+const SELECTABLE_IMAGE_MODEL_ARTIFACT_FORMS = ["full-model", "merged-model", "checkpoint"] as const;
+const IMAGE_GENERATION_MODEL_LIST_LIMIT = 500;
 
 const parsePositiveNumber = (value: string) => {
   if (value.trim() === "") return undefined;
@@ -38,6 +42,27 @@ function normalizeInstallStatus(status: unknown): RuntimeInstallStatus {
   return typeof status === "string" && INSTALL_STATUSES.includes(status as RuntimeInstallStatus)
     ? status as RuntimeInstallStatus
     : "unknown";
+}
+
+export function isSelectableImageGenerationModel(model: Pick<ModelInventoryRecord, "artifactForm" | "inferenceMode" | "lifecycleStatus" | "taskTags">): boolean {
+  if (!SELECTABLE_IMAGE_MODEL_LIFECYCLE_STATUSES.includes(model.lifecycleStatus as typeof SELECTABLE_IMAGE_MODEL_LIFECYCLE_STATUSES[number])) {
+    return false;
+  }
+
+  if (!SELECTABLE_IMAGE_MODEL_ARTIFACT_FORMS.includes(model.artifactForm as typeof SELECTABLE_IMAGE_MODEL_ARTIFACT_FORMS[number])) {
+    return false;
+  }
+
+  if (model.inferenceMode === "text-to-image") {
+    return true;
+  }
+
+  return (model.taskTags ?? []).some((tag) => tag === "text-to-image");
+}
+
+export function toImageGenerationModelDropdownValue(model: Pick<ModelInventoryRecord, "displayName" | "localPath" | "modelId" | "modelRecordId">): string | undefined {
+  const candidates = [model.modelId, model.localPath, model.displayName, model.modelRecordId];
+  return candidates.find((value) => typeof value === "string" && value.trim().length > 0)?.trim();
 }
 
 export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageGenerationOutputReference[] {
@@ -61,11 +86,6 @@ export function useImageGenerationFeature(client = createDesktopImageGenerationC
   const [installStatus, setInstallStatus] = useState<RuntimeInstallStatus>("checking");
 
   const [availableModels, setAvailableModels] = useState<string[]>([]);
-
-function isImageGenerationModel(model: { inferenceMode?: string; taskTags?: string[] }): boolean {
-  if (model.inferenceMode === "text-to-image") return true;
-  return (model.taskTags ?? []).some((tag) => tag === "text-to-image");
-}
   const mountedRef = useRef(true);
   const activePollRef = useRef<string | undefined>(undefined);
   const installStatusSequenceRef = useRef(0);
@@ -89,11 +109,11 @@ function isImageGenerationModel(model: { inferenceMode?: string; taskTags?: stri
     void (async () => {
       try {
         const modelsClient = createDesktopModelsClient();
-        const models = await modelsClient.listModels({});
+        const models = await modelsClient.listModels({ limit: IMAGE_GENERATION_MODEL_LIST_LIMIT });
         if (cancelled || !mountedRef.current) return;
         const names = models
-          .filter((model) => isImageGenerationModel({ inferenceMode: model.inferenceMode, taskTags: model.taskTags }))
-          .map((model) => model.modelId ?? model.displayName ?? model.localPath ?? model.modelRecordId)
+          .filter(isSelectableImageGenerationModel)
+          .map(toImageGenerationModelDropdownValue)
           .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
         setAvailableModels(Array.from(new Set(names)));
       } catch {
