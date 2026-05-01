@@ -1,7 +1,7 @@
 import type { ImageGenerationRequest } from "../../../../../../../modules/contracts/image-generation";
+import type { DesktopImageGenerationFinalizeResult } from "../../../../../../../modules/contracts/ipc";
 import type { RuntimeTaskRecord } from "../../../../../../../modules/contracts/runtime";
 import type { RuntimeInstallResult, RuntimeInstallStatusResult } from "../../../../../../../modules/contracts/runtime-installer";
-import type { DesktopImageGenerationFinalizeResult } from "../../../../../../../modules/contracts/ipc/desktop-image-generation-contract";
 import { getDesktopApi } from "../../../lib/desktopApi";
 
 interface PreloadResponseEnvelope {

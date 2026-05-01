@@ -19,6 +19,7 @@ const CONTRACT_FAMILIES = [
   "model",
   "persistence",
   "runtime",
+  "runtimeInstaller",
   "settings",
   "shared",
   "storage",

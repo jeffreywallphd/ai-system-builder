@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 
 import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
+import { DEFAULT_COMFYUI_REPOSITORY_URL } from "../installer/comfyui/createComfyUiRuntimeInstaller";
 import { createComfyUiHttpClient, type ComfyUiHttpClient } from "./createComfyUiHttpClient";
 import type { ComfyUiRuntimeHealth } from "./comfyUiRuntimeHealth";
 
@@ -64,7 +65,11 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         const installResult = await options.installer.ensureInstalled({
           targetId: "comfyui",
           installRoot: options.installRoot,
-          source: { type: "git", ref: options.installSourceRef },
+          source: {
+            type: "git",
+            repositoryUrl: DEFAULT_COMFYUI_REPOSITORY_URL,
+            ref: options.installSourceRef,
+          },
         });
 
         if (installResult.status !== "installed") {

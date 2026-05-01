@@ -313,6 +313,20 @@ describe("composeDesktopHost", () => {
     expect(source).not.toContain("unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels()");
   });
 
+  it("passes ComfyUI installer dependencies through the top-level desktop IPC composition", () => {
+    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
+    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
+    const sourcePath = existsSync(canonicalSourcePath)
+      ? canonicalSourcePath
+      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("const comfyUiInstallRoot = resolveComfyUiInstallRoot");
+    expect(source).toContain("const comfyUiInstaller = createComfyUiRuntimeInstaller");
+    expect(source).toContain("comfyUiInstaller,");
+    expect(source).toContain("comfyUiInstallRoot,");
+  });
+
   it("derives the Python runtime client URL from host and port when no base URL is configured", () => {
     expect(resolvePythonRuntimeBaseUrl({ PYTHON_RUNTIME_PORT: "45123" })).toBe("http://127.0.0.1:45123");
     expect(resolvePythonRuntimeBaseUrl({
