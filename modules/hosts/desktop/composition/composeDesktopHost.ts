@@ -92,6 +92,7 @@ import { PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES } from "../../
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { PowerSuspensionBlockerPort } from "../../../application/ports/desktop";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
+import { IMAGE_GENERATION_GPU_TYPE_SETTING_KEY } from "../../../contracts/settings";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
 const execFile = promisify(nodeExecFile);
@@ -288,6 +289,10 @@ function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRu
   throw new Error(`Unsupported COMFYUI_RUNTIME_DEVICE_MODE value "${value}". Use auto, cpu, directml, or cuda.`);
 }
 
+function readComfyUiEnvOverride(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode | undefined {
+  return normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR);
+}
+
 function normalizeComfyUiPythonEnvironmentMode(value: string | undefined): ComfyUiPythonEnvironmentMode | undefined {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) {
@@ -328,7 +333,7 @@ export function resolveComfyUiRuntimeDeviceMode(input: {
   hasNvidiaGpu?: boolean;
   gpuType?: string | undefined;
 } = {}): ComfyUiRuntimeDeviceMode {
-  const configured = normalizeComfyUiRuntimeDeviceMode(input.env?.COMFYUI_RUNTIME_DEVICE_MODE ?? input.env?.COMFYUI_ACCELERATOR);
+  const configured = readComfyUiEnvOverride(input.env);
   if (configured) {
     return configured;
   }
@@ -692,11 +697,6 @@ export function composeDesktopHost(
         pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
         skipPythonSetup: comfyUiSkipPythonSetup,
       });
-      const comfyUiRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({
-        env: process.env,
-        hasNvidiaGpu: detectNvidiaGpu(),
-        gpuType: process.env.COMFYUI_GPU_TYPE,
-      });
       const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS);
       const comfyUiInstallCommandTimeoutMs =
         Number.isFinite(configuredComfyUiInstallCommandTimeoutMs) && configuredComfyUiInstallCommandTimeoutMs > 0
@@ -707,7 +707,11 @@ export function composeDesktopHost(
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: comfyUiBasePythonCommand,
         pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-        runtimeDeviceMode: comfyUiRuntimeDeviceMode,
+        runtimeDeviceMode: resolveComfyUiRuntimeDeviceMode({
+          env: process.env,
+          hasNvidiaGpu: detectNvidiaGpu(),
+          gpuType: process.env.COMFYUI_GPU_TYPE,
+        }),
         execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
         skipPythonSetup: comfyUiSkipPythonSetup,
         skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
@@ -717,19 +721,78 @@ export function composeDesktopHost(
         directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
         logging: loggingPort,
       });
-      const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
-        workingDirectory: comfyUiInstallRoot,
-        pythonExecutable: comfyUiPythonCommand,
-        installer: comfyUiInstaller,
-        installRoot: comfyUiInstallRoot,
-        runtimeDeviceMode: comfyUiRuntimeDeviceMode,
-        autoInstall: true,
-        installSourceRef: process.env.COMFYUI_INSTALL_REF,
-        logging: loggingPort,
-      });
+      let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
+      let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
+      const comfyUiSupervisorPort = {
+        async start() {
+          const persistedValue = (await applicationSettings.readValues({ keys: [IMAGE_GENERATION_GPU_TYPE_SETTING_KEY] }))[0]?.value;
+          const persistedGpuType = typeof persistedValue === "string" ? persistedValue : undefined;
+          const envOverride = readComfyUiEnvOverride(process.env);
+          const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({
+            env: process.env,
+            hasNvidiaGpu: detectNvidiaGpu(),
+            gpuType: persistedGpuType,
+          });
+          const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRuntimeDeviceMode;
+          if (modeChanged && comfyUiSupervisor) {
+            await comfyUiSupervisor.stop();
+            comfyUiSupervisor = undefined;
+          }
+          if (!comfyUiSupervisor) {
+            const comfyUiInstaller = createComfyUiRuntimeInstaller({
+              gitInstaller: gitRuntimeInstaller,
+              pythonCommand: comfyUiBasePythonCommand,
+              pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
+              runtimeDeviceMode: resolvedRuntimeDeviceMode,
+              execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
+              skipPythonSetup: comfyUiSkipPythonSetup,
+              skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
+              directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
+              directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
+              directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
+              directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
+              logging: loggingPort,
+            });
+            comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+              workingDirectory: comfyUiInstallRoot,
+              pythonExecutable: comfyUiPythonCommand,
+              installer: comfyUiInstaller,
+              installRoot: comfyUiInstallRoot,
+              runtimeDeviceMode: resolvedRuntimeDeviceMode,
+              autoInstall: true,
+              installSourceRef: process.env.COMFYUI_INSTALL_REF,
+              logging: loggingPort,
+            });
+            activeRuntimeDeviceMode = resolvedRuntimeDeviceMode;
+          }
+          await loggingPort.log({
+            level: "info",
+            message: "Resolved ComfyUI runtime mode before start.",
+            timestamp: new Date().toISOString(),
+            verbosity: "normal",
+            event: "runtime.comfyui.mode.resolution",
+            component: "desktop-host-composition",
+            subsystem: "runtime",
+            data: {
+              persistedGpuType,
+              envOverride,
+              envOverrideWon: Boolean(envOverride),
+              runtimeDeviceMode: resolvedRuntimeDeviceMode,
+              processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
+            },
+          });
+          await comfyUiSupervisor.start();
+        },
+        getRecentRuntimeOutput() {
+          return comfyUiSupervisor?.getRecentRuntimeOutput() ?? [];
+        },
+        getRuntimeDeviceMode() {
+          return activeRuntimeDeviceMode ?? "auto";
+        },
+      };
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
         client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
-        supervisor: comfyUiSupervisor,
+        supervisor: comfyUiSupervisorPort,
         mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
       });
       const runtimeTaskRegistry = createRuntimeTaskRegistryRouter({ python: pythonRuntimeTaskRegistry, image: comfyUiRuntimeTaskRegistry });

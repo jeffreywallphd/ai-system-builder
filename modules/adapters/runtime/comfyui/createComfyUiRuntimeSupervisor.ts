@@ -32,6 +32,8 @@ export interface ComfyUiRuntimeSupervisor {
   start(): Promise<void>;
   isRunning(): boolean;
   getHealth(): Promise<ComfyUiRuntimeHealth>;
+  getRecentRuntimeOutput(): string[];
+  getRuntimeDeviceMode(): ComfyUiRuntimeDeviceMode;
   stop(): Promise<void>;
 }
 type DependencyMismatchReason = "torchaudio" | "torchvision" | "directml" | "unknown";
@@ -356,6 +358,12 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
           throw new Error("ComfyUI failed after dependency repair. See logs for details.");
         }
       }
+    },
+    getRecentRuntimeOutput() {
+      return [...recentRuntimeOutput];
+    },
+    getRuntimeDeviceMode() {
+      return runtimeDeviceMode;
     },
 
     isRunning() {
