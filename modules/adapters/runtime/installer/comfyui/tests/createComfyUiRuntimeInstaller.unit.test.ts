@@ -462,6 +462,42 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(messages).toContain("ComfyUI repair install finished.");
   });
 
+  it("uses targeted torchaudio repair before full repair", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(async (request) => ({ ...request, status: "installed" as const })),
+      repairInstall: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+    };
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
+      if (args[0] === "-c" && args[1] === "import torch; print(torch.__version__.split('+')[0])") return { stdout: "2.3.1\n", stderr: "" };
+      return { stdout: "", stderr: "" };
+    });
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
+    const result = await installer.repairInstall?.({ ...baseRequest, metadata: { repairReason: "torchaudio" } });
+    expect(result?.status).toBe("installed");
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torchaudio==2.3.1", "torchvision==0.18.1"]);
+    expect(gitInstaller.repairInstall).not.toHaveBeenCalled();
+  });
+
+  it("falls back to full repair when targeted repair fails", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(async (request) => ({ ...request, status: "installed" as const })),
+      repairInstall: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+    };
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
+      if (args[0] === "-c" && args[1] === "import torch; print(torch.__version__.split('+')[0])") return { stdout: "2.3.1\n", stderr: "" };
+      if (args[0] === "-c" && String(args[1]).includes("import torch")) throw { message: "import torch broken", stderr: "oops" };
+      return { stdout: "", stderr: "" };
+    });
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, skipPythonSetup: true, skipPythonValidation: true });
+    const result = await installer.repairInstall?.({ ...baseRequest, metadata: { repairReason: "torchvision" } });
+    expect(result?.status).toBe("installed");
+    expect(gitInstaller.repairInstall).toHaveBeenCalledTimes(1);
+  });
+
   it("missing installRoot fails before delegating", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(),

@@ -34,6 +34,13 @@ export interface ComfyUiRuntimeSupervisor {
   getHealth(): Promise<ComfyUiRuntimeHealth>;
   stop(): Promise<void>;
 }
+type DependencyMismatchReason = "torchaudio" | "torchvision" | "directml" | "unknown";
+type DependencyMismatchConfidence = "high" | "medium" | "low";
+interface DependencyMismatchClassification {
+  isDependencyMismatch: boolean;
+  reason: DependencyMismatchReason;
+  confidence: DependencyMismatchConfidence;
+}
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -76,6 +83,7 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
   let lastCheckAt = Date.now();
   let startupFailure: string | undefined;
   const recentRuntimeOutput: string[] = [];
+  let repairAttempted = false;
 
   const log = (level: "debug" | "info" | "error", message: string, details?: Record<string, unknown>) => {
     void options.logging?.log({
@@ -121,10 +129,18 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
 
     return details.length > 0 ? `${base} ${details.join(" ")}` : base;
   };
-  const isDependencyMismatchFailure = () => {
+  const classifyDependencyMismatchFailure = (): DependencyMismatchClassification => {
     const haystack = [startupFailure, ...recentRuntimeOutput].join(" ").toLowerCase();
-    return ["torchaudio", "winerror 127", "specified procedure could not be found", "torch.ops.load_library", "_torchaudio"]
-      .some((signature) => haystack.includes(signature.toLowerCase()));
+    const containsAny = (signals: string[]) => signals.some((signal) => haystack.includes(signal.toLowerCase()));
+    const torchaudioSignals = ["torchaudio", "_torchaudio", "winerror 127", "specified procedure could not be found", "torch.ops.load_library", "dll load failed"];
+    const torchvisionSignals = ["torchvision", "torchvision import failure", "failed to import torchvision"];
+    const directmlSignals = ["torch_directml", "directml", "dml"];
+
+    if (containsAny(torchaudioSignals)) return { isDependencyMismatch: true, reason: "torchaudio", confidence: "high" };
+    if (containsAny(torchvisionSignals)) return { isDependencyMismatch: true, reason: "torchvision", confidence: "high" };
+    if (containsAny(directmlSignals)) return { isDependencyMismatch: true, reason: "directml", confidence: "medium" };
+    if (haystack.includes("dll load failed")) return { isDependencyMismatch: true, reason: "unknown", confidence: "medium" };
+    return { isDependencyMismatch: false, reason: "unknown", confidence: "low" };
   };
 
   const throwStartupFailure = (message: string): never => {
@@ -285,15 +301,26 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       };
 
       recentRuntimeOutput.splice(0, recentRuntimeOutput.length);
+      repairAttempted = false;
       try {
         await attemptStart(1);
       } catch (firstError) {
-        if (!isDependencyMismatchFailure()) {
+        const classification = classifyDependencyMismatchFailure();
+        log("info", "[ai-system-builder][comfyui][supervisor] Dependency mismatch classification result.", {
+          classification,
+          runtimeDeviceMode,
+          startupFailure,
+          recentRuntimeOutput: [...recentRuntimeOutput],
+        });
+        if (!classification.isDependencyMismatch || classification.confidence === "low") {
           throw firstError;
         }
-        log("error", "ComfyUI dependency mismatch detected during startup.", {
-          attempt: 1, installRoot: options.installRoot, runtimeDeviceMode,
-          startupFailure, recentRuntimeOutput: [...recentRuntimeOutput],
+        if (repairAttempted) {
+          throw new Error("ComfyUI failed after dependency repair. See logs for details.");
+        }
+        repairAttempted = true;
+        log("error", "[ai-system-builder][comfyui][supervisor] ComfyUI dependency mismatch detected during startup.", {
+          attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, classification, startupFailure, recentRuntimeOutput: [...recentRuntimeOutput],
         });
         if (options.autoInstall !== true) {
           throw firstError;
@@ -301,32 +328,32 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         if (!options.installer?.repairInstall || !options.installRoot?.trim()) {
           throw new Error("ComfyUI dependency mismatch detected, but repair is unavailable.");
         }
-        log("info", "Starting ComfyUI dependency repair.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, recentRuntimeOutput: [...recentRuntimeOutput] });
+        log("info", "[ai-system-builder][comfyui][supervisor] Starting ComfyUI dependency repair.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, repairStrategy: "targeted", reason: classification.reason, recentRuntimeOutput: [...recentRuntimeOutput] });
         const repairResult = await options.installer.repairInstall({
           targetId: "comfyui",
           installRoot: options.installRoot,
           source: { type: "git", repositoryUrl: DEFAULT_COMFYUI_REPOSITORY_URL, ref: options.installSourceRef },
           allowUpdate: false,
           forceRepair: false,
+          metadata: { repairReason: classification.reason, repairConfidence: classification.confidence },
         });
         if (repairResult.status !== "installed") {
-          log("error", "ComfyUI dependency repair failed.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, repairStatus: repairResult.status, repairError: repairResult.error });
-          throw new Error(`ComfyUI dependency repair failed: ${repairResult.error?.message ?? "unknown repair error"}`);
+          log("error", "[ai-system-builder][comfyui][supervisor] ComfyUI dependency repair failed.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, repairStatus: repairResult.status, repairError: repairResult.error });
+          throw new Error(`ComfyUI dependency mismatch detected (torchaudio/torchvision). The system attempted repair but failed. runtimeDeviceMode=${runtimeDeviceMode}`);
         }
-        log("info", "ComfyUI dependency repair succeeded.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, repairStatus: repairResult.status });
+        log("info", "[ai-system-builder][comfyui][supervisor] ComfyUI dependency repair succeeded.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, repairStatus: repairResult.status });
         processHandle = undefined;
         startupFailure = undefined;
         recentRuntimeOutput.splice(0, recentRuntimeOutput.length);
-        log("info", "Retrying ComfyUI startup after dependency repair.", { attempt: 2, installRoot: options.installRoot, runtimeDeviceMode });
+        log("info", "[ai-system-builder][comfyui][supervisor] Retrying ComfyUI startup after dependency repair.", { attempt: 2, installRoot: options.installRoot, runtimeDeviceMode });
         try {
           await attemptStart(2);
-          log("info", "ComfyUI retry startup succeeded after dependency repair.", { attempt: 2, installRoot: options.installRoot, runtimeDeviceMode });
+          log("info", "[ai-system-builder][comfyui][supervisor] ComfyUI retry startup succeeded after dependency repair.", { attempt: 2, installRoot: options.installRoot, runtimeDeviceMode });
         } catch (retryError) {
-          log("error", "ComfyUI retry startup failed after dependency repair.", {
+          log("error", "[ai-system-builder][comfyui][supervisor] ComfyUI retry startup failed after dependency repair.", {
             attempt: 2, installRoot: options.installRoot, runtimeDeviceMode, startupFailure, recentRuntimeOutput: [...recentRuntimeOutput],
           });
-          const detail = retryError instanceof Error ? retryError.message : String(retryError);
-          throw new Error(`ComfyUI failed after dependency repair: ${detail}`);
+          throw new Error("ComfyUI failed after dependency repair. See logs for details.");
         }
       }
     },
