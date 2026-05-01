@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import type { Readable } from "node:stream";
 
 import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
 import type { LoggingPort } from "../../../application/ports/logging";
@@ -34,6 +35,11 @@ function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function normalizeRuntimeOutput(text: string): string | undefined {
+  const normalized = text.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupervisorOptions): ComfyUiRuntimeSupervisor {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8188;
@@ -47,6 +53,8 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
   let processHandle: ChildProcess | undefined;
   let status: ComfyUiRuntimeHealth["status"] = "stopped";
   let lastCheckAt = Date.now();
+  let startupFailure: string | undefined;
+  const recentRuntimeOutput: string[] = [];
 
   const log = (level: "debug" | "info" | "error", message: string, details?: Record<string, unknown>) => {
     void options.logging?.log({
@@ -61,11 +69,65 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
     });
   };
 
+  const appendRuntimeOutput = (text: string) => {
+    const normalized = normalizeRuntimeOutput(text);
+    if (!normalized) {
+      return;
+    }
+
+    recentRuntimeOutput.push(normalized);
+    if (recentRuntimeOutput.length > 10) {
+      recentRuntimeOutput.splice(0, recentRuntimeOutput.length - 10);
+    }
+  };
+
+  const bindRuntimeOutput = (stream: Readable | null | undefined) => {
+    stream?.on("data", (chunk: string | Buffer) => {
+      appendRuntimeOutput(chunk.toString());
+    });
+  };
+
+  const formatStartupFailure = (base: string) => {
+    const details = [
+      startupFailure,
+      recentRuntimeOutput.length > 0 ? `Recent runtime output: ${recentRuntimeOutput.join(" | ")}` : undefined,
+    ].filter((value): value is string => typeof value === "string" && value.length > 0);
+
+    return details.length > 0 ? `${base} ${details.join(" ")}` : base;
+  };
+
+  const throwStartupFailure = (message: string): never => {
+    status = "unhealthy";
+    lastCheckAt = Date.now();
+    log("error", message, {
+      startupFailure,
+      recentRuntimeOutput: recentRuntimeOutput.length > 0 ? [...recentRuntimeOutput] : undefined,
+    });
+    throw new Error(formatStartupFailure(message));
+  };
+
+  const assertStartupProcessActive = () => {
+    if (!processHandle) {
+      throwStartupFailure("ComfyUI runtime exited before health check completed.");
+    }
+    if (startupFailure && status === "unhealthy") {
+      throwStartupFailure("ComfyUI runtime failed during startup.");
+    }
+  };
+
+  const throwMissingSpawnedProcess = (): never => {
+    startupFailure = "ComfyUI runtime process spawn did not return a child process.";
+    return throwStartupFailure("ComfyUI runtime failed during startup.");
+  };
+
   return {
     async start() {
       if (processHandle && status !== "stopped") {
         return;
       }
+
+      startupFailure = undefined;
+      recentRuntimeOutput.splice(0, recentRuntimeOutput.length);
 
       let spawnWorkingDirectory = options.workingDirectory;
 
@@ -99,41 +161,60 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       status = "starting";
       lastCheckAt = Date.now();
       log("info", "Starting ComfyUI runtime process.", { pythonExecutable, spawnWorkingDirectory, host, port });
-      processHandle = spawnImplementation(pythonExecutable, ["main.py", "--listen", host, "--port", String(port)], {
-        cwd: spawnWorkingDirectory,
-        stdio: "pipe",
-      });
-      processHandle.on("error", (error) => {
+      let spawnedProcessCandidate: ChildProcess | undefined;
+      try {
+        spawnedProcessCandidate = spawnImplementation(pythonExecutable, ["main.py", "--listen", host, "--port", String(port)], {
+          cwd: spawnWorkingDirectory,
+          stdio: "pipe",
+        });
+      } catch (error) {
+        startupFailure = `ComfyUI runtime process failed to start: ${error instanceof Error ? error.message : String(error)}`;
+        throwStartupFailure("ComfyUI runtime failed during startup.");
+      }
+      const spawnedProcess = spawnedProcessCandidate ?? throwMissingSpawnedProcess();
+      processHandle = spawnedProcess;
+      bindRuntimeOutput(spawnedProcess.stdout);
+      bindRuntimeOutput(spawnedProcess.stderr);
+      spawnedProcess.on("error", (error) => {
+        startupFailure = `ComfyUI runtime process failed to start: ${error.message}`;
+        status = "unhealthy";
+        lastCheckAt = Date.now();
         log("error", "ComfyUI runtime process failed to spawn.", { error: error instanceof Error ? error.message : String(error), pythonExecutable });
       });
 
-      processHandle.once("exit", () => {
+      spawnedProcess.once("exit", (code, signal) => {
+        if (status === "starting") {
+          startupFailure = `ComfyUI runtime process exited during startup (code=${String(code ?? "null")}, signal=${String(signal ?? "null")}).`;
+        }
         processHandle = undefined;
-        status = "stopped";
+        status = status === "starting" ? "unhealthy" : "stopped";
         lastCheckAt = Date.now();
       });
 
       const timeoutAt = Date.now() + startupTimeoutMs;
       while (Date.now() < timeoutAt) {
+        assertStartupProcessActive();
         try {
           await client.getSystemStats();
+          assertStartupProcessActive();
           status = "ready";
           lastCheckAt = Date.now();
           log("info", "ComfyUI runtime is ready.", { url });
           return;
         } catch {
+          assertStartupProcessActive();
           status = "starting";
           lastCheckAt = Date.now();
           await delay(healthCheckIntervalMs);
         }
       }
 
-      processHandle.kill("SIGTERM");
+      processHandle?.kill("SIGTERM");
       processHandle = undefined;
       status = "unhealthy";
       lastCheckAt = Date.now();
       log("error", "ComfyUI runtime startup timed out.", { startupTimeoutMs, url });
-      throw new Error(`ComfyUI runtime failed to become ready within ${startupTimeoutMs}ms.`);
+      throw new Error(formatStartupFailure(`ComfyUI runtime failed to become ready within ${startupTimeoutMs}ms.`));
     },
 
     isRunning() {

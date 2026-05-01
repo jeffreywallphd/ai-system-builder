@@ -330,6 +330,7 @@ describe("composeDesktopHost", () => {
 
     expect(source).toContain("const comfyUiInstallRoot = resolveComfyUiInstallRoot");
     expect(source).toContain("const comfyUiInstaller = createComfyUiRuntimeInstaller");
+    expect(source).toContain("execFile: (file, args = []) => execFile(file, [...args])");
     expect(source).toContain("comfyUiInstaller,");
     expect(source).toContain("comfyUiInstallRoot,");
   });

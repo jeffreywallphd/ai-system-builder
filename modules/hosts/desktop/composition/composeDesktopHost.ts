@@ -1,6 +1,7 @@
 import { cpus, totalmem, freemem } from "node:os";
-import { spawnSync } from "node:child_process";
+import { execFile as nodeExecFile, spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { TaskPowerLifecycleService } from "../../../application/services/runtime";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
@@ -86,6 +87,7 @@ import type { PowerSuspensionBlockerPort } from "../../../application/ports/desk
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
+const execFile = promisify(nodeExecFile);
 
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) {
@@ -589,6 +591,7 @@ export function composeDesktopHost(
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: comfyUiPythonCommand,
+        execFile: (file, args = []) => execFile(file, [...args]),
         skipPythonSetup: process.env.COMFYUI_SKIP_PYTHON_SETUP === "1",
         skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
         logging: loggingPort,
