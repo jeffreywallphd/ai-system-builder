@@ -80,6 +80,23 @@ export const DEFAULT_DIRECTML_TORCH_VERSION = "2.3.1";
 export const DEFAULT_DIRECTML_TORCHAUDIO_VERSION = "2.3.1";
 export const DEFAULT_DIRECTML_TORCHVISION_VERSION = "0.18.1";
 
+const TORCH_TO_TORCHVISION_VERSION_MAP: Record<string, string> = {
+  "2.3.1": "0.18.1",
+  "2.4.1": "0.19.1",
+};
+
+export function resolveTorchCompanionVersions(torchVersion: string): {
+  torchVersion: string;
+  torchaudioVersion: string;
+  torchvisionVersion: string;
+} {
+  return {
+    torchVersion,
+    torchaudioVersion: torchVersion,
+    torchvisionVersion: TORCH_TO_TORCHVISION_VERSION_MAP[torchVersion] ?? DEFAULT_DIRECTML_TORCHVISION_VERSION,
+  };
+}
+
 export function buildComfyUiInstallRequest(input: BuildComfyUiInstallRequestInput): RuntimeInstallRequest {
   return {
     targetId: "comfyui",
@@ -111,8 +128,6 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   const requirementsFileName = options.requirementsFileName ?? "requirements.txt";
   const directMlPackageName = options.directMlPackageName ?? "torch-directml";
   const directMlTorchVersion = options.directMlTorchVersion ?? DEFAULT_DIRECTML_TORCH_VERSION;
-  const directMlTorchAudioVersion = options.directMlTorchAudioVersion ?? DEFAULT_DIRECTML_TORCHAUDIO_VERSION;
-  const directMlTorchVisionVersion = options.directMlTorchVisionVersion ?? DEFAULT_DIRECTML_TORCHVISION_VERSION;
   const pythonEnvironmentMode = options.pythonEnvironmentMode ?? "managed-venv";
   const stat = options.stat ?? nodeStat;
   const readFile = options.readFile ?? nodeReadFile;
@@ -369,7 +384,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
-  async function ensureDirectMlDependencies(dependencyPythonCommand: string): Promise<{ installedAt?: string; error?: RuntimeInstallResult["error"] }> {
+  async function ensureDirectMlDependencies(dependencyPythonCommand: string): Promise<{ installedAt?: string; finalTorchVersion?: string; resolvedTorchaudioVersion?: string; resolvedTorchvisionVersion?: string; error?: RuntimeInstallResult["error"] }> {
     if (options.runtimeDeviceMode !== "directml") {
       return {};
     }
@@ -386,21 +401,55 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
 
     try {
-      await runCommandStage({
-        stage: "directml-torch-dependency",
-        file: dependencyPythonCommand,
-        args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", `torch==${directMlTorchVersion}`, `torchvision==${directMlTorchVisionVersion}`, `torchaudio==${directMlTorchAudioVersion}`],
-      });
+      if (options.directMlTorchVersion) {
+        log("info", "DirectML configured torch version override is set; pre-installing requested torch.", { configuredTorchVersion: directMlTorchVersion });
+        await runCommandStage({
+          stage: "directml-configured-torch-dependency",
+          file: dependencyPythonCommand,
+          args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", `torch==${directMlTorchVersion}`],
+        });
+      }
       await runCommandStage({
         stage: "directml-dependency",
         file: dependencyPythonCommand,
         args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", directMlPackageName],
       });
+      const torchVersionResult = await runCommandStage({
+        stage: "directml-final-torch-version-probe",
+        file: dependencyPythonCommand,
+        args: ["-c", "import torch; print(torch.__version__.split('+')[0])"],
+      });
+      const finalTorchVersion = torchVersionResult.stdout.trim();
+      const resolvedCompanions = resolveTorchCompanionVersions(finalTorchVersion);
+      const resolvedTorchaudioVersion = options.directMlTorchAudioVersion ?? resolvedCompanions.torchaudioVersion;
+      const resolvedTorchvisionVersion = options.directMlTorchVisionVersion ?? resolvedCompanions.torchvisionVersion;
+      log("info", "ComfyUI DirectML dependency versions resolved.", {
+        configuredTorchVersion: options.directMlTorchVersion,
+        finalTorchVersion,
+        resolvedTorchaudioVersion,
+        resolvedTorchvisionVersion,
+        torchAudioOverrideUsed: options.directMlTorchAudioVersion !== undefined,
+        torchVisionOverrideUsed: options.directMlTorchVisionVersion !== undefined,
+      });
+      if (options.directMlTorchVersion && finalTorchVersion !== options.directMlTorchVersion) {
+        log("error", "DirectML final torch version differs from configured torch version override.", {
+          configuredTorchVersion: options.directMlTorchVersion,
+          finalTorchVersion,
+        });
+      }
+      await runCommandStage({
+        stage: "directml-torch-companion-reconcile",
+        file: dependencyPythonCommand,
+        args: ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", `torchaudio==${resolvedTorchaudioVersion}`, `torchvision==${resolvedTorchvisionVersion}`],
+      });
       log("info", "ComfyUI DirectML dependency install completed.", {
         directMlPackageName,
+        finalTorchVersion,
+        resolvedTorchaudioVersion,
+        resolvedTorchvisionVersion,
         durationMs: elapsed(stageStartedAt),
       });
-      return { installedAt: now() };
+      return { installedAt: now(), finalTorchVersion, resolvedTorchaudioVersion, resolvedTorchvisionVersion };
     } catch (error) {
       const err = error as { stdout?: string; stderr?: string; message?: string };
       log("error", "ComfyUI DirectML dependency install failed.", {
@@ -420,11 +469,16 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
-  async function checkPythonRuntimeDependencies(dependencyPythonCommand: string): Promise<{ healthy: boolean; error?: RuntimeInstallResult["error"] }> {
+  async function checkPythonRuntimeDependencies(dependencyPythonCommand: string, directMlReconciliation?: {
+    finalTorchVersion?: string;
+    resolvedTorchaudioVersion?: string;
+    resolvedTorchvisionVersion?: string;
+  }): Promise<{ healthy: boolean; error?: RuntimeInstallResult["error"] }> {
     if (!options.execFile) return { healthy: true };
     try {
       await runCommandStage({ stage: "torch-import-check", file: dependencyPythonCommand, args: ["-c", "import torch; print(torch.__version__)"] });
       await runCommandStage({ stage: "torchaudio-import-check", file: dependencyPythonCommand, args: ["-c", "import torchaudio; print(torchaudio.__version__)"] });
+      await runCommandStage({ stage: "torchvision-import-check", file: dependencyPythonCommand, args: ["-c", "import torchvision; print(torchvision.__version__)"] });
       if (options.runtimeDeviceMode === "directml") {
         await runCommandStage({ stage: "directml-import-check", file: dependencyPythonCommand, args: ["-c", "import torch_directml; print(torch_directml.device())"] });
       }
@@ -434,12 +488,20 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       const errorText = `${err?.message ?? ""} ${err?.stderr ?? ""}`;
       const code = errorText.includes("torch_directml")
         ? "directml-import-check-failed"
+        : errorText.includes("torchvision")
+          ? "torchvision-import-check-failed"
         : errorText.includes("torchaudio")
           ? "torchaudio-import-check-failed"
           : "torch-import-check-failed";
+      const message = options.runtimeDeviceMode === "directml"
+        ? "ComfyUI Python dependency mismatch detected after DirectML reconciliation. The managed environment still has incompatible torch companion packages."
+        : "ComfyUI Python dependency mismatch detected. The managed environment has incompatible torch companion packages.";
       return {
         healthy: false,
-        error: makeError(code, "ComfyUI Python dependency mismatch detected. The managed environment has incompatible torch/torchaudio binaries. Repair the ComfyUI install or allow the app to reinstall DirectML dependencies.", {
+        error: makeError(code, message, {
+          finalTorchVersion: directMlReconciliation?.finalTorchVersion,
+          attemptedTorchaudioVersion: directMlReconciliation?.resolvedTorchaudioVersion,
+          attemptedTorchvisionVersion: directMlReconciliation?.resolvedTorchvisionVersion,
           stdout: err?.stdout,
           stderr: err?.stderr,
           message: err?.message,
@@ -563,6 +625,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
 
     let pythonDependenciesInstalledAt: string | undefined;
     let directMlDependenciesInstalledAt: string | undefined;
+    let directMlReconciliation: { finalTorchVersion?: string; resolvedTorchaudioVersion?: string; resolvedTorchvisionVersion?: string } | undefined;
     if (!skipPythonSetup) {
       const pythonSetup = await ensurePythonDependencies(normalizedRequest.installRoot, pythonEnvironment.pythonCommand);
       warnings.push(...pythonSetup.warnings);
@@ -588,8 +651,13 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         return { ...installResult, status: "failed", warnings, error: directMlSetup.error };
       }
       directMlDependenciesInstalledAt = directMlSetup.installedAt;
+      directMlReconciliation = {
+        finalTorchVersion: directMlSetup.finalTorchVersion,
+        resolvedTorchaudioVersion: directMlSetup.resolvedTorchaudioVersion,
+        resolvedTorchvisionVersion: directMlSetup.resolvedTorchvisionVersion,
+      };
 
-      const dependencyCheck = await checkPythonRuntimeDependencies(pythonEnvironment.pythonCommand);
+      const dependencyCheck = await checkPythonRuntimeDependencies(pythonEnvironment.pythonCommand, directMlReconciliation);
       if (!dependencyCheck.healthy) {
         log("error", "ComfyUI install finalization failed during torchaudio import stage.", {
           installRoot: normalizedRequest.installRoot,

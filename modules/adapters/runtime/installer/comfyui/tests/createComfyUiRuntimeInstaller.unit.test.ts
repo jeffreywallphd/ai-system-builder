@@ -215,7 +215,9 @@ describe("createComfyUiRuntimeInstaller", () => {
     await installer.ensureInstalled(baseRequest);
 
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
-    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "torch-directml"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torch-directml"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-c", "import torch; print(torch.__version__.split('+')[0])"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torchaudio==2.3.1", "torchvision==0.18.1"]);
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, [entrypointPath, "--help"]);
   });
 
@@ -249,7 +251,7 @@ describe("createComfyUiRuntimeInstaller", () => {
 
     await installer.ensureInstalled(baseRequest);
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
-    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "torch-directml"]);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torch-directml"]);
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, [entrypointPath, "--help"]);
 
     execFile.mockClear();
@@ -302,13 +304,15 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(JSON.parse(finalizationMetadata).schemaVersion).toBe(2);
   });
 
-  it("directml repair installs coherent torch stack before torch-directml", async () => {
+  it("directml installs torch-directml before companion reconciliation by default", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
       getInstallStatus: testDouble.fn(),
     };
-    const execFile = testDouble.fn(async (file: string, args: string[]) => {
-      if (args[0] === "-c" && args[1] === "import torchaudio") throw new Error("broken");
+    const execFile = testDouble.fn(async (_file: string, args: string[]) => {
+      if (args[0] === "-c" && args[1] === "import torch; print(torch.__version__.split('+')[0])") {
+        return { stdout: "2.4.1\n", stderr: "" };
+      }
       return { stdout: "", stderr: "" };
     });
     const stat = testDouble.fn(async () => ({}));
@@ -317,8 +321,33 @@ describe("createComfyUiRuntimeInstaller", () => {
     const calls = execFile.mock.calls.map((call) => call[1]?.join(" "));
     const torchIndex = calls.findIndex((c) => c?.includes("torch==2.3.1"));
     const directmlIndex = calls.findIndex((c) => c?.includes("torch-directml"));
-    expect(torchIndex).toBeGreaterThan(-1);
-    expect(directmlIndex).toBeGreaterThan(torchIndex);
+    const companionIndex = calls.findIndex((c) => c?.includes("torchaudio==2.4.1") && c.includes("torchvision==0.19.1"));
+    expect(torchIndex).toBe(-1);
+    expect(directmlIndex).toBeGreaterThan(-1);
+    expect(companionIndex).toBeGreaterThan(directmlIndex);
+  });
+
+  it("uses probed torch 2.3.1 companion mapping", async () => {
+    const gitInstaller = { ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })), getInstallStatus: testDouble.fn() };
+    const execFile = testDouble.fn(async (_file: string, args: string[]) => {
+      if (args[0] === "-c" && args[1] === "import torch; print(torch.__version__.split('+')[0])") return { stdout: "2.3.1\n", stderr: "" };
+      return { stdout: "", stderr: "" };
+    });
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, runtimeDeviceMode: "directml" });
+    await installer.ensureInstalled(baseRequest);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torchaudio==2.3.1", "torchvision==0.18.1"]);
+  });
+
+  it("uses directml companion overrides when configured", async () => {
+    const gitInstaller = { ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })), getInstallStatus: testDouble.fn() };
+    const execFile = testDouble.fn(async () => ({ stdout: "2.4.1\n", stderr: "" }));
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({
+      gitInstaller, execFile, stat: stat as never, runtimeDeviceMode: "directml", directMlTorchAudioVersion: "9.9.9", directMlTorchVisionVersion: "8.8.8",
+    });
+    await installer.ensureInstalled(baseRequest);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "--force-reinstall", "--no-cache-dir", "torchaudio==9.9.9", "torchvision==8.8.8"]);
   });
 
   it("repair runs post-install validation/dependency setup", async () => {
@@ -376,6 +405,37 @@ describe("createComfyUiRuntimeInstaller", () => {
     const result = await installer.repairInstall?.(baseRequest);
     expect(result?.status).toBe("failed");
     expect(result?.error?.code).toBe("python-dependency-install-failed");
+  });
+
+  it("directml torchaudio import failure includes reconciled version details", async () => {
+    const gitInstaller = { ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })), getInstallStatus: testDouble.fn() };
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
+      if (args[0] === "-c" && args[1] === "import torch; print(torch.__version__.split('+')[0])") return { stdout: "2.4.1\n", stderr: "" };
+      if (args[0] === "-c" && args[1] === "import torchaudio; print(torchaudio.__version__)") throw { message: "torchaudio fail", stderr: "WinError 127", stdout: "" };
+      return { stdout: "", stderr: "" };
+    });
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, runtimeDeviceMode: "directml" });
+    const result = await installer.ensureInstalled(baseRequest);
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("torchaudio-import-check-failed");
+    expect(result.error?.message).toContain("after DirectML reconciliation");
+    expect(result.error?.details?.finalTorchVersion).toBe("2.4.1");
+    expect(result.error?.details?.attemptedTorchaudioVersion).toBe("2.4.1");
+    expect(result.error?.details?.attemptedTorchvisionVersion).toBe("0.19.1");
+  });
+
+  it("torchvision import failure maps to torchvision-import-check-failed", async () => {
+    const gitInstaller = { ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })), getInstallStatus: testDouble.fn() };
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
+      if (args[0] === "-c" && args[1] === "import torchvision; print(torchvision.__version__)") throw { message: "torchvision broken", stderr: "import torchvision" };
+      return { stdout: "", stderr: "" };
+    });
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
+    const result = await installer.ensureInstalled(baseRequest);
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("torchvision-import-check-failed");
   });
 
   it("repair emits status and final outcome logs for diagnosis", async () => {
