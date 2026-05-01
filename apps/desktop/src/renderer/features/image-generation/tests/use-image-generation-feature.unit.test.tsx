@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   isSelectableImageGenerationModel,
   toImageGenerationModelDropdownValue,
+  resolveModelForGeneration,
   useImageGenerationFeature,
 } from "../hooks/useImageGenerationFeature";
 
@@ -136,7 +137,7 @@ describe("useImageGenerationFeature", () => {
     expect(toImageGenerationModelDropdownValue(model)).toBe("stabilityai/stable-diffusion-xl-base-1.0");
   });
 
-  it("prefers localPath for dropdown values and does not remain loading after resolve", async () => {
+  it("uses modelId for dropdown values even when localPath exists and does not remain loading after resolve", async () => {
     listModelsMock.mockResolvedValueOnce([
       {
         modelRecordId: "sdxl-local",
@@ -171,7 +172,7 @@ describe("useImageGenerationFeature", () => {
 
     expect(hook.modelLoadStatus).toBe("success");
     expect(hook.availableModels).toHaveLength(1);
-    expect(hook.availableModels[0]?.value).toBe("/models/sdxl/stable-diffusion-xl-base-1.0.safetensors");
+    expect(hook.availableModels[0]?.value).toBe("stabilityai/stable-diffusion-xl-base-1.0");
     expect(hook.modelLoadStatus).not.toBe("loading");
     await act(async () => root.unmount());
   });
@@ -201,4 +202,30 @@ describe("useImageGenerationFeature", () => {
       },
     ]));
   });
+
+  it("normalizes model values to checkpoint filenames only when they are checkpoint-like", () => {
+    expect(resolveModelForGeneration("C:/models/sdxl/model.safetensors")).toBe("model.safetensors");
+    expect(resolveModelForGeneration("stable-diffusion-v1-5.ckpt")).toBe("stable-diffusion-v1-5.ckpt");
+    expect(resolveModelForGeneration("stabilityai/stable-diffusion-xl-base-1.0")).toBeUndefined();
+  });
+
+  it("does not send model for non-checkpoint dropdown values", async () => {
+    const client = makeClient();
+    client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r2" } });
+    client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "cancelled", requestId: "r2", taskType: "image-generation", concurrencyClass: "image-generation" } });
+
+    let hook!: ReturnType<typeof useImageGenerationFeature>;
+    const c = document.createElement("div");
+    const root = createRoot(c);
+
+    await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
+    await act(async () => {
+      hook.setForm({ prompt: "cat", negativePrompt: "", seed: "", width: "1024", height: "1024", steps: "30", sampler: "", scheduler: "", model: "stabilityai/stable-diffusion-xl-base-1.0", numImages: "1" });
+    });
+    await act(async () => { await hook.start(); });
+
+    expect(client.startImageGeneration.mock.calls[0][0].model).toBeUndefined();
+    await act(async () => root.unmount());
+  });
+
 });
