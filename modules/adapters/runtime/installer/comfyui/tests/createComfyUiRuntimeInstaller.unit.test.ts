@@ -274,6 +274,53 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(execFile).not.toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "torch-directml"]);
   });
 
+  it("stale metadata schema does not skip import checks and rewrites metadata", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [], commitSha: "abc123" })),
+      getInstallStatus: testDouble.fn(),
+    };
+    let finalizationMetadata = JSON.stringify({
+      schemaVersion: 1,
+      managedBy: "ai-system-builder",
+      targetId: "comfyui",
+      installRoot: baseRequest.installRoot,
+      commitSha: "abc123",
+      pythonEnvironmentMode: "managed-venv",
+      runtimeDeviceMode: "directml",
+      skipPythonSetup: false,
+      skipPythonValidation: false,
+      requirementsFileName: "requirements.txt",
+      directMlPackageName: "torch-directml",
+    });
+    const execFile = testDouble.fn(async () => ({ stdout: "", stderr: "" }));
+    const stat = testDouble.fn(async () => ({}));
+    const readFile = testDouble.fn(async () => finalizationMetadata);
+    const writeFile = testDouble.fn(async (_targetPath: string, content: string) => { finalizationMetadata = content; });
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, readFile: readFile as never, writeFile: writeFile as never, runtimeDeviceMode: "directml" });
+    await installer.ensureInstalled(baseRequest);
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-c", "import torchaudio"]);
+    expect(JSON.parse(finalizationMetadata).schemaVersion).toBe(2);
+  });
+
+  it("directml repair installs coherent torch stack before torch-directml", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const execFile = testDouble.fn(async (file: string, args: string[]) => {
+      if (args[0] === "-c" && args[1] === "import torchaudio") throw new Error("broken");
+      return { stdout: "", stderr: "" };
+    });
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, runtimeDeviceMode: "directml" });
+    await installer.ensureInstalled(baseRequest);
+    const calls = execFile.mock.calls.map((call) => call[1]?.join(" "));
+    const torchIndex = calls.findIndex((c) => c?.includes("torch==2.3.1"));
+    const directmlIndex = calls.findIndex((c) => c?.includes("torch-directml"));
+    expect(torchIndex).toBeGreaterThan(-1);
+    expect(directmlIndex).toBeGreaterThan(torchIndex);
+  });
+
   it("repair runs post-install validation/dependency setup", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(),

@@ -161,10 +161,6 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         return;
       }
 
-      const startStartedAt = Date.now();
-      startupFailure = undefined;
-      recentRuntimeOutput.splice(0, recentRuntimeOutput.length);
-
       let spawnWorkingDirectory = options.workingDirectory;
 
       if (options.autoInstall === true) {
@@ -201,99 +197,138 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         });
       }
 
-      status = "starting";
-      lastCheckAt = Date.now();
-      const launchArguments = buildComfyUiRuntimeLaunchArguments({ host, port, runtimeDeviceMode });
-      log("info", "Starting ComfyUI runtime process.", { pythonExecutable, launchArguments, spawnWorkingDirectory, host, port, runtimeDeviceMode });
-      let spawnedProcessCandidate: ChildProcess | undefined;
-      try {
-        spawnedProcessCandidate = spawnImplementation(pythonExecutable, launchArguments, {
-          cwd: spawnWorkingDirectory,
-          env: buildComfyUiRuntimeEnvironment(),
-          stdio: "pipe",
+      const attemptStart = async (attempt: number): Promise<void> => {
+        const startStartedAt = Date.now();
+        startupFailure = undefined;
+        status = "starting";
+        lastCheckAt = Date.now();
+        const launchArguments = buildComfyUiRuntimeLaunchArguments({ host, port, runtimeDeviceMode });
+        log("info", "Starting ComfyUI runtime process.", { attempt, pythonExecutable, launchArguments, spawnWorkingDirectory, host, port, runtimeDeviceMode });
+        let spawnedProcessCandidate: ChildProcess | undefined;
+        try {
+          spawnedProcessCandidate = spawnImplementation(pythonExecutable, launchArguments, {
+            cwd: spawnWorkingDirectory,
+            env: buildComfyUiRuntimeEnvironment(),
+            stdio: "pipe",
+          });
+        } catch (error) {
+          startupFailure = `ComfyUI runtime process failed to start: ${error instanceof Error ? error.message : String(error)}`;
+          throwStartupFailure("ComfyUI runtime failed during startup.");
+        }
+        const spawnedProcess = spawnedProcessCandidate ?? throwMissingSpawnedProcess();
+        processHandle = spawnedProcess;
+        log("info", "ComfyUI runtime process spawned; polling health endpoint.", {
+          attempt,
+          url,
+          startupTimeoutMs,
+          healthCheckIntervalMs,
         });
-      } catch (error) {
-        startupFailure = `ComfyUI runtime process failed to start: ${error instanceof Error ? error.message : String(error)}`;
-        throwStartupFailure("ComfyUI runtime failed during startup.");
-      }
-      const spawnedProcess = spawnedProcessCandidate ?? throwMissingSpawnedProcess();
-      processHandle = spawnedProcess;
-      log("info", "ComfyUI runtime process spawned; polling health endpoint.", {
-        url,
-        startupTimeoutMs,
-        healthCheckIntervalMs,
-      });
-      bindRuntimeOutput(spawnedProcess.stdout, "stdout");
-      bindRuntimeOutput(spawnedProcess.stderr, "stderr");
-      spawnedProcess.on("error", (error) => {
-        startupFailure = `ComfyUI runtime process failed to start: ${error.message}`;
+        bindRuntimeOutput(spawnedProcess.stdout, "stdout");
+        bindRuntimeOutput(spawnedProcess.stderr, "stderr");
+        spawnedProcess.on("error", (error) => {
+          startupFailure = `ComfyUI runtime process failed to start: ${error.message}`;
+          status = "unhealthy";
+          lastCheckAt = Date.now();
+          log("error", "ComfyUI runtime process failed to spawn.", { attempt, error: error instanceof Error ? error.message : String(error), pythonExecutable });
+        });
+
+        spawnedProcess.once("exit", (code, signal) => {
+          if (status === "starting") {
+            startupFailure = `ComfyUI runtime process exited during startup (code=${String(code ?? "null")}, signal=${String(signal ?? "null")}).`;
+          }
+          processHandle = undefined;
+          status = status === "starting" ? "unhealthy" : "stopped";
+          lastCheckAt = Date.now();
+          log(status === "unhealthy" ? "error" : "info", "ComfyUI runtime process exited.", {
+            attempt, code, signal, status, startupFailure,
+            recentRuntimeOutput: recentRuntimeOutput.length > 0 ? [...recentRuntimeOutput] : undefined,
+          });
+        });
+
+        const timeoutAt = Date.now() + startupTimeoutMs;
+        let healthCheckAttempts = 0;
+        let lastHealthWaitLogAt = 0;
+        while (Date.now() < timeoutAt) {
+          assertStartupProcessActive();
+          healthCheckAttempts += 1;
+          try {
+            await client.getSystemStats();
+            assertStartupProcessActive();
+            status = "ready";
+            lastCheckAt = Date.now();
+            log("info", "ComfyUI runtime is ready.", { attempt, url, healthCheckAttempts, durationMs: elapsed(startStartedAt) });
+            return;
+          } catch {
+            assertStartupProcessActive();
+            status = "starting";
+            lastCheckAt = Date.now();
+            if (Date.now() - lastHealthWaitLogAt >= 10_000) {
+              lastHealthWaitLogAt = Date.now();
+              log("info", "Waiting for ComfyUI runtime health endpoint.", {
+                attempt, url, healthCheckAttempts, elapsedMs: elapsed(startStartedAt), startupTimeoutMs,
+                recentRuntimeOutput: recentRuntimeOutput.length > 0 ? [...recentRuntimeOutput] : undefined,
+              });
+            }
+            await delay(healthCheckIntervalMs);
+          }
+        }
+
+        processHandle?.kill("SIGTERM");
+        processHandle = undefined;
         status = "unhealthy";
         lastCheckAt = Date.now();
-        log("error", "ComfyUI runtime process failed to spawn.", { error: error instanceof Error ? error.message : String(error), pythonExecutable });
-      });
-
-      spawnedProcess.once("exit", (code, signal) => {
-        if (status === "starting") {
-          startupFailure = `ComfyUI runtime process exited during startup (code=${String(code ?? "null")}, signal=${String(signal ?? "null")}).`;
-        }
-        processHandle = undefined;
-        status = status === "starting" ? "unhealthy" : "stopped";
-        lastCheckAt = Date.now();
-        log(status === "unhealthy" ? "error" : "info", "ComfyUI runtime process exited.", {
-          code,
-          signal,
-          status,
-          startupFailure,
+        log("error", "ComfyUI runtime startup timed out.", {
+          attempt, startupTimeoutMs, url, durationMs: elapsed(startStartedAt),
           recentRuntimeOutput: recentRuntimeOutput.length > 0 ? [...recentRuntimeOutput] : undefined,
         });
-      });
+        throw new Error(formatStartupFailure(`ComfyUI runtime failed to become ready within ${startupTimeoutMs}ms.`));
+      };
 
-      const timeoutAt = Date.now() + startupTimeoutMs;
-      let healthCheckAttempts = 0;
-      let lastHealthWaitLogAt = 0;
-      while (Date.now() < timeoutAt) {
-        assertStartupProcessActive();
-        healthCheckAttempts += 1;
+      recentRuntimeOutput.splice(0, recentRuntimeOutput.length);
+      try {
+        await attemptStart(1);
+      } catch (firstError) {
+        if (!isDependencyMismatchFailure()) {
+          throw firstError;
+        }
+        log("error", "ComfyUI dependency mismatch detected during startup.", {
+          attempt: 1, installRoot: options.installRoot, runtimeDeviceMode,
+          startupFailure, recentRuntimeOutput: [...recentRuntimeOutput],
+        });
+        if (options.autoInstall !== true) {
+          throw firstError;
+        }
+        if (!options.installer?.repairInstall || !options.installRoot?.trim()) {
+          throw new Error("ComfyUI dependency mismatch detected, but repair is unavailable.");
+        }
+        log("info", "Starting ComfyUI dependency repair.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, recentRuntimeOutput: [...recentRuntimeOutput] });
+        const repairResult = await options.installer.repairInstall({
+          targetId: "comfyui",
+          installRoot: options.installRoot,
+          source: { type: "git", repositoryUrl: DEFAULT_COMFYUI_REPOSITORY_URL, ref: options.installSourceRef },
+          allowUpdate: false,
+          forceRepair: false,
+        });
+        if (repairResult.status !== "installed") {
+          log("error", "ComfyUI dependency repair failed.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, repairStatus: repairResult.status, repairError: repairResult.error });
+          throw new Error(`ComfyUI dependency repair failed: ${repairResult.error?.message ?? "unknown repair error"}`);
+        }
+        log("info", "ComfyUI dependency repair succeeded.", { attempt: 1, installRoot: options.installRoot, runtimeDeviceMode, repairStatus: repairResult.status });
+        processHandle = undefined;
+        startupFailure = undefined;
+        recentRuntimeOutput.splice(0, recentRuntimeOutput.length);
+        log("info", "Retrying ComfyUI startup after dependency repair.", { attempt: 2, installRoot: options.installRoot, runtimeDeviceMode });
         try {
-          await client.getSystemStats();
-          assertStartupProcessActive();
-          status = "ready";
-          lastCheckAt = Date.now();
-          log("info", "ComfyUI runtime is ready.", {
-            url,
-            healthCheckAttempts,
-            durationMs: elapsed(startStartedAt),
+          await attemptStart(2);
+          log("info", "ComfyUI retry startup succeeded after dependency repair.", { attempt: 2, installRoot: options.installRoot, runtimeDeviceMode });
+        } catch (retryError) {
+          log("error", "ComfyUI retry startup failed after dependency repair.", {
+            attempt: 2, installRoot: options.installRoot, runtimeDeviceMode, startupFailure, recentRuntimeOutput: [...recentRuntimeOutput],
           });
-          return;
-        } catch {
-          assertStartupProcessActive();
-          status = "starting";
-          lastCheckAt = Date.now();
-          if (Date.now() - lastHealthWaitLogAt >= 10_000) {
-            lastHealthWaitLogAt = Date.now();
-            log("info", "Waiting for ComfyUI runtime health endpoint.", {
-              url,
-              healthCheckAttempts,
-              elapsedMs: elapsed(startStartedAt),
-              startupTimeoutMs,
-              recentRuntimeOutput: recentRuntimeOutput.length > 0 ? [...recentRuntimeOutput] : undefined,
-            });
-          }
-          await delay(healthCheckIntervalMs);
+          const detail = retryError instanceof Error ? retryError.message : String(retryError);
+          throw new Error(`ComfyUI failed after dependency repair: ${detail}`);
         }
       }
-
-      processHandle?.kill("SIGTERM");
-      processHandle = undefined;
-      status = "unhealthy";
-      lastCheckAt = Date.now();
-      log("error", "ComfyUI runtime startup timed out.", {
-        startupTimeoutMs,
-        url,
-        durationMs: elapsed(startStartedAt),
-        recentRuntimeOutput: recentRuntimeOutput.length > 0 ? [...recentRuntimeOutput] : undefined,
-      });
-      throw new Error(formatStartupFailure(`ComfyUI runtime failed to become ready within ${startupTimeoutMs}ms.`));
     },
 
     isRunning() {

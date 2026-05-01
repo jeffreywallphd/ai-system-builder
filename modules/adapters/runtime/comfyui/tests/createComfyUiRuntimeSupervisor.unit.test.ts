@@ -234,4 +234,88 @@ describe("createComfyUiRuntimeSupervisor", () => {
 
     await expect(supervisor.start()).rejects.toThrow("ComfyUI runtime failed during startup. ComfyUI runtime process failed to start: spawn EPERM");
   });
+
+  it("repairs dependency mismatch once and retries startup to ready", async () => {
+    const firstChild = createMockChildProcess();
+    const secondChild = createMockChildProcess();
+    const spawnImplementation = testDouble.fn()
+      .mockImplementationOnce(() => firstChild as any)
+      .mockImplementationOnce(() => secondChild as any);
+    const fetchImplementation = testDouble.fn()
+      .mockRejectedValueOnce(new Error("booting"))
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ devices: [] }) });
+    const installer = {
+      ensureInstalled: testDouble.fn(async () => ({ status: "installed" as const })),
+      repairInstall: testDouble.fn(async () => ({ status: "installed" as const })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui",
+      installRoot: "/tmp/comfyui",
+      autoInstall: true,
+      installer,
+      spawnImplementation: spawnImplementation as never,
+      fetchImplementation: fetchImplementation as never,
+      healthCheckIntervalMs: 1,
+      startupTimeoutMs: 100,
+    });
+    queueMicrotask(() => {
+      firstChild.stderr.write("torchaudio WinError 127 specified procedure could not be found");
+      firstChild.emit("exit", 1, null);
+    });
+    await supervisor.start();
+    expect(installer.repairInstall).toHaveBeenCalledTimes(1);
+    expect(spawnImplementation).toHaveBeenCalledTimes(2);
+    expect((await supervisor.getHealth()).status).toBe("ready");
+  });
+
+  it("throws clear error when dependency repair fails", async () => {
+    const firstChild = createMockChildProcess();
+    const spawnImplementation = testDouble.fn(() => firstChild as any);
+    const installer = {
+      ensureInstalled: testDouble.fn(async () => ({ status: "installed" as const })),
+      repairInstall: testDouble.fn(async () => ({ status: "failed" as const, error: { message: "pip failed" } })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui", installRoot: "/tmp/comfyui", autoInstall: true, installer,
+      spawnImplementation: spawnImplementation as never, fetchImplementation: testDouble.fn(async () => { throw new Error("boot"); }) as never, healthCheckIntervalMs: 1, startupTimeoutMs: 50,
+    });
+    queueMicrotask(() => {
+      firstChild.stderr.write("_torchaudio WinError 127");
+      firstChild.emit("exit", 1, null);
+    });
+    await expect(supervisor.start()).rejects.toThrow("ComfyUI dependency repair failed: pip failed");
+  });
+
+  it("throws clear error when retry startup fails after repair", async () => {
+    const firstChild = createMockChildProcess();
+    const secondChild = createMockChildProcess();
+    const spawnImplementation = testDouble.fn().mockImplementationOnce(() => firstChild as any).mockImplementationOnce(() => secondChild as any);
+    const installer = {
+      ensureInstalled: testDouble.fn(async () => ({ status: "installed" as const })),
+      repairInstall: testDouble.fn(async () => ({ status: "installed" as const })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui", installRoot: "/tmp/comfyui", autoInstall: true, installer,
+      spawnImplementation: spawnImplementation as never, fetchImplementation: testDouble.fn(async () => { throw new Error("boot"); }) as never, healthCheckIntervalMs: 1, startupTimeoutMs: 80,
+    });
+    queueMicrotask(() => { firstChild.stderr.write("torchaudio WinError 127"); firstChild.emit("exit", 1, null); });
+    setTimeout(() => { secondChild.stderr.write("still broken"); secondChild.emit("exit", 1, null); }, 10);
+    await expect(supervisor.start()).rejects.toThrow("ComfyUI failed after dependency repair:");
+    expect(installer.repairInstall).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not repair non-dependency startup failures or when autoInstall is false", async () => {
+    const child = createMockChildProcess();
+    const installer = { repairInstall: testDouble.fn(), ensureInstalled: testDouble.fn(), getInstallStatus: testDouble.fn() };
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui", autoInstall: false, installer,
+      spawnImplementation: testDouble.fn(() => child as any) as never, fetchImplementation: testDouble.fn(async () => { throw new Error("boot"); }) as never, healthCheckIntervalMs: 1, startupTimeoutMs: 50,
+    });
+    queueMicrotask(() => { child.stderr.write("ModuleNotFoundError"); child.emit("exit", 1, null); });
+    await expect(supervisor.start()).rejects.toThrow();
+    expect(installer.repairInstall).not.toHaveBeenCalled();
+  });
 });
