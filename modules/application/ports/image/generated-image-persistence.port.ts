@@ -2,11 +2,15 @@ import type { ImageGenerationOutput } from "../../../contracts/image-generation"
 
 export interface PersistGeneratedImageInput {
   output: ImageGenerationOutput;
-  assetId: string;
+  requestId: string;
 }
 
 export interface PersistGeneratedImageResult {
   artifactId: string;
+  storageKey: string;
+  mediaType: string;
+  sizeBytes: number;
+  checksum: string;
   originalFileName: string;
 }
 

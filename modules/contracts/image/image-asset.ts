@@ -1,4 +1,6 @@
 export interface ImageAssetMetadata {
+  requestId?: string;
+  originalFileName?: string;
   prompt?: string;
   negativePrompt?: string;
   seed?: number;
@@ -13,6 +15,6 @@ export interface ImageAssetMetadata {
 export interface ImageAsset {
   assetId: string;
   artifactId: string;
-  source: "uploaded" | "generated";
+  source: "uploaded" | "comfyui";
   metadata: ImageAssetMetadata;
 }

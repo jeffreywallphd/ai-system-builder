@@ -1,10 +1,13 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
 import { join } from "node:path";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
+import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
+import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
 import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
+import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
 import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
@@ -31,6 +34,7 @@ import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactObjectStorageAdapter,
+  createFilesystemGeneratedImagePersistenceAdapter,
   createLocalArtifactCatalogPersistenceAdapter,
   createLocalArtifactStorageBindingAdapter,
 } from "../../../adapters/storage/filesystem";
@@ -304,6 +308,24 @@ export function composeServerHost(
         }),
       });
 
+      const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
+        runtimeTaskRegistry,
+        finalizeImageGenerationService: new FinalizeImageGenerationService({
+          imageAssetRegistry: createLocalImageAssetRegistryAdapter({
+            filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
+            now: options.now,
+          }),
+          generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
+            comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
+            artifactStorageRoot: registerOptions.storageRootDirectory,
+            artifactCatalogAppend: artifactCatalog,
+            logging: loggingPort,
+            now: options.now,
+          }),
+          now: options.now,
+        }),
+      });
+
       registerExpressApi({
         app: registerOptions.app,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
@@ -324,7 +346,7 @@ export function composeServerHost(
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
         generateImageUseCase,
-        // TODO: wire imageGenerationFinalizationOrchestrator after generated-image persistence and asset registration are implemented.
+        imageGenerationFinalizationOrchestrator,
       });
     },
   };

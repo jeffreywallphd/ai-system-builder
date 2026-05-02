@@ -10,29 +10,23 @@ function createTask(overrides: Partial<RuntimeTaskRecord> = {}): RuntimeTaskReco
     status: "succeeded",
     concurrencyClass: "unknown",
     data: { outputs: [{ type: "image", engine: "comfyui", fileName: "out.png", width: 512, height: 768, promptId: "p1", subfolder: "" }] },
-    metadata: { request: { prompt: "cat", negativePrompt: "bad", seed: 7, model: "sdxl" } },
+    metadata: { request: { prompt: "cat", model: "sdxl" } },
     ...overrides,
   };
 }
 
 describe("FinalizeImageGenerationService", () => {
-  it("returns asset/artifact refs and source generated metadata", async () => {
+  it("returns asset-backed results and registers comfyui image assets", async () => {
     const imageAssetRegistry: ImageAssetRegistryPort = { registerImageAsset: testDouble.fn(async () => ({ assetId: "asset-1" })), getImageAsset: testDouble.fn(async () => null) };
-    const generatedImagePersistence: GeneratedImagePersistencePort = { persistGeneratedImage: testDouble.fn(async () => ({ artifactId: "generated/images/asset-1/out.png", originalFileName: "out.png" })) };
+    const generatedImagePersistence: GeneratedImagePersistencePort = { persistGeneratedImage: testDouble.fn(async () => ({ artifactId: "artifact-image-1", storageKey: "generated/images/artifact-image-1.png", mediaType: "image/png", sizeBytes: 123, checksum: "abc", originalFileName: "out.png" })) };
     const service = new FinalizeImageGenerationService({ imageAssetRegistry, generatedImagePersistence, createAssetId: () => "asset-1", now: () => "2026-05-01T00:00:00.000Z" });
     const result = await service.finalizeCompletedTask(createTask());
-    expect(result).toEqual({ assets: [{ assetId: "asset-1", artifactId: "generated/images/asset-1/out.png" }] });
-    expect(generatedImagePersistence.persistGeneratedImage).toHaveBeenCalledWith({ output: { type: "image", engine: "comfyui", fileName: "out.png", subfolder: "", promptId: "p1", width: 512, height: 768 }, assetId: "asset-1" });
-    expect(imageAssetRegistry.registerImageAsset).toHaveBeenCalledWith({
-      assetId: "asset-1",
-      artifactId: "generated/images/asset-1/out.png",
-      source: "generated",
-    });
+    expect(result).toEqual({ assets: [{ assetId: "asset-1", artifactId: "artifact-image-1", storageKey: "generated/images/artifact-image-1.png", mediaType: "image/png", source: "comfyui" }] });
   });
 
   it("is idempotent", async () => {
     const imageAssetRegistry: ImageAssetRegistryPort = { registerImageAsset: testDouble.fn(async () => ({ assetId: "asset-1" })), getImageAsset: testDouble.fn(async () => null) };
-    const generatedImagePersistence: GeneratedImagePersistencePort = { persistGeneratedImage: testDouble.fn(async () => ({ artifactId: "generated/images/asset-1/out.png", originalFileName: "out.png" })) };
+    const generatedImagePersistence: GeneratedImagePersistencePort = { persistGeneratedImage: testDouble.fn(async () => ({ artifactId: "artifact-image-1", storageKey: "generated/images/artifact-image-1.png", mediaType: "image/png", sizeBytes: 123, checksum: "abc", originalFileName: "out.png" })) };
     const service = new FinalizeImageGenerationService({ imageAssetRegistry, generatedImagePersistence });
     const task = createTask();
     await service.finalizeCompletedTask(task);

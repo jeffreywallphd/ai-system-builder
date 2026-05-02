@@ -11,7 +11,7 @@ export class ImageGenerationFinalizationOrchestratorService {
     },
   ) {}
 
-  public async finalizeIfCompleted(requestId: string): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string }>; reason?: string }> {
+  public async finalizeIfCompleted(requestId: string): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "comfyui" }>; reason?: string }> {
     if (this.finalizedRequests.has(requestId)) return { finalized: true };
 
     const task = await this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
