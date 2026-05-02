@@ -2,7 +2,7 @@ import type { ImageGenerationOutput } from "../../../contracts/image-generation"
 import type { RuntimeTaskRecord } from "../../../contracts/runtime";
 import type { ImageAssetRegistryPort, GeneratedImagePersistencePort } from "../../ports/image";
 
-interface FinalizedAssetRef { assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "comfyui"; }
+interface FinalizedAssetRef { assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated"; }
 
 export class FinalizeImageGenerationService {
   private readonly finalizedByRequestId = new Map<string, FinalizedAssetRef[]>();
@@ -22,15 +22,16 @@ export class FinalizeImageGenerationService {
       const registered = await this.dependencies.imageAssetRegistry.registerImageAsset({
         assetId: requestedAssetId,
         artifactId: persisted.artifactId,
-        source: "comfyui",
+        source: "generated",
         metadata: {
           ...(this.readMetadata(task)?.request ?? {}),
+          engine: output.engine,
           requestId: task.requestId,
           originalFileName: persisted.originalFileName,
           createdAt: this.dependencies.now?.() ?? new Date().toISOString(),
         },
       });
-      assets.push({ assetId: registered.assetId, artifactId: persisted.artifactId, storageKey: persisted.storageKey, mediaType: persisted.mediaType, source: "comfyui" });
+      assets.push({ assetId: registered.assetId, artifactId: persisted.artifactId, storageKey: persisted.storageKey, mediaType: persisted.mediaType, source: "generated" });
     }
 
     this.finalizedByRequestId.set(task.requestId, assets);

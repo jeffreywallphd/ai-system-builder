@@ -5,12 +5,14 @@ export interface PersistGeneratedImageInput {
   requestId: string;
 }
 
+import type { StorageObjectChecksum } from "../../../contracts/storage";
+
 export interface PersistGeneratedImageResult {
   artifactId: string;
   storageKey: string;
   mediaType: string;
   sizeBytes: number;
-  checksum: string;
+  checksum: StorageObjectChecksum;
   originalFileName: string;
 }
 

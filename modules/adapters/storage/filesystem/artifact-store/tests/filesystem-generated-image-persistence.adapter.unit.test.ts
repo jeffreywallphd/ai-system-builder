@@ -1,37 +1,44 @@
-import { mkdtemp, mkdir, writeFile, access } from "node:fs/promises";
+import { constants } from "node:fs";
+import { mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, testDouble } from "../../../../../testing/node-test";
 import { createFilesystemGeneratedImagePersistenceAdapter } from "../createFilesystemGeneratedImagePersistenceAdapter";
 
 describe("createFilesystemGeneratedImagePersistenceAdapter", () => {
-  it("moves comfy output into generated/images/<artifactId>.png", async () => {
+  it("moves comfy output into generated/images with safe artifact key and writes catalog+binding", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "img-move-"));
     const out = path.join(root, "comfy");
     const store = path.join(root, "store");
     await mkdir(out, { recursive: true });
     await writeFile(path.join(out, "x.png"), "abc");
-    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: out, artifactStorageRoot: store });
+    const artifactCatalogAppend = { appendArtifactCatalogRecord: testDouble.fn(async () => ({ ok: true as const, value: { storageKey: "generated/images/x.png" } })) };
+    const artifactStorageBinding = { upsertArtifactStorageBinding: testDouble.fn(async () => ({ ok: true as const, value: { binding: {} } })) };
+    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: out, artifactStorageRoot: store, artifactCatalogAppend, artifactStorageBinding });
     const result = await adapter.persistGeneratedImage({ output: { type: "image", engine: "comfyui", fileName: "x.png" }, requestId: "req-1" });
-    expect(result.storageKey).toBe(`generated/images/${result.artifactId}.png`);
-    await expect(access(path.join(store, result.storageKey))).resolves.toBeUndefined();
-    await expect(access(path.join(out, "x.png"))).rejects.toThrow();
+    expect(result.storageKey).toBe(`generated/images/${result.artifactId.replaceAll("/", "_")}.png`);
+    await expect(stat(path.join(store, result.storageKey))).resolves.toEqual(expect.objectContaining({ isFile: expect.any(Function) }));
+    await expect(stat(path.join(out, "x.png"))).rejects.toThrow();
+    expect(artifactCatalogAppend.appendArtifactCatalogRecord).toHaveBeenCalledWith(expect.objectContaining({ record: expect.objectContaining({ sourceKind: "generated", artifactFamily: "image" }) }));
+    expect(artifactStorageBinding.upsertArtifactStorageBinding).toHaveBeenCalledWith(expect.objectContaining({ binding: expect.objectContaining({ artifactId: result.artifactId, role: "primary", backing: expect.objectContaining({ kind: "artifact-object", provider: "filesystem", locator: result.storageKey, verification: expect.objectContaining({ exists: true }) }) }) }));
   });
 
-  it("catalogs generated images with generated sourceKind", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "img-catalog-"));
+  it("rejects path traversal in filename and subfolder", async () => {
+    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: "/tmp/out", artifactStorageRoot: "/tmp/store" });
+    await expect(adapter.persistGeneratedImage({ output: { type: "image", engine: "comfyui", fileName: "../x.png" }, requestId: "req-1" })).rejects.toThrow();
+    await expect(adapter.persistGeneratedImage({ output: { type: "image", engine: "comfyui", fileName: "x.png", subfolder: "../evil" }, requestId: "req-1" })).rejects.toThrow();
+  });
+
+  it("falls back to copy-delete on EXDEV rename", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "img-fallback-"));
     const out = path.join(root, "comfy");
     const store = path.join(root, "store");
     await mkdir(out, { recursive: true });
     await writeFile(path.join(out, "x.png"), "abc");
-    const artifactCatalogAppend = { appendArtifactCatalogRecord: testDouble.fn(async () => ({ ok: true as const, value: { storageKey: "generated/images/x.png" } })) };
-    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: out, artifactStorageRoot: store, artifactCatalogAppend, now: () => "2026-05-01T00:00:00.000Z" });
-    await adapter.persistGeneratedImage({ output: { type: "image", engine: "comfyui", fileName: "x.png" }, requestId: "req-1" });
-    expect(artifactCatalogAppend.appendArtifactCatalogRecord).toHaveBeenCalled();
-  });
-
-  it("rejects path traversal", async () => {
-    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: "/tmp/out", artifactStorageRoot: "/tmp/store" });
-    await expect(adapter.persistGeneratedImage({ output: { type: "image", engine: "comfyui", fileName: "../x.png" }, requestId: "req-1" })).rejects.toThrow();
+    const renameSpy = testDouble.spyOn(require("node:fs/promises"), "rename").mockRejectedValueOnce(Object.assign(new Error("exdev"), { code: "EXDEV" }));
+    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: out, artifactStorageRoot: store });
+    const result = await adapter.persistGeneratedImage({ output: { type: "image", engine: "comfyui", fileName: "x.png" }, requestId: "req-1" });
+    expect((await readFile(path.join(store, result.storageKey), "utf8"))).toBe("abc");
+    renameSpy.mockRestore();
   });
 });

@@ -1039,6 +1039,7 @@ export function composeDesktopHost(
             comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
             artifactStorageRoot: registerOptions.storageRootDirectory,
             artifactCatalogAppend: artifactCatalog,
+            artifactStorageBinding: artifactBindings,
             logging: loggingPort,
             now,
           }),

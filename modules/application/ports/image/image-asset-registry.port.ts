@@ -3,7 +3,7 @@ import type { ImageAsset } from "../../../contracts/image";
 export interface RegisterImageAssetInput {
   assetId?: string;
   artifactId: string;
-  source: "comfyui" | "uploaded";
+  source: "generated" | "uploaded";
   metadata?: {
     prompt?: string;
     negativePrompt?: string;
