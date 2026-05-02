@@ -1,8 +1,9 @@
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
 
-export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts }: { onGenerated?: () => void; onNavigateToArtifacts?: () => void } = {}) {
+export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onNavigateToModels }: { onGenerated?: () => void; onNavigateToArtifacts?: () => void; onNavigateToModels?: () => void } = {}) {
   const f = useImageGenerationFeature(undefined, () => onGenerated?.());
   const set = (k: keyof typeof f.form, v: string) => f.setForm((x) => ({ ...x, [k]: v }));
+  const selectedModelDownloaded = f.selectedModelRecord ? ["downloaded", "generated"].includes(f.selectedModelRecord.lifecycleStatus) : false;
 
   return (
     <section className="ui-stack ui-stack--md" aria-label="Image Generation">
@@ -10,14 +11,44 @@ export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts }: {
       <p>Generate images from a prompt. Final images are saved to Artifacts.</p>
 
       <div className="ui-stack ui-stack--sm">
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-model-record">Model (server inventory)</label>
+          <div>
+            <select id="image-generation-model-record" value={f.selectedModelRecordId} onChange={(e) => f.setSelectedModelRecordId((e.target as HTMLSelectElement).value)}>
+              <option value="">Select a server model…</option>
+              {f.imageGenerationModels.map((model) => (
+                <option key={model.modelRecordId} value={model.modelRecordId}>
+                  {`${model.displayName} (${model.modelId}) · ${model.provider} · ${model.lifecycleStatus} · ${model.artifactForm}${model.inferenceMode ? ` · ${model.inferenceMode}` : ""}`}
+                </option>
+              ))}
+            </select>{" "}
+            <button type="button" className="ui-button" onClick={() => void f.refreshModelInventory()} disabled={f.modelInventoryLoading}>Refresh Models</button>
+          </div>
+          {f.modelInventoryLoading ? <p>Loading model inventory…</p> : null}
+          {f.modelInventoryError ? <p role="alert">{f.modelInventoryError}</p> : null}
+          {f.downloadedImageGenerationModels.length === 0 ? <p role="note">No downloaded image models found. Download one on the Models page before generating. {onNavigateToModels ? <button type="button" className="ui-button" onClick={() => onNavigateToModels()}>Open Models</button> : null}</p> : null}
+          {f.selectedModelRecord ? (
+            <p role="note">
+              Selected model status: <strong>{f.selectedModelRecord.lifecycleStatus}</strong>
+              {!selectedModelDownloaded ? " (reference only; generation may fail until downloaded)." : " (available locally)."}
+            </p>
+          ) : null}
+        </div>
         {[
           ["prompt", "Prompt", "text"], ["negativePrompt", "Negative Prompt (optional)", "text"], ["seed", "Seed (optional)", "number"],
           ["width", "Width", "number"], ["height", "Height", "number"], ["steps", "Steps", "number"], ["sampler", "Sampler", "text"],
-          ["scheduler", "Scheduler", "text"], ["model", "Model / Checkpoint (optional)", "text"], ["numImages", "Number of Images", "number"],
+          ["scheduler", "Scheduler", "text"], ["numImages", "Number of Images", "number"],
         ].map(([key, label, type]) => {
           const id = `image-generation-${String(key)}`;
           return <div key={id} className="ui-stack ui-stack--xs"><label htmlFor={id}>{label}</label><input id={id} type={type} value={f.form[key as keyof typeof f.form]} onInput={(e) => set(key as keyof typeof f.form, (e.target as HTMLInputElement).value)} /></div>;
         })}
+        <details>
+          <summary>Advanced: Manual model/checkpoint override (optional)</summary>
+          <div className="ui-stack ui-stack--xs">
+            <label htmlFor="image-generation-model">Manual model/checkpoint</label>
+            <input id="image-generation-model" type="text" value={f.form.model} onInput={(e) => set("model", (e.target as HTMLInputElement).value)} placeholder="checkpoint.safetensors or model record id" />
+          </div>
+        </details>
       </div>
 
       {f.qualityNote ? <p role="note">{f.qualityNote}</p> : null}

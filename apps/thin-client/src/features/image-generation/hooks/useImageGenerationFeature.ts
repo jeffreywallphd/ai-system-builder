@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImageGenerationRequest } from "../../../../../../modules/contracts/image-generation";
+import type { ModelInventoryRecord } from "../../../../../../modules/contracts/model";
 import type { RuntimeTaskRecord, RuntimeTaskStatus } from "../../../../../../modules/contracts/runtime";
+import { createApiModelManagementClient, type ModelManagementApiClient } from "../../model-management/api/apiModelManagementClient";
 import { createApiImageGenerationClient, type FinalizedImageAsset, type ImageGenerationApiClient } from "../api/apiImageGenerationClient";
 
 const POLL_INTERVAL_MS = 1200;
@@ -8,14 +10,38 @@ type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "fina
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
 export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; sampler: string; scheduler: string; model: string; numImages: string }
+const DOWNLOADED_STATUSES = new Set(["downloaded", "generated"]);
+const IMAGE_TAGS = new Set(["image-generation", "text-to-image"]);
+const IMAGE_ARTIFACTS = new Set(["checkpoint", "full-model"]);
+
+function isLikelyImageModel(model: ModelInventoryRecord): boolean {
+  return model.inferenceMode === "text-to-image" || (model.taskTags ?? []).some((tag) => IMAGE_TAGS.has(tag)) || IMAGE_ARTIFACTS.has(model.artifactForm);
+}
+
+function rankInventoryModel(model: ModelInventoryRecord): number {
+  let rank = 0;
+  if (DOWNLOADED_STATUSES.has(model.lifecycleStatus)) rank -= 100;
+  if (model.inferenceMode === "text-to-image") rank -= 20;
+  if ((model.taskTags ?? []).some((tag) => IMAGE_TAGS.has(tag))) rank -= 10;
+  if (IMAGE_ARTIFACTS.has(model.artifactForm)) rank -= 10;
+  return rank;
+}
 
 const toUiStatus = (status: RuntimeTaskStatus): UiStatus => (["queued", "running", "succeeded", "failed", "cancelled"].includes(status) ? status : "failed") as UiStatus;
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 const parsePositiveInt = (v: string) => { const n = Number(v); return Number.isInteger(n) && Number.isFinite(n) && n > 0 ? n : undefined; };
 const parseSeed = (v: string) => { if (!v.trim()) return undefined; const n = Number(v); return Number.isInteger(n) && Number.isFinite(n) ? n : undefined; };
 
-export function useImageGenerationFeature(client: ImageGenerationApiClient = createApiImageGenerationClient(), onGenerated?: (assets: FinalizedImageAsset[]) => void) {
+export function useImageGenerationFeature(
+  client: ImageGenerationApiClient = createApiImageGenerationClient(),
+  onGenerated?: (assets: FinalizedImageAsset[]) => void,
+  modelClient: ModelManagementApiClient = createApiModelManagementClient(),
+) {
   const [form, setForm] = useState<ImageGenerationFormState>({ prompt: "", negativePrompt: "", seed: "", width: "512", height: "512", steps: "20", sampler: "euler", scheduler: "normal", model: "", numImages: "1" });
+  const [modelInventory, setModelInventory] = useState<ModelInventoryRecord[]>([]);
+  const [modelInventoryLoading, setModelInventoryLoading] = useState(false);
+  const [modelInventoryError, setModelInventoryError] = useState<string | undefined>(undefined);
+  const [selectedModelRecordId, setSelectedModelRecordId] = useState<string>("");
   const [status, setStatus] = useState<UiStatus>("idle");
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -25,8 +51,32 @@ export function useImageGenerationFeature(client: ImageGenerationApiClient = cre
   const activeRequestRef = useRef<string | undefined>(undefined);
   const pollRunIdRef = useRef(0);
   const finalizedByRequestRef = useRef(new Set<string>());
+  const modelInventoryRequestRef = useRef(0);
 
   useEffect(() => () => { mountedRef.current = false; pollRunIdRef.current += 1; activeRequestRef.current = undefined; }, []);
+
+  const refreshModelInventory = useCallback(async () => {
+    const requestId = ++modelInventoryRequestRef.current;
+    setModelInventoryLoading(true);
+    setModelInventoryError(undefined);
+    try {
+      const result = await modelClient.listModels();
+      if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
+      const sorted = [...result.models].sort((a, b) => rankInventoryModel(a) - rankInventoryModel(b) || a.displayName.localeCompare(b.displayName));
+      setModelInventory(sorted);
+      if (!selectedModelRecordId) {
+        const firstDownloaded = sorted.find((m) => DOWNLOADED_STATUSES.has(m.lifecycleStatus));
+        if (firstDownloaded) setSelectedModelRecordId(firstDownloaded.modelRecordId);
+      }
+    } catch (e) {
+      if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
+      setModelInventoryError(e instanceof Error ? e.message : "Failed to load model inventory.");
+    } finally {
+      if (mountedRef.current && requestId === modelInventoryRequestRef.current) setModelInventoryLoading(false);
+    }
+  }, [modelClient, selectedModelRecordId]);
+
+  useEffect(() => { void refreshModelInventory(); }, [refreshModelInventory]);
 
   const validationError = useMemo(() => {
     if (!form.prompt.trim()) return "Prompt is required.";
@@ -62,7 +112,8 @@ export function useImageGenerationFeature(client: ImageGenerationApiClient = cre
         sampler: form.sampler.trim() || "euler", scheduler: form.scheduler.trim() || "normal",
       };
       const seed = parseSeed(form.seed); if (seed !== undefined) payload.seed = seed;
-      if (form.model.trim()) payload.model = form.model.trim();
+      if (selectedModelRecordId.trim()) payload.model = selectedModelRecordId.trim();
+      else if (form.model.trim()) payload.model = form.model.trim();
       if (form.negativePrompt.trim()) payload.negativePrompt = form.negativePrompt.trim();
 
       const started = await client.startImageGeneration(payload);
@@ -110,5 +161,9 @@ export function useImageGenerationFeature(client: ImageGenerationApiClient = cre
     return undefined;
   }, [form.width, form.height, form.steps]);
 
-  return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl };
+  const imageGenerationModels = useMemo(() => modelInventory.filter(isLikelyImageModel), [modelInventory]);
+  const downloadedImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => DOWNLOADED_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
+  const selectedModelRecord = useMemo(() => modelInventory.find((m) => m.modelRecordId === selectedModelRecordId), [modelInventory, selectedModelRecordId]);
+
+  return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels };
 }
