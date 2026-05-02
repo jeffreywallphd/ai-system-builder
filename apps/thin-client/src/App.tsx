@@ -30,7 +30,7 @@ export function App() {
     }
 
     if (activePage === "image-generation") {
-      return <ImageGenerationPage />;
+      return <ImageGenerationPage onGenerated={() => setArtifactRefreshToken((current) => current + 1)} onNavigateToArtifacts={() => { navigateToPage("artifacts"); setActivePage("artifacts"); }} />;
     }
 
     return <HomePage onGoToArtifacts={() => {

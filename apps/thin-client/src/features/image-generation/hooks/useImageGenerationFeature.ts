@@ -1,15 +1,114 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import type { RuntimeTaskStatus } from "../../../../../../modules/contracts/runtime";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ImageGenerationRequest } from "../../../../../../modules/contracts/image-generation";
+import type { RuntimeTaskRecord, RuntimeTaskStatus } from "../../../../../../modules/contracts/runtime";
 import { createApiImageGenerationClient, type FinalizedImageAsset, type ImageGenerationApiClient } from "../api/apiImageGenerationClient";
+
 const POLL_INTERVAL_MS = 1200;
-type UiStatus = "idle"|"starting"|"queued"|"running"|"succeeded"|"finalizing"|"finalized"|"failed"|"cancelled";
-export interface ImageGenerationFormState { prompt:string; negativePrompt:string; seed:string; width:string; height:string; steps:string; sampler:string; scheduler:string; model:string; numImages:string }
-const toUiStatus=(s:RuntimeTaskStatus):UiStatus=> (s==="queued"||s==="running"||s==="succeeded"||s==="failed"||s==="cancelled")?s:"failed";
-export function useImageGenerationFeature(client:ImageGenerationApiClient=createApiImageGenerationClient()) {
-const [form,setForm]=useState<ImageGenerationFormState>({prompt:"",negativePrompt:"",seed:"",width:"512",height:"512",steps:"20",sampler:"euler",scheduler:"normal",model:"",numImages:"1"});
-const [status,setStatus]=useState<UiStatus>("idle"); const [requestId,setRequestId]=useState<string>(); const [error,setError]=useState<string>(); const [results,setResults]=useState<FinalizedImageAsset[]>([]); const finalizedByRequestRef=useRef(new Set<string>());
-const start=useCallback(async()=>{try{setError(undefined);setResults([]);setStatus("starting"); const started=await client.startImageGeneration({prompt:form.prompt,negativePrompt:form.negativePrompt||undefined,seed:form.seed?Number(form.seed):undefined,width:Number(form.width),height:Number(form.height),steps:Number(form.steps),sampler:form.sampler,scheduler:form.scheduler,model:form.model||undefined,numImages:Number(form.numImages)}); setRequestId(started.requestId); let current=started; setStatus(toUiStatus(started.status)); while(!["succeeded","failed","cancelled"].includes(current.status)){await new Promise(r=>setTimeout(r,POLL_INTERVAL_MS)); current=await client.readImageGeneration({requestId:started.requestId}); setStatus(toUiStatus(current.status));} if(current.status==="succeeded"){ setStatus("finalizing"); if(finalizedByRequestRef.current.has(started.requestId)){setStatus("finalized"); return;} let finalized=await client.finalizeImageGenerationIfCompleted({requestId:started.requestId}); if(!finalized.finalized && finalized.reason==="task not completed"){await client.readImageGeneration({requestId:started.requestId}); finalized=await client.finalizeImageGenerationIfCompleted({requestId:started.requestId});} if(finalized.finalized){finalizedByRequestRef.current.add(started.requestId); setResults(finalized.assets??[]); setStatus("finalized");} else {setStatus("failed"); setError(finalized.reason??"Finalization did not complete.");}}}catch(cause){setStatus("failed"); setError(cause instanceof Error?cause.message:"Image generation failed.");}},[client,form]);
-const cancel=useCallback(async()=>{if(!requestId)return; await client.cancelImageGeneration({requestId}); setStatus("cancelled");},[client,requestId]);
-const qualityNote=useMemo(()=> Number(form.width)<=256||Number(form.height)<=256||Number(form.steps)<15?"Low quality settings selected. Small dimensions or low step counts can produce blurry results.":undefined,[form.width,form.height,form.steps]);
-return {form,setForm,status,error,requestId,results,start,cancel,qualityNote,createPreviewUrl:client.createArtifactMediaViewUrl};
+type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "finalizing" | "finalized" | "failed" | "cancelled";
+const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
+
+export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; sampler: string; scheduler: string; model: string; numImages: string }
+
+const toUiStatus = (status: RuntimeTaskStatus): UiStatus => (["queued", "running", "succeeded", "failed", "cancelled"].includes(status) ? status : "failed") as UiStatus;
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+const parsePositiveInt = (v: string) => { const n = Number(v); return Number.isInteger(n) && Number.isFinite(n) && n > 0 ? n : undefined; };
+const parseSeed = (v: string) => { if (!v.trim()) return undefined; const n = Number(v); return Number.isInteger(n) && Number.isFinite(n) ? n : undefined; };
+
+export function useImageGenerationFeature(client: ImageGenerationApiClient = createApiImageGenerationClient(), onGenerated?: (assets: FinalizedImageAsset[]) => void) {
+  const [form, setForm] = useState<ImageGenerationFormState>({ prompt: "", negativePrompt: "", seed: "", width: "512", height: "512", steps: "20", sampler: "euler", scheduler: "normal", model: "", numImages: "1" });
+  const [status, setStatus] = useState<UiStatus>("idle");
+  const [requestId, setRequestId] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [results, setResults] = useState<FinalizedImageAsset[]>([]);
+
+  const mountedRef = useRef(true);
+  const activeRequestRef = useRef<string | undefined>(undefined);
+  const pollRunIdRef = useRef(0);
+  const finalizedByRequestRef = useRef(new Set<string>());
+
+  useEffect(() => () => { mountedRef.current = false; pollRunIdRef.current += 1; activeRequestRef.current = undefined; }, []);
+
+  const validationError = useMemo(() => {
+    if (!form.prompt.trim()) return "Prompt is required.";
+    if (!parsePositiveInt(form.width) || !parsePositiveInt(form.height) || !parsePositiveInt(form.steps) || !parsePositiveInt(form.numImages)) return "Width, height, steps, and number of images must be positive integers.";
+    if (form.seed.trim() && parseSeed(form.seed) === undefined) return "Seed must be a finite integer when provided.";
+    return undefined;
+  }, [form]);
+
+  const pollUntilTerminal = useCallback(async (id: string, runId: number): Promise<RuntimeTaskRecord | undefined> => {
+    let latest = await client.readImageGeneration({ requestId: id });
+    while (mountedRef.current && pollRunIdRef.current === runId) {
+      setStatus(toUiStatus(latest.status));
+      if (["succeeded", "failed", "cancelled"].includes(latest.status)) return latest;
+      await sleep(POLL_INTERVAL_MS);
+      if (!mountedRef.current || pollRunIdRef.current !== runId) return undefined;
+      latest = await client.readImageGeneration({ requestId: id });
+    }
+    return undefined;
+  }, [client]);
+
+  const start = useCallback(async () => {
+    if (ACTIVE_STATUSES.includes(status)) return;
+    if (validationError) { setError(validationError); return; }
+
+    pollRunIdRef.current += 1;
+    const runId = pollRunIdRef.current;
+    activeRequestRef.current = undefined;
+
+    try {
+      setError(undefined); setResults([]); setRequestId(undefined); setStatus("starting");
+      const payload: ImageGenerationRequest = {
+        prompt: form.prompt.trim(), width: parsePositiveInt(form.width)!, height: parsePositiveInt(form.height)!, steps: parsePositiveInt(form.steps)!, numImages: parsePositiveInt(form.numImages)!,
+        sampler: form.sampler.trim() || "euler", scheduler: form.scheduler.trim() || "normal",
+      };
+      const seed = parseSeed(form.seed); if (seed !== undefined) payload.seed = seed;
+      if (form.model.trim()) payload.model = form.model.trim();
+      if (form.negativePrompt.trim()) payload.negativePrompt = form.negativePrompt.trim();
+
+      const started = await client.startImageGeneration(payload);
+      if (!mountedRef.current || pollRunIdRef.current !== runId) return;
+      setRequestId(started.requestId); activeRequestRef.current = started.requestId; setStatus("queued");
+
+      const finalTask = await pollUntilTerminal(started.requestId, runId);
+      if (!finalTask || !mountedRef.current || pollRunIdRef.current !== runId) return;
+      if (finalTask.status !== "succeeded") return;
+
+      if (finalizedByRequestRef.current.has(started.requestId)) { setStatus("finalized"); return; }
+      setStatus("finalizing");
+      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId: started.requestId });
+      if (!mountedRef.current || pollRunIdRef.current !== runId) return;
+
+      if (finalized.finalized) {
+        finalizedByRequestRef.current.add(started.requestId);
+        const assets = finalized.assets ?? [];
+        setResults(assets);
+        setStatus("finalized");
+        onGenerated?.(assets);
+      } else {
+        setStatus("failed");
+        setError(finalized.reason ?? "Finalization did not complete.");
+      }
+    } catch (cause) {
+      if (!mountedRef.current || pollRunIdRef.current !== runId) return;
+      setStatus("failed");
+      setError(cause instanceof Error ? cause.message : "Image generation failed.");
+    }
+  }, [client, form, onGenerated, pollUntilTerminal, status, validationError]);
+
+  const cancel = useCallback(async () => {
+    pollRunIdRef.current += 1;
+    const id = activeRequestRef.current ?? requestId;
+    activeRequestRef.current = undefined;
+    setStatus("cancelled");
+    if (!id) return;
+    try { await client.cancelImageGeneration({ requestId: id }); } catch { /* surface existing local cancellation */ }
+  }, [client, requestId]);
+
+  const qualityNote = useMemo(() => {
+    const width = Number(form.width); const height = Number(form.height); const steps = Number(form.steps);
+    if (width <= 256 || height <= 256 || steps < 15) return "Quality warning: very small resolution or low steps can reduce detail; SDXL-style models generally perform better with larger sizes and 15+ steps.";
+    return undefined;
+  }, [form.width, form.height, form.steps]);
+
+  return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl };
 }

@@ -1,4 +1,31 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApiImageGenerationClient } from "../api/apiImageGenerationClient";
 
-describe("api image generation client",()=>{afterEach(()=>vi.unstubAllGlobals()); it("calls endpoints and parses envelopes", async()=>{const fetchMock=vi.fn().mockResolvedValueOnce({json:vi.fn().mockResolvedValue({ok:true,value:{requestId:"r1",status:"queued"}})}).mockResolvedValueOnce({json:vi.fn().mockResolvedValue({ok:true,value:{requestId:"r1",status:"running"}})}).mockResolvedValueOnce({json:vi.fn().mockResolvedValue({ok:true,value:{requestId:"r1",status:"cancelled"}})}).mockResolvedValueOnce({json:vi.fn().mockResolvedValue({ok:true,value:{finalized:true,assets:[{assetId:"a1",artifactId:"art1",storageKey:"k1",mediaType:"image/png",source:"generated"}]}})}); vi.stubGlobal("fetch",fetchMock); const c=createApiImageGenerationClient(); await c.startImageGeneration({prompt:"cat"}); await c.readImageGeneration({requestId:"r1"}); await c.cancelImageGeneration({requestId:"r1"}); const fin=await c.finalizeImageGenerationIfCompleted({requestId:"r1"}); expect(fetchMock).toHaveBeenNthCalledWith(1,"/api/image-generation/start",expect.objectContaining({method:"POST"})); expect(fetchMock).toHaveBeenNthCalledWith(2,"/api/image-generation/read",expect.any(Object)); expect(fetchMock).toHaveBeenNthCalledWith(3,"/api/image-generation/cancel",expect.any(Object)); expect(fetchMock).toHaveBeenNthCalledWith(4,"/api/image-generation/finalize",expect.any(Object)); expect(c.createArtifactMediaViewUrl("foo/bar")).toBe("/api/artifact/media/view?storageKey=foo%2Fbar"); expect(fin.finalized).toBe(true);}); it("throws on failure envelope",async()=>{vi.stubGlobal("fetch",vi.fn().mockResolvedValue({json:vi.fn().mockResolvedValue({ok:false,error:{message:"nope"}})})); const c=createApiImageGenerationClient(); await expect(c.startImageGeneration({prompt:"cat"})).rejects.toThrow("nope");});});
+describe("api image generation client", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("calls endpoints and parses typed envelopes", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { requestId: "r1" } }) })
+      .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { requestId: "r1", taskType: "image-generation", status: "running", concurrencyClass: "gpu" } }) })
+      .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { cancelled: true, message: "done" } }) })
+      .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { finalized: true, assets: [{ assetId: "a1", artifactId: "art1", storageKey: "k1", mediaType: "image/png" }] } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const c = createApiImageGenerationClient();
+    const started = await c.startImageGeneration({ prompt: "cat" });
+    const read = await c.readImageGeneration({ requestId: "r1" });
+    const cancelled = await c.cancelImageGeneration({ requestId: "r1" });
+    const fin = await c.finalizeImageGenerationIfCompleted({ requestId: "r1" });
+    expect(started.requestId).toBe("r1");
+    expect(read.requestId).toBe("r1");
+    expect(cancelled.cancelled).toBe(true);
+    expect(fin.finalized).toBe(true);
+    expect(c.createArtifactMediaViewUrl("foo/bar")).toBe("/api/artifact/media/view?storageKey=foo%2Fbar");
+  });
+
+  it("throws useful failure message with code", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 400, json: vi.fn().mockResolvedValue({ ok: false, error: { code: "validation", message: "bad" } }) }));
+    const c = createApiImageGenerationClient();
+    await expect(c.startImageGeneration({ prompt: "cat" })).rejects.toThrow("bad [validation]");
+  });
+});

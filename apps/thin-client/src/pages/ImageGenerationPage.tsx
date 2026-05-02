@@ -1,2 +1,5 @@
 import { ImageGenerationFeature } from "../features/image-generation";
-export function ImageGenerationPage(){return <ImageGenerationFeature />;}
+
+export function ImageGenerationPage({ onGenerated, onNavigateToArtifacts }: { onGenerated?: () => void; onNavigateToArtifacts?: () => void } = {}) {
+  return <ImageGenerationFeature onGenerated={onGenerated} onNavigateToArtifacts={onNavigateToArtifacts} />;
+}
