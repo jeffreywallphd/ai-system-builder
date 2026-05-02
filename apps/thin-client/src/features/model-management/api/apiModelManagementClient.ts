@@ -23,12 +23,12 @@ const post = async <T>(base: string, path: string, operation:Operation, body: Re
     const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body), signal: ctrl.signal });
     const elapsedMs=Date.now()-started;
     const ctype=response.headers.get("content-type")??"";
-    if(!ctype.includes("application/json")){ console.warn("[model-management.api] response.non_json",{...detail,status:response.status,elapsedMs,contentType:ctype}); throw new ModelManagementApiError("Model management response was not JSON.","invalid_json"); }
+    if(!ctype.includes("application/json")){ logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"response.non_json",message:"Response was not JSON",metadata:{...detail,status:response.status,elapsedMs,contentType:ctype}}); throw new ModelManagementApiError("Model management response was not JSON.","invalid_json"); }
     let raw: unknown;
-    try { raw = await response.json(); } catch { console.warn("[model-management.api] response.non_json",{...detail,status:response.status,elapsedMs}); throw new ModelManagementApiError("Model management response was not valid JSON.", "invalid_json"); }
+    try { raw = await response.json(); } catch { logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"response.invalid_json",message:"Response JSON parse failed",metadata:{...detail,status:response.status,elapsedMs}}); throw new ModelManagementApiError("Model management response was not valid JSON.", "invalid_json"); }
     let envelope:ApiEnvelope;
-    try { envelope = ensureEnvelope(raw); } catch (error) { console.warn("[model-management.api] response.malformed_envelope",{...detail,status:response.status,elapsedMs,message:error instanceof Error?error.message:String(error)}); throw error; }
-    if (!envelope.ok) { const err=asError(envelope); console.warn("[model-management.api] request.failure",{...detail,status:response.status,elapsedMs,code:err.code,message:err.message}); throw err; }
+    try { envelope = ensureEnvelope(raw); } catch (error) { logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"response.malformed_envelope",message:"Response envelope was malformed",metadata:{...detail,status:response.status,elapsedMs,errorMessage:error instanceof Error?error.message:String(error)}}); throw error; }
+    if (!envelope.ok) { const err=asError(envelope); logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"request.failure",message:err.message,metadata:{...detail,status:response.status,elapsedMs,code:err.code}}); throw err; }
     logThinClientDiagnostic("info",{feature:"model-management",operation,phase:"request.success",message:"Request success",metadata:{...detail,status:response.status,elapsedMs}});
     return pick(envelope.value);
   } catch (error) {
@@ -36,7 +36,7 @@ const post = async <T>(base: string, path: string, operation:Operation, body: Re
     if ((error instanceof DOMException && error.name === "AbortError") || error === "timeout") {
       logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"request.timeout",message:"Request timed out",metadata:{...detail,elapsedMs}}); throw new ModelManagementApiError(`Model management ${operation} request timed out.`,"timeout");
     }
-    console.warn("[model-management.api] request.failure",{...detail,elapsedMs,message:error instanceof Error?error.message:String(error)}); throw error;
+    logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"request.failure",message:error instanceof Error?error.message:String(error),metadata:{...detail,elapsedMs}}); throw error;
   } finally { window.clearTimeout(timeout); }
 };
 
