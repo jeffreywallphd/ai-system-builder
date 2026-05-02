@@ -12,7 +12,7 @@ import type {
 } from "../../../contracts/runtime";
 import { TaskType } from "../../../contracts/runtime";
 
-const genericToPythonTaskTypeMap: Record<TaskType, string> = {
+const genericToPythonTaskTypeMap: Partial<Record<TaskType, string>> = {
   [TaskType.DATASET_PREPARATION]: "prepare-training-dataset",
   [TaskType.MODEL_TRAINING]: "train-model",
   [TaskType.MODEL_VALIDATION]: "validate-model",

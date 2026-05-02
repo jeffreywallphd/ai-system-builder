@@ -30,3 +30,5 @@ export * from "./prepare-training-dataset-from-artifacts.use-case";
 export * from "./settings";
 
 export * from "./model";
+
+export * from "./image-generation";

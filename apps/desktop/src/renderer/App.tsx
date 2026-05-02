@@ -5,6 +5,7 @@ import { useDesktopPage } from "./hooks/useDesktopPage";
 import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { HomePage } from "./pages/HomePage";
 import { ModelsPage } from "./pages/ModelsPage";
+import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SystemPage } from "./pages/SystemPage";
 import { desktopPageDefinitions, type DesktopPageKey } from "./routes/desktopPages";
@@ -24,6 +25,7 @@ export function App() {
       />
     ),
     models: <ModelsPage />,
+    "image-generation": <ImageGenerationPage />,
     settings: <SettingsPage />,
     system: <SystemPage />,
   };

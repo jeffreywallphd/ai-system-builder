@@ -24,6 +24,8 @@ import {
   DESKTOP_MODEL_RECORD_DELETE_RESPONSE_CHANNEL,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
   DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_RESPONSE_CHANNEL,
   DESKTOP_MODEL_RECORD_UPDATE_RESPONSE_CHANNEL,
   DESKTOP_MODEL_DOWNLOAD_RESPONSE_CHANNEL,
   DESKTOP_MODEL_REFERENCE_SAVE_RESPONSE_CHANNEL,
@@ -36,6 +38,7 @@ import {
   createDesktopModelListSuccessResponse,
   createDesktopModelRecordDeleteSuccessResponse,
   createDesktopModelTrainSuccessResponse,
+  createDesktopModelTrainStatusSuccessResponse,
   createDesktopModelRecordUpdateSuccessResponse,
   createDesktopModelDownloadSuccessResponse,
   createDesktopModelReferenceSaveSuccessResponse,
@@ -57,6 +60,8 @@ import {
   type DesktopModelRecordUpdateRequest,
   type DesktopModelTrainRequest,
   type DesktopModelTrainResponse,
+  type DesktopModelTrainStatusRequest,
+  type DesktopModelTrainStatusResponse,
   type DesktopModelRecordUpdateResponse,
   type DesktopModelDownloadRequest,
   type DesktopModelDownloadResponse,
@@ -78,7 +83,7 @@ export interface RegisterModelManagementIpcDependencies {
   downloadModelUseCase: Pick<DownloadModelUseCase, "execute">;
   updateModelRecordUseCase: Pick<UpdateModelRecordUseCase, "execute">;
   deleteModelRecordUseCase: Pick<DeleteModelRecordUseCase, "execute">;
-  trainModelUseCase: Pick<TrainModelUseCase, "execute">;
+  trainModelUseCase: Pick<TrainModelUseCase, "execute" | "read">;
   validateModelUseCase: Pick<ValidateModelUseCase, "execute">;
   publishModelUseCase: Pick<PublishModelUseCase, "execute">;
 }
@@ -191,6 +196,17 @@ export function createTrainModelIpcHandler(useCase: Pick<TrainModelUseCase, "exe
   };
 }
 
+export function createReadModelTrainingStatusIpcHandler(useCase: Pick<TrainModelUseCase, "read">) {
+  return async (_event: unknown, request: DesktopModelTrainStatusRequest): Promise<DesktopModelTrainStatusResponse> => {
+    try {
+      const result = await useCase.read(request.payload.runId);
+      return createDesktopModelTrainStatusSuccessResponse(result, { requestId: request.requestId, correlationId: request.correlationId });
+    } catch (error) {
+      return toFailureResponse<DesktopModelTrainStatusResponse>(DESKTOP_MODEL_TRAIN_STATUS_RESPONSE_CHANNEL, error, request);
+    }
+  };
+}
+
 export function createValidateModelIpcHandler(useCase: Pick<ValidateModelUseCase, "execute">) {
   return async (_event: unknown, request: DesktopModelValidateRequest): Promise<DesktopModelValidateResponse> => {
     try {
@@ -245,6 +261,10 @@ export function registerModelManagementIpc(dependencies: RegisterModelManagement
   dependencies.ipcMain.handle(
     DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL.value,
     createTrainModelIpcHandler(dependencies.trainModelUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value,
+    createReadModelTrainingStatusIpcHandler(dependencies.trainModelUseCase),
   );
   dependencies.ipcMain.handle(
     DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL.value,

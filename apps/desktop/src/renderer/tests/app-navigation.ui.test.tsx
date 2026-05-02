@@ -116,6 +116,17 @@ describe("desktop renderer page composition", () => {
     expect(container.textContent).toContain("Model Management");
     expect(container.textContent).toContain("Browse Models");
 
+
+    const imageGenerationButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Image Generation",
+    );
+    expect(imageGenerationButton).toBeDefined();
+
+    await act(async () => {
+      imageGenerationButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Run runtime-backed image generation tasks");
+
     const settingsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Settings",
     );

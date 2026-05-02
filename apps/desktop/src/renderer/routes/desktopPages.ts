@@ -1,4 +1,4 @@
-export type DesktopPageKey = "home" | "artifacts" | "models" | "settings" | "system";
+export type DesktopPageKey = "home" | "artifacts" | "models" | "image-generation" | "settings" | "system";
 
 export interface DesktopPageDefinition {
   key: DesktopPageKey;
@@ -13,6 +13,10 @@ export const desktopPageDefinitions: readonly DesktopPageDefinition[] = [
   {
     key: "models",
     label: "Models",
+  },
+  {
+    key: "image-generation",
+    label: "Image Generation",
   },
   {
     key: "settings",

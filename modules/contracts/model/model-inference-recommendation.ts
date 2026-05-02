@@ -6,6 +6,7 @@ const TASK_TO_INFERENCE_MODE: Record<string, ModelInferenceMode> = {
   "question-answering": "text2text",
   "text-generation": "causal",
   "chat": "chat",
+  "text-to-image": "text-to-image",
 };
 
 function normalizeText(value: string | undefined): string | undefined {
