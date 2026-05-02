@@ -10,11 +10,13 @@ import {
   registerArtifactRepoApiRoutes,
   type RegisterArtifactRepoApiRoutesDependencies,
 } from "./artifact-repo/registerArtifactRepoApiRoutes";
+import { registerImageGenerationApiRoutes, type RegisterImageGenerationApiRoutesDependencies } from "./image-generation/registerImageGenerationApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
     & RegisterArtifactBrowserApiRoutesDependencies["app"]
-    & RegisterArtifactRepoApiRoutesDependencies["app"];
+    & RegisterArtifactRepoApiRoutesDependencies["app"]
+    & RegisterImageGenerationApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -32,6 +34,8 @@ export interface RegisterExpressApiDependencies {
   verifyImportedArtifactSourceBackingUseCase: RegisterArtifactRepoApiRoutesDependencies["verifyImportedArtifactSourceBackingUseCase"];
   registerArtifactFromRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["registerArtifactFromRepoUseCase"];
   localizeArtifactFromRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["localizeArtifactFromRepoUseCase"];
+  generateImageUseCase?: RegisterImageGenerationApiRoutesDependencies["generateImageUseCase"];
+  imageGenerationFinalizationOrchestrator?: RegisterImageGenerationApiRoutesDependencies["imageGenerationFinalizationOrchestrator"];
 }
 
 export function registerExpressApi(
@@ -65,4 +69,12 @@ export function registerExpressApi(
     registerArtifactFromRepoUseCase: dependencies.registerArtifactFromRepoUseCase,
     localizeArtifactFromRepoUseCase: dependencies.localizeArtifactFromRepoUseCase,
   });
+
+  if (dependencies.generateImageUseCase) {
+    registerImageGenerationApiRoutes({
+      app: dependencies.app,
+      generateImageUseCase: dependencies.generateImageUseCase,
+      imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
+    });
+  }
 }
