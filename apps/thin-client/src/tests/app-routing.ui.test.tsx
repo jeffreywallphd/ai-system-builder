@@ -41,6 +41,9 @@ describe("thin-client routing and page composition", () => {
 
     expect(container.textContent).toContain("Build visual AI workflows from your artifacts");
 
+    const imageButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Image Generation");
+    expect(imageButton).toBeDefined();
+
     const artifactsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Artifacts");
 
     await act(async () => {
