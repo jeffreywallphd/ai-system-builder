@@ -24,7 +24,7 @@ export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onN
                 {f.downloadedImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatModelOption(model)}</option>)}
               </optgroup>
               {f.referenceOnlyImageGenerationModels.length > 0 ? (
-                <optgroup label="Saved references / may need download">
+                <optgroup label="Saved references / download required">
                   {f.referenceOnlyImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatModelOption(model, true)}</option>)}
                 </optgroup>
               ) : null}
@@ -37,7 +37,7 @@ export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onN
           {f.selectedModelRecord ? (
             <p role="note">
               Selected model status: <strong>{f.selectedModelRecord.lifecycleStatus}</strong>
-              {!selectedModelDownloaded ? " (reference only; generation may fail until downloaded)." : " (available locally)."}
+              {!selectedModelDownloaded ? " (reference only; download before generating)." : " (available locally)."}
             </p>
           ) : null}
         </div>
