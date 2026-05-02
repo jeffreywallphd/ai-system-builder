@@ -19,6 +19,9 @@ import type {
   UpdateApplicationSettingRequest,
 } from "../../../../../modules/contracts/settings";
 import type {
+  ImageGenerationRequest,
+} from "../../../../../modules/contracts/image-generation";
+import type {
   BrowseModelsRequest,
   GetModelDetailsRequest,
   ModelBrowseItem,
@@ -254,7 +257,7 @@ export interface DesktopPythonRuntimeLogEntry {
 export interface DesktopPythonRuntimeLoadedModel {
   provider: "transformers";
   modelId: string;
-  inferenceMode: "text2text" | "causal" | "chat";
+  inferenceMode: "text2text" | "causal" | "chat" | "text-to-image";
   device?: "cpu" | "cuda" | "auto";
   torchDtype?: "auto" | "float16" | "bfloat16" | "float32";
   localPath?: string;
@@ -309,6 +312,15 @@ export interface DesktopDatasetPreparationApi {
   ) => Promise<unknown>;
 }
 
+export interface DesktopImageGenerationApi {
+  startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readComfyUiInstallStatus?: (input?: { installRoot?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  repairComfyUiInstall?: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+}
+
 export interface DesktopPythonRuntimeApi {
   readPythonRuntimeStatus: () => Promise<unknown>;
   controlPythonRuntime: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
@@ -336,6 +348,12 @@ interface DesktopApiBridge {
   cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
+  startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readComfyUiInstallStatus?: (input?: { installRoot?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  repairComfyUiInstall?: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   browseUnregisteredArtifacts?: () => Promise<unknown>;
   registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
@@ -388,6 +406,7 @@ interface DesktopApiBridge {
   updateModelRecord?: (input: DesktopUpdateModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   deleteModelRecord?: (input: DesktopDeleteModelRecordRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   trainModel?: (input: DesktopModelTrainingRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readModelTrainingStatus?: (input: { runId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   validateModel?: (input: DesktopValidateModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   publishModel?: (input: DesktopPublishModelRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
 }

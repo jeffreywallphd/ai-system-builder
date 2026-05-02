@@ -18,3 +18,5 @@ export * as artifactUpload from "./artifact-upload";
 
 export * as settings from "./settings";
 export * as model from "./model";
+
+export * as runtimeInstaller from "./runtime-installer";

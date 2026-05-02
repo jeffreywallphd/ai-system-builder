@@ -1,4 +1,7 @@
+import { useState } from "react";
+
 import { TabbedPanel } from "../../../components/ui/TabbedPanel";
+import { PythonRuntimeFooter } from "../../python-runtime/components/PythonRuntimeFooter";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsFeature } from "../hooks/useModelsFeature";
 import { useModelTrainingFeature } from "../hooks/useModelTrainingFeature";
@@ -9,11 +12,13 @@ import { TrainModelTab } from "./TrainModelTab";
 export function ModelsFeature(props: { client?: DesktopModelsClient }) {
   const state = useModelsFeature(props.client);
   const trainingState = useModelTrainingFeature(props.client);
+  const [activeTabId, setActiveTabId] = useState("browse-models");
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <TabbedPanel
         tabListAriaLabel="Model workspace panels"
         defaultTabId="browse-models"
+        onTabChange={setActiveTabId}
         tabs={[
           {
             id: "browse-models",
@@ -32,6 +37,7 @@ export function ModelsFeature(props: { client?: DesktopModelsClient }) {
           },
         ]}
       />
+      <PythonRuntimeFooter enabled={activeTabId === "train-model"} />
     </section>
   );
 }

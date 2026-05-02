@@ -7,4 +7,5 @@ export enum TaskType {
   MODEL_TRAINING = "model-training",
   MODEL_VALIDATION = "model-validation",
   MODEL_PUBLISHING = "model-publishing",
+  IMAGE_GENERATION = "image-generation",
 }

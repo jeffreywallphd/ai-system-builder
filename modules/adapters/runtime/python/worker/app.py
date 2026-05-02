@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import platform
+import traceback
 from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
 from os import getenv
@@ -112,7 +113,26 @@ def _build_task_status_result(record: dict[str, Any]) -> PythonRuntimeTaskStatus
 def _run_task(request: StartPythonRuntimeTaskRequest) -> Any:
     if request.taskType == "train-model":
         payload = TrainModelTaskRequest.model_validate(request.payload)
-        return train_model(payload).model_dump(mode="json")
+        def on_training_progress(progress: dict[str, Any]) -> None:
+            _update_task(request.requestId, progress=progress)
+            print(
+                json.dumps(
+                    {"event": "runtime.train_model.progress", "requestId": request.requestId, **progress},
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+
+        print(json.dumps({"event": "runtime.train_model.started", "requestId": request.requestId}, ensure_ascii=False), flush=True)
+        result = train_model(payload, on_progress=on_training_progress).model_dump(mode="json")
+        print(
+            json.dumps(
+                {"event": "runtime.train_model.completed", "requestId": request.requestId, "status": result.get("status")},
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        return result
 
     if request.taskType == "prepare-training-dataset":
         payload = PrepareTrainingDatasetRequest.model_validate(request.payload)
@@ -176,6 +196,19 @@ def _start_async_task(request: StartPythonRuntimeTaskRequest) -> StartPythonRunt
             data = _run_task(request)
             _update_task(request.requestId, status="succeeded", data=data, completedAt=_now_iso())
         except Exception as error:
+            print(
+                json.dumps(
+                    {
+                        "event": "runtime.task.failed",
+                        "requestId": request.requestId,
+                        "taskType": request.taskType,
+                        "message": str(error),
+                        "traceback": traceback.format_exc(),
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
             _update_task(
                 request.requestId,
                 status="failed",
@@ -250,5 +283,4 @@ def unload_models() -> UnloadModelsResult | JSONResponse:
         return JSONResponse(status_code=409, content={"error": PythonRuntimeError(code="model_unload_blocked", message="Cannot unload generation model while a runtime task is active.", details={"activeTaskCount": active_task_count}, retryable=True).model_dump(mode="json")})
     unloaded = unload_generation_models()
     return UnloadModelsResult(unloadedModels=[LoadedModelDescriptor.model_validate(model) for model in unloaded], activeTaskCount=0)
-
 

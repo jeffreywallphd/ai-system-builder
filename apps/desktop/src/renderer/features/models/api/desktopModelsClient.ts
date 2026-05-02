@@ -11,7 +11,7 @@ import {
   type DesktopValidateModelResult,
   type DesktopPublishModelResult,
 } from "../../../lib/desktopApi";
-import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../modules/contracts/model";
+import type { ListModelsRequest, ModelTaskTag } from "../../../../../../../modules/contracts/model";
 
 interface PreloadEnvelope {
   ok: boolean;
@@ -33,12 +33,13 @@ function ensureSuccess<T>(response: unknown, pick: (value: unknown) => T, fallba
 export interface DesktopModelsClient {
   browseModels: (input: DesktopModelBrowseRequest) => Promise<{ models: DesktopModelBrowseItem[]; nextCursor?: string }>;
   getModelDetails: (input: { provider: "huggingface"; modelId: string }) => Promise<DesktopModelDetailsResult["model"]>;
-  listModels: (input?: { source?: ModelSource; lifecycleStatus?: ModelLifecycleStatus; artifactForm?: ModelArtifactForm; search?: string }) => Promise<DesktopModelInventoryRecord[]>;
-  saveModelReference: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
-  downloadModel: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopDownloadModelResult>;
+  listModels: (input?: ListModelsRequest) => Promise<DesktopModelInventoryRecord[]>;
+  saveModelReference: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat" | "text-to-image"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
+  downloadModel: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat" | "text-to-image"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown> }) => Promise<DesktopDownloadModelResult>;
   updateModelRecord: (input: { modelRecordId: string; patch: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
   deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean }) => Promise<DesktopDeleteModelRecordResult>;
   trainModel: (input: DesktopModelTrainingRequest) => Promise<DesktopModelTrainingResult>;
+  readModelTrainingStatus: (input: { runId: string }) => Promise<DesktopModelTrainingResult>;
   validateModel: (input: { modelRecordId: string; modelPath?: string; expectedLoRA?: boolean }) => Promise<DesktopValidateModelResult>;
   publishModel: (input: {
     modelRecordId: string;
@@ -146,6 +147,16 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         await desktopApi.trainModel(input),
         (value) => value as DesktopModelTrainingResult,
         "Failed to train model.",
+      );
+    },
+    async readModelTrainingStatus(input) {
+      if (!desktopApi.readModelTrainingStatus) {
+        throw new Error("Desktop preload model training status bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.readModelTrainingStatus(input),
+        (value) => value as DesktopModelTrainingResult,
+        "Failed to read model training status.",
       );
     },
     async validateModel(input) {

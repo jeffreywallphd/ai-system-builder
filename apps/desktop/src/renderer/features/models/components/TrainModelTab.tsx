@@ -1,9 +1,23 @@
+import { useState } from "react";
+
+import { CollapsiblePanel } from "../../../components/ui/CollapsiblePanel";
+import { SettingsPanel } from "../../settings";
 import type { useModelTrainingFeature } from "../hooks/useModelTrainingFeature";
+
+function toDatasetOptionLabel(storageKey: string, originalName?: string): string {
+  if (originalName && originalName.trim().length > 0) {
+    return originalName;
+  }
+
+  const storageSegments = storageKey.split("/");
+  return storageSegments[storageSegments.length - 1] ?? storageKey;
+}
 
 type ModelTrainingState = ReturnType<typeof useModelTrainingFeature>;
 
 export function TrainModelTab(props: { state: ModelTrainingState }) {
   const s = props.state;
+  const [showHuggingFaceDefaults, setShowHuggingFaceDefaults] = useState(false);
 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -23,8 +37,22 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span>Dataset artifact IDs (comma-separated)</span>
-        <input className="ui-input" value={s.datasetArtifactIdsText} onChange={(event) => s.setDatasetArtifactIdsText(event.target.value)} placeholder="artifact-1,artifact-2" />
+        <span>Training datasets (Parquet artifacts)</span>
+        <select
+          className="ui-input"
+          multiple
+          value={s.selectedDatasetArtifactIds}
+          onChange={(event) => {
+            const selectedOptions = Array.from(event.target.selectedOptions).map((option) => option.value);
+            s.setSelectedDatasetArtifactIds(selectedOptions);
+          }}
+        >
+          {s.datasetArtifacts.map((artifact) => (
+            <option key={artifact.artifactId} value={artifact.artifactId}>
+              {toDatasetOptionLabel(artifact.storageKey, artifact.originalName)} ({artifact.artifactId})
+            </option>
+          ))}
+        </select>
       </label>
 
       <label className="ui-stack ui-stack--sm">
@@ -63,10 +91,69 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
 
       <div className="ui-grid ui-grid--two">
         <label className="ui-stack ui-stack--sm"><span>Output model name</span><input className="ui-input" value={s.outputModelName} onChange={(e) => s.setOutputModelName(e.target.value)} /></label>
-        <label className="ui-stack ui-stack--sm"><span>Local output directory</span><input className="ui-input" value={s.localOutputDirectory} onChange={(e) => s.setLocalOutputDirectory(e.target.value)} /></label>
         <label className="ui-stack ui-stack--sm"><span>Generated model display name</span><input className="ui-input" value={s.generatedDisplayName} onChange={(e) => s.setGeneratedDisplayName(e.target.value)} /></label>
         <label className="ui-stack ui-stack--sm"><span>Max safetensors shard size</span><input className="ui-input" value={s.maxShardSize} onChange={(e) => s.setMaxShardSize(e.target.value)} /></label>
       </div>
+
+      <section className="ui-stack ui-stack--sm">
+        <h3>Output destinations</h3>
+        <CollapsiblePanel
+          title="Hugging Face defaults"
+          isExpanded={showHuggingFaceDefaults}
+          onToggle={() => setShowHuggingFaceDefaults((current) => !current)}
+        >
+          <SettingsPanel
+            compact
+            title="Hugging Face defaults"
+            keys={["huggingface.token", "huggingface.defaultNamespace"]}
+          />
+        </CollapsiblePanel>
+        <label>
+          <input
+            type="checkbox"
+            checked={s.localDestinationEnabled}
+            onChange={(event) => s.setLocalDestinationEnabled(event.target.checked)}
+          />
+          Store locally
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={s.huggingFaceDestinationEnabled}
+            onChange={(event) => s.setHuggingFaceDestinationEnabled(event.target.checked)}
+          />
+          Publish to Hugging Face
+        </label>
+        {s.huggingFaceDestinationEnabled ? (
+          <div className="ui-grid ui-grid--two">
+            <label className="ui-stack ui-stack--sm">
+              <span>Model repository name</span>
+              <input
+                className="ui-input"
+                value={s.huggingFaceRepository}
+                onChange={(event) => s.setHuggingFaceRepository(event.target.value)}
+                placeholder={s.defaultHuggingFaceNamespace ? "your-model-repo" : "owner/repository"}
+              />
+              {s.defaultHuggingFaceNamespace ? (
+                <small className="ui-text-muted">
+                  Namespace: {s.defaultHuggingFaceNamespace} (publishes to {s.defaultHuggingFaceNamespace}/{s.huggingFaceRepository.trim() || "your-model-repo"}).
+                </small>
+              ) : (
+                <small className="ui-text-muted">Format: owner/repository.</small>
+              )}
+            </label>
+            <label className="ui-stack ui-stack--sm">
+              <span>Revision (optional)</span>
+              <input className="ui-input" value={s.huggingFaceRevision} onChange={(event) => s.setHuggingFaceRevision(event.target.value)} />
+            </label>
+            <label className="ui-stack ui-stack--sm">
+              <span>Path prefix (optional)</span>
+              <input className="ui-input" value={s.huggingFacePathPrefix} onChange={(event) => s.setHuggingFacePathPrefix(event.target.value)} />
+            </label>
+          </div>
+        ) : null}
+      </section>
+
       <label className="ui-stack ui-stack--sm">
         <span>Validate after training</span>
         <input type="checkbox" checked={s.validateAfterTraining} onChange={(event) => s.setValidateAfterTraining(event.target.checked)} />

@@ -30,7 +30,8 @@ async function createMainWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  const storageRootDirectory = path.join(app.getPath("userData"), "artifacts");
+  const desktopDataRootDirectory = app.getPath("userData");
+  const storageRootDirectory = path.join(desktopDataRootDirectory, "artifacts");
   const desktopHost = composeDesktopHost({
     logging: {
       verbosity: process.env.LOG_VERBOSITY,
@@ -45,6 +46,7 @@ app.whenReady().then(async () => {
   desktopHost.registerArtifactUploadIpc({
     ipcMain,
     storageRootDirectory,
+    runtimeRootDirectory: desktopDataRootDirectory,
   });
 
   await createMainWindow();

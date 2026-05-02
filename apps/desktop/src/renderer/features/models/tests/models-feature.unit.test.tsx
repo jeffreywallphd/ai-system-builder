@@ -93,6 +93,7 @@ function createClientDouble() {
         createdAt: "2026-04-27T00:05:00.000Z",
       },
     }),
+    readModelTrainingStatus: vi.fn().mockResolvedValue({ runId: "run-1", status: "succeeded" }),
     validateModel: vi.fn().mockResolvedValue({ modelRecordId: "generated-1", status: "valid", reportPath: "/tmp/report.md" }),
     publishModel: vi.fn().mockResolvedValue({ modelRecordId: "generated-1", published: true, provider: "huggingface", repository: "owner/repo" }),
   };
@@ -228,9 +229,9 @@ describe("ModelsFeature", () => {
     });
 
     expect(container.textContent).toContain("Current backend support: LoRA, QLoRA, and full fine-tuning");
-    expect(container.textContent).toContain("Dataset artifact IDs");
-
-    expect(container.querySelector("input[placeholder='artifact-1,artifact-2']")).toBeTruthy();
+    expect(container.textContent).toContain("Training datasets (Parquet artifacts)");
+    expect(container.querySelector("select[multiple]")).toBeTruthy();
+    expect(Array.from(container.querySelectorAll("input")).some((input) => input.value === "512")).toBe(true);
     expect(container.textContent).toContain("Start Training");
   });
 

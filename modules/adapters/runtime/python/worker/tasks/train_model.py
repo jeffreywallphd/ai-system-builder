@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import tempfile
 from datetime import datetime, timezone
+from math import ceil
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from ..models import TrainModelTaskRequest, TrainModelTaskResult
 from .model_serialization import DEFAULT_MAX_SHARD_SIZE, save_adapter_pretrained, save_full_model_pretrained, write_serialization_manifest
@@ -12,6 +13,8 @@ from .model_validation import validate_model_output
 
 SUPPORTED_METHODS = {"lora", "qlora", "full-finetune"}
 SUPPORTED_DATASET_FORMATS = {"jsonl", "json", "csv", "parquet"}
+DEFAULT_SEQUENCE_LENGTH = 512
+MAX_REASONABLE_TOKENIZER_LENGTH = 1_000_000
 
 
 def _require_non_empty(value: str | None, field: str) -> str:
@@ -24,6 +27,21 @@ def _to_dict(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
+
+
+def _to_positive_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        candidate = int(value)
+        return candidate if candidate > 0 else None
+    if isinstance(value, str) and value.strip():
+        try:
+            candidate = int(value.strip())
+        except ValueError:
+            return None
+        return candidate if candidate > 0 else None
+    return None
 
 
 def _parse_max_shard_size(payload: TrainModelTaskRequest) -> str:
@@ -122,14 +140,79 @@ def _load_transformers_objects(base_model_ref: str, method: str, quantization: d
 
     tokenizer = AutoTokenizer.from_pretrained(base_model_ref, use_fast=True)
     if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+        if tokenizer.eos_token is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+        elif hasattr(tokenizer, "add_special_tokens"):
+            tokenizer.add_special_tokens({"pad_token": "<pad>"})
+        else:
+            raise RuntimeError("Tokenizer does not define a pad or EOS token and cannot add a pad token.")
 
     model = AutoModelForCausalLM.from_pretrained(base_model_ref, **model_kwargs)
+    _synchronize_model_token_embeddings(model, tokenizer)
     return model, tokenizer
 
 
+def _synchronize_model_token_embeddings(model: Any, tokenizer: Any) -> None:
+    try:
+        tokenizer_size = len(tokenizer)
+    except Exception:
+        return
+
+    if tokenizer_size <= 0 or not hasattr(model, "get_input_embeddings"):
+        return
+
+    embeddings = model.get_input_embeddings()
+    model_vocab_size = getattr(embeddings, "num_embeddings", None)
+    if not isinstance(model_vocab_size, int) or tokenizer_size <= model_vocab_size:
+        return
+
+    if not hasattr(model, "resize_token_embeddings"):
+        raise RuntimeError(
+            f"Tokenizer vocabulary size ({tokenizer_size}) exceeds model embedding size ({model_vocab_size}), "
+            "and this model does not support embedding resizing."
+        )
+
+    model.resize_token_embeddings(tokenizer_size)
+
+
+def _read_model_context_length(model: Any, tokenizer: Any) -> int | None:
+    candidates: list[int] = []
+    config = getattr(model, "config", None)
+    for attribute in [
+        "max_position_embeddings",
+        "n_positions",
+        "max_sequence_length",
+        "seq_length",
+        "max_seq_len",
+    ]:
+        value = _to_positive_int(getattr(config, attribute, None))
+        if value is not None:
+            candidates.append(value)
+
+    tokenizer_limit = _to_positive_int(getattr(tokenizer, "model_max_length", None))
+    if tokenizer_limit is not None and tokenizer_limit <= MAX_REASONABLE_TOKENIZER_LENGTH:
+        candidates.append(tokenizer_limit)
+
+    return min(candidates) if candidates else None
+
+
+def _resolve_effective_sequence_length(model: Any, tokenizer: Any, requested_length: Any) -> tuple[int, str | None]:
+    requested = _to_positive_int(requested_length) or DEFAULT_SEQUENCE_LENGTH
+    model_context_length = _read_model_context_length(model, tokenizer)
+    if model_context_length is None or requested <= model_context_length:
+        return requested, None
+
+    return (
+        model_context_length,
+        (
+            f"Requested sequence length {requested} exceeds the base model context length "
+            f"{model_context_length}; using {model_context_length} to prevent position embedding overflow."
+        ),
+    )
+
+
 def _tokenize_dataset(dataset: Any, tokenizer: Any, max_sequence_length: int | None) -> Any:
-    block_size = max_sequence_length or 512
+    block_size = _to_positive_int(max_sequence_length) or DEFAULT_SEQUENCE_LENGTH
 
     text_column = "text"
     if text_column not in dataset["train"].column_names:
@@ -154,12 +237,20 @@ def _build_training_args(payload: TrainModelTaskRequest, output_dir: Path) -> An
     except Exception as error:  # pragma: no cover
         raise RuntimeError("transformers is required for TrainingArguments.") from error
 
+    try:
+        import torch
+        dataloader_pin_memory = bool(torch.cuda.is_available())
+    except Exception:
+        dataloader_pin_memory = False
+
     common = _to_dict(payload.commonParameters)
     advanced = _to_dict(payload.advancedParameters)
+    common_max_steps = common.get("maxSteps")
+    normalized_max_steps = int(common_max_steps) if isinstance(common_max_steps, (int, float)) else -1
     return TrainingArguments(
         output_dir=str(output_dir / "checkpoints"),
         num_train_epochs=float(common.get("numEpochs", 1)),
-        max_steps=int(common.get("maxSteps", -1)),
+        max_steps=normalized_max_steps,
         per_device_train_batch_size=int(common.get("batchSize", 1)),
         per_device_eval_batch_size=int(common.get("batchSize", 1)),
         learning_rate=float(common.get("learningRate", 5e-5)),
@@ -171,6 +262,8 @@ def _build_training_args(payload: TrainModelTaskRequest, output_dir: Path) -> An
         eval_steps=int(advanced.get("evalIntervalSteps", 0)) if int(advanced.get("evalIntervalSteps", 0)) > 0 else None,
         logging_steps=10,
         save_total_limit=int(advanced.get("saveTotalLimit", 2)),
+        label_names=["labels"],
+        dataloader_pin_memory=dataloader_pin_memory,
         bf16=advanced.get("mixedPrecision") == "bf16",
         fp16=advanced.get("mixedPrecision") == "fp16",
         gradient_checkpointing=bool(advanced.get("gradientCheckpointing", False)),
@@ -187,33 +280,85 @@ def _apply_lora(model: Any, payload: TrainModelTaskRequest) -> Any:
 
     advanced = _to_dict(payload.advancedParameters)
     lora = _to_dict(advanced.get("lora"))
-    target_modules = lora.get("targetModules") if isinstance(lora.get("targetModules"), list) else ["q_proj", "v_proj"]
-
-    lora_config = LoraConfig(
-        r=int(lora.get("rank", 16)),
-        lora_alpha=int(lora.get("alpha", 32)),
-        lora_dropout=float(lora.get("dropout", 0.05)),
-        target_modules=target_modules,
-        bias="none",
-        task_type=TaskType.CAUSAL_LM,
+    raw_target_modules = lora.get("targetModules")
+    target_modules = (
+        [entry.strip() for entry in raw_target_modules if isinstance(entry, str) and entry.strip()]
+        if isinstance(raw_target_modules, list)
+        else None
     )
+    lora_config_args = {
+        "r": int(lora.get("rank", 16)),
+        "lora_alpha": int(lora.get("alpha", 32)),
+        "lora_dropout": float(lora.get("dropout", 0.05)),
+        "bias": "none",
+        "task_type": TaskType.CAUSAL_LM,
+    }
+    if target_modules:
+        lora_config_args["target_modules"] = target_modules
+
+    lora_config = LoraConfig(**lora_config_args)
     return get_peft_model(model, lora_config)
 
 
-def _run_trainer(model: Any, tokenizer: Any, dataset: Any, eval_dataset: Any | None, args: Any) -> tuple[dict[str, float], list[dict[str, Any]]]:
+def _run_trainer(
+    model: Any,
+    tokenizer: Any,
+    dataset: Any,
+    eval_dataset: Any | None,
+    args: Any,
+    *,
+    on_progress: Callable[[dict[str, int]], None] | None = None,
+) -> tuple[dict[str, float], list[dict[str, Any]]]:
     try:
-        from transformers import DataCollatorForLanguageModeling, Trainer
+        from transformers import DataCollatorForLanguageModeling, Trainer, TrainerCallback
     except Exception as error:  # pragma: no cover
         raise RuntimeError("transformers Trainer is required for training.") from error
+
+    def gradient_accumulation_steps() -> int:
+        return max(int(getattr(args, "gradient_accumulation_steps", 1) or 1), 1)
+
+    def estimate_total_batches() -> int:
+        max_steps = getattr(args, "max_steps", -1)
+        if isinstance(max_steps, int) and max_steps > 0:
+            return max_steps * gradient_accumulation_steps()
+
+        train_rows = len(dataset["train"])
+        per_device_batch_size = max(int(getattr(args, "per_device_train_batch_size", 1) or 1), 1)
+        epochs = max(int(ceil(float(getattr(args, "num_train_epochs", 1) or 1))), 1)
+        return max(ceil(train_rows / per_device_batch_size), 1) * epochs
+
+    class _TrainingProgressCallback(TrainerCallback):
+        def on_step_end(self, _args: Any, state: Any, _control: Any, **_kwargs: Any) -> None:
+            if on_progress is None:
+                return
+            total_steps = estimate_total_batches()
+            current_step = int(state.global_step) if isinstance(state.global_step, int) else 0
+            total_epochs = int(_args.num_train_epochs) if isinstance(_args.num_train_epochs, (int, float)) else 0
+            current_epoch = int(state.epoch) + 1 if isinstance(state.epoch, (int, float)) else 1
+            on_progress({
+                "epoch": max(current_epoch, 1),
+                "totalEpochs": max(total_epochs, 1),
+                "batch": min(max(current_step * gradient_accumulation_steps(), 0), total_steps),
+                "totalBatches": max(total_steps, 0),
+            })
 
     trainer = Trainer(
         model=model,
         args=args,
         train_dataset=dataset["train"],
         eval_dataset=eval_dataset,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+        callbacks=[_TrainingProgressCallback()],
     )
+    if on_progress is not None:
+        total_epochs = int(ceil(float(getattr(args, "num_train_epochs", 1) or 1)))
+        on_progress({
+            "epoch": 0,
+            "totalEpochs": max(total_epochs, 1),
+            "batch": 0,
+            "totalBatches": estimate_total_batches(),
+        })
     train_result = trainer.train()
     metrics: dict[str, float] = {k: float(v) for k, v in train_result.metrics.items() if isinstance(v, (int, float))}
 
@@ -230,7 +375,11 @@ def _write_run_metadata(output_path: Path, metadata: dict[str, Any]) -> str:
     return str(run_metadata_path)
 
 
-def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
+def train_model(
+    payload: TrainModelTaskRequest,
+    *,
+    on_progress: Callable[[dict[str, Any]], None] | None = None,
+) -> TrainModelTaskResult:
     _require_non_empty(payload.output.get("outputModelName"), "output.outputModelName")
 
     if payload.method not in SUPPORTED_METHODS:
@@ -247,6 +396,9 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
     logs: list[str] = []
 
     try:
+        if on_progress is not None:
+            on_progress({"stage": "initializing", "message": "Loading training datasets and model assets..."})
+
         dataset, eval_dataset = _load_dataset(payload)
         base_model_ref = _resolve_base_model(payload)
 
@@ -254,7 +406,16 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
         quantization = _to_dict(advanced.get("quantization"))
         model, tokenizer = _load_transformers_objects(base_model_ref, payload.method, quantization)
 
-        tokenized = _tokenize_dataset(dataset, tokenizer, _to_dict(payload.commonParameters).get("maxSequenceLength"))
+        effective_sequence_length, sequence_length_warning = _resolve_effective_sequence_length(
+            model,
+            tokenizer,
+            _to_dict(payload.commonParameters).get("maxSequenceLength"),
+        )
+        if sequence_length_warning is not None:
+            warnings.append(sequence_length_warning)
+            logs.append(sequence_length_warning)
+
+        tokenized = _tokenize_dataset(dataset, tokenizer, effective_sequence_length)
         tokenized_eval = tokenized["validation"] if "validation" in tokenized else None
 
         if payload.method in {"lora", "qlora"}:
@@ -262,7 +423,19 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
             logs.append(f"Applied {payload.method.upper()} adapter config.")
 
         train_args = _build_training_args(payload, output_path)
-        metrics, checkpoints = _run_trainer(model, tokenizer, tokenized, tokenized_eval, train_args)
+        def on_training_progress(progress: dict[str, int]) -> None:
+            message = (
+                f"Epoch [{progress.get('epoch', 0)}]/[{progress.get('totalEpochs', 0)}], "
+                f"Batch [{progress.get('batch', 0)}]/[{progress.get('totalBatches', 0)}]"
+            )
+            logs.append(message)
+            if on_progress is not None:
+                on_progress({**progress, "message": message, "stage": "training"})
+
+        metrics, checkpoints = _run_trainer(model, tokenizer, tokenized, tokenized_eval, train_args, on_progress=on_training_progress)
+
+        if on_progress is not None:
+            on_progress({"stage": "serializing", "message": "Serializing trained model artifacts..."})
 
         max_shard_size = _parse_max_shard_size(payload)
         if payload.method in {"lora", "qlora"}:
@@ -271,6 +444,9 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
         else:
             serialization = save_full_model_pretrained(model, tokenizer, output_path, max_shard_size=max_shard_size)
             artifact_form = "full-model"
+
+        if on_progress is not None:
+            on_progress({"stage": "validating", "message": "Running post-training validation..."})
 
         validation_config = _to_dict(payload.validation)
         validation_enabled = bool(validation_config.get("enabled", True))
@@ -338,6 +514,9 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
                 "metadata": metadata,
             }
 
+        if on_progress is not None:
+            on_progress({"stage": "completed", "message": "Training task completed."})
+
         return TrainModelTaskResult(
             runId=run_id,
             status=final_status,
@@ -363,6 +542,8 @@ def train_model(payload: TrainModelTaskRequest) -> TrainModelTaskResult:
             ),
         )
     except Exception as error:
+        if on_progress is not None:
+            on_progress({"stage": "failed", "message": f"Training failed: {error}"})
         return TrainModelTaskResult(
             runId=run_id,
             status="failed",

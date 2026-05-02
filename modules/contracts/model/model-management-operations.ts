@@ -25,6 +25,7 @@ export interface ListModelsRequest {
   search?: string;
   limit?: number;
   cursor?: string;
+  includeDiscovered?: boolean;
 }
 
 export interface ListModelsResult {
@@ -190,6 +191,7 @@ export function normalizeListModelsRequest(request: ListModelsRequest): ListMode
     search: normalizeOptionalText(request.search),
     limit: normalizeListLimit(request.limit),
     cursor: normalizeOptionalText(request.cursor),
+    includeDiscovered: request.includeDiscovered === false ? false : undefined,
   };
 }
 

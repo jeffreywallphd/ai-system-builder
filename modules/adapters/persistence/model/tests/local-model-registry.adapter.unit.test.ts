@@ -141,4 +141,65 @@ describe("createLocalModelRegistryAdapter", () => {
     const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
     expect(persisted.models?.[0]?.modelId).toBe("org/demo-model");
   });
+
+  it("can list persisted registry records without cache discovery", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
+    const filePath = join(dir, "models.json");
+    const cacheRoot = join(dir, "hf-cache");
+    await mkdir(join(cacheRoot, "models--org--cached-model", "snapshots", "bbb"), { recursive: true });
+
+    const adapter = createLocalModelRegistryAdapter({
+      filePath,
+      now: () => "2026-04-27T00:00:00.000Z",
+      discovery: {
+        searchRoots: [cacheRoot],
+        env: {},
+        homeDirectory: join(dir, "home"),
+      },
+    });
+
+    await adapter.registerDownloadedModel({
+      modelRecordId: "registered-1",
+      displayName: "Registered Image Model",
+      source: "huggingface",
+      provider: "huggingface",
+      modelId: "org/registered-image-model",
+      localPath: join(dir, "models", "registered-image-model"),
+      artifactForm: "full-model",
+      inferenceMode: "text-to-image",
+      taskTags: ["text-to-image"],
+    });
+
+    const listed = await adapter.listModels({ limit: 10, includeDiscovered: false });
+
+    expect(listed.models.map((model) => model.modelId)).toEqual(["org/registered-image-model"]);
+    const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
+    expect(persisted.models?.map((model) => model.modelId)).toEqual(["org/registered-image-model"]);
+  });
+
+  it("uses isolated temporary files for concurrent discovery persistence", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
+    const filePath = join(dir, "models.json");
+    const cacheRoot = join(dir, "hf-cache");
+    await mkdir(join(cacheRoot, "models--org--demo-model", "snapshots", "bbb"), { recursive: true });
+
+    const adapter = createLocalModelRegistryAdapter({
+      filePath,
+      now: () => "2026-04-27T00:00:00.000Z",
+      discovery: {
+        searchRoots: [cacheRoot],
+        env: {},
+        homeDirectory: join(dir, "home"),
+      },
+    });
+
+    const listed = await Promise.all(
+      Array.from({ length: 20 }, () => adapter.listModels({ limit: 10 })),
+    );
+
+    expect(listed.every((result) => result.models[0]?.modelId === "org/demo-model")).toBe(true);
+
+    const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
+    expect(persisted.models?.[0]?.modelId).toBe("org/demo-model");
+  });
 });

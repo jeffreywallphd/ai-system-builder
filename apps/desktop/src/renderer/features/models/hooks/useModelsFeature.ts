@@ -17,7 +17,7 @@ function normalizeOptionalNumber(value: string): number | undefined {
 
 function normalizeOptionalTaskTag(value: string): ModelTaskTag | undefined {
   const normalized = value.trim().toLowerCase();
-  const allowed: ModelTaskTag[] = ["text-generation", "text2text-generation", "chat", "embeddings", "classification", "summarization", "question-answering", "code-generation"];
+  const allowed: ModelTaskTag[] = ["text-generation", "text2text-generation", "chat", "embeddings", "classification", "summarization", "question-answering", "code-generation", "text-to-image"];
   return allowed.includes(normalized as ModelTaskTag) ? normalized as ModelTaskTag : undefined;
 }
 

@@ -7,6 +7,7 @@ export const MODEL_TASK_TAGS = [
   "summarization",
   "question-answering",
   "code-generation",
+  "text-to-image",
 ] as const;
 
 export type ModelTaskTag = (typeof MODEL_TASK_TAGS)[number];

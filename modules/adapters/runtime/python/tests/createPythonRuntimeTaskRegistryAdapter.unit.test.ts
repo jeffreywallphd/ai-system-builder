@@ -106,6 +106,17 @@ it("generates non-timestamp request ids when caller does not provide one", async
     expect(record.progress?.details).toMatchObject({ generatedRowCount: 40 });
   });
 
+  it("keeps generic progress mapping when chunk fields are not present", async () => {
+    const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(async () => ({ requestId: "req-train", taskType: "train-model", status: "running", progress: { stage: "training", message: "Epoch [0]/[1], Batch [0]/[59]", epoch: 0, totalEpochs: 1, batch: 0, totalBatches: 59 } })), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
+    const record = await adapter.getTaskStatus("req-train");
+    expect(record.progress).toMatchObject({ message: "Epoch [0]/[1], Batch [0]/[59]" });
+    expect(record.progress?.current).toBeUndefined();
+    expect(record.progress?.total).toBeUndefined();
+    expect(record.progress?.unit).toBeUndefined();
+    expect(record.progress?.details).toMatchObject({ stage: "training", totalBatches: 59 });
+  });
+
   it("maps cancel status and preserves message", async () => {
     const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(async () => ({ requestId: "req-1", cancelled: false, status: "running", message: "Task is already running." })), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);

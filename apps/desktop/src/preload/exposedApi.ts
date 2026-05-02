@@ -133,16 +133,48 @@ import {
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
+  DESKTOP_IMAGE_GENERATION_START_OPERATION,
+  DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL,
+  DESKTOP_IMAGE_GENERATION_START_RESPONSE_CHANNEL,
+  DESKTOP_IMAGE_GENERATION_READ_OPERATION,
+  DESKTOP_IMAGE_GENERATION_READ_REQUEST_CHANNEL,
+  DESKTOP_IMAGE_GENERATION_READ_RESPONSE_CHANNEL,
+  DESKTOP_IMAGE_GENERATION_CANCEL_OPERATION,
+  DESKTOP_IMAGE_GENERATION_CANCEL_REQUEST_CHANNEL,
+  DESKTOP_IMAGE_GENERATION_CANCEL_RESPONSE_CHANNEL,
+  DESKTOP_IMAGE_GENERATION_FINALIZE_OPERATION,
+  DESKTOP_IMAGE_GENERATION_FINALIZE_REQUEST_CHANNEL,
+  DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL,
+  DESKTOP_COMFYUI_INSTALL_STATUS_READ_OPERATION,
+  DESKTOP_COMFYUI_INSTALL_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_COMFYUI_INSTALL_STATUS_READ_RESPONSE_CHANNEL,
+  DESKTOP_COMFYUI_INSTALL_REPAIR_OPERATION,
+  DESKTOP_COMFYUI_INSTALL_REPAIR_REQUEST_CHANNEL,
+  DESKTOP_COMFYUI_INSTALL_REPAIR_RESPONSE_CHANNEL,
+  createDesktopComfyUiInstallStatusRequest,
+  createDesktopComfyUiRepairInstallRequest,
   createDesktopPrepareTrainingDatasetStartRequest,
   createDesktopPrepareTrainingDatasetTaskReadRequest,
   createDesktopPythonRuntimeControlRequest,
   createDesktopPythonRuntimeStatusReadRequest,
+  createDesktopImageGenerationStartRequest,
+  createDesktopImageGenerationReadRequest,
+  createDesktopImageGenerationCancelRequest,
+  createDesktopImageGenerationFinalizeRequest,
   type DesktopPrepareTrainingDatasetStartRequest,
   type DesktopPrepareTrainingDatasetStartResponse,
   type DesktopPrepareTrainingDatasetTaskReadRequest,
   type DesktopPrepareTrainingDatasetTaskReadResponse,
   type DesktopPythonRuntimeControlResponse,
   type DesktopPythonRuntimeStatusReadResponse,
+  type DesktopImageGenerationStartRequest,
+  type DesktopImageGenerationStartResponse,
+  type DesktopImageGenerationReadRequest,
+  type DesktopImageGenerationReadResponse,
+  type DesktopImageGenerationCancelRequest,
+  type DesktopImageGenerationCancelResponse,
+  type DesktopImageGenerationFinalizeRequest,
+  type DesktopImageGenerationFinalizeResponse,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_OPERATION,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_RESPONSE_CHANNEL,
@@ -197,6 +229,7 @@ import {
   createDesktopModelRecordUpdateRequest,
   createDesktopModelRecordDeleteRequest,
   createDesktopModelTrainRequest,
+  createDesktopModelTrainStatusRequest,
   createDesktopModelValidateRequest,
   createDesktopModelPublishRequest,
   type DesktopModelBrowseResponse,
@@ -207,11 +240,15 @@ import {
   type DesktopModelRecordUpdateResponse,
   type DesktopModelRecordDeleteResponse,
   type DesktopModelTrainResponse,
+  type DesktopModelTrainStatusResponse,
   type DesktopModelValidateResponse,
   type DesktopModelPublishResponse,
   DESKTOP_MODEL_TRAIN_OPERATION,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
   DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_OPERATION,
+  DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_STATUS_RESPONSE_CHANNEL,
   DESKTOP_MODEL_VALIDATE_OPERATION,
   DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_VALIDATE_RESPONSE_CHANNEL,
@@ -310,6 +347,12 @@ export interface DesktopPreloadApi {
     input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeControlResponse>;
+  startImageGeneration: (input: DesktopImageGenerationStartRequest["payload"], context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationStartResponse>;
+  readImageGeneration: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationReadResponse>;
+  cancelImageGeneration: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationCancelResponse>;
+  finalizeImageGenerationIfCompleted: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationFinalizeResponse>;
+  readComfyUiInstallStatus: (input?: { installRoot?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<any>;
+  repairComfyUiInstall: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<any>;
   browseArtifacts: (
     input?: { artifactFamily?: ArtifactFamily },
     context?: DesktopArtifactUploadBridgeContext,
@@ -441,6 +484,10 @@ export interface DesktopPreloadApi {
     input: Parameters<typeof createDesktopModelTrainRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopModelTrainResponse>;
+  readModelTrainingStatus: (
+    input: Parameters<typeof createDesktopModelTrainStatusRequest>[0],
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopModelTrainStatusResponse>;
   validateModel: (
     input: Parameters<typeof createDesktopModelValidateRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
@@ -776,6 +823,36 @@ export function createDesktopPreloadApi(
         channel: DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop python runtime control IPC response envelope.",
       });
+    },
+    async startImageGeneration(input, context = {}) {
+      const request = createDesktopImageGenerationStartRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL.value, request);
+      return assertDesktopEnvelopeResponse<DesktopImageGenerationStartResponse>(response, { operation: DESKTOP_IMAGE_GENERATION_START_OPERATION, channel: DESKTOP_IMAGE_GENERATION_START_RESPONSE_CHANNEL.value, message: "Received invalid desktop image generation start IPC response envelope." });
+    },
+    async readImageGeneration(input, context = {}) {
+      const request = createDesktopImageGenerationReadRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_IMAGE_GENERATION_READ_REQUEST_CHANNEL.value, request);
+      return assertDesktopEnvelopeResponse<DesktopImageGenerationReadResponse>(response, { operation: DESKTOP_IMAGE_GENERATION_READ_OPERATION, channel: DESKTOP_IMAGE_GENERATION_READ_RESPONSE_CHANNEL.value, message: "Received invalid desktop image generation read IPC response envelope." });
+    },
+    async cancelImageGeneration(input, context = {}) {
+      const request = createDesktopImageGenerationCancelRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_IMAGE_GENERATION_CANCEL_REQUEST_CHANNEL.value, request);
+      return assertDesktopEnvelopeResponse<DesktopImageGenerationCancelResponse>(response, { operation: DESKTOP_IMAGE_GENERATION_CANCEL_OPERATION, channel: DESKTOP_IMAGE_GENERATION_CANCEL_RESPONSE_CHANNEL.value, message: "Received invalid desktop image generation cancel IPC response envelope." });
+    },
+    async finalizeImageGenerationIfCompleted(input, context = {}) {
+      const request = createDesktopImageGenerationFinalizeRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_IMAGE_GENERATION_FINALIZE_REQUEST_CHANNEL.value, request);
+      return assertDesktopEnvelopeResponse<DesktopImageGenerationFinalizeResponse>(response, { operation: DESKTOP_IMAGE_GENERATION_FINALIZE_OPERATION, channel: DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL.value, message: "Received invalid desktop image generation finalization IPC response envelope." });
+    },
+    async readComfyUiInstallStatus(input = {}, context = {}) {
+      const request = createDesktopComfyUiInstallStatusRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_COMFYUI_INSTALL_STATUS_READ_REQUEST_CHANNEL.value, request);
+      return assertDesktopEnvelopeResponse(response, { operation: DESKTOP_COMFYUI_INSTALL_STATUS_READ_OPERATION, channel: DESKTOP_COMFYUI_INSTALL_STATUS_READ_RESPONSE_CHANNEL.value, message: "Received invalid desktop ComfyUI install status IPC response envelope." });
+    },
+    async repairComfyUiInstall(input = {}, context = {}) {
+      const request = createDesktopComfyUiRepairInstallRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_COMFYUI_INSTALL_REPAIR_REQUEST_CHANNEL.value, request);
+      return assertDesktopEnvelopeResponse(response, { operation: DESKTOP_COMFYUI_INSTALL_REPAIR_OPERATION, channel: DESKTOP_COMFYUI_INSTALL_REPAIR_RESPONSE_CHANNEL.value, message: "Received invalid desktop ComfyUI repair IPC response envelope." });
     },
 
     async browseArtifacts(input = {}, context = {}) {
@@ -1225,6 +1302,18 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_MODEL_TRAIN_OPERATION,
         channel: DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop model train IPC response envelope.",
+      });
+    },
+    async readModelTrainingStatus(input, context = {}) {
+      const request = createDesktopModelTrainStatusRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopModelTrainStatusResponse>(response, {
+        operation: DESKTOP_MODEL_TRAIN_STATUS_OPERATION,
+        channel: DESKTOP_MODEL_TRAIN_STATUS_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop model training status IPC response envelope.",
       });
     },
     async validateModel(input, context = {}) {
