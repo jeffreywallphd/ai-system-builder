@@ -319,6 +319,7 @@ export function composeServerHost(
             comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
             artifactStorageRoot: registerOptions.storageRootDirectory,
             artifactCatalogAppend: artifactCatalog,
+            artifactStorageBinding: artifactBindings,
             logging: loggingPort,
             now: options.now,
           }),

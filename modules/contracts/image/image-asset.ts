@@ -15,6 +15,6 @@ export interface ImageAssetMetadata {
 export interface ImageAsset {
   assetId: string;
   artifactId: string;
-  source: "uploaded" | "comfyui";
+  source: "uploaded" | "generated";
   metadata: ImageAssetMetadata;
 }
