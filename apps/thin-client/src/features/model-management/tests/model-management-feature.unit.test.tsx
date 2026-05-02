@@ -29,4 +29,18 @@ describe('ModelManagementFeature',()=>{
   await act(async()=>{deleteButton?.dispatchEvent(new Event('click',{bubbles:true}));});
   expect(client.deleteModelRecord).not.toHaveBeenCalled();
  });
+
+ it('renders browse result cards and loaded status', async()=>{
+  const models = Array.from({length:20}).map((_,i)=>({modelId:`m-${i}`,displayName:`Model ${i}`,provider:'huggingface'}));
+  const client:any={listModels:vi.fn().mockResolvedValue({models:[]}),browseModels:vi.fn().mockResolvedValue({models}),getModelDetails:vi.fn(),saveModelReference:vi.fn(),downloadModel:vi.fn(),deleteModelRecord:vi.fn()};
+  container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container);
+  await act(async()=>{root.render(<ModelManagementFeature client={client}/>);});
+  const input = container.querySelector('input') as HTMLInputElement;
+  await act(async()=>{ Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!.call(input,'gemma'); input.dispatchEvent(new Event('input',{bubbles:true})); });
+  const browseButton = Array.from(container.querySelectorAll('button')).find((b)=>b.textContent?.includes('Browse models'));
+  await act(async()=>{browseButton?.dispatchEvent(new Event('click',{bubbles:true}));});
+  expect(container.textContent).toContain('Loaded 20 models.');
+  expect(container.querySelectorAll('section ul li.ui-panel').length).toBeGreaterThan(0);
+ });
+
 });
