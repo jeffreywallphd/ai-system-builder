@@ -162,4 +162,22 @@ describe("composeServerHost", () => {
     expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
     expect(source).not.toContain("repoBrowser: artifactRepoStorage");
   });
+
+  it("throws clear error for invalid COMFYUI runtime mode", () => {
+    const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "vulkan";
+    const host = composeServerHost();
+    expect(() => host.registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-invalid-runtime" })).toThrow("Unsupported COMFYUI runtime mode");
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
+  });
+
+  it("accepts cpu and directml COMFYUI runtime modes", () => {
+    const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "cpu";
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-cpu" })).not.toThrow();
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "directml";
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-directml" })).not.toThrow();
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
+  });
+
 });

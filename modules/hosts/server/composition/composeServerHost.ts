@@ -50,6 +50,33 @@ import {
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
+
+
+type ComfyUiRuntimeDeviceMode = "auto" | "cpu" | "directml" | "cuda";
+
+function resolveComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode {
+  const raw = env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR;
+  const normalized = raw?.trim().toLowerCase();
+  if (!normalized) return "auto";
+  if (normalized === "auto" || normalized === "cpu" || normalized === "directml" || normalized === "cuda") return normalized;
+  throw new Error(`Unsupported COMFYUI runtime mode "${raw}". Use auto, cpu, directml, or cuda via COMFYUI_RUNTIME_DEVICE_MODE/COMFYUI_ACCELERATOR.`);
+}
+
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "true" || normalized === "1") return true;
+  if (normalized === "false" || normalized === "0") return false;
+  throw new Error(`Invalid boolean environment value "${value}".`);
+}
+
+function parseNumberEnv(value: string | undefined, name: string): number | undefined {
+  const normalized = value?.trim();
+  if (!normalized) return undefined;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`${name} must be a positive number.`);
+  return parsed;
+}
 export interface ComposeServerHostLoggingOptions {
   verbosity?: string;
   fallbackVerbosity?: LogVerbosity;
@@ -225,13 +252,31 @@ export function composeServerHost(
         now: options.now,
       });
 
+      const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode(process.env);
+      void loggingPort.log({ level: "info", message: "Resolved ComfyUI runtime device mode.", timestamp: new Date().toISOString(), verbosity: "normal", event: "runtime.comfyui.configuration", component: "server-host", subsystem: "runtime", data: { runtimeDeviceMode: resolvedRuntimeDeviceMode } });
+
       const comfyUiInstallRoot = process.env.COMFYUI_INSTALL_ROOT?.trim() || join(registerOptions.storageRootDirectory, "runtime-installs", "comfyui");
       const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
-      const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
+      const installCommandTimeoutMs = parseNumberEnv(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS, "COMFYUI_INSTALL_COMMAND_TIMEOUT_MS");
+      const execFileWithTimeout = installCommandTimeoutMs
+        ? async (file: string, args: readonly string[] = []) => {
+            const { execFile } = await import("node:child_process");
+            const { promisify } = await import("node:util");
+            return promisify(execFile)(file, [...args], { timeout: installCommandTimeoutMs }) as Promise<{ stdout: string; stderr: string }>;
+          }
+        : undefined;
+      const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout });
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: process.env.COMFYUI_PYTHON_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
-        runtimeDeviceMode: (process.env.COMFYUI_RUNTIME_DEVICE_MODE ?? process.env.COMFYUI_ACCELERATOR) as "auto" | "cpu" | "directml" | "cuda" | undefined,
+        runtimeDeviceMode: resolvedRuntimeDeviceMode,
+        skipPythonSetup: parseBooleanEnv(process.env.COMFYUI_SKIP_PYTHON_SETUP),
+        skipPythonValidation: parseBooleanEnv(process.env.COMFYUI_SKIP_PYTHON_VALIDATION),
+        pythonEnvironmentMode: process.env.COMFYUI_PYTHON_ENVIRONMENT_MODE as "managed-venv" | "ambient" | undefined,
+        directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
+        directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
+        directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
+        directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
         logging: loggingPort,
       });
       const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
@@ -239,9 +284,10 @@ export function composeServerHost(
         pythonExecutable: process.env.COMFYUI_PYTHON_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
         installer: comfyUiInstaller,
         installRoot: comfyUiInstallRoot,
-        runtimeDeviceMode: (process.env.COMFYUI_RUNTIME_DEVICE_MODE ?? process.env.COMFYUI_ACCELERATOR) as "auto" | "cpu" | "directml" | "cuda" | undefined,
+        runtimeDeviceMode: resolvedRuntimeDeviceMode,
         autoInstall: true,
         installSourceRef: process.env.COMFYUI_INSTALL_REF,
+        
         logging: loggingPort,
       });
       const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
@@ -278,6 +324,7 @@ export function composeServerHost(
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
         generateImageUseCase,
+        // TODO: wire imageGenerationFinalizationOrchestrator after generated-image persistence and asset registration are implemented.
       });
     },
   };
