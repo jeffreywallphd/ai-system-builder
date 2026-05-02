@@ -34,7 +34,7 @@ describe("GenerateImageUseCase", () => {
       },
     });
 
-    await useCase.startImageGeneration({ ...validRequest, model: "stabilityai/stable-diffusion-xl-base-1.0" });
+    await useCase.startImageGeneration({ ...validRequest, model: "record-123" });
     expect(runtimeTaskRegistry.startTask).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ model: "sdxl.safetensors" }) }));
   });
 
