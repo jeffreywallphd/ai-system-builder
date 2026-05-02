@@ -458,4 +458,38 @@ describe("desktop artifact browser client", () => {
     });
     expect(result.verification.exists).toBe(true);
   });
+
+  it("normalizes object-like byte payloads before building media blobs", async () => {
+    window.desktopApi = {
+      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          storageKey: "uploads/cat.png",
+          mediaType: "image/png",
+          bytes: { 0: 4, 1: 5, 2: 6 },
+        },
+      }),
+      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
+      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+    };
+
+    const createObjectURL = vi.fn().mockReturnValue("blob:desktop-preview");
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      writable: true,
+      value: createObjectURL,
+    });
+
+    const client = createDesktopArtifactBrowserClient();
+    const media = await client.readArtifactMedia({ storageKey: "uploads/cat.png" });
+    await client.createArtifactMediaViewUrl({ storageKey: "uploads/cat.png" });
+
+    expect(Array.from(media.bytes)).toEqual([4, 5, 6]);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+  });
 });
