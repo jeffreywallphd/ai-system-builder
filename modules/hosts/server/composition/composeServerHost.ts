@@ -5,6 +5,7 @@ import { FinalizeImageGenerationService } from "../../../application/services/im
 import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
 import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
+import { createPythonRuntimeAdapterFoundation, ensurePythonRuntimeWorkerDependencies } from "../../../adapters/runtime/python";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
@@ -315,10 +316,36 @@ export function composeServerHost(
       const getModelDetailsUseCase = new GetModelDetailsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } });
       const listModelsUseCase = new ListModelsUseCase({ modelRegistry });
       const saveModelReferenceUseCase = new SaveModelReferenceUseCase({ modelRegistry });
+      const pythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL?.trim() || "http://127.0.0.1:43111";
+      const pythonRuntimeEndpoint = new URL(pythonRuntimeBaseUrl);
+      const pythonRuntimeEnvironment = {
+        ...process.env,
+        PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.hostname,
+        PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port || "43111",
+        HF_HOME: join(registerOptions.storageRootDirectory, "models", "huggingface"),
+        TRANSFORMERS_CACHE: join(registerOptions.storageRootDirectory, "models", "huggingface", "hub"),
+        HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? "1",
+        HF_HUB_DISABLE_SYMLINKS_WARNING: process.env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
+      };
+      const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
+        client: { baseUrl: pythonRuntimeBaseUrl },
+        supervisor: {
+          command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+          args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
+          cwd: process.env.PYTHON_RUNTIME_WORKER_DIR ?? "modules/adapters/runtime/python/worker",
+          env: pythonRuntimeEnvironment,
+          prepareRuntimeEnvironment(context) {
+            ensurePythonRuntimeWorkerDependencies({ command: context.command, cwd: context.cwd, env: context.env });
+          },
+        },
+      });
       const downloadModelUseCase = new DownloadModelUseCase({
         modelRegistry,
         modelDownloader: {
-          ensureModelDownloaded: async () => { throw { code: "unavailable", message: "Model download runtime is unavailable on server host." }; },
+          ensureModelDownloaded: async (request) => {
+            await pythonRuntimeFoundation.supervisor.start();
+            return pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+          },
         },
       });
       const updateModelRecordUseCase = new UpdateModelRecordUseCase({ modelRegistry });
