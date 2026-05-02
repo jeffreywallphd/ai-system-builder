@@ -10,15 +10,15 @@ export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onN
   const selectedModelDownloaded = f.selectedModelRecord ? ["downloaded", "generated"].includes(f.selectedModelRecord.lifecycleStatus) : false;
 
   return (
-    <section className="ui-stack ui-stack--md" aria-label="Image Generation">
+    <section className="ui-panel ui-stack ui-stack--sm" aria-label="Image Generation">
       <h2>Image Generation</h2>
-      <p>Generate images from a prompt. Final images are saved to Artifacts.</p>
+      <p className="ui-text-muted">Generate images from a prompt. Final images are saved to Artifacts.</p>
 
-      <div className="ui-stack ui-stack--sm">
+      <section className="ui-stack ui-stack--sm">
         <div className="ui-stack ui-stack--xs">
           <label htmlFor="image-generation-model-record">Model (server inventory)</label>
           <div>
-            <select id="image-generation-model-record" value={f.selectedModelRecordId} onChange={(e) => f.setSelectedModelRecordId((e.target as HTMLSelectElement).value)}>
+            <select className="ui-input" id="image-generation-model-record" value={f.selectedModelRecordId} onChange={(e) => f.setSelectedModelRecordId((e.target as HTMLSelectElement).value)}>
               <option value="">Select a server model…</option>
               <optgroup label="Downloaded image models">
                 {f.downloadedImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatModelOption(model)}</option>)}
@@ -31,9 +31,9 @@ export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onN
             </select>{" "}
             <button type="button" className="ui-button" onClick={() => void f.refreshModelInventory()} disabled={f.modelInventoryLoading}>Refresh Models</button>
           </div>
-          {f.modelInventoryLoading ? <p>Loading model inventory…</p> : null}
+          {f.modelInventoryLoading ? <p className="ui-text-muted">Loading model inventory…</p> : null}
           {f.modelInventoryError ? <p role="alert">{f.modelInventoryError}</p> : null}
-          {f.downloadedImageGenerationModels.length === 0 ? <p role="note">No downloaded image models found. You can still generate with a server default checkpoint or the manual override below if configured. Download one on the Models page for predictable results. {onNavigateToModels ? <button type="button" className="ui-button" onClick={() => onNavigateToModels()}>Open Models</button> : null}</p> : null}
+          {f.downloadedImageGenerationModels.length === 0 ? <p className="ui-text-muted" role="note">No downloaded image models found. You can still generate with a server default checkpoint or the manual override below if configured. Download one on the Models page for predictable results. {onNavigateToModels ? <button type="button" className="ui-button" onClick={() => onNavigateToModels()}>Open Models</button> : null}</p> : null}
           {f.selectedModelRecord ? (
             <p role="note">
               Selected model status: <strong>{f.selectedModelRecord.lifecycleStatus}</strong>
@@ -47,21 +47,21 @@ export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onN
           ["scheduler", "Scheduler", "text"], ["numImages", "Number of Images", "number"],
         ].map(([key, label, type]) => {
           const id = `image-generation-${String(key)}`;
-          return <div key={id} className="ui-stack ui-stack--xs"><label htmlFor={id}>{label}</label><input id={id} type={type} value={f.form[key as keyof typeof f.form]} onInput={(e) => set(key as keyof typeof f.form, (e.target as HTMLInputElement).value)} /></div>;
+          return <div key={id} className="ui-stack ui-stack--xs"><label htmlFor={id}>{label}</label><input className="ui-input" id={id} type={type} value={f.form[key as keyof typeof f.form]} onInput={(e) => set(key as keyof typeof f.form, (e.target as HTMLInputElement).value)} /></div>;
         })}
         <details>
           <summary>Advanced: Manual model/checkpoint override (optional)</summary>
           <div className="ui-stack ui-stack--xs">
             <label htmlFor="image-generation-model">Manual model/checkpoint</label>
-            <input id="image-generation-model" type="text" value={f.form.model} onInput={(e) => set("model", (e.target as HTMLInputElement).value)} placeholder="checkpoint.safetensors or model record id" />
+            <input className="ui-input" id="image-generation-model" type="text" value={f.form.model} onInput={(e) => set("model", (e.target as HTMLInputElement).value)} placeholder="checkpoint.safetensors or model record id" />
           </div>
         </details>
-      </div>
+      </section>
 
       {f.qualityNote ? <p role="note">{f.qualityNote}</p> : null}
       {f.validationError ? <p role="alert">{f.validationError}</p> : null}
 
-      <div>
+      <div className="ui-grid ui-grid--two">
         <button className="ui-button" type="button" onClick={() => void f.start()} disabled={f.isGenerateDisabled}>Generate</button>{" "}
         <button className="ui-button" type="button" onClick={() => void f.cancel()} disabled={f.isCancelDisabled}>Cancel</button>{" "}
         <button className="ui-button" type="button" onClick={() => onNavigateToArtifacts?.()}>Open Artifacts</button>
