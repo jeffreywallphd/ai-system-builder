@@ -14,6 +14,7 @@ describe('registerExpressApi image generation', ()=>{
       storeArtifactInRepoUseCase:{ execute:testDouble.fn() }, publishArtifactToRepoUseCase:{ execute:testDouble.fn() },
       verifyPublishedArtifactBackingUseCase:{ execute:testDouble.fn() }, verifyImportedArtifactSourceBackingUseCase:{ execute:testDouble.fn() },
       registerArtifactFromRepoUseCase:{ execute:testDouble.fn() }, localizeArtifactFromRepoUseCase:{ execute:testDouble.fn() },
+      browseModelsUseCase:{ execute:testDouble.fn() }, getModelDetailsUseCase:{ execute:testDouble.fn() }, listModelsUseCase:{ execute:testDouble.fn() }, saveModelReferenceUseCase:{ execute:testDouble.fn() }, downloadModelUseCase:{ execute:testDouble.fn() }, updateModelRecordUseCase:{ execute:testDouble.fn() }, deleteModelRecordUseCase:{ execute:testDouble.fn() },
       generateImageUseCase: { startImageGeneration:testDouble.fn(), readImageGeneration:testDouble.fn(), cancelImageGeneration:testDouble.fn() },
     } as any);
     const paths = app.post.mock.calls.map((c:any)=>c[0]);

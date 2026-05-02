@@ -11,12 +11,14 @@ import {
   type RegisterArtifactRepoApiRoutesDependencies,
 } from "./artifact-repo/registerArtifactRepoApiRoutes";
 import { registerImageGenerationApiRoutes, type RegisterImageGenerationApiRoutesDependencies } from "./image-generation/registerImageGenerationApiRoutes";
+import { registerModelManagementApiRoutes, type RegisterModelManagementApiRoutesDependencies } from "./model/registerModelManagementApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
     & RegisterArtifactBrowserApiRoutesDependencies["app"]
     & RegisterArtifactRepoApiRoutesDependencies["app"]
-    & RegisterImageGenerationApiRoutesDependencies["app"];
+    & RegisterImageGenerationApiRoutesDependencies["app"]
+    & RegisterModelManagementApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -36,6 +38,15 @@ export interface RegisterExpressApiDependencies {
   localizeArtifactFromRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["localizeArtifactFromRepoUseCase"];
   generateImageUseCase: RegisterImageGenerationApiRoutesDependencies["generateImageUseCase"];
   imageGenerationFinalizationOrchestrator?: RegisterImageGenerationApiRoutesDependencies["imageGenerationFinalizationOrchestrator"];
+  browseModelsUseCase: RegisterModelManagementApiRoutesDependencies["browseModelsUseCase"];
+  getModelDetailsUseCase: RegisterModelManagementApiRoutesDependencies["getModelDetailsUseCase"];
+  listModelsUseCase: RegisterModelManagementApiRoutesDependencies["listModelsUseCase"];
+  saveModelReferenceUseCase: RegisterModelManagementApiRoutesDependencies["saveModelReferenceUseCase"];
+  downloadModelUseCase: RegisterModelManagementApiRoutesDependencies["downloadModelUseCase"];
+  updateModelRecordUseCase: RegisterModelManagementApiRoutesDependencies["updateModelRecordUseCase"];
+  deleteModelRecordUseCase: RegisterModelManagementApiRoutesDependencies["deleteModelRecordUseCase"];
+  validateModelUseCase?: RegisterModelManagementApiRoutesDependencies["validateModelUseCase"];
+  publishModelUseCase?: RegisterModelManagementApiRoutesDependencies["publishModelUseCase"];
 }
 
 export function registerExpressApi(
@@ -68,6 +79,19 @@ export function registerExpressApi(
     verifyImportedArtifactSourceBackingUseCase: dependencies.verifyImportedArtifactSourceBackingUseCase,
     registerArtifactFromRepoUseCase: dependencies.registerArtifactFromRepoUseCase,
     localizeArtifactFromRepoUseCase: dependencies.localizeArtifactFromRepoUseCase,
+  });
+
+  registerModelManagementApiRoutes({
+    app: dependencies.app,
+    browseModelsUseCase: dependencies.browseModelsUseCase,
+    getModelDetailsUseCase: dependencies.getModelDetailsUseCase,
+    listModelsUseCase: dependencies.listModelsUseCase,
+    saveModelReferenceUseCase: dependencies.saveModelReferenceUseCase,
+    downloadModelUseCase: dependencies.downloadModelUseCase,
+    updateModelRecordUseCase: dependencies.updateModelRecordUseCase,
+    deleteModelRecordUseCase: dependencies.deleteModelRecordUseCase,
+    validateModelUseCase: dependencies.validateModelUseCase,
+    publishModelUseCase: dependencies.publishModelUseCase,
   });
 
   registerImageGenerationApiRoutes({
