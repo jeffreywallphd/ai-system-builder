@@ -32,6 +32,7 @@ function requireBodyObject(body: unknown): Record<string, unknown> {
   if (!isObjectRecord(body)) throw new ModelManagementApiValidationError("Request body must be an object.");
   return body;
 }
+
 function mapWithContractNormalizer<T>(body: unknown, normalize: (request: T) => T): T {
   try {
     return normalize(requireBodyObject(body) as T);
@@ -40,6 +41,7 @@ function mapWithContractNormalizer<T>(body: unknown, normalize: (request: T) => 
     throw new ModelManagementApiValidationError(error instanceof Error ? error.message : "Invalid request body.");
   }
 }
+
 const mapBrowseModelsApiRequestToCommand = (body: unknown): BrowseModelsRequest => mapWithContractNormalizer(body, normalizeBrowseModelsRequest);
 const mapGetModelDetailsApiRequestToCommand = (body: unknown): GetModelDetailsRequest => mapWithContractNormalizer(body, normalizeGetModelDetailsRequest);
 const mapListModelsApiRequestToCommand = (body: unknown): ListModelsRequest => mapWithContractNormalizer(body, normalizeListModelsRequest);
@@ -50,13 +52,65 @@ const mapDeleteModelRecordApiRequestToCommand = (body: unknown): DeleteModelReco
 
 const mapFailureCode = (error: unknown): "internal" | "validation" | "not-found" | "unavailable" => {
   if (error instanceof ModelManagementApiValidationError) return "validation";
-  if (typeof error === "object" && error && "code" in error) { const code = (error as { code?: string }).code; if (code === "validation" || code === "not-found" || code === "unavailable") return code; }
+  if (typeof error === "object" && error && "code" in error) {
+    const code = (error as { code?: string }).code;
+    if (code === "validation" || code === "not-found" || code === "unavailable") return code;
+  }
   return "internal";
 };
 const statusCode = (response: { ok: boolean; error?: { code: string } }) => response.ok ? 200 : response.error?.code === "validation" ? 400 : response.error?.code === "not-found" ? 404 : response.error?.code === "unavailable" ? 503 : 500;
 
-function summarizeBody(body: unknown): Record<string, unknown> { const record = isObjectRecord(body) ? body : {}; return { provider: typeof record.provider === "string" ? record.provider : undefined, query: typeof record.query === "string" ? record.query.trim() : undefined, modelId: typeof record.modelId === "string" ? record.modelId.trim() : undefined, modelRecordId: typeof record.modelRecordId === "string" ? record.modelRecordId.trim() : undefined }; }
-function registerRoute(app: ModelManagementExpressRoutePort, logger: ModelRouteLogger | undefined, path: string, operation: `${Lowercase<string>}.${Lowercase<string>}`, execute: (body: unknown) => Promise<unknown>) { app.post(path, async (request, response) => { const started=Date.now(); const context = contextFrom(request); const requestSummary = summarizeBody(request.body); logger?.info("model-management.route.request", { operation, path, ...requestSummary }); try { const value = await execute(request.body); const apiResponse = createApiSuccessResponse(operation, value, context); logger?.info("model-management.route.success", { operation, path, elapsedMs:Date.now()-started, resultCount:Array.isArray((value as Record<string,unknown>)?.models)?((value as Record<string,unknown>).models as unknown[]).length:undefined }); response.status(statusCode(apiResponse)).json(apiResponse); } catch (error) { const message = error instanceof Error ? error.message : "Unexpected error."; logger?.warn("model-management.route.failure", { operation, path, ...requestSummary, elapsedMs:Date.now()-started, code: mapFailureCode(error), message }); const apiResponse = createApiFailureResponse(createApiError(operation, mapFailureCode(error), message, context), context); response.status(statusCode(apiResponse)).json(apiResponse); } }); }
+function summarizeBody(body: unknown): Record<string, unknown> {
+  const record = isObjectRecord(body) ? body : {};
+  return {
+    provider: typeof record.provider === "string" ? record.provider : undefined,
+    query: typeof record.query === "string" ? record.query.trim() : undefined,
+    modelId: typeof record.modelId === "string" ? record.modelId.trim() : undefined,
+    modelRecordId: typeof record.modelRecordId === "string" ? record.modelRecordId.trim() : undefined,
+  };
+}
+
+function summarizeResult(operation: string, value: unknown): Record<string, unknown> {
+  if (!isObjectRecord(value)) return {};
+  if (operation === "model.browse" || operation === "model.list") {
+    return { resultCount: Array.isArray(value.models) ? value.models.length : undefined };
+  }
+  if (operation === "model.download") {
+    return {
+      modelId: typeof value.modelId === "string" ? value.modelId : undefined,
+      modelRecordId: typeof value.modelRecordId === "string" ? value.modelRecordId : undefined,
+      downloaded: typeof value.downloaded === "boolean" ? value.downloaded : undefined,
+      fromCache: typeof value.fromCache === "boolean" ? value.fromCache : undefined,
+    };
+  }
+  return {
+    modelId: typeof value.modelId === "string" ? value.modelId : undefined,
+    modelRecordId: typeof value.modelRecordId === "string" ? value.modelRecordId : undefined,
+  };
+}
+
+function registerRoute(app: ModelManagementExpressRoutePort, logger: ModelRouteLogger | undefined, path: string, operation: `${Lowercase<string>}.${Lowercase<string>}`, execute: (body: unknown) => Promise<unknown>) {
+  app.post(path, async (request, response) => {
+    const context = contextFrom(request);
+    const requestSummary = summarizeBody(request.body);
+    logger?.info("api.model.request.received", { operation, ...requestSummary, ...context });
+    try {
+      const value = await execute(request.body);
+      const apiResponse = createApiSuccessResponse(operation, value, context);
+      logger?.info("api.model.request.succeeded", { operation, ...summarizeResult(operation, value), ...context });
+      response.status(statusCode(apiResponse)).json(apiResponse);
+    } catch (error) {
+      const code = mapFailureCode(error);
+      const message = error instanceof Error ? error.message : "Unexpected error.";
+      const details = typeof error === "object" && error !== null && "details" in error && isObjectRecord((error as { details?: unknown }).details)
+        ? (error as { details: Record<string, unknown> }).details
+        : undefined;
+      logger?.warn("api.model.request.failed", { operation, code, message, details, ...requestSummary, ...context });
+      const apiResponse = createApiFailureResponse(createApiError(operation, code, message, context), context);
+      response.status(statusCode(apiResponse)).json(apiResponse);
+    }
+  });
+}
 
 export function registerModelManagementApiRoutes(dependencies: RegisterModelManagementApiRoutesDependencies): void {
   registerRoute(dependencies.app, dependencies.logger, "/api/model/browse", "model.browse", async (body) => dependencies.browseModelsUseCase.execute(mapBrowseModelsApiRequestToCommand(body)));

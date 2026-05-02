@@ -211,4 +211,19 @@ describe("composeServerHost", () => {
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
   });
 
+
+  it("wires server model download through python runtime instead of unavailable stub", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("pythonRuntimeFoundation.runtimePort.ensureModelDownloaded");
+    expect(source).not.toContain("Model download runtime is unavailable on server host.");
+  });
+
+  it("passes model-management logger into Hugging Face browse/details adapter", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("createHuggingFaceModelBrowseDetailsAdapter({");
+    expect(source).toContain("logger: modelManagementLogger");
+  });
+
 });
