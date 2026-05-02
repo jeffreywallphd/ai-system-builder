@@ -1,11 +1,13 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it, vi } from "vitest";
-import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { isComfyUiCheckpointImageModel, useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
 
-function model(modelRecordId: string, lifecycleStatus: string, inferenceMode = "text-to-image") {
-  return { modelRecordId, displayName: modelRecordId, modelId: `id/${modelRecordId}`, provider: "hf", source: "huggingface", artifactForm: "checkpoint", lifecycleStatus, inferenceMode, taskTags: inferenceMode === "text-to-image" ? ["image-generation"] : ["chat"] };
+function model(modelRecordId: string, lifecycleStatus: string, inferenceMode = "text-to-image", artifactForm = "checkpoint") {
+  return { modelRecordId, displayName: modelRecordId, modelId: `id/${modelRecordId}`, provider: "hf", source: "huggingface", artifactForm, lifecycleStatus, inferenceMode, taskTags: inferenceMode === "text-to-image" ? ["image-generation"] : ["chat"] };
 }
+
+function flush() { return new Promise((resolve) => setTimeout(resolve, 0)); }
 
 function Harness({ client, modelClient }: { client: any; modelClient: any }) {
   const f = useImageGenerationFeature(client, undefined, modelClient);
@@ -13,6 +15,11 @@ function Harness({ client, modelClient }: { client: any; modelClient: any }) {
 }
 
 describe("useImageGenerationFeature", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it("sends latest selected model record id and selection does not reload inventory", async () => {
     const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1" }), readImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1", status: "failed" }), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
     const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [model("a", "downloaded"), model("b", "downloaded")] }) };
@@ -35,17 +42,54 @@ describe("useImageGenerationFeature", () => {
     expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ model: "manual.ckpt" }));
   });
 
-  it("auto-selects downloaded image model, not downloaded non-image; reference image can be selected", async () => {
+  it("auto-selects downloaded checkpoint image model, not downloaded non-image or full-model records", async () => {
     const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
-    const modelClient1 = { listModels: vi.fn().mockResolvedValue({ models: [model("txt", "downloaded", "chat"), model("img", "downloaded", "text-to-image")] }) };
+    const modelClient1 = { listModels: vi.fn().mockResolvedValue({ models: [model("txt", "downloaded", "chat"), model("full", "downloaded", "text-to-image", "full-model"), model("img", "downloaded", "text-to-image")] }) };
     const c = document.createElement("div"); const root = createRoot(c);
     await act(async()=>{root.render(<Harness client={client} modelClient={modelClient1} />);});
     expect((c.querySelector("#selected") as HTMLElement).textContent).toBe("img");
 
     const modelClient2 = { listModels: vi.fn().mockResolvedValue({ models: [model("txt", "downloaded", "chat"), model("ref", "registered", "text-to-image")] }) };
     await act(async()=>{root.render(<Harness client={client} modelClient={modelClient2} />);});
-    expect((c.querySelector("#selected") as HTMLElement).textContent).toBe("ref");
+    expect((c.querySelector("#selected") as HTMLElement).textContent).toBe("");
     expect((c.querySelector("#downloaded") as HTMLElement).textContent).toBe("");
+  });
+
+  it("classifies only checkpoint image models as ComfyUI generation candidates", () => {
+    expect(isComfyUiCheckpointImageModel(model("openelm", "downloaded", "chat", "full-model") as any)).toBe(false);
+    expect(isComfyUiCheckpointImageModel(model("sdxl", "downloaded", "text-to-image", "checkpoint") as any)).toBe(true);
+  });
+
+  it("does not submit a selected reference-only checkpoint image model", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [model("ref", "registered", "text-to-image")] }) };
+    function H() {
+      const f = useImageGenerationFeature(client, undefined, modelClient);
+      return <div><button id="select" onClick={() => f.setSelectedModelRecordId("ref")}>select</button><button id="prompt" onClick={() => f.setForm((x) => ({ ...x, prompt: "cat" }))}>prompt</button><button id="start" onClick={() => void f.start()}>start</button><span id="error">{f.error ?? ""}</span></div>;
+    }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<H />);});
+    await act(async()=>{(c.querySelector("#select") as HTMLButtonElement).click(); (c.querySelector("#prompt") as HTMLButtonElement).click(); (c.querySelector("#start") as HTMLButtonElement).click();});
+    expect(client.startImageGeneration).not.toHaveBeenCalled();
+    expect((c.querySelector("#error") as HTMLElement).textContent).toContain("saved reference only");
+  });
+
+  it("keeps the default model inventory client stable across state renders", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      headers: { get: () => "application/json" },
+      json: async () => ({ ok: true, value: { models: [] } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    function H() {
+      const f = useImageGenerationFeature();
+      return <button id="prompt" onClick={() => f.setForm((x) => ({ ...x, prompt: "cat" }))}>{f.modelInventoryLoading ? "loading" : "ready"}</button>;
+    }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<H />); await flush(); await flush();});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(async()=>{(c.querySelector("#prompt") as HTMLButtonElement).click(); await flush();});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not show prompt validation until generate attempt", async () => {
