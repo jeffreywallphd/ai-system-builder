@@ -34,7 +34,7 @@ export interface RegisterExpressApiDependencies {
   verifyImportedArtifactSourceBackingUseCase: RegisterArtifactRepoApiRoutesDependencies["verifyImportedArtifactSourceBackingUseCase"];
   registerArtifactFromRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["registerArtifactFromRepoUseCase"];
   localizeArtifactFromRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["localizeArtifactFromRepoUseCase"];
-  generateImageUseCase?: RegisterImageGenerationApiRoutesDependencies["generateImageUseCase"];
+  generateImageUseCase: RegisterImageGenerationApiRoutesDependencies["generateImageUseCase"];
   imageGenerationFinalizationOrchestrator?: RegisterImageGenerationApiRoutesDependencies["imageGenerationFinalizationOrchestrator"];
 }
 
@@ -70,11 +70,9 @@ export function registerExpressApi(
     localizeArtifactFromRepoUseCase: dependencies.localizeArtifactFromRepoUseCase,
   });
 
-  if (dependencies.generateImageUseCase) {
-    registerImageGenerationApiRoutes({
-      app: dependencies.app,
-      generateImageUseCase: dependencies.generateImageUseCase,
-      imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
-    });
-  }
+  registerImageGenerationApiRoutes({
+    app: dependencies.app,
+    generateImageUseCase: dependencies.generateImageUseCase,
+    imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
+  });
 }

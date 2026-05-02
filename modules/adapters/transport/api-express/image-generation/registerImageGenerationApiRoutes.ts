@@ -8,6 +8,8 @@ const API_IMAGE_GENERATION_READ_OPERATION = "image-generation.read" as const;
 const API_IMAGE_GENERATION_CANCEL_OPERATION = "image-generation.cancel" as const;
 const API_IMAGE_GENERATION_FINALIZE_OPERATION = "image-generation.finalize-if-completed" as const;
 
+type ImageGenerationOperation = typeof API_IMAGE_GENERATION_START_OPERATION | typeof API_IMAGE_GENERATION_READ_OPERATION | typeof API_IMAGE_GENERATION_CANCEL_OPERATION | typeof API_IMAGE_GENERATION_FINALIZE_OPERATION;
+
 interface ExpressRequestLike { body?: unknown; headers?: Record<string, string | string[] | undefined>; }
 interface ExpressResponseLike { status: (code: number) => ExpressResponseLike; json: (body: unknown) => void; }
 export interface ExpressRoutePort { post: (path: string, handler: (request: ExpressRequestLike, response: ExpressResponseLike) => Promise<void>) => void; }
@@ -20,18 +22,56 @@ export interface RegisterImageGenerationApiRoutesDependencies {
 
 const getHeader = (h: ExpressRequestLike["headers"], k: string) => Array.isArray(h?.[k]) ? h?.[k][0] : h?.[k];
 const contextFrom = (r: ExpressRequestLike) => ({ requestId: getHeader(r.headers, "x-request-id"), correlationId: getHeader(r.headers, "x-correlation-id") });
-const failure = (operation: `${Lowercase<string>}.${Lowercase<string>}`, error: unknown, context: { requestId?: string; correlationId?: string }) => createApiFailureResponse(createApiError(operation, "internal", error instanceof Error ? error.message : "Unexpected error.", context), context);
-const statusCode = (response: { ok: boolean }) => (response.ok ? 200 : 500);
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
+
+function mapStartBody(body: unknown): ImageGenerationRequest {
+  if (!isObjectRecord(body)) throw new Error("Request body must be an object.");
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+  if (!prompt) throw new Error("prompt is required.");
+  return { ...body, prompt } as ImageGenerationRequest;
+}
+
+function mapRequestIdBody(body: unknown): string {
+  if (!isObjectRecord(body)) throw new Error("Request body must be an object.");
+  const requestId = typeof body.requestId === "string" ? body.requestId.trim() : "";
+  if (!requestId) throw new Error("requestId is required.");
+  return requestId;
+}
+
+function failure(operation: ImageGenerationOperation, code: "internal" | "validation" | "not-found" | "unavailable", message: string, context: { requestId?: string; correlationId?: string }) {
+  return createApiFailureResponse(createApiError(operation, code, message, context), context);
+}
+
+function statusCode(response: { ok: boolean; error?: { code: string } }): number {
+  if (response.ok) return 200;
+  switch (response.error?.code) {
+    case "validation": return 400;
+    case "not-found": return 404;
+    case "unavailable": return 503;
+    default: return 500;
+  }
+}
+
+function mapFailureCode(error: unknown): "internal" | "validation" | "not-found" | "unavailable" {
+  if (error instanceof Error && (error.message.includes("required") || error.message.includes("body"))) return "validation";
+  if (typeof error === "object" && error && "code" in error) {
+    const code = (error as { code?: string }).code;
+    if (code === "validation" || code === "not-found" || code === "unavailable") return code;
+  }
+  return "internal";
+}
 
 export function registerImageGenerationApiRoutes(dependencies: RegisterImageGenerationApiRoutesDependencies): void {
   dependencies.app.post("/api/image-generation/start", async (request, response) => {
     const context = contextFrom(request);
     try {
-      const value = await dependencies.generateImageUseCase.startImageGeneration(request.body as ImageGenerationRequest, context);
+      const value = await dependencies.generateImageUseCase.startImageGeneration(mapStartBody(request.body), context);
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_START_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const apiResponse = failure(API_IMAGE_GENERATION_START_OPERATION, error, context);
+      const message = error instanceof Error ? error.message : "Unexpected error.";
+      const apiResponse = failure(API_IMAGE_GENERATION_START_OPERATION, mapFailureCode(error), message, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
@@ -39,11 +79,12 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
   dependencies.app.post("/api/image-generation/read", async (request, response) => {
     const context = contextFrom(request);
     try {
-      const value = await dependencies.generateImageUseCase.readImageGeneration((request.body as { requestId: string }).requestId, context);
+      const value = await dependencies.generateImageUseCase.readImageGeneration(mapRequestIdBody(request.body), context);
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_READ_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const apiResponse = failure(API_IMAGE_GENERATION_READ_OPERATION, error, context);
+      const message = error instanceof Error ? error.message : "Unexpected error.";
+      const apiResponse = failure(API_IMAGE_GENERATION_READ_OPERATION, mapFailureCode(error), message, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
@@ -51,29 +92,32 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
   dependencies.app.post("/api/image-generation/cancel", async (request, response) => {
     const context = contextFrom(request);
     try {
-      const value = await dependencies.generateImageUseCase.cancelImageGeneration((request.body as { requestId: string }).requestId, context);
+      const value = await dependencies.generateImageUseCase.cancelImageGeneration(mapRequestIdBody(request.body), context);
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_CANCEL_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const apiResponse = failure(API_IMAGE_GENERATION_CANCEL_OPERATION, error, context);
+      const message = error instanceof Error ? error.message : "Unexpected error.";
+      const apiResponse = failure(API_IMAGE_GENERATION_CANCEL_OPERATION, mapFailureCode(error), message, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
 
   dependencies.app.post("/api/image-generation/finalize", async (request, response) => {
     const context = contextFrom(request);
-    if (!dependencies.imageGenerationFinalizationOrchestrator) {
-      const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, { finalized: false, reason: "image generation finalization is unavailable" }, context);
-      response.status(statusCode(apiResponse)).json(apiResponse);
-      return;
-    }
-
     try {
-      const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted((request.body as { requestId: string }).requestId);
+      const requestId = mapRequestIdBody(request.body);
+      if (!dependencies.imageGenerationFinalizationOrchestrator) {
+        const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, { finalized: false, reason: "image generation finalization is unavailable" }, context);
+        response.status(statusCode(apiResponse)).json(apiResponse);
+        return;
+      }
+
+      const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(requestId);
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const apiResponse = failure(API_IMAGE_GENERATION_FINALIZE_OPERATION, error, context);
+      const message = error instanceof Error ? error.message : "Unexpected error.";
+      const apiResponse = failure(API_IMAGE_GENERATION_FINALIZE_OPERATION, mapFailureCode(error), message, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
