@@ -12,9 +12,9 @@ function downloadStateLabel(record: ModelInventoryRecord): string {
 
 export function ModelManagementFeature({ client }: { client?: ModelManagementApiClient }) {
   const vm = useModelManagementFeature(client);
-  return <section className="ui-panel ui-stack ui-stack--sm"><header className="ui-grid ui-grid--two"><h2>Models</h2><button className="ui-button" onClick={() => void vm.refreshInventory()} disabled={vm.inventoryLoading}>{vm.inventoryLoading ? "Refreshing..." : "Refresh"}</button></header>
-    {vm.error ? <p role="alert">{vm.error}</p> : null}
-    {vm.status ? <p role="status">{vm.status}</p> : null}
+  return <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm"><header className="ui-grid ui-grid--two"><h2>Models</h2><button className="ui-button" onClick={() => void vm.refreshInventory()} disabled={vm.inventoryLoading}>{vm.inventoryLoading ? "Refreshing..." : "Refresh"}</button></header>
+    {vm.error ? <p className="ui-feedback ui-feedback--error" role="alert">{vm.error}</p> : null}
+    {vm.status ? <p role="status" className="ui-status">{vm.status}</p> : null}
 
     <section className="ui-stack ui-stack--sm"><h3>Browse models</h3>
       <input className="ui-input" value={vm.query} placeholder="Search models" onChange={(e) => vm.setQuery(e.target.value)} />
@@ -37,6 +37,6 @@ export function ModelManagementFeature({ client }: { client?: ModelManagementApi
       </li>)}</ul>
     </section>
 
-    {vm.details ? <details><summary>Diagnostics</summary><dl className="ui-grid ui-grid--two">{Object.entries(vm.details).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{typeof value === "object" ? JSON.stringify(value) : String(value)}</dd></Fragment>)}</dl></details> : null}
+    <details><summary>Diagnostics</summary><ul className="ui-stack ui-stack--xs">{vm.diagnostics.map((d,idx)=><li key={idx}>{d.level.toUpperCase()}: {d.message}</li>)}</ul></details>{vm.details ? <details><summary>Model details</summary><dl className="ui-grid ui-grid--two">{Object.entries(vm.details).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{typeof value === "object" ? JSON.stringify(value) : String(value)}</dd></Fragment>)}</dl></details> : null}
   </section>;
 }
