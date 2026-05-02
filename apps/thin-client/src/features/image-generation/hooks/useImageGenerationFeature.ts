@@ -54,7 +54,7 @@ export function useImageGenerationFeature(
   const finalizedByRequestRef = useRef(new Set<string>());
   const modelInventoryRequestRef = useRef(0);
 
-  useEffect(() => () => { mountedRef.current = false; pollRunIdRef.current += 1; activeRequestRef.current = undefined; }, []);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; pollRunIdRef.current += 1; activeRequestRef.current = undefined; }; }, []);
 
   const refreshModelInventory = useCallback(async () => {
     const requestId = ++modelInventoryRequestRef.current;

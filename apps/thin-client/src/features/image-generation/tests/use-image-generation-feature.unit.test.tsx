@@ -1,4 +1,4 @@
-import { act } from "react";
+import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
@@ -67,4 +67,12 @@ describe("useImageGenerationFeature", () => {
     expect((c.querySelector('#selected') as HTMLElement).textContent).toBe('img');
   });
 
+  it("strict mode still loads model inventory", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
+    const listModels = vi.fn().mockResolvedValue({ models: [model("img", "downloaded", "text-to-image")] });
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<React.StrictMode><Harness client={client} modelClient={{ listModels }} /></React.StrictMode>);});
+    expect(listModels).toHaveBeenCalled();
+    expect((c.querySelector('#selected') as HTMLElement).textContent).toBe('img');
+  });
 });
