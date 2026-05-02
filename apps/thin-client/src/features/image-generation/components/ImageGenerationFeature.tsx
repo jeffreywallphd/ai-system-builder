@@ -1,2 +1,48 @@
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
-export function ImageGenerationFeature(){const f=useImageGenerationFeature(); const set=(k:keyof typeof f.form,v:string)=>f.setForm((x)=>({...x,[k]:v})); return <section className="ui-stack ui-stack--md"><h2>Image Generation</h2><p>Generate images from a prompt. Results are saved as artifacts for later browsing.</p><label>Prompt<input value={f.form.prompt} onInput={(e)=>set("prompt",(e.target as HTMLInputElement).value)} /></label><label>Negative Prompt<input value={f.form.negativePrompt} onInput={(e)=>set("negativePrompt",(e.target as HTMLInputElement).value)} /></label><label>Seed<input value={f.form.seed} onInput={(e)=>set("seed",(e.target as HTMLInputElement).value)} /></label><label>Width<input value={f.form.width} onInput={(e)=>set("width",(e.target as HTMLInputElement).value)} /></label><label>Height<input value={f.form.height} onInput={(e)=>set("height",(e.target as HTMLInputElement).value)} /></label><label>Steps<input value={f.form.steps} onInput={(e)=>set("steps",(e.target as HTMLInputElement).value)} /></label><label>Sampler<input value={f.form.sampler} onInput={(e)=>set("sampler",(e.target as HTMLInputElement).value)} /></label><label>Scheduler<input value={f.form.scheduler} onInput={(e)=>set("scheduler",(e.target as HTMLInputElement).value)} /></label><label>Model / Checkpoint (optional)<input value={f.form.model} onInput={(e)=>set("model",(e.target as HTMLInputElement).value)} /></label><label>Number of Images<input value={f.form.numImages} onInput={(e)=>set("numImages",(e.target as HTMLInputElement).value)} /></label>{f.qualityNote?<p>{f.qualityNote}</p>:null}<div><button className="ui-button" type="button" onClick={()=>void f.start()}>Generate</button> <button className="ui-button" type="button" onClick={()=>void f.cancel()}>Cancel</button></div><h3>Status</h3><p>{f.status}</p>{f.error?<p>{f.error}</p>:null}{f.requestId?<p>Request ID: {f.requestId}</p>:null}<h3>Results</h3><a href="/artifacts">Open Artifacts</a>{f.results.map((a)=><article key={a.assetId}><img src={f.createPreviewUrl(a.storageKey)} alt={a.assetId} /><p>{a.assetId}</p><p>{a.artifactId}</p><p>{a.storageKey}</p><p>{a.mediaType}</p><p>{a.source??"generated"}</p></article>)}</section>}
+
+export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts }: { onGenerated?: () => void; onNavigateToArtifacts?: () => void } = {}) {
+  const f = useImageGenerationFeature(undefined, () => onGenerated?.());
+  const set = (k: keyof typeof f.form, v: string) => f.setForm((x) => ({ ...x, [k]: v }));
+
+  return (
+    <section className="ui-stack ui-stack--md" aria-label="Image Generation">
+      <h2>Image Generation</h2>
+      <p>Generate images from a prompt. Final images are saved to Artifacts.</p>
+
+      <div className="ui-stack ui-stack--sm">
+        {[
+          ["prompt", "Prompt", "text"], ["negativePrompt", "Negative Prompt (optional)", "text"], ["seed", "Seed (optional)", "number"],
+          ["width", "Width", "number"], ["height", "Height", "number"], ["steps", "Steps", "number"], ["sampler", "Sampler", "text"],
+          ["scheduler", "Scheduler", "text"], ["model", "Model / Checkpoint (optional)", "text"], ["numImages", "Number of Images", "number"],
+        ].map(([key, label, type]) => {
+          const id = `image-generation-${String(key)}`;
+          return <div key={id} className="ui-stack ui-stack--xs"><label htmlFor={id}>{label}</label><input id={id} type={type} value={f.form[key as keyof typeof f.form]} onInput={(e) => set(key as keyof typeof f.form, (e.target as HTMLInputElement).value)} /></div>;
+        })}
+      </div>
+
+      {f.qualityNote ? <p role="note">{f.qualityNote}</p> : null}
+      {f.validationError ? <p role="alert">{f.validationError}</p> : null}
+
+      <div>
+        <button className="ui-button" type="button" onClick={() => void f.start()} disabled={f.isGenerateDisabled}>Generate</button>{" "}
+        <button className="ui-button" type="button" onClick={() => void f.cancel()} disabled={f.isCancelDisabled}>Cancel</button>{" "}
+        <button className="ui-button" type="button" onClick={() => onNavigateToArtifacts?.()}>Open Artifacts</button>
+      </div>
+
+      <h3>Status</h3>
+      <p><strong>{f.status}</strong></p>
+      {f.requestId ? <p>Request ID: {f.requestId}</p> : null}
+      {f.error ? <p role="alert">{f.error}</p> : null}
+
+      <h3>Generated Images</h3>
+      <div className="ui-stack ui-stack--sm">
+        {f.results.map((asset) => (
+          <article key={asset.assetId} className="ui-stack ui-stack--xs">
+            <img src={f.createPreviewUrl(asset.storageKey)} alt={`Generated image ${asset.assetId}`} />
+            <p>{asset.assetId}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
