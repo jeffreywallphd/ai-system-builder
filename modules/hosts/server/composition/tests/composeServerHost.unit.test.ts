@@ -84,6 +84,30 @@ describe("composeServerHost", () => {
     expect(result.value.exists).toBe(false);
   });
 
+  it("composes top-level artifact repo storage before route-local model management logging exists", async () => {
+    const hubClient = {
+      fileExists: testDouble.fn(async () => false),
+      uploadFile: testDouble.fn(async () => undefined),
+      downloadFile: testDouble.fn(async () => new Response(new Uint8Array([]), { status: 200 })),
+    };
+
+    const host = composeServerHost({
+      artifactRepo: {
+        huggingFaceHubClient: hubClient,
+      },
+    });
+
+    const result = await host.artifactRepoStorage.hasArtifactInRepo({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/a.png",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it("uses updated host token configuration for Hugging Face store operations", async () => {
     const hubClient = {
       fileExists: testDouble.fn(async () => true),

@@ -150,7 +150,6 @@ export function composeServerHost(
 
   const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter({
     accessTokenProvider: () => tokenConfigStore.getToken(),
-        logger: modelManagementLogger,
     fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
     hubClient: options.artifactRepo?.huggingFaceHubClient,
   });
