@@ -1,5 +1,7 @@
 import type { BrowseModelsRequest, BrowseModelsResult, DeleteModelRecordRequest, DeleteModelRecordResult, DownloadModelRequest, DownloadModelResult, GetModelDetailsRequest, GetModelDetailsResult, ListModelsRequest, ListModelsResult, SaveModelReferenceRequest, SaveModelReferenceResult, UpdateModelRecordRequest, UpdateModelRecordResult } from "../../../../../../modules/contracts/model";
 
+import { logThinClientDiagnostic } from "../../../diagnostics/thinClientDiagnostics";
+
 type ApiEnvelope = { ok: boolean; value?: unknown; error?: { message?: string; code?: string; details?: unknown } };
 type Operation = "browse"|"details"|"list"|"save"|"download"|"update"|"delete";
 
@@ -16,7 +18,7 @@ const summary=(b:Record<string,unknown>)=>({provider:b.provider,query:typeof b.q
 
 const post = async <T>(base: string, path: string, operation:Operation, body: Record<string, unknown>, pick: (v: unknown) => T) => {
   const endpoint=apiUrl(base,path); const started=Date.now(); const ctrl=new AbortController(); const timeout=window.setTimeout(()=>ctrl.abort("timeout"),timeouts[operation]);
-  const detail={operation,endpoint,...summary(body)}; console.info("[model-management.api] request.start", detail);
+  const detail={operation,endpoint,...summary(body)}; logThinClientDiagnostic("info",{feature:"model-management",operation,phase:"request.start",message:"Request started",metadata:detail});
   try {
     const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
     const elapsedMs=Date.now()-started;
@@ -27,12 +29,12 @@ const post = async <T>(base: string, path: string, operation:Operation, body: Re
     let envelope:ApiEnvelope;
     try { envelope = ensureEnvelope(raw); } catch (error) { console.warn("[model-management.api] response.malformed_envelope",{...detail,status:response.status,elapsedMs,message:error instanceof Error?error.message:String(error)}); throw error; }
     if (!envelope.ok) { const err=asError(envelope); console.warn("[model-management.api] request.failure",{...detail,status:response.status,elapsedMs,code:err.code,message:err.message}); throw err; }
-    console.info("[model-management.api] request.success",{...detail,status:response.status,elapsedMs});
+    logThinClientDiagnostic("info",{feature:"model-management",operation,phase:"request.success",message:"Request success",metadata:{...detail,status:response.status,elapsedMs}});
     return pick(envelope.value);
   } catch (error) {
     const elapsedMs=Date.now()-started;
     if ((error instanceof DOMException && error.name === "AbortError") || error === "timeout") {
-      console.warn("[model-management.api] request.timeout",{...detail,elapsedMs}); throw new ModelManagementApiError(`Model management ${operation} request timed out.`,"timeout");
+      logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"request.timeout",message:"Request timed out",metadata:{...detail,elapsedMs}}); throw new ModelManagementApiError(`Model management ${operation} request timed out.`,"timeout");
     }
     console.warn("[model-management.api] request.failure",{...detail,elapsedMs,message:error instanceof Error?error.message:String(error)}); throw error;
   } finally { window.clearTimeout(timeout); }

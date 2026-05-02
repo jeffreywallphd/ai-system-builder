@@ -17,8 +17,8 @@ export function ModelManagementFeature({ client }: { client?: ModelManagementApi
     {vm.status ? <p role="status" className="ui-status">{vm.status}</p> : null}
 
     <section className="ui-stack ui-stack--sm"><h3>Browse models</h3>
-      <input className="ui-input" value={vm.query} placeholder="Search models" onChange={(e) => vm.setQuery(e.target.value)} />
-      <select className="ui-input" value={vm.provider} onChange={(e) => vm.setProvider(e.target.value as "huggingface")}><option value="huggingface">Hugging Face</option></select>
+      <label className="ui-stack ui-stack--xs"><span className="ui-label">Search</span><input className="ui-input" value={vm.query} placeholder="Search models" onChange={(e) => vm.setQuery(e.target.value)} /></label>
+      <label className="ui-stack ui-stack--xs"><span className="ui-label">Provider</span><select className="ui-input" value={vm.provider} onChange={(e) => vm.setProvider(e.target.value as "huggingface")}><option value="huggingface">Hugging Face</option></select></label>
       <div className="ui-grid ui-grid--two"><button className="ui-button" onClick={() => void vm.browse()} disabled={vm.browsing}>Browse models</button><button className="ui-button" onClick={vm.clear} disabled={vm.loading}>Clear</button></div>
       {vm.query.trim().length === 0 ? <p className="ui-text-muted">Enter a search term to browse models.</p> : null}
     </section>
@@ -37,6 +37,6 @@ export function ModelManagementFeature({ client }: { client?: ModelManagementApi
       </li>)}</ul>
     </section>
 
-    <details><summary>Diagnostics</summary><ul className="ui-stack ui-stack--xs">{vm.diagnostics.map((d,idx)=><li key={idx}>{d.level.toUpperCase()}: {d.message}</li>)}</ul></details>{vm.details ? <details><summary>Model details</summary><dl className="ui-grid ui-grid--two">{Object.entries(vm.details).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{typeof value === "object" ? JSON.stringify(value) : String(value)}</dd></Fragment>)}</dl></details> : null}
+    <details className="ui-panel"><summary>Diagnostics</summary><ul className="ui-stack ui-stack--xs">{vm.diagnostics.map((d,idx)=><li key={idx}><strong>{d.operation}</strong> {d.phase} - {d.message} <span className="ui-text-muted">{d.timestamp}</span>{d.metadata?.endpoint? <div className="ui-text-muted">endpoint: {String(d.metadata.endpoint)}</div>:null}{d.metadata?.status? <div className="ui-text-muted">status: {String(d.metadata.status)}</div>:null}{d.metadata?.elapsedMs? <div className="ui-text-muted">elapsedMs: {String(d.metadata.elapsedMs)}</div>:null}</li>)}</ul></details>{vm.details ? <details><summary>Model details</summary><dl className="ui-grid ui-grid--two">{Object.entries(vm.details).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{typeof value === "object" ? JSON.stringify(value) : String(value)}</dd></Fragment>)}</dl></details> : null}
   </section>;
 }

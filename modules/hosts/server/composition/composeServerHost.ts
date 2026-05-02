@@ -150,6 +150,7 @@ export function composeServerHost(
 
   const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter({
     accessTokenProvider: () => tokenConfigStore.getToken(),
+        logger: modelManagementLogger,
     fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
     hubClient: options.artifactRepo?.huggingFaceHubClient,
   });
@@ -308,9 +309,16 @@ export function composeServerHost(
         supervisor: comfyUiSupervisor,
         mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
       });
+      
+      const modelManagementLogger = {
+        info: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"info", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
+        warn: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"warn", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
+      };
+
       const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now: options.now });
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
+        logger: modelManagementLogger,
       });
       const browseModelsUseCase = new BrowseModelsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } });
       const getModelDetailsUseCase = new GetModelDetailsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } });
@@ -405,6 +413,7 @@ export function composeServerHost(
         deleteModelRecordUseCase,
         generateImageUseCase,
         imageGenerationFinalizationOrchestrator,
+        modelManagementLogger,
       });
     },
   };
