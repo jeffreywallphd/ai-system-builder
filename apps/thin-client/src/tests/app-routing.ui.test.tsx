@@ -62,5 +62,15 @@ describe("thin-client routing and page composition", () => {
 
     expect(container.textContent).toContain("Data Artifact Browser");
     expect(window.location.pathname).toBe("/artifacts");
+    const modelsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Models");
+    expect(modelsButton).toBeDefined();
+
+    await act(async () => {
+      modelsButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Model Management");
+    expect(window.location.pathname).toBe("/models");
+
   });
 });
