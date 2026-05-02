@@ -57,4 +57,14 @@ describe("useImageGenerationFeature", () => {
     await act(async()=>{(c.querySelector("#start") as HTMLButtonElement).click();});
     expect((c.querySelector("#validation") as HTMLElement).textContent).toContain("Prompt is required");
   });
+
+  it('loads model inventory without invalid list source metadata', async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
+    const listModels = vi.fn().mockResolvedValue({ models: [model('img', 'downloaded', 'text-to-image')] });
+    const c = document.createElement('div'); const root = createRoot(c);
+    await act(async()=>{root.render(<Harness client={client} modelClient={{ listModels }} />);});
+    expect(listModels).toHaveBeenCalledWith();
+    expect((c.querySelector('#selected') as HTMLElement).textContent).toBe('img');
+  });
+
 });

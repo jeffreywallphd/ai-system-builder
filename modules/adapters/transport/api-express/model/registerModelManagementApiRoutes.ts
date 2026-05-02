@@ -25,7 +25,7 @@ export interface RegisterModelManagementApiRoutesDependencies { app: ModelManage
 
 class ModelManagementApiValidationError extends Error {}
 const getHeader = (h: ExpressRequestLike["headers"], k: string) => Array.isArray(h?.[k]) ? h?.[k][0] : h?.[k];
-const contextFrom = (r: ExpressRequestLike) => ({ requestId: getHeader(r.headers, "x-request-id"), correlationId: getHeader(r.headers, "x-correlation-id") });
+const contextFrom = (r: ExpressRequestLike) => ({ requestId: getHeader(r.headers, "x-request-id"), correlationId: getHeader(r.headers, "x-correlation-id"), clientSource: getHeader(r.headers, "x-client-source") });
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
 function requireBodyObject(body: unknown): Record<string, unknown> {

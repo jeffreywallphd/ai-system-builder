@@ -34,4 +34,14 @@ describe('useModelManagementFeature', () => {
     await act(async()=>{resolveOld({models:[{modelId:'old',displayName:'Old',provider:'huggingface'}]}); await flush();});
     expect(vm.browseResults[0].modelId).toBe('new');
   });
+
+  it('inventory refresh uses provider without invalid source metadata', async () => {
+    const client:any={listModels:vi.fn().mockResolvedValue({models:[{modelRecordId:'1',displayName:'A',provider:'huggingface',source:'huggingface',artifactForm:'checkpoint',lifecycleStatus:'downloaded'}]}),browseModels:vi.fn().mockResolvedValue({models:[]}),getModelDetails:vi.fn(),saveModelReference:vi.fn(),downloadModel:vi.fn(),deleteModelRecord:vi.fn()};
+    let vm:any; function T(){ vm = useModelManagementFeature(client); return null; }
+    container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container);
+    await act(async()=>{root.render(<T/>);});
+    expect(client.listModels).toHaveBeenCalledWith({provider:'huggingface'});
+    expect(vm.inventory).toHaveLength(1);
+  });
+
 });
