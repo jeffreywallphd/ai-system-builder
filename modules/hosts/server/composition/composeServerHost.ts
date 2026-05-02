@@ -1,4 +1,11 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
+import { join } from "node:path";
+import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
+import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
+import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
+import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
+import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
+import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
@@ -218,6 +225,39 @@ export function composeServerHost(
         now: options.now,
       });
 
+      const comfyUiInstallRoot = process.env.COMFYUI_INSTALL_ROOT?.trim() || join(registerOptions.storageRootDirectory, "runtime-installs", "comfyui");
+      const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
+      const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
+      const comfyUiInstaller = createComfyUiRuntimeInstaller({
+        gitInstaller: gitRuntimeInstaller,
+        pythonCommand: process.env.COMFYUI_PYTHON_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+        runtimeDeviceMode: (process.env.COMFYUI_RUNTIME_DEVICE_MODE ?? process.env.COMFYUI_ACCELERATOR) as "auto" | "cpu" | "directml" | "cuda" | undefined,
+        logging: loggingPort,
+      });
+      const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+        workingDirectory: comfyUiInstallRoot,
+        pythonExecutable: process.env.COMFYUI_PYTHON_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+        installer: comfyUiInstaller,
+        installRoot: comfyUiInstallRoot,
+        runtimeDeviceMode: (process.env.COMFYUI_RUNTIME_DEVICE_MODE ?? process.env.COMFYUI_ACCELERATOR) as "auto" | "cpu" | "directml" | "cuda" | undefined,
+        autoInstall: true,
+        installSourceRef: process.env.COMFYUI_INSTALL_REF,
+        logging: loggingPort,
+      });
+      const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
+        client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
+        supervisor: comfyUiSupervisor,
+        mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
+      });
+      const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now: options.now });
+      const generateImageUseCase = new GenerateImageUseCase({
+        runtimeTaskRegistry,
+        modelCheckpointResolver: createLocalModelCheckpointResolverAdapter({
+          modelRegistry,
+          comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
+        }),
+      });
+
       registerExpressApi({
         app: registerOptions.app,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
@@ -237,6 +277,7 @@ export function composeServerHost(
         verifyImportedArtifactSourceBackingUseCase: verifyImportedArtifactSourceBacking,
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
+        generateImageUseCase,
       });
     },
   };

@@ -122,7 +122,7 @@ describe("composeServerHost", () => {
       storageRootDirectory: "/tmp/server-artifact-upload-test",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(14);
+    expect(app.post).toHaveBeenCalledTimes(18);
     expect(app.get).toHaveBeenCalledTimes(3);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
@@ -140,6 +140,10 @@ describe("composeServerHost", () => {
       "/api/artifact/source/verify",
       "/api/artifact/register-from-repo",
       "/api/artifact/localize-from-repo",
+      "/api/image-generation/start",
+      "/api/image-generation/read",
+      "/api/image-generation/cancel",
+      "/api/image-generation/finalize",
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
     expect(registeredGetPaths).toEqual(["/api/artifact/upload/policy", "/api/artifact/media/view", "/api/config/huggingface-token"]);
