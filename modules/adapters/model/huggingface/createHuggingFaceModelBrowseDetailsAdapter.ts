@@ -80,6 +80,7 @@ export interface CreateHuggingFaceModelBrowseDetailsAdapterOptions {
   accessTokenProvider?: () => string | undefined;
   hubClient?: HuggingFaceModelHubClient;
   officialHubClientLoader?: () => Promise<HuggingFaceModelHubClient>;
+  logger?: { info:(event:string,data:Record<string,unknown>)=>void; warn:(event:string,data:Record<string,unknown>)=>void };
 }
 
 function toOptionalText(value: unknown): string | undefined {
@@ -330,11 +331,10 @@ async function loadOfficialHubClient(): Promise<HuggingFaceModelHubClient> {
   return assertHubClient(loaded);
 }
 
-async function collectListModels(
-  iterableLike: AsyncIterable<HuggingFaceModelListEntry> | Promise<Iterable<HuggingFaceModelListEntry>>,
-): Promise<HuggingFaceModelListEntry[]> {
-  const resolved = await iterableLike;
-  if (Symbol.asyncIterator in Object(resolved)) {
+async function collectListModels(iterableLike: unknown): Promise<HuggingFaceModelListEntry[]> {
+  const resolved = await Promise.resolve(iterableLike as never);
+  if (Array.isArray(resolved)) return resolved as HuggingFaceModelListEntry[];
+  if (resolved && typeof resolved === "object" && Symbol.asyncIterator in Object(resolved)) {
     const rows: HuggingFaceModelListEntry[] = [];
     for await (const row of resolved as AsyncIterable<HuggingFaceModelListEntry>) {
       rows.push(row);
@@ -342,13 +342,15 @@ async function collectListModels(
     return rows;
   }
 
-  return Array.from(resolved as Iterable<HuggingFaceModelListEntry>);
+  if (resolved && typeof resolved === "object" && Symbol.iterator in Object(resolved)) return Array.from(resolved as Iterable<HuggingFaceModelListEntry>);
+  throw new Error("Hugging Face listModels returned unsupported shape.");
 }
 
 export function createHuggingFaceModelBrowseDetailsAdapter(
   options: CreateHuggingFaceModelBrowseDetailsAdapterOptions = {},
 ): ModelBrowsePort & ModelDetailsPort {
   const fallbackAccessToken = options.accessToken;
+  const logger=options.logger;
   const accessTokenProvider = options.accessTokenProvider;
   const officialHubClientLoader = options.officialHubClientLoader ?? loadOfficialHubClient;
 
@@ -362,7 +364,8 @@ export function createHuggingFaceModelBrowseDetailsAdapter(
     }
 
     if (!lazyHubClient) {
-      lazyHubClient = officialHubClientLoader().catch((error) => {
+      logger?.info("hf.adapter.dynamic_import.start",{});
+      lazyHubClient = officialHubClientLoader().then((c)=>{logger?.info("hf.adapter.dynamic_import.success",{hasListModels:typeof c.listModels==="function",hasModelInfo:typeof c.modelInfo==="function"}); return c;}).catch((error) => {logger?.warn("hf.adapter.dynamic_import.failure",{message:error instanceof Error?error.message:String(error)});
         throw new HuggingFaceModelClientUnavailableError(
           `Failed to initialize @huggingface/hub client: ${error instanceof Error ? error.message : String(error)}.`,
         );
@@ -376,7 +379,8 @@ export function createHuggingFaceModelBrowseDetailsAdapter(
     async browseModels(request: BrowseModelsRequest): Promise<BrowseModelsResult> {
       try {
         const hubClient = await resolveHubClient();
-        const items = await collectListModels(hubClient.listModels({
+        logger?.info("hf.adapter.browse.request",{query:request.query,owner:request.authorOrOrg,task:request.taskTags?.[0],limit:request.limit,hasToken:Boolean(resolveAccessToken())});
+        const items = await collectListModels(await hubClient.listModels({
           search: {
             query: request.query,
             owner: request.authorOrOrg,
@@ -390,6 +394,7 @@ export function createHuggingFaceModelBrowseDetailsAdapter(
         }));
 
         const models = items.map((entry) => toModelBrowseItem(entry));
+        logger?.info("hf.adapter.browse.success",{resultCount:models.length});
         return normalizeBrowseModelsResult({
           models,
           // @huggingface/hub listModels does not expose a stable cursor in this adapter slice.
@@ -403,6 +408,7 @@ export function createHuggingFaceModelBrowseDetailsAdapter(
     async getModelDetails(request: GetModelDetailsRequest): Promise<GetModelDetailsResult> {
       try {
         const hubClient = await resolveHubClient();
+        logger?.info("hf.adapter.details.request",{modelId:request.modelId,hasToken:Boolean(resolveAccessToken())});
         const info = await hubClient.modelInfo({
           name: request.modelId,
           accessToken: resolveAccessToken(),
