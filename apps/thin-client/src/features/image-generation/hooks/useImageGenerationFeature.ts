@@ -46,6 +46,7 @@ export function useImageGenerationFeature(
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [results, setResults] = useState<FinalizedImageAsset[]>([]);
+  const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
 
   const mountedRef = useRef(true);
   const activeRequestRef = useRef<string | undefined>(undefined);
@@ -63,18 +64,22 @@ export function useImageGenerationFeature(
       const result = await modelClient.listModels();
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       const sorted = [...result.models].sort((a, b) => rankInventoryModel(a) - rankInventoryModel(b) || a.displayName.localeCompare(b.displayName));
+      const downloadedImageModel = sorted.find((m) => isLikelyImageModel(m) && DOWNLOADED_STATUSES.has(m.lifecycleStatus));
+      const referenceImageModel = sorted.find((m) => isLikelyImageModel(m));
       setModelInventory(sorted);
-      if (!selectedModelRecordId) {
-        const firstDownloaded = sorted.find((m) => DOWNLOADED_STATUSES.has(m.lifecycleStatus));
-        if (firstDownloaded) setSelectedModelRecordId(firstDownloaded.modelRecordId);
-      }
+      setSelectedModelRecordId((current) => {
+        if (current && sorted.some((m) => m.modelRecordId === current)) return current;
+        if (downloadedImageModel) return downloadedImageModel.modelRecordId;
+        if (referenceImageModel) return referenceImageModel.modelRecordId;
+        return "";
+      });
     } catch (e) {
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       setModelInventoryError(e instanceof Error ? e.message : "Failed to load model inventory.");
     } finally {
       if (mountedRef.current && requestId === modelInventoryRequestRef.current) setModelInventoryLoading(false);
     }
-  }, [modelClient, selectedModelRecordId]);
+  }, [modelClient]);
 
   useEffect(() => { void refreshModelInventory(); }, [refreshModelInventory]);
 
@@ -98,6 +103,7 @@ export function useImageGenerationFeature(
   }, [client]);
 
   const start = useCallback(async () => {
+    setHasAttemptedGeneration(true);
     if (ACTIVE_STATUSES.includes(status)) return;
     if (validationError) { setError(validationError); return; }
 
@@ -144,7 +150,7 @@ export function useImageGenerationFeature(
       setStatus("failed");
       setError(cause instanceof Error ? cause.message : "Image generation failed.");
     }
-  }, [client, form, onGenerated, pollUntilTerminal, status, validationError]);
+  }, [client, form, onGenerated, pollUntilTerminal, selectedModelRecordId, status, validationError]);
 
   const cancel = useCallback(async () => {
     pollRunIdRef.current += 1;
@@ -152,8 +158,13 @@ export function useImageGenerationFeature(
     activeRequestRef.current = undefined;
     setStatus("cancelled");
     if (!id) return;
-    try { await client.cancelImageGeneration({ requestId: id }); } catch { /* surface existing local cancellation */ }
+    try { await client.cancelImageGeneration({ requestId: id }); } catch { }
   }, [client, requestId]);
+
+  useEffect(() => {
+    if (!hasAttemptedGeneration) return;
+    setError(validationError);
+  }, [form, hasAttemptedGeneration, validationError]);
 
   const qualityNote = useMemo(() => {
     const width = Number(form.width); const height = Number(form.height); const steps = Number(form.steps);
@@ -163,7 +174,8 @@ export function useImageGenerationFeature(
 
   const imageGenerationModels = useMemo(() => modelInventory.filter(isLikelyImageModel), [modelInventory]);
   const downloadedImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => DOWNLOADED_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
+  const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !DOWNLOADED_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
   const selectedModelRecord = useMemo(() => modelInventory.find((m) => m.modelRecordId === selectedModelRecordId), [modelInventory, selectedModelRecordId]);
 
-  return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels };
+  return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels };
 }

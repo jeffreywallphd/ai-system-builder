@@ -1,5 +1,9 @@
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
 
+function formatModelOption(model: { displayName: string; modelId?: string; provider: string; lifecycleStatus: string; artifactForm: string; inferenceMode?: string }, referenceOnly = false): string {
+  return `${model.displayName}${model.modelId ? ` (${model.modelId})` : ""} · ${model.provider} · ${model.lifecycleStatus} · ${model.artifactForm}${model.inferenceMode ? ` · ${model.inferenceMode}` : ""}${referenceOnly ? " · reference only" : ""}`;
+}
+
 export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onNavigateToModels }: { onGenerated?: () => void; onNavigateToArtifacts?: () => void; onNavigateToModels?: () => void } = {}) {
   const f = useImageGenerationFeature(undefined, () => onGenerated?.());
   const set = (k: keyof typeof f.form, v: string) => f.setForm((x) => ({ ...x, [k]: v }));
@@ -16,17 +20,20 @@ export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onN
           <div>
             <select id="image-generation-model-record" value={f.selectedModelRecordId} onChange={(e) => f.setSelectedModelRecordId((e.target as HTMLSelectElement).value)}>
               <option value="">Select a server model…</option>
-              {f.imageGenerationModels.map((model) => (
-                <option key={model.modelRecordId} value={model.modelRecordId}>
-                  {`${model.displayName} (${model.modelId}) · ${model.provider} · ${model.lifecycleStatus} · ${model.artifactForm}${model.inferenceMode ? ` · ${model.inferenceMode}` : ""}`}
-                </option>
-              ))}
+              <optgroup label="Downloaded image models">
+                {f.downloadedImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatModelOption(model)}</option>)}
+              </optgroup>
+              {f.referenceOnlyImageGenerationModels.length > 0 ? (
+                <optgroup label="Saved references / may need download">
+                  {f.referenceOnlyImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatModelOption(model, true)}</option>)}
+                </optgroup>
+              ) : null}
             </select>{" "}
             <button type="button" className="ui-button" onClick={() => void f.refreshModelInventory()} disabled={f.modelInventoryLoading}>Refresh Models</button>
           </div>
           {f.modelInventoryLoading ? <p>Loading model inventory…</p> : null}
           {f.modelInventoryError ? <p role="alert">{f.modelInventoryError}</p> : null}
-          {f.downloadedImageGenerationModels.length === 0 ? <p role="note">No downloaded image models found. Download one on the Models page before generating. {onNavigateToModels ? <button type="button" className="ui-button" onClick={() => onNavigateToModels()}>Open Models</button> : null}</p> : null}
+          {f.downloadedImageGenerationModels.length === 0 ? <p role="note">No downloaded image models found. You can still generate with a server default checkpoint or the manual override below if configured. Download one on the Models page for predictable results. {onNavigateToModels ? <button type="button" className="ui-button" onClick={() => onNavigateToModels()}>Open Models</button> : null}</p> : null}
           {f.selectedModelRecord ? (
             <p role="note">
               Selected model status: <strong>{f.selectedModelRecord.lifecycleStatus}</strong>
