@@ -7,6 +7,7 @@ import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, cr
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
+import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
 import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
 import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import type { LoggingPort } from "../../../application/ports/logging";
@@ -25,6 +26,13 @@ import {
   StoreArtifactUploadUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
+  BrowseModelsUseCase,
+  GetModelDetailsUseCase,
+  ListModelsUseCase,
+  SaveModelReferenceUseCase,
+  DownloadModelUseCase,
+  UpdateModelRecordUseCase,
+  DeleteModelRecordUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -300,6 +308,21 @@ export function composeServerHost(
         mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
       });
       const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now: options.now });
+      const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
+        accessTokenProvider: () => tokenConfigStore.getToken(),
+      });
+      const browseModelsUseCase = new BrowseModelsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } });
+      const getModelDetailsUseCase = new GetModelDetailsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } });
+      const listModelsUseCase = new ListModelsUseCase({ modelRegistry });
+      const saveModelReferenceUseCase = new SaveModelReferenceUseCase({ modelRegistry });
+      const downloadModelUseCase = new DownloadModelUseCase({
+        modelRegistry,
+        modelDownloader: {
+          ensureModelDownloaded: async () => { throw { code: "unavailable", message: "Model download runtime is unavailable on server host." }; },
+        },
+      });
+      const updateModelRecordUseCase = new UpdateModelRecordUseCase({ modelRegistry });
+      const deleteModelRecordUseCase = new DeleteModelRecordUseCase({ modelRegistry });
       const generateImageUseCase = new GenerateImageUseCase({
         runtimeTaskRegistry,
         modelCheckpointResolver: createLocalModelCheckpointResolverAdapter({
@@ -346,6 +369,13 @@ export function composeServerHost(
         verifyImportedArtifactSourceBackingUseCase: verifyImportedArtifactSourceBacking,
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
+        browseModelsUseCase,
+        getModelDetailsUseCase,
+        listModelsUseCase,
+        saveModelReferenceUseCase,
+        downloadModelUseCase,
+        updateModelRecordUseCase,
+        deleteModelRecordUseCase,
         generateImageUseCase,
         imageGenerationFinalizationOrchestrator,
       });
