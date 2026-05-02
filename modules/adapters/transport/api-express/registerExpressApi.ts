@@ -46,7 +46,8 @@ export interface RegisterExpressApiDependencies {
   updateModelRecordUseCase: RegisterModelManagementApiRoutesDependencies["updateModelRecordUseCase"];
   deleteModelRecordUseCase: RegisterModelManagementApiRoutesDependencies["deleteModelRecordUseCase"];
   validateModelUseCase?: RegisterModelManagementApiRoutesDependencies["validateModelUseCase"];
-  publishModelUseCase?: RegisterModelManagementApiRoutesDependencies["publishModelUseCase"];
+  publishModelUseCase?: RegisterModelManagementApiRoutesDependencies["publishModelUseCase"]
+  modelManagementLogger?: RegisterModelManagementApiRoutesDependencies["logger"];
 }
 
 export function registerExpressApi(
@@ -92,6 +93,7 @@ export function registerExpressApi(
     deleteModelRecordUseCase: dependencies.deleteModelRecordUseCase,
     validateModelUseCase: dependencies.validateModelUseCase,
     publishModelUseCase: dependencies.publishModelUseCase,
+    logger: dependencies.modelManagementLogger,
   });
 
   registerImageGenerationApiRoutes({

@@ -60,6 +60,7 @@ export function useImageGenerationFeature(
     const requestId = ++modelInventoryRequestRef.current;
     setModelInventoryLoading(true);
     setModelInventoryError(undefined);
+    console.info("[image-generation] inventory.list.start", { operation: "list", endpoint: "/api/model/list" });
     try {
       const result = await modelClient.listModels();
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
@@ -67,6 +68,7 @@ export function useImageGenerationFeature(
       const downloadedImageModel = sorted.find((m) => isLikelyImageModel(m) && DOWNLOADED_STATUSES.has(m.lifecycleStatus));
       const referenceImageModel = sorted.find((m) => isLikelyImageModel(m));
       setModelInventory(sorted);
+      console.info("[image-generation] inventory.list.success", { operation: "list", endpoint: "/api/model/list", totalModels: sorted.length, imageCandidates: sorted.filter(isLikelyImageModel).length, selectedModelRecordId: downloadedImageModel?.modelRecordId ?? referenceImageModel?.modelRecordId ?? "", manualFallback: !downloadedImageModel && !referenceImageModel });
       setSelectedModelRecordId((current) => {
         if (current && sorted.some((m) => m.modelRecordId === current)) return current;
         if (downloadedImageModel) return downloadedImageModel.modelRecordId;
@@ -75,7 +77,9 @@ export function useImageGenerationFeature(
       });
     } catch (e) {
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
-      setModelInventoryError(e instanceof Error ? e.message : "Failed to load model inventory.");
+      const message = e instanceof Error ? e.message : "Failed to load model inventory.";
+      console.warn("[image-generation] inventory.list.failure", { operation: "list", endpoint: "/api/model/list", message, selectedModelRecordId });
+      setModelInventoryError(message);
     } finally {
       if (mountedRef.current && requestId === modelInventoryRequestRef.current) setModelInventoryLoading(false);
     }
