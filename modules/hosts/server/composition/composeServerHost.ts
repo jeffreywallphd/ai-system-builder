@@ -76,7 +76,7 @@ export interface RegisterServerApiOptions {
   runtimeRootDirectory: string;
 }
 
-export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
+export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "server-runtime-root";
 export type ServerComfyUiLaunchPythonExecutableSource = "ambient" | "managed-venv" | "skip-python-setup";
 
 function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRuntimeDeviceMode | undefined {
@@ -152,7 +152,7 @@ export function resolveServerComfyUiInstallRoot(input: {
   const runtime = resolveServerRuntimeRootDirectory({ env, runtimeRootDirectory: input.runtimeRootDirectory });
   return {
     installRoot: join(runtime.runtimeRootDirectory, "runtime-installs", "comfyui"),
-    source: runtime.source,
+    source: "server-runtime-root",
   };
 }
 
@@ -302,6 +302,7 @@ export function composeServerHost(
           serverPythonRuntimeRootDirectory: pythonRuntimeRoot,
           hfHomeSource: process.env.HF_HOME?.trim() ? "HF_HOME" : "SERVER_RUNTIME_ROOT/default-runtime-root",
           transformersCacheSource: process.env.TRANSFORMERS_CACHE?.trim() ? "TRANSFORMERS_CACHE" : "SERVER_RUNTIME_ROOT/default-runtime-root",
+          taskRegistryOwnership: "server",
           hfHome,
           transformersCache,
         },
