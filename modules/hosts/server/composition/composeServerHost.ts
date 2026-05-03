@@ -157,6 +157,8 @@ export interface RegisterServerApiOptions {
 
 export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
 export type ServerComfyUiLaunchPythonExecutableSource = "ambient" | "managed-venv" | "skip-python-setup";
+export type ServerPythonRuntimeMode = "worker-sidecar";
+export type ServerPythonRuntimeRootSource = "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
 
 function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRuntimeDeviceMode | undefined {
   const normalized = value?.trim().toLowerCase();
@@ -328,6 +330,17 @@ export function composeServerHost(
         pythonEnvironmentMode,
         skipPythonSetup,
       });
+      const pythonRuntimeRoot = joinHostPath(serverRuntimeResolution.runtimeRootDirectory, "models", "huggingface");
+      const pythonRuntimeRootSource: ServerPythonRuntimeRootSource = serverRuntimeResolution.source;
+      const hfHome = process.env.HF_HOME?.trim() || pythonRuntimeRoot;
+      const transformersCache = process.env.TRANSFORMERS_CACHE?.trim() || joinHostPath(pythonRuntimeRoot, "hub");
+      const pythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL?.trim() || "http://127.0.0.1:43111";
+      const pythonRuntimeEndpoint = new URL(pythonRuntimeBaseUrl);
+      const pythonRuntimeWorkerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+        configuredWorkerDirectory: process.env.PYTHON_RUNTIME_WORKER_DIR,
+      });
+      const pythonRuntimeCommand = process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
+      const pythonRuntimeArgs = process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"];
       if (invalidPythonEnvironmentMode) {
         void loggingPort.log({
           timestamp: new Date().toISOString(),
@@ -352,9 +365,13 @@ export function composeServerHost(
           host: "server",
           serverStorageRootDirectory: registerOptions.storageRootDirectory,
           serverRuntimeRootDirectory: serverRuntimeResolution.runtimeRootDirectory,
-          pythonRuntimeMode: "ambient-only",
-          pythonRuntimeRootDirectory: null,
-          pythonRuntimeRootSource: "not-configured",
+          pythonRuntimeMode: "worker-sidecar" satisfies ServerPythonRuntimeMode,
+          pythonRuntimeRootDirectory: pythonRuntimeRoot,
+          pythonRuntimeRootSource,
+          pythonRuntimeWorkerDirectory,
+          pythonRuntimeBaseUrl,
+          pythonRuntimeCommand,
+          pythonRuntimeArgs,
           taskRegistryOwnership: "server",
         },
       });
@@ -383,9 +400,6 @@ export function composeServerHost(
           installRootSource: runtimeResolution.source,
         },
       });
-      const pythonRuntimeRoot = joinHostPath(serverRuntimeResolution.runtimeRootDirectory, "models", "huggingface");
-      const hfHome = process.env.HF_HOME?.trim() || pythonRuntimeRoot;
-      const transformersCache = process.env.TRANSFORMERS_CACHE?.trim() || joinHostPath(pythonRuntimeRoot, "hub");
       void loggingPort.log({
         timestamp: new Date().toISOString(),
         level: "info",
@@ -549,11 +563,6 @@ export function composeServerHost(
       const getModelDetailsUseCase = new GetModelDetailsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } });
       const listModelsUseCase = new ListModelsUseCase({ modelRegistry });
       const saveModelReferenceUseCase = new SaveModelReferenceUseCase({ modelRegistry });
-      const pythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL?.trim() || "http://127.0.0.1:43111";
-      const pythonRuntimeEndpoint = new URL(pythonRuntimeBaseUrl);
-      const pythonRuntimeWorkerDirectory = resolveServerPythonRuntimeWorkerDirectory({
-        configuredWorkerDirectory: process.env.PYTHON_RUNTIME_WORKER_DIR,
-      });
       const pythonRuntimeEnvironment = {
         ...process.env,
         PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.hostname,
@@ -566,8 +575,8 @@ export function composeServerHost(
       const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
         client: { baseUrl: pythonRuntimeBaseUrl },
         supervisor: {
-          command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
-          args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
+          command: pythonRuntimeCommand,
+          args: pythonRuntimeArgs,
           cwd: pythonRuntimeWorkerDirectory,
           env: pythonRuntimeEnvironment,
           prepareRuntimeEnvironment(context) {

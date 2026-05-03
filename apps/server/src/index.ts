@@ -1,10 +1,20 @@
 import { createServer } from "./createServer";
 
-const { app, config } = createServer();
+const { app, config, loggingPort } = createServer();
 
 app.listen(config.port, () => {
-  // eslint-disable-next-line no-console
-  console.log(
-    `[server] listening on port ${config.port} (storage root: ${config.storageRootDirectory}, runtime root: ${config.runtimeRootDirectory})`,
-  );
+  void loggingPort.log({
+    timestamp: new Date().toISOString(),
+    level: "info",
+    verbosity: "normal",
+    event: "server.http.listening",
+    host: "server",
+    component: "server-host",
+    message: "Server HTTP listener started.",
+    data: {
+      port: config.port,
+      storageRootDirectory: config.storageRootDirectory,
+      runtimeRootDirectory: config.runtimeRootDirectory,
+    },
+  });
 });

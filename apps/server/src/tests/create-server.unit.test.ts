@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "../../../../modules/testing/node-test";
+import type { StructuredLogEvent } from "../../../../modules/contracts/logging";
 
 import {
   DEFAULT_SERVER_PORT,
   DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
   DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
+  createServer,
   resolveDefaultServerRuntimeRootDirectory,
   resolveDefaultServerStorageRootDirectory,
   resolveServerAppRootDirectory,
@@ -73,9 +75,45 @@ describe("resolveServerRuntimeConfig", () => {
     expect(source).toContain("storageRootDirectory: config.storageRootDirectory");
   });
 
-  it("index startup log includes runtime root", () => {
+  it("createServer exposes the composed server logging port", async () => {
+    const emittedEvents: StructuredLogEvent[] = [];
+    const { loggingPort } = createServer({
+      env: {},
+      now: () => "2026-05-03T00:00:00.000Z",
+      logSink: (_serializedEvent, event) => {
+        emittedEvents.push(event);
+      },
+    });
+    emittedEvents.splice(0, emittedEvents.length);
+
+    await loggingPort.log({
+      timestamp: "",
+      level: "info",
+      verbosity: "normal",
+      event: "server.test",
+      message: "Server test event.",
+      component: "server-test",
+    });
+
+    expect(emittedEvents).toEqual([
+      {
+        timestamp: "2026-05-03T00:00:00.000Z",
+        level: "info",
+        verbosity: "normal",
+        event: "server.test",
+        message: "Server test event.",
+        component: "server-test",
+        host: "server",
+      },
+    ]);
+  });
+
+  it("index startup log uses structured server host logging", () => {
     const source = readFileSync(path.resolve("apps/server/src/index.ts"), "utf8");
-    expect(source).toContain("runtime root:");
+    expect(source).toContain("loggingPort.log");
+    expect(source).toContain("server.http.listening");
     expect(source).toContain("config.runtimeRootDirectory");
+    expect(source).not.toContain("console.log");
+    expect(source).not.toContain("[server] listening");
   });
 });
