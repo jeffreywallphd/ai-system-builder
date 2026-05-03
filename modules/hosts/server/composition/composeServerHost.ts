@@ -63,33 +63,13 @@ import {
 } from "../../../adapters/transport/api-express/registerExpressApi";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
-import { join, resolve } from "node:path";
 import {
   buildComfyUiManagedPythonExecutablePath,
   type ComfyUiPythonEnvironmentMode,
 } from "../../../adapters/runtime/comfyui/comfyUiPythonEnvironment";
 import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
 
-
-
-type ComfyUiRuntimeDeviceMode = "auto" | "cpu" | "directml" | "cuda";
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
-
-function resolveComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode {
-  const raw = env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR;
-  const normalized = raw?.trim().toLowerCase();
-  if (!normalized) return "auto";
-  if (normalized === "auto" || normalized === "cpu" || normalized === "directml" || normalized === "cuda") return normalized;
-  throw new Error(`Unsupported COMFYUI runtime mode "${raw}". Use auto, cpu, directml, or cuda via COMFYUI_RUNTIME_DEVICE_MODE/COMFYUI_ACCELERATOR.`);
-}
-
-function parseBooleanEnv(value: string | undefined): boolean | undefined {
-  const normalized = value?.trim().toLowerCase();
-  if (!normalized) return undefined;
-  if (normalized === "true" || normalized === "1") return true;
-  if (normalized === "false" || normalized === "0") return false;
-  throw new Error(`Invalid boolean environment value "${value}".`);
-}
 
 function parseNumberEnv(value: string | undefined, name: string): number | undefined {
   const normalized = value?.trim();
@@ -97,6 +77,18 @@ function parseNumberEnv(value: string | undefined, name: string): number | undef
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`${name} must be a positive number.`);
   return parsed;
+}
+
+function isPosixAbsolutePath(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//");
+}
+
+function resolveHostPath(value: string): string {
+  return isPosixAbsolutePath(value) ? value.replace(/\/+$/, "") || "/" : resolve(value);
+}
+
+function joinHostPath(root: string, ...segments: string[]): string {
+  return isPosixAbsolutePath(root) ? [root.replace(/\/+$/, ""), ...segments].filter(Boolean).join("/") : join(root, ...segments);
 }
 
 export function resolveServerPythonRuntimeWorkerDirectory(input: {
@@ -160,15 +152,15 @@ export interface ComposeServerHostOptions {
 export interface RegisterServerApiOptions {
   app: RegisterExpressApiDependencies["app"];
   storageRootDirectory: string;
-  runtimeRootDirectory: string;
+  runtimeRootDirectory?: string;
 }
 
-export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "server-runtime-root";
+export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
 export type ServerComfyUiLaunchPythonExecutableSource = "ambient" | "managed-venv" | "skip-python-setup";
 
 function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRuntimeDeviceMode | undefined {
   const normalized = value?.trim().toLowerCase();
-  if (!normalized) return undefined;
+  if (!normalized || normalized === "undefined") return undefined;
   if (normalized === "auto" || normalized === "cpu" || normalized === "directml" || normalized === "cuda") return normalized;
   return undefined;
 }
@@ -203,7 +195,14 @@ export function resolveServerComfyUiLaunchPythonExecutable(input: {
     return { launchPythonExecutable: input.basePythonCommand, source: "skip-python-setup" };
   }
   return {
-    launchPythonExecutable: buildComfyUiManagedPythonExecutablePath({ installRoot: input.installRoot, platform: input.platform }),
+    launchPythonExecutable: isPosixAbsolutePath(input.installRoot)
+      ? joinHostPath(
+          input.installRoot,
+          ".venv",
+          (input.platform ?? process.platform) === "win32" ? "Scripts" : "bin",
+          (input.platform ?? process.platform) === "win32" ? "python.exe" : "python",
+        )
+      : buildComfyUiManagedPythonExecutablePath({ installRoot: input.installRoot, platform: input.platform }),
     source: "managed-venv",
   };
 }
@@ -222,7 +221,7 @@ export function resolveServerRuntimeRootDirectory(input: {
     return { runtimeRootDirectory: resolve(configured), source: "SERVER_RUNTIME_ROOT" };
   }
   return {
-    runtimeRootDirectory: resolve(input.runtimeRootDirectory),
+    runtimeRootDirectory: resolveHostPath(input.runtimeRootDirectory),
     source: "default-server-runtime-root",
   };
 }
@@ -238,8 +237,8 @@ export function resolveServerComfyUiInstallRoot(input: {
   }
   const runtime = resolveServerRuntimeRootDirectory({ env, runtimeRootDirectory: input.runtimeRootDirectory });
   return {
-    installRoot: join(runtime.runtimeRootDirectory, "runtime-installs", "comfyui"),
-    source: "server-runtime-root",
+    installRoot: joinHostPath(runtime.runtimeRootDirectory, "runtime-installs", "comfyui"),
+    source: runtime.source,
   };
 }
 
@@ -304,14 +303,24 @@ export function composeServerHost(
       return tokenConfigStore.clearToken();
     },
     registerApi(registerOptions) {
+      const defaultRuntimeRootDirectory = joinHostPath(dirname(registerOptions.storageRootDirectory), "server-runtime");
+      const serverRuntimeResolution = resolveServerRuntimeRootDirectory({
+        env: process.env,
+        runtimeRootDirectory: registerOptions.runtimeRootDirectory ?? defaultRuntimeRootDirectory,
+      });
       const runtimeResolution = resolveServerComfyUiInstallRoot({
         env: process.env,
-        runtimeRootDirectory: registerOptions.runtimeRootDirectory,
+        runtimeRootDirectory: serverRuntimeResolution.runtimeRootDirectory,
       });
-      const basePythonCommand = process.env.COMFYUI_PYTHON_COMMAND?.trim() || (process.platform === "win32" ? "python" : "python3");
+      const basePythonCommand = process.env.COMFYUI_PYTHON_COMMAND?.trim() || (isPosixAbsolutePath(serverRuntimeResolution.runtimeRootDirectory) ? "python3" : process.platform === "win32" ? "python" : "python3");
       const { pythonEnvironmentMode, invalidValue: invalidPythonEnvironmentMode } = resolveServerComfyUiPythonEnvironmentMode(process.env);
       const skipPythonSetup = parseBooleanEnvFlag(process.env.COMFYUI_SKIP_PYTHON_SETUP);
       const skipPythonValidation = parseBooleanEnvFlag(process.env.COMFYUI_SKIP_PYTHON_VALIDATION);
+      const rawRuntimeDeviceMode = process.env.COMFYUI_RUNTIME_DEVICE_MODE ?? process.env.COMFYUI_ACCELERATOR;
+      const normalizedRawRuntimeDeviceMode = rawRuntimeDeviceMode?.trim().toLowerCase();
+      if (normalizedRawRuntimeDeviceMode && normalizedRawRuntimeDeviceMode !== "undefined" && !normalizeComfyUiRuntimeDeviceMode(rawRuntimeDeviceMode)) {
+        throw new Error(`Unsupported COMFYUI runtime mode "${rawRuntimeDeviceMode}". Use auto, cpu, directml, or cuda via COMFYUI_RUNTIME_DEVICE_MODE/COMFYUI_ACCELERATOR.`);
+      }
       const runtimeDeviceMode = resolveServerComfyUiRuntimeDeviceMode(process.env);
       const launchPythonResolution = resolveServerComfyUiLaunchPythonExecutable({
         installRoot: runtimeResolution.installRoot,
@@ -342,7 +351,7 @@ export function composeServerHost(
         data: {
           host: "server",
           serverStorageRootDirectory: registerOptions.storageRootDirectory,
-          serverRuntimeRootDirectory: registerOptions.runtimeRootDirectory,
+          serverRuntimeRootDirectory: serverRuntimeResolution.runtimeRootDirectory,
           pythonRuntimeMode: "ambient-only",
           pythonRuntimeRootDirectory: null,
           pythonRuntimeRootSource: "not-configured",
@@ -359,10 +368,10 @@ export function composeServerHost(
         message: "Resolved server ComfyUI runtime roots.",
         data: {
           serverStorageRootDirectory: registerOptions.storageRootDirectory,
-          serverRuntimeRootDirectory: registerOptions.runtimeRootDirectory,
+          serverRuntimeRootDirectory: serverRuntimeResolution.runtimeRootDirectory,
           comfyUiInstallRoot: runtimeResolution.installRoot,
           comfyUiInstallRootSource: runtimeResolution.source,
-          storageRuntimeRootsDistinct: resolve(registerOptions.storageRootDirectory) !== resolve(registerOptions.runtimeRootDirectory),
+          storageRuntimeRootsDistinct: resolveHostPath(registerOptions.storageRootDirectory) !== serverRuntimeResolution.runtimeRootDirectory,
           autoInstall: true,
           runtimeDeviceMode,
           pythonEnvironmentMode,
@@ -374,9 +383,9 @@ export function composeServerHost(
           installRootSource: runtimeResolution.source,
         },
       });
-      const pythonRuntimeRoot = join(registerOptions.runtimeRootDirectory, "models", "huggingface");
+      const pythonRuntimeRoot = joinHostPath(serverRuntimeResolution.runtimeRootDirectory, "models", "huggingface");
       const hfHome = process.env.HF_HOME?.trim() || pythonRuntimeRoot;
-      const transformersCache = process.env.TRANSFORMERS_CACHE?.trim() || join(pythonRuntimeRoot, "hub");
+      const transformersCache = process.env.TRANSFORMERS_CACHE?.trim() || joinHostPath(pythonRuntimeRoot, "hub");
       void loggingPort.log({
         timestamp: new Date().toISOString(),
         level: "info",
@@ -482,10 +491,10 @@ export function composeServerHost(
         now: options.now,
       });
 
-      const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode(process.env);
+      const resolvedRuntimeDeviceMode = runtimeDeviceMode;
       void loggingPort.log({ level: "info", message: "Resolved ComfyUI runtime device mode.", timestamp: new Date().toISOString(), verbosity: "normal", event: "runtime.comfyui.configuration", component: "server-host", subsystem: "runtime", data: { runtimeDeviceMode: resolvedRuntimeDeviceMode } });
 
-      const comfyUiInstallRoot = process.env.COMFYUI_INSTALL_ROOT?.trim() || join(registerOptions.storageRootDirectory, "runtime-installs", "comfyui");
+      const comfyUiInstallRoot = runtimeResolution.installRoot;
       const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
       const installCommandTimeoutMs = parseNumberEnv(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS, "COMFYUI_INSTALL_COMMAND_TIMEOUT_MS");
       const execFileWithTimeout = installCommandTimeoutMs
@@ -498,11 +507,11 @@ export function composeServerHost(
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout });
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
-        pythonCommand: process.env.COMFYUI_PYTHON_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+        pythonCommand: basePythonCommand,
         runtimeDeviceMode: resolvedRuntimeDeviceMode,
-        skipPythonSetup: parseBooleanEnv(process.env.COMFYUI_SKIP_PYTHON_SETUP),
-        skipPythonValidation: parseBooleanEnv(process.env.COMFYUI_SKIP_PYTHON_VALIDATION),
-        pythonEnvironmentMode: process.env.COMFYUI_PYTHON_ENVIRONMENT_MODE as "managed-venv" | "ambient" | undefined,
+        skipPythonSetup,
+        skipPythonValidation,
+        pythonEnvironmentMode,
         directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
         directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
         directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
@@ -511,7 +520,7 @@ export function composeServerHost(
       });
       const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
         workingDirectory: comfyUiInstallRoot,
-        pythonExecutable: process.env.COMFYUI_PYTHON_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+        pythonExecutable: launchPythonResolution.launchPythonExecutable,
         installer: comfyUiInstaller,
         installRoot: comfyUiInstallRoot,
         runtimeDeviceMode: resolvedRuntimeDeviceMode,
@@ -549,8 +558,8 @@ export function composeServerHost(
         ...process.env,
         PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.hostname,
         PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port || "43111",
-        HF_HOME: join(registerOptions.storageRootDirectory, "models", "huggingface"),
-        TRANSFORMERS_CACHE: join(registerOptions.storageRootDirectory, "models", "huggingface", "hub"),
+        HF_HOME: hfHome,
+        TRANSFORMERS_CACHE: transformersCache,
         HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? "1",
         HF_HUB_DISABLE_SYMLINKS_WARNING: process.env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
       };
@@ -581,7 +590,7 @@ export function composeServerHost(
         runtimeTaskRegistry,
         modelCheckpointResolver: createLocalModelCheckpointResolverAdapter({
           modelRegistry,
-          comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
+          comfyUiCheckpointDirectory: joinHostPath(comfyUiInstallRoot, "models", "checkpoints"),
         }),
       });
 
@@ -593,7 +602,7 @@ export function composeServerHost(
             now: options.now,
           }),
           generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
-            comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
+            comfyUiOutputRoot: joinHostPath(comfyUiInstallRoot, "output"),
             artifactStorageRoot: registerOptions.storageRootDirectory,
             artifactCatalogAppend: artifactCatalog,
             artifactStorageBinding: artifactBindings,

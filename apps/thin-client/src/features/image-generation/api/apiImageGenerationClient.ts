@@ -59,10 +59,10 @@ function ensureSuccess<T>(response: ApiResponseEnvelope, status: number, pick: (
   return pick(response.value);
 }
 
-async function postJson(baseUrl: string, path: string, body: Record<string, unknown>): Promise<{ envelope: ApiResponseEnvelope; status: number }> {
+async function postJson(baseUrl: string, path: string, body: Record<string, unknown>, source: string): Promise<{ envelope: ApiResponseEnvelope; status: number }> {
   const response = await fetch(createApiUrl(baseUrl, path), {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-client-source": source },
     body: JSON.stringify(body),
   });
 
@@ -106,94 +106,23 @@ export function createApiImageGenerationClient(options: { apiBaseUrl?: string; s
 
   return {
     async startImageGeneration(input, context) {
-      const { envelope, status } = await postJson(apiBaseUrl, "/image-generation/start", { ...input, source: context?.source ?? source });
+      const { envelope, status } = await postJson(apiBaseUrl, "/image-generation/start", { ...input }, context?.source ?? source);
       return ensureSuccess(envelope, status, expectRequestId);
     },
     async readImageGeneration(input, context) {
-      const { envelope, status } = await postJson(apiBaseUrl, "/image-generation/read", { ...input, source: context?.source ?? source });
+      const { envelope, status } = await postJson(apiBaseUrl, "/image-generation/read", { ...input }, context?.source ?? source);
       return ensureSuccess(envelope, status, expectTaskRecord);
     },
     async cancelImageGeneration(input, context) {
-      const { envelope, status } = await postJson(apiBaseUrl, "/image-generation/cancel", { ...input, source: context?.source ?? source });
+      const { envelope, status } = await postJson(apiBaseUrl, "/image-generation/cancel", { ...input }, context?.source ?? source);
       return ensureSuccess(envelope, status, expectCancelResult);
     },
     async finalizeImageGenerationIfCompleted(input, context) {
-      const { envelope, status } = await postJson(apiBaseUrl, "/image-generation/finalize", { ...input, source: context?.source ?? source });
+      const { envelope, status } = await postJson(apiBaseUrl, "/image-generation/finalize", { ...input }, context?.source ?? source);
       return ensureSuccess(envelope, status, expectFinalizeResult);
     },
     createArtifactMediaViewUrl(storageKey) {
       return `${createApiUrl(apiBaseUrl, "/artifact/media/view")}?storageKey=${encodeURIComponent(storageKey)}`;
-export class ImageGenerationApiError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly endpoint: string,
-    public readonly status?: number,
-    public readonly details?: Record<string, unknown>,
-  ) {
-    super(message);
-    this.name = "ImageGenerationApiError";
-  }
-
-  get httpStatus(): number | undefined {
-    return this.status;
-  }
-}
-
-export type ApiResult<T> = { ok: true; value: T } | { ok: false; error: ImageGenerationApiError };
-
-function apiUrl(base: string, endpoint: string): string {
-  return `${base.replace(/\/+$/, "") || "/api"}${endpoint}`;
-}
-
-async function callApi<T>(baseUrl: string, endpoint: string, payload: Record<string, unknown>): Promise<ApiResult<T>> {
-  const response = await fetch(apiUrl(baseUrl, endpoint), {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-client-source": "thin-client.image-generation" },
-    body: JSON.stringify({ payload }),
-  });
-  const text = await response.text();
-  let body: unknown;
-  try {
-    body = text ? JSON.parse(text) : undefined;
-  } catch {
-    return { ok: false, error: new ImageGenerationApiError(`Non-JSON response from ${endpoint} (status ${response.status}).`, "non-json-response", endpoint, response.status) };
-  }
-
-  if (!response.ok) {
-    const errorBody = (body as { error?: { code?: string; message?: string; details?: Record<string, unknown> } })?.error;
-    return {
-      ok: false,
-      error: new ImageGenerationApiError(
-        errorBody?.message ?? `Request failed (${response.status}).`,
-        errorBody?.code ?? `http-${response.status}`,
-        endpoint,
-        response.status,
-        errorBody?.details,
-      ),
-    };
-  }
-
-  if (!body || typeof body !== "object" || (body as { ok?: boolean }).ok !== true) {
-    return { ok: false, error: new ImageGenerationApiError("Response is not a valid success envelope.", "invalid-envelope", endpoint, response.status) };
-  }
-
-  return { ok: true, value: (body as { value: T }).value };
-}
-
-export function createApiImageGenerationClient(apiBaseUrl = "/api") {
-  return {
-    startImageGeneration(input: ImageGenerationRequest) {
-      return callApi<{ requestId: string }>(apiBaseUrl, "/image-generation/start", input as unknown as Record<string, unknown>);
-    },
-    readImageGeneration(requestId: string) {
-      return callApi<RuntimeTaskRecord>(apiBaseUrl, "/image-generation/read", { requestId });
-    },
-    cancelImageGeneration(requestId: string) {
-      return callApi<RuntimeTaskRecord>(apiBaseUrl, "/image-generation/cancel", { requestId });
-    },
-    finalizeImageGeneration(requestId: string) {
-      return callApi<{ assets?: Array<{ assetId: string; artifactId: string; storageKey?: string }> }>(apiBaseUrl, "/image-generation/finalize", { requestId });
     },
   };
 }
