@@ -33,16 +33,22 @@ function normalizePort(rawPort: string | undefined): number {
 }
 
 export function resolveDefaultServerStorageRootDirectory(): string {
-  return path.resolve(
-    __dirname,
-    "..",
-    DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
-  );
+  return path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME);
+}
+
+export function resolveDefaultServerRuntimeRootDirectory(): string {
+  return path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME);
+}
+
+export function resolveServerRuntimeRootDirectory(env: NodeJS.ProcessEnv = process.env): string {
+  const runtimeRootFromEnv = env.SERVER_RUNTIME_ROOT?.trim();
+  return runtimeRootFromEnv && runtimeRootFromEnv.length > 0
+    ? path.resolve(runtimeRootFromEnv)
+    : resolveDefaultServerRuntimeRootDirectory();
 }
 
 export function resolveServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env): ServerRuntimeConfig {
   const storageRootFromEnv = env.SERVER_STORAGE_ROOT?.trim();
-  const runtimeRootFromEnv = env.SERVER_RUNTIME_ROOT?.trim();
 
   const storageRootDirectory =
     storageRootFromEnv && storageRootFromEnv.length > 0
@@ -52,9 +58,7 @@ export function resolveServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env)
   return {
     port: normalizePort(env.PORT),
     storageRootDirectory,
-    runtimeRootDirectory: runtimeRootFromEnv && runtimeRootFromEnv.length > 0
-      ? path.resolve(runtimeRootFromEnv)
-      : path.resolve(storageRootDirectory, "..", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+    runtimeRootDirectory: resolveServerRuntimeRootDirectory(env),
   };
 }
 

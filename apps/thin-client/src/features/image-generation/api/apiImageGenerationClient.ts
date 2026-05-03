@@ -10,7 +10,7 @@ async function parse<T>(response: Response, endpoint: string): Promise<ApiResult
   return { ok:true, value: body.value as T };
 }
 export function createApiImageGenerationClient(apiBaseUrl = "/api") { return {
-  startImageGeneration: async (input: ImageGenerationRequest) => parse<{requestId:string}>(await fetch(apiUrl(apiBaseUrl,"/image-generation/start"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({payload:input})}),"/image-generation/start"),
-  readImageGeneration: async (requestId:string) => parse<RuntimeTaskRecord>(await fetch(apiUrl(apiBaseUrl,"/image-generation/read"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({payload:{requestId}})}),"/image-generation/read"),
-  finalizeImageGenerationIfCompleted: async (requestId:string) => parse<{assets?: Array<{assetId:string;artifactId:string;storageKey?:string}>}>(await fetch(apiUrl(apiBaseUrl,"/image-generation/finalize-if-completed"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({payload:{requestId}})}),"/image-generation/finalize-if-completed"),
+  startImageGeneration: async (input: ImageGenerationRequest) => parse<{requestId:string}>(await fetch(apiUrl(apiBaseUrl,"/image-generation/start"),{method:"POST",headers:{"content-type":"application/json","x-client-source":"thin-client.image-generation"},body:JSON.stringify({payload:input})}),"/image-generation/start"),
+  readImageGeneration: async (requestId:string) => parse<RuntimeTaskRecord>(await fetch(apiUrl(apiBaseUrl,"/image-generation/read"),{method:"POST",headers:{"content-type":"application/json","x-client-source":"thin-client.image-generation"},body:JSON.stringify({payload:{requestId}})}),"/image-generation/read"),
+  finalizeImageGenerationIfCompleted: async (requestId:string) => parse<{assets?: Array<{assetId:string;artifactId:string;storageKey?:string}>}>(await fetch(apiUrl(apiBaseUrl,"/image-generation/finalize-if-completed"),{method:"POST",headers:{"content-type":"application/json","x-client-source":"thin-client.image-generation"},body:JSON.stringify({payload:{requestId}})}),"/image-generation/finalize-if-completed"),
 }; }
