@@ -42,6 +42,7 @@ import {
 } from "../../../adapters/transport/api-express/registerExpressApi";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
+import { join, resolve } from "node:path";
 
 export interface ComposeServerHostLoggingOptions {
   verbosity?: string;
@@ -67,6 +68,45 @@ export interface ComposeServerHostOptions {
 export interface RegisterServerApiOptions {
   app: RegisterExpressApiDependencies["app"];
   storageRootDirectory: string;
+  runtimeRootDirectory?: string;
+}
+
+export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
+
+export function resolveServerRuntimeRootDirectory(input: {
+  env?: NodeJS.ProcessEnv;
+  storageRootDirectory: string;
+}): { runtimeRootDirectory: string; source: "SERVER_RUNTIME_ROOT" | "default-server-runtime-root" } {
+  const env = input.env ?? process.env;
+  const configured = env.SERVER_RUNTIME_ROOT?.trim();
+  if (configured) {
+    return { runtimeRootDirectory: resolve(configured), source: "SERVER_RUNTIME_ROOT" };
+  }
+  return {
+    runtimeRootDirectory: resolve(input.storageRootDirectory, "..", "server-runtime"),
+    source: "default-server-runtime-root",
+  };
+}
+
+export function resolveServerComfyUiInstallRoot(input: {
+  env?: NodeJS.ProcessEnv;
+  storageRootDirectory: string;
+  runtimeRootDirectory?: string;
+}): { installRoot: string; source: ServerComfyUiInstallRootSource; runtimeRootDirectory: string } {
+  const env = input.env ?? process.env;
+  const configured = env.COMFYUI_INSTALL_ROOT?.trim();
+  if (configured) {
+    const runtimeRoot = input.runtimeRootDirectory ?? resolveServerRuntimeRootDirectory({ env, storageRootDirectory: input.storageRootDirectory }).runtimeRootDirectory;
+    return { installRoot: resolve(configured), source: "COMFYUI_INSTALL_ROOT", runtimeRootDirectory: runtimeRoot };
+  }
+  const runtime = input.runtimeRootDirectory
+    ? { runtimeRootDirectory: input.runtimeRootDirectory, source: "SERVER_RUNTIME_ROOT" as const }
+    : resolveServerRuntimeRootDirectory({ env, storageRootDirectory: input.storageRootDirectory });
+  return {
+    installRoot: join(runtime.runtimeRootDirectory, "runtime-installs", "comfyui"),
+    source: runtime.source,
+    runtimeRootDirectory: runtime.runtimeRootDirectory,
+  };
 }
 
 export interface ServerHostComposition {
@@ -130,6 +170,28 @@ export function composeServerHost(
       return tokenConfigStore.clearToken();
     },
     registerApi(registerOptions) {
+      const runtimeResolution = resolveServerComfyUiInstallRoot({
+        storageRootDirectory: registerOptions.storageRootDirectory,
+        runtimeRootDirectory: registerOptions.runtimeRootDirectory,
+      });
+      void loggingPort.log({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        verbosity: "normal",
+        event: "runtime.comfyui.server.configuration",
+        host: "server",
+        component: "server-host",
+        message: "Resolved server ComfyUI runtime roots.",
+        data: {
+          serverStorageRootDirectory: registerOptions.storageRootDirectory,
+          serverRuntimeRootDirectory: runtimeResolution.runtimeRootDirectory,
+          comfyUiInstallRoot: runtimeResolution.installRoot,
+          comfyUiInstallRootSource: runtimeResolution.source,
+          storageRuntimeRootsDistinct: resolve(registerOptions.storageRootDirectory) !== resolve(runtimeResolution.runtimeRootDirectory),
+          autoInstall: true,
+          runtimeDeviceMode: process.env.COMFYUI_RUNTIME_DEVICE_MODE ?? "auto",
+        },
+      });
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });

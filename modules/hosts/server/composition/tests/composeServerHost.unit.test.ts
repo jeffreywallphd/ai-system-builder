@@ -9,7 +9,7 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
-import { composeServerHost } from "../composeServerHost";
+import { composeServerHost, resolveServerComfyUiInstallRoot } from "../composeServerHost";
 
 describe("composeServerHost", () => {
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
@@ -157,5 +157,35 @@ describe("composeServerHost", () => {
     expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
     expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
     expect(source).not.toContain("repoBrowser: artifactRepoStorage");
+  });
+});
+
+describe("server runtime/comfy root resolution", () => {
+  it("defaults ComfyUI install root under server-runtime sibling, not storage root", () => {
+    const { installRoot, runtimeRootDirectory, source } = resolveServerComfyUiInstallRoot({
+      env: {} as NodeJS.ProcessEnv,
+      storageRootDirectory: "/app/server-artifacts",
+    });
+    expect(runtimeRootDirectory).toBe("/app/server-runtime");
+    expect(installRoot).toBe("/app/server-runtime/runtime-installs/comfyui");
+    expect(source).toBe("default-server-runtime-root");
+  });
+
+  it("uses SERVER_RUNTIME_ROOT when provided", () => {
+    const { installRoot, source } = resolveServerComfyUiInstallRoot({
+      env: { SERVER_RUNTIME_ROOT: " /tmp/runtime-root " } as NodeJS.ProcessEnv,
+      storageRootDirectory: "/app/server-artifacts",
+    });
+    expect(installRoot).toBe(resolve("/tmp/runtime-root", "runtime-installs", "comfyui"));
+    expect(source).toBe("SERVER_RUNTIME_ROOT");
+  });
+
+  it("COMFYUI_INSTALL_ROOT overrides exact install root", () => {
+    const { installRoot, source } = resolveServerComfyUiInstallRoot({
+      env: { SERVER_RUNTIME_ROOT: "/tmp/runtime-root", COMFYUI_INSTALL_ROOT: " /tmp/custom-comfy " } as NodeJS.ProcessEnv,
+      storageRootDirectory: "/app/server-artifacts",
+    });
+    expect(installRoot).toBe(resolve("/tmp/custom-comfy"));
+    expect(source).toBe("COMFYUI_INSTALL_ROOT");
   });
 });
