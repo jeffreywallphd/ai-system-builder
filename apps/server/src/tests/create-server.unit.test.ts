@@ -4,6 +4,7 @@ import { describe, expect, it } from "../../../../modules/testing/node-test";
 
 import {
   DEFAULT_SERVER_PORT,
+  DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
   DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
   resolveDefaultServerStorageRootDirectory,
   resolveServerRuntimeConfig,
@@ -21,6 +22,9 @@ describe("resolveServerRuntimeConfig", () => {
     expect(config.storageRootDirectory).toBe(
       path.resolve(__dirname, "..", "..", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     );
+    expect(config.runtimeRootDirectory).toBe(
+      path.resolve(__dirname, "..", "..", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+    );
   });
 
   it("honors SERVER_STORAGE_ROOT override when provided", () => {
@@ -29,6 +33,15 @@ describe("resolveServerRuntimeConfig", () => {
     });
 
     expect(config.storageRootDirectory).toBe(path.resolve("./tmp/server-root"));
+    expect(config.runtimeRootDirectory).toBe(path.resolve("./tmp/server-root", "..", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME));
+  });
+
+  it("honors SERVER_RUNTIME_ROOT override when provided", () => {
+    const config = resolveServerRuntimeConfig({
+      SERVER_RUNTIME_ROOT: " ./tmp/server-runtime ",
+    });
+
+    expect(config.runtimeRootDirectory).toBe(path.resolve("./tmp/server-runtime"));
   });
 
   it("exposes the same default storage root through resolveDefaultServerStorageRootDirectory in CJS runtime", () => {

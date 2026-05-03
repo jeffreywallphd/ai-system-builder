@@ -5,6 +5,6 @@ const { app, config } = createServer();
 app.listen(config.port, () => {
   // eslint-disable-next-line no-console
   console.log(
-    `[server] listening on port ${config.port} (storage root: ${config.storageRootDirectory})`,
+    `[server] listening on port ${config.port} (storage root: ${config.storageRootDirectory}, runtime root: ${config.runtimeRootDirectory})`,
   );
 });

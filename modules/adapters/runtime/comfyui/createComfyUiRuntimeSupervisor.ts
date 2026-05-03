@@ -203,6 +203,9 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
 
         if (installResult.status !== "installed") {
           log("error", "ComfyUI auto-install failed.", { installRoot: options.installRoot, error: installResult.error });
+          if (installResult.error?.code === "unmanaged-install-root") {
+            throw new Error(`ComfyUI install failed: The ComfyUI install root is non-empty but is not managed by AI System Builder. Set COMFYUI_INSTALL_ROOT to a managed ComfyUI checkout, set SERVER_RUNTIME_ROOT to a clean runtime directory, or move/delete the unmanaged directory if it is a failed partial install. Destructive repair is intentionally not automatic. [${installResult.error.code}]`);
+          }
           throw new Error(`ComfyUI install failed: ${installResult.error?.message ?? "unknown install error"}`);
         }
 
