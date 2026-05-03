@@ -73,7 +73,7 @@ export interface ComposeServerHostOptions {
 export interface RegisterServerApiOptions {
   app: RegisterExpressApiDependencies["app"];
   storageRootDirectory: string;
-  runtimeRootDirectory?: string;
+  runtimeRootDirectory: string;
 }
 
 export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
@@ -127,7 +127,7 @@ export function resolveServerComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = p
 
 export function resolveServerRuntimeRootDirectory(input: {
   env?: NodeJS.ProcessEnv;
-  storageRootDirectory: string;
+  runtimeRootDirectory: string;
 }): { runtimeRootDirectory: string; source: "SERVER_RUNTIME_ROOT" | "default-server-runtime-root" } {
   const env = input.env ?? process.env;
   const configured = env.SERVER_RUNTIME_ROOT?.trim();
@@ -135,29 +135,24 @@ export function resolveServerRuntimeRootDirectory(input: {
     return { runtimeRootDirectory: resolve(configured), source: "SERVER_RUNTIME_ROOT" };
   }
   return {
-    runtimeRootDirectory: resolve(input.storageRootDirectory, "..", "server-runtime"),
+    runtimeRootDirectory: resolve(input.runtimeRootDirectory),
     source: "default-server-runtime-root",
   };
 }
 
 export function resolveServerComfyUiInstallRoot(input: {
   env?: NodeJS.ProcessEnv;
-  storageRootDirectory: string;
-  runtimeRootDirectory?: string;
-}): { installRoot: string; source: ServerComfyUiInstallRootSource; runtimeRootDirectory: string } {
+  runtimeRootDirectory: string;
+}): { installRoot: string; source: ServerComfyUiInstallRootSource } {
   const env = input.env ?? process.env;
   const configured = env.COMFYUI_INSTALL_ROOT?.trim();
   if (configured) {
-    const runtimeRoot = input.runtimeRootDirectory ?? resolveServerRuntimeRootDirectory({ env, storageRootDirectory: input.storageRootDirectory }).runtimeRootDirectory;
-    return { installRoot: resolve(configured), source: "COMFYUI_INSTALL_ROOT", runtimeRootDirectory: runtimeRoot };
+    return { installRoot: resolve(configured), source: "COMFYUI_INSTALL_ROOT" };
   }
-  const runtime = input.runtimeRootDirectory
-    ? { runtimeRootDirectory: input.runtimeRootDirectory, source: "SERVER_RUNTIME_ROOT" as const }
-    : resolveServerRuntimeRootDirectory({ env, storageRootDirectory: input.storageRootDirectory });
+  const runtime = resolveServerRuntimeRootDirectory({ env, runtimeRootDirectory: input.runtimeRootDirectory });
   return {
     installRoot: join(runtime.runtimeRootDirectory, "runtime-installs", "comfyui"),
     source: runtime.source,
-    runtimeRootDirectory: runtime.runtimeRootDirectory,
   };
 }
 
@@ -224,10 +219,9 @@ export function composeServerHost(
     registerApi(registerOptions) {
       const runtimeResolution = resolveServerComfyUiInstallRoot({
         env: process.env,
-        storageRootDirectory: registerOptions.storageRootDirectory,
         runtimeRootDirectory: registerOptions.runtimeRootDirectory,
       });
-      const basePythonCommand = process.env.COMFYUI_PYTHON_COMMAND?.trim() || "python";
+      const basePythonCommand = process.env.COMFYUI_PYTHON_COMMAND?.trim() || (process.platform === "win32" ? "python" : "python3");
       const { pythonEnvironmentMode, invalidValue: invalidPythonEnvironmentMode } = resolveServerComfyUiPythonEnvironmentMode(process.env);
       const skipPythonSetup = parseBooleanEnvFlag(process.env.COMFYUI_SKIP_PYTHON_SETUP);
       const skipPythonValidation = parseBooleanEnvFlag(process.env.COMFYUI_SKIP_PYTHON_VALIDATION);
@@ -261,7 +255,7 @@ export function composeServerHost(
         data: {
           host: "server",
           serverStorageRootDirectory: registerOptions.storageRootDirectory,
-          serverRuntimeRootDirectory: runtimeResolution.runtimeRootDirectory,
+          serverRuntimeRootDirectory: registerOptions.runtimeRootDirectory,
           pythonRuntimeMode: "ambient-only",
           pythonRuntimeRootDirectory: null,
           pythonRuntimeRootSource: "not-configured",
@@ -278,10 +272,10 @@ export function composeServerHost(
         message: "Resolved server ComfyUI runtime roots.",
         data: {
           serverStorageRootDirectory: registerOptions.storageRootDirectory,
-          serverRuntimeRootDirectory: runtimeResolution.runtimeRootDirectory,
+          serverRuntimeRootDirectory: registerOptions.runtimeRootDirectory,
           comfyUiInstallRoot: runtimeResolution.installRoot,
           comfyUiInstallRootSource: runtimeResolution.source,
-          storageRuntimeRootsDistinct: resolve(registerOptions.storageRootDirectory) !== resolve(runtimeResolution.runtimeRootDirectory),
+          storageRuntimeRootsDistinct: resolve(registerOptions.storageRootDirectory) !== resolve(registerOptions.runtimeRootDirectory),
           autoInstall: true,
           runtimeDeviceMode,
           pythonEnvironmentMode,
@@ -291,6 +285,25 @@ export function composeServerHost(
           skipPythonSetup,
           skipPythonValidation,
           installRootSource: runtimeResolution.source,
+        },
+      });
+      const pythonRuntimeRoot = join(registerOptions.runtimeRootDirectory, "models", "huggingface");
+      const hfHome = process.env.HF_HOME?.trim() || pythonRuntimeRoot;
+      const transformersCache = process.env.TRANSFORMERS_CACHE?.trim() || join(pythonRuntimeRoot, "hub");
+      void loggingPort.log({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        verbosity: "normal",
+        event: "runtime.python.server.paths",
+        host: "server",
+        component: "server-host",
+        message: "Resolved Python runtime cache paths.",
+        data: {
+          serverPythonRuntimeRootDirectory: pythonRuntimeRoot,
+          hfHomeSource: process.env.HF_HOME?.trim() ? "HF_HOME" : "SERVER_RUNTIME_ROOT/default-runtime-root",
+          transformersCacheSource: process.env.TRANSFORMERS_CACHE?.trim() ? "TRANSFORMERS_CACHE" : "SERVER_RUNTIME_ROOT/default-runtime-root",
+          hfHome,
+          transformersCache,
         },
       });
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({

@@ -126,6 +126,7 @@ describe("composeServerHost", () => {
     host.registerApi({
       app,
       storageRootDirectory: "/tmp/server-artifact-upload-test",
+      runtimeRootDirectory: "/tmp/server-runtime",
     });
 
     expect(app.post).toHaveBeenCalledTimes(14);
@@ -168,11 +169,10 @@ describe("composeServerHost", () => {
 
 describe("server runtime/comfy root resolution", () => {
   it("defaults ComfyUI install root under server-runtime sibling, not storage root", () => {
-    const { installRoot, runtimeRootDirectory, source } = resolveServerComfyUiInstallRoot({
+    const { installRoot, source } = resolveServerComfyUiInstallRoot({
       env: {} as NodeJS.ProcessEnv,
-      storageRootDirectory: "/app/server-artifacts",
+      runtimeRootDirectory: "/app/server-runtime",
     });
-    expect(runtimeRootDirectory).toBe("/app/server-runtime");
     expect(installRoot).toBe("/app/server-runtime/runtime-installs/comfyui");
     expect(source).toBe("default-server-runtime-root");
   });
@@ -180,7 +180,7 @@ describe("server runtime/comfy root resolution", () => {
   it("uses SERVER_RUNTIME_ROOT when provided", () => {
     const { installRoot, source } = resolveServerComfyUiInstallRoot({
       env: { SERVER_RUNTIME_ROOT: " /tmp/runtime-root " } as NodeJS.ProcessEnv,
-      storageRootDirectory: "/app/server-artifacts",
+      runtimeRootDirectory: "/app/server-runtime",
     });
     expect(installRoot).toBe(resolve("/tmp/runtime-root", "runtime-installs", "comfyui"));
     expect(source).toBe("SERVER_RUNTIME_ROOT");
@@ -189,7 +189,7 @@ describe("server runtime/comfy root resolution", () => {
   it("COMFYUI_INSTALL_ROOT overrides exact install root", () => {
     const { installRoot, source } = resolveServerComfyUiInstallRoot({
       env: { SERVER_RUNTIME_ROOT: "/tmp/runtime-root", COMFYUI_INSTALL_ROOT: " /tmp/custom-comfy " } as NodeJS.ProcessEnv,
-      storageRootDirectory: "/app/server-artifacts",
+      runtimeRootDirectory: "/app/server-runtime",
     });
     expect(installRoot).toBe(resolve("/tmp/custom-comfy"));
     expect(source).toBe("COMFYUI_INSTALL_ROOT");
@@ -202,7 +202,7 @@ describe("server ComfyUI python/runtime resolution", () => {
     expect(mode).toEqual({ pythonEnvironmentMode: "managed-venv" });
     const launch = resolveServerComfyUiLaunchPythonExecutable({
       installRoot: "/tmp/server-runtime/runtime-installs/comfyui",
-      basePythonCommand: "python",
+      basePythonCommand: "python3",
       pythonEnvironmentMode: mode.pythonEnvironmentMode,
       skipPythonSetup: false,
       platform: "linux",
@@ -259,12 +259,12 @@ describe("server ComfyUI python/runtime resolution", () => {
       .find((event) => event.event === "runtime.comfyui.server.configuration");
     expect(comfyLog?.data).toMatchObject({
       pythonEnvironmentMode: "managed-venv",
-      basePythonCommand: "python",
+      basePythonCommand: "python3",
       launchPythonExecutableSource: "managed-venv",
       skipPythonSetup: false,
       skipPythonValidation: false,
       runtimeDeviceMode: "auto",
-      installRootSource: "SERVER_RUNTIME_ROOT",
+      installRootSource: "default-server-runtime-root",
     });
   });
 
