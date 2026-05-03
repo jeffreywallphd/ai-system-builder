@@ -654,10 +654,7 @@ export function ensurePythonRuntimeWorkerDependencies(
     }
 
     attemptTorchInstallFlow(spawnSyncImplementation, options, target, diagnostics);
-  } catch (error) {
+  } finally {
     persistDiagnostics(options, diagnostics);
-    throw error;
   }
-
-  persistDiagnostics(options, diagnostics);
 }

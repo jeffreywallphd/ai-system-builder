@@ -25,8 +25,8 @@ describe("thin-client routing and page composition", () => {
   it("renders landing Home content and navigates to Artifacts workflow page", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ json: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }) })
-      .mockResolvedValue({ json: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }) });
+      .mockResolvedValueOnce({ status: 200, headers: { get: () => "application/json" }, json: vi.fn().mockResolvedValue({ ok: true, value: { models: [] } }) })
+      .mockResolvedValue({ status: 200, headers: { get: () => "application/json" }, json: vi.fn().mockResolvedValue({ ok: true, value: { items: [], models: [] } }) });
     vi.stubGlobal("fetch", fetchMock);
 
     const container = document.createElement("div");
@@ -43,6 +43,21 @@ describe("thin-client routing and page composition", () => {
 
     const imageButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Image Generation");
     expect(imageButton).toBeDefined();
+
+    await act(async () => {
+      imageButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Image Generation");
+    const openModelsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Open Models");
+    expect(openModelsButton).toBeDefined();
+
+    await act(async () => {
+      openModelsButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Browse models");
+    expect(window.location.pathname).toBe("/models");
 
     const artifactsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Artifacts");
 
@@ -69,7 +84,7 @@ describe("thin-client routing and page composition", () => {
       modelsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Model Management");
+    expect(container.textContent).toContain("Browse models");
     expect(window.location.pathname).toBe("/models");
 
   });
