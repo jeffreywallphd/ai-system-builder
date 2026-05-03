@@ -61,3 +61,19 @@ Packs are summaries and routing aids, not substitutes for canonical sources.
 ## Stop Condition
 
 - If required canonical guidance is missing, unclear, or conflicting, do not invent policy silently; treat the task as requiring canonical clarification/update in the same work item.
+
+
+
+## Hybrid execution and host-owned runtime routing
+
+For tasks involving desktop-server hybrid execution, local/remote feature placement, host-owned runtime roots, server runtime root vs artifact storage root, or desktop delegation to configured server:
+
+- Always include `index.pack.md`.
+- Include `architecture.pack.md` for boundary decisions.
+- Include `runtime.pack.md` for runtime root/process/adapter work.
+- Include `desktop-host.pack.md` when desktop IPC/preload/host routing is involved.
+- Include `server-host.pack.md` when server host/API/runtime is involved.
+- Include `image-generation.pack.md` when ComfyUI/image generation is involved.
+- Include `persistence-storage.pack.md` when artifact storage roots, generated outputs, or storage/runtime root separation is involved.
+
+Escalation: if a task changes host-owned runtime behavior or per-feature execution placement, read ADR-0013 directly.

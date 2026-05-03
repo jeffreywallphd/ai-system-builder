@@ -39,7 +39,7 @@ Include this pack when prompts involve:
 
 ## Canonical References
 
-- `docs/adr/ADR-0013-runtime-installer.md`
+- `docs/adr/ADR-0014-runtime-installer.md`
 - `docs/adr/ADR-0012-image-generation-runtime.md`
 
 ## Metadata and Safety

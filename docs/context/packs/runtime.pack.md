@@ -54,6 +54,14 @@
 
 ## Prompt Assembly Notes
 
+## Host-owned runtime instances
+
+- Runtime contracts are shared; runtime instances are host-owned.
+- Desktop and server runtime roots/processes are independent by default.
+- Future per-feature remote/local routing belongs in host composition.
+- ADR-0013 is the canonical source for cross-host runtime ownership.
+
+
 - Typical set: `index` + `runtime`.
 - Add `architecture` for cross-layer decisions.
 - Add `logging` for diagnosability-heavy runtime work and `testing` for bug fixes/refactors.
