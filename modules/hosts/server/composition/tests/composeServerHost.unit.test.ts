@@ -267,4 +267,33 @@ describe("server ComfyUI python/runtime resolution", () => {
       installRootSource: "SERVER_RUNTIME_ROOT",
     });
   });
+
+  it("logs server-owned general Python runtime diagnostics without desktop/runtime-root leakage", () => {
+    const sink = testDouble.fn();
+    const host = composeServerHost({ logSink: sink });
+    host.registerApi({
+      app: { post: testDouble.fn(), get: testDouble.fn() },
+      storageRootDirectory: "/tmp/server-storage",
+      runtimeRootDirectory: "/tmp/server-runtime",
+    });
+    const pythonLog = sink.mock.calls
+      .map((call) => call[1] as StructuredLogEvent)
+      .find((event) => event.event === "runtime.python.server.configuration");
+    expect(pythonLog?.data).toMatchObject({
+      host: "server",
+      serverStorageRootDirectory: "/tmp/server-storage",
+      serverRuntimeRootDirectory: "/tmp/server-runtime",
+      pythonRuntimeMode: "ambient-only",
+      pythonRuntimeRootDirectory: null,
+      pythonRuntimeRootSource: "not-configured",
+      taskRegistryOwnership: "server",
+    });
+  });
+
+  it("keeps server host composition free of desktop-host imports", () => {
+    const sourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(sourcePath, "utf8");
+    expect(source).not.toContain("hosts/desktop");
+    expect(source).not.toContain("transport/ipc-electron");
+  });
 });
