@@ -9,13 +9,13 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
-import { composeServerHost, resolveServerPythonRuntimeWorkerDirectory } from "../composeServerHost";
 import {
   composeServerHost,
   resolveServerComfyUiInstallRoot,
   resolveServerComfyUiLaunchPythonExecutable,
   resolveServerComfyUiPythonEnvironmentMode,
   resolveServerComfyUiRuntimeDeviceMode,
+  resolveServerPythonRuntimeWorkerDirectory,
 } from "../composeServerHost";
 
 describe("composeServerHost", () => {
@@ -357,7 +357,7 @@ describe("server ComfyUI python/runtime resolution", () => {
     });
   });
 
-  it("logs server-owned general Python runtime diagnostics without desktop/runtime-root leakage", () => {
+  it("logs server-owned Python worker-sidecar diagnostics without desktop/runtime-root leakage", () => {
     const sink = testDouble.fn();
     const host = composeServerHost({ logSink: sink });
     host.registerApi({
@@ -372,10 +372,17 @@ describe("server ComfyUI python/runtime resolution", () => {
       host: "server",
       serverStorageRootDirectory: "/tmp/server-storage",
       serverRuntimeRootDirectory: "/tmp/server-runtime",
+      pythonRuntimeMode: "worker-sidecar",
+      pythonRuntimeRootDirectory: "/tmp/server-runtime/models/huggingface",
+      pythonRuntimeRootSource: "default-server-runtime-root",
+      pythonRuntimeBaseUrl: "http://127.0.0.1:43111",
+      pythonRuntimeWorkerDirectory: expect.stringMatching(/modules[\\/]adapters[\\/]runtime[\\/]python[\\/]worker$/),
+      pythonRuntimeArgs: ["main.py"],
+      taskRegistryOwnership: "server",
+    });
+    expect(pythonLog?.data).not.toMatchObject({
       pythonRuntimeMode: "ambient-only",
       pythonRuntimeRootDirectory: null,
-      pythonRuntimeRootSource: "not-configured",
-      taskRegistryOwnership: "server",
     });
   });
 

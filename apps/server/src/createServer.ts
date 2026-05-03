@@ -4,6 +4,8 @@ import path from "node:path";
 import express from "express";
 
 import { composeServerHost } from "../../../modules/hosts/server";
+import type { LoggingPort } from "../../../modules/application/ports/logging";
+import type { StructuredLogSink } from "../../../modules/adapters/observability/logging";
 
 export const DEFAULT_SERVER_PORT = 3010;
 export const DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME = "server-artifacts";
@@ -17,11 +19,14 @@ export interface ServerRuntimeConfig {
 
 export interface CreateServerOptions {
   env?: NodeJS.ProcessEnv;
+  logSink?: StructuredLogSink;
+  now?: () => string;
 }
 
 export interface CreatedServer {
   app: express.Express;
   config: ServerRuntimeConfig;
+  loggingPort: LoggingPort;
 }
 
 interface ServerRootResolutionOptions {
@@ -134,6 +139,8 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
       verbosity: options.env?.LOG_VERBOSITY,
       level: "info",
     },
+    logSink: options.logSink,
+    now: options.now,
     artifactRepo: {
       huggingFaceAccessToken: options.env?.HF_TOKEN ?? options.env?.HUGGING_FACE_TOKEN,
       huggingFaceTokenConfigFilePath: path.join(config.storageRootDirectory, "config", "hugging-face-token.json"),
@@ -152,5 +159,6 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
   return {
     app,
     config,
+    loggingPort: serverHost.loggingPort,
   };
 }
