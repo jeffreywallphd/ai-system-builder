@@ -4,6 +4,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { HomePage } from "./pages/HomePage";
 import { ImageGenerationPage } from "./pages/ImageGenerationPage";
+import { ModelsPage } from "./pages/ModelsPage";
 import {
   resolveThinClientPage,
   thinClientPageDefinitions,
@@ -11,7 +12,7 @@ import {
 } from "./routes/thinClientPages";
 
 function navigateToPage(page: ThinClientPageKey): void {
-  const path = page === "artifacts" ? "/artifacts" : page === "image-generation" ? "/image-generation" : "/";
+  const path = page === "artifacts" ? "/artifacts" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : "/";
   window.history.pushState({}, "", path);
 }
 
@@ -30,6 +31,11 @@ export function App() {
     }
 
     if (activePage === "image-generation") {
+      return <ImageGenerationPage onGenerated={() => setArtifactRefreshToken((current) => current + 1)} onNavigateToArtifacts={() => { navigateToPage("artifacts"); setActivePage("artifacts"); }} />;
+    }
+
+    if (activePage === "models") {
+      return <ModelsPage />;
       return <ImageGenerationPage />;
     }
 

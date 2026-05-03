@@ -14,6 +14,8 @@ export interface RegisterImageAssetInput {
     width?: number;
     height?: number;
     createdAt?: string;
+    requestId?: string;
+    originalFileName?: string;
   };
 }
 

@@ -126,9 +126,15 @@ function toRendererResult(responseBody: unknown): ThinClientArtifactUploadResult
   };
 }
 
+function copyToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 function createUploadFormData(input: ThinClientArtifactUploadInput): FormData {
   const formData = new FormData();
-  const file = new File([input.bytes], input.fileName, { type: input.mediaType });
+  const file = new File([copyToArrayBuffer(input.bytes)], input.fileName, { type: input.mediaType });
 
   formData.append("file", file);
   formData.append("source", input.source ?? DEFAULT_UPLOAD_SOURCE);

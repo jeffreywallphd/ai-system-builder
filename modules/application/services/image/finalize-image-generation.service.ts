@@ -2,7 +2,7 @@ import type { ImageGenerationOutput } from "../../../contracts/image-generation"
 import type { RuntimeTaskRecord } from "../../../contracts/runtime";
 import type { ImageAssetRegistryPort, GeneratedImagePersistencePort } from "../../ports/image";
 
-interface FinalizedAssetRef { assetId: string; artifactId: string; }
+interface FinalizedAssetRef { assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated"; }
 
 export class FinalizeImageGenerationService {
   private readonly finalizedByRequestId = new Map<string, FinalizedAssetRef[]>();
@@ -17,21 +17,21 @@ export class FinalizeImageGenerationService {
     const outputs = this.getOutputs(task.data);
     const assets: FinalizedAssetRef[] = [];
     for (const output of outputs) {
-      const assetId = this.dependencies.createAssetId?.() ?? `generated-${task.requestId}-${assets.length + 1}`;
-      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, assetId });
-      await this.dependencies.imageAssetRegistry.registerImageAsset({
-        assetId,
+      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, requestId: task.requestId });
+      const requestedAssetId = this.dependencies.createAssetId?.() ?? `img-${task.requestId}-${assets.length + 1}`;
+      const registered = await this.dependencies.imageAssetRegistry.registerImageAsset({
+        assetId: requestedAssetId,
         artifactId: persisted.artifactId,
         source: "generated",
         metadata: {
           ...(this.readMetadata(task)?.request ?? {}),
           engine: output.engine,
-          width: output.width,
-          height: output.height,
+          requestId: task.requestId,
+          originalFileName: persisted.originalFileName,
           createdAt: this.dependencies.now?.() ?? new Date().toISOString(),
         },
       });
-      assets.push({ assetId, artifactId: persisted.artifactId });
+      assets.push({ assetId: registered.assetId, artifactId: persisted.artifactId, storageKey: persisted.storageKey, mediaType: persisted.mediaType, source: "generated" });
     }
 
     this.finalizedByRequestId.set(task.requestId, assets);

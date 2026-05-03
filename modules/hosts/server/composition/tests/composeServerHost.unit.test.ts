@@ -9,6 +9,7 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
+import { composeServerHost, resolveServerPythonRuntimeWorkerDirectory } from "../composeServerHost";
 import {
   composeServerHost,
   resolveServerComfyUiInstallRoot,
@@ -90,6 +91,30 @@ describe("composeServerHost", () => {
     expect(result.value.exists).toBe(false);
   });
 
+  it("composes top-level artifact repo storage before route-local model management logging exists", async () => {
+    const hubClient = {
+      fileExists: testDouble.fn(async () => false),
+      uploadFile: testDouble.fn(async () => undefined),
+      downloadFile: testDouble.fn(async () => new Response(new Uint8Array([]), { status: 200 })),
+    };
+
+    const host = composeServerHost({
+      artifactRepo: {
+        huggingFaceHubClient: hubClient,
+      },
+    });
+
+    const result = await host.artifactRepoStorage.hasArtifactInRepo({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/a.png",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it("uses updated host token configuration for Hugging Face store operations", async () => {
     const hubClient = {
       fileExists: testDouble.fn(async () => true),
@@ -129,7 +154,7 @@ describe("composeServerHost", () => {
       runtimeRootDirectory: "/tmp/server-runtime",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(14);
+    expect(app.post).toHaveBeenCalledTimes(25);
     expect(app.get).toHaveBeenCalledTimes(3);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
@@ -147,6 +172,17 @@ describe("composeServerHost", () => {
       "/api/artifact/source/verify",
       "/api/artifact/register-from-repo",
       "/api/artifact/localize-from-repo",
+      "/api/model/browse",
+      "/api/model/details",
+      "/api/model/list",
+      "/api/model/reference/save",
+      "/api/model/download",
+      "/api/model/record/update",
+      "/api/model/record/delete",
+      "/api/image-generation/start",
+      "/api/image-generation/read",
+      "/api/image-generation/cancel",
+      "/api/image-generation/finalize",
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
     expect(registeredGetPaths).toEqual(["/api/artifact/upload/policy", "/api/artifact/media/view", "/api/config/huggingface-token"]);
@@ -165,6 +201,59 @@ describe("composeServerHost", () => {
     expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
     expect(source).not.toContain("repoBrowser: artifactRepoStorage");
   });
+
+  it("throws clear error for invalid COMFYUI runtime mode", () => {
+    const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "vulkan";
+    const host = composeServerHost();
+    expect(() => host.registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-invalid-runtime" })).toThrow("Unsupported COMFYUI runtime mode");
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
+  });
+
+  it("accepts cpu and directml COMFYUI runtime modes", () => {
+    const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "cpu";
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-cpu" })).not.toThrow();
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "directml";
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-directml" })).not.toThrow();
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
+  });
+
+
+  it("wires server model download through python runtime instead of unavailable stub", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("pythonRuntimeFoundation.runtimePort.ensureModelDownloaded");
+    expect(source).not.toContain("Model download runtime is unavailable on server host.");
+  });
+
+  it("resolves the server Python runtime worker directory from the repository root when launched from app workspace", () => {
+    const workerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+      cwd: resolve("apps/server"),
+      startDirectory: resolve("dist/modules/hosts/server/composition"),
+      exists: (candidate) => candidate === resolve("modules/adapters/runtime/python/worker"),
+    });
+
+    expect(workerDirectory).toBe(resolve("modules/adapters/runtime/python/worker"));
+  });
+
+  it("keeps explicit server Python runtime worker directory overrides absolute", () => {
+    const workerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+      configuredWorkerDirectory: "custom/python-worker",
+      cwd: resolve("apps/server"),
+      exists: () => false,
+    });
+
+    expect(workerDirectory).toBe(resolve("apps/server/custom/python-worker"));
+  });
+
+  it("passes model-management logger into Hugging Face browse/details adapter", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("createHuggingFaceModelBrowseDetailsAdapter({");
+    expect(source).toContain("logger: modelManagementLogger");
+  });
+
 });
 
 describe("server runtime/comfy root resolution", () => {

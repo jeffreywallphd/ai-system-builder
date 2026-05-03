@@ -47,6 +47,8 @@ export function createLocalImageAssetRegistryAdapter(
       source: input.source,
       metadata: {
         createdAt: input.metadata?.createdAt ?? now(),
+        requestId: input.metadata?.requestId,
+        originalFileName: input.metadata?.originalFileName,
         prompt: input.metadata?.prompt,
         negativePrompt: input.metadata?.negativePrompt,
         seed: input.metadata?.seed,

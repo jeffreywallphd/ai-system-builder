@@ -1,4 +1,6 @@
 export interface ImageAssetMetadata {
+  requestId?: string;
+  originalFileName?: string;
   prompt?: string;
   negativePrompt?: string;
   seed?: number;
