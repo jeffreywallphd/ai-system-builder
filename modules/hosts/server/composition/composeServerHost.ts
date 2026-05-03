@@ -43,6 +43,11 @@ import {
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import { join, resolve } from "node:path";
+import {
+  buildComfyUiManagedPythonExecutablePath,
+  type ComfyUiPythonEnvironmentMode,
+} from "../../../adapters/runtime/comfyui/comfyUiPythonEnvironment";
+import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
 
 export interface ComposeServerHostLoggingOptions {
   verbosity?: string;
@@ -72,6 +77,53 @@ export interface RegisterServerApiOptions {
 }
 
 export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
+export type ServerComfyUiLaunchPythonExecutableSource = "ambient" | "managed-venv" | "skip-python-setup";
+
+function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRuntimeDeviceMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "auto" || normalized === "cpu" || normalized === "directml" || normalized === "cuda") return normalized;
+  return undefined;
+}
+
+function parseBooleanEnvFlag(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+export function resolveServerComfyUiPythonEnvironmentMode(env: NodeJS.ProcessEnv = process.env): {
+  pythonEnvironmentMode: ComfyUiPythonEnvironmentMode;
+  invalidValue?: string;
+} {
+  const raw = env.COMFYUI_PYTHON_ENVIRONMENT_MODE?.trim();
+  const normalized = raw?.toLowerCase();
+  if (!normalized) return { pythonEnvironmentMode: "managed-venv" };
+  if (normalized === "managed-venv" || normalized === "ambient") return { pythonEnvironmentMode: normalized };
+  return { pythonEnvironmentMode: "managed-venv", invalidValue: raw };
+}
+
+export function resolveServerComfyUiLaunchPythonExecutable(input: {
+  installRoot: string;
+  basePythonCommand: string;
+  pythonEnvironmentMode: ComfyUiPythonEnvironmentMode;
+  skipPythonSetup: boolean;
+  platform?: NodeJS.Platform;
+}): { launchPythonExecutable: string; source: ServerComfyUiLaunchPythonExecutableSource } {
+  if (input.pythonEnvironmentMode === "ambient") {
+    return { launchPythonExecutable: input.basePythonCommand, source: "ambient" };
+  }
+  if (input.skipPythonSetup) {
+    return { launchPythonExecutable: input.basePythonCommand, source: "skip-python-setup" };
+  }
+  return {
+    launchPythonExecutable: buildComfyUiManagedPythonExecutablePath({ installRoot: input.installRoot, platform: input.platform }),
+    source: "managed-venv",
+  };
+}
+
+export function resolveServerComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode {
+  return normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR) ?? "auto";
+}
 
 export function resolveServerRuntimeRootDirectory(input: {
   env?: NodeJS.ProcessEnv;
@@ -171,9 +223,33 @@ export function composeServerHost(
     },
     registerApi(registerOptions) {
       const runtimeResolution = resolveServerComfyUiInstallRoot({
+        env: process.env,
         storageRootDirectory: registerOptions.storageRootDirectory,
         runtimeRootDirectory: registerOptions.runtimeRootDirectory,
       });
+      const basePythonCommand = process.env.COMFYUI_PYTHON_COMMAND?.trim() || "python";
+      const { pythonEnvironmentMode, invalidValue: invalidPythonEnvironmentMode } = resolveServerComfyUiPythonEnvironmentMode(process.env);
+      const skipPythonSetup = parseBooleanEnvFlag(process.env.COMFYUI_SKIP_PYTHON_SETUP);
+      const skipPythonValidation = parseBooleanEnvFlag(process.env.COMFYUI_SKIP_PYTHON_VALIDATION);
+      const runtimeDeviceMode = resolveServerComfyUiRuntimeDeviceMode(process.env);
+      const launchPythonResolution = resolveServerComfyUiLaunchPythonExecutable({
+        installRoot: runtimeResolution.installRoot,
+        basePythonCommand,
+        pythonEnvironmentMode,
+        skipPythonSetup,
+      });
+      if (invalidPythonEnvironmentMode) {
+        void loggingPort.log({
+          timestamp: new Date().toISOString(),
+          level: "warn",
+          verbosity: "normal",
+          event: "runtime.comfyui.server.configuration",
+          host: "server",
+          component: "server-host",
+          message: "Invalid COMFYUI_PYTHON_ENVIRONMENT_MODE value. Falling back to managed-venv.",
+          data: { invalidComfyUiPythonEnvironmentMode: invalidPythonEnvironmentMode, fallbackPythonEnvironmentMode: "managed-venv" },
+        });
+      }
       void loggingPort.log({
         timestamp: new Date().toISOString(),
         level: "info",
@@ -189,7 +265,14 @@ export function composeServerHost(
           comfyUiInstallRootSource: runtimeResolution.source,
           storageRuntimeRootsDistinct: resolve(registerOptions.storageRootDirectory) !== resolve(runtimeResolution.runtimeRootDirectory),
           autoInstall: true,
-          runtimeDeviceMode: process.env.COMFYUI_RUNTIME_DEVICE_MODE ?? "auto",
+          runtimeDeviceMode,
+          pythonEnvironmentMode,
+          basePythonCommand,
+          launchPythonExecutable: launchPythonResolution.launchPythonExecutable,
+          launchPythonExecutableSource: launchPythonResolution.source,
+          skipPythonSetup,
+          skipPythonValidation,
+          installRootSource: runtimeResolution.source,
         },
       });
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({

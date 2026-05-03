@@ -9,7 +9,13 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
-import { composeServerHost, resolveServerComfyUiInstallRoot } from "../composeServerHost";
+import {
+  composeServerHost,
+  resolveServerComfyUiInstallRoot,
+  resolveServerComfyUiLaunchPythonExecutable,
+  resolveServerComfyUiPythonEnvironmentMode,
+  resolveServerComfyUiRuntimeDeviceMode,
+} from "../composeServerHost";
 
 describe("composeServerHost", () => {
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
@@ -187,5 +193,78 @@ describe("server runtime/comfy root resolution", () => {
     });
     expect(installRoot).toBe(resolve("/tmp/custom-comfy"));
     expect(source).toBe("COMFYUI_INSTALL_ROOT");
+  });
+});
+
+describe("server ComfyUI python/runtime resolution", () => {
+  it("defaults to managed-venv mode and managed launch executable", () => {
+    const mode = resolveServerComfyUiPythonEnvironmentMode({} as NodeJS.ProcessEnv);
+    expect(mode).toEqual({ pythonEnvironmentMode: "managed-venv" });
+    const launch = resolveServerComfyUiLaunchPythonExecutable({
+      installRoot: "/tmp/server-runtime/runtime-installs/comfyui",
+      basePythonCommand: "python",
+      pythonEnvironmentMode: mode.pythonEnvironmentMode,
+      skipPythonSetup: false,
+      platform: "linux",
+    });
+    expect(launch).toEqual({
+      launchPythonExecutable: "/tmp/server-runtime/runtime-installs/comfyui/.venv/bin/python",
+      source: "managed-venv",
+    });
+  });
+
+  it("uses ambient mode and COMFYUI_PYTHON_COMMAND as launch python", () => {
+    const mode = resolveServerComfyUiPythonEnvironmentMode({ COMFYUI_PYTHON_ENVIRONMENT_MODE: "ambient" } as NodeJS.ProcessEnv);
+    expect(mode.pythonEnvironmentMode).toBe("ambient");
+    const launch = resolveServerComfyUiLaunchPythonExecutable({
+      installRoot: "/tmp/comfy",
+      basePythonCommand: "python3.11",
+      pythonEnvironmentMode: mode.pythonEnvironmentMode,
+      skipPythonSetup: false,
+    });
+    expect(launch).toEqual({ launchPythonExecutable: "python3.11", source: "ambient" });
+  });
+
+  it("uses base python command when skip python setup is enabled", () => {
+    const launch = resolveServerComfyUiLaunchPythonExecutable({
+      installRoot: "/tmp/comfy",
+      basePythonCommand: "python-custom",
+      pythonEnvironmentMode: "managed-venv",
+      skipPythonSetup: true,
+    });
+    expect(launch).toEqual({ launchPythonExecutable: "python-custom", source: "skip-python-setup" });
+  });
+
+  it("falls back to managed-venv for invalid environment mode values", () => {
+    const mode = resolveServerComfyUiPythonEnvironmentMode({ COMFYUI_PYTHON_ENVIRONMENT_MODE: "global" } as NodeJS.ProcessEnv);
+    expect(mode).toEqual({ pythonEnvironmentMode: "managed-venv", invalidValue: "global" });
+  });
+
+  it("resolves runtime device mode from COMFYUI_RUNTIME_DEVICE_MODE and COMFYUI_ACCELERATOR", () => {
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "directml" } as NodeJS.ProcessEnv)).toBe("directml");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_ACCELERATOR: "cpu" } as NodeJS.ProcessEnv)).toBe("cpu");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "unknown" } as NodeJS.ProcessEnv)).toBe("auto");
+  });
+
+  it("logs structured ComfyUI python/runtime diagnostics", () => {
+    const sink = testDouble.fn();
+    const host = composeServerHost({ logSink: sink });
+    host.registerApi({
+      app: { post: testDouble.fn(), get: testDouble.fn() },
+      storageRootDirectory: "/tmp/server-storage",
+      runtimeRootDirectory: "/tmp/server-runtime",
+    });
+    const comfyLog = sink.mock.calls
+      .map((call) => call[1] as StructuredLogEvent)
+      .find((event) => event.event === "runtime.comfyui.server.configuration");
+    expect(comfyLog?.data).toMatchObject({
+      pythonEnvironmentMode: "managed-venv",
+      basePythonCommand: "python",
+      launchPythonExecutableSource: "managed-venv",
+      skipPythonSetup: false,
+      skipPythonValidation: false,
+      runtimeDeviceMode: "auto",
+      installRootSource: "SERVER_RUNTIME_ROOT",
+    });
   });
 });
