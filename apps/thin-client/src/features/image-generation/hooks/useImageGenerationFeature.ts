@@ -10,7 +10,7 @@ type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "fina
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
 export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; sampler: string; scheduler: string; model: string; numImages: string }
-const DOWNLOADED_STATUSES = new Set(["downloaded", "generated"]);
+const GENERATION_READY_STATUSES = new Set(["downloaded", "generated", "validated"]);
 const IMAGE_TAGS = new Set(["image-generation", "text-to-image"]);
 const CHECKPOINT_ARTIFACT_FORM = "checkpoint";
 const defaultImageGenerationClient = createApiImageGenerationClient();
@@ -23,7 +23,7 @@ export function isComfyUiCheckpointImageModel(model: ModelInventoryRecord): bool
 
 function rankInventoryModel(model: ModelInventoryRecord): number {
   let rank = 0;
-  if (DOWNLOADED_STATUSES.has(model.lifecycleStatus)) rank -= 100;
+  if (GENERATION_READY_STATUSES.has(model.lifecycleStatus)) rank -= 100;
   if (model.inferenceMode === "text-to-image") rank -= 20;
   if ((model.taskTags ?? []).some((tag) => IMAGE_TAGS.has(tag))) rank -= 10;
   if (model.artifactForm === CHECKPOINT_ARTIFACT_FORM) rank -= 10;
@@ -68,7 +68,7 @@ export function useImageGenerationFeature(
       const result = await modelClient.listModels();
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       const sorted = [...result.models].sort((a, b) => rankInventoryModel(a) - rankInventoryModel(b) || a.displayName.localeCompare(b.displayName));
-      const downloadedImageModel = sorted.find((m) => isComfyUiCheckpointImageModel(m) && DOWNLOADED_STATUSES.has(m.lifecycleStatus));
+      const downloadedImageModel = sorted.find((m) => isComfyUiCheckpointImageModel(m) && GENERATION_READY_STATUSES.has(m.lifecycleStatus));
       setModelInventory(sorted);
       console.info("[image-generation] inventory.list.success", { operation: "list", endpoint: "/api/model/list", totalModels: sorted.length, imageCandidates: sorted.filter(isComfyUiCheckpointImageModel).length, selectedModelRecordId: downloadedImageModel?.modelRecordId ?? "", manualFallback: !downloadedImageModel });
       setSelectedModelRecordId((current) => {
@@ -118,7 +118,7 @@ export function useImageGenerationFeature(
         setError("Selected server model is not a ComfyUI checkpoint image model. Choose a downloaded checkpoint image model or use the manual checkpoint override.");
         return;
       }
-      if (!DOWNLOADED_STATUSES.has(selectedModelRecord.lifecycleStatus)) {
+      if (!GENERATION_READY_STATUSES.has(selectedModelRecord.lifecycleStatus)) {
         setError("Selected server model is a saved reference only. Download a checkpoint-format image model before generating.");
         return;
       }
@@ -190,8 +190,8 @@ export function useImageGenerationFeature(
   }, [form.width, form.height, form.steps]);
 
   const imageGenerationModels = useMemo(() => modelInventory.filter(isComfyUiCheckpointImageModel), [modelInventory]);
-  const downloadedImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => DOWNLOADED_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
-  const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !DOWNLOADED_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
+  const downloadedImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => GENERATION_READY_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
+  const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !GENERATION_READY_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
 
   return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels };
 }

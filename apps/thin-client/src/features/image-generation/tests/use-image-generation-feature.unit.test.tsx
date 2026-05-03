@@ -49,10 +49,21 @@ describe("useImageGenerationFeature", () => {
     await act(async()=>{root.render(<Harness client={client} modelClient={modelClient1} />);});
     expect((c.querySelector("#selected") as HTMLElement).textContent).toBe("img");
 
-    const modelClient2 = { listModels: vi.fn().mockResolvedValue({ models: [model("txt", "downloaded", "chat"), model("ref", "registered", "text-to-image")] }) };
+    const modelClient2 = { listModels: vi.fn().mockResolvedValue({ models: [model("txt", "downloaded", "chat"), model("ref", "saved-reference", "text-to-image")] }) };
     await act(async()=>{root.render(<Harness client={client} modelClient={modelClient2} />);});
     expect((c.querySelector("#selected") as HTMLElement).textContent).toBe("");
     expect((c.querySelector("#downloaded") as HTMLElement).textContent).toBe("");
+  });
+
+
+
+  it("treats validated checkpoint image models as generation-ready inventory", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [model("validated", "validated", "text-to-image")] }) };
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<Harness client={client} modelClient={modelClient} />);});
+    expect((c.querySelector("#downloaded") as HTMLElement).textContent).toBe("validated");
+    expect((c.querySelector("#selected") as HTMLElement).textContent).toBe("validated");
   });
 
   it("classifies only checkpoint image models as ComfyUI generation candidates", () => {
@@ -62,7 +73,7 @@ describe("useImageGenerationFeature", () => {
 
   it("does not submit a selected reference-only checkpoint image model", async () => {
     const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
-    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [model("ref", "registered", "text-to-image")] }) };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [model("ref", "saved-reference", "text-to-image")] }) };
     function H() {
       const f = useImageGenerationFeature(client, undefined, modelClient);
       return <div><button id="select" onClick={() => f.setSelectedModelRecordId("ref")}>select</button><button id="prompt" onClick={() => f.setForm((x) => ({ ...x, prompt: "cat" }))}>prompt</button><button id="start" onClick={() => void f.start()}>start</button><span id="error">{f.error ?? ""}</span></div>;
