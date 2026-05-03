@@ -1,3 +1,4 @@
+import { formatImageGenerationModelDropdownLabel } from "../../../../../../modules/ui/shared";
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
 
 function formatModelOption(model: { displayName: string; modelId?: string; provider: string; lifecycleStatus: string; artifactForm: string; inferenceMode?: string }, referenceOnly = false): string {
@@ -7,7 +8,7 @@ function formatModelOption(model: { displayName: string; modelId?: string; provi
 export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onNavigateToModels }: { onGenerated?: () => void; onNavigateToArtifacts?: () => void; onNavigateToModels?: () => void } = {}) {
   const f = useImageGenerationFeature(undefined, () => onGenerated?.());
   const set = (k: keyof typeof f.form, v: string) => f.setForm((x) => ({ ...x, [k]: v }));
-  const selectedModelDownloaded = f.selectedModelRecord ? ["downloaded", "generated"].includes(f.selectedModelRecord.lifecycleStatus) : false;
+  const selectedModelDownloaded = f.selectedModelRecord ? ["downloaded", "generated", "validated"].includes(f.selectedModelRecord.lifecycleStatus) : false;
 
   return (
     <section className="ui-panel ui-stack ui-stack--sm" aria-label="Image Generation">
@@ -21,11 +22,11 @@ export function ImageGenerationFeature({ onGenerated, onNavigateToArtifacts, onN
             <select className="ui-input" id="image-generation-model-record" value={f.selectedModelRecordId} onChange={(e) => f.setSelectedModelRecordId((e.target as HTMLSelectElement).value)}>
               <option value="">Select a server model…</option>
               <optgroup label="Downloaded image models">
-                {f.downloadedImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatModelOption(model)}</option>)}
+                {f.downloadedImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatImageGenerationModelDropdownLabel(model)}</option>)}
               </optgroup>
               {f.referenceOnlyImageGenerationModels.length > 0 ? (
                 <optgroup label="Saved references / download required">
-                  {f.referenceOnlyImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatModelOption(model, true)}</option>)}
+                  {f.referenceOnlyImageGenerationModels.map((model) => <option key={model.modelRecordId} value={model.modelRecordId}>{formatImageGenerationModelDropdownLabel(model, true)}</option>)}
                 </optgroup>
               ) : null}
             </select>{" "}

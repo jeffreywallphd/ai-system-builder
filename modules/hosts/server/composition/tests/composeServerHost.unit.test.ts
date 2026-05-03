@@ -9,7 +9,7 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
-import { composeServerHost } from "../composeServerHost";
+import { composeServerHost, resolveServerPythonRuntimeWorkerDirectory } from "../composeServerHost";
 
 describe("composeServerHost", () => {
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
@@ -217,6 +217,26 @@ describe("composeServerHost", () => {
     const source = readFileSync(canonicalSourcePath, "utf8");
     expect(source).toContain("pythonRuntimeFoundation.runtimePort.ensureModelDownloaded");
     expect(source).not.toContain("Model download runtime is unavailable on server host.");
+  });
+
+  it("resolves the server Python runtime worker directory from the repository root when launched from app workspace", () => {
+    const workerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+      cwd: resolve("apps/server"),
+      startDirectory: resolve("dist/modules/hosts/server/composition"),
+      exists: (candidate) => candidate === resolve("modules/adapters/runtime/python/worker"),
+    });
+
+    expect(workerDirectory).toBe(resolve("modules/adapters/runtime/python/worker"));
+  });
+
+  it("keeps explicit server Python runtime worker directory overrides absolute", () => {
+    const workerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+      configuredWorkerDirectory: "custom/python-worker",
+      cwd: resolve("apps/server"),
+      exists: () => false,
+    });
+
+    expect(workerDirectory).toBe(resolve("apps/server/custom/python-worker"));
   });
 
   it("passes model-management logger into Hugging Face browse/details adapter", () => {

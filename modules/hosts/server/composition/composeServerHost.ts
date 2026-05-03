@@ -1,5 +1,6 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
 import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
 import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
@@ -66,6 +67,7 @@ import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 
 
 type ComfyUiRuntimeDeviceMode = "auto" | "cpu" | "directml" | "cuda";
+const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 
 function resolveComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode {
   const raw = env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR;
@@ -89,6 +91,44 @@ function parseNumberEnv(value: string | undefined, name: string): number | undef
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`${name} must be a positive number.`);
   return parsed;
+}
+
+export function resolveServerPythonRuntimeWorkerDirectory(input: {
+  configuredWorkerDirectory?: string;
+  cwd?: string;
+  startDirectory?: string;
+  exists?: (path: string) => boolean;
+} = {}): string {
+  const exists = input.exists ?? existsSync;
+  const configured = input.configuredWorkerDirectory?.trim();
+  if (configured) {
+    return isAbsolute(configured) ? configured : resolve(input.cwd ?? process.cwd(), configured);
+  }
+
+  const candidates: string[] = [];
+  const seedDirectories = [
+    input.cwd ?? process.cwd(),
+    process.env.INIT_CWD,
+    input.startDirectory,
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+  for (const seedDirectory of seedDirectories) {
+    let cursor = resolve(seedDirectory);
+    while (true) {
+      candidates.push(resolve(cursor, PYTHON_RUNTIME_WORKER_RELATIVE_PATH));
+      const parent = dirname(cursor);
+      if (parent === cursor) {
+        break;
+      }
+      cursor = parent;
+    }
+  }
+
+  if (candidates.length === 0) {
+    candidates.push(resolve(PYTHON_RUNTIME_WORKER_RELATIVE_PATH));
+  }
+
+  return candidates.find((candidate) => exists(candidate)) ?? candidates[0];
 }
 export interface ComposeServerHostLoggingOptions {
   verbosity?: string;
@@ -325,6 +365,9 @@ export function composeServerHost(
       const saveModelReferenceUseCase = new SaveModelReferenceUseCase({ modelRegistry });
       const pythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL?.trim() || "http://127.0.0.1:43111";
       const pythonRuntimeEndpoint = new URL(pythonRuntimeBaseUrl);
+      const pythonRuntimeWorkerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+        configuredWorkerDirectory: process.env.PYTHON_RUNTIME_WORKER_DIR,
+      });
       const pythonRuntimeEnvironment = {
         ...process.env,
         PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.hostname,
@@ -339,7 +382,7 @@ export function composeServerHost(
         supervisor: {
           command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
           args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
-          cwd: process.env.PYTHON_RUNTIME_WORKER_DIR ?? "modules/adapters/runtime/python/worker",
+          cwd: pythonRuntimeWorkerDirectory,
           env: pythonRuntimeEnvironment,
           prepareRuntimeEnvironment(context) {
             ensurePythonRuntimeWorkerDependencies({ command: context.command, cwd: context.cwd, env: context.env });

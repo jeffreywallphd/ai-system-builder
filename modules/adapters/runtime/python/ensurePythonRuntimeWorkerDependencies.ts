@@ -124,7 +124,7 @@ print(json.dumps(result))
 `.trim();
 
 function normalizeOutput(result: SpawnSyncReturns<string>): string {
-  const output = [result.stdout, result.stderr]
+  const output = [result.stdout, result.stderr, result.error?.message]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .join("\n")
     .trim();

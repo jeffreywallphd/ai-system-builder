@@ -313,6 +313,22 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
       })).toThrow("Unsupported Python version");
   });
 
+  it("includes spawn errors when environment inspection cannot execute", () => {
+    const spawnSyncImplementation = createSpawnSyncImplementation(() =>
+      createSpawnSyncResult({
+        status: null,
+        error: new Error("spawn python ENOENT"),
+      }));
+
+    expect(() =>
+      ensurePythonRuntimeWorkerDependencies({
+        command: "python",
+        cwd: "/tmp/runtime-worker",
+        spawnSyncImplementation: spawnSyncImplementation as any,
+        diagnosticsFile: "/tmp/diag.json",
+      })).toThrow("spawn python ENOENT");
+  });
+
   it("throws when final CPU verification fails after fallback", () => {
     const spawnSyncImplementation = createSpawnSyncImplementation((command, args) => {
       if (command === "python" && args[0] === "-c" && args[1]?.includes("asb:python-env-inspect")) {
