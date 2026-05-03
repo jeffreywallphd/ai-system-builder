@@ -254,6 +254,14 @@ describe("composeServerHost", () => {
     expect(source).toContain("logger: modelManagementLogger");
   });
 
+  it("prepares ComfyUI before synchronizing selected model checkpoints", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("createRuntimePreparedModelCheckpointResolver");
+    expect(source).toContain("runtime: comfyUiSupervisor");
+    expect(source).toContain("modelCheckpointResolver: localModelCheckpointResolver");
+  });
+
 });
 
 describe("server runtime/comfy root resolution", () => {

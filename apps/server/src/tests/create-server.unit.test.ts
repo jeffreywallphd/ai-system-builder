@@ -6,6 +6,7 @@ import type { StructuredLogEvent } from "../../../../modules/contracts/logging";
 
 import {
   DEFAULT_SERVER_PORT,
+  DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
   DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
   DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
   createServer,
@@ -23,7 +24,12 @@ describe("resolveServerRuntimeConfig", () => {
       path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     );
     expect(config.runtimeRootDirectory).toBe(
-      path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+      path.resolve(
+        "apps",
+        "server",
+        DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
+        DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
+      ),
     );
     expect(config.runtimeRootDirectory).not.toContain(config.storageRootDirectory);
   });
@@ -37,7 +43,11 @@ describe("resolveServerRuntimeConfig", () => {
       path.join(serverAppRootDirectory, DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     );
     expect(config.runtimeRootDirectory).toBe(
-      path.join(serverAppRootDirectory, DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+      path.join(
+        serverAppRootDirectory,
+        DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
+        DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
+      ),
     );
     expect(config.storageRootDirectory).not.toContain(path.join("apps", "server", "apps", "server"));
     expect(config.runtimeRootDirectory).not.toContain(path.join("apps", "server", "apps", "server"));
@@ -65,7 +75,12 @@ describe("resolveServerRuntimeConfig", () => {
       path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     );
     expect(resolveDefaultServerRuntimeRootDirectory()).toBe(
-      path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+      path.resolve(
+        "apps",
+        "server",
+        DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
+        DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
+      ),
     );
   });
 

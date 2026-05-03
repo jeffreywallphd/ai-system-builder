@@ -30,3 +30,9 @@ From this workspace directly:
   2. `HF_TOKEN`, then
   3. `HUGGING_FACE_TOKEN`.
 - Thin-client Hugging Face register/localize/publish/verify flows depend on this server-side configuration for private/gated repositories.
+
+## Local runtime state
+
+- `SERVER_STORAGE_ROOT` overrides server artifact storage.
+- `SERVER_RUNTIME_ROOT` overrides server-owned runtime state for ComfyUI, Python worker caches, and managed runtime dependencies.
+- Without overrides, server runtime state lives under `apps/server/.local/server-runtime`, which keeps dev runtime installs out of the source tree and separate from artifact storage.

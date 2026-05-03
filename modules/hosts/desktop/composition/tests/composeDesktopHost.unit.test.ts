@@ -408,6 +408,9 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("processReuse: modeChanged ? \"restarted_mode_changed\" : \"reused_or_started\"");
     expect(source).toContain("comfyUiInstaller,");
     expect(source).toContain("comfyUiInstallRoot,");
+    expect(source).toContain("createRuntimePreparedModelCheckpointResolver");
+    expect(source).toContain("runtime: comfyUiSupervisorPort");
+    expect(source).toContain("modelCheckpointResolver: localModelCheckpointResolver");
   });
 
   it("wires generated image finalization into desktop image generation IPC", () => {

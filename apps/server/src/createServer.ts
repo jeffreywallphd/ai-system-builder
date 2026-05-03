@@ -9,6 +9,7 @@ import type { StructuredLogSink } from "../../../modules/adapters/observability/
 
 export const DEFAULT_SERVER_PORT = 3010;
 export const DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME = "server-artifacts";
+export const DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME = ".local";
 export const DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME = "server-runtime";
 
 export interface ServerRuntimeConfig {
@@ -100,7 +101,11 @@ export function resolveDefaultServerStorageRootDirectory(options: ServerRootReso
 }
 
 export function resolveDefaultServerRuntimeRootDirectory(options: ServerRootResolutionOptions = {}): string {
-  return path.join(resolveServerAppRootDirectory(options), DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME);
+  return path.join(
+    resolveServerAppRootDirectory(options),
+    DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
+    DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
+  );
 }
 
 export function resolveServerRuntimeRootDirectory(

@@ -57,6 +57,7 @@ import {
   createHuggingFaceTokenConfigStore,
   type HuggingFaceTokenStatus,
 } from "../../shared/huggingFaceTokenConfigStore";
+import { createRuntimePreparedModelCheckpointResolver } from "../../shared/createRuntimePreparedModelCheckpointResolver";
 import {
   registerExpressApi,
   type RegisterExpressApiDependencies,
@@ -595,11 +596,15 @@ export function composeServerHost(
       });
       const updateModelRecordUseCase = new UpdateModelRecordUseCase({ modelRegistry });
       const deleteModelRecordUseCase = new DeleteModelRecordUseCase({ modelRegistry });
+      const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
+        modelRegistry,
+        comfyUiCheckpointDirectory: joinHostPath(comfyUiInstallRoot, "models", "checkpoints"),
+      });
       const generateImageUseCase = new GenerateImageUseCase({
         runtimeTaskRegistry,
-        modelCheckpointResolver: createLocalModelCheckpointResolverAdapter({
-          modelRegistry,
-          comfyUiCheckpointDirectory: joinHostPath(comfyUiInstallRoot, "models", "checkpoints"),
+        modelCheckpointResolver: createRuntimePreparedModelCheckpointResolver({
+          runtime: comfyUiSupervisor,
+          modelCheckpointResolver: localModelCheckpointResolver,
         }),
       });
 
