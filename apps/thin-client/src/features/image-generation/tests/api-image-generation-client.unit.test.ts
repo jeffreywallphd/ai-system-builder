@@ -21,6 +21,10 @@ describe("api image generation client", () => {
     expect(cancelled.cancelled).toBe(true);
     expect(fin.finalized).toBe(true);
     expect(c.createArtifactMediaViewUrl("foo/bar")).toBe("/api/artifact/media/view?storageKey=foo%2Fbar");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      headers: expect.objectContaining({ "x-client-source": "thin-client.image-generation" }),
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).not.toHaveProperty("source");
   });
 
   it("throws useful failure message with code", async () => {
