@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { describe, expect, it } from "../../../../modules/testing/node-test";
+import { readFileSync } from "node:fs";
 
 import {
   DEFAULT_SERVER_PORT,
@@ -8,7 +9,7 @@ import {
   DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
   resolveDefaultServerRuntimeRootDirectory,
   resolveDefaultServerStorageRootDirectory,
-  resolveServerRuntimeConfig,
+  resolveServerRuntimeConfig
 } from "../createServer";
 
 describe("resolveServerRuntimeConfig", () => {
@@ -48,5 +49,17 @@ path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     expect(resolveDefaultServerRuntimeRootDirectory()).toBe(
 path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
     );
+  });
+
+  it("createServer passes runtime root to registerApi", () => {
+    const source = readFileSync(path.resolve("apps/server/src/createServer.ts"), "utf8");
+    expect(source).toContain("runtimeRootDirectory: config.runtimeRootDirectory");
+    expect(source).toContain("storageRootDirectory: config.storageRootDirectory");
+  });
+
+  it("index startup log includes runtime root", () => {
+    const source = readFileSync(path.resolve("apps/server/src/index.ts"), "utf8");
+    expect(source).toContain("runtime root:");
+    expect(source).toContain("config.runtimeRootDirectory");
   });
 });
