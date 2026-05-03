@@ -95,3 +95,15 @@ When adding runtime-related functionality:
 3. Keep application use cases runtime-agnostic (depend on ports/contracts).
 4. Keep domain unaware of runtime mechanics.
 5. Record significant runtime decisions in ADRs when they affect long-term architecture.
+
+
+
+## Host-owned runtime instances
+
+Runtime contracts and adapters are shared; runtime instances are owned by the executing host. Runtime task records describe lifecycle semantics, not physical runtime location.
+
+Desktop and server may both use ComfyUI adapters, but each host owns its own process/install/cache state by default. Runtime roots store sidecar installs, managed Python environments, dependency state, caches, and temp outputs. Artifact storage stores durable user/system artifacts.
+
+`SERVER_RUNTIME_ROOT` and `SERVER_STORAGE_ROOT` should be separate. Remote execution placement should be implemented in host composition through adapter/client substitution, not by changing application/domain logic.
+
+ADR-0013 is the canonical cross-host runtime ownership ADR.

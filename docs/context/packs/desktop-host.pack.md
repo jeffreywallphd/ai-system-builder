@@ -37,6 +37,16 @@
 
 ## Key Constraints
 
+## Host-owned runtime execution guidance
+
+- Desktop renderer should keep using preload/IPC even when a feature later executes remotely.
+- Desktop host composition may later route features to local adapters or remote server API client adapters.
+- Do not put configured-server calls directly in desktop renderer components for runtime-heavy feature execution.
+- Desktop local runtime roots are desktop-owned.
+- Desktop and server runtime roots should not be shared by default.
+- See ADR-0013.
+
+
 - Do not turn IPC handlers into a miscellaneous service layer.
 - Keep desktop transport translation thin and contract-driven.
 - Keep IPC request/response/error envelopes transport-compatible and free of Electron object leakage.

@@ -349,3 +349,20 @@ describe("createComfyUiRuntimeSupervisor", () => {
     expect(installer.repairInstall.mock.calls[0]?.[0]?.metadata?.repairReason).toBe("torchvision");
   });
 });
+
+it("surfaces actionable guidance for unmanaged install root failures", async () => {
+  const installer = {
+    ensureInstalled: testDouble.fn(async () => ({ status: "failed" as const, error: { code: "unmanaged-install-root", message: "Install root is non-empty and unmanaged" } })),
+    repairInstall: testDouble.fn(),
+    getInstallStatus: testDouble.fn(),
+  };
+  const supervisor = createComfyUiRuntimeSupervisor({
+    workingDirectory: "/tmp/comfyui",
+    installRoot: "/tmp/comfyui",
+    autoInstall: true,
+    installer,
+    spawnImplementation: testDouble.fn() as never,
+  });
+
+  await expect(supervisor.start()).rejects.toThrow("Set COMFYUI_INSTALL_ROOT to a managed ComfyUI checkout, set SERVER_RUNTIME_ROOT to a clean runtime directory");
+});

@@ -36,6 +36,7 @@ export function App() {
 
     if (activePage === "models") {
       return <ModelsPage />;
+      return <ImageGenerationPage />;
     }
 
     return <HomePage onGoToArtifacts={() => {

@@ -37,6 +37,16 @@
 
 ## Key Constraints
 
+## Host-owned runtime and storage roots
+
+- Server may own runtime sidecars such as ComfyUI/Python when server is execution authority.
+- `SERVER_RUNTIME_ROOT` is the intended server runtime root override.
+- `SERVER_STORAGE_ROOT` is for artifact storage, not runtime installs.
+- Server model-management and image-generation should share server-owned model registry/cache only when server executes the feature.
+- Server host runtime state should not be shared with desktop by default.
+- See ADR-0013.
+
+
 - Do not accumulate business logic in routes/controllers/middleware.
 - Do not encode HTTP semantics into domain/application models.
 - Keep host wiring, transport translation, and application orchestration as separate responsibilities.

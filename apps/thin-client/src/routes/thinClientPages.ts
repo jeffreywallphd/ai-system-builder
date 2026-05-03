@@ -1,4 +1,5 @@
 export type ThinClientPageKey = "home" | "artifacts" | "image-generation" | "models";
+export type ThinClientPageKey = "home" | "artifacts" | "image-generation";
 
 export interface ThinClientPageDefinition {
   key: ThinClientPageKey;

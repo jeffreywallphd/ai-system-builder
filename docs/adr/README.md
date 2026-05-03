@@ -26,3 +26,11 @@ Use one of: `proposed`, `accepted`, `superseded`, `deprecated`.
 1. Create a new ADR from `template.md`.
 2. Link related ADRs and docs/context packs when relevant.
 3. Keep decision and rationale aligned with current code.
+
+
+## Current ADRs
+
+- ADR-0003: Host Model and Transport Separation
+- ADR-0012: Image Generation Runtime
+- ADR-0013: Host-Owned Runtime Execution and Feature Placement (important source for cross-host runtime ownership and feature execution-placement decisions)
+- ADR-0014: Runtime Installer Architecture
