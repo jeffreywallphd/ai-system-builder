@@ -67,3 +67,15 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - DirectML override env vars for torch companions are advanced controls and can break compatibility if set incorrectly.
 - When detected, the supervisor performs one managed dependency repair attempt and retries startup once before surfacing a clear actionable failure.
 - The repair flow is non-destructive: it repairs managed Python dependencies and does not delete models or ComfyUI repo files.
+
+
+
+## Host-owned execution and output ownership
+
+- Image generation can execute in desktop local mode, server/thin-client mode, or future desktop remote mode.
+- The executing host owns ComfyUI/Python runtime process/install/cache state.
+- Generated outputs finalize into the executing host artifact storage.
+- Thin-client and future desktop-remote UI should consume artifact-backed references/media URLs.
+- UI should not depend on ComfyUI temp output folders.
+- Model/checkpoint resolution belongs to the executing host.
+- Canonical references: ADR-0013 and ADR-0012.
