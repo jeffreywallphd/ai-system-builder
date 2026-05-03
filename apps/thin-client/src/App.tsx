@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { HomePage } from "./pages/HomePage";
+import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import {
   resolveThinClientPage,
   thinClientPageDefinitions,
@@ -10,7 +11,7 @@ import {
 } from "./routes/thinClientPages";
 
 function navigateToPage(page: ThinClientPageKey): void {
-  const path = page === "artifacts" ? "/artifacts" : "/";
+  const path = page === "artifacts" ? "/artifacts" : page === "image-generation" ? "/image-generation" : "/";
   window.history.pushState({}, "", path);
 }
 
@@ -26,6 +27,10 @@ export function App() {
           onUploaded={() => setArtifactRefreshToken((current) => current + 1)}
         />
       );
+    }
+
+    if (activePage === "image-generation") {
+      return <ImageGenerationPage />;
     }
 
     return <HomePage onGoToArtifacts={() => {
