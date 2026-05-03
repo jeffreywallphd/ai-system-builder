@@ -1,7 +1,7 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "../../../../modules/testing/node-test";
-import { readFileSync } from "node:fs";
 
 import {
   DEFAULT_SERVER_PORT,
@@ -9,7 +9,8 @@ import {
   DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
   resolveDefaultServerRuntimeRootDirectory,
   resolveDefaultServerStorageRootDirectory,
-  resolveServerRuntimeConfig
+  resolveServerAppRootDirectory,
+  resolveServerRuntimeConfig,
 } from "../createServer";
 
 describe("resolveServerRuntimeConfig", () => {
@@ -17,12 +18,27 @@ describe("resolveServerRuntimeConfig", () => {
     const config = resolveServerRuntimeConfig({});
     expect(config.port).toBe(DEFAULT_SERVER_PORT);
     expect(config.storageRootDirectory).toBe(
-path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
+      path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     );
     expect(config.runtimeRootDirectory).toBe(
-path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+      path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
     );
     expect(config.runtimeRootDirectory).not.toContain(config.storageRootDirectory);
+  });
+
+  it("resolves default server roots from the app workspace cwd without duplicating apps/server", () => {
+    const serverAppRootDirectory = path.resolve("apps", "server");
+    const config = resolveServerRuntimeConfig({}, { cwd: serverAppRootDirectory });
+
+    expect(resolveServerAppRootDirectory({ cwd: serverAppRootDirectory, env: {} })).toBe(serverAppRootDirectory);
+    expect(config.storageRootDirectory).toBe(
+      path.join(serverAppRootDirectory, DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
+    );
+    expect(config.runtimeRootDirectory).toBe(
+      path.join(serverAppRootDirectory, DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+    );
+    expect(config.storageRootDirectory).not.toContain(path.join("apps", "server", "apps", "server"));
+    expect(config.runtimeRootDirectory).not.toContain(path.join("apps", "server", "apps", "server"));
   });
 
   it("honors SERVER_STORAGE_ROOT override when provided without moving runtime root", () => {
@@ -44,10 +60,10 @@ path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
 
   it("exposes stable default storage/runtime roots in CJS runtime", () => {
     expect(resolveDefaultServerStorageRootDirectory()).toBe(
-path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
+      path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     );
     expect(resolveDefaultServerRuntimeRootDirectory()).toBe(
-path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+      path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
     );
   });
 
