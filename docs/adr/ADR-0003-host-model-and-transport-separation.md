@@ -59,6 +59,15 @@ Merging concerns obscures ownership boundaries and increases the risk that lifec
 
 ## Consequences
 
+## Related follow-up clarification
+
+ADR-0003 separates host responsibilities from transport responsibilities. ADR-0013 builds on this by defining host-owned runtime execution and future per-feature execution placement.
+
+Desktop remote execution (future work) must preserve renderer -> preload/IPC boundaries. Remote delegation should be selected in desktop host composition, not in renderer components.
+
+- Related: ADR-0013
+
+
 ### Positive
 
 - Application logic remains reusable across desktop and server host models.

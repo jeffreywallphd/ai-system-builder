@@ -6,10 +6,12 @@ import { composeServerHost } from "../../../modules/hosts/server";
 
 export const DEFAULT_SERVER_PORT = 3010;
 export const DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME = "server-artifacts";
+export const DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME = "server-runtime";
 
 export interface ServerRuntimeConfig {
   port: number;
   storageRootDirectory: string;
+  runtimeRootDirectory: string;
 }
 
 export interface CreateServerOptions {
@@ -31,22 +33,32 @@ function normalizePort(rawPort: string | undefined): number {
 }
 
 export function resolveDefaultServerStorageRootDirectory(): string {
-  return path.resolve(
-    __dirname,
-    "..",
-    DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
-  );
+  return path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME);
+}
+
+export function resolveDefaultServerRuntimeRootDirectory(): string {
+  return path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME);
+}
+
+export function resolveServerRuntimeRootDirectory(env: NodeJS.ProcessEnv = process.env): string {
+  const runtimeRootFromEnv = env.SERVER_RUNTIME_ROOT?.trim();
+  return runtimeRootFromEnv && runtimeRootFromEnv.length > 0
+    ? path.resolve(runtimeRootFromEnv)
+    : resolveDefaultServerRuntimeRootDirectory();
 }
 
 export function resolveServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env): ServerRuntimeConfig {
   const storageRootFromEnv = env.SERVER_STORAGE_ROOT?.trim();
 
+  const storageRootDirectory =
+    storageRootFromEnv && storageRootFromEnv.length > 0
+      ? path.resolve(storageRootFromEnv)
+      : resolveDefaultServerStorageRootDirectory();
+
   return {
     port: normalizePort(env.PORT),
-    storageRootDirectory:
-      storageRootFromEnv && storageRootFromEnv.length > 0
-        ? path.resolve(storageRootFromEnv)
-        : resolveDefaultServerStorageRootDirectory(),
+    storageRootDirectory,
+    runtimeRootDirectory: resolveServerRuntimeRootDirectory(env),
   };
 }
 
@@ -69,6 +81,7 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
   serverHost.registerApi({
     app,
     storageRootDirectory: config.storageRootDirectory,
+    runtimeRootDirectory: config.runtimeRootDirectory,
   });
 
   return {
