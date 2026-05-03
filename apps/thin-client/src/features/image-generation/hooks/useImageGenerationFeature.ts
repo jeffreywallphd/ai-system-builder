@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImageGenerationRequest } from "../../../../../../modules/contracts/image-generation";
 import type { ModelInventoryRecord } from "../../../../../../modules/contracts/model";
 import type { RuntimeTaskRecord, RuntimeTaskStatus } from "../../../../../../modules/contracts/runtime";
+import {
+  isImageGenerationModelCandidate,
+  isImageGenerationModelReady,
+  toImageGenerationModelDropdownOption,
+} from "../../../../../../modules/ui/shared";
 import { createApiModelManagementClient, type ModelManagementApiClient } from "../../model-management/api/apiModelManagementClient";
 import { createApiImageGenerationClient, type FinalizedImageAsset, type ImageGenerationApiClient } from "../api/apiImageGenerationClient";
 
@@ -10,23 +15,19 @@ type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "fina
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
 export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; sampler: string; scheduler: string; model: string; numImages: string }
-const GENERATION_READY_STATUSES = new Set(["downloaded", "generated", "validated"]);
-const IMAGE_TAGS = new Set(["image-generation", "text-to-image"]);
-const CHECKPOINT_ARTIFACT_FORM = "checkpoint";
 const defaultImageGenerationClient = createApiImageGenerationClient();
 const defaultModelManagementClient = createApiModelManagementClient();
 
-export function isComfyUiCheckpointImageModel(model: ModelInventoryRecord): boolean {
-  return model.artifactForm === CHECKPOINT_ARTIFACT_FORM
-    && (model.inferenceMode === "text-to-image" || (model.taskTags ?? []).some((tag) => IMAGE_TAGS.has(tag)));
+export function isServerInventoryImageGenerationModel(model: ModelInventoryRecord): boolean {
+  return isImageGenerationModelCandidate(model);
 }
 
 function rankInventoryModel(model: ModelInventoryRecord): number {
   let rank = 0;
-  if (GENERATION_READY_STATUSES.has(model.lifecycleStatus)) rank -= 100;
+  if (isImageGenerationModelReady(model)) rank -= 100;
   if (model.inferenceMode === "text-to-image") rank -= 20;
-  if ((model.taskTags ?? []).some((tag) => IMAGE_TAGS.has(tag))) rank -= 10;
-  if (model.artifactForm === CHECKPOINT_ARTIFACT_FORM) rank -= 10;
+  if ((model.taskTags ?? []).some((tag) => tag === "text-to-image")) rank -= 10;
+  if (model.artifactForm === "checkpoint") rank -= 10;
   return rank;
 }
 
@@ -68,11 +69,11 @@ export function useImageGenerationFeature(
       const result = await modelClient.listModels();
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       const sorted = [...result.models].sort((a, b) => rankInventoryModel(a) - rankInventoryModel(b) || a.displayName.localeCompare(b.displayName));
-      const downloadedImageModel = sorted.find((m) => isComfyUiCheckpointImageModel(m) && GENERATION_READY_STATUSES.has(m.lifecycleStatus));
+      const downloadedImageModel = sorted.find((m) => isServerInventoryImageGenerationModel(m) && isImageGenerationModelReady(m));
       setModelInventory(sorted);
-      console.info("[image-generation] inventory.list.success", { operation: "list", endpoint: "/api/model/list", totalModels: sorted.length, imageCandidates: sorted.filter(isComfyUiCheckpointImageModel).length, selectedModelRecordId: downloadedImageModel?.modelRecordId ?? "", manualFallback: !downloadedImageModel });
+      console.info("[image-generation] inventory.list.success", { operation: "list", endpoint: "/api/model/list", totalModels: sorted.length, imageCandidates: sorted.filter(isServerInventoryImageGenerationModel).length, selectedModelRecordId: downloadedImageModel?.modelRecordId ?? "", manualFallback: !downloadedImageModel });
       setSelectedModelRecordId((current) => {
-        if (current && sorted.some((m) => m.modelRecordId === current && isComfyUiCheckpointImageModel(m))) return current;
+        if (current && sorted.some((m) => m.modelRecordId === current && isServerInventoryImageGenerationModel(m))) return current;
         if (downloadedImageModel) return downloadedImageModel.modelRecordId;
         return "";
       });
@@ -114,12 +115,12 @@ export function useImageGenerationFeature(
     if (ACTIVE_STATUSES.includes(status)) return;
     if (validationError) { setError(validationError); return; }
     if (selectedModelRecord) {
-      if (!isComfyUiCheckpointImageModel(selectedModelRecord)) {
-        setError("Selected server model is not a ComfyUI checkpoint image model. Choose a downloaded checkpoint image model or use the manual checkpoint override.");
+      if (!isServerInventoryImageGenerationModel(selectedModelRecord)) {
+        setError("Selected server model is not an image generation model. Choose a downloaded image model or use the manual checkpoint override.");
         return;
       }
-      if (!GENERATION_READY_STATUSES.has(selectedModelRecord.lifecycleStatus)) {
-        setError("Selected server model is a saved reference only. Download a checkpoint-format image model before generating.");
+      if (!isImageGenerationModelReady(selectedModelRecord)) {
+        setError("Selected server model is a saved reference only. Download the image model before generating.");
         return;
       }
     }
@@ -189,9 +190,10 @@ export function useImageGenerationFeature(
     return undefined;
   }, [form.width, form.height, form.steps]);
 
-  const imageGenerationModels = useMemo(() => modelInventory.filter(isComfyUiCheckpointImageModel), [modelInventory]);
-  const downloadedImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => GENERATION_READY_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
-  const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !GENERATION_READY_STATUSES.has(m.lifecycleStatus)), [imageGenerationModels]);
+  const imageGenerationModels = useMemo(() => modelInventory.filter(isServerInventoryImageGenerationModel), [modelInventory]);
+  const downloadedImageGenerationModels = useMemo(() => imageGenerationModels.filter(isImageGenerationModelReady), [imageGenerationModels]);
+  const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !isImageGenerationModelReady(m)), [imageGenerationModels]);
+  const imageGenerationModelOptions = useMemo(() => imageGenerationModels.map(toImageGenerationModelDropdownOption).filter((option): option is NonNullable<typeof option> => Boolean(option)), [imageGenerationModels]);
 
-  return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels };
+  return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions };
 }

@@ -1,10 +1,10 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isComfyUiCheckpointImageModel, useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
+import { isServerInventoryImageGenerationModel, useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
 
 function model(modelRecordId: string, lifecycleStatus: string, inferenceMode = "text-to-image", artifactForm = "checkpoint") {
-  return { modelRecordId, displayName: modelRecordId, modelId: `id/${modelRecordId}`, provider: "hf", source: "huggingface", artifactForm, lifecycleStatus, inferenceMode, taskTags: inferenceMode === "text-to-image" ? ["image-generation"] : ["chat"] };
+  return { modelRecordId, displayName: modelRecordId, modelId: `id/${modelRecordId}`, provider: "hf", source: "huggingface", artifactForm, lifecycleStatus, inferenceMode, taskTags: inferenceMode === "text-to-image" ? ["text-to-image"] : ["chat"] };
 }
 
 function flush() { return new Promise((resolve) => setTimeout(resolve, 0)); }
@@ -42,11 +42,12 @@ describe("useImageGenerationFeature", () => {
     expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ model: "manual.ckpt" }));
   });
 
-  it("auto-selects downloaded checkpoint image model, not downloaded non-image or full-model records", async () => {
+  it("auto-selects downloaded image model records across server inventory model forms", async () => {
     const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
     const modelClient1 = { listModels: vi.fn().mockResolvedValue({ models: [model("txt", "downloaded", "chat"), model("full", "downloaded", "text-to-image", "full-model"), model("img", "downloaded", "text-to-image")] }) };
     const c = document.createElement("div"); const root = createRoot(c);
     await act(async()=>{root.render(<Harness client={client} modelClient={modelClient1} />);});
+    expect((c.querySelector("#downloaded") as HTMLElement).textContent).toBe("img,full");
     expect((c.querySelector("#selected") as HTMLElement).textContent).toBe("img");
 
     const modelClient2 = { listModels: vi.fn().mockResolvedValue({ models: [model("txt", "downloaded", "chat"), model("ref", "saved-reference", "text-to-image")] }) };
@@ -66,9 +67,11 @@ describe("useImageGenerationFeature", () => {
     expect((c.querySelector("#selected") as HTMLElement).textContent).toBe("validated");
   });
 
-  it("classifies only checkpoint image models as ComfyUI generation candidates", () => {
-    expect(isComfyUiCheckpointImageModel(model("openelm", "downloaded", "chat", "full-model") as any)).toBe(false);
-    expect(isComfyUiCheckpointImageModel(model("sdxl", "downloaded", "text-to-image", "checkpoint") as any)).toBe(true);
+  it("classifies image models across supported server inventory artifact forms", () => {
+    expect(isServerInventoryImageGenerationModel(model("openelm", "downloaded", "chat", "full-model") as any)).toBe(false);
+    expect(isServerInventoryImageGenerationModel(model("sdxl", "downloaded", "text-to-image", "checkpoint") as any)).toBe(true);
+    expect(isServerInventoryImageGenerationModel(model("sdxl-full", "downloaded", "text-to-image", "full-model") as any)).toBe(true);
+    expect(isServerInventoryImageGenerationModel({ ...model("stable-diffusion-xl-base-1.0", "downloaded", undefined as any, "full-model"), inferenceMode: undefined, taskTags: undefined } as any)).toBe(true);
   });
 
   it("does not submit a selected reference-only checkpoint image model", async () => {
