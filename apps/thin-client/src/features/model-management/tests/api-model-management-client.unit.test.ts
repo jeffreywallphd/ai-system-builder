@@ -36,3 +36,9 @@ describe('api model management client',()=>{
   await expect(createApiModelManagementClient().listModels()).rejects.toThrow('missing models array');
  });
 });
+
+
+it('preserves security status/code for unauthorized errors', async()=>{
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({headers:{get:()=> 'application/json'},status:401,json:vi.fn().mockResolvedValue({ok:false,error:{message:'Missing bearer token.',code:'security.unauthenticated',details:{}}})}));
+  await expect(createApiModelManagementClient().listModels()).rejects.toMatchObject({status:401, code:'security.unauthenticated'});
+});

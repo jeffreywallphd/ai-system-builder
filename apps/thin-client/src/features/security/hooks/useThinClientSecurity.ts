@@ -3,7 +3,7 @@ import { pairedDeviceTokenStore } from "../../../security/pairedDeviceTokenStore
 import { createSecurityApiClient } from "../../../security/securityApiClient";
 import { FORBIDDEN_GUIDANCE, toSecurityGuidance, type ThinClientSecurityError } from "../../../security/securityErrors";
 
-type SecurityUiState = "loading" | "disabled-dev" | "unpaired" | "paired" | "pairing" | "pairing-failed" | "unauthorized" | "error";
+type SecurityUiState = "loading" | "disabled-dev" | "unpaired" | "paired" | "token-invalid" | "pairing" | "pairing-failed" | "unauthorized" | "error";
 
 export function useThinClientSecurity() {
   const api = useMemo(() => createSecurityApiClient(), []);
@@ -29,14 +29,7 @@ export function useThinClientSecurity() {
   }, [api, loadStatus]);
 
   const clearLocalPairing = useCallback(() => { pairedDeviceTokenStore.clearToken(); setError(undefined); }, []);
-  const revokeCurrentToken = useCallback(async () => {
-    const deviceId = status?.currentPrincipal?.deviceId;
-    if (!deviceId) return;
-    await api.revokeCurrentToken(deviceId);
-    pairedDeviceTokenStore.clearToken();
-    await loadStatus();
-  }, [api, loadStatus, status]);
-
+  const guidance = toSecurityGuidance(error);
   const uiState: SecurityUiState = useMemo(() => {
     if (!status && !error) return "loading";
     if (pairingBusy) return "pairing";
@@ -46,9 +39,10 @@ export function useThinClientSecurity() {
     if (guidance) return "unpaired";
     if (error && status?.mode === "lan-https-token") return "pairing-failed";
     if (status?.mode === "lan-https-token" && !pairedDeviceTokenStore.hasToken()) return "unpaired";
-    if (status?.mode === "lan-https-token" && pairedDeviceTokenStore.hasToken()) return "paired";
+    if (status?.mode === "lan-https-token" && pairedDeviceTokenStore.hasToken() && status?.currentPrincipal) return "paired";
+    if (status?.mode === "lan-https-token" && pairedDeviceTokenStore.hasToken() && guidance) { if (error?.status === 401) { pairedDeviceTokenStore.clearToken(); return "token-invalid"; } }
     return error ? "error" : "loading";
-  }, [error, pairingBusy, status]);
+  }, [error, guidance, pairingBusy, status]);
 
-  return { uiState, status, error, guidance: toSecurityGuidance(error), completePairing, clearLocalPairing, revokeCurrentToken, hasToken: pairedDeviceTokenStore.hasToken() };
+  return { uiState, status, error, guidance, completePairing, clearLocalPairing, hasToken: pairedDeviceTokenStore.hasToken() };
 }

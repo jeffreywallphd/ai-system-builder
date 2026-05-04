@@ -163,12 +163,12 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
   const app = express();
   app.use(express.json({ limit: "5mb" }));
   applySecurityHeaders(app);
+  app.use(security.middleware);
   registerSecurityRoutes(app, {
-    getStatus: () => security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date() }),
+    getStatus: (authContext) => security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date(), currentAuthContext: authContext as any }),
     completePairing: (body) => security.services.completePairing.execute(body),
     revokeToken: (body) => security.credentials.revokeDevice({ deviceId: (body as any)?.deviceId, revokedAt: new Date() }),
   });
-  app.use(security.middleware);
 
   serverHost.registerApi({
     app,

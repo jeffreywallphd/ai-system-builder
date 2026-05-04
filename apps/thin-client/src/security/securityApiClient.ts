@@ -3,8 +3,8 @@ import type { ThinClientSecurityError } from "./securityErrors";
 
 interface ApiEnvelope { ok: boolean; value?: unknown; error?: { code?: string; message?: string; details?: unknown; endpoint?: string } }
 
-export interface SecurityStatusResult { mode: "disabled-dev" | "lan-https-token"; currentPrincipal?: { displayName?: string; deviceName?: string; deviceId?: string } }
-export interface CompletePairingRequest { pairingCode: string; deviceName?: string }
+export interface SecurityStatusResult { mode: "disabled-dev" | "lan-https-token"; httpsEnabled: boolean; httpsRequired: boolean; authRequired: boolean; pairingEnabled: boolean; pairedDeviceCount?: number; currentPrincipal?: { displayName?: string; deviceName?: string; deviceId?: string } }
+export interface CompletePairingRequest { pairingCode: string; deviceName?: string; requestedScopes?: string[] }
 export interface CompletePairingResult { bearerToken: string; deviceId?: string; deviceName?: string; grantedScopes?: string[] }
 
 const apiUrl = (base: string, suffix: string) => `${base.trim().replace(/\/+$/, "") || "/api"}${suffix}`;
@@ -34,12 +34,8 @@ export function createSecurityApiClient(options: { apiBaseUrl?: string } = {}) {
       return value as SecurityStatusResult;
     },
     completePairing: async (request: CompletePairingRequest): Promise<CompletePairingResult> => {
-      const value = await send(apiBaseUrl, "/security/pairing/complete", { method: "POST", headers: { "content-type": "application/json", "x-client-source": "thin-client.security" }, body: JSON.stringify({ pairingCode: request.pairingCode, deviceName: request.deviceName }) }, false);
+      const value = await send(apiBaseUrl, "/security/pairing/complete", { method: "POST", headers: { "content-type": "application/json", "x-client-source": "thin-client.security" }, body: JSON.stringify({ pairingCode: request.pairingCode, deviceName: request.deviceName, requestedScopes: request.requestedScopes }) }, false);
       return value as CompletePairingResult;
-    },
-    revokeCurrentToken: async (deviceId: string): Promise<{ revoked: boolean; deviceId: string }> => {
-      const value = await send(apiBaseUrl, "/security/token/revoke", { method: "POST", headers: { "content-type": "application/json", "x-client-source": "thin-client.security" }, body: JSON.stringify({ deviceId }) }, true);
-      return value as { revoked: boolean; deviceId: string };
     },
   };
 }

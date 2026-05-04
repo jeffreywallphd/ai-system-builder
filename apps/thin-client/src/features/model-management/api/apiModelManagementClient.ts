@@ -2,16 +2,17 @@ import { secureFetch } from "../../../security/secureFetch";
 import type { BrowseModelsRequest, BrowseModelsResult, DeleteModelRecordRequest, DeleteModelRecordResult, DownloadModelRequest, DownloadModelResult, GetModelDetailsRequest, GetModelDetailsResult, ListModelsRequest, ListModelsResult, SaveModelReferenceRequest, SaveModelReferenceResult, UpdateModelRecordRequest, UpdateModelRecordResult } from "../../../../../../modules/contracts/model";
 
 import { logThinClientDiagnostic } from "../../../diagnostics/thinClientDiagnostics";
+import { parseApiEnvelope, toThinClientApiError } from "../../../security/apiErrorEnvelope";
 
 type ApiEnvelope = { ok: boolean; value?: unknown; error?: { message?: string; code?: string; details?: unknown } };
 type Operation = "browse"|"details"|"list"|"save"|"download"|"update"|"delete";
 
-export class ModelManagementApiError extends Error { constructor(message: string, public readonly code?: string, public readonly details?: unknown) { super(message); }}
+export class ModelManagementApiError extends Error { constructor(message: string, public readonly code?: string, public readonly details?: unknown, public readonly status?: number, public readonly endpoint?: string) { super(message); }}
 export interface ModelManagementApiClient { browseModels:(input:BrowseModelsRequest)=>Promise<BrowseModelsResult>; getModelDetails:(input:GetModelDetailsRequest)=>Promise<GetModelDetailsResult>; listModels:(input?:ListModelsRequest)=>Promise<ListModelsResult>; saveModelReference:(input:SaveModelReferenceRequest)=>Promise<SaveModelReferenceResult>; downloadModel:(input:DownloadModelRequest)=>Promise<DownloadModelResult>; updateModelRecord:(input:UpdateModelRecordRequest)=>Promise<UpdateModelRecordResult>; deleteModelRecord:(input:DeleteModelRecordRequest)=>Promise<DeleteModelRecordResult>; }
 const apiUrl = (b: string, s: string) => `${b.trim().replace(/\/+$/, "") || "/api"}${s}`;
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
-const ensureEnvelope = (v: unknown): ApiEnvelope => { if (isObject(v) && "ok" in v) return v as ApiEnvelope; throw new ModelManagementApiError("Model management response is not a valid API envelope.", "invalid_envelope", v); };
-const asError = (e: ApiEnvelope) => new ModelManagementApiError(e.error?.message ?? "Model management request failed.", e.error?.code, e.error?.details);
+const ensureEnvelope = (v: unknown): ApiEnvelope => { try { return parseApiEnvelope(v) as ApiEnvelope; } catch { throw new ModelManagementApiError("Model management response is not a valid API envelope.", "invalid_envelope", v); } };
+const asError = (e: ApiEnvelope, status:number, endpoint:string) => { const apiError = toThinClientApiError(status, endpoint, e as any); return new ModelManagementApiError(apiError.message, apiError.code, apiError.details, apiError.status, apiError.endpoint); };
 const requireObject = (value: unknown, message: string) => { if (!isObject(value)) throw new ModelManagementApiError(message, "invalid_payload", value); return value; };
 const requireModels = (value: unknown, message: string) => { const obj = requireObject(value, message); if (!Array.isArray(obj.models)) throw new ModelManagementApiError(message, "invalid_payload", value); return obj; };
 const timeouts:Record<Operation,number>={list:15000,details:15000,save:15000,delete:15000,update:15000,browse:30000,download:120000};
@@ -29,7 +30,7 @@ const post = async <T>(base: string, path: string, operation:Operation, body: Re
     try { raw = await response.json(); } catch { logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"response.invalid_json",message:"Response JSON parse failed",metadata:{...detail,status:response.status,elapsedMs}}); throw new ModelManagementApiError("Model management response was not valid JSON.", "invalid_json"); }
     let envelope:ApiEnvelope;
     try { envelope = ensureEnvelope(raw); } catch (error) { logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"response.malformed_envelope",message:"Response envelope was malformed",metadata:{...detail,status:response.status,elapsedMs,errorMessage:error instanceof Error?error.message:String(error)}}); throw error; }
-    if (!envelope.ok) { const err=asError(envelope); logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"request.failure",message:err.message,metadata:{...detail,status:response.status,elapsedMs,code:err.code}}); throw err; }
+    if (!envelope.ok) { const err=asError(envelope,response.status,endpoint); logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"request.failure",message:err.message,metadata:{...detail,status:response.status,elapsedMs,code:err.code}}); throw err; }
     logThinClientDiagnostic("info",{feature:"model-management",operation,phase:"request.success",message:"Request success",metadata:{...detail,status:response.status,elapsedMs}});
     return pick(envelope.value);
   } catch (error) {
