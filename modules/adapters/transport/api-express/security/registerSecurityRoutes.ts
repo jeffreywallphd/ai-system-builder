@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createApiError, createApiFailureResponse, createApiSuccessResponse } from "../../../../contracts/api";
-import { SECURITY_SCOPES, type CompleteLanPairingRequest, type SecurityScope } from "../../../../contracts/security";
+import { SECURITY_SCOPES, SecurityApplicationError, type CompleteLanPairingRequest, type SecurityScope, type AuthContext } from "../../../../contracts/security";
+import { createSecurityApiFailure, mapSecurityFailure } from "./createSecurityApiFailure";
 import { getExpressAuthContext } from "./expressAuthContext";
 
 interface RevokeRequest { deviceId: string }
@@ -29,11 +30,16 @@ function normalizePairingRequest(value: unknown): CompleteLanPairingRequest {
   return normalized;
 }
 
-export function registerSecurityRoutes(app: Express, deps: { getStatus: (authContext?: unknown) => Promise<unknown>; completePairing: (body: CompleteLanPairingRequest) => Promise<unknown>; revokeToken: (body: RevokeRequest) => Promise<unknown> }) {
+export function registerSecurityRoutes(app: Express, deps: { getStatus: (authContext?: AuthContext) => Promise<unknown>; completePairing: (body: CompleteLanPairingRequest) => Promise<unknown>; revokeToken: (body: RevokeRequest) => Promise<unknown> }) {
   app.get('/api/security/status', async (req, res) => {
     try {
       res.status(200).json(createApiSuccessResponse("security.status", await deps.getStatus(getExpressAuthContext(req))));
     } catch (error) {
+      if (error instanceof SecurityApplicationError) {
+        const mapped = mapSecurityFailure(error);
+        res.status(mapped.status).json(createSecurityApiFailure(mapped));
+        return;
+      }
       const message = error instanceof Error ? error.message : "Security status failed.";
       res.status(500).json(createApiFailureResponse(createApiError("security.status", "internal", message)));
     }
@@ -43,6 +49,11 @@ export function registerSecurityRoutes(app: Express, deps: { getStatus: (authCon
     try {
       res.status(200).json(createApiSuccessResponse("security.pairing.complete", await deps.completePairing(normalizePairingRequest(req.body))));
     } catch (error) {
+      if (error instanceof SecurityApplicationError) {
+        const mapped = mapSecurityFailure(error);
+        res.status(mapped.status).json(createSecurityApiFailure(mapped));
+        return;
+      }
       res.status(400).json(createApiFailureResponse(createApiError("security.pairing.complete", "validation", error instanceof Error ? error.message : "Invalid pairing request.")));
     }
   });
@@ -51,8 +62,13 @@ export function registerSecurityRoutes(app: Express, deps: { getStatus: (authCon
     try {
       const body = asRecord(req.body);
       if (typeof body.deviceId !== "string" || body.deviceId.trim().length < 1) throw new Error("deviceId is required.");
-      res.status(200).json(createApiSuccessResponse("security.token.revoke", await deps.revokeToken({ deviceId: body.deviceId })));
+      res.status(200).json(createApiSuccessResponse("security.token.revoke", await deps.revokeToken({ deviceId: body.deviceId.trim() })));
     } catch (error) {
+      if (error instanceof SecurityApplicationError) {
+        const mapped = mapSecurityFailure(error);
+        res.status(mapped.status).json(createSecurityApiFailure(mapped));
+        return;
+      }
       res.status(400).json(createApiFailureResponse(createApiError("security.token.revoke", "validation", error instanceof Error ? error.message : "Invalid revoke request.")));
     }
   });

@@ -24,6 +24,7 @@
    AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token \
    AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem \
    AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem \
+   SERVER_TOKEN_HASH_SECRET=<strong-random-secret> \
    npm run dev:server
    ```
 3. Confirm server starts in HTTPS mode and does not fall back to HTTP.
@@ -39,3 +40,7 @@
     - Authorization header values
     - pairing code
     - TLS private key contents
+
+
+12. Verify startup fails with an actionable error if `SERVER_TOKEN_HASH_SECRET` is missing in `lan-https-token`.
+13. In `disabled-dev`, verify warning indicates insecure fallback is being used when `SERVER_TOKEN_HASH_SECRET` is unset.
