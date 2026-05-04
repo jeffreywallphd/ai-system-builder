@@ -1,17 +1,9 @@
-import http from "node:http";
-import https from "node:https";
-import { createHttpsServerOptions } from "../../../modules/adapters/transport/api-express/security";
-import { createServer } from "./createServer";
+import { createServer, createServerListener } from "./createServer";
 
 async function main() {
   const { app, config, loggingPort } = await createServer();
 
-  let listener: http.Server | https.Server;
-  if (config.security.httpsEnabled) {
-    listener = https.createServer(createHttpsServerOptions(config.security.tlsMaterial), app);
-  } else {
-    listener = http.createServer(app);
-  }
+  const listener = createServerListener({ app, config, loggingPort });
 
   listener.listen(config.port, () => {
     void loggingPort.log({

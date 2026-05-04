@@ -22,7 +22,7 @@ async function createTempRoot(): Promise<string> {
 describe("server app artifact upload route", () => {
   it("mounts the upload route and stores image bytes through the server host use case", async () => {
     const storageRootDirectory = await createTempRoot();
-    const { app } = createServer({
+    const { app } = await createServer({
       env: {
         ...process.env,
         PORT: "0",
@@ -92,7 +92,7 @@ describe("server app artifact upload route", () => {
 
   it("returns a client failure envelope when request payload fails use-case validation", async () => {
     const storageRootDirectory = await createTempRoot();
-    const { app } = createServer({
+    const { app } = await createServer({
       env: {
         ...process.env,
         PORT: "0",
