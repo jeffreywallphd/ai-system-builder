@@ -34,6 +34,13 @@ case path rather than desktop preload wiring.
 - Default API base URL in thin-client code is `/api`.
 - In local development, Vite proxies `/api` to the server on `127.0.0.1:3010`, which allows running
   thin-client and server on separate ports while keeping feature clients same-origin by default.
+- Thin-client Vite dev server defaults to HTTP at `http://localhost:5173`.
+- Optional thin-client Vite HTTPS can be enabled with:
+  - `AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED=true`
+  - `AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH=/path/to/thin-client-cert.pem`
+  - `AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH=/path/to/thin-client-key.pem`
+- When thin-client HTTPS is enabled, cert/key files must be present and readable or Vite startup fails with an actionable error.
+- Thin-client HTTPS env vars control only the Vite UI listener (port 5173), not server API listener mode (port 3010).
 - When `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` or `AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token` is
   set for the thin-client dev server process, the Vite proxy targets `https://127.0.0.1:3010`.
 - For dev-generated TLS (`AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed` or `auto-local-ca`), the
@@ -70,3 +77,48 @@ From this workspace directly:
 - Use **Save token** to configure/update token and **Clear token** to remove it.
 - Token source of truth is server-side config (`/api/config/huggingface-token`), not browser-local state.
 - Auth-required artifact errors now direct users to this in-product token settings path.
+
+
+## Thin-client Vite HTTPS development examples
+
+### Default HTTP thin-client
+
+```bash
+npm run dev:thin-client
+```
+
+UI origin: `http://localhost:5173`
+
+### HTTPS server API, HTTP thin-client
+
+```bash
+AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
+npm run dev:thin-client
+```
+
+- UI remains `http://localhost:5173`.
+- `/api` proxy target becomes `https://127.0.0.1:3010`.
+
+### HTTPS server API and HTTPS thin-client
+
+```bash
+AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED=true \
+AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH=/path/to/cert.pem \
+AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH=/path/to/key.pem \
+AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
+npm run dev:thin-client
+```
+
+- UI origin becomes `https://localhost:5173`.
+- `/api` proxy target is `https://127.0.0.1:3010`.
+
+Notes:
+
+- You can reuse server-generated dev cert/key files for thin-client HTTPS when certificate SANs include `localhost`.
+- Thin-client does not auto-discover server cert file paths; set thin-client cert/key env vars explicitly.
+- Browser trust warnings may still occur for self-signed certificates.
+- `auto-local-ca` requires manual CA trust installation.
+- Switching thin-client Vite between HTTP/HTTPS requires restarting `npm run dev:thin-client`.
+- Never commit or log private keys; this TLS mode is for development only, not public-internet hardening.

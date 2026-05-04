@@ -66,4 +66,18 @@ describe("thin-client Vite API proxy config", () => {
       secure: false,
     });
   });
+
+  it("does not change API proxy target when only thin-client HTTPS env vars are set", () => {
+    const environment = {
+      AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED: "true",
+      AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH: "/tmp/thin-client-cert.pem",
+      AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH: "/tmp/thin-client-key.pem",
+    };
+
+    expect(resolveThinClientApiProxyTarget(environment)).toBe("http://127.0.0.1:3010");
+    expect(createThinClientApiProxyConfig(environment)).toMatchObject({
+      target: "http://127.0.0.1:3010",
+      secure: true,
+    });
+  });
 });
