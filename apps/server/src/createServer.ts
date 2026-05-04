@@ -140,6 +140,7 @@ export function resolveServerRuntimeConfig(
 export function createServer(options: CreateServerOptions = {}): CreatedServer {
   const config = resolveServerRuntimeConfig(options.env);
   const serverHost = composeServerHost({
+    env: options.env,
     logging: {
       verbosity: options.env?.LOG_VERBOSITY,
       level: "info",
