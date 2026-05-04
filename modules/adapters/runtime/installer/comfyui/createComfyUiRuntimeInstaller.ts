@@ -285,7 +285,17 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
 
     if (!options.execFile) {
-      return { pythonCommand };
+      return {
+        pythonCommand,
+        error: makeError(
+          "python-environment-command-runner-missing",
+          "Cannot create ComfyUI managed Python environment because no command runner is configured",
+          {
+            environmentRoot: buildComfyUiManagedPythonEnvironmentRoot(installRoot),
+            pythonExecutable: managedPythonCommand,
+          },
+        ),
+      };
     }
 
     const environmentRoot = buildComfyUiManagedPythonEnvironmentRoot(installRoot);

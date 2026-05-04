@@ -262,6 +262,14 @@ describe("composeServerHost", () => {
     expect(source).toContain("modelCheckpointResolver: localModelCheckpointResolver");
   });
 
+  it("wires a command runner into the server ComfyUI installer by default", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("const execFileWithTimeout = async");
+    expect(source).toContain("createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout })");
+    expect(source).toContain("execFile: execFileWithTimeout");
+  });
+
 });
 
 describe("server runtime/comfy root resolution", () => {

@@ -1,6 +1,8 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
+import { execFile as nodeExecFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
 import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
 import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
@@ -71,6 +73,7 @@ import {
 import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
+const execFile = promisify(nodeExecFile);
 
 function parseNumberEnv(value: string | undefined, name: string): number | undefined {
   const normalized = value?.trim();
@@ -516,17 +519,15 @@ export function composeServerHost(
       const comfyUiInstallRoot = runtimeResolution.installRoot;
       const comfyUiBaseUrl = env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
       const installCommandTimeoutMs = parseNumberEnv(env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS, "COMFYUI_INSTALL_COMMAND_TIMEOUT_MS");
-      const execFileWithTimeout = installCommandTimeoutMs
-        ? async (file: string, args: readonly string[] = []) => {
-            const { execFile } = await import("node:child_process");
-            const { promisify } = await import("node:util");
-            return promisify(execFile)(file, [...args], { timeout: installCommandTimeoutMs }) as Promise<{ stdout: string; stderr: string }>;
-          }
-        : undefined;
+      const execFileWithTimeout = async (file: string, args: readonly string[] = []) => execFile(file, [...args], {
+        ...(installCommandTimeoutMs ? { timeout: installCommandTimeoutMs } : {}),
+        windowsHide: true,
+      }) as Promise<{ stdout: string; stderr: string }>;
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout });
       const comfyUiInstaller = createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: basePythonCommand,
+        execFile: execFileWithTimeout,
         runtimeDeviceMode: resolvedRuntimeDeviceMode,
         skipPythonSetup,
         skipPythonValidation,
