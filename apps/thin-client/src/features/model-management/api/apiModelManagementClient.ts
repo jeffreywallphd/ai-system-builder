@@ -1,3 +1,4 @@
+import { secureFetch } from "../../../security/secureFetch";
 import type { BrowseModelsRequest, BrowseModelsResult, DeleteModelRecordRequest, DeleteModelRecordResult, DownloadModelRequest, DownloadModelResult, GetModelDetailsRequest, GetModelDetailsResult, ListModelsRequest, ListModelsResult, SaveModelReferenceRequest, SaveModelReferenceResult, UpdateModelRecordRequest, UpdateModelRecordResult } from "../../../../../../modules/contracts/model";
 
 import { logThinClientDiagnostic } from "../../../diagnostics/thinClientDiagnostics";
@@ -20,7 +21,7 @@ const post = async <T>(base: string, path: string, operation:Operation, body: Re
   const endpoint=apiUrl(base,path); const started=Date.now(); const ctrl=new AbortController(); const timeout=window.setTimeout(()=>ctrl.abort("timeout"),timeouts[operation]);
   const detail={operation,endpoint,...summary(body)}; logThinClientDiagnostic("info",{feature:"model-management",operation,phase:"request.start",message:"Request started",metadata:detail});
   try {
-    const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body), signal: ctrl.signal });
+    const response = await secureFetch(endpoint, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body), signal: ctrl.signal });
     const elapsedMs=Date.now()-started;
     const ctype=response.headers.get("content-type")??"";
     if(!ctype.includes("application/json")){ logThinClientDiagnostic("warn",{feature:"model-management",operation,phase:"response.non_json",message:"Response was not JSON",metadata:{...detail,status:response.status,elapsedMs,contentType:ctype}}); throw new ModelManagementApiError("Model management response was not JSON.","invalid_json"); }

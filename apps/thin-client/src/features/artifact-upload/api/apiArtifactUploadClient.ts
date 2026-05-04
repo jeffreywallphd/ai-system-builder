@@ -1,3 +1,4 @@
+import { secureFetch } from "../../../security/secureFetch";
 export interface ThinClientArtifactUploadInput {
   fileName: string;
   mediaType: string;
@@ -151,7 +152,7 @@ export function createApiArtifactUploadClient(
 
   return {
     async uploadArtifact(input: ThinClientArtifactUploadInput): Promise<ThinClientArtifactUploadResult> {
-      const response = await fetch(uploadUrl, {
+      const response = await secureFetch(uploadUrl, {
         method: "POST",
         body: createUploadFormData(input),
       });
@@ -171,7 +172,7 @@ export function createApiArtifactUploadClient(
     },
 
     async getAcceptedTypes(): Promise<ThinClientArtifactUploadAcceptedTypePolicy> {
-      const response = await fetch(uploadPolicyUrl);
+      const response = await secureFetch(uploadPolicyUrl);
       const responseBody = await readApiResponseBody(response);
       if (!isApiResponseEnvelope(responseBody) || !responseBody.ok || !responseBody.value?.policy) {
         throw new Error("Failed to read accepted artifact upload types.");
