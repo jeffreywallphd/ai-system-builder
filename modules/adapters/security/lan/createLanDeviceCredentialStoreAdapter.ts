@@ -19,6 +19,7 @@ export function createLanDeviceCredentialStoreAdapter(path: string): DeviceCrede
   return {
     async saveDeviceCredential(record) { const s = await load(); s.records.push(record); await save(s); },
     async findActiveDeviceCredentialByTokenHash({ tokenHash, now }) { const s = await load(); return s.records.find((r) => r.tokenHash === tokenHash && !r.revokedAt && (!r.expiresAt || new Date(r.expiresAt) > now)); },
+    async findDeviceCredentialByTokenHash({ tokenHash }) { const s = await load(); return s.records.find((r) => r.tokenHash === tokenHash); },
     async revokeDevice({ deviceId, revokedAt }) { const s = await load(); const r = s.records.find((v) => v.deviceId === deviceId && !v.revokedAt); if (!r) return false; r.revokedAt = revokedAt.toISOString(); await save(s); return true; },
     async countActiveDevices({ now }) { const s = await load(); return s.records.filter((r) => !r.revokedAt && (!r.expiresAt || new Date(r.expiresAt) > now)).length; },
   };
