@@ -9,6 +9,9 @@ export function resolveServerSecurityConfig(env: NodeJS.ProcessEnv, storageRootD
   const tlsKeyPath = env.AI_SYSTEM_BUILDER_TLS_KEY_PATH?.trim();
   if (httpsRequired && !tlsCertPath) throw new Error("AI_SYSTEM_BUILDER_TLS_CERT_PATH is required in lan-https-token mode. Provide a readable TLS certificate PEM path.");
   if (httpsRequired && !tlsKeyPath) throw new Error("AI_SYSTEM_BUILDER_TLS_KEY_PATH is required in lan-https-token mode. Provide a readable TLS private key PEM path.");
+  const devSecurityToggleRequested = env.AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED === "true";
+  const devSecurityToggleEnabled = mode === "disabled-dev" && devSecurityToggleRequested;
+  if (mode !== "disabled-dev" && devSecurityToggleRequested) console.warn("[security] Ignoring AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED because startup mode is not disabled-dev.");
   return {
     mode, httpsEnabled, httpsRequired, tlsCertPath, tlsKeyPath,
     pairingEnabled: env.AI_SYSTEM_BUILDER_PAIRING_ENABLED !== "false",
@@ -16,5 +19,6 @@ export function resolveServerSecurityConfig(env: NodeJS.ProcessEnv, storageRootD
     allowLocalhostWithoutAuth: env.AI_SYSTEM_BUILDER_ALLOW_LOCALHOST_WITHOUT_AUTH === "true",
     securityStorePath: env.AI_SYSTEM_BUILDER_SECURITY_STORE_PATH?.trim() || path.join(storageRootDirectory, "config", "security"),
     authRequired: mode !== "disabled-dev",
+    devSecurityToggleEnabled,
   };
 }

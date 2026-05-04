@@ -4,11 +4,17 @@ import { resolveApiRoutePolicy } from "./apiRouteSecurityPolicy";
 import { setExpressAuthContext } from "./expressAuthContext";
 import { createSecurityApiFailure, mapSecurityFailure } from "./createSecurityApiFailure";
 import { extractBearerToken } from "./extractExpressSecurityInput";
+import type { DevSecurityEnforcementStore } from "./devSecurityEnforcement";
 
-export function createExpressSecurityMiddleware(deps: { verifyToken: (req: { token: string; now: Date }) => Promise<AuthContext>; httpsRequired: boolean; authRequired: boolean }) {
+export function createExpressSecurityMiddleware(deps: { verifyToken: (req: { token: string; now: Date }) => Promise<AuthContext>; httpsRequired: boolean; authRequired: boolean; mode: "disabled-dev" | "lan-https-token"; devSecurityEnforcement?: DevSecurityEnforcementStore }) {
   return async (request: Request, response: Response, next: NextFunction) => {
     const policy = resolveApiRoutePolicy(request.method, request.path);
     setExpressAuthContext(request, ANONYMOUS_AUTH_CONTEXT);
+
+    const runtimeMode = deps.mode === "lan-https-token"
+      ? "lan-token-enforced"
+      : (deps.devSecurityEnforcement?.isEnabled() ? deps.devSecurityEnforcement.getMode() : "disabled-dev");
+    const authRequired = deps.mode === "lan-https-token" ? true : runtimeMode === "lan-token-enforced";
 
     if (deps.httpsRequired && request.protocol !== "https") {
       return response.status(400).json(createSecurityApiFailure({ status: 400, code: "security.https-required", message: "HTTPS is required." }));
@@ -30,7 +36,7 @@ export function createExpressSecurityMiddleware(deps: { verifyToken: (req: { tok
     }
 
     if (!token) {
-      if (!deps.authRequired) return next();
+      if (!authRequired) return next();
       return response.status(401).json(createSecurityApiFailure({ status: 401, code: "security.unauthenticated", message: "Missing bearer token." }));
     }
 

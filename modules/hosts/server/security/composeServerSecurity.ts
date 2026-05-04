@@ -5,7 +5,7 @@ import { createLanPairingTokenIssuerAdapter } from "../../../adapters/security/l
 import { createLanDeviceCredentialStoreAdapter } from "../../../adapters/security/lan/createLanDeviceCredentialStoreAdapter";
 import { createLanBearerTokenVerifierAdapter } from "../../../adapters/security/lan/createLanBearerTokenVerifierAdapter";
 import { createLanPairingCodeStoreAdapter } from "../../../adapters/security/lan/createLanPairingCodeStoreAdapter";
-import { createExpressSecurityMiddleware } from "../../../adapters/transport/api-express/security";
+import { createExpressSecurityMiddleware, createInMemoryDevSecurityEnforcementStore } from "../../../adapters/transport/api-express/security";
 import { resolveServerSecurityConfig } from "./resolveServerSecurityConfig";
 
 const DEV_ONLY_INSECURE_TOKEN_HASH_SECRET = "dev-only-insecure-token-hash-secret";
@@ -35,6 +35,7 @@ export function composeServerSecurity(env: NodeJS.ProcessEnv, storageRootDirecto
     },
   });
   const getStatusService = new GetSecurityStatusService(credentials);
-  const middleware = createExpressSecurityMiddleware({ verifyToken: verifier.verifyToken.bind(verifier), httpsRequired: config.httpsRequired, authRequired: config.authRequired });
-  return { config, middleware, services: { completePairing, getStatusService }, credentials };
+  const devSecurityEnforcement = createInMemoryDevSecurityEnforcementStore(config.devSecurityToggleEnabled ? "disabled-dev" : undefined);
+  const middleware = createExpressSecurityMiddleware({ verifyToken: verifier.verifyToken.bind(verifier), httpsRequired: config.httpsRequired, authRequired: config.authRequired, mode: config.mode, devSecurityEnforcement });
+  return { config, middleware, services: { completePairing, getStatusService }, credentials, devSecurityEnforcement };
 }

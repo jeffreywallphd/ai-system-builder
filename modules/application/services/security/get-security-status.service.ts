@@ -10,6 +10,9 @@ export class GetSecurityStatusService {
     pairingEnabled: boolean;
     currentAuthContext?: AuthContext;
     now: Date;
+    devSecurityToggleEnabled?: boolean;
+    devSecurityEnforcementMode?: "disabled-dev" | "lan-token-enforced";
+    requiresRestartToChangeTransportSecurity?: boolean;
   }): Promise<SecurityStatus> {
     const pairedDeviceCount = await this.credentials.countActiveDevices({ now: input.now });
     return {
@@ -20,6 +23,9 @@ export class GetSecurityStatusService {
       pairingEnabled: input.pairingEnabled,
       pairedDeviceCount,
       currentPrincipal: input.currentAuthContext?.principal,
+      devSecurityToggleEnabled: input.devSecurityToggleEnabled,
+      devSecurityEnforcementMode: input.devSecurityEnforcementMode,
+      requiresRestartToChangeTransportSecurity: input.requiresRestartToChangeTransportSecurity,
     };
   }
 }

@@ -165,9 +165,11 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
   applySecurityHeaders(app);
   app.use(security.middleware);
   registerSecurityRoutes(app, {
-    getStatus: (authContext) => security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date(), currentAuthContext: authContext }),
+    getStatus: (authContext) => security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date(), currentAuthContext: authContext, devSecurityToggleEnabled: security.config.devSecurityToggleEnabled, devSecurityEnforcementMode: security.devSecurityEnforcement.isEnabled() ? security.devSecurityEnforcement.getMode() : undefined, requiresRestartToChangeTransportSecurity: true }),
     completePairing: (body) => security.services.completePairing.execute(body),
     revokeToken: (body) => security.credentials.revokeDevice({ deviceId: body.deviceId, revokedAt: new Date() }),
+    getDevMode: security.devSecurityEnforcement.isEnabled() ? () => security.devSecurityEnforcement.getMode() : undefined,
+    setDevMode: security.devSecurityEnforcement.isEnabled() ? (mode) => security.devSecurityEnforcement.setMode(mode) : undefined,
   });
 
   serverHost.registerApi({

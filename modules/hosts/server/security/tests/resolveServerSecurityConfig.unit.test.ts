@@ -7,10 +7,17 @@ describe("resolveServerSecurityConfig", () => {
     expect(cfg.mode).toBe("disabled-dev");
     expect(cfg.authRequired).toBe(false);
     expect(cfg.httpsRequired).toBe(false);
+    expect(cfg.devSecurityToggleEnabled).toBe(false);
   });
 
   it("requires cert and key for lan-https-token", () => {
     expect(() => resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token" }, "/tmp/storage")).toThrow(/AI_SYSTEM_BUILDER_TLS_CERT_PATH/);
     expect(() => resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", AI_SYSTEM_BUILDER_TLS_CERT_PATH: "/tmp/cert.pem" }, "/tmp/storage")).toThrow(/AI_SYSTEM_BUILDER_TLS_KEY_PATH/);
+  });
+
+  it("enables dev toggle only in disabled-dev", () => {
+    expect(resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED: "true" }, "/tmp/storage").devSecurityToggleEnabled).toBe(true);
+    const cfg = resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED: "true", AI_SYSTEM_BUILDER_TLS_CERT_PATH: "/tmp/cert.pem", AI_SYSTEM_BUILDER_TLS_KEY_PATH: "/tmp/key.pem" }, "/tmp/storage");
+    expect(cfg.devSecurityToggleEnabled).toBe(false);
   });
 });

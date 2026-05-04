@@ -136,3 +136,11 @@ $bytes = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Fi
 
 - Do not put it in docs, logs, screenshots, or shell history where avoidable.
 - Prefer a secret manager or user-level environment variable for routine local use.
+
+## Dev security enforcement toggle (development only)
+
+- Startup security mode (`AI_SYSTEM_BUILDER_SECURITY_MODE`) still owns HTTP/HTTPS listener protocol and requires restart to change.
+- Optional dev-only toggle: `AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true` (only active when startup mode is `disabled-dev`).
+- This toggle only changes request-time auth enforcement (`disabled-dev` vs `lan-token-enforced`) for local testing.
+- It does **not** switch a running listener between HTTP and HTTPS.
+- Do not use this toggle as production security.

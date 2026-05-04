@@ -3,6 +3,7 @@ import { createApiError, createApiFailureResponse, createApiSuccessResponse } fr
 import { SECURITY_SCOPES, SecurityApplicationError, type CompleteLanPairingRequest, type SecurityScope, type AuthContext } from "../../../../contracts/security";
 import { createSecurityApiFailure, mapSecurityFailure } from "./createSecurityApiFailure";
 import { getExpressAuthContext } from "./expressAuthContext";
+import type { DevSecurityEnforcementMode } from "./devSecurityEnforcement";
 
 interface RevokeRequest { deviceId: string }
 const KNOWN_SCOPES = new Set<SecurityScope>(SECURITY_SCOPES);
@@ -30,7 +31,7 @@ function normalizePairingRequest(value: unknown): CompleteLanPairingRequest {
   return normalized;
 }
 
-export function registerSecurityRoutes(app: Express, deps: { getStatus: (authContext?: AuthContext) => Promise<unknown>; completePairing: (body: CompleteLanPairingRequest) => Promise<unknown>; revokeToken: (body: RevokeRequest) => Promise<unknown> }) {
+export function registerSecurityRoutes(app: Express, deps: { getStatus: (authContext?: AuthContext) => Promise<unknown>; completePairing: (body: CompleteLanPairingRequest) => Promise<unknown>; revokeToken: (body: RevokeRequest) => Promise<unknown>; getDevMode?: () => DevSecurityEnforcementMode; setDevMode?: (mode: DevSecurityEnforcementMode) => void; }) {
   app.get('/api/security/status', async (req, res) => {
     try {
       res.status(200).json(createApiSuccessResponse("security.status", await deps.getStatus(getExpressAuthContext(req))));
@@ -56,6 +57,23 @@ export function registerSecurityRoutes(app: Express, deps: { getStatus: (authCon
       }
       res.status(400).json(createApiFailureResponse(createApiError("security.pairing.complete", "validation", error instanceof Error ? error.message : "Invalid pairing request.")));
     }
+  });
+
+
+  app.get('/api/security/dev-mode', async (_req, res) => {
+    if (!deps.getDevMode) { res.status(404).json(createSecurityApiFailure({ status: 404, code: "security.route-policy-missing", message: "Not found." })); return; }
+    res.status(200).json(createApiSuccessResponse("security.dev-mode", { mode: deps.getDevMode() }));
+  });
+
+  app.post('/api/security/dev-mode', async (req, res) => {
+    if (!deps.setDevMode) { res.status(404).json(createSecurityApiFailure({ status: 404, code: "security.route-policy-missing", message: "Not found." })); return; }
+    const body = asRecord(req.body);
+    if (body.mode !== "disabled-dev" && body.mode !== "lan-token-enforced") {
+      res.status(400).json(createApiFailureResponse(createApiError("security.dev-mode", "validation", "mode must be disabled-dev or lan-token-enforced.")));
+      return;
+    }
+    deps.setDevMode(body.mode);
+    res.status(200).json(createApiSuccessResponse("security.dev-mode", { mode: body.mode }));
   });
 
   app.post('/api/security/token/revoke', async (req, res) => {
