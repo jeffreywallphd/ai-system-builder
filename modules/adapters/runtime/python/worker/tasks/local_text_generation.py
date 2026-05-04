@@ -119,6 +119,21 @@ def _report_model_download_progress(
 
 
 class _StructuredSnapshotTqdm:
+    @classmethod
+    def get_lock(cls) -> Any:
+        from tqdm.auto import tqdm
+
+        if not hasattr(cls, "_lock"):
+            cls._lock = tqdm.get_lock()
+        return cls._lock
+
+    @classmethod
+    def set_lock(cls, lock: Any) -> None:
+        from tqdm.auto import tqdm
+
+        cls._lock = lock
+        tqdm.set_lock(lock)
+
     def __init__(self, *args: Any, **kwargs: Any):
         self._model_id = kwargs.pop("_asb_model_id", None)
         self._profile_name = kwargs.pop("_asb_profile_name", None)
@@ -447,13 +462,22 @@ def ensure_generation_model_downloaded(
             from_cache=True,
             local_path=local_path,
         )
-    except Exception:
-        _emit_model_download_event("runtime.model_download.cache_check.missed", model_config.modelId)
+    except Exception as error:
+        _emit_model_download_event(
+            "runtime.model_download.cache_check.missed",
+            model_config.modelId,
+            errorType=type(error).__name__,
+            message=str(error) or type(error).__name__,
+            profile=download_profile.name,
+        )
         _report_model_download_progress(
             model_config.modelId,
             on_progress,
             "cache-miss",
             f"No complete cached Hugging Face snapshot found for {model_config.modelId}.",
+            errorType=type(error).__name__,
+            errorMessage=str(error) or type(error).__name__,
+            profile=download_profile.name,
         )
 
     try:
