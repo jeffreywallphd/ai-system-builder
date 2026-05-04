@@ -123,6 +123,49 @@ describe("resolveServerRuntimeConfig", () => {
     ]);
   });
 
+  it("createServer passes explicit environment into server runtime composition", () => {
+    const previousPythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL;
+    process.env.PYTHON_RUNTIME_BASE_URL = "http://127.0.0.1:49999";
+    const emittedEvents: StructuredLogEvent[] = [];
+    const storageRootDirectory = path.resolve("tmp/server-env-storage");
+    const runtimeRootDirectory = path.resolve("tmp/server-env-runtime");
+
+    try {
+      createServer({
+        env: {
+          SERVER_STORAGE_ROOT: storageRootDirectory,
+          SERVER_RUNTIME_ROOT: runtimeRootDirectory,
+          PYTHON_RUNTIME_BASE_URL: "http://127.0.0.1:43112",
+          PYTHON_RUNTIME_COMMAND: "python-custom",
+          PYTHON_RUNTIME_ARGS: "worker.py --ready",
+          PYTHON_RUNTIME_WORKER_DIR: "modules/adapters/runtime/python/worker",
+        },
+        logSink: (_serializedEvent, event) => {
+          emittedEvents.push(event);
+        },
+      });
+    } finally {
+      if (previousPythonRuntimeBaseUrl === undefined) {
+        delete process.env.PYTHON_RUNTIME_BASE_URL;
+      } else {
+        process.env.PYTHON_RUNTIME_BASE_URL = previousPythonRuntimeBaseUrl;
+      }
+    }
+
+    const pythonRuntimeLog = emittedEvents.find(
+      (event) => event.event === "runtime.python.server.configuration",
+    );
+    expect(pythonRuntimeLog?.data).toMatchObject({
+      serverStorageRootDirectory: storageRootDirectory,
+      serverRuntimeRootDirectory: runtimeRootDirectory,
+      pythonRuntimeRootDirectory: path.join(runtimeRootDirectory, "models", "huggingface"),
+      pythonRuntimeRootSource: "SERVER_RUNTIME_ROOT",
+      pythonRuntimeBaseUrl: "http://127.0.0.1:43112",
+      pythonRuntimeCommand: "python-custom",
+      pythonRuntimeArgs: ["worker.py", "--ready"],
+    });
+  });
+
   it("index startup log uses structured server host logging", () => {
     const source = readFileSync(path.resolve("apps/server/src/index.ts"), "utf8");
     expect(source).toContain("loggingPort.log");
