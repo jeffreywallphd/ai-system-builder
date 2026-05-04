@@ -37,6 +37,42 @@ Security is a cross-cutting architecture concern implemented through shared cont
 - Initial implementation target: `HTTPS + LAN pairing bearer token`.
 - Future modes are added by new adapters, not use-case rewrites.
 
+## Current first implementation status (rebuild branch)
+
+This ADR remains the canonical architecture decision. Current implementation is a first LAN-focused security slice:
+
+- `disabled-dev` (implemented)
+  - HTTP allowed.
+  - Authentication not required.
+  - Explicitly insecure/noisy mode for local development only.
+- `lan-https-token` (implemented)
+  - HTTPS required.
+  - `AI_SYSTEM_BUILDER_TLS_CERT_PATH` and `AI_SYSTEM_BUILDER_TLS_KEY_PATH` are required.
+  - `SERVER_TOKEN_HASH_SECRET` is required.
+  - Protected APIs require `Authorization: Bearer <opaque-token>`.
+  - Server persists token hashes only in server-side security store data.
+  - Thin-client token persistence flows through `pairedDeviceTokenStore`.
+  - Current browser storage uses `localStorage` as an initial LAN convenience; it is not hostile-browser-hardened storage.
+- Security status supports both public discovery and authenticated principal validation when a bearer token is sent.
+- Unknown `/api/*` routes are denied by centralized route policy with `security.route-policy-missing`.
+- Canonical security API failures in active use include:
+  - `security.unauthenticated`
+  - `security.invalid-token`
+  - `security.expired-token`
+  - `security.revoked-token`
+  - `security.forbidden`
+  - `security.https-required`
+  - `security.route-policy-missing`
+
+Current limitations / required follow-up:
+
+- Pairing-code creation/admin UX is not full device administration.
+- `POST /api/security/token/revoke` exists and is currently policy-gated as admin (`security:admin`); normal thin-client self-revoke/admin device-management UX is not a completed first-implementation flow.
+- Pairing endpoints should be rate-limited as hardening follow-up (not complete in current implementation).
+- Audit logging is an architectural requirement/follow-up; not yet complete as a dedicated security-audit subsystem.
+- Storage security and resource-level authorization are next-phase beyond current route-level scope checks.
+- mTLS, external TLS termination mode, API-key mode, OAuth, encryption at rest, and public-internet hardening remain future adapter/phased work.
+
 ## Security domains
 
 1. **Identity and authentication**
@@ -295,7 +331,7 @@ Initial capabilities:
   - token is random opaque token
   - server stores only token hash
   - pairing code is short-lived and one-time use
-  - pairing endpoints are rate-limited
+  - pairing endpoints should be rate-limited (required hardening follow-up)
 
 Recommended initial endpoints:
 

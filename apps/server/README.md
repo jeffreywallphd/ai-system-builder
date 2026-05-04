@@ -98,6 +98,7 @@ Then run server with generated files:
 AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token \
 AI_SYSTEM_BUILDER_TLS_CERT_PATH=./certs/localhost+lan.pem \
 AI_SYSTEM_BUILDER_TLS_KEY_PATH=./certs/localhost+lan-key.pem \
+SERVER_TOKEN_HASH_SECRET=<strong-random-secret> \
 npm run dev:server
 ```
 
@@ -130,5 +131,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ```powershell
-[Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
+$bytes = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Fill($bytes); [Convert]::ToHexString($bytes)
 ```
+
+- Do not put it in docs, logs, screenshots, or shell history where avoidable.
+- Prefer a secret manager or user-level environment variable for routine local use.

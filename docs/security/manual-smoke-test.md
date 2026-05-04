@@ -1,5 +1,16 @@
 # Manual Security Smoke Test
 
+## Shared setup
+
+1. Generate a strong `SERVER_TOKEN_HASH_SECRET` (do not commit or screenshot it):
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+   ```powershell
+   $bytes = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Fill($bytes); [Convert]::ToHexString($bytes)
+   ```
+2. Keep secrets out of docs/logs/shell history where possible.
+
 ## disabled-dev smoke
 
 1. Start server:
@@ -7,14 +18,12 @@
    AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev npm run dev:server
    ```
 2. Confirm startup log clearly shows disabled/insecure mode.
-3. Start thin-client.
-4. Confirm security UI indicates disabled-dev/insecure state.
-5. Confirm model management, image generation, and artifact browser requests work without pairing.
+3. Confirm `/api/security/status` succeeds without auth and reports disabled-dev posture.
+4. Confirm model management, image generation, and artifact browser requests work without pairing.
 
 ## lan-https-token smoke
 
-1. Generate or provide cert/key.
-   Example with mkcert:
+1. Generate or provide cert/key (example with mkcert):
    ```bash
    mkcert -install
    mkcert localhost 127.0.0.1 ::1
@@ -28,19 +37,24 @@
    npm run dev:server
    ```
 3. Confirm server starts in HTTPS mode and does not fall back to HTTP.
-4. Start thin-client against HTTPS server.
-5. Confirm security UI shows unpaired state.
-6. Try protected API before pairing; expect `401` and pairing guidance.
-7. Complete pairing via valid pairing code.
-8. Confirm bearer token is not displayed in UI.
-9. Confirm model/image/artifact requests succeed with Authorization header when scope permits.
-10. Confirm an action without required scope returns `403` and permission guidance.
-11. Confirm logs do **not** contain:
-    - bearer token
-    - Authorization header values
-    - pairing code
-    - TLS private key contents
+4. Confirm public `GET /api/security/status` works without bearer token.
+5. Try protected API before pairing; expect `401` with canonical unauthenticated/invalid-token guidance.
+6. Pairing-code provisioning note (current implementation):
+   - Pairing completion route exists: `POST /api/security/pairing/complete`.
+   - Pairing-code creation/admin UX is not a complete first-implementation workflow.
+   - If no provisioning UI/tooling is available in your environment, manual testing requires a pre-existing valid pairing-code entry in the server security store.
+7. Complete pairing via valid pairing code and confirm bearer token is not rendered in UI/logs.
+8. Confirm authenticated `GET /api/security/status` includes principal semantics when valid bearer token is sent.
+9. Confirm protected model/image/artifact API calls succeed when scope permits.
+10. Confirm insufficient-scope action returns `403` with canonical `security.forbidden` behavior.
+11. Confirm stale/invalid token behavior:
+    - invalid token -> `401` + `security.invalid-token`
+    - expired token -> `401` + `security.expired-token` (when applicable)
+    - revoked token -> `401` + `security.revoked-token` (when applicable)
+12. Confirm unknown `/api/*` route is denied by route policy (`security.route-policy-missing`).
+13. Confirm startup fails with actionable error if `SERVER_TOKEN_HASH_SECRET` is missing in `lan-https-token`.
 
+## Scope/limitations reminder
 
-12. Verify startup fails with an actionable error if `SERVER_TOKEN_HASH_SECRET` is missing in `lan-https-token`.
-13. In `disabled-dev`, verify warning indicates insecure fallback is being used when `SERVER_TOKEN_HASH_SECRET` is unset.
+- Rate limiting, dedicated audit logging subsystem, and public-internet hardening are not complete in this first implementation.
+- mTLS, OAuth, external TLS termination mode, and encryption at rest are future phases.
