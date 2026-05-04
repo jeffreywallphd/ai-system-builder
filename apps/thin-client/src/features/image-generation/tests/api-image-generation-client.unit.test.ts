@@ -30,6 +30,13 @@ describe("api image generation client", () => {
   it("throws useful failure message with code", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 400, json: vi.fn().mockResolvedValue({ ok: false, error: { code: "validation", message: "bad" } }) }));
     const c = createApiImageGenerationClient();
-    await expect(c.startImageGeneration({ prompt: "cat" })).rejects.toThrow("bad [validation]");
+    await expect(c.startImageGeneration({ prompt: "cat" })).rejects.toThrow("bad");
   });
+});
+
+
+it("preserves security status/code on unauthorized", async()=>{
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 401, json: vi.fn().mockResolvedValue({ ok:false, error:{ code:"security.invalid-token", message:"bad token" } }) }));
+  const c = createApiImageGenerationClient();
+  await expect(c.startImageGeneration({ prompt:"cat" })).rejects.toMatchObject({ status:401, code:"security.invalid-token" });
 });

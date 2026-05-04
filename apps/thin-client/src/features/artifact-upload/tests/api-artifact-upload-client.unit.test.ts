@@ -118,7 +118,7 @@ describe("api artifact upload client", () => {
       ok: false,
       error: {
         code: "internal",
-        message: "Artifact upload failed (500 Internal Server Error).",
+        message: "Request failed (HTTP 500).",
       },
     });
   });
