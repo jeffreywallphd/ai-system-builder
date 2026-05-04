@@ -354,11 +354,11 @@ export function resolveComfyUiRuntimeDeviceMode(input: {
     return "cpu";
   }
 
-  if ((input.platform ?? process.platform) === "win32" && input.hasNvidiaGpu === false) {
-    return "directml";
+  if (input.hasNvidiaGpu === true) {
+    return "cuda";
   }
 
-  return "auto";
+  return "cpu";
 }
 
 export function detectNvidiaGpu(): boolean | undefined {
@@ -792,7 +792,7 @@ export function composeDesktopHost(
           return comfyUiSupervisor?.getRecentRuntimeOutput() ?? [];
         },
         getRuntimeDeviceMode() {
-          return activeRuntimeDeviceMode ?? "auto";
+          return activeRuntimeDeviceMode ?? "cpu";
         },
       };
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({

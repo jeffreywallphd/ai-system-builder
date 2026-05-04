@@ -91,8 +91,9 @@ describe("composeDesktopHost", () => {
     );
   });
 
-  it("resolves DirectML for Windows machines without detected Nvidia GPUs", () => {
-    expect(resolveComfyUiRuntimeDeviceMode({ env: {}, platform: "win32", hasNvidiaGpu: false })).toBe("directml");
+  it("defaults to CPU when no accelerator is clearly confirmed", () => {
+    expect(resolveComfyUiRuntimeDeviceMode({ env: {}, platform: "win32", hasNvidiaGpu: false })).toBe("cpu");
+    expect(resolveComfyUiRuntimeDeviceMode({ env: {}, platform: "win32" })).toBe("cpu");
   });
 
   it("honors explicit ComfyUI runtime device mode overrides", () => {
@@ -120,6 +121,11 @@ describe("composeDesktopHost", () => {
     expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "amd" })).toBe("directml");
     expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "intel" })).toBe("directml");
     expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "cpu" })).toBe("cpu");
+  });
+
+  it("resolves CUDA only when Nvidia is explicitly detected or configured", () => {
+    expect(resolveComfyUiRuntimeDeviceMode({ hasNvidiaGpu: true })).toBe("cuda");
+    expect(resolveComfyUiRuntimeDeviceMode({ hasNvidiaGpu: false })).toBe("cpu");
   });
 
   it("rejects unsupported ComfyUI runtime device mode overrides", () => {

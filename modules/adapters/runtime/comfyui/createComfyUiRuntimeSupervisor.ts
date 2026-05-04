@@ -58,7 +58,7 @@ export function buildComfyUiRuntimeLaunchArguments(input: {
   port: number;
   runtimeDeviceMode?: ComfyUiRuntimeDeviceMode;
 }): string[] {
-  const deviceMode = input.runtimeDeviceMode ?? "auto";
+  const deviceMode = input.runtimeDeviceMode ?? "cpu";
   const deviceArguments =
     deviceMode === "directml"
       ? ["--directml"]
@@ -72,7 +72,7 @@ export function buildComfyUiRuntimeLaunchArguments(input: {
 export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupervisorOptions): ComfyUiRuntimeSupervisor {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8188;
-  const runtimeDeviceMode = options.runtimeDeviceMode ?? "auto";
+  const runtimeDeviceMode = options.runtimeDeviceMode ?? "cpu";
   const url = `http://${host}:${port}`;
   const startupTimeoutMs = options.startupTimeoutMs ?? 120_000;
   const healthCheckIntervalMs = options.healthCheckIntervalMs ?? 1_000;
