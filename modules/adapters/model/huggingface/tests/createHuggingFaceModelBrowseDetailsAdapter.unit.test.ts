@@ -179,6 +179,74 @@ describe("createHuggingFaceModelBrowseDetailsAdapter", () => {
       .rejects
       .toThrow("unauthorized or access denied");
   });
+
+  it("maps provider fetch failures to unavailable and logs redacted cause diagnostics", async () => {
+    const logger = { info: testDouble.fn(), warn: testDouble.fn() };
+    const fetchCause = Object.assign(new Error("connect timed out"), { code: "ETIMEDOUT" });
+    const fetchFailure = new TypeError("fetch failed");
+    (fetchFailure as Error & { cause?: unknown }).cause = fetchCause;
+    testDouble.spyOn(globalThis, "fetch").mockRejectedValue(fetchFailure);
+
+    const hubClient = createHubClientDouble({
+      listModels: testDouble.fn(async function* (params: { fetch?: typeof fetch }) {
+        if (!params.fetch) {
+          throw new Error("Expected diagnostic fetch to be provided.");
+        }
+        await params.fetch("https://huggingface.co/api/models?search=stable%20diffusion");
+      }),
+    });
+    const adapter = createHuggingFaceModelBrowseDetailsAdapter({ hubClient, logger });
+
+    try {
+      await adapter.browseModels({ provider: "huggingface", query: "stable diffusion", limit: 25 });
+      throw new Error("Expected browseModels to fail.");
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: "unavailable",
+        details: {
+          provider: "huggingface",
+          operation: "browseModels",
+          errorMessage: "fetch failed",
+          causeCode: "ETIMEDOUT",
+        },
+      });
+      expect(error instanceof Error ? error.message : String(error)).toContain("provider request could not be completed");
+    }
+
+    expect(logger.warn.mock.calls.some((call: unknown[]) =>
+      call[0] === "hf.adapter.fetch.failure" &&
+      (call[1] as Record<string, unknown>)?.operation === "browseModels" &&
+      (call[1] as Record<string, unknown>)?.causeCode === "ETIMEDOUT"
+    )).toBe(true);
+    expect(logger.warn.mock.calls.some((call: unknown[]) =>
+      call[0] === "hf.adapter.browse.failure" &&
+      (call[1] as Record<string, unknown>)?.code === "unavailable"
+    )).toBe(true);
+  });
+
+  it("preserves not-found provider status as a route-mappable error code", async () => {
+    const adapter = createHuggingFaceModelBrowseDetailsAdapter({
+      hubClient: createHubClientDouble({
+        modelInfo: testDouble.fn(async () => {
+          throw { statusCode: 404, message: "Not found" };
+        }),
+      }),
+    });
+
+    try {
+      await adapter.getModelDetails({ provider: "huggingface", modelId: "missing/model" });
+      throw new Error("Expected getModelDetails to fail.");
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: "not-found",
+        details: {
+          provider: "huggingface",
+          operation: "getModelDetails",
+          status: 404,
+        },
+      });
+    }
+  });
 });
 
 
