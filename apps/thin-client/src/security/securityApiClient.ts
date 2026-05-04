@@ -2,7 +2,7 @@ import { parseApiEnvelope, toThinClientApiError } from "./apiErrorEnvelope";
 import { secureFetch } from "./secureFetch";
 import type { ThinClientSecurityError } from "./securityErrors";
 
-export interface SecurityStatusResult { mode: "disabled-dev" | "lan-https-token"; httpsEnabled: boolean; httpsRequired: boolean; authRequired: boolean; pairingEnabled: boolean; pairedDeviceCount?: number; currentPrincipal?: { displayName?: string; deviceName?: string; deviceId?: string } }
+export interface SecurityStatusResult { mode: "disabled-dev" | "lan-https-token"; httpsEnabled: boolean; httpsRequired: boolean; authRequired: boolean; pairingEnabled: boolean; pairedDeviceCount?: number; currentPrincipal?: { displayName?: string; deviceName?: string; deviceId?: string }; devSecurityToggleEnabled?: boolean; devSecurityEnforcementMode?: "disabled-dev" | "lan-token-enforced"; requiresRestartToChangeTransportSecurity?: boolean }
 export interface CompletePairingRequest { pairingCode: string; deviceName?: string; requestedScopes?: string[] }
 export interface CompletePairingResult { bearerToken: string; deviceId?: string; deviceName?: string; grantedScopes?: string[] }
 
@@ -30,9 +30,20 @@ export function createSecurityApiClient(options: { apiBaseUrl?: string } = {}) {
       const value = await send(apiBaseUrl, "/security/status", { method: "GET" }, opts.includeAuth === true);
       return value as SecurityStatusResult;
     },
+
+    getDevSecurityMode: async (): Promise<DevSecurityModeResult> => {
+      const value = await send(apiBaseUrl, "/security/dev-mode", { method: "GET" }, false);
+      return value as DevSecurityModeResult;
+    },
+    setDevSecurityMode: async (mode: "disabled-dev" | "lan-token-enforced"): Promise<DevSecurityModeResult> => {
+      const value = await send(apiBaseUrl, "/security/dev-mode", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode }) }, false);
+      return value as DevSecurityModeResult;
+    },
     completePairing: async (request: CompletePairingRequest): Promise<CompletePairingResult> => {
       const value = await send(apiBaseUrl, "/security/pairing/complete", { method: "POST", headers: { "content-type": "application/json", "x-client-source": "thin-client.security" }, body: JSON.stringify({ pairingCode: request.pairingCode, deviceName: request.deviceName, requestedScopes: request.requestedScopes }) }, false);
       return value as CompletePairingResult;
     },
   };
 }
+
+export interface DevSecurityModeResult { mode: "disabled-dev" | "lan-token-enforced" }

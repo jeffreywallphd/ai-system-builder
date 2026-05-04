@@ -86,3 +86,10 @@ Identity/authentication, authorization/policy, transport security, storage secur
 - Do not claim HTTPS + LAN token is sufficient for public internet production exposure.
 - Do not claim bearer tokens encrypt traffic.
 - Do not move all feature code into `security/` folders.
+
+## Dev enforcement override (local testing only)
+
+- `AI_SYSTEM_BUILDER_SECURITY_MODE` remains startup-owned and controls listener/transport posture.
+- `AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true` enables a dev-only in-memory enforcement override **only** when startup mode is `disabled-dev`.
+- The override toggles middleware auth behavior (`disabled-dev` or `lan-token-enforced`) for local testing.
+- It does not convert HTTP to HTTPS on a running server and is not production security.

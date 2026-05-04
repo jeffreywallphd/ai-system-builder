@@ -55,10 +55,12 @@ export function useThinClientSecurity() {
     finally { setPairingBusy(false); }
   }, [api, loadStatus]);
 
+  const setDevSecurityEnforcementMode = useCallback(async (mode: "disabled-dev" | "lan-token-enforced") => { await api.setDevSecurityMode(mode); await loadStatus(); }, [api, loadStatus]);
+
   const clearLocalPairing = useCallback(() => { pairedDeviceTokenStore.clearToken(); setError(undefined); }, []);
   const guidance = toSecurityGuidance(error);
   const hasToken = pairedDeviceTokenStore.hasToken();
   const uiState = useMemo(() => deriveSecurityUiState({ status, error, pairingBusy, hasToken }), [status, error, pairingBusy, hasToken]);
 
-  return { uiState, status, error, guidance, completePairing, clearLocalPairing, hasToken };
+  return { uiState, status, error, guidance, completePairing, clearLocalPairing, hasToken, setDevSecurityEnforcementMode };
 }

@@ -58,3 +58,6 @@
 
 - Rate limiting, dedicated audit logging subsystem, and public-internet hardening are not complete in this first implementation.
 - mTLS, OAuth, external TLS termination mode, and encryption at rest are future phases.
+
+- Dev enforcement toggle: set `AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true` with `AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev` to test auth-on/auth-off behavior without restarting for every auth test.
+- Changing transport listener mode (HTTP/HTTPS) still requires restarting `dev:server`; the dev toggle does not enable TLS transport.

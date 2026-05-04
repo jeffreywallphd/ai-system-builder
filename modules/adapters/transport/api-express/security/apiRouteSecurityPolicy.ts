@@ -4,6 +4,8 @@ export const API_ROUTE_POLICIES: ReadonlyMap<string, ApiRoutePolicy> = new Map<s
   ["GET /api/security/status", { public: true }],
   ["POST /api/security/pairing/complete", { public: true }],
   ["POST /api/security/token/revoke", { public: false, scopes: ["security:admin"] }],
+  ["GET /api/security/dev-mode", { public: true }],
+  ["POST /api/security/dev-mode", { public: true }],
 
   ["POST /api/model/browse", { public: false, scopes: ["model:read"] }],
   ["POST /api/model/details", { public: false, scopes: ["model:read"] }],
