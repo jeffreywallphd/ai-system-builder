@@ -31,7 +31,7 @@ function normalizePairingRequest(value: unknown): CompleteLanPairingRequest {
   return normalized;
 }
 
-export function registerSecurityRoutes(app: Express, deps: { getStatus: (authContext?: AuthContext) => Promise<unknown>; completePairing: (body: CompleteLanPairingRequest) => Promise<unknown>; revokeToken: (body: RevokeRequest) => Promise<unknown>; getDevMode?: () => DevSecurityEnforcementMode; setDevMode?: (mode: DevSecurityEnforcementMode) => void; }) {
+export function registerSecurityRoutes(app: Express, deps: { getStatus: (authContext?: AuthContext) => Promise<unknown>; completePairing: (body: CompleteLanPairingRequest) => Promise<unknown>; revokeToken: (body: RevokeRequest) => Promise<unknown>; getDevMode?: () => DevSecurityEnforcementMode; setDevMode?: (mode: DevSecurityEnforcementMode) => void; getLocalCaPem?: () => Promise<string | undefined>; }) {
   app.get('/api/security/status', async (req, res) => {
     try {
       res.status(200).json(createApiSuccessResponse("security.status", await deps.getStatus(getExpressAuthContext(req))));
@@ -74,6 +74,14 @@ export function registerSecurityRoutes(app: Express, deps: { getStatus: (authCon
     }
     deps.setDevMode(body.mode);
     res.status(200).json(createApiSuccessResponse("security.dev-mode", { mode: body.mode }));
+  });
+
+
+  app.get('/api/security/tls/local-ca.pem', async (_req, res) => {
+    if (!deps.getLocalCaPem) { res.status(404).json(createSecurityApiFailure({ status: 404, code: "security.route-policy-missing", message: "Not found." })); return; }
+    const pem = await deps.getLocalCaPem();
+    if (!pem) { res.status(404).json(createSecurityApiFailure({ status: 404, code: "security.route-policy-missing", message: "Not found." })); return; }
+    res.status(200).type('application/x-pem-file').send(pem);
   });
 
   app.post('/api/security/token/revoke', async (req, res) => {

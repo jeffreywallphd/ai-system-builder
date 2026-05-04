@@ -78,7 +78,7 @@ Behavior:
 - `manual` mode: user-supplied certificate/private key PEM files via `AI_SYSTEM_BUILDER_TLS_CERT_PATH` and `AI_SYSTEM_BUILDER_TLS_KEY_PATH`.
 - `auto-self-signed` mode: server generates/reuses a dev certificate/key in the server security store (or `AI_SYSTEM_BUILDER_TLS_CERT_DIRECTORY`).
 
-`auto-local-ca` is not implemented yet (future work). Self-signed certs enable HTTPS transport but browsers/devices may still require a trust exception or manual trust step.
+`auto-local-ca` mode generates/reuses a local development CA plus server certificate for local/dev/LAN testing. Trust installation is manual. Self-signed certs enable HTTPS transport but browsers/devices may still require a trust exception or manual trust step.
 
 Not implemented in this phase: automatic ACME/web-CA certificate provisioning, external reverse-proxy TLS termination mode, mTLS, OAuth, or production public-internet hardening.
 

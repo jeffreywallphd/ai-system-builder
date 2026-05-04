@@ -102,5 +102,5 @@ Identity/authentication, authorization/policy, transport security, storage secur
 - Default `dev:server` is `disabled-dev` over HTTP with no auth.
 - HTTPS dev transport can be enabled with `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` and `AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed`.
 - `auto-self-signed` generates/reuses certificate material for transport but may still produce browser trust warnings.
-- `auto-local-ca` is planned but not implemented in current prompts.
+- `auto-local-ca` is supported for local/dev/LAN testing with manual CA trust installation.
 - Listener mode changes (HTTP/HTTPS) require restart; dev auth enforcement toggle is runtime auth-only.

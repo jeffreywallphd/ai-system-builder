@@ -68,3 +68,11 @@ describe("SecurityStatusPanel", () => {
     expect(container?.textContent).not.toContain("Dev security enforcement");
   });
 });
+
+
+it("shows manual trust guidance for auto-local-ca", async () => {
+  await renderWithStatus({ mode: "disabled-dev", httpsEnabled: true, httpsRequired: false, tls: { mode: "auto-local-ca", source: "generated", hosts: ["localhost"], localCa: { available: true, downloadUrl: "/api/security/tls/local-ca.pem", trustInstallationRequired: true } } });
+  expect(container?.textContent).toContain("Manual trust required");
+  expect(container?.textContent).toContain("do not commit generated TLS files");
+  expect(container?.innerHTML).toContain("/api/security/tls/local-ca.pem");
+});
