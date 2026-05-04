@@ -7,7 +7,8 @@ export function resolveServerSecurityConfig(env: NodeJS.ProcessEnv, storageRootD
   const httpsRequired = mode === "lan-https-token";
   const tlsCertPath = env.AI_SYSTEM_BUILDER_TLS_CERT_PATH?.trim();
   const tlsKeyPath = env.AI_SYSTEM_BUILDER_TLS_KEY_PATH?.trim();
-  if (httpsRequired && (!tlsCertPath || !tlsKeyPath)) throw new Error("lan-https-token mode requires AI_SYSTEM_BUILDER_TLS_CERT_PATH and AI_SYSTEM_BUILDER_TLS_KEY_PATH.");
+  if (httpsRequired && !tlsCertPath) throw new Error("AI_SYSTEM_BUILDER_TLS_CERT_PATH is required in lan-https-token mode. Provide a readable TLS certificate PEM path.");
+  if (httpsRequired && !tlsKeyPath) throw new Error("AI_SYSTEM_BUILDER_TLS_KEY_PATH is required in lan-https-token mode. Provide a readable TLS private key PEM path.");
   return {
     mode, httpsEnabled, httpsRequired, tlsCertPath, tlsKeyPath,
     pairingEnabled: env.AI_SYSTEM_BUILDER_PAIRING_ENABLED !== "false",
