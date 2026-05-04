@@ -196,6 +196,11 @@ def _ensure_model_download_data(
     availability = ensure_generation_model_downloaded(
         LocalModelConfig(provider=request.provider, modelId=request.modelId),
         on_progress=on_progress,
+        download_context={
+            "inferenceMode": request.inferenceMode,
+            "taskTags": request.taskTags,
+            "artifactForm": request.artifactForm,
+        },
     )
     return EnsureModelDownloadResult(
         provider=request.provider,

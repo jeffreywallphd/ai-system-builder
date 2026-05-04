@@ -7,6 +7,7 @@ import inspect
 import json
 from os import environ
 from pathlib import Path
+import re
 from threading import Lock
 from typing import Any, Callable
 
@@ -26,6 +27,36 @@ class GenerationModelAvailability:
     downloaded: bool
     from_cache: bool
     local_path: str | None = None
+
+
+@dataclass(frozen=True)
+class HuggingFaceSnapshotDownloadProfile:
+    name: str
+    allow_patterns: tuple[str, ...] | None
+    ignore_patterns: tuple[str, ...]
+
+
+GENERIC_TRANSFORMERS_SNAPSHOT_PROFILE = HuggingFaceSnapshotDownloadProfile(
+    name="transformers",
+    allow_patterns=None,
+    ignore_patterns=(
+        "*.h5",
+        "*.msgpack",
+        "*.onnx",
+        "*.ot",
+        "*.tflite",
+        "flax_model.*",
+        "model.onnx*",
+        "openvino_model.*",
+        "tf_model.*",
+    ),
+)
+
+CHECKPOINT_SNAPSHOT_PROFILE = HuggingFaceSnapshotDownloadProfile(
+    name="checkpoint",
+    allow_patterns=("*.ckpt", "*.safetensors"),
+    ignore_patterns=("*/*",),
+)
 
 
 def _snapshot_file_stats(path: str | Path | None) -> dict[str, int]:
@@ -84,6 +115,167 @@ def _report_model_download_progress(
         "runtime.model_download.progress",
         model_id,
         **{key: value for key, value in progress.items() if key not in {"provider", "modelId"}},
+    )
+
+
+class _StructuredSnapshotTqdm:
+    def __init__(self, *args: Any, **kwargs: Any):
+        self._model_id = kwargs.pop("_asb_model_id", None)
+        self._profile_name = kwargs.pop("_asb_profile_name", None)
+        self._on_progress = kwargs.pop("_asb_on_progress", None)
+        self._last_reported = -1
+        from tqdm.auto import tqdm
+
+        self._inner = tqdm(*args, **kwargs)
+        self._emit_progress()
+
+    def __iter__(self):
+        for item in self._inner:
+            self._emit_progress()
+            yield item
+
+    def __enter__(self):
+        self._inner.__enter__()
+        self._emit_progress()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any):
+        return self._inner.__exit__(exc_type, exc_value, traceback)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    def update(self, n: int = 1) -> Any:
+        result = self._inner.update(n)
+        self._emit_progress()
+        return result
+
+    def close(self) -> None:
+        self._emit_progress(force=True)
+        self._inner.close()
+
+    def _emit_progress(self, force: bool = False) -> None:
+        if not self._model_id:
+            return
+
+        completed = int(getattr(self._inner, "n", 0) or 0)
+        total_value = getattr(self._inner, "total", None)
+        total = int(total_value) if isinstance(total_value, (int, float)) and total_value >= 0 else None
+        if not force and completed == self._last_reported:
+            return
+
+        self._last_reported = completed
+        data: dict[str, Any] = {
+            "completedFileCount": completed,
+            "profile": self._profile_name,
+        }
+        if total is not None:
+            data["totalFileCount"] = total
+
+        _report_model_download_progress(
+            self._model_id,
+            self._on_progress,
+            "snapshot-progress",
+            f"Downloading Hugging Face snapshot files for {self._model_id}.",
+            **data,
+        )
+
+
+def _create_structured_snapshot_tqdm(
+    model_id: str,
+    profile_name: str,
+    on_progress: Callable[[dict[str, Any]], None] | None,
+):
+    class _ConfiguredStructuredSnapshotTqdm(_StructuredSnapshotTqdm):
+        def __init__(self, *args: Any, **kwargs: Any):
+            kwargs["_asb_model_id"] = model_id
+            kwargs["_asb_profile_name"] = profile_name
+            kwargs["_asb_on_progress"] = on_progress
+            super().__init__(*args, **kwargs)
+
+    return _ConfiguredStructuredSnapshotTqdm
+
+
+def _normalize_context_text(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
+
+def _normalize_context_text_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    normalized: list[str] = []
+    for entry in value:
+        normalized_entry = _normalize_context_text(entry)
+        if normalized_entry:
+            normalized.append(normalized_entry)
+    return normalized
+
+
+def _looks_like_checkpoint_model(model_id: str) -> bool:
+    return bool(re.search(r"\b(stable-diffusion|sdxl|flux|text-to-image|txt2img|diffusion)\b", model_id.lower()))
+
+
+def _resolve_snapshot_download_profile(
+    model_config: LocalModelConfig,
+    download_context: Mapping[str, Any] | None,
+) -> HuggingFaceSnapshotDownloadProfile:
+    inference_mode = _normalize_context_text(download_context.get("inferenceMode") if download_context else None)
+    artifact_form = _normalize_context_text(download_context.get("artifactForm") if download_context else None)
+    task_tags = _normalize_context_text_list(download_context.get("taskTags") if download_context else None)
+
+    if inference_mode == "text-to-image" or "text-to-image" in task_tags:
+        return CHECKPOINT_SNAPSHOT_PROFILE
+
+    if artifact_form == "checkpoint" or _looks_like_checkpoint_model(model_config.modelId):
+        return CHECKPOINT_SNAPSHOT_PROFILE
+
+    return GENERIC_TRANSFORMERS_SNAPSHOT_PROFILE
+
+
+def _snapshot_download_kwargs(profile: HuggingFaceSnapshotDownloadProfile) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    if profile.allow_patterns:
+        kwargs["allow_patterns"] = list(profile.allow_patterns)
+    if profile.ignore_patterns:
+        kwargs["ignore_patterns"] = list(profile.ignore_patterns)
+    return kwargs
+
+
+def _top_level_checkpoint_files(path: str | Path | None) -> list[str]:
+    if not path:
+        return []
+
+    snapshot_path = Path(path)
+    if not snapshot_path.exists():
+        return []
+
+    checkpoint_files = []
+    for child in snapshot_path.iterdir():
+        if child.is_file() and child.suffix.lower() in {".ckpt", ".safetensors"}:
+            checkpoint_files.append(child.name)
+    return sorted(checkpoint_files)
+
+
+def _validate_snapshot_profile_result(
+    model_config: LocalModelConfig,
+    profile: HuggingFaceSnapshotDownloadProfile,
+    local_path: str,
+) -> None:
+    if profile.name != CHECKPOINT_SNAPSHOT_PROFILE.name:
+        return
+
+    checkpoint_files = _top_level_checkpoint_files(local_path)
+    if checkpoint_files:
+        return
+
+    raise RuntimeError(
+        (
+            f"Hugging Face model '{model_config.modelId}' did not expose a top-level .safetensors or .ckpt checkpoint "
+            "after applying the checkpoint download profile. Choose a checkpoint-format model artifact or save it as a reference."
+        )
     )
 
 
@@ -194,11 +386,14 @@ class TransformersChatGenerator(TransformersCausalGenerator):
 def ensure_generation_model_downloaded(
     model_config: LocalModelConfig,
     on_progress: Callable[[dict[str, Any]], None] | None = None,
+    download_context: Mapping[str, Any] | None = None,
 ) -> GenerationModelAvailability:
     if model_config.provider != "transformers":
         raise ValueError(f"Unsupported generation model provider: {model_config.provider}")
 
     configure_huggingface_download_environment()
+    download_profile = _resolve_snapshot_download_profile(model_config, download_context)
+    snapshot_kwargs = _snapshot_download_kwargs(download_profile)
 
     try:
         from huggingface_hub import snapshot_download
@@ -214,18 +409,24 @@ def ensure_generation_model_downloaded(
             on_progress,
             "cache-check",
             f"Checking local Hugging Face cache for {model_config.modelId}.",
+            profile=download_profile.name,
+            allowPatterns=list(download_profile.allow_patterns or ()),
+            ignorePatterns=list(download_profile.ignore_patterns),
         )
         _emit_model_download_event("runtime.model_download.cache_check.started", model_config.modelId)
         local_path = snapshot_download(
             repo_id=model_config.modelId,
             local_files_only=True,
+            **snapshot_kwargs,
         )
+        _validate_snapshot_profile_result(model_config, download_profile, local_path)
         cache_candidate_path = local_path
         cache_stats = _snapshot_file_stats(local_path)
         _emit_model_download_event(
             "runtime.model_download.cache_check.succeeded",
             model_config.modelId,
             localPath=local_path,
+            profile=download_profile.name,
             **cache_stats,
         )
         _report_model_download_progress(
@@ -234,8 +435,17 @@ def ensure_generation_model_downloaded(
             "cache-hit",
             f"Found cached Hugging Face snapshot for {model_config.modelId}.",
             localPath=local_path,
+            profile=download_profile.name,
             fileCount=cache_stats["fileCount"],
             totalBytes=cache_stats["totalBytes"],
+        )
+        _RESOLVED_MODEL_REFERENCES[model_config.modelId] = local_path
+        return GenerationModelAvailability(
+            provider=model_config.provider,
+            model_id=model_config.modelId,
+            downloaded=False,
+            from_cache=True,
+            local_path=local_path,
         )
     except Exception:
         _emit_model_download_event("runtime.model_download.cache_check.missed", model_config.modelId)
@@ -253,25 +463,35 @@ def ensure_generation_model_downloaded(
             on_progress,
             "snapshot-download",
             f"Downloading Hugging Face snapshot for {model_config.modelId}.",
+            profile=download_profile.name,
             cachedFileCount=before_stats["fileCount"],
             cachedTotalBytes=before_stats["totalBytes"],
+            allowPatterns=list(download_profile.allow_patterns or ()),
+            ignorePatterns=list(download_profile.ignore_patterns),
         )
         _emit_model_download_event(
             "runtime.model_download.snapshot.started",
             model_config.modelId,
+            profile=download_profile.name,
             cachedFileCount=before_stats["fileCount"],
             cachedTotalBytes=before_stats["totalBytes"],
+            allowPatterns=list(download_profile.allow_patterns or ()),
+            ignorePatterns=list(download_profile.ignore_patterns),
         )
         local_path = snapshot_download(
             repo_id=model_config.modelId,
             local_files_only=False,
+            tqdm_class=_create_structured_snapshot_tqdm(model_config.modelId, download_profile.name, on_progress),
+            **snapshot_kwargs,
         )
+        _validate_snapshot_profile_result(model_config, download_profile, local_path)
         after_stats = _snapshot_file_stats(local_path)
         downloaded_missing_files = after_stats["fileCount"] > before_stats["fileCount"] or after_stats["totalBytes"] > before_stats["totalBytes"]
         _emit_model_download_event(
             "runtime.model_download.snapshot.succeeded",
             model_config.modelId,
             localPath=local_path,
+            profile=download_profile.name,
             fileCount=after_stats["fileCount"],
             totalBytes=after_stats["totalBytes"],
             downloadedMissingFiles=downloaded_missing_files,
@@ -282,6 +502,7 @@ def ensure_generation_model_downloaded(
             "snapshot-complete",
             f"Hugging Face snapshot is complete for {model_config.modelId}.",
             localPath=local_path,
+            profile=download_profile.name,
             fileCount=after_stats["fileCount"],
             totalBytes=after_stats["totalBytes"],
             downloadedMissingFiles=downloaded_missing_files,
@@ -300,6 +521,7 @@ def ensure_generation_model_downloaded(
             model_config.modelId,
             errorType=type(error).__name__,
             message=str(error) or type(error).__name__,
+            profile=download_profile.name,
         )
         _report_model_download_progress(
             model_config.modelId,
@@ -308,7 +530,10 @@ def ensure_generation_model_downloaded(
             f"Hugging Face snapshot download failed for {model_config.modelId}.",
             errorType=type(error).__name__,
             errorMessage=str(error) or type(error).__name__,
+            profile=download_profile.name,
         )
+        if isinstance(error, RuntimeError) and str(error).startswith("Hugging Face model "):
+            raise
         raise RuntimeError(
             (
                 f"Generation model '{model_config.modelId}' is not available in the local Hugging Face cache. "

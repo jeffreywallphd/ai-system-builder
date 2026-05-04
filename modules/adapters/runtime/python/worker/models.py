@@ -38,6 +38,9 @@ class PythonRuntimeCapabilitiesResult(BaseModel):
 class EnsureModelDownloadRequest(BaseModel):
     provider: Literal["transformers"]
     modelId: str
+    inferenceMode: str | None = None
+    taskTags: list[str] | None = None
+    artifactForm: str | None = None
 
 
 class EnsureModelDownloadResult(BaseModel):
