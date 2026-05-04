@@ -3,15 +3,19 @@ import react from "@vitejs/plugin-react";
 import { createThinClientApiProxyConfig } from "./viteDevProxyConfig";
 import { resolveThinClientViteHttpsConfig } from "./viteDevHttpsConfig";
 
-const thinClientViteHttpsConfig = resolveThinClientViteHttpsConfig();
+export function createThinClientViteConfig(environment: NodeJS.ProcessEnv = process.env) {
+  const thinClientViteHttpsConfig = resolveThinClientViteHttpsConfig(environment);
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    https: thinClientViteHttpsConfig || undefined,
-    host: "0.0.0.0",
-    proxy: {
-      "/api": createThinClientApiProxyConfig(),
+  return {
+    plugins: [react()],
+    server: {
+      https: thinClientViteHttpsConfig || undefined,
+      host: "0.0.0.0",
+      proxy: {
+        "/api": createThinClientApiProxyConfig(environment),
+      },
     },
-  },
-});
+  };
+}
+
+export default defineConfig(createThinClientViteConfig());
