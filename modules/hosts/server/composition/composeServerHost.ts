@@ -178,6 +178,16 @@ function parseBooleanEnvFlag(value: string | undefined): boolean {
   return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
+function classifyPythonRuntimeSupervisorLogLevel(eventType: string, source?: unknown): "info" | "warn" | "error" {
+  if (eventType === "process-error" || eventType === "startup-timeout") {
+    return "error";
+  }
+  if (eventType === "process-exit" || source === "stderr") {
+    return "warn";
+  }
+  return "info";
+}
+
 export function resolveServerComfyUiPythonEnvironmentMode(env: NodeJS.ProcessEnv = process.env): {
   pythonEnvironmentMode: ComfyUiPythonEnvironmentMode;
   invalidValue?: string;
@@ -588,14 +598,64 @@ export function composeServerHost(
           prepareRuntimeEnvironment(context) {
             ensurePythonRuntimeWorkerDependencies({ command: context.command, cwd: context.cwd, env: context.env });
           },
+          onEvent(event) {
+            const source = event.data?.source;
+            const detail = event.detail?.trim();
+            const message = event.type === "stdio"
+              ? `Python runtime ${source === "stderr" ? "stderr" : "stdout"}: ${detail ?? ""}`
+              : detail ?? `Python runtime event: ${event.type}`;
+            void loggingPort.log({
+              timestamp: new Date().toISOString(),
+              level: classifyPythonRuntimeSupervisorLogLevel(event.type, source),
+              verbosity: "normal",
+              event: "runtime.python.server.activity",
+              message,
+              component: "python-runtime-supervisor",
+              subsystem: "runtime",
+              data: {
+                eventType: event.type,
+                supervisorStatus: event.status,
+                ...event.data,
+              },
+            });
+          },
         },
       });
       const downloadModelUseCase = new DownloadModelUseCase({
         modelRegistry,
         modelDownloader: {
           ensureModelDownloaded: async (request) => {
+            const startedAt = Date.now();
+            modelManagementLogger.info("runtime.python.model_download.requested", {
+              provider: request.provider,
+              modelId: request.modelId,
+            });
             await pythonRuntimeFoundation.supervisor.start();
-            return pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+            modelManagementLogger.info("runtime.python.model_download.runtime_ready", {
+              provider: request.provider,
+              modelId: request.modelId,
+              elapsedMs: Date.now() - startedAt,
+            });
+            try {
+              const result = await pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+              modelManagementLogger.info("runtime.python.model_download.succeeded", {
+                provider: result.provider,
+                modelId: result.modelId,
+                downloaded: result.downloaded,
+                fromCache: result.fromCache,
+                hasLocalPath: typeof result.localPath === "string" && result.localPath.length > 0,
+                elapsedMs: Date.now() - startedAt,
+              });
+              return result;
+            } catch (error) {
+              modelManagementLogger.warn("runtime.python.model_download.failed", {
+                provider: request.provider,
+                modelId: request.modelId,
+                message: error instanceof Error ? error.message : String(error),
+                elapsedMs: Date.now() - startedAt,
+              });
+              throw error;
+            }
           },
         },
       });

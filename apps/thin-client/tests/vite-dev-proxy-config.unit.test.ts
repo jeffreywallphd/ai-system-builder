@@ -1,6 +1,7 @@
 import { describe, expect, it } from "../../../modules/testing/node-test";
 
 import {
+  THIN_CLIENT_API_PROXY_TIMEOUT_MS,
   createThinClientApiProxyConfig,
   resolveThinClientApiProxyTarget,
   shouldVerifyThinClientApiProxyTls,
@@ -15,6 +16,8 @@ describe("thin-client Vite API proxy config", () => {
       target: "http://127.0.0.1:3010",
       changeOrigin: true,
       secure: true,
+      timeout: THIN_CLIENT_API_PROXY_TIMEOUT_MS,
+      proxyTimeout: THIN_CLIENT_API_PROXY_TIMEOUT_MS,
     });
   });
 

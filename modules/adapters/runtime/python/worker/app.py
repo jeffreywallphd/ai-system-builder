@@ -264,10 +264,50 @@ def cancel_task(request_id: str) -> CancelPythonRuntimeTaskResult:
 
 @app.post("/models/ensure-downloaded", response_model=EnsureModelDownloadResult)
 def ensure_model_download(request: EnsureModelDownloadRequest) -> EnsureModelDownloadResult | JSONResponse:
+    started_at = time.monotonic()
+    print(
+        json.dumps(
+            {
+                "event": "runtime.model_download.started",
+                "provider": request.provider,
+                "modelId": request.modelId,
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
     try:
         availability = ensure_generation_model_downloaded(LocalModelConfig(provider=request.provider, modelId=request.modelId))
     except Exception as error:
+        print(
+            json.dumps(
+                {
+                    "event": "runtime.model_download.failed",
+                    "provider": request.provider,
+                    "modelId": request.modelId,
+                    "elapsedMs": round((time.monotonic() - started_at) * 1000),
+                    "message": str(error),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
         return JSONResponse(status_code=502, content={"error": PythonRuntimeError(code="model_download_failed", errorCode="generation_model_not_available", stage="generation", message=str(error), details={"provider": request.provider, "modelId": request.modelId}, retryable=True).model_dump(mode="json")})
+    print(
+        json.dumps(
+            {
+                "event": "runtime.model_download.succeeded",
+                "provider": request.provider,
+                "modelId": request.modelId,
+                "downloaded": availability.downloaded,
+                "fromCache": availability.from_cache,
+                "hasLocalPath": bool(availability.local_path),
+                "elapsedMs": round((time.monotonic() - started_at) * 1000),
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
     return EnsureModelDownloadResult(provider=request.provider, modelId=request.modelId, downloaded=availability.downloaded, fromCache=availability.from_cache, localPath=availability.local_path)
 
 

@@ -224,7 +224,18 @@ describe("composeServerHost", () => {
     const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
     const source = readFileSync(canonicalSourcePath, "utf8");
     expect(source).toContain("pythonRuntimeFoundation.runtimePort.ensureModelDownloaded");
+    expect(source).toContain("runtime.python.model_download.requested");
+    expect(source).toContain("runtime.python.model_download.succeeded");
+    expect(source).toContain("runtime.python.model_download.failed");
     expect(source).not.toContain("Model download runtime is unavailable on server host.");
+  });
+
+  it("wires server Python runtime supervisor activity into structured logs", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("onEvent(event)");
+    expect(source).toContain("runtime.python.server.activity");
+    expect(source).toContain("classifyPythonRuntimeSupervisorLogLevel");
   });
 
   it("resolves the server Python runtime worker directory from the repository root when launched from app workspace", () => {

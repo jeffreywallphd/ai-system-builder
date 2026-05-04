@@ -2,6 +2,7 @@ import type { ProxyOptions } from "vite";
 
 const DEFAULT_SERVER_HOST = "127.0.0.1";
 const DEFAULT_SERVER_PORT = "3010";
+export const THIN_CLIENT_API_PROXY_TIMEOUT_MS = 30 * 60 * 1000;
 const HTTPS_CERT_MODES_WITH_DEV_TRUST = new Set(["auto-self-signed", "auto-local-ca"]);
 
 type ThinClientDevProxyEnvironment = Partial<Record<
@@ -59,5 +60,7 @@ export function createThinClientApiProxyConfig(
     target: resolveThinClientApiProxyTarget(environment),
     changeOrigin: true,
     secure: shouldVerifyThinClientApiProxyTls(environment),
+    timeout: THIN_CLIENT_API_PROXY_TIMEOUT_MS,
+    proxyTimeout: THIN_CLIENT_API_PROXY_TIMEOUT_MS,
   };
 }
