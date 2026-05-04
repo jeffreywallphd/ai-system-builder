@@ -21,6 +21,12 @@ export interface ServerRuntimeConfig {
   security: Awaited<ReturnType<typeof composeServerSecurity>>["config"];
 }
 
+export interface ResolvedServerRuntimePaths {
+  port: number;
+  storageRootDirectory: string;
+  runtimeRootDirectory: string;
+}
+
 export interface CreateServerOptions {
   env?: NodeJS.ProcessEnv;
   logSink?: StructuredLogSink;
@@ -121,10 +127,10 @@ export function resolveServerRuntimeRootDirectory(
     : resolveDefaultServerRuntimeRootDirectory({ cwd: options.cwd, env });
 }
 
-export async function resolveServerRuntimeConfig(
+export function resolveServerRuntimePaths(
   env: NodeJS.ProcessEnv = process.env,
   options: { cwd?: string } = {},
-): Promise<ServerRuntimeConfig> {
+): ResolvedServerRuntimePaths {
   const storageRootFromEnv = env.SERVER_STORAGE_ROOT?.trim();
   const rootResolutionOptions = { cwd: options.cwd, env };
 
@@ -134,18 +140,20 @@ export async function resolveServerRuntimeConfig(
       : resolveDefaultServerStorageRootDirectory(rootResolutionOptions);
 
   const runtimeRootDirectory = resolveServerRuntimeRootDirectory(env, options);
-  const security = (await composeServerSecurity(env, storageRootDirectory)).config;
-  return {
-    port: normalizePort(env.PORT),
-    storageRootDirectory,
-    runtimeRootDirectory,
-    security,
-  };
+  return { port: normalizePort(env.PORT), storageRootDirectory, runtimeRootDirectory };
+}
+
+export function resolveServerRuntimeConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  options: { cwd?: string } = {},
+): ResolvedServerRuntimePaths {
+  return resolveServerRuntimePaths(env, options);
 }
 
 export async function createServer(options: CreateServerOptions = {}): Promise<CreatedServer> {
-  const config = await resolveServerRuntimeConfig(options.env);
-  const security = await composeServerSecurity(options.env ?? process.env, config.storageRootDirectory);
+  const runtimePaths = resolveServerRuntimePaths(options.env);
+  const security = await composeServerSecurity(options.env ?? process.env, runtimePaths.storageRootDirectory);
+  const config: ServerRuntimeConfig = { ...runtimePaths, security: security.config };
   const serverHost = composeServerHost({
     env: options.env,
     logging: {
@@ -170,7 +178,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<C
     revokeToken: (body) => security.credentials.revokeDevice({ deviceId: body.deviceId, revokedAt: new Date() }),
     getDevMode: security.devSecurityEnforcement.isEnabled() ? () => security.devSecurityEnforcement.getMode() : undefined,
     setDevMode: security.devSecurityEnforcement.isEnabled() ? (mode) => security.devSecurityEnforcement.setMode(mode) : undefined,
-    getLocalCaPem: security.config.tlsStatus?.mode === "auto-local-ca" && security.config.tlsStatus.localCa?.certificatePath ? async () => readFileSync(security.config.tlsStatus!.localCa!.certificatePath!, "utf8") : undefined,
+    getLocalCaPem: security.config.tlsStatus?.mode === "auto-local-ca" ? security.config.tlsMaterial?.getLocalCaPublicCertificatePem : undefined,
   });
 
   serverHost.registerApi({

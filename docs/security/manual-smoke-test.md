@@ -85,3 +85,6 @@
 - Self-signed certs may still show browser trust warnings until explicitly trusted.
 - Dev auth enforcement toggle does not switch HTTP/HTTPS; listener mode changes require restart.
 - Do not commit or log private keys or token hash secrets.
+
+
+No automatic trust-store installation is performed. Trust installation is manual; browser/mobile trust limitations apply. Do not commit private keys or SERVER_TOKEN_HASH_SECRET.

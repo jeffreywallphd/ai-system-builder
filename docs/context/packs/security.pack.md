@@ -25,7 +25,7 @@ Summarize the planned security architecture direction for implementation prompts
   - `lan-https-token`
 - Required env for `lan-https-token`:
   - `AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token`
-  - `AI_SYSTEM_BUILDER_TLS_CERT_MODE=manual|auto-self-signed`
+  - `AI_SYSTEM_BUILDER_TLS_CERT_MODE=manual|auto-self-signed|auto-local-ca`
   - `SERVER_TOKEN_HASH_SECRET`
 - Optional env/config commonly used:
   - `AI_SYSTEM_BUILDER_PAIRING_ENABLED`
@@ -104,3 +104,6 @@ Identity/authentication, authorization/policy, transport security, storage secur
 - `auto-self-signed` generates/reuses certificate material for transport but may still produce browser trust warnings.
 - `auto-local-ca` is supported for local/dev/LAN testing with manual CA trust installation.
 - Listener mode changes (HTTP/HTTPS) require restart; dev auth enforcement toggle is runtime auth-only.
+
+
+No automatic trust-store installation is performed. Trust installation is manual; browser/mobile trust limitations apply. Do not commit private keys or SERVER_TOKEN_HASH_SECRET.
