@@ -4,8 +4,6 @@ import io
 import json
 import unittest
 from contextlib import redirect_stdout
-from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -320,7 +318,7 @@ class ExampleGenerationTests(unittest.TestCase):
     def test_ensure_generation_model_downloaded_returns_cached_when_present(self) -> None:
         snapshot_download = unittest.mock.Mock()
         with patch.dict("sys.modules", {"huggingface_hub": SimpleNamespace(snapshot_download=snapshot_download)}):
-            snapshot_download.return_value = "/tmp/hf-cache/model"
+            snapshot_download.side_effect = ["/tmp/hf-cache/model", "/tmp/hf-cache/model"]
             result = ensure_generation_model_downloaded(
                 ExampleGenerationConfig.model_validate(
                     {
@@ -333,34 +331,31 @@ class ExampleGenerationTests(unittest.TestCase):
         self.assertFalse(result.downloaded)
         self.assertTrue(result.from_cache)
         self.assertEqual(result.local_path, "/tmp/hf-cache/model")
-        snapshot_download.assert_called_once_with(repo_id="test-model", local_files_only=True)
+        self.assertEqual(snapshot_download.call_count, 2)
+        snapshot_download.assert_any_call(repo_id="test-model", local_files_only=True)
+        snapshot_download.assert_any_call(repo_id="test-model", local_files_only=False)
 
-    def test_ensure_generation_model_downloaded_uses_existing_safetensors_cache_before_download(self) -> None:
-        with TemporaryDirectory() as temporary_directory:
-            cache_root = Path(temporary_directory)
-            snapshot_path = cache_root / "models--Qwen--Qwen3-8B" / "snapshots" / "abcdef"
-            snapshot_path.mkdir(parents=True, exist_ok=True)
-            (snapshot_path / "model-00001-of-00002.safetensors").write_bytes(b"weights")
-
-            snapshot_download = unittest.mock.Mock(side_effect=RuntimeError("should-not-download"))
-            with patch.dict(
-                "sys.modules",
-                {"huggingface_hub": SimpleNamespace(snapshot_download=snapshot_download)},
-            ):
-                with patch.dict("os.environ", {"HF_HUB_CACHE": temporary_directory}, clear=False):
-                    result = ensure_generation_model_downloaded(
-                        ExampleGenerationConfig.model_validate(
-                            {
-                                "mode": "qa",
-                                "model": {"provider": "transformers", "modelId": "Qwen/Qwen3-8B"},
-                            }
-                        ).model
-                    )
+    def test_ensure_generation_model_downloaded_verifies_cache_through_hub_snapshot(self) -> None:
+        snapshot_download = unittest.mock.Mock(side_effect=["/tmp/hf-cache/model", "/tmp/hf-cache/model"])
+        with patch.dict(
+            "sys.modules",
+            {"huggingface_hub": SimpleNamespace(snapshot_download=snapshot_download)},
+        ):
+            result = ensure_generation_model_downloaded(
+                ExampleGenerationConfig.model_validate(
+                    {
+                        "mode": "qa",
+                        "model": {"provider": "transformers", "modelId": "test-org/test-model"},
+                    }
+                ).model
+            )
 
         self.assertFalse(result.downloaded)
         self.assertTrue(result.from_cache)
-        self.assertEqual(result.local_path, str(snapshot_path))
-        snapshot_download.assert_not_called()
+        self.assertEqual(result.local_path, "/tmp/hf-cache/model")
+        self.assertEqual(snapshot_download.call_count, 2)
+        snapshot_download.assert_any_call(repo_id="test-org/test-model", local_files_only=True)
+        snapshot_download.assert_any_call(repo_id="test-org/test-model", local_files_only=False)
 
     def test_ensure_generation_model_downloaded_auto_downloads_when_missing_from_cache(self) -> None:
         snapshot_download = unittest.mock.Mock()
@@ -379,6 +374,29 @@ class ExampleGenerationTests(unittest.TestCase):
         self.assertFalse(result.from_cache)
         self.assertEqual(result.local_path, "/tmp/hf-cache/model")
         self.assertEqual(snapshot_download.call_count, 2)
+
+    def test_ensure_generation_model_downloaded_reports_snapshot_progress(self) -> None:
+        progress: list[dict[str, object]] = []
+        snapshot_download = unittest.mock.Mock()
+        with patch.dict("sys.modules", {"huggingface_hub": SimpleNamespace(snapshot_download=snapshot_download)}):
+            snapshot_download.side_effect = [RuntimeError("cache-miss"), "/tmp/hf-cache/model"]
+            result = ensure_generation_model_downloaded(
+                ExampleGenerationConfig.model_validate(
+                    {
+                        "mode": "qa",
+                        "model": {"provider": "transformers", "modelId": "test-model"},
+                    }
+                ).model,
+                on_progress=progress.append,
+            )
+
+        self.assertTrue(result.downloaded)
+        self.assertEqual(
+            [entry["stage"] for entry in progress],
+            ["cache-check", "cache-miss", "snapshot-download", "snapshot-complete"],
+        )
+        self.assertEqual(progress[-1]["modelId"], "test-model")
+        self.assertEqual(progress[-1]["downloadedMissingFiles"], False)
 
     def test_ensure_generation_model_downloaded_raises_when_download_fails(self) -> None:
         snapshot_download = unittest.mock.Mock(side_effect=RuntimeError("cannot-download"))
