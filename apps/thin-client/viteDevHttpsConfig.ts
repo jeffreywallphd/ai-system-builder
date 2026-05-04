@@ -26,12 +26,37 @@ function requirePath(value: string | undefined, variableName: string): string {
   return trimmedPath;
 }
 
-function readRequiredPemFile(path: string, variableName: string): Buffer {
+function readRequiredPemFile(path: string, variableName: string, includePathInError: boolean): Buffer {
   try {
     return readFileSync(path);
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown read error";
-    throw new Error(`${variableName} could not be read at \"${path}\": ${reason}`);
+    if (includePathInError) {
+      throw new Error(`${variableName} could not be read at \"${path}\": ${reason}`);
+    }
+    throw new Error(`${variableName} could not be read.`);
+  }
+}
+
+function validateCertificatePemShape(contents: Buffer, variableName: string): void {
+  const pemText = contents.toString("utf8");
+  if (!pemText.includes("-----BEGIN CERTIFICATE-----")) {
+    throw new Error(`${variableName} must point to a PEM certificate file containing -----BEGIN CERTIFICATE-----.`);
+  }
+}
+
+function validatePrivateKeyPemShape(contents: Buffer, variableName: string): void {
+  const pemText = contents.toString("utf8");
+  const hasSupportedHeader = [
+    "-----BEGIN PRIVATE KEY-----",
+    "-----BEGIN RSA PRIVATE KEY-----",
+    "-----BEGIN EC PRIVATE KEY-----",
+  ].some((header) => pemText.includes(header));
+
+  if (!hasSupportedHeader) {
+    throw new Error(
+      `${variableName} must point to a PEM private key file with a supported BEGIN header.`,
+    );
   }
 }
 
@@ -51,8 +76,13 @@ export function resolveThinClientViteHttpsConfig(
     "AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH",
   );
 
+  const cert = readRequiredPemFile(certPath, "AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH", true);
+  const key = readRequiredPemFile(keyPath, "AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH", false);
+  validateCertificatePemShape(cert, "AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH");
+  validatePrivateKeyPemShape(key, "AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH");
+
   return {
-    cert: readRequiredPemFile(certPath, "AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH"),
-    key: readRequiredPemFile(keyPath, "AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH"),
+    cert,
+    key,
   };
 }
