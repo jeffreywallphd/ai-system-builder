@@ -8,3 +8,5 @@ export * from "./security-status";
 export * from "./lan-pairing";
 export * from "./device-credential";
 export * from "./security-event";
+
+export * from "./tls-certificate";

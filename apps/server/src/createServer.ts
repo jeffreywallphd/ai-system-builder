@@ -18,7 +18,7 @@ export interface ServerRuntimeConfig {
   port: number;
   storageRootDirectory: string;
   runtimeRootDirectory: string;
-  security: ReturnType<typeof composeServerSecurity>["config"];
+  security: Awaited<ReturnType<typeof composeServerSecurity>>["config"];
 }
 
 export interface CreateServerOptions {
@@ -121,10 +121,10 @@ export function resolveServerRuntimeRootDirectory(
     : resolveDefaultServerRuntimeRootDirectory({ cwd: options.cwd, env });
 }
 
-export function resolveServerRuntimeConfig(
+export async function resolveServerRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
   options: { cwd?: string } = {},
-): ServerRuntimeConfig {
+): Promise<ServerRuntimeConfig> {
   const storageRootFromEnv = env.SERVER_STORAGE_ROOT?.trim();
   const rootResolutionOptions = { cwd: options.cwd, env };
 
@@ -134,7 +134,7 @@ export function resolveServerRuntimeConfig(
       : resolveDefaultServerStorageRootDirectory(rootResolutionOptions);
 
   const runtimeRootDirectory = resolveServerRuntimeRootDirectory(env, options);
-  const security = composeServerSecurity(env, storageRootDirectory).config;
+  const security = (await composeServerSecurity(env, storageRootDirectory)).config;
   return {
     port: normalizePort(env.PORT),
     storageRootDirectory,
@@ -143,9 +143,9 @@ export function resolveServerRuntimeConfig(
   };
 }
 
-export function createServer(options: CreateServerOptions = {}): CreatedServer {
-  const config = resolveServerRuntimeConfig(options.env);
-  const security = composeServerSecurity(options.env ?? process.env, config.storageRootDirectory);
+export async function createServer(options: CreateServerOptions = {}): Promise<CreatedServer> {
+  const config = await resolveServerRuntimeConfig(options.env);
+  const security = await composeServerSecurity(options.env ?? process.env, config.storageRootDirectory);
   const serverHost = composeServerHost({
     env: options.env,
     logging: {
