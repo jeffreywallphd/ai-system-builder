@@ -18,6 +18,27 @@ function createMockChildProcess() {
 }
 
 describe("createComfyUiRuntimeSupervisor", () => {
+  it("defaults launch arguments to CPU to avoid ComfyUI CUDA autodetection", () => {
+    expect(buildComfyUiRuntimeLaunchArguments({ host: "127.0.0.1", port: 8188 })).toEqual([
+      "main.py",
+      "--cpu",
+      "--listen",
+      "127.0.0.1",
+      "--port",
+      "8188",
+    ]);
+  });
+
+  it("preserves explicit auto launch mode for troubleshooting", () => {
+    expect(buildComfyUiRuntimeLaunchArguments({ host: "127.0.0.1", port: 8188, runtimeDeviceMode: "auto" })).toEqual([
+      "main.py",
+      "--listen",
+      "127.0.0.1",
+      "--port",
+      "8188",
+    ]);
+  });
+
   it("builds DirectML launch arguments without falling through to CUDA autodetection", () => {
     expect(buildComfyUiRuntimeLaunchArguments({ host: "127.0.0.1", port: 8188, runtimeDeviceMode: "directml" })).toEqual([
       "main.py",

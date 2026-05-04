@@ -346,9 +346,11 @@ describe("server ComfyUI python/runtime resolution", () => {
   });
 
   it("resolves runtime device mode from COMFYUI_RUNTIME_DEVICE_MODE and COMFYUI_ACCELERATOR", () => {
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv)).toBe("cpu");
     expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "directml" } as NodeJS.ProcessEnv)).toBe("directml");
     expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_ACCELERATOR: "cpu" } as NodeJS.ProcessEnv)).toBe("cpu");
-    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "unknown" } as NodeJS.ProcessEnv)).toBe("auto");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "auto" } as NodeJS.ProcessEnv)).toBe("auto");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "unknown" } as NodeJS.ProcessEnv)).toBe("cpu");
   });
 
   it("logs structured ComfyUI python/runtime diagnostics", () => {
@@ -368,7 +370,7 @@ describe("server ComfyUI python/runtime resolution", () => {
       launchPythonExecutableSource: "managed-venv",
       skipPythonSetup: false,
       skipPythonValidation: false,
-      runtimeDeviceMode: "auto",
+      runtimeDeviceMode: "cpu",
       installRootSource: "default-server-runtime-root",
     });
   });

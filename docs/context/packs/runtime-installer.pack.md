@@ -72,6 +72,7 @@ Include this pack when prompts involve:
 - DirectML reconciliation is required for Intel/AMD GPU paths and does not assume NVIDIA/CUDA availability.
 - `COMFYUI_DIRECTML_TORCH_VERSION`, `COMFYUI_DIRECTML_TORCHAUDIO_VERSION`, and `COMFYUI_DIRECTML_TORCHVISION_VERSION` are advanced overrides; misuse can still create incompatible binary combinations.
 - DirectML/Intel GPU setups can hit native extension mismatches (for example `torchaudio` + `WinError 127`) after upstream package drift.
+- ComfyUI runtime device defaults must be conservative: use CPU unless an accelerator is explicitly configured or clearly detected, and avoid implicit NVIDIA/CUDA autodetection.
 - ComfyUI supervisor detects dependency mismatch startup signatures, triggers a single non-destructive managed dependency repair, and retries startup once.
 - Dependency repair does not update git checkout refs by default and never deletes model files or ComfyUI repository files.
 - If repair or retry fails, the runtime returns actionable startup errors that include recent runtime output context.
