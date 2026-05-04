@@ -1,15 +1,19 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "../../../../modules/testing/node-test";
-import { readFileSync } from "node:fs";
+import type { StructuredLogEvent } from "../../../../modules/contracts/logging";
 
 import {
   DEFAULT_SERVER_PORT,
+  DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
   DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
   DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME,
+  createServer,
   resolveDefaultServerRuntimeRootDirectory,
   resolveDefaultServerStorageRootDirectory,
-  resolveServerRuntimeConfig
+  resolveServerAppRootDirectory,
+  resolveServerRuntimeConfig,
 } from "../createServer";
 
 describe("resolveServerRuntimeConfig", () => {
@@ -17,12 +21,36 @@ describe("resolveServerRuntimeConfig", () => {
     const config = resolveServerRuntimeConfig({});
     expect(config.port).toBe(DEFAULT_SERVER_PORT);
     expect(config.storageRootDirectory).toBe(
-path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
+      path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     );
     expect(config.runtimeRootDirectory).toBe(
-path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+      path.resolve(
+        "apps",
+        "server",
+        DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
+        DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
+      ),
     );
     expect(config.runtimeRootDirectory).not.toContain(config.storageRootDirectory);
+  });
+
+  it("resolves default server roots from the app workspace cwd without duplicating apps/server", () => {
+    const serverAppRootDirectory = path.resolve("apps", "server");
+    const config = resolveServerRuntimeConfig({}, { cwd: serverAppRootDirectory });
+
+    expect(resolveServerAppRootDirectory({ cwd: serverAppRootDirectory, env: {} })).toBe(serverAppRootDirectory);
+    expect(config.storageRootDirectory).toBe(
+      path.join(serverAppRootDirectory, DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
+    );
+    expect(config.runtimeRootDirectory).toBe(
+      path.join(
+        serverAppRootDirectory,
+        DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
+        DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
+      ),
+    );
+    expect(config.storageRootDirectory).not.toContain(path.join("apps", "server", "apps", "server"));
+    expect(config.runtimeRootDirectory).not.toContain(path.join("apps", "server", "apps", "server"));
   });
 
   it("honors SERVER_STORAGE_ROOT override when provided without moving runtime root", () => {
@@ -44,10 +72,15 @@ path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
 
   it("exposes stable default storage/runtime roots in CJS runtime", () => {
     expect(resolveDefaultServerStorageRootDirectory()).toBe(
-path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
+      path.resolve("apps", "server", DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME),
     );
     expect(resolveDefaultServerRuntimeRootDirectory()).toBe(
-path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
+      path.resolve(
+        "apps",
+        "server",
+        DEFAULT_SERVER_LOCAL_STATE_DIRECTORY_NAME,
+        DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME,
+      ),
     );
   });
 
@@ -57,9 +90,88 @@ path.resolve("apps", "server", DEFAULT_SERVER_RUNTIME_ROOT_DIRECTORY_NAME),
     expect(source).toContain("storageRootDirectory: config.storageRootDirectory");
   });
 
-  it("index startup log includes runtime root", () => {
+  it("createServer exposes the composed server logging port", async () => {
+    const emittedEvents: StructuredLogEvent[] = [];
+    const { loggingPort } = createServer({
+      env: {},
+      now: () => "2026-05-03T00:00:00.000Z",
+      logSink: (_serializedEvent, event) => {
+        emittedEvents.push(event);
+      },
+    });
+    emittedEvents.splice(0, emittedEvents.length);
+
+    await loggingPort.log({
+      timestamp: "",
+      level: "info",
+      verbosity: "normal",
+      event: "server.test",
+      message: "Server test event.",
+      component: "server-test",
+    });
+
+    expect(emittedEvents).toEqual([
+      {
+        timestamp: "2026-05-03T00:00:00.000Z",
+        level: "info",
+        verbosity: "normal",
+        event: "server.test",
+        message: "Server test event.",
+        component: "server-test",
+        host: "server",
+      },
+    ]);
+  });
+
+  it("createServer passes explicit environment into server runtime composition", () => {
+    const previousPythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL;
+    process.env.PYTHON_RUNTIME_BASE_URL = "http://127.0.0.1:49999";
+    const emittedEvents: StructuredLogEvent[] = [];
+    const storageRootDirectory = path.resolve("tmp/server-env-storage");
+    const runtimeRootDirectory = path.resolve("tmp/server-env-runtime");
+
+    try {
+      createServer({
+        env: {
+          SERVER_STORAGE_ROOT: storageRootDirectory,
+          SERVER_RUNTIME_ROOT: runtimeRootDirectory,
+          PYTHON_RUNTIME_BASE_URL: "http://127.0.0.1:43112",
+          PYTHON_RUNTIME_COMMAND: "python-custom",
+          PYTHON_RUNTIME_ARGS: "worker.py --ready",
+          PYTHON_RUNTIME_WORKER_DIR: "modules/adapters/runtime/python/worker",
+        },
+        logSink: (_serializedEvent, event) => {
+          emittedEvents.push(event);
+        },
+      });
+    } finally {
+      if (previousPythonRuntimeBaseUrl === undefined) {
+        delete process.env.PYTHON_RUNTIME_BASE_URL;
+      } else {
+        process.env.PYTHON_RUNTIME_BASE_URL = previousPythonRuntimeBaseUrl;
+      }
+    }
+
+    const pythonRuntimeLog = emittedEvents.find(
+      (event) => event.event === "runtime.python.server.configuration",
+    );
+    expect(pythonRuntimeLog?.data).toMatchObject({
+      serverStorageRootDirectory: storageRootDirectory,
+      serverRuntimeRootDirectory: runtimeRootDirectory,
+      pythonRuntimeRootDirectory: path.join(runtimeRootDirectory, "models", "huggingface"),
+      pythonRuntimeRootSource: "SERVER_RUNTIME_ROOT",
+      pythonRuntimeBaseUrl: "http://127.0.0.1:43112",
+      pythonRuntimeCommand: "python-custom",
+      pythonRuntimeArgs: ["worker.py", "--ready"],
+    });
+  });
+
+  it("index startup log uses structured server host logging", () => {
     const source = readFileSync(path.resolve("apps/server/src/index.ts"), "utf8");
-    expect(source).toContain("runtime root:");
+    expect(source).toContain("loggingPort.log");
+    expect(source).toContain("server.http.listening");
     expect(source).toContain("config.runtimeRootDirectory");
+    expect(source).not.toContain("console.log");
+    expect(source).not.toContain("[server] listening");
   });
 });

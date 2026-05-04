@@ -166,3 +166,15 @@ Before merging, confirm:
 - Are apps only bootstrapping/composing?
 
 If any answer is "no", refactor before adding more code on top.
+
+## Security dependency guidance
+
+- `modules/contracts/security` may be imported broadly where contract types are needed.
+- Application security ports may be used by application services/use cases.
+- `modules/adapters/security` implementations must not be imported by domain/application layers.
+- Transport adapters may compose security adapters/ports.
+- Feature UI must not import server security adapters.
+- Security adapters must not depend on feature UI.
+- Domain code must not depend on Express, TLS socket APIs, filesystem credential stores, or crypto implementation details.
+
+See ADR-0015.

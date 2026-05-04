@@ -67,6 +67,7 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - DirectML override env vars for torch companions are advanced controls and can break compatibility if set incorrectly.
 - When detected, the supervisor performs one managed dependency repair attempt and retries startup once before surfacing a clear actionable failure.
 - The repair flow is non-destructive: it repairs managed Python dependencies and does not delete models or ComfyUI repo files.
+- ComfyUI host composition defaults to CPU when no accelerator is explicitly configured or clearly detected; do not let implicit ComfyUI autodetection assume NVIDIA/CUDA.
 
 
 
@@ -79,3 +80,7 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - UI should not depend on ComfyUI temp output folders.
 - Model/checkpoint resolution belongs to the executing host.
 - Canonical references: ADR-0013 and ADR-0012.
+
+- Image-generation routes should require image-generation scopes through centralized route policy.
+- Generated image artifacts should be authorized via artifact storage/media routes.
+- ComfyUI temp paths must not be exposed as security-relevant client state.

@@ -31,7 +31,13 @@ export function App() {
     }
 
     if (activePage === "image-generation") {
-      return <ImageGenerationPage onGenerated={() => setArtifactRefreshToken((current) => current + 1)} onNavigateToArtifacts={() => { navigateToPage("artifacts"); setActivePage("artifacts"); }} />;
+      return (
+        <ImageGenerationPage
+          onGenerated={() => setArtifactRefreshToken((current) => current + 1)}
+          onNavigateToArtifacts={() => { navigateToPage("artifacts"); setActivePage("artifacts"); }}
+          onNavigateToModels={() => { navigateToPage("models"); setActivePage("models"); }}
+        />
+      );
     }
 
     if (activePage === "models") {

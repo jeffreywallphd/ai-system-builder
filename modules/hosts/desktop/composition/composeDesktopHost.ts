@@ -87,6 +87,7 @@ import {
   createHuggingFaceTokenConfigStore,
   type HuggingFaceTokenStatus,
 } from "../../shared/huggingFaceTokenConfigStore";
+import { createRuntimePreparedModelCheckpointResolver } from "../../shared/createRuntimePreparedModelCheckpointResolver";
 import {
   registerElectronIpc,
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
@@ -353,11 +354,11 @@ export function resolveComfyUiRuntimeDeviceMode(input: {
     return "cpu";
   }
 
-  if ((input.platform ?? process.platform) === "win32" && input.hasNvidiaGpu === false) {
-    return "directml";
+  if (input.hasNvidiaGpu === true) {
+    return "cuda";
   }
 
-  return "auto";
+  return "cpu";
 }
 
 export function detectNvidiaGpu(): boolean | undefined {
@@ -791,7 +792,7 @@ export function composeDesktopHost(
           return comfyUiSupervisor?.getRecentRuntimeOutput() ?? [];
         },
         getRuntimeDeviceMode() {
-          return activeRuntimeDeviceMode ?? "auto";
+          return activeRuntimeDeviceMode ?? "cpu";
         },
       };
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
@@ -1020,12 +1021,16 @@ export function composeDesktopHost(
         modelRegistry,
         runtimeTaskRegistry,
       });
+      const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
+        modelRegistry,
+        comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
+        log: (entry) => recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
+      });
       const generateImageUseCase = new GenerateImageUseCase({
         runtimeTaskRegistry,
-        modelCheckpointResolver: createLocalModelCheckpointResolverAdapter({
-          modelRegistry,
-          comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
-          log: (entry) => recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
+        modelCheckpointResolver: createRuntimePreparedModelCheckpointResolver({
+          runtime: comfyUiSupervisorPort,
+          modelCheckpointResolver: localModelCheckpointResolver,
         }),
       });
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({

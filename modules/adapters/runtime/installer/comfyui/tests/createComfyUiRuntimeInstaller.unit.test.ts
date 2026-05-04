@@ -203,6 +203,29 @@ describe("createComfyUiRuntimeInstaller", () => {
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
   });
 
+  it("fails finalization when managed Python environment is missing and no command runner can create it", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const stat = testDouble.fn(async (targetPath: string) => {
+      if (targetPath === managedPythonPath) {
+        throw new Error("missing");
+      }
+      return {};
+    });
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, stat: stat as never });
+
+    const result = await installer.ensureInstalled(baseRequest);
+
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("python-environment-command-runner-missing");
+    expect(result.error?.details).toMatchObject({
+      environmentRoot: managedPythonEnvironmentRoot,
+      pythonExecutable: managedPythonPath,
+    });
+  });
+
   it("installs torch-directml when DirectML runtime mode is selected", async () => {
     const gitInstaller = {
       ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),

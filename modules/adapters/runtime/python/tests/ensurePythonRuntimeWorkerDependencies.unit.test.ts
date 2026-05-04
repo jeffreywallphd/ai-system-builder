@@ -1,4 +1,7 @@
 import type { SpawnSyncReturns } from "node:child_process";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
@@ -93,6 +96,50 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
       spawnSyncImplementation.mock.calls.some((call) =>
         Array.isArray(call[1]) && call[1].join(" ") === "-m pip install --upgrade torch --index-url https://download.pytorch.org/whl/cpu"),
     ).toBe(false);
+  });
+
+  it("writes diagnostics when an existing matching torch installation returns early", () => {
+    const diagnosticsFile = join(mkdtempSync(join(tmpdir(), "python-runtime-diag-")), "diag.json");
+    const spawnSyncImplementation = createSpawnSyncImplementation((command, args) => {
+      if (command === "python" && args[0] === "-c" && args[1]?.includes("asb:python-env-inspect")) {
+        return createSpawnSyncResult({ stdout: createEnvironmentInspectionJson() });
+      }
+      if (command === "python" && args.join(" ") === "-m pip --version") {
+        return createSpawnSyncResult({ stdout: "pip 25.0 from /venv/lib/python3.11/site-packages/pip (python 3.11)" });
+      }
+      if (command === "python" && args[0] === "-c" && args[1]?.includes("os.access") && args[2] === "/tmp/runtime-worker") {
+        return createSpawnSyncResult({ stdout: "1\n" });
+      }
+      if (command === "python" && args[0] === "-c" && args[1] === workerDependencyProbeScript) {
+        return createSpawnSyncResult({ status: 0 });
+      }
+      if (command === "nvidia-smi") {
+        return createSpawnSyncResult({ status: 1, stderr: "not found" });
+      }
+      if (command === "rocminfo") {
+        return createSpawnSyncResult({ status: 1, stderr: "not found" });
+      }
+      if (command === "python" && args[0] === "-c" && args[1]?.includes("asb:torch-install-probe")) {
+        return createSpawnSyncResult({
+          stdout: JSON.stringify({ installed: true, version: "2.6.0+cpu", cudaVersion: null, hipVersion: null, cudaAvailable: false }),
+        });
+      }
+      if (command === "python" && args[0] === "-c" && args[1]?.includes("asb:torch-verification")) {
+        return createSpawnSyncResult({ stdout: JSON.stringify({ ok: true, backend: "cpu", version: "2.6.0+cpu" }) });
+      }
+
+      throw new Error(`Unexpected command: ${command} ${args.join(" ")}`);
+    });
+
+    ensurePythonRuntimeWorkerDependencies({
+      command: "python",
+      cwd: "/tmp/runtime-worker",
+      spawnSyncImplementation: spawnSyncImplementation as any,
+      diagnosticsFile,
+    });
+
+    const diagnostics = JSON.parse(readFileSync(diagnosticsFile, "utf8")) as { verificationResult?: { success?: boolean; backend?: string } };
+    expect(diagnostics.verificationResult).toMatchObject({ success: true, backend: "cpu" });
   });
 
   it("falls back to CPU when CUDA installation fails", () => {

@@ -9,13 +9,13 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
-import { composeServerHost, resolveServerPythonRuntimeWorkerDirectory } from "../composeServerHost";
 import {
   composeServerHost,
   resolveServerComfyUiInstallRoot,
   resolveServerComfyUiLaunchPythonExecutable,
   resolveServerComfyUiPythonEnvironmentMode,
   resolveServerComfyUiRuntimeDeviceMode,
+  resolveServerPythonRuntimeWorkerDirectory,
 } from "../composeServerHost";
 
 describe("composeServerHost", () => {
@@ -254,6 +254,22 @@ describe("composeServerHost", () => {
     expect(source).toContain("logger: modelManagementLogger");
   });
 
+  it("prepares ComfyUI before synchronizing selected model checkpoints", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("createRuntimePreparedModelCheckpointResolver");
+    expect(source).toContain("runtime: comfyUiSupervisor");
+    expect(source).toContain("modelCheckpointResolver: localModelCheckpointResolver");
+  });
+
+  it("wires a command runner into the server ComfyUI installer by default", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("const execFileWithTimeout = async");
+    expect(source).toContain("createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout })");
+    expect(source).toContain("execFile: execFileWithTimeout");
+  });
+
 });
 
 describe("server runtime/comfy root resolution", () => {
@@ -330,9 +346,11 @@ describe("server ComfyUI python/runtime resolution", () => {
   });
 
   it("resolves runtime device mode from COMFYUI_RUNTIME_DEVICE_MODE and COMFYUI_ACCELERATOR", () => {
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv)).toBe("cpu");
     expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "directml" } as NodeJS.ProcessEnv)).toBe("directml");
     expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_ACCELERATOR: "cpu" } as NodeJS.ProcessEnv)).toBe("cpu");
-    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "unknown" } as NodeJS.ProcessEnv)).toBe("auto");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "auto" } as NodeJS.ProcessEnv)).toBe("auto");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "unknown" } as NodeJS.ProcessEnv)).toBe("cpu");
   });
 
   it("logs structured ComfyUI python/runtime diagnostics", () => {
@@ -352,12 +370,12 @@ describe("server ComfyUI python/runtime resolution", () => {
       launchPythonExecutableSource: "managed-venv",
       skipPythonSetup: false,
       skipPythonValidation: false,
-      runtimeDeviceMode: "auto",
+      runtimeDeviceMode: "cpu",
       installRootSource: "default-server-runtime-root",
     });
   });
 
-  it("logs server-owned general Python runtime diagnostics without desktop/runtime-root leakage", () => {
+  it("logs server-owned Python worker-sidecar diagnostics without desktop/runtime-root leakage", () => {
     const sink = testDouble.fn();
     const host = composeServerHost({ logSink: sink });
     host.registerApi({
@@ -372,10 +390,17 @@ describe("server ComfyUI python/runtime resolution", () => {
       host: "server",
       serverStorageRootDirectory: "/tmp/server-storage",
       serverRuntimeRootDirectory: "/tmp/server-runtime",
+      pythonRuntimeMode: "worker-sidecar",
+      pythonRuntimeRootDirectory: "/tmp/server-runtime/models/huggingface",
+      pythonRuntimeRootSource: "default-server-runtime-root",
+      pythonRuntimeBaseUrl: "http://127.0.0.1:43111",
+      pythonRuntimeWorkerDirectory: expect.stringMatching(/modules[\\/]adapters[\\/]runtime[\\/]python[\\/]worker$/),
+      pythonRuntimeArgs: ["main.py"],
+      taskRegistryOwnership: "server",
+    });
+    expect(pythonLog?.data).not.toMatchObject({
       pythonRuntimeMode: "ambient-only",
       pythonRuntimeRootDirectory: null,
-      pythonRuntimeRootSource: "not-configured",
-      taskRegistryOwnership: "server",
     });
   });
 

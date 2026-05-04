@@ -90,3 +90,7 @@
 
 
 - Server host route surface now includes Hugging Face token config endpoints (`GET/POST/DELETE /api/config/huggingface-token`) so thin-client users can recover from auth-required artifact errors without leaving the product.
+
+- Server host composes security mode and Express security middleware wiring.
+- Server host owns LAN pairing/token-store configuration seams.
+- Initial target mode is HTTPS + bearer token (`lan-https-token`), with explicit noisy `disabled-dev` mode only for development.

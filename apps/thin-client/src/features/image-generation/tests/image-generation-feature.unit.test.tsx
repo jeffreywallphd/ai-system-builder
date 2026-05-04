@@ -9,4 +9,22 @@ describe("ImageGenerationFeature",()=>{it("shows grouped model options and artif
 it("does not import desktop/preload/ipc modules", async () => {
   const source = await readFile("apps/thin-client/src/features/image-generation/components/ImageGenerationFeature.tsx", "utf-8");
   for (const fragment of ["desktop", "preload", "ipc", "electron"]) expect(source.includes(fragment)).toBe(false);
+});
+
+it("keeps thin-client image-generation sources free of duplicate implementation fragments", async () => {
+  const [apiClient, hook, component, page, routes] = await Promise.all([
+    readFile("apps/thin-client/src/features/image-generation/api/apiImageGenerationClient.ts", "utf-8"),
+    readFile("apps/thin-client/src/features/image-generation/hooks/useImageGenerationFeature.ts", "utf-8"),
+    readFile("apps/thin-client/src/features/image-generation/components/ImageGenerationFeature.tsx", "utf-8"),
+    readFile("apps/thin-client/src/pages/ImageGenerationPage.tsx", "utf-8"),
+    readFile("apps/thin-client/src/routes/thinClientPages.ts", "utf-8"),
+  ]);
+
+  expect(apiClient.match(/export function createApiImageGenerationClient/g)).toHaveLength(1);
+  expect(apiClient).not.toContain("export class ImageGenerationApiError");
+  expect(hook.match(/export function useImageGenerationFeature/g)).toHaveLength(1);
+  expect(hook).not.toContain("createApiArtifactBrowserClient");
+  expect(component.match(/export function ImageGenerationFeature/g)).toHaveLength(1);
+  expect(page.match(/export function ImageGenerationPage/g)).toHaveLength(1);
+  expect(routes.match(/export type ThinClientPageKey/g)).toHaveLength(1);
 });});
