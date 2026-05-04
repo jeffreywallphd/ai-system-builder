@@ -6,6 +6,7 @@ export const SECURITY_ERROR_CODES = [
   "security.expired-token",
   "security.revoked-token",
   "security.forbidden",
+  "security.route-policy-missing",
   "security.pairing-disabled",
   "security.pairing-code-invalid",
   "security.pairing-code-expired",
