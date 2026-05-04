@@ -96,8 +96,11 @@ Identity/authentication, authorization/policy, transport security, storage secur
 - Dev HTTPS testing in `disabled-dev` is supported via `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` plus TLS cert/key env vars.
 - Thin-client Vite dev HTTPS is separate from server API HTTPS and is optional/dev-only:
   - `AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED=true`
-  - `AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH=/path/to/cert.pem`
-  - `AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH=/path/to/key.pem`
+  - Explicit listener certificate files can be supplied with
+    `AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH=/path/to/cert.pem` and
+    `AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH=/path/to/key.pem`.
+  - If no explicit thin-client cert/key paths are supplied, `AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed`
+    or `auto-local-ca` generates/reuses dev listener certificate material for Vite.
   - Default remains HTTP thin-client at `http://localhost:5173`.
   - Thin-client HTTPS does not change server API HTTPS mode; proxy target still follows server HTTPS env (`AI_SYSTEM_BUILDER_HTTPS_ENABLED` / `AI_SYSTEM_BUILDER_SECURITY_MODE`).
 - Startup transport mode is restart-bound; dev auth enforcement toggle is runtime-only and does not live-switch HTTP/HTTPS.

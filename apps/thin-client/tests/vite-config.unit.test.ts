@@ -5,8 +5,8 @@ import { describe, expect, it } from "../../../modules/testing/node-test";
 import { createThinClientViteConfig } from "../vite.config";
 
 describe("thin-client Vite config", () => {
-  it("wires server.https from resolveThinClientViteHttpsConfig behavior", () => {
-    const disabledConfig = createThinClientViteConfig({
+  it("wires server.https from resolveThinClientViteHttpsConfig behavior", async () => {
+    const disabledConfig = await createThinClientViteConfig({
       AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED: "false",
     } as NodeJS.ProcessEnv);
     expect(disabledConfig.server.https).toBeUndefined();
@@ -17,7 +17,7 @@ describe("thin-client Vite config", () => {
     writeFileSync(certPath, "-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----");
     writeFileSync(keyPath, "-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----");
 
-    const enabledConfig = createThinClientViteConfig({
+    const enabledConfig = await createThinClientViteConfig({
       AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED: "true",
       AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH: certPath,
       AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH: keyPath,

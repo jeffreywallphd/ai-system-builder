@@ -3,8 +3,8 @@ import react from "@vitejs/plugin-react";
 import { createThinClientApiProxyConfig } from "./viteDevProxyConfig";
 import { resolveThinClientViteHttpsConfig } from "./viteDevHttpsConfig";
 
-export function createThinClientViteConfig(environment: NodeJS.ProcessEnv = process.env) {
-  const thinClientViteHttpsConfig = resolveThinClientViteHttpsConfig(environment);
+export async function createThinClientViteConfig(environment: NodeJS.ProcessEnv = process.env) {
+  const thinClientViteHttpsConfig = await resolveThinClientViteHttpsConfig(environment);
 
   return {
     plugins: [react()],
@@ -18,4 +18,4 @@ export function createThinClientViteConfig(environment: NodeJS.ProcessEnv = proc
   };
 }
 
-export default defineConfig(createThinClientViteConfig());
+export default defineConfig(() => createThinClientViteConfig());

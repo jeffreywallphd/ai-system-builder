@@ -123,8 +123,6 @@ Terminal 2 (thin-client HTTPS enabled):
 
 ```bash
 AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED=true \
-AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH=/path/to/cert.pem \
-AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH=/path/to/key.pem \
 AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
 AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
 npm run dev:thin-client
@@ -135,13 +133,16 @@ Open `https://localhost:5173`.
 Expected:
 
 - Vite reports `https://localhost:5173`.
+- Thin-client Vite generates or reuses dev certificate material when explicit thin-client cert/key paths are not set.
 - Browser may still show a trust warning for self-signed/untrusted certs.
 - Server security page/status still shows API HTTPS enabled.
 
 Notes:
 
 - You may reuse server-generated dev cert/key for thin-client HTTPS if cert SANs include `localhost`.
-- Thin-client cert/key paths must be set explicitly; they are not auto-discovered.
+- To force a specific Vite listener certificate, set `AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH`
+  and `AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH`.
+- Thin-client does not auto-discover server cert file paths.
 - `auto-local-ca` requires manual CA trust installation.
 - Switching thin-client HTTP/HTTPS mode requires restarting `npm run dev:thin-client`.
 - Do not commit or log private keys.
