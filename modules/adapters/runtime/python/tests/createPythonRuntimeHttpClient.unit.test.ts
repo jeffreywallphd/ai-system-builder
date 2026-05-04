@@ -75,6 +75,9 @@ describe("createPythonRuntimeHttpClient", () => {
     const result = await client.ensureModelDownloaded({
       provider: "transformers",
       modelId: "stabilityai/stable-diffusion-xl-base-1.0",
+      inferenceMode: "text-to-image",
+      taskTags: ["text-to-image"],
+      artifactForm: "checkpoint",
     });
 
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -84,6 +87,9 @@ describe("createPythonRuntimeHttpClient", () => {
       payload: {
         provider: "transformers",
         modelId: "stabilityai/stable-diffusion-xl-base-1.0",
+        inferenceMode: "text-to-image",
+        taskTags: ["text-to-image"],
+        artifactForm: "checkpoint",
       },
     });
     expect(String(fetcher.mock.calls[1]?.[0])).toContain("/tasks/model-download-");

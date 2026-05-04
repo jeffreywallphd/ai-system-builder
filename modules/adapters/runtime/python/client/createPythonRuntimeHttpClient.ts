@@ -24,7 +24,13 @@ import {
 export interface PythonRuntimeHttpClient {
   getHealthStatus(): Promise<PythonRuntimeHealthCheckResult>;
   getCapabilities(): Promise<PythonRuntimeCapabilitiesResult>;
-  ensureModelDownloaded(request: { provider: "transformers"; modelId: string }): Promise<{
+  ensureModelDownloaded(request: {
+    provider: "transformers";
+    modelId: string;
+    inferenceMode?: string;
+    taskTags?: string[];
+    artifactForm?: string;
+  }): Promise<{
     provider: "transformers";
     modelId: string;
     downloaded: boolean;

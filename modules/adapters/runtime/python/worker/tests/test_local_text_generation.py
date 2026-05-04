@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import sys
+from types import SimpleNamespace
 import unittest
 from os import environ
 from unittest.mock import patch
 
-from modules.adapters.runtime.python.worker.models import ExampleGenerationConfig
+from modules.adapters.runtime.python.worker.models import ExampleGenerationConfig, LocalModelConfig
 from modules.adapters.runtime.python.worker.tasks.local_text_generation import (
     DEFAULT_MAX_NEW_TOKENS,
     _GENERATOR_CACHE,
+    _resolve_snapshot_download_profile,
     _move_tokenized_inputs_to_model_device,
     _resolve_generation_params,
     _resolve_model_kwargs,
     _supports_manual_device_move,
     configure_huggingface_download_environment,
+    ensure_generation_model_downloaded,
     get_or_create_local_text_generator,
 )
 
@@ -172,6 +176,106 @@ class LocalTextGenerationTests(unittest.TestCase):
                 environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = previous_symlink_warning
             else:
                 environ.pop("HF_HUB_DISABLE_SYMLINKS_WARNING", None)
+
+    def test_text_to_image_download_uses_checkpoint_snapshot_profile(self) -> None:
+        profile = _resolve_snapshot_download_profile(
+            LocalModelConfig(provider="transformers", modelId="stabilityai/stable-diffusion-xl-base-1.0"),
+            {"inferenceMode": "text-to-image", "taskTags": ["text-to-image"], "artifactForm": "checkpoint"},
+        )
+
+        self.assertEqual(profile.name, "checkpoint")
+        self.assertEqual(profile.allow_patterns, ("*.ckpt", "*.safetensors"))
+        self.assertIn("*/*", profile.ignore_patterns)
+
+    def test_stable_diffusion_download_uses_checkpoint_profile_even_without_task_hints(self) -> None:
+        profile = _resolve_snapshot_download_profile(
+            LocalModelConfig(provider="transformers", modelId="stabilityai/stable-diffusion-xl-base-1.0"),
+            None,
+        )
+
+        self.assertEqual(profile.name, "checkpoint")
+
+    def test_model_download_passes_checkpoint_patterns_and_emits_structured_progress(self) -> None:
+        calls: list[dict] = []
+        progress_events: list[dict] = []
+        snapshot_dir = "C:/hf/snapshots/sdxl"
+
+        def fake_snapshot_download(**kwargs):
+            calls.append(kwargs)
+            if kwargs.get("local_files_only") is True:
+                raise RuntimeError("cache miss")
+            tqdm_class = kwargs.get("tqdm_class")
+            self.assertIsNotNone(tqdm_class)
+            progress = tqdm_class(total=2)
+            progress.update(1)
+            progress.update(1)
+            progress.close()
+            return snapshot_dir
+
+        fake_hub = SimpleNamespace(snapshot_download=fake_snapshot_download)
+        with (
+            patch.dict(sys.modules, {"huggingface_hub": fake_hub}),
+            patch("modules.adapters.runtime.python.worker.tasks.local_text_generation._snapshot_file_stats", return_value={"fileCount": 1, "totalBytes": 7}),
+            patch("modules.adapters.runtime.python.worker.tasks.local_text_generation._validate_snapshot_profile_result"),
+        ):
+            result = ensure_generation_model_downloaded(
+                LocalModelConfig(provider="transformers", modelId="stabilityai/stable-diffusion-xl-base-1.0"),
+                on_progress=progress_events.append,
+                download_context={"inferenceMode": "text-to-image", "taskTags": ["text-to-image"]},
+            )
+
+        download_call = calls[-1]
+        self.assertEqual(download_call["allow_patterns"], ["*.ckpt", "*.safetensors"])
+        self.assertEqual(download_call["ignore_patterns"], ["*/*"])
+        self.assertFalse(download_call["local_files_only"])
+        self.assertEqual(result.local_path, snapshot_dir)
+        self.assertTrue(any(event.get("stage") == "snapshot-progress" for event in progress_events))
+        self.assertTrue(any(event.get("completedFileCount") == 2 for event in progress_events))
+
+    def test_model_download_returns_after_valid_profile_cache_hit(self) -> None:
+        calls: list[dict] = []
+
+        def fake_snapshot_download(**kwargs):
+            calls.append(kwargs)
+            return "C:/hf/snapshots/sdxl"
+
+        fake_hub = SimpleNamespace(snapshot_download=fake_snapshot_download)
+        with (
+            patch.dict(sys.modules, {"huggingface_hub": fake_hub}),
+            patch("modules.adapters.runtime.python.worker.tasks.local_text_generation._snapshot_file_stats", return_value={"fileCount": 1, "totalBytes": 7}),
+            patch("modules.adapters.runtime.python.worker.tasks.local_text_generation._validate_snapshot_profile_result"),
+        ):
+            result = ensure_generation_model_downloaded(
+                LocalModelConfig(provider="transformers", modelId="stabilityai/stable-diffusion-xl-base-1.0"),
+                download_context={"inferenceMode": "text-to-image"},
+            )
+
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0]["local_files_only"])
+        self.assertFalse(result.downloaded)
+        self.assertTrue(result.from_cache)
+
+    def test_checkpoint_download_fails_clearly_when_no_top_level_checkpoint_is_available(self) -> None:
+        def fake_snapshot_download(**kwargs):
+            if kwargs.get("local_files_only") is True:
+                raise RuntimeError("cache miss")
+            return "C:/hf/snapshots/sdxl"
+
+        def fail_validation(*_args):
+            raise RuntimeError(
+                "Hugging Face model 'stabilityai/stable-diffusion-xl-base-1.0' did not expose a top-level .safetensors or .ckpt checkpoint."
+            )
+
+        fake_hub = SimpleNamespace(snapshot_download=fake_snapshot_download)
+        with (
+            patch.dict(sys.modules, {"huggingface_hub": fake_hub}),
+            patch("modules.adapters.runtime.python.worker.tasks.local_text_generation._validate_snapshot_profile_result", side_effect=fail_validation),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "top-level .safetensors or .ckpt"):
+                ensure_generation_model_downloaded(
+                    LocalModelConfig(provider="transformers", modelId="stabilityai/stable-diffusion-xl-base-1.0"),
+                    download_context={"inferenceMode": "text-to-image"},
+                )
 
     def test_auto_device_uses_transformers_device_map(self) -> None:
         config = ExampleGenerationConfig.model_validate(
