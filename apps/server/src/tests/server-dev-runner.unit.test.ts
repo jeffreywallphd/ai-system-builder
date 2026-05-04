@@ -27,6 +27,16 @@ describe("server dev runner", () => {
     expect(source).not.toContain("esbuild");
   });
 
+  it("keeps Hugging Face model browsing fetch types compatible with server TypeScript", () => {
+    const source = readFileSync(
+      path.resolve("modules/adapters/model/huggingface/createHuggingFaceModelBrowseDetailsAdapter.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain("type HuggingFaceFetchInput = Parameters<typeof fetch>[0];");
+    expect(source).not.toContain("RequestInfo");
+  });
+
   it("awaits the compiled async server factory before creating the listener", async () => {
     const { startCompiledServer } = await import("../../../../dev-tools/scripts/server/dev-server.mjs");
     const env = { PORT: "43110" };
