@@ -93,3 +93,6 @@ Identity/authentication, authorization/policy, transport security, storage secur
 - `AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true` enables a dev-only in-memory enforcement override **only** when startup mode is `disabled-dev`.
 - The override toggles middleware auth behavior (`disabled-dev` or `lan-token-enforced`) for local testing.
 - It does not convert HTTP to HTTPS on a running server and is not production security.
+
+- Dev HTTPS testing in `disabled-dev` is supported via `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` plus TLS cert/key env vars.
+- Startup transport mode is restart-bound; dev auth enforcement toggle is runtime-only and does not live-switch HTTP/HTTPS.

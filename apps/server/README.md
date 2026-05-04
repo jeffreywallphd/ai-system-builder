@@ -104,6 +104,26 @@ npm run dev:server
 
 If you generate certs inside this repo, keep them out of git (for example under an ignored `certs/` directory).
 
+
+### Dev HTTPS in `disabled-dev` (restart required)
+
+Default `npm run dev:server` starts in `disabled-dev` with HTTP and no auth.
+
+To run HTTPS while staying in `disabled-dev`:
+
+```bash
+AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev
+AI_SYSTEM_BUILDER_HTTPS_ENABLED=true
+AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem
+AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem
+AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true
+npm run dev:server
+```
+
+- Listener protocol (HTTP/HTTPS) is selected at startup and requires restart to change.
+- Dev security enforcement dropdown only appears when `AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true`.
+- Dev enforcement toggles auth behavior only (`disabled-dev` vs `lan-token-enforced`), not transport mode.
+
 ## Token handling and storage
 
 - Pairing tokens are bearer secrets; do not share them.

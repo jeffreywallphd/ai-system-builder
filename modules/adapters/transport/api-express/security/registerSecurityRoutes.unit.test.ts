@@ -15,11 +15,25 @@ describe("registerSecurityRoutes", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("dev mode endpoints reject invalid mode and update mode", async () => {
+  it("dev mode endpoints are 404 when toggle disabled", async () => {
+    const app = makeApp();
+    registerSecurityRoutes(app, { getStatus: async () => ({}), completePairing: async () => ({}), revokeToken: async () => ({}) });
+    let res = makeRes();
+    await app.routes.get("GET /api/security/dev-mode")({}, res);
+    expect(res.statusCode).toBe(404);
+    res = makeRes();
+    await app.routes.get("POST /api/security/dev-mode")({ body: { mode: "disabled-dev" } }, res);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("dev mode endpoints validate and update mode when enabled", async () => {
     const app = makeApp();
     let mode: "disabled-dev" | "lan-token-enforced" = "disabled-dev";
     registerSecurityRoutes(app, { getStatus: async () => ({}), completePairing: async () => ({}), revokeToken: async () => ({}), getDevMode: () => mode, setDevMode: (m) => { mode = m; } });
     let res = makeRes();
+    await app.routes.get("GET /api/security/dev-mode")({}, res);
+    expect(res.statusCode).toBe(200);
+    res = makeRes();
     await app.routes.get("POST /api/security/dev-mode")({ body: { mode: "invalid" } }, res);
     expect(res.statusCode).toBe(400);
     res = makeRes();

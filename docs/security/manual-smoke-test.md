@@ -61,3 +61,19 @@
 
 - Dev enforcement toggle: set `AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true` with `AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev` to test auth-on/auth-off behavior without restarting for every auth test.
 - Changing transport listener mode (HTTP/HTTPS) still requires restarting `dev:server`; the dev toggle does not enable TLS transport.
+
+
+## disabled-dev with HTTPS smoke (restart required)
+
+1. Start server in disabled-dev with HTTPS listener:
+   ```bash
+   AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev \
+   AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
+   AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem \
+   AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem \
+   AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true \
+   npm run dev:server
+   ```
+2. Confirm `/api/security/status` reports `mode=disabled-dev` and `httpsEnabled=true`.
+3. Confirm security page shows HTTPS enabled plus dev enforcement dropdown.
+4. Toggle dev enforcement and verify only auth behavior changes; listener protocol does not change until restart.
