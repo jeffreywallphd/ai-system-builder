@@ -11,6 +11,7 @@ from modules.adapters.runtime.python.worker.models import ExampleGenerationConfi
 from modules.adapters.runtime.python.worker.tasks.local_text_generation import (
     DEFAULT_MAX_NEW_TOKENS,
     _GENERATOR_CACHE,
+    _create_structured_snapshot_tqdm,
     _resolve_snapshot_download_profile,
     _move_tokenized_inputs_to_model_device,
     _resolve_generation_params,
@@ -231,6 +232,53 @@ class LocalTextGenerationTests(unittest.TestCase):
         self.assertEqual(result.local_path, snapshot_dir)
         self.assertTrue(any(event.get("stage") == "snapshot-progress" for event in progress_events))
         self.assertTrue(any(event.get("completedFileCount") == 2 for event in progress_events))
+
+    def test_structured_snapshot_tqdm_supports_concurrent_download_lock_protocol(self) -> None:
+        from tqdm.contrib.concurrent import ensure_lock
+
+        progress_events: list[dict] = []
+        tqdm_class = _create_structured_snapshot_tqdm(
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            "checkpoint",
+            progress_events.append,
+        )
+
+        with ensure_lock(tqdm_class) as lock:
+            self.assertIsNotNone(lock)
+
+        progress = tqdm_class(total=1)
+        progress.update(1)
+        progress.close()
+
+        self.assertTrue(any(event.get("stage") == "snapshot-progress" for event in progress_events))
+        self.assertTrue(any(event.get("completedFileCount") == 1 for event in progress_events))
+
+    def test_model_download_reports_cache_miss_cause_before_snapshot_download(self) -> None:
+        calls: list[dict] = []
+        progress_events: list[dict] = []
+
+        def fake_snapshot_download(**kwargs):
+            calls.append(kwargs)
+            if kwargs.get("local_files_only") is True:
+                raise RuntimeError("cache is incomplete")
+            return "C:/hf/snapshots/sdxl"
+
+        fake_hub = SimpleNamespace(snapshot_download=fake_snapshot_download)
+        with (
+            patch.dict(sys.modules, {"huggingface_hub": fake_hub}),
+            patch("modules.adapters.runtime.python.worker.tasks.local_text_generation._snapshot_file_stats", return_value={"fileCount": 1, "totalBytes": 7}),
+            patch("modules.adapters.runtime.python.worker.tasks.local_text_generation._validate_snapshot_profile_result"),
+        ):
+            ensure_generation_model_downloaded(
+                LocalModelConfig(provider="transformers", modelId="stabilityai/stable-diffusion-xl-base-1.0"),
+                on_progress=progress_events.append,
+                download_context={"inferenceMode": "text-to-image"},
+            )
+
+        cache_miss_event = next(event for event in progress_events if event.get("stage") == "cache-miss")
+        self.assertEqual(cache_miss_event["errorType"], "RuntimeError")
+        self.assertEqual(cache_miss_event["errorMessage"], "cache is incomplete")
+        self.assertEqual(cache_miss_event["profile"], "checkpoint")
 
     def test_model_download_returns_after_valid_profile_cache_hit(self) -> None:
         calls: list[dict] = []
