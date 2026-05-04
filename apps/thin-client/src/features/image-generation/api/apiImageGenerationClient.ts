@@ -1,3 +1,4 @@
+import { secureFetch } from "../../../security/secureFetch";
 import type { ImageGenerationRequest } from "../../../../../../modules/contracts/image-generation";
 import type { RuntimeTaskRecord } from "../../../../../../modules/contracts/runtime";
 
@@ -60,7 +61,7 @@ function ensureSuccess<T>(response: ApiResponseEnvelope, status: number, pick: (
 }
 
 async function postJson(baseUrl: string, path: string, body: Record<string, unknown>, source: string): Promise<{ envelope: ApiResponseEnvelope; status: number }> {
-  const response = await fetch(createApiUrl(baseUrl, path), {
+  const response = await secureFetch(createApiUrl(baseUrl, path), {
     method: "POST",
     headers: { "content-type": "application/json", "x-client-source": source },
     body: JSON.stringify(body),

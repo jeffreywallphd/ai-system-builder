@@ -1,3 +1,4 @@
+import { secureFetch } from "../../../security/secureFetch";
 import type { ArtifactBrowseItem as ArtifactBrowseContractItem } from "../../../../../../modules/contracts/artifact-browser";
 import { resolveArtifactFamily as resolveCanonicalArtifactFamily } from "../../../../../../modules/application/shared/artifact-family-classifier";
 
@@ -194,7 +195,7 @@ export function createApiArtifactBrowserClient(
 
   return {
     async getHuggingFaceTokenStatus() {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
         method: "GET",
       });
       const envelope = ensureEnvelope((await response.json()) as unknown);
@@ -202,7 +203,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async setHuggingFaceToken(input) {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -214,7 +215,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async clearHuggingFaceToken() {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/config/huggingface-token"), {
         method: "DELETE",
       });
       const envelope = ensureEnvelope((await response.json()) as unknown);
@@ -222,7 +223,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async browseHuggingFaceNamespaceDatasets(input) {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/huggingface/namespace/datasets"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/huggingface/namespace/datasets"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -240,7 +241,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async browseHuggingFaceDatasetParquetFiles(input) {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -259,7 +260,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async browseArtifacts(input = {}): Promise<ThinClientArtifactBrowseItem[]> {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/browse"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/browse"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -275,7 +276,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async readArtifactDetail(locator: ArtifactBrowserLocator): Promise<ThinClientArtifactDetail> {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/read"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/read"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -297,7 +298,7 @@ export function createApiArtifactBrowserClient(
     async readArtifactContent(
       locator: ArtifactBrowserLocator,
     ): Promise<ThinClientArtifactContentDescriptor> {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/content/read"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/content/read"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -322,7 +323,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async publishArtifactToHuggingFace(input): Promise<ThinClientPublishedBacking> {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/publish"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/publish"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -353,7 +354,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async verifyPublishedArtifactBacking(input): Promise<ThinClientPublishedBacking> {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/publish/verify"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/publish/verify"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -376,7 +377,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async verifyImportedSourceBacking(input): Promise<ThinClientPublishedBacking> {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/source/verify"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/source/verify"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -403,7 +404,7 @@ export function createApiArtifactBrowserClient(
         mediaType: input.mediaType,
         fileName: input.path,
       });
-      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/register-from-repo"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/register-from-repo"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -433,7 +434,7 @@ export function createApiArtifactBrowserClient(
     },
 
     async localizeArtifactFromRepo(input): Promise<ThinClientLocalizedArtifactFromRepo> {
-      const response = await fetch(createApiUrl(apiBaseUrl, "/artifact/localize-from-repo"), {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/localize-from-repo"), {
         method: "POST",
         headers: {
           "content-type": "application/json",

@@ -5,6 +5,7 @@ import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { HomePage } from "./pages/HomePage";
 import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import { ModelsPage } from "./pages/ModelsPage";
+import { SecurityPage } from "./pages/SecurityPage";
 import {
   resolveThinClientPage,
   thinClientPageDefinitions,
@@ -12,7 +13,7 @@ import {
 } from "./routes/thinClientPages";
 
 function navigateToPage(page: ThinClientPageKey): void {
-  const path = page === "artifacts" ? "/artifacts" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : "/";
+  const path = page === "artifacts" ? "/artifacts" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "security" ? "/security" : "/";
   window.history.pushState({}, "", path);
 }
 
@@ -42,7 +43,10 @@ export function App() {
 
     if (activePage === "models") {
       return <ModelsPage />;
-      return <ImageGenerationPage />;
+    }
+
+    if (activePage === "security") {
+      return <SecurityPage />;
     }
 
     return <HomePage onGoToArtifacts={() => {
