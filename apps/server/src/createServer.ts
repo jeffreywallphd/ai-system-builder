@@ -4,6 +4,8 @@ import path from "node:path";
 import express from "express";
 
 import { composeServerHost } from "../../../modules/hosts/server";
+import { applySecurityHeaders, registerSecurityRoutes } from "../../../modules/adapters/transport/api-express/security";
+import { composeServerSecurity } from "../../../modules/hosts/server/security/composeServerSecurity";
 import type { LoggingPort } from "../../../modules/application/ports/logging";
 import type { StructuredLogSink } from "../../../modules/adapters/observability/logging";
 
@@ -16,6 +18,7 @@ export interface ServerRuntimeConfig {
   port: number;
   storageRootDirectory: string;
   runtimeRootDirectory: string;
+  security: ReturnType<typeof composeServerSecurity>["config"];
 }
 
 export interface CreateServerOptions {
@@ -130,15 +133,19 @@ export function resolveServerRuntimeConfig(
       ? path.resolve(storageRootFromEnv)
       : resolveDefaultServerStorageRootDirectory(rootResolutionOptions);
 
+  const runtimeRootDirectory = resolveServerRuntimeRootDirectory(env, options);
+  const security = composeServerSecurity(env, storageRootDirectory).config;
   return {
     port: normalizePort(env.PORT),
     storageRootDirectory,
-    runtimeRootDirectory: resolveServerRuntimeRootDirectory(env, options),
+    runtimeRootDirectory,
+    security,
   };
 }
 
 export function createServer(options: CreateServerOptions = {}): CreatedServer {
   const config = resolveServerRuntimeConfig(options.env);
+  const security = composeServerSecurity(options.env ?? process.env, config.storageRootDirectory);
   const serverHost = composeServerHost({
     env: options.env,
     logging: {
@@ -155,6 +162,13 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
 
   const app = express();
   app.use(express.json({ limit: "5mb" }));
+  applySecurityHeaders(app);
+  registerSecurityRoutes(app, {
+    getStatus: () => security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date() }),
+    completePairing: (body) => security.services.completePairing.execute(body),
+    revokeToken: (body) => security.credentials.revokeDevice({ deviceId: (body as any)?.deviceId, revokedAt: new Date() }),
+  });
+  app.use(security.middleware);
 
   serverHost.registerApi({
     app,
