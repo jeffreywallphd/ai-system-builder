@@ -112,6 +112,27 @@ Contributors should:
 
 ## Practical boundaries
 
+## Execution authority and feature placement
+
+Host is the execution authority. Desktop and server each own runtime execution whenever they execute a feature.
+
+Desktop renderer should continue using preload/IPC regardless of local execution or future remote execution. Thin-client calls server APIs and never owns runtime execution.
+
+Future execution placement should be per feature rather than all-or-nothing. Example future placement:
+- image generation: remote
+- artifact browsing: local
+- training: remote
+- model management: local or remote by execution target
+
+## Host-owned runtime roots
+
+Runtime roots are host-owned. Desktop and server runtime roots are independent by default. Avoid sharing ComfyUI/Python install roots across hosts unless an advanced explicit override is configured.
+
+Runtime roots must not be treated as artifact storage roots.
+
+See ADR-0013 for canonical cross-host runtime ownership and placement guidance.
+
+
 - Apps own framework bootstrap surfaces (for example `express()` instantiation and app-level middleware).
 - Host modules compose dependencies and register transport adapters against app-provided ports.
 - Transport adapter registration should be feature-sliced (for example `artifact-upload/...`) with only tiny top-level aggregators.

@@ -268,3 +268,15 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 - Server path persists token under server storage root config directory and surfaces masked status to thin client.
 - Desktop path persists token under desktop AppData artifact config directory and surfaces masked status to renderer via preload/IPC.
 - Hugging Face artifact-repo storage adapter resolves token dynamically from this config seam for publish/register/localize/verify workflows.
+
+
+
+## Runtime roots are not artifact storage roots
+
+Runtime roots are neither persistence nor artifact-object storage roots. Runtime roots contain sidecar installs, managed Python environments, dependency state, runtime caches, and temporary sidecar outputs.
+
+Artifact storage roots contain durable artifacts and catalog-backed content. ComfyUI `output/` should be treated as runtime/temp staging until generated outputs are finalized into artifact storage.
+
+Server defaults should keep `SERVER_STORAGE_ROOT` and `SERVER_RUNTIME_ROOT` distinct. Desktop local mode should use desktop-owned runtime roots and desktop-owned artifact storage roots. Server/thin-client mode should use server-owned runtime roots and server-owned artifact storage roots. Future desktop-remote mode should not assume remote artifacts are local files.
+
+See ADR-0013 and ADR-0012.

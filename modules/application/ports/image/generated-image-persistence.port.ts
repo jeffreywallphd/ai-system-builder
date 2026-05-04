@@ -2,11 +2,17 @@ import type { ImageGenerationOutput } from "../../../contracts/image-generation"
 
 export interface PersistGeneratedImageInput {
   output: ImageGenerationOutput;
-  assetId: string;
+  requestId: string;
 }
+
+import type { StorageObjectChecksum } from "../../../contracts/storage";
 
 export interface PersistGeneratedImageResult {
   artifactId: string;
+  storageKey: string;
+  mediaType: string;
+  sizeBytes: number;
+  checksum: StorageObjectChecksum;
   originalFileName: string;
 }
 

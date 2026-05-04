@@ -141,6 +141,11 @@ Current implementation priority is **desktop-first**. Server and hybrid compatib
 
 ## Transport role
 
+Server/thin-client mode is also a remote execution authority for future resource-heavy work. Desktop-server hybrid direction should support per-feature execution placement, though implementation remains future work documented by ADR-0013.
+
+Runtime roots and artifact storage roots are separate concerns and should remain independently configured per host.
+
+
 Transport technologies are adapters, not application definitions.
 
 - Express is the default server API transport adapter.
@@ -153,6 +158,9 @@ Transport technologies are adapters, not application definitions.
 - Transport operation identifiers follow the shared operation identity helper pattern (lowercase dotted segments) to reduce ad hoc naming drift.
 - IPC channel identifiers must be derived from operation identity using `ipc.<operation>.<kind>` (`request`, `response`, `event`) to prevent channel/operation drift.
 - Business rules must stay in domain/application layers, not in route handlers or IPC handlers.
+- Desktop IPC remains the renderer boundary even when a feature executes remotely in the future.
+- Desktop host composition may choose local adapters or configured-server remote client adapters behind IPC.
+- See ADR-0013 for host-owned runtime execution and feature placement direction.
 
 ## Persistence and storage posture
 

@@ -92,6 +92,17 @@ Clarifications:
 
 ## Consequences
 
+## Host-owned execution clarification
+
+Image-generation execution is host-owned. Desktop-local and server-side ComfyUI runtime instances are independent by default, including host-specific ComfyUI install roots, Python environments, runtime process state, and runtime caches.
+
+Runtime roots are separate from artifact storage roots. Generated images must be finalized into the executing host's artifact storage. Thin-client flows must not rely on ComfyUI temp output paths or server filesystem paths.
+
+Future desktop-remote image generation (not yet implemented) should return server-owned artifact/image references through desktop IPC-facing APIs, or explicitly localize/import artifacts when local copies are required. Model/checkpoint resolution belongs to the executing host's model registry/checkpoint resolver, not UI components.
+
+- Related canonical guidance: ADR-0013
+
+
 ### Positive
 
 - Preserves strict layer boundaries and contract purity.

@@ -1,4 +1,17 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
+import { existsSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
+import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
+import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
+import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
+import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
+import { createPythonRuntimeAdapterFoundation, ensurePythonRuntimeWorkerDependencies } from "../../../adapters/runtime/python";
+import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
+import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
+import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
+import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
+import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
@@ -15,6 +28,13 @@ import {
   StoreArtifactUploadUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
+  BrowseModelsUseCase,
+  GetModelDetailsUseCase,
+  ListModelsUseCase,
+  SaveModelReferenceUseCase,
+  DownloadModelUseCase,
+  UpdateModelRecordUseCase,
+  DeleteModelRecordUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -24,6 +44,7 @@ import {
   createFilesystemArtifactBrowserReadAdapter,
   createFilesystemArtifactContentRetrievalAdapter,
   createFilesystemArtifactObjectStorageAdapter,
+  createFilesystemGeneratedImagePersistenceAdapter,
   createLocalArtifactCatalogPersistenceAdapter,
   createLocalArtifactStorageBindingAdapter,
 } from "../../../adapters/storage/filesystem";
@@ -42,7 +63,79 @@ import {
 } from "../../../adapters/transport/api-express/registerExpressApi";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
+import { join, resolve } from "node:path";
+import {
+  buildComfyUiManagedPythonExecutablePath,
+  type ComfyUiPythonEnvironmentMode,
+} from "../../../adapters/runtime/comfyui/comfyUiPythonEnvironment";
+import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
 
+
+
+type ComfyUiRuntimeDeviceMode = "auto" | "cpu" | "directml" | "cuda";
+const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
+
+function resolveComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode {
+  const raw = env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR;
+  const normalized = raw?.trim().toLowerCase();
+  if (!normalized) return "auto";
+  if (normalized === "auto" || normalized === "cpu" || normalized === "directml" || normalized === "cuda") return normalized;
+  throw new Error(`Unsupported COMFYUI runtime mode "${raw}". Use auto, cpu, directml, or cuda via COMFYUI_RUNTIME_DEVICE_MODE/COMFYUI_ACCELERATOR.`);
+}
+
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "true" || normalized === "1") return true;
+  if (normalized === "false" || normalized === "0") return false;
+  throw new Error(`Invalid boolean environment value "${value}".`);
+}
+
+function parseNumberEnv(value: string | undefined, name: string): number | undefined {
+  const normalized = value?.trim();
+  if (!normalized) return undefined;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`${name} must be a positive number.`);
+  return parsed;
+}
+
+export function resolveServerPythonRuntimeWorkerDirectory(input: {
+  configuredWorkerDirectory?: string;
+  cwd?: string;
+  startDirectory?: string;
+  exists?: (path: string) => boolean;
+} = {}): string {
+  const exists = input.exists ?? existsSync;
+  const configured = input.configuredWorkerDirectory?.trim();
+  if (configured) {
+    return isAbsolute(configured) ? configured : resolve(input.cwd ?? process.cwd(), configured);
+  }
+
+  const candidates: string[] = [];
+  const seedDirectories = [
+    input.cwd ?? process.cwd(),
+    process.env.INIT_CWD,
+    input.startDirectory,
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+  for (const seedDirectory of seedDirectories) {
+    let cursor = resolve(seedDirectory);
+    while (true) {
+      candidates.push(resolve(cursor, PYTHON_RUNTIME_WORKER_RELATIVE_PATH));
+      const parent = dirname(cursor);
+      if (parent === cursor) {
+        break;
+      }
+      cursor = parent;
+    }
+  }
+
+  if (candidates.length === 0) {
+    candidates.push(resolve(PYTHON_RUNTIME_WORKER_RELATIVE_PATH));
+  }
+
+  return candidates.find((candidate) => exists(candidate)) ?? candidates[0];
+}
 export interface ComposeServerHostLoggingOptions {
   verbosity?: string;
   fallbackVerbosity?: LogVerbosity;
@@ -67,6 +160,87 @@ export interface ComposeServerHostOptions {
 export interface RegisterServerApiOptions {
   app: RegisterExpressApiDependencies["app"];
   storageRootDirectory: string;
+  runtimeRootDirectory: string;
+}
+
+export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "server-runtime-root";
+export type ServerComfyUiLaunchPythonExecutableSource = "ambient" | "managed-venv" | "skip-python-setup";
+
+function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRuntimeDeviceMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "auto" || normalized === "cpu" || normalized === "directml" || normalized === "cuda") return normalized;
+  return undefined;
+}
+
+function parseBooleanEnvFlag(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+export function resolveServerComfyUiPythonEnvironmentMode(env: NodeJS.ProcessEnv = process.env): {
+  pythonEnvironmentMode: ComfyUiPythonEnvironmentMode;
+  invalidValue?: string;
+} {
+  const raw = env.COMFYUI_PYTHON_ENVIRONMENT_MODE?.trim();
+  const normalized = raw?.toLowerCase();
+  if (!normalized) return { pythonEnvironmentMode: "managed-venv" };
+  if (normalized === "managed-venv" || normalized === "ambient") return { pythonEnvironmentMode: normalized };
+  return { pythonEnvironmentMode: "managed-venv", invalidValue: raw };
+}
+
+export function resolveServerComfyUiLaunchPythonExecutable(input: {
+  installRoot: string;
+  basePythonCommand: string;
+  pythonEnvironmentMode: ComfyUiPythonEnvironmentMode;
+  skipPythonSetup: boolean;
+  platform?: NodeJS.Platform;
+}): { launchPythonExecutable: string; source: ServerComfyUiLaunchPythonExecutableSource } {
+  if (input.pythonEnvironmentMode === "ambient") {
+    return { launchPythonExecutable: input.basePythonCommand, source: "ambient" };
+  }
+  if (input.skipPythonSetup) {
+    return { launchPythonExecutable: input.basePythonCommand, source: "skip-python-setup" };
+  }
+  return {
+    launchPythonExecutable: buildComfyUiManagedPythonExecutablePath({ installRoot: input.installRoot, platform: input.platform }),
+    source: "managed-venv",
+  };
+}
+
+export function resolveServerComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode {
+  return normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR) ?? "auto";
+}
+
+export function resolveServerRuntimeRootDirectory(input: {
+  env?: NodeJS.ProcessEnv;
+  runtimeRootDirectory: string;
+}): { runtimeRootDirectory: string; source: "SERVER_RUNTIME_ROOT" | "default-server-runtime-root" } {
+  const env = input.env ?? process.env;
+  const configured = env.SERVER_RUNTIME_ROOT?.trim();
+  if (configured) {
+    return { runtimeRootDirectory: resolve(configured), source: "SERVER_RUNTIME_ROOT" };
+  }
+  return {
+    runtimeRootDirectory: resolve(input.runtimeRootDirectory),
+    source: "default-server-runtime-root",
+  };
+}
+
+export function resolveServerComfyUiInstallRoot(input: {
+  env?: NodeJS.ProcessEnv;
+  runtimeRootDirectory: string;
+}): { installRoot: string; source: ServerComfyUiInstallRootSource } {
+  const env = input.env ?? process.env;
+  const configured = env.COMFYUI_INSTALL_ROOT?.trim();
+  if (configured) {
+    return { installRoot: resolve(configured), source: "COMFYUI_INSTALL_ROOT" };
+  }
+  const runtime = resolveServerRuntimeRootDirectory({ env, runtimeRootDirectory: input.runtimeRootDirectory });
+  return {
+    installRoot: join(runtime.runtimeRootDirectory, "runtime-installs", "comfyui"),
+    source: "server-runtime-root",
+  };
 }
 
 export interface ServerHostComposition {
@@ -130,6 +304,96 @@ export function composeServerHost(
       return tokenConfigStore.clearToken();
     },
     registerApi(registerOptions) {
+      const runtimeResolution = resolveServerComfyUiInstallRoot({
+        env: process.env,
+        runtimeRootDirectory: registerOptions.runtimeRootDirectory,
+      });
+      const basePythonCommand = process.env.COMFYUI_PYTHON_COMMAND?.trim() || (process.platform === "win32" ? "python" : "python3");
+      const { pythonEnvironmentMode, invalidValue: invalidPythonEnvironmentMode } = resolveServerComfyUiPythonEnvironmentMode(process.env);
+      const skipPythonSetup = parseBooleanEnvFlag(process.env.COMFYUI_SKIP_PYTHON_SETUP);
+      const skipPythonValidation = parseBooleanEnvFlag(process.env.COMFYUI_SKIP_PYTHON_VALIDATION);
+      const runtimeDeviceMode = resolveServerComfyUiRuntimeDeviceMode(process.env);
+      const launchPythonResolution = resolveServerComfyUiLaunchPythonExecutable({
+        installRoot: runtimeResolution.installRoot,
+        basePythonCommand,
+        pythonEnvironmentMode,
+        skipPythonSetup,
+      });
+      if (invalidPythonEnvironmentMode) {
+        void loggingPort.log({
+          timestamp: new Date().toISOString(),
+          level: "warn",
+          verbosity: "normal",
+          event: "runtime.comfyui.server.configuration",
+          host: "server",
+          component: "server-host",
+          message: "Invalid COMFYUI_PYTHON_ENVIRONMENT_MODE value. Falling back to managed-venv.",
+          data: { invalidComfyUiPythonEnvironmentMode: invalidPythonEnvironmentMode, fallbackPythonEnvironmentMode: "managed-venv" },
+        });
+      }
+      void loggingPort.log({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        verbosity: "normal",
+        event: "runtime.python.server.configuration",
+        host: "server",
+        component: "server-host",
+        message: "Resolved server Python runtime ownership.",
+        data: {
+          host: "server",
+          serverStorageRootDirectory: registerOptions.storageRootDirectory,
+          serverRuntimeRootDirectory: registerOptions.runtimeRootDirectory,
+          pythonRuntimeMode: "ambient-only",
+          pythonRuntimeRootDirectory: null,
+          pythonRuntimeRootSource: "not-configured",
+          taskRegistryOwnership: "server",
+        },
+      });
+      void loggingPort.log({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        verbosity: "normal",
+        event: "runtime.comfyui.server.configuration",
+        host: "server",
+        component: "server-host",
+        message: "Resolved server ComfyUI runtime roots.",
+        data: {
+          serverStorageRootDirectory: registerOptions.storageRootDirectory,
+          serverRuntimeRootDirectory: registerOptions.runtimeRootDirectory,
+          comfyUiInstallRoot: runtimeResolution.installRoot,
+          comfyUiInstallRootSource: runtimeResolution.source,
+          storageRuntimeRootsDistinct: resolve(registerOptions.storageRootDirectory) !== resolve(registerOptions.runtimeRootDirectory),
+          autoInstall: true,
+          runtimeDeviceMode,
+          pythonEnvironmentMode,
+          basePythonCommand,
+          launchPythonExecutable: launchPythonResolution.launchPythonExecutable,
+          launchPythonExecutableSource: launchPythonResolution.source,
+          skipPythonSetup,
+          skipPythonValidation,
+          installRootSource: runtimeResolution.source,
+        },
+      });
+      const pythonRuntimeRoot = join(registerOptions.runtimeRootDirectory, "models", "huggingface");
+      const hfHome = process.env.HF_HOME?.trim() || pythonRuntimeRoot;
+      const transformersCache = process.env.TRANSFORMERS_CACHE?.trim() || join(pythonRuntimeRoot, "hub");
+      void loggingPort.log({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        verbosity: "normal",
+        event: "runtime.python.server.paths",
+        host: "server",
+        component: "server-host",
+        message: "Resolved Python runtime cache paths.",
+        data: {
+          serverPythonRuntimeRootDirectory: pythonRuntimeRoot,
+          hfHomeSource: process.env.HF_HOME?.trim() ? "HF_HOME" : "SERVER_RUNTIME_ROOT/default-runtime-root",
+          transformersCacheSource: process.env.TRANSFORMERS_CACHE?.trim() ? "TRANSFORMERS_CACHE" : "SERVER_RUNTIME_ROOT/default-runtime-root",
+          taskRegistryOwnership: "server",
+          hfHome,
+          transformersCache,
+        },
+      });
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
@@ -218,6 +482,128 @@ export function composeServerHost(
         now: options.now,
       });
 
+      const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode(process.env);
+      void loggingPort.log({ level: "info", message: "Resolved ComfyUI runtime device mode.", timestamp: new Date().toISOString(), verbosity: "normal", event: "runtime.comfyui.configuration", component: "server-host", subsystem: "runtime", data: { runtimeDeviceMode: resolvedRuntimeDeviceMode } });
+
+      const comfyUiInstallRoot = process.env.COMFYUI_INSTALL_ROOT?.trim() || join(registerOptions.storageRootDirectory, "runtime-installs", "comfyui");
+      const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
+      const installCommandTimeoutMs = parseNumberEnv(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS, "COMFYUI_INSTALL_COMMAND_TIMEOUT_MS");
+      const execFileWithTimeout = installCommandTimeoutMs
+        ? async (file: string, args: readonly string[] = []) => {
+            const { execFile } = await import("node:child_process");
+            const { promisify } = await import("node:util");
+            return promisify(execFile)(file, [...args], { timeout: installCommandTimeoutMs }) as Promise<{ stdout: string; stderr: string }>;
+          }
+        : undefined;
+      const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout });
+      const comfyUiInstaller = createComfyUiRuntimeInstaller({
+        gitInstaller: gitRuntimeInstaller,
+        pythonCommand: process.env.COMFYUI_PYTHON_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+        runtimeDeviceMode: resolvedRuntimeDeviceMode,
+        skipPythonSetup: parseBooleanEnv(process.env.COMFYUI_SKIP_PYTHON_SETUP),
+        skipPythonValidation: parseBooleanEnv(process.env.COMFYUI_SKIP_PYTHON_VALIDATION),
+        pythonEnvironmentMode: process.env.COMFYUI_PYTHON_ENVIRONMENT_MODE as "managed-venv" | "ambient" | undefined,
+        directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
+        directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
+        directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
+        directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
+        logging: loggingPort,
+      });
+      const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+        workingDirectory: comfyUiInstallRoot,
+        pythonExecutable: process.env.COMFYUI_PYTHON_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+        installer: comfyUiInstaller,
+        installRoot: comfyUiInstallRoot,
+        runtimeDeviceMode: resolvedRuntimeDeviceMode,
+        autoInstall: true,
+        installSourceRef: process.env.COMFYUI_INSTALL_REF,
+        
+        logging: loggingPort,
+      });
+      const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
+        client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
+        supervisor: comfyUiSupervisor,
+        mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
+      });
+      
+      const modelManagementLogger = {
+        info: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"info", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
+        warn: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"warn", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
+      };
+
+      const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now: options.now });
+      const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
+        accessTokenProvider: () => tokenConfigStore.getToken(),
+        logger: modelManagementLogger,
+      });
+      const browseModelsUseCase = new BrowseModelsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } });
+      const getModelDetailsUseCase = new GetModelDetailsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } });
+      const listModelsUseCase = new ListModelsUseCase({ modelRegistry });
+      const saveModelReferenceUseCase = new SaveModelReferenceUseCase({ modelRegistry });
+      const pythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL?.trim() || "http://127.0.0.1:43111";
+      const pythonRuntimeEndpoint = new URL(pythonRuntimeBaseUrl);
+      const pythonRuntimeWorkerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+        configuredWorkerDirectory: process.env.PYTHON_RUNTIME_WORKER_DIR,
+      });
+      const pythonRuntimeEnvironment = {
+        ...process.env,
+        PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.hostname,
+        PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port || "43111",
+        HF_HOME: join(registerOptions.storageRootDirectory, "models", "huggingface"),
+        TRANSFORMERS_CACHE: join(registerOptions.storageRootDirectory, "models", "huggingface", "hub"),
+        HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? "1",
+        HF_HUB_DISABLE_SYMLINKS_WARNING: process.env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
+      };
+      const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
+        client: { baseUrl: pythonRuntimeBaseUrl },
+        supervisor: {
+          command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
+          args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
+          cwd: pythonRuntimeWorkerDirectory,
+          env: pythonRuntimeEnvironment,
+          prepareRuntimeEnvironment(context) {
+            ensurePythonRuntimeWorkerDependencies({ command: context.command, cwd: context.cwd, env: context.env });
+          },
+        },
+      });
+      const downloadModelUseCase = new DownloadModelUseCase({
+        modelRegistry,
+        modelDownloader: {
+          ensureModelDownloaded: async (request) => {
+            await pythonRuntimeFoundation.supervisor.start();
+            return pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+          },
+        },
+      });
+      const updateModelRecordUseCase = new UpdateModelRecordUseCase({ modelRegistry });
+      const deleteModelRecordUseCase = new DeleteModelRecordUseCase({ modelRegistry });
+      const generateImageUseCase = new GenerateImageUseCase({
+        runtimeTaskRegistry,
+        modelCheckpointResolver: createLocalModelCheckpointResolverAdapter({
+          modelRegistry,
+          comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
+        }),
+      });
+
+      const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
+        runtimeTaskRegistry,
+        finalizeImageGenerationService: new FinalizeImageGenerationService({
+          imageAssetRegistry: createLocalImageAssetRegistryAdapter({
+            filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
+            now: options.now,
+          }),
+          generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
+            comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
+            artifactStorageRoot: registerOptions.storageRootDirectory,
+            artifactCatalogAppend: artifactCatalog,
+            artifactStorageBinding: artifactBindings,
+            logging: loggingPort,
+            now: options.now,
+          }),
+          now: options.now,
+        }),
+      });
+
       registerExpressApi({
         app: registerOptions.app,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
@@ -237,6 +623,16 @@ export function composeServerHost(
         verifyImportedArtifactSourceBackingUseCase: verifyImportedArtifactSourceBacking,
         registerArtifactFromRepoUseCase: registerArtifactFromRepo,
         localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
+        browseModelsUseCase,
+        getModelDetailsUseCase,
+        listModelsUseCase,
+        saveModelReferenceUseCase,
+        downloadModelUseCase,
+        updateModelRecordUseCase,
+        deleteModelRecordUseCase,
+        generateImageUseCase,
+        imageGenerationFinalizationOrchestrator,
+        modelManagementLogger,
       });
     },
   };

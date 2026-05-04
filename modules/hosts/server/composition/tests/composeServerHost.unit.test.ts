@@ -9,7 +9,14 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
-import { composeServerHost } from "../composeServerHost";
+import { composeServerHost, resolveServerPythonRuntimeWorkerDirectory } from "../composeServerHost";
+import {
+  composeServerHost,
+  resolveServerComfyUiInstallRoot,
+  resolveServerComfyUiLaunchPythonExecutable,
+  resolveServerComfyUiPythonEnvironmentMode,
+  resolveServerComfyUiRuntimeDeviceMode,
+} from "../composeServerHost";
 
 describe("composeServerHost", () => {
   it("provides a LoggingPort-backed seam using the real logging adapter", async () => {
@@ -84,6 +91,30 @@ describe("composeServerHost", () => {
     expect(result.value.exists).toBe(false);
   });
 
+  it("composes top-level artifact repo storage before route-local model management logging exists", async () => {
+    const hubClient = {
+      fileExists: testDouble.fn(async () => false),
+      uploadFile: testDouble.fn(async () => undefined),
+      downloadFile: testDouble.fn(async () => new Response(new Uint8Array([]), { status: 200 })),
+    };
+
+    const host = composeServerHost({
+      artifactRepo: {
+        huggingFaceHubClient: hubClient,
+      },
+    });
+
+    const result = await host.artifactRepoStorage.hasArtifactInRepo({
+      target: {
+        provider: "huggingface",
+        repository: "openai/demo-artifacts",
+        path: "images/a.png",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it("uses updated host token configuration for Hugging Face store operations", async () => {
     const hubClient = {
       fileExists: testDouble.fn(async () => true),
@@ -120,9 +151,10 @@ describe("composeServerHost", () => {
     host.registerApi({
       app,
       storageRootDirectory: "/tmp/server-artifact-upload-test",
+      runtimeRootDirectory: "/tmp/server-runtime",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(14);
+    expect(app.post).toHaveBeenCalledTimes(25);
     expect(app.get).toHaveBeenCalledTimes(3);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
@@ -140,6 +172,17 @@ describe("composeServerHost", () => {
       "/api/artifact/source/verify",
       "/api/artifact/register-from-repo",
       "/api/artifact/localize-from-repo",
+      "/api/model/browse",
+      "/api/model/details",
+      "/api/model/list",
+      "/api/model/reference/save",
+      "/api/model/download",
+      "/api/model/record/update",
+      "/api/model/record/delete",
+      "/api/image-generation/start",
+      "/api/image-generation/read",
+      "/api/image-generation/cancel",
+      "/api/image-generation/finalize",
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
     expect(registeredGetPaths).toEqual(["/api/artifact/upload/policy", "/api/artifact/media/view", "/api/config/huggingface-token"]);
@@ -157,5 +200,189 @@ describe("composeServerHost", () => {
     expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
     expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
     expect(source).not.toContain("repoBrowser: artifactRepoStorage");
+  });
+
+  it("throws clear error for invalid COMFYUI runtime mode", () => {
+    const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "vulkan";
+    const host = composeServerHost();
+    expect(() => host.registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-invalid-runtime" })).toThrow("Unsupported COMFYUI runtime mode");
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
+  });
+
+  it("accepts cpu and directml COMFYUI runtime modes", () => {
+    const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "cpu";
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-cpu" })).not.toThrow();
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = "directml";
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-directml" })).not.toThrow();
+    process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
+  });
+
+
+  it("wires server model download through python runtime instead of unavailable stub", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("pythonRuntimeFoundation.runtimePort.ensureModelDownloaded");
+    expect(source).not.toContain("Model download runtime is unavailable on server host.");
+  });
+
+  it("resolves the server Python runtime worker directory from the repository root when launched from app workspace", () => {
+    const workerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+      cwd: resolve("apps/server"),
+      startDirectory: resolve("dist/modules/hosts/server/composition"),
+      exists: (candidate) => candidate === resolve("modules/adapters/runtime/python/worker"),
+    });
+
+    expect(workerDirectory).toBe(resolve("modules/adapters/runtime/python/worker"));
+  });
+
+  it("keeps explicit server Python runtime worker directory overrides absolute", () => {
+    const workerDirectory = resolveServerPythonRuntimeWorkerDirectory({
+      configuredWorkerDirectory: "custom/python-worker",
+      cwd: resolve("apps/server"),
+      exists: () => false,
+    });
+
+    expect(workerDirectory).toBe(resolve("apps/server/custom/python-worker"));
+  });
+
+  it("passes model-management logger into Hugging Face browse/details adapter", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("createHuggingFaceModelBrowseDetailsAdapter({");
+    expect(source).toContain("logger: modelManagementLogger");
+  });
+
+});
+
+describe("server runtime/comfy root resolution", () => {
+  it("defaults ComfyUI install root under server-runtime sibling, not storage root", () => {
+    const { installRoot, source } = resolveServerComfyUiInstallRoot({
+      env: {} as NodeJS.ProcessEnv,
+      runtimeRootDirectory: "/app/server-runtime",
+    });
+    expect(installRoot).toBe("/app/server-runtime/runtime-installs/comfyui");
+    expect(source).toBe("default-server-runtime-root");
+  });
+
+  it("uses SERVER_RUNTIME_ROOT when provided", () => {
+    const { installRoot, source } = resolveServerComfyUiInstallRoot({
+      env: { SERVER_RUNTIME_ROOT: " /tmp/runtime-root " } as NodeJS.ProcessEnv,
+      runtimeRootDirectory: "/app/server-runtime",
+    });
+    expect(installRoot).toBe(resolve("/tmp/runtime-root", "runtime-installs", "comfyui"));
+    expect(source).toBe("SERVER_RUNTIME_ROOT");
+  });
+
+  it("COMFYUI_INSTALL_ROOT overrides exact install root", () => {
+    const { installRoot, source } = resolveServerComfyUiInstallRoot({
+      env: { SERVER_RUNTIME_ROOT: "/tmp/runtime-root", COMFYUI_INSTALL_ROOT: " /tmp/custom-comfy " } as NodeJS.ProcessEnv,
+      runtimeRootDirectory: "/app/server-runtime",
+    });
+    expect(installRoot).toBe(resolve("/tmp/custom-comfy"));
+    expect(source).toBe("COMFYUI_INSTALL_ROOT");
+  });
+});
+
+describe("server ComfyUI python/runtime resolution", () => {
+  it("defaults to managed-venv mode and managed launch executable", () => {
+    const mode = resolveServerComfyUiPythonEnvironmentMode({} as NodeJS.ProcessEnv);
+    expect(mode).toEqual({ pythonEnvironmentMode: "managed-venv" });
+    const launch = resolveServerComfyUiLaunchPythonExecutable({
+      installRoot: "/tmp/server-runtime/runtime-installs/comfyui",
+      basePythonCommand: "python3",
+      pythonEnvironmentMode: mode.pythonEnvironmentMode,
+      skipPythonSetup: false,
+      platform: "linux",
+    });
+    expect(launch).toEqual({
+      launchPythonExecutable: "/tmp/server-runtime/runtime-installs/comfyui/.venv/bin/python",
+      source: "managed-venv",
+    });
+  });
+
+  it("uses ambient mode and COMFYUI_PYTHON_COMMAND as launch python", () => {
+    const mode = resolveServerComfyUiPythonEnvironmentMode({ COMFYUI_PYTHON_ENVIRONMENT_MODE: "ambient" } as NodeJS.ProcessEnv);
+    expect(mode.pythonEnvironmentMode).toBe("ambient");
+    const launch = resolveServerComfyUiLaunchPythonExecutable({
+      installRoot: "/tmp/comfy",
+      basePythonCommand: "python3.11",
+      pythonEnvironmentMode: mode.pythonEnvironmentMode,
+      skipPythonSetup: false,
+    });
+    expect(launch).toEqual({ launchPythonExecutable: "python3.11", source: "ambient" });
+  });
+
+  it("uses base python command when skip python setup is enabled", () => {
+    const launch = resolveServerComfyUiLaunchPythonExecutable({
+      installRoot: "/tmp/comfy",
+      basePythonCommand: "python-custom",
+      pythonEnvironmentMode: "managed-venv",
+      skipPythonSetup: true,
+    });
+    expect(launch).toEqual({ launchPythonExecutable: "python-custom", source: "skip-python-setup" });
+  });
+
+  it("falls back to managed-venv for invalid environment mode values", () => {
+    const mode = resolveServerComfyUiPythonEnvironmentMode({ COMFYUI_PYTHON_ENVIRONMENT_MODE: "global" } as NodeJS.ProcessEnv);
+    expect(mode).toEqual({ pythonEnvironmentMode: "managed-venv", invalidValue: "global" });
+  });
+
+  it("resolves runtime device mode from COMFYUI_RUNTIME_DEVICE_MODE and COMFYUI_ACCELERATOR", () => {
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "directml" } as NodeJS.ProcessEnv)).toBe("directml");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_ACCELERATOR: "cpu" } as NodeJS.ProcessEnv)).toBe("cpu");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "unknown" } as NodeJS.ProcessEnv)).toBe("auto");
+  });
+
+  it("logs structured ComfyUI python/runtime diagnostics", () => {
+    const sink = testDouble.fn();
+    const host = composeServerHost({ logSink: sink });
+    host.registerApi({
+      app: { post: testDouble.fn(), get: testDouble.fn() },
+      storageRootDirectory: "/tmp/server-storage",
+      runtimeRootDirectory: "/tmp/server-runtime",
+    });
+    const comfyLog = sink.mock.calls
+      .map((call) => call[1] as StructuredLogEvent)
+      .find((event) => event.event === "runtime.comfyui.server.configuration");
+    expect(comfyLog?.data).toMatchObject({
+      pythonEnvironmentMode: "managed-venv",
+      basePythonCommand: "python3",
+      launchPythonExecutableSource: "managed-venv",
+      skipPythonSetup: false,
+      skipPythonValidation: false,
+      runtimeDeviceMode: "auto",
+      installRootSource: "default-server-runtime-root",
+    });
+  });
+
+  it("logs server-owned general Python runtime diagnostics without desktop/runtime-root leakage", () => {
+    const sink = testDouble.fn();
+    const host = composeServerHost({ logSink: sink });
+    host.registerApi({
+      app: { post: testDouble.fn(), get: testDouble.fn() },
+      storageRootDirectory: "/tmp/server-storage",
+      runtimeRootDirectory: "/tmp/server-runtime",
+    });
+    const pythonLog = sink.mock.calls
+      .map((call) => call[1] as StructuredLogEvent)
+      .find((event) => event.event === "runtime.python.server.configuration");
+    expect(pythonLog?.data).toMatchObject({
+      host: "server",
+      serverStorageRootDirectory: "/tmp/server-storage",
+      serverRuntimeRootDirectory: "/tmp/server-runtime",
+      pythonRuntimeMode: "ambient-only",
+      pythonRuntimeRootDirectory: null,
+      pythonRuntimeRootSource: "not-configured",
+      taskRegistryOwnership: "server",
+    });
+  });
+
+  it("keeps server host composition free of desktop-host imports", () => {
+    const sourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(sourcePath, "utf8");
+    expect(source).not.toContain("hosts/desktop");
+    expect(source).not.toContain("transport/ipc-electron");
   });
 });
