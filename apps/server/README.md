@@ -59,6 +59,7 @@ AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token
 AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem
 AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem
 AI_SYSTEM_BUILDER_PAIRING_ENABLED=true
+SERVER_TOKEN_HASH_SECRET=<strong-random-secret>
 ```
 
 Optional root overrides often used in local setups:
@@ -113,3 +114,21 @@ If you generate certs inside this repo, keep them out of git (for example under 
 ## Manual smoke checklist
 
 Detailed checklist: `docs/security/manual-smoke-test.md`.
+
+
+### `SERVER_TOKEN_HASH_SECRET`
+
+- Used to derive stable token hashes for credential lookup; this value is sensitive.
+- In `lan-https-token` mode it is required at startup.
+- In `disabled-dev` mode, if unset, the server falls back to an explicitly insecure dev-only default and logs a warning.
+- Never commit this value and never log it.
+
+Generate examples:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+```powershell
+[Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
+```

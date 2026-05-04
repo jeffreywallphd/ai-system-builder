@@ -165,9 +165,9 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
   applySecurityHeaders(app);
   app.use(security.middleware);
   registerSecurityRoutes(app, {
-    getStatus: (authContext) => security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date(), currentAuthContext: authContext as any }),
+    getStatus: (authContext) => security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date(), currentAuthContext: authContext }),
     completePairing: (body) => security.services.completePairing.execute(body),
-    revokeToken: (body) => security.credentials.revokeDevice({ deviceId: (body as any)?.deviceId, revokedAt: new Date() }),
+    revokeToken: (body) => security.credentials.revokeDevice({ deviceId: body.deviceId, revokedAt: new Date() }),
   });
 
   serverHost.registerApi({

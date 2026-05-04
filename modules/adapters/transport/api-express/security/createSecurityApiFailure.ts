@@ -7,7 +7,11 @@ export function createSecurityApiFailure(error: { code: string; message: string;
 
 export function mapSecurityFailure(error: unknown): { status: number; code: string; message: string } {
   if (error instanceof SecurityApplicationError) {
-    return { status: error.code === "security.forbidden" ? 403 : 401, code: error.code, message: error.message };
+    if (error.code === "security.forbidden") return { status: 403, code: error.code, message: error.message };
+    if (error.code === "security.pairing-code-invalid" || error.code === "security.pairing-code-expired" || error.code === "security.pairing-disabled") {
+      return { status: 400, code: error.code, message: error.message };
+    }
+    return { status: 401, code: error.code, message: error.message };
   }
   return { status: 500, code: "security.internal", message: "Security middleware failed." };
 }

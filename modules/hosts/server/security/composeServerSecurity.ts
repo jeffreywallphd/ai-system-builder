@@ -8,10 +8,22 @@ import { createLanPairingCodeStoreAdapter } from "../../../adapters/security/lan
 import { createExpressSecurityMiddleware } from "../../../adapters/transport/api-express/security";
 import { resolveServerSecurityConfig } from "./resolveServerSecurityConfig";
 
+const DEV_ONLY_INSECURE_TOKEN_HASH_SECRET = "dev-only-insecure-token-hash-secret";
+
+function resolveTokenHashSecret(env: NodeJS.ProcessEnv, mode: "disabled-dev" | "lan-https-token"): string {
+  const configuredSecret = env.SERVER_TOKEN_HASH_SECRET?.trim();
+  if (configuredSecret) return configuredSecret;
+  if (mode === "disabled-dev") {
+    console.warn("[security] SERVER_TOKEN_HASH_SECRET is not set; using dev-only insecure token hash secret for disabled-dev mode.");
+    return DEV_ONLY_INSECURE_TOKEN_HASH_SECRET;
+  }
+  throw new Error("SERVER_TOKEN_HASH_SECRET is required in lan-https-token mode. Set a strong random secret in your environment before starting the server.");
+}
+
 export function composeServerSecurity(env: NodeJS.ProcessEnv, storageRootDirectory: string) {
   const config = resolveServerSecurityConfig(env, storageRootDirectory);
   const credentials = createLanDeviceCredentialStoreAdapter(path.join(config.securityStorePath, "device-credentials.json"));
-  const tokenHashSecret = env.SERVER_TOKEN_HASH_SECRET?.trim() || "dev-only-insecure-token-hash-secret";
+  const tokenHashSecret = resolveTokenHashSecret(env, config.mode);
   const verifier = createLanBearerTokenVerifierAdapter({ findCredentialByTokenHash: credentials.findDeviceCredentialByTokenHash, tokenHashSecret });
   const completePairing = new CompleteLanPairingService({
     pairingCodes: createLanPairingCodeStoreAdapter(path.join(config.securityStorePath, "pairing-codes.json")),

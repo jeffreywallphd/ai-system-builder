@@ -8,6 +8,9 @@ describe("api route security policy coverage", () => {
   it("has explicit policy entries for registered API routes", () => {
     expect(API_ROUTE_POLICIES.size).toBeGreaterThan(20);
     for (const key of API_ROUTE_POLICIES.keys()) expect(key.startsWith("GET /api/") || key.startsWith("POST /api/") || key.startsWith("DELETE /api/")).toBe(true);
+    const publicRoutes = [...API_ROUTE_POLICIES.entries()].filter(([, p]) => p.public).map(([route]) => route).sort();
+    expect(publicRoutes).toEqual(["GET /api/security/status", "POST /api/security/pairing/complete"]);
+    expect(API_ROUTE_POLICIES.get("POST /api/security/token/revoke")?.public).toBe(false);
   });
 
   it("denies unknown api routes", () => {
@@ -33,8 +36,8 @@ describe("security middleware", () => {
       await middleware(req,res,()=>{});
       expect(res.body.error.code).toBe(expected);
     };
-    await check("security.invalid-token","security.invalid-token");
-    await check("security.expired-token","security.expired-token");
-    await check("security.revoked-token","security.revoked-token");
+    await check("security.invalid-token","unauthorized");
+    await check("security.expired-token","unauthorized");
+    await check("security.revoked-token","unauthorized");
   });
 });
