@@ -41,3 +41,12 @@ describe("registerSecurityRoutes", () => {
     expect(mode).toBe("lan-token-enforced");
   });
 });
+
+
+it("serves local CA PEM only when provider exists", async () => {
+  const app = makeApp();
+  registerSecurityRoutes(app, { getStatus: async () => ({}), completePairing: async () => ({}), revokeToken: async () => ({}), getLocalCaPem: async () => "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----" });
+  const res = makeRes();
+  await app.routes.get("GET /api/security/tls/local-ca.pem")({}, res);
+  expect(res.statusCode).toBe(200);
+});

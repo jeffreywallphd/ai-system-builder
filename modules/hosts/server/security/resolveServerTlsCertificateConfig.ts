@@ -4,7 +4,6 @@ import { parseTlsCertificateHosts } from "../../../adapters/security/tls";
 
 export function resolveServerTlsCertificateConfig(env: NodeJS.ProcessEnv, securityStorePath: string, httpsEnabled: boolean, httpsRequired: boolean) {
   const certMode = (env.AI_SYSTEM_BUILDER_TLS_CERT_MODE?.trim() || "manual") as TlsCertificateMode;
-  if (certMode === "auto-local-ca") throw new Error("AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-local-ca is not implemented yet. Use manual or auto-self-signed.");
   const certPath = env.AI_SYSTEM_BUILDER_TLS_CERT_PATH?.trim();
   const keyPath = env.AI_SYSTEM_BUILDER_TLS_KEY_PATH?.trim();
   if ((httpsEnabled || httpsRequired) && certMode === "manual") {

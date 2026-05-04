@@ -81,7 +81,7 @@
 
 - Default `dev:server` remains HTTP/no-auth (`disabled-dev`).
 - Use `AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed` with either `disabled-dev` + `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` or `lan-https-token`.
-- `auto-local-ca` is future work and not implemented.
+- `auto-local-ca` is supported for local/dev/LAN testing. Download `/api/security/tls/local-ca.pem` and install trust manually.
 - Self-signed certs may still show browser trust warnings until explicitly trusted.
 - Dev auth enforcement toggle does not switch HTTP/HTTPS; listener mode changes require restart.
 - Do not commit or log private keys or token hash secrets.

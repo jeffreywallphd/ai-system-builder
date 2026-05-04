@@ -20,17 +20,19 @@ export function SecurityStatusPanel() {
       {status?.mode === "disabled-dev" && !status.httpsEnabled ? <p>Default dev is HTTP/no-auth. To test HTTPS in dev, restart dev:server with HTTPS enabled and a certificate mode.</p> : null}
       {status?.mode === "disabled-dev" && status.httpsEnabled ? <p>HTTPS is enabled for this dev server. Authentication is still controlled separately by dev security enforcement.</p> : null}
       {status?.mode === "lan-https-token" ? <p>LAN HTTPS token mode is active. HTTPS and bearer-token authentication are required.</p> : null}
-      {status?.tls?.mode === "auto-self-signed" ? <p>Auto self-signed certificates can enable HTTPS transport, but your browser or mobile device may still show a trust warning unless you explicitly trust the certificate/CA. Local CA support is planned separately.</p> : null}
+      {status?.tls?.mode === "auto-self-signed" ? <p>Auto self-signed certificates can enable HTTPS transport, but your browser or mobile device may still show a trust warning unless you explicitly trust the certificate/CA.</p> : null}
+      {status?.tls?.mode === "auto-local-ca" ? <div className="ui-stack"><p>Local CA available: {status?.tls?.localCa?.available ? "Yes" : "No"}</p>{status?.tls?.localCa?.downloadUrl ? <p><a href={status.tls.localCa.downloadUrl} target="_blank" rel="noreferrer">Download local CA certificate (PEM)</a></p> : null}<p>Manual trust required: install/trust this public CA certificate in your OS/browser/device trust store.</p><p>After trust installation, restart browser/app if needed. Never share private keys and do not commit generated TLS files.</p></div> : null}
+
       <div className="ui-stack">
         <h4>Development restart examples</h4>
         <pre><code>AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev npm run dev:server</code></pre>
         <pre><code>{`AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev \\
 AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \\
-AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \\
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-local-ca \\
 AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true \\
 npm run dev:server`}</code></pre>
         <pre><code>{`AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token \\
-AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \\
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-local-ca \\
 SERVER_TOKEN_HASH_SECRET=<strong-random-secret> \\
 npm run dev:server`}</code></pre>
         <pre><code>{`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`}</code></pre>
