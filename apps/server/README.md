@@ -56,9 +56,7 @@ Required environment variables:
 
 ```bash
 AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token
-AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem
-AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem
-AI_SYSTEM_BUILDER_PAIRING_ENABLED=true
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed
 SERVER_TOKEN_HASH_SECRET=<strong-random-secret>
 ```
 
@@ -77,9 +75,10 @@ Behavior:
 
 ### Certificate options
 
-- User-supplied certificate/private key PEM files.
-- `mkcert`-generated development/LAN certs.
-- Private LAN CA-issued certificate/private key.
+- `manual` mode: user-supplied certificate/private key PEM files via `AI_SYSTEM_BUILDER_TLS_CERT_PATH` and `AI_SYSTEM_BUILDER_TLS_KEY_PATH`.
+- `auto-self-signed` mode: server generates/reuses a dev certificate/key in the server security store (or `AI_SYSTEM_BUILDER_TLS_CERT_DIRECTORY`).
+
+`auto-local-ca` is not implemented yet (future work). Self-signed certs enable HTTPS transport but browsers/devices may still require a trust exception or manual trust step.
 
 Not implemented in this phase: automatic ACME/web-CA certificate provisioning, external reverse-proxy TLS termination mode, mTLS, OAuth, or production public-internet hardening.
 
@@ -114,8 +113,7 @@ To run HTTPS while staying in `disabled-dev`:
 ```bash
 AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev
 AI_SYSTEM_BUILDER_HTTPS_ENABLED=true
-AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem
-AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed
 AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true
 npm run dev:server
 ```
@@ -164,3 +162,6 @@ $bytes = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Fi
 - This toggle only changes request-time auth enforcement (`disabled-dev` vs `lan-token-enforced`) for local testing.
 - It does **not** switch a running listener between HTTP and HTTPS.
 - Do not use this toggle as production security.
+
+
+- Never commit generated private keys or token hash secrets; do not print secret values in logs.
