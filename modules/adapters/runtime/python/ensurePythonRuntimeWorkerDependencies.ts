@@ -97,7 +97,7 @@ print(json.dumps({
 const WORKER_DEPENDENCY_PROBE_SCRIPT = `
 # asb:worker-dependency-probe
 import importlib.util
-required = ["accelerate", "datasets", "fastapi", "hf_xet", "peft", "pyarrow", "safetensors", "uvicorn", "huggingface_hub", "transformers"]
+required = ["docx", "fastapi", "hf_xet", "huggingface_hub", "markdownify", "pypdf", "safetensors", "transformers", "uvicorn"]
 missing = [name for name in required if importlib.util.find_spec(name) is None]
 if missing:
   raise ModuleNotFoundError(f"No module named '{missing[0]}'")
@@ -542,7 +542,7 @@ function installWorkerRequirementsIfNeeded(
     throw new Error(`Failed to probe Python runtime worker dependencies: ${probeOutput}`);
   }
 
-  const missingDependencyPattern = /No module named ['"](accelerate|datasets|fastapi|hf_xet|peft|pyarrow|safetensors|uvicorn|huggingface_hub|transformers)['"]/i;
+  const missingDependencyPattern = /No module named ['"](docx|fastapi|hf_xet|huggingface_hub|markdownify|pypdf|safetensors|transformers|uvicorn)['"]/i;
   if (!missingDependencyPattern.test(probeOutput)) {
     throw new Error(
       `Python dependency probe failed for an unexpected reason; aborting startup. ${probeOutput}`,

@@ -40,7 +40,7 @@ function createEnvironmentInspectionJson(version = "3.11.9"): string {
 const workerDependencyProbeScript = `
 # asb:worker-dependency-probe
 import importlib.util
-required = ["accelerate", "datasets", "fastapi", "hf_xet", "peft", "pyarrow", "safetensors", "uvicorn", "huggingface_hub", "transformers"]
+required = ["docx", "fastapi", "hf_xet", "huggingface_hub", "markdownify", "pypdf", "safetensors", "transformers", "uvicorn"]
 missing = [name for name in required if importlib.util.find_spec(name) is None]
 if missing:
   raise ModuleNotFoundError(f"No module named '{missing[0]}'")
@@ -283,7 +283,7 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
     ).toBe(true);
   });
 
-  it("installs worker requirements when model-training dataset dependencies are missing", () => {
+  it("does not install startup requirements when training-only dependencies are missing", () => {
     const spawnSyncImplementation = createSpawnSyncImplementation((command, args) => {
       if (command === "python" && args[0] === "-c" && args[1]?.includes("asb:python-env-inspect")) {
         return createSpawnSyncResult({ stdout: createEnvironmentInspectionJson() });
@@ -295,13 +295,7 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
         return createSpawnSyncResult({ stdout: "1\n" });
       }
       if (command === "python" && args[0] === "-c" && args[1] === workerDependencyProbeScript) {
-        return createSpawnSyncResult({
-          status: 1,
-          stderr: "ModuleNotFoundError: No module named 'datasets'",
-        });
-      }
-      if (command === "python" && args.join(" ") === "-m pip install -r requirements.txt") {
-        return createSpawnSyncResult({ status: 0, stdout: "Successfully installed requirements" });
+        return createSpawnSyncResult({ status: 0 });
       }
       if (command === "nvidia-smi") {
         return createSpawnSyncResult({ status: 1, stderr: "not found" });
@@ -335,9 +329,21 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
     });
 
     expect(
-      spawnSyncImplementation.mock.calls.some((call) =>
-        Array.isArray(call[1]) && call[1].join(" ") === "-m pip install -r requirements.txt"),
+      spawnSyncImplementation.mock.calls.every((call) =>
+        !Array.isArray(call[1]) || call[1].join(" ") !== "-m pip install -r requirements.txt"),
     ).toBe(true);
+  });
+
+  it("keeps pyarrow out of startup requirement installation", () => {
+    const requirementsText = readFileSync(
+      join(process.cwd(), "modules", "adapters", "runtime", "python", "worker", "requirements.txt"),
+      "utf8",
+    );
+
+    expect(requirementsText).not.toContain("pyarrow==");
+    expect(requirementsText).not.toContain("datasets>=");
+    expect(requirementsText).not.toContain("accelerate>=");
+    expect(requirementsText).not.toContain("peft>=");
   });
 
   it("fails early when Python version is unsupported", () => {
