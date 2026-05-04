@@ -18,6 +18,44 @@ Summarize the planned security architecture direction for implementation prompts
 - First implementation target: HTTPS + LAN pairing bearer token.
 - Bearer tokens authenticate clients; HTTPS/TLS provides confidentiality/integrity.
 
+## Current implementation snapshot
+
+- Security modes in use:
+  - `disabled-dev`
+  - `lan-https-token`
+- Required env for `lan-https-token`:
+  - `AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token`
+  - `AI_SYSTEM_BUILDER_TLS_CERT_PATH`
+  - `AI_SYSTEM_BUILDER_TLS_KEY_PATH`
+  - `SERVER_TOKEN_HASH_SECRET`
+- Optional env/config commonly used:
+  - `AI_SYSTEM_BUILDER_PAIRING_ENABLED`
+  - `AI_SYSTEM_BUILDER_SECURITY_STORE_PATH`
+  - `SERVER_STORAGE_ROOT`
+  - `SERVER_RUNTIME_ROOT`
+- Security store defaults under server storage root: `config/security`.
+- Token model:
+  - Opaque bearer token.
+  - Server persists token hash only.
+  - Token hash secret is sensitive; never commit or log it.
+- Thin-client model:
+  - `secureFetch` adds `Authorization: Bearer` when token is present.
+  - Token is persisted via `pairedDeviceTokenStore`.
+  - Current browser storage uses localStorage for LAN convenience and is not hostile-browser hardened.
+- Route policy model:
+  - Centralized API route policy table.
+  - Unknown `/api/*` routes are denied with `security.route-policy-missing`.
+- Error mapping:
+  - Preserve HTTP status and canonical security error code at client boundaries.
+- Current limitations:
+  - no OAuth
+  - no mTLS
+  - no external TLS termination mode
+  - no encryption-at-rest
+  - no public-internet hardening
+  - no full admin device-management UI
+  - rate limiting, audit subsystem, and resource-level storage authorization remain follow-up work
+
 ## Security domains
 
 Identity/authentication, authorization/policy, transport security, storage security, secrets/credentials, audit logging, input hardening, runtime/process isolation, supply-chain/model/plugin security, and privacy/data governance.

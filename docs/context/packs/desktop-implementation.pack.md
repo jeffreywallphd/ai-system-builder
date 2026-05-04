@@ -57,3 +57,14 @@
 - Add `testing` for behavior-sensitive desktop refactors.
 - Add `desktop-styling` when renderer CSS layering/tokens/shared style ownership are part of scope.
 - Use minimum-sufficient context: include only desktop packs relevant to touched layers (`main`, preload, renderer, host composition, IPC adapter).
+
+
+## Security implementation reminders
+
+- Use shared security API utilities (`secureFetch`, security API client wrappers) for protected server calls.
+- Do not duplicate `Authorization` header construction in feature components/hooks.
+- Do not place bearer tokens in query strings or request bodies.
+- Preserve `401`/`403` status and canonical security error codes in UI handling paths.
+- `401` in `lan-https-token` mode should guide pairing/re-pairing.
+- `403` should guide missing-permission remediation.
+- Never render or log bearer tokens or pairing codes.
