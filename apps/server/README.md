@@ -165,3 +165,6 @@ $bytes = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Fi
 
 
 - Never commit generated private keys or token hash secrets; do not print secret values in logs.
+
+
+No automatic trust-store installation is performed. Trust installation is manual; browser/mobile trust limitations apply. Do not commit private keys or SERVER_TOKEN_HASH_SECRET.

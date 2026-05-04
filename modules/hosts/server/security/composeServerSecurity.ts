@@ -7,7 +7,7 @@ import { createLanBearerTokenVerifierAdapter } from "../../../adapters/security/
 import { createLanPairingCodeStoreAdapter } from "../../../adapters/security/lan/createLanPairingCodeStoreAdapter";
 import { createExpressSecurityMiddleware, createInMemoryDevSecurityEnforcementStore } from "../../../adapters/transport/api-express/security";
 import { resolveServerSecurityConfig } from "./resolveServerSecurityConfig";
-import { createFilesystemTlsCertificateStore, createSelfSignedTlsCertificateProvider } from "../../../adapters/security/tls";
+import { createCompositeTlsCertificateProvider, createFilesystemTlsCertificateStore } from "../../../adapters/security/tls";
 
 
 const DEV_ONLY_INSECURE_TOKEN_HASH_SECRET = "dev-only-insecure-token-hash-secret";
@@ -24,7 +24,7 @@ function resolveTokenHashSecret(env: NodeJS.ProcessEnv, mode: "disabled-dev" | "
 
 export async function composeServerSecurity(env: NodeJS.ProcessEnv, storageRootDirectory: string) {
   const config = resolveServerSecurityConfig(env, storageRootDirectory);
-  const tlsProvider = createSelfSignedTlsCertificateProvider(createFilesystemTlsCertificateStore());
+  const tlsProvider = createCompositeTlsCertificateProvider(createFilesystemTlsCertificateStore());
   const tlsMaterial = await tlsProvider.resolveCertificateMaterial({ httpsEnabled: config.httpsEnabled, httpsRequired: config.httpsRequired, mode: config.tls.certMode, manualCertPath: config.tls.certPath, manualKeyPath: config.tls.keyPath, certificateDirectory: config.tls.certificateDirectory, hosts: config.tls.hosts, now: new Date() });
   const credentials = createLanDeviceCredentialStoreAdapter(path.join(config.securityStorePath, "device-credentials.json"));
   const tokenHashSecret = resolveTokenHashSecret(env, config.mode);

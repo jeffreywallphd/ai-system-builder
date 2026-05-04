@@ -6,6 +6,7 @@ export interface ResolvedTlsCertificateMaterial {
   certificatePath?: string;
   keyPath?: string;
   status: TlsCertificateStatus;
+  getLocalCaPublicCertificatePem?: () => Promise<string>;
 }
 
 export interface TlsCertificateProviderPort {
