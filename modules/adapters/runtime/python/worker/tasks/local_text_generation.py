@@ -4,10 +4,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 import gc
 import inspect
-from os import environ, getenv
+import json
+from os import environ
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, Callable
 
 from ..models import ExampleGenerationConfig, LocalModelConfig
 
@@ -25,6 +26,65 @@ class GenerationModelAvailability:
     downloaded: bool
     from_cache: bool
     local_path: str | None = None
+
+
+def _snapshot_file_stats(path: str | Path | None) -> dict[str, int]:
+    if not path:
+        return {"fileCount": 0, "totalBytes": 0}
+
+    snapshot_path = Path(path)
+    if not snapshot_path.exists():
+        return {"fileCount": 0, "totalBytes": 0}
+
+    file_count = 0
+    total_bytes = 0
+    for child in snapshot_path.rglob("*"):
+        if not child.is_file():
+            continue
+        file_count += 1
+        try:
+            total_bytes += child.stat().st_size
+        except OSError:
+            continue
+    return {"fileCount": file_count, "totalBytes": total_bytes}
+
+
+def _emit_model_download_event(event: str, model_id: str, **data: Any) -> None:
+    print(
+        json.dumps(
+            {
+                "event": event,
+                "provider": "transformers",
+                "modelId": model_id,
+                **data,
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+
+
+def _report_model_download_progress(
+    model_id: str,
+    on_progress: Callable[[dict[str, Any]], None] | None,
+    stage: str,
+    message: str,
+    **data: Any,
+) -> None:
+    progress = {
+        "stage": stage,
+        "message": message,
+        "provider": "transformers",
+        "modelId": model_id,
+        **data,
+    }
+    if on_progress is not None:
+        on_progress(progress)
+    _emit_model_download_event(
+        "runtime.model_download.progress",
+        model_id,
+        **{key: value for key, value in progress.items() if key not in {"provider", "modelId"}},
+    )
 
 
 class LocalTextGenerator:
@@ -131,7 +191,10 @@ class TransformersChatGenerator(TransformersCausalGenerator):
         return self._generate_new_tokens_text(input_ids, generation_inputs)
 
 
-def ensure_generation_model_downloaded(model_config: LocalModelConfig) -> GenerationModelAvailability:
+def ensure_generation_model_downloaded(
+    model_config: LocalModelConfig,
+    on_progress: Callable[[dict[str, Any]], None] | None = None,
+) -> GenerationModelAvailability:
     if model_config.provider != "transformers":
         raise ValueError(f"Unsupported generation model provider: {model_config.provider}")
 
@@ -144,60 +207,108 @@ def ensure_generation_model_downloaded(model_config: LocalModelConfig) -> Genera
             "The 'huggingface_hub' package is required to validate and download generation models."
         ) from error
 
-    cached_reference = _find_cached_model_reference(model_config.modelId)
-    if cached_reference is not None:
-        resolved_path = str(cached_reference)
-        _RESOLVED_MODEL_REFERENCES[model_config.modelId] = resolved_path
-        return GenerationModelAvailability(
-            provider=model_config.provider,
-            model_id=model_config.modelId,
-            downloaded=False,
-            from_cache=True,
-            local_path=resolved_path,
-        )
-
+    cache_candidate_path: str | None = None
     try:
-        print(
-            f"Checking local Hugging Face cache for generation model {model_config.modelId}.",
-            flush=True,
+        _report_model_download_progress(
+            model_config.modelId,
+            on_progress,
+            "cache-check",
+            f"Checking local Hugging Face cache for {model_config.modelId}.",
         )
+        _emit_model_download_event("runtime.model_download.cache_check.started", model_config.modelId)
         local_path = snapshot_download(
             repo_id=model_config.modelId,
             local_files_only=True,
         )
-        _RESOLVED_MODEL_REFERENCES[model_config.modelId] = local_path
-        return GenerationModelAvailability(
-            provider=model_config.provider,
-            model_id=model_config.modelId,
-            downloaded=False,
-            from_cache=True,
-            local_path=local_path,
+        cache_candidate_path = local_path
+        cache_stats = _snapshot_file_stats(local_path)
+        _emit_model_download_event(
+            "runtime.model_download.cache_check.succeeded",
+            model_config.modelId,
+            localPath=local_path,
+            **cache_stats,
+        )
+        _report_model_download_progress(
+            model_config.modelId,
+            on_progress,
+            "cache-hit",
+            f"Found cached Hugging Face snapshot for {model_config.modelId}.",
+            localPath=local_path,
+            fileCount=cache_stats["fileCount"],
+            totalBytes=cache_stats["totalBytes"],
         )
     except Exception:
-        pass
+        _emit_model_download_event("runtime.model_download.cache_check.missed", model_config.modelId)
+        _report_model_download_progress(
+            model_config.modelId,
+            on_progress,
+            "cache-miss",
+            f"No complete cached Hugging Face snapshot found for {model_config.modelId}.",
+        )
 
     try:
-        print(
-            f"Downloading generation model {model_config.modelId} from Hugging Face.",
-            flush=True,
+        before_stats = _snapshot_file_stats(cache_candidate_path)
+        _report_model_download_progress(
+            model_config.modelId,
+            on_progress,
+            "snapshot-download",
+            f"Downloading Hugging Face snapshot for {model_config.modelId}.",
+            cachedFileCount=before_stats["fileCount"],
+            cachedTotalBytes=before_stats["totalBytes"],
+        )
+        _emit_model_download_event(
+            "runtime.model_download.snapshot.started",
+            model_config.modelId,
+            cachedFileCount=before_stats["fileCount"],
+            cachedTotalBytes=before_stats["totalBytes"],
         )
         local_path = snapshot_download(
             repo_id=model_config.modelId,
             local_files_only=False,
         )
-        print(
-            f"Finished downloading generation model {model_config.modelId}.",
-            flush=True,
+        after_stats = _snapshot_file_stats(local_path)
+        downloaded_missing_files = after_stats["fileCount"] > before_stats["fileCount"] or after_stats["totalBytes"] > before_stats["totalBytes"]
+        _emit_model_download_event(
+            "runtime.model_download.snapshot.succeeded",
+            model_config.modelId,
+            localPath=local_path,
+            fileCount=after_stats["fileCount"],
+            totalBytes=after_stats["totalBytes"],
+            downloadedMissingFiles=downloaded_missing_files,
+        )
+        _report_model_download_progress(
+            model_config.modelId,
+            on_progress,
+            "snapshot-complete",
+            f"Hugging Face snapshot is complete for {model_config.modelId}.",
+            localPath=local_path,
+            fileCount=after_stats["fileCount"],
+            totalBytes=after_stats["totalBytes"],
+            downloadedMissingFiles=downloaded_missing_files,
         )
         _RESOLVED_MODEL_REFERENCES[model_config.modelId] = local_path
         return GenerationModelAvailability(
             provider=model_config.provider,
             model_id=model_config.modelId,
-            downloaded=True,
-            from_cache=False,
+            downloaded=downloaded_missing_files or cache_candidate_path is None,
+            from_cache=cache_candidate_path is not None and not downloaded_missing_files,
             local_path=local_path,
         )
     except Exception as error:
+        _emit_model_download_event(
+            "runtime.model_download.snapshot.failed",
+            model_config.modelId,
+            errorType=type(error).__name__,
+            message=str(error) or type(error).__name__,
+        )
+        _report_model_download_progress(
+            model_config.modelId,
+            on_progress,
+            "snapshot-failed",
+            f"Hugging Face snapshot download failed for {model_config.modelId}.",
+            errorType=type(error).__name__,
+            errorMessage=str(error) or type(error).__name__,
+        )
         raise RuntimeError(
             (
                 f"Generation model '{model_config.modelId}' is not available in the local Hugging Face cache. "
@@ -213,57 +324,6 @@ def ensure_generation_model_is_available(config: ExampleGenerationConfig) -> Gen
 _GENERATOR_CACHE: dict[tuple[str, str, str, str, str], LocalTextGenerator] = {}
 _GENERATOR_CACHE_LOCK = Lock()
 _RESOLVED_MODEL_REFERENCES: dict[str, str] = {}
-
-
-def _candidate_huggingface_cache_roots() -> list[Path]:
-    candidates: list[Path] = []
-    for environment_variable in (
-        "HF_HUB_CACHE",
-        "HUGGINGFACE_HUB_CACHE",
-        "TRANSFORMERS_CACHE",
-    ):
-        configured = getenv(environment_variable)
-        if configured:
-            candidates.append(Path(configured))
-
-    hf_home = getenv("HF_HOME")
-    if hf_home:
-        hf_home_path = Path(hf_home)
-        candidates.extend([hf_home_path / "hub", hf_home_path / "models"])
-
-    home = Path.home()
-    candidates.extend(
-        [
-            home / ".cache" / "huggingface" / "hub",
-            home / ".cache" / "huggingface" / "models",
-        ]
-    )
-    return candidates
-
-
-def _find_cached_model_reference(model_id: str) -> Path | None:
-    normalized_repo_id = model_id.replace("/", "--")
-    repo_folder_name = f"models--{normalized_repo_id}"
-    for cache_root in _candidate_huggingface_cache_roots():
-        repo_root = cache_root / repo_folder_name
-        if not repo_root.exists():
-            continue
-
-        snapshots_dir = repo_root / "snapshots"
-        if snapshots_dir.exists():
-            snapshot_directories = sorted(
-                (path for path in snapshots_dir.iterdir() if path.is_dir()),
-                key=lambda path: path.stat().st_mtime,
-                reverse=True,
-            )
-            for snapshot_path in snapshot_directories:
-                if any(snapshot_path.rglob("*.safetensors")):
-                    return snapshot_path
-
-        if any(repo_root.rglob("*.safetensors")):
-            return repo_root
-
-    return None
 
 
 def _generator_cache_key(model: LocalModelConfig) -> tuple[str, str, str, str, str]:
