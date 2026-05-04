@@ -294,7 +294,12 @@ class ExampleGenerationTests(unittest.TestCase):
         config = ExampleGenerationConfig.model_validate(
             {
                 "mode": "qa",
-                "model": {"provider": "transformers", "modelId": "test-model", "device": "cpu"},
+                "model": {
+                    "provider": "transformers",
+                    "modelId": "test-model",
+                    "device": "cpu",
+                    "inferenceMode": "text2text",
+                },
             }
         )
 
@@ -331,9 +336,22 @@ class ExampleGenerationTests(unittest.TestCase):
         self.assertFalse(result.downloaded)
         self.assertTrue(result.from_cache)
         self.assertEqual(result.local_path, "/tmp/hf-cache/model")
-        self.assertEqual(snapshot_download.call_count, 2)
-        snapshot_download.assert_any_call(repo_id="test-model", local_files_only=True)
-        snapshot_download.assert_any_call(repo_id="test-model", local_files_only=False)
+        self.assertEqual(snapshot_download.call_count, 1)
+        snapshot_download.assert_any_call(
+            repo_id="test-model",
+            local_files_only=True,
+            ignore_patterns=[
+                "*.h5",
+                "*.msgpack",
+                "*.onnx",
+                "*.ot",
+                "*.tflite",
+                "flax_model.*",
+                "model.onnx*",
+                "openvino_model.*",
+                "tf_model.*",
+            ],
+        )
 
     def test_ensure_generation_model_downloaded_verifies_cache_through_hub_snapshot(self) -> None:
         snapshot_download = unittest.mock.Mock(side_effect=["/tmp/hf-cache/model", "/tmp/hf-cache/model"])
@@ -353,9 +371,22 @@ class ExampleGenerationTests(unittest.TestCase):
         self.assertFalse(result.downloaded)
         self.assertTrue(result.from_cache)
         self.assertEqual(result.local_path, "/tmp/hf-cache/model")
-        self.assertEqual(snapshot_download.call_count, 2)
-        snapshot_download.assert_any_call(repo_id="test-org/test-model", local_files_only=True)
-        snapshot_download.assert_any_call(repo_id="test-org/test-model", local_files_only=False)
+        self.assertEqual(snapshot_download.call_count, 1)
+        snapshot_download.assert_any_call(
+            repo_id="test-org/test-model",
+            local_files_only=True,
+            ignore_patterns=[
+                "*.h5",
+                "*.msgpack",
+                "*.onnx",
+                "*.ot",
+                "*.tflite",
+                "flax_model.*",
+                "model.onnx*",
+                "openvino_model.*",
+                "tf_model.*",
+            ],
+        )
 
     def test_ensure_generation_model_downloaded_auto_downloads_when_missing_from_cache(self) -> None:
         snapshot_download = unittest.mock.Mock()

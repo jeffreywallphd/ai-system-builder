@@ -421,4 +421,13 @@ describe("server ComfyUI python/runtime resolution", () => {
     expect(source).not.toContain("hosts/desktop");
     expect(source).not.toContain("transport/ipc-electron");
   });
+
+  it("keeps Hugging Face Xet enabled by default while assigning a server-owned Xet cache", () => {
+    const sourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("HF_XET_CACHE");
+    expect(source).toContain("joinHostPath(pythonRuntimeRoot, \"xet\")");
+    expect(source).not.toContain("HF_HUB_DISABLE_XET: env.HF_HUB_DISABLE_XET ?? \"1\"");
+  });
 });

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
+from shutil import rmtree
 import sys
 from types import SimpleNamespace
 import unittest
@@ -12,6 +14,7 @@ from modules.adapters.runtime.python.worker.tasks.local_text_generation import (
     DEFAULT_MAX_NEW_TOKENS,
     _GENERATOR_CACHE,
     _create_structured_snapshot_tqdm,
+    _start_snapshot_cache_progress_monitor,
     _resolve_snapshot_download_profile,
     _move_tokenized_inputs_to_model_device,
     _resolve_generation_params,
@@ -161,18 +164,42 @@ class LocalTextGenerationTests(unittest.TestCase):
 
     def test_configures_huggingface_downloads_without_disabling_xet(self) -> None:
         previous_xet = environ.pop("HF_HUB_DISABLE_XET", None)
+        previous_xet_cache = environ.pop("HF_XET_CACHE", None)
+        previous_hf_home = environ.get("HF_HOME")
+        previous_download_timeout = environ.pop("HF_HUB_DOWNLOAD_TIMEOUT", None)
+        previous_etag_timeout = environ.pop("HF_HUB_ETAG_TIMEOUT", None)
         previous_symlink_warning = environ.pop("HF_HUB_DISABLE_SYMLINKS_WARNING", None)
 
         try:
+            environ["HF_HOME"] = "C:/hf-home"
             configure_huggingface_download_environment()
 
             self.assertIsNone(environ.get("HF_HUB_DISABLE_XET"))
+            self.assertEqual(environ.get("HF_XET_CACHE"), str(Path("C:/hf-home") / "xet"))
+            self.assertEqual(environ.get("HF_HUB_DOWNLOAD_TIMEOUT"), "60")
+            self.assertEqual(environ.get("HF_HUB_ETAG_TIMEOUT"), "30")
             self.assertEqual(environ.get("HF_HUB_DISABLE_SYMLINKS_WARNING"), "1")
         finally:
             if previous_xet is not None:
                 environ["HF_HUB_DISABLE_XET"] = previous_xet
             else:
                 environ.pop("HF_HUB_DISABLE_XET", None)
+            if previous_xet_cache is not None:
+                environ["HF_XET_CACHE"] = previous_xet_cache
+            else:
+                environ.pop("HF_XET_CACHE", None)
+            if previous_hf_home is not None:
+                environ["HF_HOME"] = previous_hf_home
+            else:
+                environ.pop("HF_HOME", None)
+            if previous_download_timeout is not None:
+                environ["HF_HUB_DOWNLOAD_TIMEOUT"] = previous_download_timeout
+            else:
+                environ.pop("HF_HUB_DOWNLOAD_TIMEOUT", None)
+            if previous_etag_timeout is not None:
+                environ["HF_HUB_ETAG_TIMEOUT"] = previous_etag_timeout
+            else:
+                environ.pop("HF_HUB_ETAG_TIMEOUT", None)
             if previous_symlink_warning is not None:
                 environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = previous_symlink_warning
             else:
@@ -252,6 +279,37 @@ class LocalTextGenerationTests(unittest.TestCase):
 
         self.assertTrue(any(event.get("stage") == "snapshot-progress" for event in progress_events))
         self.assertTrue(any(event.get("completedFileCount") == 1 for event in progress_events))
+
+    def test_snapshot_cache_progress_monitor_reports_observed_bytes(self) -> None:
+        progress_events: list[dict] = []
+
+        cache_root = Path.cwd() / "artifacts" / "hf-cache-progress-test"
+        rmtree(cache_root, ignore_errors=True)
+        self.addCleanup(lambda: rmtree(cache_root, ignore_errors=True))
+        cache_root.mkdir(parents=True)
+
+        with patch.dict(
+            environ,
+            {
+                "HF_HUB_CACHE": str(cache_root),
+                "AI_SYSTEM_BUILDER_HF_DOWNLOAD_PROGRESS_INTERVAL_SECONDS": "0.01",
+            },
+        ):
+            stop_monitor = _start_snapshot_cache_progress_monitor(
+                "test-org/test-model",
+                "checkpoint",
+                progress_events.append,
+            )
+            repo_cache = cache_root / "models--test-org--test-model" / "blobs"
+            repo_cache.mkdir(parents=True)
+            (repo_cache / "partial.safetensors.incomplete").write_bytes(b"123456789")
+            stop_monitor()
+
+        cache_progress = [event for event in progress_events if event.get("stage") == "snapshot-cache-progress"]
+        self.assertGreaterEqual(len(cache_progress), 1)
+        self.assertEqual(cache_progress[-1]["observedFileCount"], 1)
+        self.assertEqual(cache_progress[-1]["observedTotalBytes"], 9)
+        self.assertEqual(cache_progress[-1]["profile"], "checkpoint")
 
     def test_model_download_reports_cache_miss_cause_before_snapshot_download(self) -> None:
         calls: list[dict] = []

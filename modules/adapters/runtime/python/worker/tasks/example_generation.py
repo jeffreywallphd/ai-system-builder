@@ -233,6 +233,8 @@ def generate_qa_examples_for_chunks(
                 raw_answer_output,
                 error,
             )
+            if config.failurePolicy == "skip":
+                continue
             raise
 
         examples.append(
