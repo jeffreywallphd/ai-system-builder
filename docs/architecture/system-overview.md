@@ -250,3 +250,7 @@ Desktop renderer artifact-browser publish/re-check UX should call the preload-ba
 - Imported-source backing verification can be re-checked explicitly (`artifact.source.verify`) without changing artifact identity or collapsing source/published concepts.
 - Artifact browser list/detail now surfaces minimal backing-state cues (`Remote only`, `Localized`, `Published`) while keeping artifacts as the core entity.
 - This is an incremental usefulness step for the current image-focused slice, not full remote sync or provider-native browsing parity.
+
+## Security architecture posture
+
+Security is cross-cutting and layered rather than a monolithic module. The first implementation target is **HTTPS + LAN pairing bearer token** (`lan-https-token`). Transport security remains adapter-based and swappable, while authorization policy is shared but enforced at both transport and application/resource boundaries. Storage and runtime security concerns remain separate from transport security and are enforced in their own adapter/application seams. ADR-0015 is the canonical security architecture reference.

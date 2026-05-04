@@ -65,3 +65,7 @@
 - Typical set: `index` + `runtime`.
 - Add `architecture` for cross-layer decisions.
 - Add `logging` for diagnosability-heavy runtime work and `testing` for bug fixes/refactors.
+
+- Runtime env vars and logs must be redacted for secrets.
+- Runtime temp paths should not be exposed to clients/contracts.
+- Runtime/model/plugin downloads are supply-chain security concerns.

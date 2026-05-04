@@ -158,3 +158,7 @@ If host code starts accumulating business logic, move that logic inward before i
 - Desktop host exposes equivalent token config through preload/IPC so renderer flows can save/update/clear token without environment restarts.
 - Artifact register/localize/publish/verify flows read token from host config at execution time; users no longer need to re-enter token per action.
 - Public repositories may work without token; private/gated repositories can require one.
+
+## Host security composition guidance
+
+Hosts choose concrete security modes through composition. Server host owns server security configuration and API transport security setup. Desktop host will later own configured remote-server credential handling, and thin-client relies on server APIs through secure fetch behavior. Development no-auth mode must be explicit and noisy. Future remote desktop execution must route through secure API client adapters behind desktop IPC boundaries. See ADR-0015.

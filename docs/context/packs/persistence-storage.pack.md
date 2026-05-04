@@ -100,3 +100,8 @@
 
 
 - Hugging Face token config now follows a host-side persisted config seam (server-storage-root for thin client and desktop AppData for desktop host) and is consumed dynamically by artifact-repo operations; do not fall back to client-only token state as source of truth.
+
+- Enforce storage-key/path containment rules in filesystem adapters.
+- Artifact reads/writes should be authorized by shared policy seams.
+- Secrets are not ordinary settings payloads.
+- Future at-rest encryption should use a data-protection port seam.

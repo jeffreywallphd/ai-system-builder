@@ -280,3 +280,7 @@ Artifact storage roots contain durable artifacts and catalog-backed content. Com
 Server defaults should keep `SERVER_STORAGE_ROOT` and `SERVER_RUNTIME_ROOT` distinct. Desktop local mode should use desktop-owned runtime roots and desktop-owned artifact storage roots. Server/thin-client mode should use server-owned runtime roots and server-owned artifact storage roots. Future desktop-remote mode should not assume remote artifacts are local files.
 
 See ADR-0013 and ADR-0012.
+
+## Storage security guidance
+
+Storage keys are opaque identifiers, not raw paths. Filesystem storage adapters must enforce path canonicalization + containment under configured storage roots. Artifact content reads/writes should be authorization-aware. Secrets and credentials are not ordinary settings payloads. Optional encryption at rest should be introduced via a `DataProtectionPort` seam, and audit events should cover sensitive artifact operations. See ADR-0015.
