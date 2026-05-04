@@ -31,8 +31,7 @@
 2. Start server with HTTPS required:
    ```bash
    AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token \
-   AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem \
-   AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem \
+   AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
    SERVER_TOKEN_HASH_SECRET=<strong-random-secret> \
    npm run dev:server
    ```
@@ -69,11 +68,20 @@
    ```bash
    AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev \
    AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
-   AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem \
-   AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem \
+   AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
    AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED=true \
    npm run dev:server
    ```
 2. Confirm `/api/security/status` reports `mode=disabled-dev` and `httpsEnabled=true`.
 3. Confirm security page shows HTTPS enabled plus dev enforcement dropdown.
 4. Toggle dev enforcement and verify only auth behavior changes; listener protocol does not change until restart.
+
+
+## TLS mode reminders
+
+- Default `dev:server` remains HTTP/no-auth (`disabled-dev`).
+- Use `AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed` with either `disabled-dev` + `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` or `lan-https-token`.
+- `auto-local-ca` is future work and not implemented.
+- Self-signed certs may still show browser trust warnings until explicitly trusted.
+- Dev auth enforcement toggle does not switch HTTP/HTTPS; listener mode changes require restart.
+- Do not commit or log private keys or token hash secrets.

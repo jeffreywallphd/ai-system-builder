@@ -25,8 +25,7 @@ Summarize the planned security architecture direction for implementation prompts
   - `lan-https-token`
 - Required env for `lan-https-token`:
   - `AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token`
-  - `AI_SYSTEM_BUILDER_TLS_CERT_PATH`
-  - `AI_SYSTEM_BUILDER_TLS_KEY_PATH`
+  - `AI_SYSTEM_BUILDER_TLS_CERT_MODE=manual|auto-self-signed`
   - `SERVER_TOKEN_HASH_SECRET`
 - Optional env/config commonly used:
   - `AI_SYSTEM_BUILDER_PAIRING_ENABLED`
@@ -96,3 +95,12 @@ Identity/authentication, authorization/policy, transport security, storage secur
 
 - Dev HTTPS testing in `disabled-dev` is supported via `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` plus TLS cert/key env vars.
 - Startup transport mode is restart-bound; dev auth enforcement toggle is runtime-only and does not live-switch HTTP/HTTPS.
+
+
+## TLS certificate UX notes
+
+- Default `dev:server` is `disabled-dev` over HTTP with no auth.
+- HTTPS dev transport can be enabled with `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` and `AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed`.
+- `auto-self-signed` generates/reuses certificate material for transport but may still produce browser trust warnings.
+- `auto-local-ca` is planned but not implemented in current prompts.
+- Listener mode changes (HTTP/HTTPS) require restart; dev auth enforcement toggle is runtime auth-only.
