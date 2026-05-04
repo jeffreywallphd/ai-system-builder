@@ -32,8 +32,13 @@ case path rather than desktop preload wiring.
 ## Development wiring
 
 - Default API base URL in thin-client code is `/api`.
-- In local development, Vite proxies `/api` to `http://127.0.0.1:3000`, which allows running thin-client
-  and server on separate ports while keeping feature clients same-origin by default.
+- In local development, Vite proxies `/api` to the server on `127.0.0.1:3010`, which allows running
+  thin-client and server on separate ports while keeping feature clients same-origin by default.
+- When `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` or `AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token` is
+  set for the thin-client dev server process, the Vite proxy targets `https://127.0.0.1:3010`.
+- For dev-generated TLS (`AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed` or `auto-local-ca`), the
+  Vite proxy disables proxy-side certificate verification so Node can reach the HTTPS dev server.
+- To force a specific dev proxy origin, set `AI_SYSTEM_BUILDER_THIN_CLIENT_API_PROXY_TARGET`.
 - To use a different server origin directly, set `VITE_API_BASE_URL` (for example
   `http://127.0.0.1:3100/api`).
 
