@@ -7,6 +7,8 @@ import { createLanBearerTokenVerifierAdapter } from "../../../adapters/security/
 import { createLanPairingCodeStoreAdapter } from "../../../adapters/security/lan/createLanPairingCodeStoreAdapter";
 import { createExpressSecurityMiddleware, createInMemoryDevSecurityEnforcementStore } from "../../../adapters/transport/api-express/security";
 import { resolveServerSecurityConfig } from "./resolveServerSecurityConfig";
+import { createFilesystemTlsCertificateStore, createSelfSignedTlsCertificateProvider } from "../../../adapters/security/tls";
+
 
 const DEV_ONLY_INSECURE_TOKEN_HASH_SECRET = "dev-only-insecure-token-hash-secret";
 
@@ -20,8 +22,10 @@ function resolveTokenHashSecret(env: NodeJS.ProcessEnv, mode: "disabled-dev" | "
   throw new Error("SERVER_TOKEN_HASH_SECRET is required in lan-https-token mode. Set a strong random secret in your environment before starting the server.");
 }
 
-export function composeServerSecurity(env: NodeJS.ProcessEnv, storageRootDirectory: string) {
+export async function composeServerSecurity(env: NodeJS.ProcessEnv, storageRootDirectory: string) {
   const config = resolveServerSecurityConfig(env, storageRootDirectory);
+  const tlsProvider = createSelfSignedTlsCertificateProvider(createFilesystemTlsCertificateStore());
+  const tlsMaterial = await tlsProvider.resolveCertificateMaterial({ httpsEnabled: config.httpsEnabled, httpsRequired: config.httpsRequired, mode: config.tls.certMode, manualCertPath: config.tls.certPath, manualKeyPath: config.tls.keyPath, certificateDirectory: config.tls.certificateDirectory, hosts: config.tls.hosts, now: new Date() });
   const credentials = createLanDeviceCredentialStoreAdapter(path.join(config.securityStorePath, "device-credentials.json"));
   const tokenHashSecret = resolveTokenHashSecret(env, config.mode);
   const verifier = createLanBearerTokenVerifierAdapter({ findCredentialByTokenHash: credentials.findDeviceCredentialByTokenHash, tokenHashSecret });
@@ -37,5 +41,5 @@ export function composeServerSecurity(env: NodeJS.ProcessEnv, storageRootDirecto
   const getStatusService = new GetSecurityStatusService(credentials);
   const devSecurityEnforcement = createInMemoryDevSecurityEnforcementStore(config.devSecurityToggleEnabled ? "disabled-dev" : undefined);
   const middleware = createExpressSecurityMiddleware({ verifyToken: verifier.verifyToken.bind(verifier), httpsRequired: config.httpsRequired, authRequired: config.authRequired, mode: config.mode, devSecurityEnforcement });
-  return { config, middleware, services: { completePairing, getStatusService }, credentials, devSecurityEnforcement };
+  return { config: { ...config, tlsMaterial, tlsStatus: tlsMaterial?.status }, middleware, services: { completePairing, getStatusService }, credentials, devSecurityEnforcement };
 }
