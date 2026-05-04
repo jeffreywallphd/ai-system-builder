@@ -3,3 +3,4 @@ export * from './applySecurityHeaders';
 export * from './createExpressSecurityMiddleware';
 export * from './createHttpsServerOptions';
 export * from './registerSecurityRoutes';
+export * from './expressAuthContext';
