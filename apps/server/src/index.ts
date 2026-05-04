@@ -1,18 +1,28 @@
-import { createServer } from "./createServer";
+import { accessSync, constants } from "node:fs";
 import http from "node:http";
 import https from "node:https";
 import { createHttpsServerOptions } from "../../../modules/adapters/transport/api-express/security";
+import { createServer } from "./createServer";
 
 const { app, config, loggingPort } = createServer();
 
-const listener = config.security.httpsEnabled
-  ? https.createServer(createHttpsServerOptions(config.security.tlsCertPath!, config.security.tlsKeyPath!), app)
-  : http.createServer(app);
+if (config.security.httpsEnabled) {
+  if (!config.security.tlsCertPath || !config.security.tlsKeyPath) throw new Error("HTTPS enabled but TLS cert/key paths are missing. Set SECURITY_TLS_CERT_PATH and SECURITY_TLS_KEY_PATH.");
+  accessSync(config.security.tlsCertPath, constants.R_OK);
+  accessSync(config.security.tlsKeyPath, constants.R_OK);
+}
 
-listener.listen(config.port, () => {
-  void loggingPort.log({
-    timestamp: new Date().toISOString(), level: "info", verbosity: "normal", event: "server.listener.started", host: "server", component: "server-host",
-    message: config.security.mode === "disabled-dev" ? "Server started with security disabled-dev (INSECURE)." : "Server listener started.",
-    data: { port: config.port, storageRootDirectory: config.storageRootDirectory, runtimeRootDirectory: config.runtimeRootDirectory, securityMode: config.security.mode, httpsEnabled: config.security.httpsEnabled, httpsRequired: config.security.httpsRequired },
-  });
-});
+let listener: http.Server | https.Server;
+if (config.security.httpsEnabled) {
+  const certPath = config.security.tlsCertPath as string;
+  const keyPath = config.security.tlsKeyPath as string;
+  listener = https.createServer(createHttpsServerOptions(certPath, keyPath), app);
+} else {
+  listener = http.createServer(app);
+}
+
+if (!config.security.httpsEnabled) {
+  void loggingPort.log({ timestamp: new Date().toISOString(), level: "warn", verbosity: "normal", event: "server.security.insecure-http", host: "server", component: "server-host", message: "Server started over HTTP without TLS (INSECURE).", data: { port: config.port } });
+}
+
+listener.listen(config.port);

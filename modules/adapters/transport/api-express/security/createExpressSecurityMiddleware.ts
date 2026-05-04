@@ -1,25 +1,46 @@
-import type { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { createApiError, createApiFailureResponse } from "../../../../contracts/api";
-import { createAnonymousAuthContext } from "../../../../contracts/security";
+import { ANONYMOUS_AUTH_CONTEXT, type AuthContext, SecurityApplicationError } from "../../../../contracts/security";
 import { extractBearerToken } from "./extractExpressSecurityInput";
 import { resolveApiRoutePolicy } from "./apiRouteSecurityPolicy";
 
-export function createExpressSecurityMiddleware(deps: { verifyToken: (req: { token: string; now: Date }) => Promise<any>; httpsRequired: boolean }) {
+type RequestWithAuth = Request & { authContext: AuthContext };
+const setAuth = (request: Request, authContext: AuthContext): RequestWithAuth => Object.assign(request, { authContext });
+
+function mapSecurityError(error: unknown): { status: number; code: string; message: string } {
+  if (error instanceof SecurityApplicationError) {
+    const status = error.code === "security.forbidden" ? 403 : 401;
+    return { status, code: error.code, message: error.message };
+  }
+  return { status: 500, code: "security.internal", message: "Security middleware failed." };
+}
+
+export function createExpressSecurityMiddleware(deps: { verifyToken: (req: { token: string; now: Date }) => Promise<AuthContext>; httpsRequired: boolean; authRequired: boolean }) {
   return async (request: Request, response: Response, next: NextFunction) => {
     const policy = resolveApiRoutePolicy(request.method, request.path);
-    (request as any).authContext = createAnonymousAuthContext();
+    setAuth(request, ANONYMOUS_AUTH_CONTEXT);
     if (deps.httpsRequired && request.protocol !== "https") {
-      return response.status(400).json(createApiFailureResponse(createApiError("security.transport", "validation", "HTTPS is required.")));
+      return response.status(400).json(createApiFailureResponse(createApiError("security.transport", "validation", "HTTPS is required.", { details: { securityCode: "security.https-required" } })));
+    }
+    if (policy.deny) {
+      return response.status(403).json(createApiFailureResponse(createApiError("security.authz", "forbidden", "Route is not allowed.", { details: { securityCode: "security.forbidden" } })));
     }
     if (policy.public) return next();
     const token = extractBearerToken(request.headers.authorization);
-    if (!token) return response.status(401).json(createApiFailureResponse(createApiError("security.auth", "validation", "Missing bearer token.")));
-    const context = await deps.verifyToken({ token, now: new Date() });
-    (request as any).authContext = context;
-    if (!context.authenticated) return response.status(401).json(createApiFailureResponse(createApiError("security.auth", "validation", "Invalid token.")));
-    if (policy.scopes?.some((scope) => !context.principal.scopes.includes(scope))) {
-      return response.status(403).json(createApiFailureResponse(createApiError("security.authz", "validation", "Forbidden.")));
+    if (!token) {
+      if (!deps.authRequired) return next();
+      return response.status(401).json(createApiFailureResponse(createApiError("security.auth", "unauthorized", "Missing bearer token.", { details: { securityCode: "security.unauthenticated" } })));
     }
-    next();
+    try {
+      const context = await deps.verifyToken({ token, now: new Date() });
+      setAuth(request, context);
+      if (policy.scopes?.some((scope) => !context.principal.scopes.includes(scope as any))) {
+        return response.status(403).json(createApiFailureResponse(createApiError("security.authz", "forbidden", "Forbidden.", { details: { securityCode: "security.forbidden" } })));
+      }
+      return next();
+    } catch (error) {
+      const mapped = mapSecurityError(error);
+      return response.status(mapped.status).json(createApiFailureResponse(createApiError("security.auth", "unauthorized", mapped.message, { details: { securityCode: mapped.code } })));
+    }
   };
 }

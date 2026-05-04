@@ -3,7 +3,7 @@ import type {
   CompleteLanPairingResult,
   SecurityScope,
 } from "../../../contracts/security";
-import { createSecurityError, SECURITY_SCOPES } from "../../../contracts/security";
+import { SECURITY_SCOPES, createSecurityApplicationError } from "../../../contracts/security";
 import type {
   DeviceCredentialStorePort,
   PairingCodeStorePort,
@@ -17,6 +17,7 @@ export interface CompleteLanPairingDependencies {
   credentials: DeviceCredentialStorePort;
   audit?: SecurityAuditLogPort;
   now?: () => Date;
+  idGenerator: { createDeviceId: () => string; createSecurityEventId: () => string };
 }
 
 export class CompleteLanPairingService {
@@ -26,12 +27,12 @@ export class CompleteLanPairingService {
     const now = this.deps.now?.() ?? new Date();
     const consumed = await this.deps.pairingCodes.consumePairingCode({ pairingCode: request.pairingCode, now });
     if (consumed.status !== "valid") {
-      if (consumed.status === "disabled") throw createSecurityError("security.pairing-disabled", "LAN pairing is disabled.");
-      if (consumed.status === "expired") throw createSecurityError("security.pairing-code-expired", "Pairing code expired.");
-      throw createSecurityError("security.pairing-code-invalid", "Invalid pairing code.", { status: consumed.status });
+      if (consumed.status === "disabled") throw createSecurityApplicationError("security.pairing-disabled", "LAN pairing is disabled.");
+      if (consumed.status === "expired") throw createSecurityApplicationError("security.pairing-code-expired", "Pairing code expired.");
+      throw createSecurityApplicationError("security.pairing-code-invalid", "Invalid pairing code.", { status: consumed.status });
     }
 
-    const deviceId = `device-${now.getTime()}`;
+    const deviceId = this.deps.idGenerator.createDeviceId();
     const deviceName = request.deviceName?.trim() || consumed.defaultDeviceName || `Paired device ${deviceId}`;
     const grantedScopes = this.resolveGrantedScopes(request.requestedScopes, consumed.defaultScopes);
     const token = await this.deps.tokens.issueDeviceToken({
@@ -52,7 +53,7 @@ export class CompleteLanPairingService {
     });
 
     await this.deps.audit?.recordSecurityEvent({
-      eventId: `evt-${deviceId}`,
+      eventId: this.deps.idGenerator.createSecurityEventId(),
       kind: "pairing.completed",
       occurredAt: now.toISOString(),
       principalId: deviceId,

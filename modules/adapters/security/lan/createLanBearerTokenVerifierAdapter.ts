@@ -1,12 +1,14 @@
 import type { TokenVerifierPort } from "../../../application/ports/security";
-import { createAnonymousAuthContext } from "../../../contracts/security";
+import { createSecurityApplicationError } from "../../../contracts/security";
 import { hashToken } from "../shared/hashToken";
 
-export function createLanBearerTokenVerifierAdapter(deps: { findActiveDeviceCredentialByTokenHash: (request: { tokenHash: string; now: Date }) => Promise<any> }): TokenVerifierPort {
+export function createLanBearerTokenVerifierAdapter(deps: { findCredentialByTokenHash: (request: { tokenHash: string }) => Promise<any>; tokenHashSecret: string }): TokenVerifierPort {
   return {
     async verifyToken({ token, now }) {
-      const found = await deps.findActiveDeviceCredentialByTokenHash({ tokenHash: hashToken(token), now });
-      if (!found) return createAnonymousAuthContext();
+      const found = await deps.findCredentialByTokenHash({ tokenHash: hashToken(token, deps.tokenHashSecret) });
+      if (!found) throw createSecurityApplicationError("security.invalid-token", "Invalid token.");
+      if (found.revokedAt) throw createSecurityApplicationError("security.revoked-token", "Revoked token.");
+      if (found.expiresAt && new Date(found.expiresAt) <= now) throw createSecurityApplicationError("security.expired-token", "Expired token.");
       return {
         authenticated: true,
         authMethod: "lan-pairing-token",
