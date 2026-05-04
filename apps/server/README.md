@@ -36,3 +36,80 @@ From this workspace directly:
 - `SERVER_STORAGE_ROOT` overrides server artifact storage.
 - `SERVER_RUNTIME_ROOT` overrides server-owned runtime state for ComfyUI, Python worker caches, and managed runtime dependencies.
 - Without overrides, server runtime state lives under `apps/server/.local/server-runtime`, which keeps dev runtime installs out of the source tree and separate from artifact storage.
+
+## Security modes and HTTPS startup
+
+### `disabled-dev` (insecure local development)
+
+```bash
+AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev npm run dev:server
+```
+
+- HTTP is allowed.
+- Authentication is not required for protected APIs.
+- Startup logs include a loud insecure warning once at startup.
+- Use this only on a trusted local machine; it is not safe for LAN/shared networks.
+
+### `lan-https-token` (LAN pairing + bearer token)
+
+Required environment variables:
+
+```bash
+AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token
+AI_SYSTEM_BUILDER_TLS_CERT_PATH=/path/to/cert.pem
+AI_SYSTEM_BUILDER_TLS_KEY_PATH=/path/to/key.pem
+AI_SYSTEM_BUILDER_PAIRING_ENABLED=true
+```
+
+Optional root overrides often used in local setups:
+
+```bash
+SERVER_STORAGE_ROOT=/path/to/server-artifacts
+SERVER_RUNTIME_ROOT=/path/to/server-runtime
+```
+
+Behavior:
+
+- HTTPS is required and there is no silent fallback to HTTP.
+- Certificate/key files must be readable before startup completes.
+- Protected APIs require a valid bearer token from LAN pairing.
+
+### Certificate options
+
+- User-supplied certificate/private key PEM files.
+- `mkcert`-generated development/LAN certs.
+- Private LAN CA-issued certificate/private key.
+
+Not implemented in this phase: automatic ACME/web-CA certificate provisioning, external reverse-proxy TLS termination mode, mTLS, OAuth, or production public-internet hardening.
+
+## Manual mkcert workflow (no runtime dependency)
+
+Example:
+
+```bash
+mkcert -install
+mkcert localhost 127.0.0.1 ::1 <your-lan-hostname> <your-lan-ip>
+```
+
+Then run server with generated files:
+
+```bash
+AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token \
+AI_SYSTEM_BUILDER_TLS_CERT_PATH=./certs/localhost+lan.pem \
+AI_SYSTEM_BUILDER_TLS_KEY_PATH=./certs/localhost+lan-key.pem \
+npm run dev:server
+```
+
+If you generate certs inside this repo, keep them out of git (for example under an ignored `certs/` directory).
+
+## Token handling and storage
+
+- Pairing tokens are bearer secrets; do not share them.
+- Server persists token hashes only in the server security store.
+- Thin-client stores the bearer token through `pairedDeviceTokenStore`.
+- Current thin-client browser persistence uses localStorage for initial LAN workflow; treat this as a convenience model, not hostile-browser hardened storage.
+- Clearing client token forgets local pairing for that device.
+
+## Manual smoke checklist
+
+Detailed checklist: `docs/security/manual-smoke-test.md`.

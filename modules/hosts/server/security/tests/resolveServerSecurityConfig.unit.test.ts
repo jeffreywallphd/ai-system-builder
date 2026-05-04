@@ -10,6 +10,7 @@ describe("resolveServerSecurityConfig", () => {
   });
 
   it("requires cert and key for lan-https-token", () => {
-    expect(() => resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token" }, "/tmp/storage")).toThrow(/requires/);
+    expect(() => resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token" }, "/tmp/storage")).toThrow(/AI_SYSTEM_BUILDER_TLS_CERT_PATH/);
+    expect(() => resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", AI_SYSTEM_BUILDER_TLS_CERT_PATH: "/tmp/cert.pem" }, "/tmp/storage")).toThrow(/AI_SYSTEM_BUILDER_TLS_KEY_PATH/);
   });
 });
