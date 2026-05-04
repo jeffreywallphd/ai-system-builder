@@ -72,3 +72,6 @@
 - Add `desktop-implementation` for renderer/main/preload structure work.
 - Add `architecture` for cross-layer changes.
 - Add `logging` for startup/IPC diagnostics and `testing` for regression-sensitive changes.
+
+- Desktop remote server credentials should live behind desktop host credential-store seams (not renderer-local ad hoc storage).
+- Future remote feature execution must use secure API client adapters behind desktop IPC boundaries.

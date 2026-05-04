@@ -89,3 +89,8 @@ Desktop remote execution (future work) must preserve renderer -> preload/IPC bou
 - Keep contract public-surface discipline explicit: root contracts exports are family namespaces only, and non-contract modules consume contracts through family barrels.
 - Add guidance for composition root placement in `apps/desktop/` and `apps/server/` to prevent logic leakage into transport handlers.
 - Create a future ADR for hybrid synchronization/coordination once implementation planning begins.
+
+
+## Security boundary cross-reference
+
+ADR-0015 defines security architecture boundaries across host, transport, storage, and runtime concerns.

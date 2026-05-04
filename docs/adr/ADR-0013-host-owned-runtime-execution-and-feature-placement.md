@@ -81,3 +81,8 @@ Server/thin-client image-generation work also exposed the need to keep runtime r
 - Add artifact localization/import flow for remote-generated assets if needed.
 - Add runtime-root config helpers and tests.
 - Update prompts/context packs when feature routing work begins.
+
+
+## Security boundary cross-reference
+
+ADR-0015 defines security architecture boundaries across host, transport, storage, and runtime concerns.

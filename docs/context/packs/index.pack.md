@@ -77,3 +77,4 @@ Only use these when needed. Do not overload the context window with uncessary in
 - For desktop renderer styling tasks, pair `desktop-implementation` with `desktop-styling` and include only style-relevant canonical docs.
 
 - Treat runtime instances as host-owned: shared contracts/use cases define behavior, while host composition selects local or future remote execution placement; see ADR-0013 for cross-host runtime ownership.
+- Security is layered and adapter-based; use ADR-0015 and `security.pack.md` for authn/authz, transport encryption, storage security, credential handling, audit, and runtime security work.

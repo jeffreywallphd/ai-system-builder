@@ -13,6 +13,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | --- | --- |
 | repo layout, module placement, dependency direction at a repo level | `docs/context/packs/repository-overview.pack.md` |
 | cross-layer architecture or boundary decisions | `docs/context/packs/architecture.pack.md` |
+| authn/authz, credential handling, transport encryption, storage security, audit, runtime/process security policy | `docs/context/packs/security.pack.md` |
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
 | runtime task registry lifecycle for long-running runtime tasks (start/read/cancel, shared lifecycle/progress/retention semantics) | `docs/context/packs/runtime-task-registry.pack.md` |
 | image generation feature architecture/contracts, ComfyUI runtime-sidecar concerns, image asset modeling | `docs/context/packs/image-generation.pack.md` |
@@ -77,3 +78,10 @@ For tasks involving desktop-server hybrid execution, local/remote feature placem
 - Include `persistence-storage.pack.md` when artifact storage roots, generated outputs, or storage/runtime root separation is involved.
 
 Escalation: if a task changes host-owned runtime behavior or per-feature execution placement, read ADR-0013 directly.
+
+
+## Security routing and escalation
+
+For security tasks, include `index.pack.md`, `architecture.pack.md` (if present), `security.pack.md`, `server-host.pack.md`, `desktop-host.pack.md`, `persistence-storage.pack.md`, `runtime.pack.md`, and feature packs (for example `image-generation.pack.md`) when feature-level enforcement is in scope.
+
+If a task changes authn/authz, credential handling, transport encryption, storage security, audit behavior, or runtime security policy, read ADR-0015 directly.
