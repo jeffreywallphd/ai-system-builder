@@ -18,31 +18,43 @@ describe("SecurityStatusPanel", () => {
     vi.resetAllMocks();
   });
 
-  it("renders dropdown only when dev toggle enabled and shows restart copy", async () => {
-    useThinClientSecurityMock.mockReturnValue({
-      uiState: "disabled-dev", status: { mode: "disabled-dev", devSecurityToggleEnabled: true, devSecurityEnforcementMode: "disabled-dev" },
-      guidance: undefined, error: undefined, completePairing: vi.fn(), clearLocalPairing: vi.fn(), setDevSecurityEnforcementMode: vi.fn(),
-    });
+  it("shows transport section with HTTP-only guidance", async () => {
+    useThinClientSecurityMock.mockReturnValue({ uiState: "disabled-dev", status: { mode: "disabled-dev", httpsEnabled: false, httpsRequired: false, requiresRestartToChangeTransportSecurity: true }, guidance: undefined, error: undefined, completePairing: vi.fn(), clearLocalPairing: vi.fn(), setDevSecurityEnforcementMode: vi.fn(), devSecurityModeUpdateSuccess: undefined, devSecurityModeUpdateError: undefined });
+    container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
+    await act(async () => { root?.render(<SecurityStatusPanel />); });
+    expect(container.textContent).toContain("Transport security");
+    expect(container.textContent).toContain("Current listener: HTTP only");
+    expect(container.textContent).toContain("restart dev:server");
+  });
+
+  it("shows HTTPS-enabled dev message", async () => {
+    useThinClientSecurityMock.mockReturnValue({ uiState: "disabled-dev", status: { mode: "disabled-dev", httpsEnabled: true, httpsRequired: false, requiresRestartToChangeTransportSecurity: true }, guidance: undefined, error: undefined, completePairing: vi.fn(), clearLocalPairing: vi.fn(), setDevSecurityEnforcementMode: vi.fn(), devSecurityModeUpdateSuccess: undefined, devSecurityModeUpdateError: undefined });
+    container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
+    await act(async () => { root?.render(<SecurityStatusPanel />); });
+    expect(container.textContent).toContain("HTTPS is enabled for this dev server");
+  });
+
+  it("renders dropdown only when dev toggle enabled", async () => {
+    useThinClientSecurityMock.mockReturnValue({ uiState: "disabled-dev", status: { mode: "disabled-dev", httpsEnabled: true, httpsRequired: false, devSecurityToggleEnabled: true, devSecurityEnforcementMode: "disabled-dev" }, guidance: undefined, error: undefined, completePairing: vi.fn(), clearLocalPairing: vi.fn(), setDevSecurityEnforcementMode: vi.fn(), devSecurityModeUpdateSuccess: undefined, devSecurityModeUpdateError: undefined });
     container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
     await act(async () => { root?.render(<SecurityStatusPanel />); });
     expect(container.textContent).toContain("Dev security enforcement");
-    expect(container.textContent).toContain("requires restarting dev:server");
   });
 
   it("does not render dropdown when dev toggle disabled", async () => {
-    useThinClientSecurityMock.mockReturnValue({ uiState: "disabled-dev", status: { mode: "disabled-dev", devSecurityToggleEnabled: false }, guidance: undefined, error: undefined, completePairing: vi.fn(), clearLocalPairing: vi.fn(), setDevSecurityEnforcementMode: vi.fn() });
+    useThinClientSecurityMock.mockReturnValue({ uiState: "disabled-dev", status: { mode: "disabled-dev", httpsEnabled: false, httpsRequired: false, devSecurityToggleEnabled: false }, guidance: undefined, error: undefined, completePairing: vi.fn(), clearLocalPairing: vi.fn(), setDevSecurityEnforcementMode: vi.fn(), devSecurityModeUpdateSuccess: undefined, devSecurityModeUpdateError: undefined });
     container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
     await act(async () => { root?.render(<SecurityStatusPanel />); });
     expect(container.textContent).not.toContain("Dev security enforcement");
   });
-
   it("calls setter when dropdown changes", async () => {
     const setDevSecurityEnforcementMode = vi.fn().mockResolvedValue(undefined);
-    useThinClientSecurityMock.mockReturnValue({ uiState: "disabled-dev", status: { mode: "disabled-dev", devSecurityToggleEnabled: true, devSecurityEnforcementMode: "disabled-dev" }, guidance: undefined, error: undefined, completePairing: vi.fn(), clearLocalPairing: vi.fn(), setDevSecurityEnforcementMode });
+    useThinClientSecurityMock.mockReturnValue({ uiState: "disabled-dev", status: { mode: "disabled-dev", httpsEnabled: true, httpsRequired: false, devSecurityToggleEnabled: true, devSecurityEnforcementMode: "disabled-dev" }, guidance: undefined, error: undefined, completePairing: vi.fn(), clearLocalPairing: vi.fn(), setDevSecurityEnforcementMode, devSecurityModeUpdateSuccess: undefined, devSecurityModeUpdateError: undefined });
     container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
     await act(async () => { root?.render(<SecurityStatusPanel />); });
     const select = container.querySelector("select") as HTMLSelectElement;
     await act(async () => { select.value = "lan-token-enforced"; select.dispatchEvent(new Event("change", { bubbles: true })); });
     expect(setDevSecurityEnforcementMode).toHaveBeenCalledWith("lan-token-enforced");
   });
+
 });

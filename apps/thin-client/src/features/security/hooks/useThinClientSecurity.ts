@@ -26,6 +26,8 @@ export function useThinClientSecurity() {
   const [status, setStatus] = useState<SecurityStatusResult>();
   const [error, setError] = useState<ThinClientSecurityError>();
   const [pairingBusy, setPairingBusy] = useState(false);
+  const [devSecurityModeUpdateError, setDevSecurityModeUpdateError] = useState<string>();
+  const [devSecurityModeUpdateSuccess, setDevSecurityModeUpdateSuccess] = useState<string>();
 
   const loadStatus = useCallback(async () => {
     try {
@@ -55,12 +57,23 @@ export function useThinClientSecurity() {
     finally { setPairingBusy(false); }
   }, [api, loadStatus]);
 
-  const setDevSecurityEnforcementMode = useCallback(async (mode: "disabled-dev" | "lan-token-enforced") => { await api.setDevSecurityMode(mode); await loadStatus(); }, [api, loadStatus]);
+  const setDevSecurityEnforcementMode = useCallback(async (mode: "disabled-dev" | "lan-token-enforced") => {
+    setDevSecurityModeUpdateError(undefined);
+    setDevSecurityModeUpdateSuccess(undefined);
+    try {
+      await api.setDevSecurityMode(mode);
+      await loadStatus();
+      setDevSecurityModeUpdateSuccess("Dev security enforcement updated.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update dev security enforcement.";
+      setDevSecurityModeUpdateError(message);
+    }
+  }, [api, loadStatus]);
 
   const clearLocalPairing = useCallback(() => { pairedDeviceTokenStore.clearToken(); setError(undefined); }, []);
   const guidance = toSecurityGuidance(error);
   const hasToken = pairedDeviceTokenStore.hasToken();
   const uiState = useMemo(() => deriveSecurityUiState({ status, error, pairingBusy, hasToken }), [status, error, pairingBusy, hasToken]);
 
-  return { uiState, status, error, guidance, completePairing, clearLocalPairing, hasToken, setDevSecurityEnforcementMode };
+  return { uiState, status, error, guidance, completePairing, clearLocalPairing, hasToken, setDevSecurityEnforcementMode, devSecurityModeUpdateError, devSecurityModeUpdateSuccess };
 }
