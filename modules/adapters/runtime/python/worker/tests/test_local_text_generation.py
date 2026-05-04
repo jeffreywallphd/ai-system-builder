@@ -11,11 +11,14 @@ from unittest.mock import patch
 
 from modules.adapters.runtime.python.worker.models import ExampleGenerationConfig, LocalModelConfig
 from modules.adapters.runtime.python.worker.tasks.local_text_generation import (
+    CHECKPOINT_SNAPSHOT_PROFILE,
     DEFAULT_MAX_NEW_TOKENS,
     _GENERATOR_CACHE,
     _create_structured_snapshot_tqdm,
     _start_snapshot_cache_progress_monitor,
     _resolve_snapshot_download_profile,
+    _structured_huggingface_file_progress,
+    _validate_snapshot_profile_result,
     _move_tokenized_inputs_to_model_device,
     _resolve_generation_params,
     _resolve_model_kwargs,
@@ -162,7 +165,7 @@ class LocalTextGenerationTests(unittest.TestCase):
     def setUp(self) -> None:
         _GENERATOR_CACHE.clear()
 
-    def test_configures_huggingface_downloads_without_disabling_xet(self) -> None:
+    def test_configures_huggingface_downloads_with_http_default_and_explicit_xet_override(self) -> None:
         previous_xet = environ.pop("HF_HUB_DISABLE_XET", None)
         previous_xet_cache = environ.pop("HF_XET_CACHE", None)
         previous_hf_home = environ.get("HF_HOME")
@@ -174,11 +177,15 @@ class LocalTextGenerationTests(unittest.TestCase):
             environ["HF_HOME"] = "C:/hf-home"
             configure_huggingface_download_environment()
 
-            self.assertIsNone(environ.get("HF_HUB_DISABLE_XET"))
+            self.assertEqual(environ.get("HF_HUB_DISABLE_XET"), "1")
             self.assertEqual(environ.get("HF_XET_CACHE"), str(Path("C:/hf-home") / "xet"))
             self.assertEqual(environ.get("HF_HUB_DOWNLOAD_TIMEOUT"), "60")
             self.assertEqual(environ.get("HF_HUB_ETAG_TIMEOUT"), "30")
             self.assertEqual(environ.get("HF_HUB_DISABLE_SYMLINKS_WARNING"), "1")
+
+            environ["HF_HUB_DISABLE_XET"] = "0"
+            configure_huggingface_download_environment()
+            self.assertEqual(environ.get("HF_HUB_DISABLE_XET"), "0")
         finally:
             if previous_xet is not None:
                 environ["HF_HUB_DISABLE_XET"] = previous_xet
@@ -214,6 +221,8 @@ class LocalTextGenerationTests(unittest.TestCase):
         self.assertEqual(profile.name, "checkpoint")
         self.assertEqual(profile.allow_patterns, ("*.ckpt", "*.safetensors"))
         self.assertIn("*/*", profile.ignore_patterns)
+        self.assertIn("*lora*", profile.ignore_patterns)
+        self.assertIn("*adapter*", profile.ignore_patterns)
 
     def test_stable_diffusion_download_uses_checkpoint_profile_even_without_task_hints(self) -> None:
         profile = _resolve_snapshot_download_profile(
@@ -254,11 +263,60 @@ class LocalTextGenerationTests(unittest.TestCase):
 
         download_call = calls[-1]
         self.assertEqual(download_call["allow_patterns"], ["*.ckpt", "*.safetensors"])
-        self.assertEqual(download_call["ignore_patterns"], ["*/*"])
+        self.assertEqual(download_call["ignore_patterns"], ["*/*", "*lora*", "*LoRA*", "*adapter*", "*Adapter*"])
         self.assertFalse(download_call["local_files_only"])
         self.assertEqual(result.local_path, snapshot_dir)
         self.assertTrue(any(event.get("stage") == "snapshot-progress" for event in progress_events))
         self.assertTrue(any(event.get("completedFileCount") == 2 for event in progress_events))
+
+    def test_structured_snapshot_tqdm_reports_byte_progress(self) -> None:
+        progress_events: list[dict] = []
+        tqdm_class = _create_structured_snapshot_tqdm(
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            "checkpoint",
+            progress_events.append,
+        )
+
+        progress = tqdm_class(total=100, unit="B")
+        progress.update(25)
+        progress.close()
+
+        byte_progress = [event for event in progress_events if event.get("progressUnit") == "bytes"]
+        self.assertGreaterEqual(len(byte_progress), 1)
+        self.assertEqual(byte_progress[-1]["downloadedBytes"], 25)
+        self.assertEqual(byte_progress[-1]["totalBytes"], 100)
+        self.assertEqual(byte_progress[-1]["downloadPercent"], 25)
+
+    def test_structured_huggingface_file_progress_bridges_http_byte_progress(self) -> None:
+        import huggingface_hub.file_download as file_download
+
+        progress_events: list[dict] = []
+        original_context = file_download._get_progress_bar_context
+
+        with _structured_huggingface_file_progress(
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            "checkpoint",
+            progress_events.append,
+        ):
+            with file_download._get_progress_bar_context(
+                desc="sd_xl_base_1.0.safetensors",
+                log_level=20,
+                total=100,
+                initial=10,
+                unit="B",
+                unit_scale=True,
+                name="huggingface_hub.http_get",
+            ) as progress:
+                progress.update(20)
+
+        self.assertIs(file_download._get_progress_bar_context, original_context)
+        byte_progress = [event for event in progress_events if event.get("progressUnit") == "bytes"]
+        self.assertGreaterEqual(len(byte_progress), 1)
+        self.assertEqual(byte_progress[-1]["stage"], "snapshot-progress")
+        self.assertEqual(byte_progress[-1]["downloadedBytes"], 30)
+        self.assertEqual(byte_progress[-1]["totalBytes"], 100)
+        self.assertEqual(byte_progress[-1]["downloadName"], "sd_xl_base_1.0.safetensors")
+        self.assertEqual(byte_progress[-1]["downloadBackend"], "http")
 
     def test_structured_snapshot_tqdm_supports_concurrent_download_lock_protocol(self) -> None:
         from tqdm.contrib.concurrent import ensure_lock
@@ -292,6 +350,7 @@ class LocalTextGenerationTests(unittest.TestCase):
             environ,
             {
                 "HF_HUB_CACHE": str(cache_root),
+                "HF_XET_CACHE": str(cache_root / "xet-cache"),
                 "AI_SYSTEM_BUILDER_HF_DOWNLOAD_PROGRESS_INTERVAL_SECONDS": "0.01",
             },
         ):
@@ -309,7 +368,31 @@ class LocalTextGenerationTests(unittest.TestCase):
         self.assertGreaterEqual(len(cache_progress), 1)
         self.assertEqual(cache_progress[-1]["observedFileCount"], 1)
         self.assertEqual(cache_progress[-1]["observedTotalBytes"], 9)
+        self.assertEqual(cache_progress[-1]["observedHubTotalBytes"], 9)
+        self.assertEqual(cache_progress[-1]["observedXetTotalBytes"], 0)
         self.assertEqual(cache_progress[-1]["profile"], "checkpoint")
+
+    def test_checkpoint_validation_rejects_only_small_auxiliary_lora_files(self) -> None:
+        snapshot_path = Path.cwd() / "artifacts" / "hf-checkpoint-validation-test"
+        rmtree(snapshot_path, ignore_errors=True)
+        self.addCleanup(lambda: rmtree(snapshot_path, ignore_errors=True))
+        snapshot_path.mkdir(parents=True)
+        (snapshot_path / "sd_xl_offset_example-lora_1.0.safetensors").write_bytes(b"small")
+
+        with patch.dict(environ, {"AI_SYSTEM_BUILDER_HF_CHECKPOINT_MIN_BYTES": "100"}):
+            with self.assertRaisesRegex(RuntimeError, "Auxiliary LoRA/adapter files"):
+                _validate_snapshot_profile_result(
+                    LocalModelConfig(provider="transformers", modelId="stabilityai/stable-diffusion-xl-base-1.0"),
+                    CHECKPOINT_SNAPSHOT_PROFILE,
+                    str(snapshot_path),
+                )
+
+            (snapshot_path / "sd_xl_base_1.0.safetensors").write_bytes(b"x" * 101)
+            _validate_snapshot_profile_result(
+                LocalModelConfig(provider="transformers", modelId="stabilityai/stable-diffusion-xl-base-1.0"),
+                CHECKPOINT_SNAPSHOT_PROFILE,
+                str(snapshot_path),
+            )
 
     def test_model_download_reports_cache_miss_cause_before_snapshot_download(self) -> None:
         calls: list[dict] = []
