@@ -20,3 +20,5 @@ export * as settings from "./settings";
 export * as model from "./model";
 
 export * as runtimeInstaller from "./runtime-installer";
+
+export * as security from "./security";

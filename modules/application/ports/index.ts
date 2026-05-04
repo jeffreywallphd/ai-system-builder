@@ -20,3 +20,4 @@ export * from "./image-generation";
 export * from "./image";
 
 export * from "./runtime-installer";
+export * from "./security";
