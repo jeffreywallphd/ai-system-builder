@@ -1,10 +1,16 @@
 import { existsSync, readFileSync } from "node:fs";
+import http from "node:http";
+import https from "node:https";
 import path from "node:path";
 
 import express from "express";
 
 import { composeServerHost } from "../../../modules/hosts/server";
-import { applySecurityHeaders, registerSecurityRoutes } from "../../../modules/adapters/transport/api-express/security";
+import {
+  applySecurityHeaders,
+  createHttpsServerOptions,
+  registerSecurityRoutes,
+} from "../../../modules/adapters/transport/api-express/security";
 import { composeServerSecurity } from "../../../modules/hosts/server/security/composeServerSecurity";
 import type { LoggingPort } from "../../../modules/application/ports/logging";
 import type { StructuredLogSink } from "../../../modules/adapters/observability/logging";
@@ -38,6 +44,8 @@ export interface CreatedServer {
   config: ServerRuntimeConfig;
   loggingPort: LoggingPort;
 }
+
+export type ServerListener = http.Server | https.Server;
 
 interface ServerRootResolutionOptions {
   cwd?: string;
@@ -192,4 +200,12 @@ export async function createServer(options: CreateServerOptions = {}): Promise<C
     config,
     loggingPort: serverHost.loggingPort,
   };
+}
+
+export function createServerListener(createdServer: CreatedServer): ServerListener {
+  if (createdServer.config.security.httpsEnabled) {
+    return https.createServer(createHttpsServerOptions(createdServer.config.security.tlsMaterial), createdServer.app);
+  }
+
+  return http.createServer(createdServer.app);
 }

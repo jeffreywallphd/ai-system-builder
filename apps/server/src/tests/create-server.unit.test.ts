@@ -92,7 +92,7 @@ describe("resolveServerRuntimeConfig", () => {
 
   it("createServer exposes the composed server logging port", async () => {
     const emittedEvents: StructuredLogEvent[] = [];
-    const { loggingPort } = createServer({
+    const { loggingPort } = await createServer({
       env: {},
       now: () => "2026-05-03T00:00:00.000Z",
       logSink: (_serializedEvent, event) => {
@@ -123,7 +123,7 @@ describe("resolveServerRuntimeConfig", () => {
     ]);
   });
 
-  it("createServer passes explicit environment into server runtime composition", () => {
+  it("createServer passes explicit environment into server runtime composition", async () => {
     const previousPythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL;
     process.env.PYTHON_RUNTIME_BASE_URL = "http://127.0.0.1:49999";
     const emittedEvents: StructuredLogEvent[] = [];
@@ -131,7 +131,7 @@ describe("resolveServerRuntimeConfig", () => {
     const runtimeRootDirectory = path.resolve("tmp/server-env-runtime");
 
     try {
-      createServer({
+      await createServer({
         env: {
           SERVER_STORAGE_ROOT: storageRootDirectory,
           SERVER_RUNTIME_ROOT: runtimeRootDirectory,
@@ -169,6 +169,7 @@ describe("resolveServerRuntimeConfig", () => {
   it("index startup log uses structured server host logging", () => {
     const source = readFileSync(path.resolve("apps/server/src/index.ts"), "utf8");
     expect(source).toContain("loggingPort.log");
+    expect(source).toContain("createServerListener");
     expect(source).toContain("server.http.listening");
     expect(source).toContain("config.runtimeRootDirectory");
     expect(source).not.toContain("console.log");
