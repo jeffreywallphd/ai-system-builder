@@ -117,7 +117,8 @@ class WorkerAppTests(unittest.TestCase):
             },
         )
 
-        def fake_download(_model_config, on_progress=None):
+        def fake_download(_model_config, on_progress=None, download_context=None):
+            del download_context
             if on_progress is not None:
                 on_progress(
                     {

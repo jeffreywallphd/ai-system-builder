@@ -465,7 +465,7 @@ export function composeDesktopHost(
     ...process.env,
     PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.host,
     PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port,
-    HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? "1",
+    ...(process.env.HF_HUB_DISABLE_XET ? { HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET } : {}),
     HF_HUB_DISABLE_SYMLINKS_WARNING: process.env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
   };
   const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({

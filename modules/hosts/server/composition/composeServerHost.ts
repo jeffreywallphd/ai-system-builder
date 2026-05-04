@@ -585,7 +585,8 @@ export function composeServerHost(
         PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port || "43111",
         HF_HOME: hfHome,
         TRANSFORMERS_CACHE: transformersCache,
-        HF_HUB_DISABLE_XET: env.HF_HUB_DISABLE_XET ?? "1",
+        ...(env.HF_HUB_DISABLE_XET ? { HF_HUB_DISABLE_XET: env.HF_HUB_DISABLE_XET } : {}),
+        HF_XET_CACHE: env.HF_XET_CACHE?.trim() || joinHostPath(pythonRuntimeRoot, "xet"),
         HF_HUB_DISABLE_SYMLINKS_WARNING: env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
       };
       const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({

@@ -375,6 +375,7 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start()");
     expect(source).toContain("requiredCapabilities: PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES");
     expect(source).toContain("HF_HUB_DISABLE_XET");
+    expect(source).not.toContain("HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? \"1\"");
     expect(source).toContain("PrepareTrainingDatasetFromArtifactsUseCase");
     expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
   });
