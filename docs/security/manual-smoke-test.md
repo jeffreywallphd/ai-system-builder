@@ -88,3 +88,61 @@
 
 
 No automatic trust-store installation is performed. Trust installation is manual; browser/mobile trust limitations apply. Do not commit private keys or SERVER_TOKEN_HASH_SECRET.
+
+## Thin-client Vite HTTP/HTTPS smoke (with HTTPS server API)
+
+### HTTP thin-client + HTTPS API
+
+Terminal 1:
+
+```bash
+AI_SYSTEM_BUILDER_SECURITY_MODE=disabled-dev \
+AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
+npm run dev:server
+```
+
+Terminal 2:
+
+```bash
+AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
+npm run dev:thin-client
+```
+
+Open `http://localhost:5173`.
+
+Expected:
+
+- Vite reports `http://localhost:5173`.
+- Server security page/status shows API HTTPS enabled.
+
+### HTTPS thin-client + HTTPS API
+
+Terminal 2 (thin-client HTTPS enabled):
+
+```bash
+AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED=true \
+AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_CERT_PATH=/path/to/cert.pem \
+AI_SYSTEM_BUILDER_THIN_CLIENT_TLS_KEY_PATH=/path/to/key.pem \
+AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
+AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
+npm run dev:thin-client
+```
+
+Open `https://localhost:5173`.
+
+Expected:
+
+- Vite reports `https://localhost:5173`.
+- Browser may still show a trust warning for self-signed/untrusted certs.
+- Server security page/status still shows API HTTPS enabled.
+
+Notes:
+
+- You may reuse server-generated dev cert/key for thin-client HTTPS if cert SANs include `localhost`.
+- Thin-client cert/key paths must be set explicitly; they are not auto-discovered.
+- `auto-local-ca` requires manual CA trust installation.
+- Switching thin-client HTTP/HTTPS mode requires restarting `npm run dev:thin-client`.
+- Do not commit or log private keys.
+- This is development-only TLS support, not production/public-internet hardening.
