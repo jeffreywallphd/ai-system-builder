@@ -42,7 +42,8 @@ class HuggingFaceModelClientUnavailableError extends HuggingFaceModelProviderErr
 }
 
 type HuggingFaceModelOperation = "browseModels" | "getModelDetails";
-type HuggingFaceFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type HuggingFaceFetchInput = Parameters<typeof fetch>[0];
+type HuggingFaceFetch = (input: HuggingFaceFetchInput, init?: RequestInit) => Promise<Response>;
 
 interface HuggingFaceModelListEntry {
   id?: string;
@@ -445,7 +446,7 @@ async function collectListModels(iterableLike: unknown): Promise<HuggingFaceMode
   throw new Error("Hugging Face listModels returned unsupported shape.");
 }
 
-function summarizeFetchUrl(input: RequestInfo | URL): Record<string, unknown> {
+function summarizeFetchUrl(input: HuggingFaceFetchInput): Record<string, unknown> {
   const rawUrl = typeof input === "string"
     ? input
     : input instanceof URL
