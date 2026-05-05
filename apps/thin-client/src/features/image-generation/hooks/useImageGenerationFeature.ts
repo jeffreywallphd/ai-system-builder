@@ -267,8 +267,10 @@ export function useImageGenerationFeature(
       return false;
     }
     finalizedByRequestRef.current.add(id);
-    const assets = (finalized.assets ?? []).map((asset, index) => ({ ...asset, source: `${name.trim()}-${index + 1}` }));
+    const displayName = name.trim();
+    const assets = (finalized.assets ?? []).map((asset) => ({ ...asset, source: displayName }));
     setResults(assets);
+    setRuntimeOutputPreviews([]);
     setStatus("finalized");
     onGenerated?.(assets);
     return true;
