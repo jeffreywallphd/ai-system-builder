@@ -9,17 +9,21 @@ describe("api image generation client", () => {
       .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { requestId: "r1" } }) })
       .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { requestId: "r1", taskType: "image-generation", status: "running", concurrencyClass: "gpu" } }) })
       .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { cancelled: true, message: "done" } }) })
-      .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { finalized: true, assets: [{ assetId: "a1", artifactId: "art1", storageKey: "k1", mediaType: "image/png" }] } }) });
+      .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { finalized: true, assets: [{ assetId: "a1", artifactId: "art1", storageKey: "k1", mediaType: "image/png" }] } }) })
+      .mockResolvedValueOnce({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { unloaded: true, message: "released" } }) });
     vi.stubGlobal("fetch", fetchMock);
     const c = createApiImageGenerationClient();
     const started = await c.startImageGeneration({ prompt: "cat" });
     const read = await c.readImageGeneration({ requestId: "r1" });
     const cancelled = await c.cancelImageGeneration({ requestId: "r1" });
     const fin = await c.finalizeImageGenerationIfCompleted({ requestId: "r1" });
+    const unloaded = await c.unloadModel();
     expect(started.requestId).toBe("r1");
     expect(read.requestId).toBe("r1");
     expect(cancelled.cancelled).toBe(true);
     expect(fin.finalized).toBe(true);
+    expect(unloaded.unloaded).toBe(true);
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/image-generation/unload-model");
     expect(c.createArtifactMediaViewUrl("foo/bar")).toBe("/api/artifact/media/view?storageKey=foo%2Fbar");
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
       headers: expect.objectContaining({ "x-client-source": "thin-client.image-generation" }),

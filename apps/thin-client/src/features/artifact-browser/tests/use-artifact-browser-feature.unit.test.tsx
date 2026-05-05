@@ -26,7 +26,7 @@ describe("ArtifactBrowserFeature", () => {
     mountedContainer = undefined;
   });
 
-  it("does not expose publish controls while showing published backing details", async () => {
+  it("exposes publish controls while showing published backing details", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
@@ -113,7 +113,7 @@ describe("ArtifactBrowserFeature", () => {
       artifactButton.click();
     });
 
-    expect(container.textContent).not.toContain("Publish to Hugging Face");
+    expect(container.textContent).toContain("Publish to Hugging Face");
     expect(container.textContent).toContain("Published Backing");
     expect(container.textContent).toContain("openai/demo");
     expect(container.textContent).toContain("Not yet verified");
@@ -223,7 +223,7 @@ describe("ArtifactBrowserFeature", () => {
     expect(client.clearHuggingFaceToken).toHaveBeenCalled();
   });
 
-  it("does not render the publish action in the artifact detail panel", async () => {
+  it("publishes a selected local artifact from the artifact detail panel", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
@@ -268,7 +268,26 @@ describe("ArtifactBrowserFeature", () => {
     });
 
     expect(container.textContent).toContain("Delete artifact");
-    expect(container.textContent).not.toContain("Publish to Hugging Face");
+    const publishToggle = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Publish to Hugging Face") as HTMLButtonElement;
+    await act(async () => {
+      publishToggle.click();
+    });
+    const repositoryInput = Array.from(container.querySelectorAll("input"))
+      .find((input) => input.getAttribute("placeholder") === "owner/repository") as HTMLInputElement;
+    setInputValue(repositoryInput, "openai/demo");
+    const publishButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    await act(async () => {
+      publishButton.click();
+    });
+    expect(client.publishArtifactToHuggingFace).toHaveBeenCalledWith({
+      artifactId: "uploads/cat.png",
+      repository: "openai/demo",
+      path: "cat.png",
+      revision: "main",
+      mediaType: "",
+    });
   });
 
   it("re-checks published backing existence from the artifact detail panel", async () => {

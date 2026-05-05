@@ -53,6 +53,7 @@ export function useImageGenerationFeature(
   const [error, setError] = useState<string | undefined>(undefined);
   const [results, setResults] = useState<FinalizedImageAsset[]>([]);
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
+  const [unloadModelState, setUnloadModelState] = useState<{ status: "idle" | "loading" | "success" | "error"; message?: string }>({ status: "idle" });
 
   const mountedRef = useRef(true);
   const activeRequestRef = useRef<string | undefined>(undefined);
@@ -182,6 +183,24 @@ export function useImageGenerationFeature(
     try { await client.cancelImageGeneration({ requestId: id }); } catch { }
   }, [client, requestId]);
 
+  const unloadModel = useCallback(async () => {
+    setUnloadModelState({ status: "loading", message: "Unloading image generation model..." });
+    try {
+      const result = await client.unloadModel();
+      if (!mountedRef.current) return;
+      setUnloadModelState({
+        status: "success",
+        message: result.message ?? "Image generation model unloaded.",
+      });
+    } catch (cause) {
+      if (!mountedRef.current) return;
+      setUnloadModelState({
+        status: "error",
+        message: cause instanceof Error ? cause.message : "Failed to unload image generation model.",
+      });
+    }
+  }, [client]);
+
   useEffect(() => {
     if (!hasAttemptedGeneration) return;
     setError(validationError);
@@ -198,5 +217,5 @@ export function useImageGenerationFeature(
   const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !isImageGenerationModelReady(m)), [imageGenerationModels]);
   const imageGenerationModelOptions = useMemo(() => imageGenerationModels.map(toImageGenerationModelDropdownOption).filter((option): option is NonNullable<typeof option> => Boolean(option)), [imageGenerationModels]);
 
-  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, cancel, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions };
+  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, cancel, unloadModel, unloadModelState, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions };
 }

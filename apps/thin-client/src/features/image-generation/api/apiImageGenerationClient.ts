@@ -31,11 +31,17 @@ export interface CancelImageGenerationResult {
   status?: string;
 }
 
+export interface UnloadImageGenerationModelResult {
+  unloaded: boolean;
+  message?: string;
+}
+
 export interface ImageGenerationApiClient {
   startImageGeneration: (input: ImageGenerationRequest, context?: { source?: string }) => Promise<{ requestId: string }>;
   readImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<RuntimeTaskRecord>;
   cancelImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<CancelImageGenerationResult>;
   finalizeImageGenerationIfCompleted: (input: { requestId: string }, context?: { source?: string }) => Promise<FinalizeImageGenerationResult>;
+  unloadModel: (context?: { source?: string }) => Promise<UnloadImageGenerationModelResult>;
   createArtifactMediaViewUrl: (storageKey: string) => string;
 }
 
@@ -99,6 +105,11 @@ function expectCancelResult(value: unknown): CancelImageGenerationResult {
   return value as unknown as CancelImageGenerationResult;
 }
 
+function expectUnloadModelResult(value: unknown): UnloadImageGenerationModelResult {
+  if (!isRecord(value) || typeof value.unloaded !== "boolean") throw new Error("Image generation unload response is malformed.");
+  return value as unknown as UnloadImageGenerationModelResult;
+}
+
 function expectFinalizeResult(value: unknown): FinalizeImageGenerationResult {
   if (!isRecord(value) || typeof value.finalized !== "boolean") throw new Error("Image generation finalize response is malformed.");
   return value as unknown as FinalizeImageGenerationResult;
@@ -124,6 +135,10 @@ export function createApiImageGenerationClient(options: { apiBaseUrl?: string; s
     async finalizeImageGenerationIfCompleted(input, context) {
       const { envelope, status, endpoint } = await postJson(apiBaseUrl, "/image-generation/finalize", { ...input }, context?.source ?? source);
       return ensureSuccess(envelope, status, endpoint, expectFinalizeResult);
+    },
+    async unloadModel(context) {
+      const { envelope, status, endpoint } = await postJson(apiBaseUrl, "/image-generation/unload-model", {}, context?.source ?? source);
+      return ensureSuccess(envelope, status, endpoint, expectUnloadModelResult);
     },
     createArtifactMediaViewUrl(storageKey) {
       return `${createApiUrl(apiBaseUrl, "/artifact/media/view")}?storageKey=${encodeURIComponent(storageKey)}`;

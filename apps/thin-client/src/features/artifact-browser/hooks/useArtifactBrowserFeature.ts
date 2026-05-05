@@ -50,7 +50,12 @@ export interface UseArtifactBrowserFeatureResult {
   confirmPendingDelete: () => Promise<void>;
   cancelPendingDelete: () => void;
   setDeleteConfirmationInput: (value: string) => void;
-  publishArtifactToHuggingFace: () => Promise<void>;
+  publishArtifactToHuggingFace: (input?: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<void>;
   registerArtifactFromHuggingFace: (input?: {
     repository?: string;
     pathInRepo?: string;
@@ -454,8 +459,13 @@ export function useArtifactBrowserFeature(
     }
   }
 
-  async function publishArtifactToHuggingFace(): Promise<void> {
-    await publishLogic.publishArtifactToHuggingFace();
+  async function publishArtifactToHuggingFace(input?: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }): Promise<void> {
+    await publishLogic.publishArtifactToHuggingFace(input);
     await refreshArtifacts();
   }
 

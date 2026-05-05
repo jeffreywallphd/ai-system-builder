@@ -39,6 +39,7 @@ export interface RegisterExpressApiDependencies {
   localizeArtifactFromRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["localizeArtifactFromRepoUseCase"];
   generateImageUseCase: RegisterImageGenerationApiRoutesDependencies["generateImageUseCase"];
   imageGenerationFinalizationOrchestrator?: RegisterImageGenerationApiRoutesDependencies["imageGenerationFinalizationOrchestrator"];
+  imageGenerationRuntimeControl?: RegisterImageGenerationApiRoutesDependencies["imageGenerationRuntimeControl"];
   browseModelsUseCase: RegisterModelManagementApiRoutesDependencies["browseModelsUseCase"];
   getModelDetailsUseCase: RegisterModelManagementApiRoutesDependencies["getModelDetailsUseCase"];
   listModelsUseCase: RegisterModelManagementApiRoutesDependencies["listModelsUseCase"];
@@ -102,5 +103,6 @@ export function registerExpressApi(
     app: dependencies.app,
     generateImageUseCase: dependencies.generateImageUseCase,
     imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
+    imageGenerationRuntimeControl: dependencies.imageGenerationRuntimeControl,
   });
 }

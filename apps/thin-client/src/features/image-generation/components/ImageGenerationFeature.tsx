@@ -148,7 +148,13 @@ export function ImageGenerationFeature({
         <button className="ui-button" type="button" onClick={() => onNavigateToArtifacts?.()}>
           Open Artifacts
         </button>
+        <button className="ui-button" type="button" onClick={() => void feature.unloadModel()} disabled={feature.isUnloadModelDisabled}>
+          {feature.unloadModelState.status === "loading" ? "Unloading model..." : "Unload model"}
+        </button>
       </div>
+      {feature.unloadModelState.message ? (
+        <p role={feature.unloadModelState.status === "error" ? "alert" : "status"}>{feature.unloadModelState.message}</p>
+      ) : null}
 
       <h3>Status</h3>
       <p>

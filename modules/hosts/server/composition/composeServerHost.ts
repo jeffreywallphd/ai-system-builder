@@ -621,8 +621,18 @@ export function composeServerHost(
           return activeRuntimeDeviceMode ?? runtimeDeviceMode;
         },
       };
+      const comfyUiClient = createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl });
+      const imageGenerationRuntimeControl = {
+        async unloadModel() {
+          if (!comfyUiSupervisor?.isRunning()) {
+            return { unloaded: true, message: "No running ComfyUI runtime process has a loaded model." };
+          }
+          await comfyUiClient.unloadModels();
+          return { unloaded: true, message: "ComfyUI model memory was released." };
+        },
+      };
       const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
-        client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
+        client: comfyUiClient,
         supervisor: comfyUiSupervisorPort,
         mapperOptions: { defaultCheckpoint: env.COMFYUI_DEFAULT_CHECKPOINT },
       });
@@ -784,6 +794,7 @@ export function composeServerHost(
         deleteModelRecordUseCase,
         generateImageUseCase,
         imageGenerationFinalizationOrchestrator,
+        imageGenerationRuntimeControl,
         modelManagementLogger,
       });
     },

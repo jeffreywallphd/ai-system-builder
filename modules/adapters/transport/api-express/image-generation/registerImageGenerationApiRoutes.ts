@@ -7,8 +7,9 @@ const API_IMAGE_GENERATION_START_OPERATION = "image-generation.start" as const;
 const API_IMAGE_GENERATION_READ_OPERATION = "image-generation.read" as const;
 const API_IMAGE_GENERATION_CANCEL_OPERATION = "image-generation.cancel" as const;
 const API_IMAGE_GENERATION_FINALIZE_OPERATION = "image-generation.finalize-if-completed" as const;
+const API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION = "image-generation.unload-model" as const;
 
-type ImageGenerationOperation = typeof API_IMAGE_GENERATION_START_OPERATION | typeof API_IMAGE_GENERATION_READ_OPERATION | typeof API_IMAGE_GENERATION_CANCEL_OPERATION | typeof API_IMAGE_GENERATION_FINALIZE_OPERATION;
+type ImageGenerationOperation = typeof API_IMAGE_GENERATION_START_OPERATION | typeof API_IMAGE_GENERATION_READ_OPERATION | typeof API_IMAGE_GENERATION_CANCEL_OPERATION | typeof API_IMAGE_GENERATION_FINALIZE_OPERATION | typeof API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION;
 
 interface ExpressRequestLike { body?: unknown; headers?: Record<string, string | string[] | undefined>; }
 interface ExpressResponseLike { status: (code: number) => ExpressResponseLike; json: (body: unknown) => void; }
@@ -18,6 +19,9 @@ export interface RegisterImageGenerationApiRoutesDependencies {
   app: ExpressRoutePort;
   generateImageUseCase: Pick<GenerateImageUseCase, "startImageGeneration" | "readImageGeneration" | "cancelImageGeneration">;
   imageGenerationFinalizationOrchestrator?: Pick<ImageGenerationFinalizationOrchestratorService, "finalizeIfCompleted">;
+  imageGenerationRuntimeControl?: {
+    unloadModel: () => Promise<{ unloaded: boolean; message?: string }>;
+  };
 }
 
 const getHeader = (h: ExpressRequestLike["headers"], k: string) => Array.isArray(h?.[k]) ? h?.[k][0] : h?.[k];
@@ -118,6 +122,24 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unexpected error.";
       const apiResponse = failure(API_IMAGE_GENERATION_FINALIZE_OPERATION, mapFailureCode(error), message, context);
+      response.status(statusCode(apiResponse)).json(apiResponse);
+    }
+  });
+
+  dependencies.app.post("/api/image-generation/unload-model", async (request, response) => {
+    const context = contextFrom(request);
+    try {
+      if (!dependencies.imageGenerationRuntimeControl) {
+        const apiResponse = failure(API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION, "unavailable", "Image generation runtime control is unavailable.", context);
+        response.status(statusCode(apiResponse)).json(apiResponse);
+        return;
+      }
+      const value = await dependencies.imageGenerationRuntimeControl.unloadModel();
+      const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION, value, context);
+      response.status(statusCode(apiResponse)).json(apiResponse);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unexpected error.";
+      const apiResponse = failure(API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION, mapFailureCode(error), message, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
