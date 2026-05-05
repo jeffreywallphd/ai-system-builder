@@ -72,7 +72,10 @@ export async function startCompiledServer(options) {
   const compiledServerModule = requireFromRoot(paths.serverCreateServerPath);
   assertCompiledServerModule(compiledServerModule, paths.serverCreateServerPath);
 
-  const createdServer = await compiledServerModule.createServer({ env });
+  const createdServer = await compiledServerModule.createServer({
+    env,
+    restartServer: options.restartServer,
+  });
   const listener = compiledServerModule.createServerListener(createdServer);
 
   await new Promise((resolve, reject) => {
@@ -148,6 +151,7 @@ export function startServerDevRunner(options = {}) {
           env,
           stderr,
           requireFromRoot,
+          restartServer: restartCompiledServer,
         });
       })
       .catch((error) => {

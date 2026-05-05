@@ -13,6 +13,7 @@ import {
 import { registerImageGenerationApiRoutes, type RegisterImageGenerationApiRoutesDependencies } from "./image-generation/registerImageGenerationApiRoutes";
 import { registerModelManagementApiRoutes, type RegisterModelManagementApiRoutesDependencies } from "./model/registerModelManagementApiRoutes";
 import { registerApplicationSettingsApiRoutes, type RegisterApplicationSettingsApiRoutesDependencies } from "./settings/registerApplicationSettingsApiRoutes";
+import { registerServerControlApiRoutes, type RegisterServerControlApiRoutesDependencies } from "./server-control/registerServerControlApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -20,7 +21,8 @@ export interface RegisterExpressApiDependencies {
     & RegisterArtifactRepoApiRoutesDependencies["app"]
     & RegisterImageGenerationApiRoutesDependencies["app"]
     & RegisterModelManagementApiRoutesDependencies["app"]
-    & RegisterApplicationSettingsApiRoutesDependencies["app"];
+    & RegisterApplicationSettingsApiRoutesDependencies["app"]
+    & RegisterServerControlApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -56,6 +58,7 @@ export interface RegisterExpressApiDependencies {
   readSettingsUseCase?: RegisterApplicationSettingsApiRoutesDependencies["readSettingsUseCase"];
   updateSettingUseCase?: RegisterApplicationSettingsApiRoutesDependencies["updateSettingUseCase"];
   clearSettingUseCase?: RegisterApplicationSettingsApiRoutesDependencies["clearSettingUseCase"];
+  restartServer?: RegisterServerControlApiRoutesDependencies["restartServer"];
 }
 
 export function registerExpressApi(
@@ -126,4 +129,9 @@ export function registerExpressApi(
       clearSettingUseCase: dependencies.clearSettingUseCase,
     });
   }
+
+  registerServerControlApiRoutes({
+    app: dependencies.app,
+    restartServer: dependencies.restartServer,
+  });
 }

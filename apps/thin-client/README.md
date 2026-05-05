@@ -9,14 +9,14 @@ Current scope:
 - feature-local artifact upload workflow under `src/features/artifact-upload/`
 - feature-local artifact browser workflow under `src/features/artifact-browser/`
 - fetch-based HTTP artifact-upload client that calls the server API route (`/api/artifact/upload`)
-- artifact publish flow that calls `POST /api/artifact/publish` and surfaces published backing details
 - artifact publish verification/re-check flow that calls `POST /api/artifact/publish/verify`
 - imported-source verification/re-check flow that calls `POST /api/artifact/source/verify`
 - artifact detail panel can render persisted published backing metadata from server-side binding records
 - artifact register/import flow that calls `POST /api/artifact/register-from-repo` and refreshes artifact-browser selection on success
 - imported artifact localize/download flow that calls `POST /api/artifact/localize-from-repo` when remote-source artifacts do not yet have local bytes
 - artifact browser list/detail now surfaces minimal artifact-first backing-state cues (`Remote only`, `Localized`, `Published`) and local object availability/localization state
-- artifact-browser publish/re-check state orchestration now uses a shared cross-host hook from `modules/ui/shared`
+- artifact-browser published-backing re-check state orchestration uses a shared cross-host hook from `modules/ui/shared`
+- settings page server restart control that calls `POST /api/server/restart`
 - token-first style baseline under `src/styles/`
 
 ## Hugging Face auth behavior
@@ -71,14 +71,6 @@ From this workspace directly:
 - `npm run dev`
 - `npm run build`
 - `npm run preview`
-
-
-## Hugging Face token configuration UI
-
-- Artifact Browser now includes a **Hugging Face token** section that shows configured/not-configured status and masked token state.
-- Use **Save token** to configure/update token and **Clear token** to remove it.
-- Token source of truth is server-side config (`/api/config/huggingface-token`), not browser-local state.
-- Auth-required artifact errors now direct users to this in-product token settings path.
 
 
 ## Thin-client Vite HTTPS development examples

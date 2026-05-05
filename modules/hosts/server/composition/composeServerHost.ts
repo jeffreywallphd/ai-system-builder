@@ -161,6 +161,7 @@ export interface ComposeServerHostOptions {
   logSink?: StructuredLogSink;
   now?: () => string;
   artifactRepo?: ComposeServerHostArtifactRepoOptions;
+  restartServer?: () => void | Promise<void>;
   settings?: {
     localSettingsFilePath?: string;
   };
@@ -877,6 +878,7 @@ export function composeServerHost(
         updateSettingUseCase,
         clearSettingUseCase,
         modelManagementLogger,
+        restartServer: options.restartServer,
       });
     },
   };

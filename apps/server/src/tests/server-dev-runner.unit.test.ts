@@ -60,8 +60,9 @@ describe("server dev runner", () => {
         callback();
       }),
     });
-    const createServer = testDouble.fn(async (options: { env: typeof env }) => {
-      expect(options).toEqual({ env });
+    const createServer = testDouble.fn(async (options: { env: typeof env; restartServer?: () => void }) => {
+      expect(options.env).toBe(env);
+      expect(options.restartServer).toBeUndefined();
       return createdServer;
     });
     const createServerListener = testDouble.fn((actualCreatedServer: typeof createdServer) => {
