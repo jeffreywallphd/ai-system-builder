@@ -7,6 +7,7 @@ import {
   isImageGenerationModelReady,
   toImageGenerationModelDropdownOption,
 } from "../../../../../../modules/ui/shared";
+import { createApiArtifactBrowserClient, type ArtifactBrowserApiClient, type ThinClientArtifactBrowseItem } from "../../artifact-browser/api/apiArtifactBrowserClient";
 import { createApiModelManagementClient, type ModelManagementApiClient } from "../../model-management/api/apiModelManagementClient";
 import { createApiImageGenerationClient, type FinalizedImageAsset, type ImageGenerationApiClient } from "../api/apiImageGenerationClient";
 
@@ -14,10 +15,11 @@ const POLL_INTERVAL_MS = 1200;
 type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "finalizing" | "finalized" | "failed" | "cancelled";
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
-export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; sampler: string; scheduler: string; model: string; numImages: string }
+export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; cfg: string; denoise: string; sampler: string; scheduler: string; model: string; numImages: string; latentSourceArtifactId: string }
 export type ImageGenerationRuntimeMode = "auto" | "cpu" | "cuda" | "directml";
 const defaultImageGenerationClient = createApiImageGenerationClient();
 const defaultModelManagementClient = createApiModelManagementClient();
+const defaultArtifactBrowserClient = createApiArtifactBrowserClient();
 
 export function isServerInventoryImageGenerationModel(model: ModelInventoryRecord): boolean {
   return isImageGenerationModelCandidate(model);
@@ -41,13 +43,17 @@ export function useImageGenerationFeature(
   client: ImageGenerationApiClient = defaultImageGenerationClient,
   onGenerated?: (assets: FinalizedImageAsset[]) => void,
   modelClient: ModelManagementApiClient = defaultModelManagementClient,
+  artifactClient: ArtifactBrowserApiClient = defaultArtifactBrowserClient,
 ) {
-  const [form, setForm] = useState<ImageGenerationFormState>({ prompt: "", negativePrompt: "", seed: "", width: "512", height: "512", steps: "20", sampler: "euler", scheduler: "normal", model: "", numImages: "1" });
+  const [form, setForm] = useState<ImageGenerationFormState>({ prompt: "", negativePrompt: "", seed: "", width: "512", height: "512", steps: "20", cfg: "8", denoise: "1", sampler: "euler", scheduler: "normal", model: "", numImages: "1", latentSourceArtifactId: "" });
   const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>("cpu");
   const [modelInventory, setModelInventory] = useState<ModelInventoryRecord[]>([]);
   const [modelInventoryLoading, setModelInventoryLoading] = useState(false);
   const [modelInventoryError, setModelInventoryError] = useState<string | undefined>(undefined);
   const [selectedModelRecordId, setSelectedModelRecordId] = useState<string>("");
+  const [imageArtifacts, setImageArtifacts] = useState<ThinClientArtifactBrowseItem[]>([]);
+  const [imageArtifactsLoading, setImageArtifactsLoading] = useState(false);
+  const [imageArtifactsError, setImageArtifactsError] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<UiStatus>("idle");
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -60,6 +66,7 @@ export function useImageGenerationFeature(
   const pollRunIdRef = useRef(0);
   const finalizedByRequestRef = useRef(new Set<string>());
   const modelInventoryRequestRef = useRef(0);
+  const imageArtifactsRequestRef = useRef(0);
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; pollRunIdRef.current += 1; activeRequestRef.current = undefined; }; }, []);
 
@@ -92,10 +99,30 @@ export function useImageGenerationFeature(
 
   useEffect(() => { void refreshModelInventory(); }, [refreshModelInventory]);
 
+  const refreshImageArtifacts = useCallback(async () => {
+    const requestId = ++imageArtifactsRequestRef.current;
+    setImageArtifactsLoading(true);
+    setImageArtifactsError(undefined);
+    try {
+      const items = await artifactClient.browseArtifacts({ artifactFamily: "image" });
+      if (!mountedRef.current || requestId !== imageArtifactsRequestRef.current) return;
+      setImageArtifacts(items.filter((item) => item.artifactFamily === "image" || item.mediaType?.startsWith("image/")));
+    } catch (cause) {
+      if (!mountedRef.current || requestId !== imageArtifactsRequestRef.current) return;
+      setImageArtifactsError(cause instanceof Error ? cause.message : "Failed to load image artifacts.");
+    } finally {
+      if (mountedRef.current && requestId === imageArtifactsRequestRef.current) setImageArtifactsLoading(false);
+    }
+  }, [artifactClient]);
+
+  useEffect(() => { void refreshImageArtifacts(); }, [refreshImageArtifacts]);
+
   const validationError = useMemo(() => {
     if (!form.prompt.trim()) return "Prompt is required.";
     if (!parsePositiveInt(form.width) || !parsePositiveInt(form.height) || !parsePositiveInt(form.steps) || !parsePositiveInt(form.numImages)) return "Width, height, steps, and number of images must be positive integers.";
     if (form.seed.trim() && parseSeed(form.seed) === undefined) return "Seed must be a finite integer when provided.";
+    const cfg = Number(form.cfg); if (!Number.isFinite(cfg) || cfg <= 0) return "CFG must be a positive number.";
+    const denoise = Number(form.denoise); if (!Number.isFinite(denoise) || denoise < 0 || denoise > 1) return "Denoise must be between 0 and 1.";
     return undefined;
   }, [form]);
 
@@ -136,12 +163,15 @@ export function useImageGenerationFeature(
       setError(undefined); setResults([]); setRequestId(undefined); setStatus("starting");
       const payload: ImageGenerationRequest = {
         prompt: form.prompt.trim(), width: parsePositiveInt(form.width)!, height: parsePositiveInt(form.height)!, steps: parsePositiveInt(form.steps)!, numImages: parsePositiveInt(form.numImages)!,
+        cfg: Number(form.cfg), denoise: Number(form.denoise),
         sampler: form.sampler.trim() || "euler", scheduler: form.scheduler.trim() || "normal",
       };
       const seed = parseSeed(form.seed); if (seed !== undefined) payload.seed = seed;
       if (selectedModelRecordId.trim()) payload.model = selectedModelRecordId.trim();
       else if (form.model.trim()) payload.model = form.model.trim();
       if (form.negativePrompt.trim()) payload.negativePrompt = form.negativePrompt.trim();
+      if (form.latentSourceArtifactId.trim()) payload.latentSource = { kind: "artifact", artifactId: form.latentSourceArtifactId.trim() };
+      else payload.latentSource = { kind: "empty" };
       payload.engineHints = { ...(payload.engineHints ?? {}), runtimeDeviceMode: runtimeMode };
 
       const started = await client.startImageGeneration(payload);
@@ -217,5 +247,5 @@ export function useImageGenerationFeature(
   const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !isImageGenerationModelReady(m)), [imageGenerationModels]);
   const imageGenerationModelOptions = useMemo(() => imageGenerationModels.map(toImageGenerationModelDropdownOption).filter((option): option is NonNullable<typeof option> => Boolean(option)), [imageGenerationModels]);
 
-  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, cancel, unloadModel, unloadModelState, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions };
+  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, cancel, unloadModel, unloadModelState, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
 }

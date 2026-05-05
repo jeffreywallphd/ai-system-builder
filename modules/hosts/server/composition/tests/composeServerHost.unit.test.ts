@@ -311,13 +311,13 @@ describe("server runtime/comfy root resolution", () => {
     expect(source).toBe("SERVER_RUNTIME_ROOT");
   });
 
-  it("COMFYUI_INSTALL_ROOT overrides exact install root", () => {
+  it("ignores COMFYUI_INSTALL_ROOT and keeps server ComfyUI under server runtime root", () => {
     const { installRoot, source } = resolveServerComfyUiInstallRoot({
       env: { SERVER_RUNTIME_ROOT: "/tmp/runtime-root", COMFYUI_INSTALL_ROOT: " /tmp/custom-comfy " } as NodeJS.ProcessEnv,
       runtimeRootDirectory: "/app/server-runtime",
     });
-    expect(installRoot).toBe(resolve("/tmp/custom-comfy"));
-    expect(source).toBe("COMFYUI_INSTALL_ROOT");
+    expect(installRoot).toBe(resolve("/tmp/runtime-root", "runtime-installs", "comfyui"));
+    expect(source).toBe("SERVER_RUNTIME_ROOT");
   });
 });
 

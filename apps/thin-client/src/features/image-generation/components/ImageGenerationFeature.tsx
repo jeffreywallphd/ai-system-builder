@@ -92,6 +92,29 @@ export function ImageGenerationFeature({
           </select>
         </div>
 
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-latent-source">Latent source</label>
+          <div>
+            <select
+              className="ui-input"
+              id="image-generation-latent-source"
+              value={feature.form.latentSourceArtifactId}
+              onChange={(event) => setFormValue("latentSourceArtifactId", (event.target as HTMLSelectElement).value)}
+            >
+              <option value="">Empty latent image</option>
+              {feature.imageArtifacts.map((artifact) => (
+                <option key={artifact.storageKey} value={artifact.storageKey}>
+                  {artifact.originalName ?? artifact.storageKey}
+                </option>
+              ))}
+            </select>{" "}
+            <button type="button" className="ui-button" onClick={() => void feature.refreshImageArtifacts()} disabled={feature.imageArtifactsLoading}>
+              Refresh Images
+            </button>
+          </div>
+          {feature.imageArtifactsError ? <p role="alert">{feature.imageArtifactsError}</p> : null}
+        </div>
+
         {[
           ["prompt", "Prompt", "text"],
           ["negativePrompt", "Negative Prompt (optional)", "text"],
@@ -99,6 +122,8 @@ export function ImageGenerationFeature({
           ["width", "Width", "number"],
           ["height", "Height", "number"],
           ["steps", "Steps", "number"],
+          ["cfg", "CFG", "number"],
+          ["denoise", "Denoise", "number"],
           ["sampler", "Sampler", "text"],
           ["scheduler", "Scheduler", "text"],
           ["numImages", "Number of Images", "number"],
