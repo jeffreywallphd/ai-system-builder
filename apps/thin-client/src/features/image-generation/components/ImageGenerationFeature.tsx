@@ -77,6 +77,21 @@ export function ImageGenerationFeature({
           ) : null}
         </div>
 
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-runtime-mode">Runtime mode</label>
+          <select
+            className="ui-input"
+            id="image-generation-runtime-mode"
+            value={feature.runtimeMode}
+            onChange={(event) => feature.setRuntimeMode((event.target as HTMLSelectElement).value as typeof feature.runtimeMode)}
+          >
+            <option value="cpu">CPU</option>
+            <option value="cuda">CUDA</option>
+            <option value="directml">DirectML</option>
+            <option value="auto">Auto</option>
+          </select>
+        </div>
+
         {[
           ["prompt", "Prompt", "text"],
           ["negativePrompt", "Negative Prompt (optional)", "text"],

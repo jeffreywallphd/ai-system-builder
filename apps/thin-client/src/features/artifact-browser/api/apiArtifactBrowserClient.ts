@@ -130,6 +130,7 @@ export interface ArtifactBrowserApiClient {
   browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily }) => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
+  deleteRegisteredArtifact: (locator: ArtifactBrowserLocator) => Promise<{ storageKey: string }>;
   createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator) => string;
   publishArtifactToHuggingFace: (input: {
     artifactId: string;
@@ -301,6 +302,26 @@ export function createApiArtifactBrowserClient(
         }
 
         return content;
+      });
+    },
+
+    async deleteRegisteredArtifact(locator: ArtifactBrowserLocator): Promise<{ storageKey: string }> {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/delete"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ locator, source }),
+      });
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, response.status, "", (value) => {
+        const deleted = value as { storageKey?: unknown };
+        if (!deleted || typeof deleted.storageKey !== "string") {
+          throw new Error("Artifact delete response is missing deleted storage key.");
+        }
+
+        return { storageKey: deleted.storageKey };
       });
     },
 

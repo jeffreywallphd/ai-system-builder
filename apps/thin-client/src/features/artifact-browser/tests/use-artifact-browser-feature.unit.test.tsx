@@ -26,7 +26,7 @@ describe("ArtifactBrowserFeature", () => {
     mountedContainer = undefined;
   });
 
-  it("publishes a selected artifact and shows published backing details", async () => {
+  it("does not expose publish controls while showing published backing details", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
@@ -63,6 +63,7 @@ describe("ArtifactBrowserFeature", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -112,35 +113,13 @@ describe("ArtifactBrowserFeature", () => {
       artifactButton.click();
     });
 
-    const publishToggleButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Publish to Hugging Face") as HTMLButtonElement;
-    await act(async () => {
-      publishToggleButton.click();
-    });
-
-    const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
-
-    const publishButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Publish") as HTMLButtonElement;
-    await act(async () => {
-      publishButton.click();
-    });
-
-    expect(client.publishArtifactToHuggingFace).toHaveBeenCalledWith({
-      artifactId: "uploads/cat.png",
-      repository: "openai/demo",
-      path: "images/cat.png",
-      revision: "main",
-      mediaType: "",
-    });
+    expect(container.textContent).not.toContain("Publish to Hugging Face");
     expect(container.textContent).toContain("Published Backing");
     expect(container.textContent).toContain("openai/demo");
     expect(container.textContent).toContain("Not yet verified");
   });
 
-  it("shows publish failure message", async () => {
+  it("deletes a selected artifact after confirmation", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
@@ -158,10 +137,11 @@ describe("ArtifactBrowserFeature", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
+      deleteRegisteredArtifact: vi.fn().mockResolvedValue({ storageKey: "uploads/cat.png" }),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
-      publishArtifactToHuggingFace: vi.fn().mockRejectedValue(new Error("Missing Hugging Face token.")),
+      publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn(),
       localizeArtifactFromRepo: vi.fn(),
@@ -182,24 +162,24 @@ describe("ArtifactBrowserFeature", () => {
     await act(async () => {
       artifactButton.click();
     });
-    const publishToggleButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Publish to Hugging Face") as HTMLButtonElement;
+    const deleteButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Delete artifact") as HTMLButtonElement;
     await act(async () => {
-      publishToggleButton.click();
+      deleteButton.click();
     });
 
-    const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
+    const confirmationInput = Array.from(container.querySelectorAll("input"))
+      .find((input) => input.getAttribute("placeholder") === "Delete") as HTMLInputElement;
+    setInputValue(confirmationInput, "Delete");
 
-    const publishButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    const confirmButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Confirm delete") as HTMLButtonElement;
     await act(async () => {
-      publishButton.click();
+      confirmButton.click();
     });
 
-    expect(container.textContent).toContain("Missing Hugging Face token.");
-    expect(container.textContent).toContain("This Hugging Face repository may require an access token.");
+    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
+    expect(container.textContent).toContain("Deleted uploads/cat.png.");
   });
 
   it("saves and clears Hugging Face token from token settings", async () => {
@@ -208,6 +188,7 @@ describe("ArtifactBrowserFeature", () => {
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••9999" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -242,19 +223,7 @@ describe("ArtifactBrowserFeature", () => {
     expect(client.clearHuggingFaceToken).toHaveBeenCalled();
   });
 
-  it("disables repeat publish submit while pending", async () => {
-    let resolvePublish: ((value: {
-      target: {
-        provider: string;
-        repository: string;
-        path: string;
-        revision: string;
-        locator: string;
-      };
-      verification: {
-        exists: boolean;
-      };
-    }) => void) | undefined;
+  it("does not render the publish action in the artifact detail panel", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
@@ -272,12 +241,11 @@ describe("ArtifactBrowserFeature", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
-      publishArtifactToHuggingFace: vi.fn().mockImplementation(() => new Promise((resolve) => {
-        resolvePublish = resolve;
-      })),
+      publishArtifactToHuggingFace: vi.fn(),
       verifyPublishedArtifactBacking: vi.fn(),
       registerArtifactFromRepo: vi.fn(),
       localizeArtifactFromRepo: vi.fn(),
@@ -298,38 +266,9 @@ describe("ArtifactBrowserFeature", () => {
     await act(async () => {
       artifactButton.click();
     });
-    const publishToggleButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Publish to Hugging Face") as HTMLButtonElement;
-    await act(async () => {
-      publishToggleButton.click();
-    });
 
-    const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
-
-    const publishButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent === "Publish") as HTMLButtonElement;
-    await act(async () => {
-      publishButton.click();
-    });
-    expect(publishButton.disabled).toBe(true);
-    expect(container.textContent).toContain("Publishing...");
-
-    await act(async () => {
-      resolvePublish?.({
-        target: {
-          provider: "huggingface",
-          repository: "openai/demo",
-          path: "images/cat.png",
-          revision: "main",
-          locator: "openai/demo/images/cat.png",
-        },
-        verification: {
-          exists: true,
-        },
-      });
-    });
+    expect(container.textContent).toContain("Delete artifact");
+    expect(container.textContent).not.toContain("Publish to Hugging Face");
   });
 
   it("re-checks published backing existence from the artifact detail panel", async () => {
@@ -358,6 +297,7 @@ describe("ArtifactBrowserFeature", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=uploads%2Fcat.png"),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -417,6 +357,7 @@ describe("ArtifactBrowserFeature", () => {
       }),
       readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -490,6 +431,7 @@ describe("ArtifactBrowserFeature", () => {
       }),
       readArtifactContent: vi.fn().mockRejectedValue(new Error("missing local bytes")),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -586,6 +528,7 @@ describe("ArtifactBrowserFeature", () => {
       readArtifactDetail: vi.fn(),
       readArtifactContent: vi.fn(),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -662,8 +605,9 @@ describe("ArtifactBrowserFeature", () => {
           locator: { storageKey: "artifacts/20260418000000-local01" },
           availability: "available" as const,
           retrieval: "deferred" as const,
-        }),
+      }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue("/api/artifact/media/view?storageKey=artifacts%2F20260418000000-local01"),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
@@ -762,6 +706,7 @@ describe("ArtifactBrowserFeature", () => {
         retrieval: "deferred" as const,
       }),
       createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      deleteRegisteredArtifact: vi.fn(),
       getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
       setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
       clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),

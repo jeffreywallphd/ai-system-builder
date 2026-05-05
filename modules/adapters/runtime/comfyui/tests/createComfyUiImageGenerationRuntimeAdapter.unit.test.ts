@@ -21,6 +21,25 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
     expect(result).toMatchObject({ requestId: "r1", status: "queued", metadata: { engine: "comfyui", comfyUiPromptId: "p1" } });
   });
 
+  it("passes requested runtime device mode from image generation engine hints", async () => {
+    const supervisor = {
+      ...baseSupervisor,
+      startWithRuntimeDeviceMode: testDouble.fn(async () => {}),
+      getRuntimeDeviceMode: testDouble.fn(() => "cuda"),
+    };
+    const client = { submitPrompt: testDouble.fn(async () => ({ prompt_id: "p1", number: 1 })), getQueue: testDouble.fn(), getHistory: testDouble.fn() };
+    const adapter = createComfyUiImageGenerationRuntimeAdapter({ supervisor, client, mapperOptions: { defaultCheckpoint: "sdxl" } });
+
+    const result = await adapter.startTask({
+      taskType: TaskType.IMAGE_GENERATION,
+      payload: { prompt: "cat", engineHints: { runtimeDeviceMode: "cuda" } },
+      requestId: "r1",
+    });
+
+    expect(supervisor.startWithRuntimeDeviceMode).toHaveBeenCalledWith({ runtimeDeviceMode: "cuda" });
+    expect(result.metadata).toMatchObject({ requestedRuntimeDeviceMode: "cuda", runtimeDeviceMode: "cuda" });
+  });
+
   it("read maps running state", async () => {
     const adapter = createComfyUiImageGenerationRuntimeAdapter({
       supervisor: baseSupervisor,
