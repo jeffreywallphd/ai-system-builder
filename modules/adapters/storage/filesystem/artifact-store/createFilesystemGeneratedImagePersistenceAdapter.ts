@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { GeneratedImagePersistencePort } from "../../../../application/ports/image";
@@ -22,29 +22,32 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
 
   return {
     async persistGeneratedImage({ output }) {
-      const sourcePath = path.resolve(outputRoot, output.subfolder ?? "", output.fileName);
-      const relativeOutput = path.relative(outputRoot, sourcePath);
-      if (relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) throw new Error("ComfyUI output path traversal rejected.");
-
       const artifactId = artifactIdFactory.createArtifactId().toString();
       const safeArtifactFilePart = artifactId.replaceAll("/", "_");
       const storageKey = `generated/images/${safeArtifactFilePart}.png`;
       const destinationPath = path.join(storageRoot, storageKey);
       await mkdir(path.dirname(destinationPath), { recursive: true });
 
-      try {
-        await rename(sourcePath, destinationPath);
-      } catch (error) {
-        const err = error as NodeJS.ErrnoException;
-        if (err.code !== "EXDEV") throw error;
-        await options.logging?.log({ timestamp: new Date().toISOString(), level: "warn", verbosity: "normal", component: "storage.filesystem", event: "generated_image_move_fallback", message: "Cross-device rename failed, using copy-delete fallback." });
-        await copyFile(sourcePath, destinationPath);
-        await rm(sourcePath);
+      if (output.contentBase64 && output.contentBase64.trim()) {
+        await writeFile(destinationPath, Buffer.from(output.contentBase64, "base64"));
+      } else {
+        const sourcePath = path.resolve(outputRoot, output.subfolder ?? "", output.fileName);
+        const relativeOutput = path.relative(outputRoot, sourcePath);
+        if (relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) throw new Error("ComfyUI output path traversal rejected.");
+        try {
+          await rename(sourcePath, destinationPath);
+        } catch (error) {
+          const err = error as NodeJS.ErrnoException;
+          if (err.code !== "EXDEV") throw error;
+          await options.logging?.log({ timestamp: new Date().toISOString(), level: "warn", verbosity: "normal", component: "storage.filesystem", event: "generated_image_move_fallback", message: "Cross-device rename failed, using copy-delete fallback." });
+          await copyFile(sourcePath, destinationPath);
+          await rm(sourcePath);
+        }
+        await stat(sourcePath).then(() => { throw new Error("Generated image source still exists after finalization."); }, () => undefined);
       }
 
       const [destinationStats, destinationBytes] = await Promise.all([stat(destinationPath), readFile(destinationPath)]);
       if (!destinationStats.isFile()) throw new Error("Generated image destination is not a file.");
-      await stat(sourcePath).then(() => { throw new Error("Generated image source still exists after finalization."); }, () => undefined);
 
       const checksum = { algorithm: "sha256" as const, value: createHash("sha256").update(destinationBytes).digest("hex") };
       const createdAt = now();

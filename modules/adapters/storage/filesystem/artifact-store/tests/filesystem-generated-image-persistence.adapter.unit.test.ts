@@ -41,4 +41,19 @@ describe("createFilesystemGeneratedImagePersistenceAdapter", () => {
     expect((await readFile(path.join(store, result.storageKey), "utf8"))).toBe("abc");
     renameSpy.mockRestore();
   });
+
+  it("persists generated image from in-memory base64 content when runtime file was already deleted", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "img-memory-"));
+    const out = path.join(root, "comfy");
+    const store = path.join(root, "store");
+    await mkdir(out, { recursive: true });
+    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: out, artifactStorageRoot: store });
+    const pngBody = Buffer.from("abc");
+    const result = await adapter.persistGeneratedImage({
+      output: { type: "image", engine: "comfyui", fileName: "x.png", contentBase64: pngBody.toString("base64"), mediaType: "image/png" },
+      requestId: "req-1",
+    });
+    await expect(stat(path.join(store, result.storageKey))).resolves.toEqual(expect.objectContaining({ isFile: expect.any(Function) }));
+    expect(await readFile(path.join(store, result.storageKey))).toEqual(pngBody);
+  });
 });
