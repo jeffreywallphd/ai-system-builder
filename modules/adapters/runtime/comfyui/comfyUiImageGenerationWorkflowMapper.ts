@@ -33,17 +33,19 @@ export function mapImageGenerationRequestToComfyUiPrompt(
   const scheduler = request.scheduler ?? options.defaultScheduler ?? "karras";
   const seed = request.seed ?? (Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) + 1);
   const controlAfterGenerate = request.seed === undefined ? "randomize" : "fixed";
+  const numImages = Math.max(Math.floor(request.numImages ?? 1), 1);
   const hasLatentReference = request.latentSource?.kind === "artifact" && Boolean(options.latentReferenceImageName);
   const faceIdReferences = (request.faceId?.enabled ? request.faceId.references : undefined) ?? [];
   const faceReferenceImageName = options.faceReferenceImageNames?.find((imageName) => imageName.trim().length > 0);
   const hasFaceReference = faceIdReferences.length > 0 && Boolean(faceReferenceImageName) && !hasLatentReference;
-  const latentSource = hasLatentReference ? ["10", 0] : hasFaceReference ? ["18", 0] : ["4", 0];
+  const encodedLatentSource = hasLatentReference ? ["10", 0] : hasFaceReference ? ["18", 0] : undefined;
+  const latentSource = encodedLatentSource && numImages > 1 ? ["11", 0] : encodedLatentSource ?? ["4", 0];
 
   const prompt: ComfyUiPromptPayload["prompt"] = {
       "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: checkpoint } },
       "2": { class_type: "CLIPTextEncode", inputs: { text: request.prompt, clip: ["1", 1] } },
       "3": { class_type: "CLIPTextEncode", inputs: { text: request.negativePrompt ?? "", clip: ["1", 1] } },
-      "4": { class_type: "EmptyLatentImage", inputs: { width, height, batch_size: request.numImages ?? 1 } },
+      "4": { class_type: "EmptyLatentImage", inputs: { width, height, batch_size: numImages } },
       "5": {
         class_type: "KSampler",
         inputs: {
@@ -72,6 +74,9 @@ export function mapImageGenerationRequestToComfyUiPrompt(
   if (hasFaceReference) {
     prompt["17"] = { class_type: "LoadImage", inputs: { image: faceReferenceImageName } };
     prompt["18"] = { class_type: "VAEEncode", inputs: { pixels: ["17", 0], vae: ["1", 2] } };
+  }
+  if (encodedLatentSource && numImages > 1) {
+    prompt["11"] = { class_type: "RepeatLatentBatch", inputs: { samples: encodedLatentSource, amount: numImages } };
   }
 
   return { prompt };

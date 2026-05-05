@@ -22,7 +22,7 @@ export const DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL = createIpcChann
 export interface DesktopImageGenerationReadRequestPayload { requestId: string; }
 export interface DesktopImageGenerationCancelRequestPayload { requestId: string; }
 export interface DesktopImageGenerationFinalizeRequestPayload { requestId: string; }
-export interface DesktopImageGenerationFinalizeResult { finalized: boolean; assets?: Array<{ assetId: string; artifactId: string }>; reason?: string; }
+export interface DesktopImageGenerationFinalizeResult { finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey?: string; mediaType?: string }>; reason?: string; }
 
 export type DesktopImageGenerationStartRequest = IpcRequest<ImageGenerationRequest, typeof DESKTOP_IMAGE_GENERATION_START_OPERATION, Record<string, never>, typeof DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL.value>;
 export type DesktopImageGenerationStartResponse = IpcResponse<StartRuntimeTaskResult, Record<string, unknown>, typeof DESKTOP_IMAGE_GENERATION_START_OPERATION, Record<string, never>, typeof DESKTOP_IMAGE_GENERATION_START_RESPONSE_CHANNEL.value>;

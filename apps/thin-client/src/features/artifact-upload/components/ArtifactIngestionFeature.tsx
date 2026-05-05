@@ -1,6 +1,6 @@
 import type { ApiArtifactUploadClient } from "../api/apiArtifactUploadClient";
 import type { ArtifactBrowserApiClient } from "../../artifact-browser/api/apiArtifactBrowserClient";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CollapsiblePanel } from "../../../components/ui/CollapsiblePanel";
 import { useArtifactUploadFeature } from "../hooks/useArtifactUploadFeature";
 import { ArtifactUploadForm } from "./ArtifactUploadForm";
@@ -13,8 +13,21 @@ export interface ArtifactIngestionFeatureProps {
   onUploadComplete?: () => void;
 }
 
+type ExpandedPanelsState = {
+  uploadData: boolean;
+  scrapeWebData: boolean;
+  importFromHuggingFace: boolean;
+};
+
+let persistedExpandedPanels: ExpandedPanelsState = {
+  uploadData: false,
+  scrapeWebData: false,
+  importFromHuggingFace: false,
+};
+
 export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete }: ArtifactIngestionFeatureProps) {
-  const [expandedPanels, setExpandedPanels] = useState({
+  const shouldPersistPanelState = client === undefined && ingestionClient === undefined;
+  const [expandedPanels, setExpandedPanels] = useState<ExpandedPanelsState>(shouldPersistPanelState ? persistedExpandedPanels : {
     uploadData: false,
     scrapeWebData: false,
     importFromHuggingFace: false,
@@ -46,6 +59,11 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
     ingestWebsiteSingle,
     ingestWebsiteBatch,
   } = useArtifactUploadFeature(client, onUploadComplete);
+
+  useEffect(() => {
+    if (!shouldPersistPanelState) return;
+    persistedExpandedPanels = expandedPanels;
+  }, [expandedPanels, shouldPersistPanelState]);
 
   return (
     <section className="ui-stack ui-stack--sm">

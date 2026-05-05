@@ -22,7 +22,7 @@ export function ImageGenerationFeature({
   return (
     <section className="ui-panel ui-stack ui-stack--sm" aria-label="Image Generation">
       <h2>Image Generation</h2>
-      <p className="ui-text-muted">Generate images from a prompt. Save the generation to register it in Artifacts.</p>
+      <p className="ui-text-muted">Generate images from a prompt. Completed generations are registered in Artifacts automatically.</p>
 
       <section className="ui-stack ui-stack--sm">
         <div className="ui-stack ui-stack--xs">
@@ -159,7 +159,6 @@ export function ImageGenerationFeature({
           ["sampler", "Sampler", "text"],
           ["scheduler", "Scheduler", "text"],
           ["numImages", "Number of Images", "number"],
-          ["outputFileName", "Output File Name (optional)", "text"],
         ].map(([key, label, type]) => {
           const formKey = key as keyof typeof feature.form;
           const id = `image-generation-${String(key)}`;
@@ -240,16 +239,9 @@ export function ImageGenerationFeature({
       </ul>
       {feature.requestId ? <p>Request ID: {feature.requestId}</p> : null}
       {feature.error ? <p role="alert">{feature.error}</p> : null}
-      {feature.status === "succeeded" ? <button className="ui-button" type="button" onClick={() => { const name = window.prompt("Name this image generation"); if (name) void feature.saveGeneration(name); }}>Save Generation</button> : null}
 
       <h3>Generated Images</h3>
       <div className="ui-stack ui-stack--sm">
-        {feature.runtimeOutputPreviews.map((preview) => (
-          <article key={`runtime-${preview.url}`} className="ui-stack ui-stack--xs">
-            <img src={preview.url} alt={`Generated runtime image ${preview.fileName}`} />
-            <p>{preview.fileName}</p>
-          </article>
-        ))}
         {feature.results.map((asset) => (
           <article key={asset.assetId} className="ui-stack ui-stack--xs">
             <img src={feature.createPreviewUrl(asset.storageKey)} alt={`Generated image ${asset.assetId}`} />

@@ -35,4 +35,15 @@ describe("ImageGenerationFinalizationOrchestratorService", () => {
     expect(finalizeImageGenerationService.finalizeCompletedTask).not.toHaveBeenCalled();
     expect(result).toEqual({ finalized: true, assets: [{ assetId: "asset-1", artifactId: "artifact-1", storageKey: "generated/images/artifact-1.png", mediaType: "image/png", source: "generated" }] });
   });
+
+  it("does not report finalized when persisted output refs are incomplete", async () => {
+    const runtimeTaskRegistry = { getTaskStatus: testDouble.fn(async () => ({ requestId: "r1", taskType: TaskType.IMAGE_GENERATION, status: "succeeded", concurrencyClass: "unknown", data: { outputs: [{ artifactId: "artifact-1", assetId: "asset-1" }] } })) };
+    const finalizeImageGenerationService = { finalizeCompletedTask: testDouble.fn(async () => ({ assets: [] })) };
+    const orchestrator = new ImageGenerationFinalizationOrchestratorService({ runtimeTaskRegistry, finalizeImageGenerationService } as never);
+
+    const result = await orchestrator.finalizeIfCompleted("r1");
+
+    expect(finalizeImageGenerationService.finalizeCompletedTask).not.toHaveBeenCalled();
+    expect(result).toEqual({ finalized: false, reason: "completed task did not report artifact-backed generated image outputs" });
+  });
 });

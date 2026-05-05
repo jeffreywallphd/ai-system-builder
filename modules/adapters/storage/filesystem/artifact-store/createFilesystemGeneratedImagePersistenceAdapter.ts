@@ -22,22 +22,20 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
   const artifactIdFactory = new SystemArtifactIdFactory();
 
   return {
-    async persistGeneratedImage({ output, preferredFileName }) {
+    async persistGeneratedImage({ output }) {
       const artifactId = artifactIdFactory.createArtifactId().toString();
-      const desiredFileName = sanitizeFileName(preferredFileName) ?? sanitizeFileName(output.fileName) ?? "generated-image.png";
+      const desiredFileName = sanitizeFileName(output.fileName) ?? "generated-image.png";
       const storageKey = await reserveGeneratedImageStorageKey(storageRoot, desiredFileName);
       const destinationPath = path.join(storageRoot, storageKey);
       await mkdir(path.dirname(destinationPath), { recursive: true });
 
       if (output.contentBase64 && output.contentBase64.trim()) {
-        await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_preview_memory_cached", message: `Persisting generated image from in-memory output for ${output.fileName}.` });
+        await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_inline_content_persisted", message: `Persisting generated image from inline output content for ${output.fileName}.` });
         await writeFile(destinationPath, Buffer.from(output.contentBase64, "base64"));
-        const sourcePath = path.resolve(outputRoot, output.subfolder ?? "", output.fileName);
+        const sourcePath = resolveContainedOutputPath(outputRoot, output.subfolder, output.fileName);
         await rm(sourcePath, { force: true }).catch(() => undefined);
       } else {
-        const sourcePath = path.resolve(outputRoot, output.subfolder ?? "", output.fileName);
-        const relativeOutput = path.relative(outputRoot, sourcePath);
-        if (relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) throw new Error("ComfyUI output path traversal rejected.");
+        const sourcePath = resolveContainedOutputPath(outputRoot, output.subfolder, output.fileName);
         try {
           await rename(sourcePath, destinationPath);
         } catch (error) {
@@ -69,6 +67,13 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
       return { artifactId, storageKey, mediaType: "image/png", sizeBytes: destinationStats.size, checksum, originalFileName: output.fileName };
     },
   };
+}
+
+function resolveContainedOutputPath(outputRoot: string, subfolder: string | undefined, fileName: string): string {
+  const sourcePath = path.resolve(outputRoot, subfolder ?? "", fileName);
+  const relativeOutput = path.relative(outputRoot, sourcePath);
+  if (relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) throw new Error("ComfyUI output path traversal rejected.");
+  return sourcePath;
 }
 
 function sanitizeFileName(value: string | undefined): string | undefined {

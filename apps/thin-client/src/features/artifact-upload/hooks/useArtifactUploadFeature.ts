@@ -44,14 +44,28 @@ export interface UseArtifactUploadFeatureResult {
   ingestWebsiteBatch: () => Promise<void>;
 }
 
+interface PersistedFileUploadState {
+  selectedFile: File | null;
+  viewState: UploadViewState;
+}
+
+let persistedFileUploadState: PersistedFileUploadState = {
+  selectedFile: null,
+  viewState: { status: "idle" },
+};
+
 export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUploadComplete?: () => void): UseArtifactUploadFeatureResult {
   const uploadClient = useArtifactUploadClient(client);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const shouldPersistFileUploadState = client === undefined;
+  const [selectedFile, setSelectedFile] = useState<File | null>(shouldPersistFileUploadState ? persistedFileUploadState.selectedFile : null);
   const [acceptedFileTypes, setAcceptedFileTypes] = useState<string>("*");
-  const [viewState, setViewState] = useState<UploadViewState>({
-    status: "idle",
-  });
+  const [viewState, setViewState] = useState<UploadViewState>(shouldPersistFileUploadState ? persistedFileUploadState.viewState : { status: "idle" });
   const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete);
+
+  useEffect(() => {
+    if (!shouldPersistFileUploadState) return;
+    persistedFileUploadState = { selectedFile, viewState };
+  }, [selectedFile, shouldPersistFileUploadState, viewState]);
 
   useEffect(() => {
     void uploadClient.getAcceptedTypes().then((policy) => {

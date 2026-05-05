@@ -9,18 +9,18 @@ export class FinalizeImageGenerationService {
 
   public constructor(private readonly dependencies: { imageAssetRegistry: ImageAssetRegistryPort; generatedImagePersistence: GeneratedImagePersistencePort; createAssetId?: () => string; now?: () => string; }) {}
 
-  public async finalizeCompletedTask(task: RuntimeTaskRecord, options?: { preferredFileName?: string }): Promise<{ assets: FinalizedAssetRef[] }> {
+  public async finalizeCompletedTask(task: RuntimeTaskRecord): Promise<{ assets: FinalizedAssetRef[] }> {
     const existing = this.finalizedByRequestId.get(task.requestId);
     if (existing) return { assets: existing };
     if (task.status !== "succeeded") throw new Error("Image generation finalization requires a succeeded runtime task.");
 
     const outputs = this.getOutputs(task.data);
+    if (outputs.length === 0) throw new Error("Image generation finalization requires at least one generated image output.");
     const assets: FinalizedAssetRef[] = [];
     for (const output of outputs) {
       const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({
         output,
         requestId: task.requestId,
-        preferredFileName: options?.preferredFileName ?? this.readPreferredOutputFileName(task),
       });
       const requestedAssetId = this.dependencies.createAssetId?.() ?? `img-${task.requestId}-${assets.length + 1}`;
       const registered = await this.dependencies.imageAssetRegistry.registerImageAsset({
@@ -45,13 +45,6 @@ export class FinalizeImageGenerationService {
   private readMetadata(task: RuntimeTaskRecord): { request?: Record<string, unknown> } | undefined {
     return typeof task.metadata === "object" && task.metadata !== null ? (task.metadata as { request?: Record<string, unknown> }) : undefined;
   }
-  private readPreferredOutputFileName(task: RuntimeTaskRecord): string | undefined {
-    const request = this.readMetadata(task)?.request;
-    if (!request || typeof request !== "object") return undefined;
-    const hint = (request as { engineHints?: { outputFileName?: unknown } }).engineHints?.outputFileName;
-    return typeof hint === "string" && hint.trim().length > 0 ? hint.trim() : undefined;
-  }
-
   private getOutputs(data: unknown): ImageGenerationOutput[] {
     if (typeof data !== "object" || data === null || !Array.isArray((data as { outputs?: unknown[] }).outputs)) throw new Error("Image generation finalization requires task outputs.");
     return (data as { outputs: unknown[] }).outputs.map((output) => this.asOutput(output));

@@ -40,11 +40,10 @@ export interface ImageGenerationApiClient {
   startImageGeneration: (input: ImageGenerationRequest, context?: { source?: string }) => Promise<{ requestId: string }>;
   readImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<RuntimeTaskRecord>;
   cancelImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<CancelImageGenerationResult>;
-  finalizeImageGenerationIfCompleted: (input: { requestId: string; preferredFileName?: string }, context?: { source?: string }) => Promise<FinalizeImageGenerationResult>;
+  finalizeImageGenerationIfCompleted: (input: { requestId: string }, context?: { source?: string }) => Promise<FinalizeImageGenerationResult>;
   unloadModel: (context?: { source?: string }) => Promise<UnloadImageGenerationModelResult>;
   readRuntimeResources: (context?: { source?: string }) => Promise<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>;
   createArtifactMediaViewUrl: (storageKey: string) => string;
-  createRuntimeOutputPreviewUrl: (fileName: string, subfolder?: string) => string;
 }
 
 const createApiUrl = (baseUrl: string, suffix: string): string => `${baseUrl.trim().replace(/\/+$/, "") || "/api"}${suffix}`;
@@ -160,11 +159,6 @@ export function createApiImageGenerationClient(options: { apiBaseUrl?: string; s
     },
     createArtifactMediaViewUrl(storageKey) {
       return `${createApiUrl(apiBaseUrl, "/artifact/media/view")}?storageKey=${encodeURIComponent(storageKey)}`;
-    },
-    createRuntimeOutputPreviewUrl(fileName, subfolder) {
-      const params = new URLSearchParams({ fileName });
-      if (subfolder) params.set("subfolder", subfolder);
-      return `${createApiUrl(apiBaseUrl, "/image-generation/output-preview")}?${params.toString()}`;
     },
   };
 }

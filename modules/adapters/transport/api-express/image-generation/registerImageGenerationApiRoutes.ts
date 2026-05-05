@@ -23,8 +23,6 @@ export interface RegisterImageGenerationApiRoutesDependencies {
   imageGenerationRuntimeControl?: {
     unloadModel: () => Promise<{ unloaded: boolean; message?: string }>;
     readRuntimeResources?: () => Promise<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>;
-    readOutputPreview?: (input: { fileName: string; subfolder?: string }) => Promise<{ mediaType: string; contentBase64: string }>;
-    cacheTaskOutputsInMemory?: (input: { taskRecord: unknown }) => Promise<void>;
   };
 }
 
@@ -46,13 +44,6 @@ function mapRequestIdBody(body: unknown): string {
   if (!requestId) throw new Error("requestId is required.");
   return requestId;
 }
-function mapFinalizeBody(body: unknown): { requestId: string; preferredFileName?: string } {
-  if (!isObjectRecord(body)) throw new Error("Request body must be an object.");
-  const requestId = mapRequestIdBody(body);
-  const preferredFileName = typeof body.preferredFileName === "string" ? body.preferredFileName.trim() : "";
-  return { requestId, preferredFileName: preferredFileName.length > 0 ? preferredFileName : undefined };
-}
-
 function failure(operation: ImageGenerationOperation, code: "internal" | "validation" | "not-found" | "unavailable", message: string, context: { requestId?: string; correlationId?: string }) {
   return createApiFailureResponse(createApiError(operation, code, message, context), context);
 }
@@ -94,13 +85,6 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
     const context = contextFrom(request);
     try {
       const value = await dependencies.generateImageUseCase.readImageGeneration(mapRequestIdBody(request.body), context);
-      if (value?.status === "succeeded") {
-        try {
-          await dependencies.imageGenerationRuntimeControl?.cacheTaskOutputsInMemory?.({ taskRecord: value });
-        } catch {
-          // Preview caching is best-effort; the task record itself is still the source of truth.
-        }
-      }
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_READ_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
@@ -126,14 +110,14 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
   dependencies.app.post("/api/image-generation/finalize", async (request, response) => {
     const context = contextFrom(request);
     try {
-      const finalizeRequest = mapFinalizeBody(request.body);
+      const requestId = mapRequestIdBody(request.body);
       if (!dependencies.imageGenerationFinalizationOrchestrator) {
         const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, { finalized: false, reason: "image generation finalization is unavailable" }, context);
         response.status(statusCode(apiResponse)).json(apiResponse);
         return;
       }
 
-      const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(finalizeRequest.requestId, { preferredFileName: finalizeRequest.preferredFileName });
+      const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(requestId);
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
@@ -158,23 +142,6 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
       const message = error instanceof Error ? error.message : "Unexpected error.";
       const apiResponse = failure(API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION, mapFailureCode(error), message, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
-    }
-  });
-
-
-  dependencies.app.get?.("/api/image-generation/output-preview", async (request: any, response: any) => {
-    try {
-      const fileName = typeof request?.query?.fileName === "string" ? request.query.fileName.trim() : "";
-      const subfolder = typeof request?.query?.subfolder === "string" ? request.query.subfolder.trim() : undefined;
-      if (!fileName || !dependencies.imageGenerationRuntimeControl?.readOutputPreview) {
-        response.status(404).end();
-        return;
-      }
-      const preview = await dependencies.imageGenerationRuntimeControl.readOutputPreview({ fileName, subfolder });
-      response.setHeader("content-type", preview.mediaType);
-      response.status(200).send(Buffer.from(preview.contentBase64, "base64"));
-    } catch {
-      response.status(404).end();
     }
   });
 

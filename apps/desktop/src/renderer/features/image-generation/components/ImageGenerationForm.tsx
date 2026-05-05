@@ -44,7 +44,6 @@ export function ImageGenerationForm({ form, setForm, validationError, isStartDis
       </div> : null}
 
       <label className="ui-stack ui-stack--sm"><span>Number of Images</span><input className="ui-input" type="number" {...bindText("numImages")} /></label>
-      <label className="ui-stack ui-stack--sm"><span>Output file name</span><input className="ui-input" placeholder="my-image.png" {...bindText("outputFileName")} /></label>
       {validationError ? <p className="ui-feedback ui-feedback--error">{validationError}</p> : null}
       <button type="button" className="ui-button" onClick={onSubmit} disabled={isStartDisabled}>Start Generation</button>
     </section>
