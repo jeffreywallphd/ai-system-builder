@@ -31,6 +31,7 @@ export function mapImageGenerationRequestToComfyUiPrompt(
   const sampler = request.sampler ?? options.defaultSampler ?? "dpmpp_2m";
   const scheduler = request.scheduler ?? options.defaultScheduler ?? "karras";
   const seed = request.seed ?? (Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) + 1);
+  const controlAfterGenerate = request.seed === undefined ? "randomize" : "fixed";
   const latentSource = request.latentSource?.kind === "artifact" && options.latentReferenceImageName
     ? ["10", 0]
     : ["4", 0];
@@ -44,6 +45,7 @@ export function mapImageGenerationRequestToComfyUiPrompt(
         class_type: "KSampler",
         inputs: {
           seed,
+          control_after_generate: controlAfterGenerate,
           steps,
           cfg,
           sampler_name: sampler,
