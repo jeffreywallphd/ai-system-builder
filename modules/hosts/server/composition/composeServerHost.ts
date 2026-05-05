@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cpus, freemem, totalmem } from "node:os";
+import { spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
 import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
@@ -691,7 +692,15 @@ export function composeServerHost(
           const cpuUsagePercent = deltaTotal > 0 ? Math.max(0, Math.min(100, (1 - deltaIdle / deltaTotal) * 100)) : 0;
           const totalMemory = totalmem();
           const memoryUsagePercent = totalMemory > 0 ? Math.max(0, Math.min(100, ((totalMemory - freemem()) / totalMemory) * 100)) : 0;
-          const gpuUsagePercent = 0;
+          const gpuSample = spawnSync("nvidia-smi", ["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"], { encoding: "utf8", timeout: 800 });
+          const gpuUsagePercent = gpuSample.status === 0 && gpuSample.stdout
+            ? (() => {
+              const values = gpuSample.stdout.split("\n").map((line) => Number.parseFloat(line.trim())).filter((value) => Number.isFinite(value));
+              if (values.length === 0) return 0;
+              const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+              return Math.max(0, Math.min(100, avg));
+            })()
+            : 0;
           return { memoryUsagePercent, cpuUsagePercent, gpuUsagePercent };
         },
         async cacheTaskOutputsInMemory({ taskRecord }: { taskRecord: unknown }) {

@@ -118,10 +118,14 @@ function expectFinalizeResult(value: unknown): FinalizeImageGenerationResult {
 }
 function expectRuntimeResources(value: unknown): { memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number } {
   if (!isRecord(value)) throw new Error("Image generation runtime resources response is malformed.");
+  const toPercent = (input: unknown) => {
+    const parsed = Number(input);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
   return {
-    memoryUsagePercent: typeof value.memoryUsagePercent === "number" ? value.memoryUsagePercent : 0,
-    cpuUsagePercent: typeof value.cpuUsagePercent === "number" ? value.cpuUsagePercent : 0,
-    gpuUsagePercent: typeof value.gpuUsagePercent === "number" ? value.gpuUsagePercent : 0,
+    memoryUsagePercent: toPercent(value.memoryUsagePercent),
+    cpuUsagePercent: toPercent(value.cpuUsagePercent),
+    gpuUsagePercent: toPercent(value.gpuUsagePercent),
   };
 }
 

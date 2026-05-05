@@ -17,7 +17,7 @@ export class FinalizeImageGenerationService {
     const outputs = this.getOutputs(task.data);
     const assets: FinalizedAssetRef[] = [];
     for (const output of outputs) {
-      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, requestId: task.requestId });
+      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, requestId: task.requestId, preferredFileName: this.readPreferredOutputFileName(task) });
       const requestedAssetId = this.dependencies.createAssetId?.() ?? `img-${task.requestId}-${assets.length + 1}`;
       const registered = await this.dependencies.imageAssetRegistry.registerImageAsset({
         assetId: requestedAssetId,
@@ -40,6 +40,12 @@ export class FinalizeImageGenerationService {
 
   private readMetadata(task: RuntimeTaskRecord): { request?: Record<string, unknown> } | undefined {
     return typeof task.metadata === "object" && task.metadata !== null ? (task.metadata as { request?: Record<string, unknown> }) : undefined;
+  }
+  private readPreferredOutputFileName(task: RuntimeTaskRecord): string | undefined {
+    const request = this.readMetadata(task)?.request;
+    if (!request || typeof request !== "object") return undefined;
+    const hint = (request as { engineHints?: { outputFileName?: unknown } }).engineHints?.outputFileName;
+    return typeof hint === "string" && hint.trim().length > 0 ? hint.trim() : undefined;
   }
 
   private getOutputs(data: unknown): ImageGenerationOutput[] {
