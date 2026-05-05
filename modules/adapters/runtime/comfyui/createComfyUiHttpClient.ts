@@ -1,7 +1,9 @@
 import {
   mapComfyUiHistoryResponse,
+  mapComfyUiFreeMemoryResponse,
   mapComfyUiPromptResponse,
   mapComfyUiQueueResponse,
+  type ComfyUiFreeMemoryResponse,
   type ComfyUiHistoryResponse,
   type ComfyUiPromptResponse,
   type ComfyUiQueueResponse,
@@ -17,6 +19,7 @@ export interface ComfyUiHttpClient {
   getQueue(): Promise<ComfyUiQueueResponse>;
   getHistory(): Promise<ComfyUiHistoryResponse>;
   submitPrompt(promptPayload: unknown): Promise<ComfyUiPromptResponse>;
+  unloadModels(): Promise<ComfyUiFreeMemoryResponse>;
 }
 
 function trimTrailingSlash(value: string): string {
@@ -80,6 +83,18 @@ export function createComfyUiHttpClient(options: CreateComfyUiHttpClientOptions)
       });
       const payload = await parseJsonResponseSafe(response);
       return mapPayload("/prompt", response, payload, mapComfyUiPromptResponse);
+    },
+
+    async unloadModels() {
+      const response = await fetcher(`${baseUrl}/free`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ unload_models: true, free_memory: true }),
+      });
+      const payload = await parseJsonResponseSafe(response);
+      return mapPayload("/free", response, payload, mapComfyUiFreeMemoryResponse);
     },
   };
 }

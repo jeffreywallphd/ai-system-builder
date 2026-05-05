@@ -32,6 +32,20 @@ describe("createComfyUiHttpClient", () => {
     expect((fetcher.mock.calls[0]?.[1] as { method: string }).method).toBe("POST");
   });
 
+  it("posts ComfyUI free-memory request when unloading models", async () => {
+    const fetcher = testDouble.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ unload_models: true, free_memory: true }) });
+    const client = createComfyUiHttpClient({ baseUrl: "http://127.0.0.1:8188", fetchImplementation: fetcher as never });
+
+    const result = await client.unloadModels();
+
+    expect(fetcher.mock.calls[0]?.[0]).toBe("http://127.0.0.1:8188/free");
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ unload_models: true, free_memory: true }),
+    });
+    expect(result).toEqual({ unloadedModels: true, freedMemory: true });
+  });
+
   it("surfaces endpoint failures", async () => {
     const fetcher = testDouble.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: "boom" }) });
     const client = createComfyUiHttpClient({ baseUrl: "http://127.0.0.1:8188", fetchImplementation: fetcher as never });

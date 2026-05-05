@@ -59,6 +59,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     content,
     imageViewUrl,
     publishState,
+    publishForm,
     registerState,
     localizeState,
     sourceVerifyState,
@@ -83,6 +84,12 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     localizeArtifactFromRepo,
     recheckPublishedBacking,
     recheckSourceBacking,
+    publishArtifactToHuggingFace,
+    setRepository,
+    setPathInRepo,
+    setRevision,
+    setMediaType,
+    togglePublishForm,
     setRegisterRepository,
     setRegisterNamespace,
     setRegisterPathInRepo,
@@ -95,6 +102,10 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
   } = useArtifactBrowserFeature(client);
 
   const backingState = deriveArtifactBackingState(detail, content);
+  const publishRepository = publishForm.repository.trim();
+  const publishPathPrefix = publishForm.pathInRepo.trim().replace(/^\/+|\/+$/g, "");
+  const publishFileName = detail?.originalName?.trim() || detail?.locator.storageKey.split("/").pop() || "artifact";
+  const publishPath = publishPathPrefix ? `${publishPathPrefix}/${publishFileName}` : publishFileName;
 
   return (
     <section className="ui-panel ui-stack ui-stack--sm">
@@ -288,6 +299,45 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
           {backingState.isRemoteOnly ? (
             <p role="status">Remote-only artifact. Local preview is unavailable until localization.</p>
           ) : null}
+          {backingState.hasLocalObjectAvailable ? (
+            <section className="ui-stack ui-stack--sm">
+              <button className="ui-button" type="button" onClick={togglePublishForm} disabled={publishState.status === "loading"}>
+                Publish to Hugging Face
+              </button>
+              {publishForm.showPublishForm ? (
+                <div className="ui-stack ui-stack--sm">
+                  <p role="note">Private or gated Hugging Face repositories may require a host/server token.</p>
+                  <label className="ui-stack ui-stack--sm">
+                    <span>Dataset repository</span>
+                    <input className="ui-input" value={publishForm.repository} onChange={(event) => setRepository(event.target.value)} placeholder="owner/repository" required />
+                  </label>
+                  <label className="ui-stack ui-stack--sm">
+                    <span>Path prefix (optional)</span>
+                    <input className="ui-input" value={publishForm.pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} />
+                    <small className="ui-text-muted">Publishes artifact to: {publishPath}</small>
+                  </label>
+                  <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={publishForm.revision} onChange={(event) => setRevision(event.target.value)} /></label>
+                  <label className="ui-stack ui-stack--sm"><span>Media type (optional)</span><input className="ui-input" value={publishForm.mediaType} onChange={(event) => setMediaType(event.target.value)} /></label>
+                  <button
+                    className="ui-button"
+                    type="button"
+                    disabled={publishState.status === "loading" || publishRepository.length === 0}
+                    onClick={() => void publishArtifactToHuggingFace({
+                      repository: publishRepository,
+                      path: publishPath,
+                      revision: publishForm.revision,
+                      mediaType: publishForm.mediaType,
+                    })}
+                  >
+                    {publishState.status === "loading" ? "Publishing..." : "Publish"}
+                  </button>
+                </div>
+              ) : null}
+              {publishState.message ? <p role={publishState.status === "error" ? "alert" : "status"}>{publishState.message}</p> : null}
+            </section>
+          ) : (
+            <p role="status">Publish is available after local bytes are present.</p>
+          )}
         </section>
       ) : null}
 
