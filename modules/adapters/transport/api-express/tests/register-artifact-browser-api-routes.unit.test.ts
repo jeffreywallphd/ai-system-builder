@@ -14,6 +14,7 @@ function createUseCases() {
     readArtifactDetailUseCase: { execute: testDouble.fn() },
     readArtifactContentUseCase: { execute: testDouble.fn() },
     artifactMediaViewRetrieval: { retrieveArtifactViewerMediaByStorageKey: testDouble.fn() },
+    deleteRegisteredArtifactUseCase: { execute: testDouble.fn() },
   };
 }
 
@@ -56,14 +57,19 @@ describe("registerArtifactBrowserApiRoutes", () => {
     });
     (dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey as ReturnType<typeof testDouble.fn>)
       .mockResolvedValue({ ok: true, value: { storageKey: "uploads/a.png", mediaType: "image/png", bytes: new Uint8Array([1]) } });
+    (dependencies.deleteRegisteredArtifactUseCase.execute as ReturnType<typeof testDouble.fn>).mockResolvedValue({
+      ok: true,
+      value: { storageKey: "uploads/a.png" },
+    });
 
     registerArtifactBrowserApiRoutes({ app, ...dependencies });
 
-    expect(app.post).toHaveBeenCalledTimes(3);
+    expect(app.post).toHaveBeenCalledTimes(4);
     expect(app.get).toHaveBeenCalledTimes(1);
     expect(postHandlers.has("/api/artifact/browse")).toBe(true);
     expect(postHandlers.has("/api/artifact/read")).toBe(true);
     expect(postHandlers.has("/api/artifact/content/read")).toBe(true);
+    expect(postHandlers.has("/api/artifact/delete")).toBe(true);
     expect(getHandlers.has("/api/artifact/media/view")).toBe(true);
 
     const response = {
@@ -85,6 +91,10 @@ describe("registerArtifactBrowserApiRoutes", () => {
       { body: { locator: { storageKey: "uploads/a.png" }, source: "thin-client" }, headers: {} },
       response,
     );
+    await postHandlers.get("/api/artifact/delete")?.(
+      { body: { locator: { storageKey: "uploads/a.png" }, source: "thin-client" }, headers: {} },
+      response,
+    );
     await getHandlers.get("/api/artifact/media/view")?.(
       { query: { storageKey: "uploads/a.png" }, headers: {} },
       response,
@@ -100,6 +110,10 @@ describe("registerArtifactBrowserApiRoutes", () => {
     );
     expect(dependencies.readArtifactContentUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
+      { requestId: undefined, correlationId: undefined },
+    );
+    expect(dependencies.deleteRegisteredArtifactUseCase.execute).toHaveBeenCalledWith(
+      { storageKey: "uploads/a.png" },
       { requestId: undefined, correlationId: undefined },
     );
     expect(dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey).toHaveBeenCalledWith(

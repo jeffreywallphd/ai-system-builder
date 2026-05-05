@@ -8,7 +8,7 @@ describe("api artifact browser client", () => {
     vi.unstubAllGlobals();
   });
 
-  it("calls browse/detail/content/publish/verify/localize endpoints and maps responses", async () => {
+  it("calls browse/detail/content/delete/publish/verify/localize endpoints and maps responses", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -65,6 +65,14 @@ describe("api artifact browser client", () => {
               availability: "available",
               retrieval: "deferred",
             },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({
+          ok: true,
+          value: {
+            storageKey: "uploads/a.png",
           },
         }),
       })
@@ -153,6 +161,7 @@ describe("api artifact browser client", () => {
     const browse = await client.browseArtifacts();
     const detail = await client.readArtifactDetail({ storageKey: "uploads/a.png" });
     const content = await client.readArtifactContent({ storageKey: "uploads/a.png" });
+    const deleted = await client.deleteRegisteredArtifact({ storageKey: "uploads/a.png" });
     const imageViewUrl = client.createArtifactMediaViewUrl({ storageKey: "uploads/a.png" });
     const publish = await client.publishArtifactToHuggingFace({
       artifactId: "uploads/a.png",
@@ -204,21 +213,26 @@ describe("api artifact browser client", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       7,
-      "/api/artifact/publish",
+      "/api/artifact/delete",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       8,
-      "/api/artifact/publish/verify",
+      "/api/artifact/publish",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       9,
-      "/api/artifact/source/verify",
+      "/api/artifact/publish/verify",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       10,
+      "/api/artifact/source/verify",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      11,
       "/api/artifact/localize-from-repo",
       expect.objectContaining({ method: "POST" }),
     );
@@ -229,6 +243,7 @@ describe("api artifact browser client", () => {
     expect(browse[0].storageKey).toBe("uploads/a.png");
     expect(detail.locator.storageKey).toBe("uploads/a.png");
     expect(content.retrieval).toBe("deferred");
+    expect(deleted.storageKey).toBe("uploads/a.png");
     expect((content as unknown as { bytes?: unknown }).bytes).toBeUndefined();
     expect(imageViewUrl).toBe("/api/artifact/media/view?storageKey=uploads%2Fa.png");
     expect(publish.verification.exists).toBe(true);

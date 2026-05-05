@@ -15,6 +15,7 @@ type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "fina
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
 export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; sampler: string; scheduler: string; model: string; numImages: string }
+export type ImageGenerationRuntimeMode = "auto" | "cpu" | "cuda" | "directml";
 const defaultImageGenerationClient = createApiImageGenerationClient();
 const defaultModelManagementClient = createApiModelManagementClient();
 
@@ -42,6 +43,7 @@ export function useImageGenerationFeature(
   modelClient: ModelManagementApiClient = defaultModelManagementClient,
 ) {
   const [form, setForm] = useState<ImageGenerationFormState>({ prompt: "", negativePrompt: "", seed: "", width: "512", height: "512", steps: "20", sampler: "euler", scheduler: "normal", model: "", numImages: "1" });
+  const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>("cpu");
   const [modelInventory, setModelInventory] = useState<ModelInventoryRecord[]>([]);
   const [modelInventoryLoading, setModelInventoryLoading] = useState(false);
   const [modelInventoryError, setModelInventoryError] = useState<string | undefined>(undefined);
@@ -139,6 +141,7 @@ export function useImageGenerationFeature(
       if (selectedModelRecordId.trim()) payload.model = selectedModelRecordId.trim();
       else if (form.model.trim()) payload.model = form.model.trim();
       if (form.negativePrompt.trim()) payload.negativePrompt = form.negativePrompt.trim();
+      payload.engineHints = { ...(payload.engineHints ?? {}), runtimeDeviceMode: runtimeMode };
 
       const started = await client.startImageGeneration(payload);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
@@ -168,7 +171,7 @@ export function useImageGenerationFeature(
       setStatus("failed");
       setError(cause instanceof Error ? cause.message : "Image generation failed.");
     }
-  }, [client, form, onGenerated, pollUntilTerminal, selectedModelRecord, selectedModelRecordId, status, validationError]);
+  }, [client, form, onGenerated, pollUntilTerminal, runtimeMode, selectedModelRecord, selectedModelRecordId, status, validationError]);
 
   const cancel = useCallback(async () => {
     pollRunIdRef.current += 1;
@@ -195,5 +198,5 @@ export function useImageGenerationFeature(
   const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !isImageGenerationModelReady(m)), [imageGenerationModels]);
   const imageGenerationModelOptions = useMemo(() => imageGenerationModels.map(toImageGenerationModelDropdownOption).filter((option): option is NonNullable<typeof option> => Boolean(option)), [imageGenerationModels]);
 
-  return { form, setForm, status, error, requestId, results, start, cancel, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions };
+  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, cancel, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions };
 }

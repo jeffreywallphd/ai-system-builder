@@ -10,6 +10,8 @@ import type {
   ReadArtifactDetailCommand,
   ReadArtifactDetailUseCasePort,
   ReadArtifactDetailUseCaseResult,
+  DeleteRegisteredArtifactCommand,
+  DeleteRegisteredArtifactUseCase,
 } from "../../../../application/use-cases";
 import {
   createApiArtifactBrowseFailureResponse,
@@ -18,11 +20,15 @@ import {
   createApiArtifactContentReadFailureResponse,
   createApiArtifactContentReadRequest,
   createApiArtifactContentReadSuccessResponse,
+  createApiArtifactRegisteredDeleteFailureResponse,
+  createApiArtifactRegisteredDeleteRequest,
+  createApiArtifactRegisteredDeleteSuccessResponse,
   createApiArtifactReadFailureResponse,
   createApiArtifactReadRequest,
   createApiArtifactReadSuccessResponse,
   type ApiArtifactBrowseResponse,
   type ApiArtifactContentReadResponse,
+  type ApiArtifactRegisteredDeleteResponse,
   type ApiArtifactReadResponse,
 } from "../../../../contracts/api";
 
@@ -45,7 +51,7 @@ export interface ExpressRequestLike {
 export interface ExpressResponseLike {
   status: (statusCode: number) => ExpressResponseLike;
   json: (
-    body: ApiArtifactBrowseResponse | ApiArtifactReadResponse | ApiArtifactContentReadResponse,
+    body: ApiArtifactBrowseResponse | ApiArtifactReadResponse | ApiArtifactContentReadResponse | ApiArtifactRegisteredDeleteResponse,
   ) => void;
   send?: (body: Uint8Array | Buffer) => void;
   setHeader?: (name: string, value: string) => void;
@@ -68,6 +74,7 @@ export interface RegisterArtifactBrowserApiRoutesDependencies {
   readArtifactDetailUseCase: ReadArtifactDetailUseCasePort;
   readArtifactContentUseCase: ReadArtifactContentUseCasePort;
   artifactMediaViewRetrieval: ArtifactContentRetrievalPort;
+  deleteRegisteredArtifactUseCase: Pick<DeleteRegisteredArtifactUseCase, "execute">;
 }
 
 function getRequestHeader(
@@ -109,7 +116,7 @@ function mapArtifactBrowserApiRequestContext(
 }
 
 function resolveStatusCode(
-  response: ApiArtifactBrowseResponse | ApiArtifactReadResponse | ApiArtifactContentReadResponse,
+  response: ApiArtifactBrowseResponse | ApiArtifactReadResponse | ApiArtifactContentReadResponse | ApiArtifactRegisteredDeleteResponse,
 ): number {
   if (response.ok) {
     return 200;
@@ -183,6 +190,24 @@ export function mapArtifactContentReadApiRequestToCommand(
   );
 
   return { locator: apiRequest.payload.locator };
+}
+
+export function mapArtifactRegisteredDeleteApiRequestToCommand(
+  requestBody: ArtifactReadApiRequestBody,
+  context: { requestId?: string; correlationId?: string },
+): DeleteRegisteredArtifactCommand {
+  const apiRequest = createApiArtifactRegisteredDeleteRequest(
+    {
+      storageKey: requestBody.locator.storageKey,
+      boundary: {
+        host: "server",
+        source: normalizeSource(requestBody.source),
+      },
+    },
+    context,
+  );
+
+  return { storageKey: apiRequest.payload.storageKey };
 }
 
 export function mapArtifactMediaViewApiRequest(
@@ -342,6 +367,49 @@ export function registerArtifactBrowserApiRoutes(
 
     const result = await dependencies.readArtifactContentUseCase.execute(command, context);
     const apiResponse = mapReadArtifactContentResultToApiResponse(result, context);
+    response.status(resolveStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/artifact/delete", async (request, response) => {
+    const context = mapArtifactBrowserApiRequestContext(request);
+
+    let command: DeleteRegisteredArtifactCommand;
+    try {
+      command = mapArtifactRegisteredDeleteApiRequestToCommand(
+        request.body as ArtifactReadApiRequestBody,
+        context,
+      );
+    } catch (error) {
+      const apiResponse = createApiArtifactRegisteredDeleteFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid artifact delete request.",
+        context,
+      );
+      response.status(resolveStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.deleteRegisteredArtifactUseCase.execute(command, context);
+    if (!result.ok) {
+      const apiResponse = createApiArtifactRegisteredDeleteFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details,
+          requestId: result.requestId ?? context.requestId,
+          correlationId: result.correlationId ?? context.correlationId,
+        },
+      );
+      response.status(resolveStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const apiResponse = createApiArtifactRegisteredDeleteSuccessResponse(result.value, {
+      requestId: result.requestId ?? context.requestId,
+      correlationId: result.correlationId ?? context.correlationId,
+    });
     response.status(resolveStatusCode(apiResponse)).json(apiResponse);
   });
 

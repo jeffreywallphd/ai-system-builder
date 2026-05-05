@@ -27,6 +27,7 @@ export interface RegisterExpressApiDependencies {
   readArtifactDetailUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactContentUseCase"];
   artifactMediaViewRetrieval: RegisterArtifactBrowserApiRoutesDependencies["artifactMediaViewRetrieval"];
+  deleteRegisteredArtifactUseCase: RegisterArtifactBrowserApiRoutesDependencies["deleteRegisteredArtifactUseCase"];
   hasArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["hasArtifactInRepoUseCase"];
   browseHuggingFaceNamespaceDatasetsUseCase: RegisterArtifactRepoApiRoutesDependencies["browseHuggingFaceNamespaceDatasetsUseCase"];
   browseHuggingFaceDatasetParquetFilesUseCase: RegisterArtifactRepoApiRoutesDependencies["browseHuggingFaceDatasetParquetFilesUseCase"];
@@ -64,6 +65,7 @@ export function registerExpressApi(
     readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
     readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
     artifactMediaViewRetrieval: dependencies.artifactMediaViewRetrieval,
+    deleteRegisteredArtifactUseCase: dependencies.deleteRegisteredArtifactUseCase,
   });
 
   registerArtifactRepoApiRoutes({

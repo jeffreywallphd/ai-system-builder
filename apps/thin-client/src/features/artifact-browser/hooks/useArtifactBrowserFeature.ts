@@ -42,8 +42,14 @@ export interface UseArtifactBrowserFeatureResult {
     showRegisterForm: boolean;
   };
   viewState: ArtifactBrowserViewState;
+  pendingDeleteStorageKey?: string;
+  deleteConfirmationInput: string;
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
+  requestDeleteRegisteredArtifact: (storageKey: string) => void;
+  confirmPendingDelete: () => Promise<void>;
+  cancelPendingDelete: () => void;
+  setDeleteConfirmationInput: (value: string) => void;
   publishArtifactToHuggingFace: () => Promise<void>;
   registerArtifactFromHuggingFace: (input?: {
     repository?: string;
@@ -126,6 +132,8 @@ export function useArtifactBrowserFeature(
   const [expandedHuggingFaceDataset, setExpandedHuggingFaceDataset] = useState<string | undefined>();
   const [tokenInput, setTokenInput] = useState("");
   const [tokenState, setTokenState] = useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [pendingDeleteStorageKey, setPendingDeleteStorageKey] = useState<string | undefined>();
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
   const [huggingFaceTokenStatus, setHuggingFaceTokenStatus] = useState<{ configured: boolean; maskedToken?: string }>({
     configured: false,
   });
@@ -228,6 +236,48 @@ export function useArtifactBrowserFeature(
       setViewState({
         status: "error",
         message: error instanceof Error ? error.message : "Failed to load artifact detail.",
+      });
+    }
+  }
+
+  function requestDeleteRegisteredArtifact(storageKey: string): void {
+    setPendingDeleteStorageKey(storageKey);
+    setDeleteConfirmationInput("");
+  }
+
+  function cancelPendingDelete(): void {
+    setPendingDeleteStorageKey(undefined);
+    setDeleteConfirmationInput("");
+  }
+
+  async function confirmPendingDelete(): Promise<void> {
+    if (!pendingDeleteStorageKey) {
+      return;
+    }
+    if (deleteConfirmationInput !== "Delete") {
+      setViewState({ status: "error", message: "Type Delete to confirm artifact deletion." });
+      return;
+    }
+
+    const storageKey = pendingDeleteStorageKey;
+    setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
+    try {
+      await artifactClient.deleteRegisteredArtifact({ storageKey });
+      setPendingDeleteStorageKey(undefined);
+      setDeleteConfirmationInput("");
+      if (selectedStorageKey === storageKey) {
+        setSelectedStorageKey(undefined);
+        setDetail(undefined);
+        setContent(undefined);
+        setImageViewUrl(undefined);
+        publishLogic.setPublishedBackingFromDetail(undefined);
+      }
+      await refreshArtifacts();
+      setViewState({ status: "success", message: `Deleted ${storageKey}.` });
+    } catch (error) {
+      setViewState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to delete artifact.",
       });
     }
   }
@@ -439,8 +489,13 @@ export function useArtifactBrowserFeature(
       showRegisterForm,
     },
     viewState,
+    pendingDeleteStorageKey,
+    deleteConfirmationInput,
     selectArtifact,
     refreshArtifacts,
+    requestDeleteRegisteredArtifact,
+    confirmPendingDelete,
+    cancelPendingDelete,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace,
@@ -458,6 +513,7 @@ export function useArtifactBrowserFeature(
     setRevision: publishLogic.setRevision,
     setMediaType: publishLogic.setMediaType,
     togglePublishForm: publishLogic.togglePublishForm,
+    setDeleteConfirmationInput,
     setRegisterRepository,
     setRegisterNamespace,
     setRegisterPathInRepo,

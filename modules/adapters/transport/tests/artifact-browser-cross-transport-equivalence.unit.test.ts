@@ -35,6 +35,7 @@ async function invokeApiArtifactContentReadRoute(
     readArtifactDetailUseCase: { execute: testDouble.fn() },
     readArtifactContentUseCase: { execute },
     artifactMediaViewRetrieval: { retrieveArtifactViewerMediaByStorageKey: testDouble.fn() },
+    deleteRegisteredArtifactUseCase: { execute: testDouble.fn() },
   });
 
   const response = {

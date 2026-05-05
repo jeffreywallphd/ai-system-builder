@@ -30,6 +30,7 @@ import {
   StoreArtifactUploadUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
+  DeleteRegisteredArtifactUseCase,
   BrowseModelsUseCase,
   GetModelDetailsUseCase,
   ListModelsUseCase,
@@ -173,6 +174,14 @@ function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRu
   return undefined;
 }
 
+function normalizeServerImageGenerationRuntimeMode(value: string | undefined): ComfyUiRuntimeDeviceMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "nvidia") return "cuda";
+  if (normalized === "amd" || normalized === "intel") return "directml";
+  return normalizeComfyUiRuntimeDeviceMode(normalized);
+}
+
 function parseBooleanEnvFlag(value: string | undefined): boolean {
   const normalized = value?.trim().toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "yes";
@@ -225,8 +234,13 @@ export function resolveServerComfyUiLaunchPythonExecutable(input: {
   };
 }
 
-export function resolveServerComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode {
-  return normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR) ?? "cpu";
+export function resolveServerComfyUiRuntimeDeviceMode(
+  env: NodeJS.ProcessEnv = process.env,
+  requestedRuntimeMode?: string,
+): ComfyUiRuntimeDeviceMode {
+  return normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR)
+    ?? normalizeServerImageGenerationRuntimeMode(requestedRuntimeMode)
+    ?? "cpu";
 }
 
 export function resolveServerRuntimeRootDirectory(input: {
@@ -522,6 +536,12 @@ export function composeServerHost(
         artifactStorage: storage,
         now: options.now,
       });
+      const deleteRegisteredArtifact = new DeleteRegisteredArtifactUseCase({
+        artifactCatalogRead: artifactCatalog,
+        artifactCatalogDelete: artifactCatalog,
+        storage,
+        artifactBindingStorage: artifactBindings,
+      });
 
       const resolvedRuntimeDeviceMode = runtimeDeviceMode;
       void loggingPort.log({ level: "info", message: "Resolved ComfyUI runtime device mode.", timestamp: new Date().toISOString(), verbosity: "normal", event: "runtime.comfyui.configuration", component: "server-host", subsystem: "runtime", data: { runtimeDeviceMode: resolvedRuntimeDeviceMode } });
@@ -534,11 +554,13 @@ export function composeServerHost(
         windowsHide: true,
       }) as Promise<{ stdout: string; stderr: string }>;
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout });
-      const comfyUiInstaller = createComfyUiRuntimeInstaller({
+      let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
+      let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
+      const createComfyUiInstallerForMode = (mode: ComfyUiRuntimeDeviceMode) => createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: basePythonCommand,
         execFile: execFileWithTimeout,
-        runtimeDeviceMode: resolvedRuntimeDeviceMode,
+        runtimeDeviceMode: mode,
         skipPythonSetup,
         skipPythonValidation,
         pythonEnvironmentMode,
@@ -548,20 +570,60 @@ export function composeServerHost(
         directMlPackageName: env.COMFYUI_DIRECTML_PACKAGE,
         logging: loggingPort,
       });
-      const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
-        workingDirectory: comfyUiInstallRoot,
-        pythonExecutable: launchPythonResolution.launchPythonExecutable,
-        installer: comfyUiInstaller,
-        installRoot: comfyUiInstallRoot,
-        runtimeDeviceMode: resolvedRuntimeDeviceMode,
-        autoInstall: true,
-        installSourceRef: env.COMFYUI_INSTALL_REF,
-        
-        logging: loggingPort,
-      });
+      const startComfyUiWithRuntimeDeviceMode = async (request: { runtimeDeviceMode?: ComfyUiRuntimeDeviceMode }) => {
+        const resolvedRequestMode = resolveServerComfyUiRuntimeDeviceMode(env, request.runtimeDeviceMode);
+        const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRequestMode;
+        if (modeChanged && comfyUiSupervisor) {
+          await comfyUiSupervisor.stop();
+          comfyUiSupervisor = undefined;
+        }
+        if (!comfyUiSupervisor) {
+          comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+            workingDirectory: comfyUiInstallRoot,
+            pythonExecutable: launchPythonResolution.launchPythonExecutable,
+            installer: createComfyUiInstallerForMode(resolvedRequestMode),
+            installRoot: comfyUiInstallRoot,
+            runtimeDeviceMode: resolvedRequestMode,
+            autoInstall: true,
+            installSourceRef: env.COMFYUI_INSTALL_REF,
+            logging: loggingPort,
+          });
+          activeRuntimeDeviceMode = resolvedRequestMode;
+        }
+        await loggingPort.log({
+          level: "info",
+          message: "Resolved server ComfyUI runtime mode before start.",
+          timestamp: new Date().toISOString(),
+          verbosity: "normal",
+          event: "runtime.comfyui.mode.resolution",
+          component: "server-host",
+          subsystem: "runtime",
+          data: {
+            requestedRuntimeDeviceMode: request.runtimeDeviceMode,
+            envOverrideWon: Boolean(normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR)),
+            runtimeDeviceMode: resolvedRequestMode,
+            processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
+          },
+        });
+        await comfyUiSupervisor.start();
+      };
+      const comfyUiSupervisorPort = {
+        async start() {
+          await startComfyUiWithRuntimeDeviceMode({});
+        },
+        async startWithRuntimeDeviceMode(request: { runtimeDeviceMode?: ComfyUiRuntimeDeviceMode }) {
+          await startComfyUiWithRuntimeDeviceMode(request);
+        },
+        getRecentRuntimeOutput() {
+          return comfyUiSupervisor?.getRecentRuntimeOutput() ?? [];
+        },
+        getRuntimeDeviceMode() {
+          return activeRuntimeDeviceMode ?? runtimeDeviceMode;
+        },
+      };
       const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
         client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
-        supervisor: comfyUiSupervisor,
+        supervisor: comfyUiSupervisorPort,
         mapperOptions: { defaultCheckpoint: env.COMFYUI_DEFAULT_CHECKPOINT },
       });
       
@@ -669,7 +731,7 @@ export function composeServerHost(
       const generateImageUseCase = new GenerateImageUseCase({
         runtimeTaskRegistry,
         modelCheckpointResolver: createRuntimePreparedModelCheckpointResolver({
-          runtime: comfyUiSupervisor,
+          runtime: comfyUiSupervisorPort,
           modelCheckpointResolver: localModelCheckpointResolver,
         }),
       });
@@ -703,6 +765,7 @@ export function composeServerHost(
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,
+        deleteRegisteredArtifactUseCase: deleteRegisteredArtifact,
         hasArtifactInRepoUseCase: hasArtifactInRepo,
         browseHuggingFaceNamespaceDatasetsUseCase: browseHuggingFaceNamespaceDatasets,
         browseHuggingFaceDatasetParquetFilesUseCase: browseHuggingFaceDatasetParquetFiles,

@@ -154,7 +154,7 @@ describe("composeServerHost", () => {
       runtimeRootDirectory: "/tmp/server-runtime",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(25);
+    expect(app.post).toHaveBeenCalledTimes(26);
     expect(app.get).toHaveBeenCalledTimes(3);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
@@ -162,6 +162,7 @@ describe("composeServerHost", () => {
       "/api/artifact/browse",
       "/api/artifact/read",
       "/api/artifact/content/read",
+      "/api/artifact/delete",
       "/api/config/huggingface-token",
       "/api/artifact-repo/has",
       "/api/huggingface/namespace/datasets",
@@ -217,6 +218,14 @@ describe("composeServerHost", () => {
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = "directml";
     expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-directml" })).not.toThrow();
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
+  });
+
+  it("resolves request-selected server image-generation runtime modes when no env override is set", () => {
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv, "cuda")).toBe("cuda");
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv, "directml")).toBe("directml");
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv, "cpu")).toBe("cpu");
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv, "nvidia")).toBe("cuda");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "cpu" } as NodeJS.ProcessEnv, "cuda")).toBe("cpu");
   });
 
 
