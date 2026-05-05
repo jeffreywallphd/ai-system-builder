@@ -48,4 +48,14 @@ describe("comfyUiImageGenerationWorkflowMapper", () => {
     expect(implicit.prompt["5"].inputs.seed).not.toBe(0);
     expect(implicit.prompt["5"].inputs.control_after_generate).toBe("randomize");
   });
+
+  it("maps faceId conditioning workflow when references are provided", () => {
+    const payload = mapImageGenerationRequestToComfyUiPrompt(
+      { prompt: "portrait", faceId: { enabled: true, references: [{ artifactId: "face-a.png" }], identityStrength: 0.9, structureStrength: 0.6, noise: 0.2 } },
+      { defaultCheckpoint: "sdxl.safetensors" },
+    );
+    expect(payload.prompt["11"]).toEqual({ class_type: "LoadImage", inputs: { image: "face-a.png" } });
+    expect(payload.prompt["15"].class_type).toBe("IPAdapterFaceID");
+    expect(payload.prompt["5"].inputs.positive).toEqual(["16", 0]);
+  });
 });
