@@ -40,7 +40,7 @@ export interface ImageGenerationApiClient {
   startImageGeneration: (input: ImageGenerationRequest, context?: { source?: string }) => Promise<{ requestId: string }>;
   readImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<RuntimeTaskRecord>;
   cancelImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<CancelImageGenerationResult>;
-  finalizeImageGenerationIfCompleted: (input: { requestId: string }, context?: { source?: string }) => Promise<FinalizeImageGenerationResult>;
+  finalizeImageGenerationIfCompleted: (input: { requestId: string; preferredFileName?: string }, context?: { source?: string }) => Promise<FinalizeImageGenerationResult>;
   unloadModel: (context?: { source?: string }) => Promise<UnloadImageGenerationModelResult>;
   readRuntimeResources: (context?: { source?: string }) => Promise<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>;
   createArtifactMediaViewUrl: (storageKey: string) => string;

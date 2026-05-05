@@ -45,6 +45,27 @@ const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(r
 const parsePositiveInt = (v: string) => { const n = Number(v); return Number.isInteger(n) && Number.isFinite(n) && n > 0 ? n : undefined; };
 const parseSeed = (v: string) => { if (!v.trim()) return undefined; const n = Number(v); return Number.isInteger(n) && Number.isFinite(n) ? n : undefined; };
 const randomSeed = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+const sanitizeUserOutputName = (value: string): string => {
+  const stem = value.trim().replace(/\.[a-zA-Z0-9]+$/, "");
+  const normalized = stem.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return normalized;
+};
+const toRuntimePreviewUrl = (
+  client: ImageGenerationApiClient,
+  output: { fileName?: unknown; subfolder?: unknown; contentBase64?: unknown; mediaType?: unknown },
+): { url: string; fileName: string } | undefined => {
+  const fileName = typeof output.fileName === "string" ? output.fileName.trim() : "";
+  if (!fileName) return undefined;
+  const contentBase64 = typeof output.contentBase64 === "string" ? output.contentBase64.trim() : "";
+  if (contentBase64) {
+    const mediaType = typeof output.mediaType === "string" && output.mediaType.trim() ? output.mediaType : "image/png";
+    return { url: `data:${mediaType};base64,${contentBase64}`, fileName };
+  }
+  return {
+    url: client.createRuntimeOutputPreviewUrl(fileName, typeof output.subfolder === "string" ? output.subfolder : undefined),
+    fileName,
+  };
+};
 
 export function useImageGenerationFeature(
   client: ImageGenerationApiClient = defaultImageGenerationClient,
@@ -206,8 +227,8 @@ export function useImageGenerationFeature(
       if (finalTask.status !== "succeeded") return;
       const outputs = Array.isArray((finalTask as any)?.data?.outputs) ? (finalTask as any).data.outputs : [];
       const previews = outputs
-        .filter((o: any) => o && typeof o.fileName === "string" && o.fileName.trim())
-        .map((o: any) => ({ url: client.createRuntimeOutputPreviewUrl(o.fileName, typeof o.subfolder === "string" ? o.subfolder : undefined), fileName: o.fileName }));
+        .map((output: any) => toRuntimePreviewUrl(client, output))
+        .filter((preview): preview is { url: string; fileName: string } => Boolean(preview));
       setRuntimeOutputPreviews(previews);
       setStatus("succeeded");
     } catch (cause) {
@@ -233,7 +254,13 @@ export function useImageGenerationFeature(
     if (!id || !name.trim()) return false;
     if (finalizedByRequestRef.current.has(id)) return true;
     setStatus("finalizing");
-    const finalized = await client.finalizeImageGenerationIfCompleted({ requestId: id });
+    const preferredFileName = sanitizeUserOutputName(name);
+    if (!preferredFileName) {
+      setStatus("failed");
+      setError("Please provide a valid image name using letters, numbers, spaces, dashes, or underscores.");
+      return false;
+    }
+    const finalized = await client.finalizeImageGenerationIfCompleted({ requestId: id, preferredFileName });
     if (!finalized.finalized) {
       setStatus("failed");
       setError(finalized.reason ?? "Finalization did not complete.");

@@ -11,7 +11,7 @@ function flush() { return new Promise((resolve) => setTimeout(resolve, 0)); }
 
 function Harness({ client, modelClient }: { client: any; modelClient: any }) {
   const f = useImageGenerationFeature(client, undefined, modelClient);
-  return <div><button id="start" onClick={() => void f.start()}>start</button><button id="selectB" onClick={() => f.setSelectedModelRecordId("b")}>b</button><button id="refresh" onClick={() => void f.refreshModelInventory()}>r</button><input id="prompt" value={f.form.prompt} onInput={(e)=>f.setForm((x)=>({...x,prompt:(e.target as HTMLInputElement).value}))}/><span id="validation">{f.validationError ?? ""}</span><span id="downloaded">{f.downloadedImageGenerationModels.map((m)=>m.modelRecordId).join(",")}</span><span id="selected">{f.selectedModelRecordId}</span></div>;
+  return <div><button id="start" onClick={() => void f.start()}>start</button><button id="selectB" onClick={() => f.setSelectedModelRecordId("b")}>b</button><button id="refresh" onClick={() => void f.refreshModelInventory()}>r</button><input id="prompt" value={f.form.prompt} onInput={(e)=>f.setForm((x)=>({...x,prompt:(e.target as HTMLInputElement).value}))}/><span id="validation">{f.validationError ?? ""}</span><span id="downloaded">{f.downloadedImageGenerationModels.map((m)=>m.modelRecordId).join(",")}</span><span id="selected">{f.selectedModelRecordId}</span><span id="preview">{f.runtimeOutputPreviews[0]?.url ?? ""}</span></div>;
 }
 
 describe("useImageGenerationFeature", () => {
@@ -157,5 +157,28 @@ describe("useImageGenerationFeature", () => {
     await act(async()=>{root.render(<React.StrictMode><Harness client={client} modelClient={{ listModels }} /></React.StrictMode>);});
     expect(listModels).toHaveBeenCalled();
     expect((c.querySelector('#selected') as HTMLElement).textContent).toBe('img');
+  });
+
+  it("prefers in-memory output bytes for runtime previews before save", async () => {
+    const client = {
+      createArtifactMediaViewUrl: vi.fn(),
+      createRuntimeOutputPreviewUrl: vi.fn().mockReturnValue("/api/image-generation/output-preview?fileName=x.png"),
+      startImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1" }),
+      readImageGeneration: vi.fn().mockResolvedValue({
+        requestId: "r1",
+        status: "succeeded",
+        data: { outputs: [{ fileName: "x.png", contentBase64: "YWJj", mediaType: "image/png" }] },
+      }),
+      finalizeImageGenerationIfCompleted: vi.fn(),
+      cancelImageGeneration: vi.fn(),
+      readRuntimeResources: vi.fn().mockResolvedValue({ memoryUsagePercent: 1, cpuUsagePercent: 2, gpuUsagePercent: 3 }),
+      unloadModel: vi.fn(),
+    };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<Harness client={client} modelClient={modelClient} />);});
+    await act(async()=>{(c.querySelector("#prompt") as HTMLInputElement).value = "cat"; (c.querySelector("#prompt") as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true })); (c.querySelector("#start") as HTMLButtonElement).click(); await flush();});
+    expect((c.querySelector("#preview") as HTMLElement).textContent).toBe("data:image/png;base64,YWJj");
+    expect(client.createRuntimeOutputPreviewUrl).not.toHaveBeenCalled();
   });
 });

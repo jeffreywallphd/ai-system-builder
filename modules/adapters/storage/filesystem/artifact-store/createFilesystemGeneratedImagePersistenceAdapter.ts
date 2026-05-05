@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { GeneratedImagePersistencePort } from "../../../../application/ports/image";
@@ -24,7 +25,7 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
     async persistGeneratedImage({ output, preferredFileName }) {
       const artifactId = artifactIdFactory.createArtifactId().toString();
       const desiredFileName = sanitizeFileName(preferredFileName) ?? sanitizeFileName(output.fileName) ?? "generated-image.png";
-      const storageKey = `generated/images/${artifactId.replaceAll("/", "_")}-${desiredFileName}`;
+      const storageKey = await reserveGeneratedImageStorageKey(storageRoot, desiredFileName);
       const destinationPath = path.join(storageRoot, storageKey);
       await mkdir(path.dirname(destinationPath), { recursive: true });
 
@@ -73,4 +74,22 @@ function sanitizeFileName(value: string | undefined): string | undefined {
   if (!stripped) return undefined;
   if (/\.[a-zA-Z0-9]+$/.test(stripped)) return stripped;
   return `${stripped}.png`;
+}
+
+async function reserveGeneratedImageStorageKey(storageRoot: string, desiredFileName: string): Promise<string> {
+  const parsed = path.parse(desiredFileName);
+  const ext = parsed.ext || ".png";
+  const base = parsed.name || "generated-image";
+  let next = 0;
+  while (next < 10_000) {
+    const candidate = next === 0 ? `${base}${ext}` : `${base}-${next + 1}${ext}`;
+    const storageKey = `generated/images/${candidate}`;
+    try {
+      await access(path.join(storageRoot, storageKey), constants.F_OK);
+      next += 1;
+    } catch {
+      return storageKey;
+    }
+  }
+  throw new Error("Unable to reserve generated image file name.");
 }

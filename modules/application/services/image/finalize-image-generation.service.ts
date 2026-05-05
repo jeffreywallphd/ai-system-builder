@@ -9,7 +9,7 @@ export class FinalizeImageGenerationService {
 
   public constructor(private readonly dependencies: { imageAssetRegistry: ImageAssetRegistryPort; generatedImagePersistence: GeneratedImagePersistencePort; createAssetId?: () => string; now?: () => string; }) {}
 
-  public async finalizeCompletedTask(task: RuntimeTaskRecord): Promise<{ assets: FinalizedAssetRef[] }> {
+  public async finalizeCompletedTask(task: RuntimeTaskRecord, options?: { preferredFileName?: string }): Promise<{ assets: FinalizedAssetRef[] }> {
     const existing = this.finalizedByRequestId.get(task.requestId);
     if (existing) return { assets: existing };
     if (task.status !== "succeeded") throw new Error("Image generation finalization requires a succeeded runtime task.");
@@ -17,7 +17,11 @@ export class FinalizeImageGenerationService {
     const outputs = this.getOutputs(task.data);
     const assets: FinalizedAssetRef[] = [];
     for (const output of outputs) {
-      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, requestId: task.requestId, preferredFileName: this.readPreferredOutputFileName(task) });
+      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({
+        output,
+        requestId: task.requestId,
+        preferredFileName: options?.preferredFileName ?? this.readPreferredOutputFileName(task),
+      });
       const requestedAssetId = this.dependencies.createAssetId?.() ?? `img-${task.requestId}-${assets.length + 1}`;
       const registered = await this.dependencies.imageAssetRegistry.registerImageAsset({
         assetId: requestedAssetId,
