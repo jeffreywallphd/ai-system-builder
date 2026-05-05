@@ -115,15 +115,32 @@ export function ImageGenerationFeature({
           {feature.imageArtifactsError ? <p role="alert">{feature.imageArtifactsError}</p> : null}
         </div>
 
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-prompt">Prompt</label>
+          <textarea
+            className="ui-input ui-textarea"
+            id="image-generation-prompt"
+            value={feature.form.prompt}
+            onInput={(event) => setFormValue("prompt", (event.target as HTMLTextAreaElement).value)}
+          />
+        </div>
+
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-negativePrompt">Negative Prompt (optional)</label>
+          <textarea
+            className="ui-input ui-textarea"
+            id="image-generation-negativePrompt"
+            value={feature.form.negativePrompt}
+            onInput={(event) => setFormValue("negativePrompt", (event.target as HTMLTextAreaElement).value)}
+          />
+        </div>
+
         {[
-          ["prompt", "Prompt", "text"],
-          ["negativePrompt", "Negative Prompt (optional)", "text"],
           ["seed", "Seed (optional)", "number"],
           ["width", "Width", "number"],
           ["height", "Height", "number"],
           ["steps", "Steps", "number"],
           ["cfg", "CFG", "number"],
-          ["denoise", "Denoise", "number"],
           ["sampler", "Sampler", "text"],
           ["scheduler", "Scheduler", "text"],
           ["numImages", "Number of Images", "number"],
@@ -143,6 +160,21 @@ export function ImageGenerationFeature({
             </div>
           );
         })}
+
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-denoise">Denoise</label>
+          <input
+            className="ui-input"
+            id="image-generation-denoise"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={feature.form.denoise}
+            onInput={(event) => setFormValue("denoise", (event.target as HTMLInputElement).value)}
+          />
+          <output htmlFor="image-generation-denoise">{feature.form.denoise}</output>
+        </div>
 
         <details>
           <summary>Advanced: Manual model/checkpoint override (optional)</summary>

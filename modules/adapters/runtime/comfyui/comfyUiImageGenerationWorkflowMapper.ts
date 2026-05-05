@@ -28,8 +28,8 @@ export function mapImageGenerationRequestToComfyUiPrompt(
   const steps = request.steps ?? options.defaultSteps ?? 30;
   const cfg = request.cfg ?? 8;
   const denoise = request.denoise ?? 1;
-  const sampler = request.sampler ?? options.defaultSampler ?? "euler";
-  const scheduler = request.scheduler ?? options.defaultScheduler ?? "normal";
+  const sampler = request.sampler ?? options.defaultSampler ?? "dpmpp_2m";
+  const scheduler = request.scheduler ?? options.defaultScheduler ?? "karras";
   const seed = request.seed ?? (Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) + 1);
   const latentSource = request.latentSource?.kind === "artifact" && options.latentReferenceImageName
     ? ["10", 0]
@@ -61,7 +61,7 @@ export function mapImageGenerationRequestToComfyUiPrompt(
 
   if (request.latentSource?.kind === "artifact" && options.latentReferenceImageName) {
     prompt["8"] = { class_type: "LoadImage", inputs: { image: options.latentReferenceImageName } };
-    prompt["9"] = { class_type: "ResizeAndPadImage", inputs: { image: ["8", 0], target_width: width, target_height: height } };
+    prompt["9"] = { class_type: "ResizeAndPadImage", inputs: { image: ["8", 0], target_width: width, target_height: height, padding_color: "black", interpolation: "area" } };
     prompt["10"] = { class_type: "VAEEncode", inputs: { pixels: ["9", 0], vae: ["1", 2] } };
   }
 
